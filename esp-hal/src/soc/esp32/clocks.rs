@@ -20,7 +20,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 use crate::{
     clock::Clocks,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -58,6 +58,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
         xtal_clk: None,
@@ -68,6 +69,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
         xtal_clk: None,
@@ -78,6 +80,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
 }
 
@@ -711,6 +714,27 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
+// TIMG_CALIBRATION_CLOCK
+
+fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+    // bit, which is managed by the calibration process.
+}
+
+fn configure_timg_calibration_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
+) {
+    TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+        w.rtc_cali_clk_sel().bits(match new_config {
+            TimgCalibrationClockConfig::RcSlowClk => 0,
+            TimgCalibrationClockConfig::RcFastDivClk => 1,
+            TimgCalibrationClockConfig::Xtal32kClk => 2,
+        })
+    });
+}
+
 impl McpwmInstance {
     // MCPWM_FUNCTION_CLOCK
 
@@ -727,33 +751,7 @@ impl McpwmInstance {
         // Nothing to do.
     }
 }
-impl TimgInstance {
-    // TIMG_CALIBRATION_CLOCK
 
-    fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
-        // bit, which is managed by the calibration process.
-    }
-
-    fn configure_calibration_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<TimgCalibrationClockConfig>,
-        new_config: TimgCalibrationClockConfig,
-    ) {
-        let regs = match self {
-            Self::Timg0 => TIMG0::regs(),
-            Self::Timg1 => TIMG1::regs(),
-        };
-        regs.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel().bits(match new_config {
-                TimgCalibrationClockConfig::RcSlowClk => 0,
-                TimgCalibrationClockConfig::RcFastDivClk => 1,
-                TimgCalibrationClockConfig::Xtal32kClk => 2,
-            })
-        });
-    }
-}
 impl UartInstance {
     // UART_FUNCTION_CLOCK
 

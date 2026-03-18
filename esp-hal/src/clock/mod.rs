@@ -73,10 +73,7 @@ pub use crate::soc::clocks::ClockConfig;
 pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
-#[cfg(any(
-    soc_has_clock_node_timg_calibration_clock,
-    soc_has_clock_node_timg0_calibration_clock
-))]
+#[cfg(soc_has_clock_node_timg_calibration_clock)]
 use crate::{peripherals::TIMG0, soc::clocks::ClockTree};
 
 impl CpuClock {
@@ -111,10 +108,7 @@ impl CpuClock {
 #[instability::unstable]
 pub struct RtcClock;
 
-#[cfg(any(
-    soc_has_clock_node_timg_calibration_clock,
-    soc_has_clock_node_timg0_calibration_clock
-))]
+#[cfg(soc_has_clock_node_timg_calibration_clock)]
 use crate::soc::clocks::TimgCalibrationClockConfig;
 
 /// RTC Watchdog Timer driver.
@@ -143,10 +137,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-    #[cfg(any(
-        soc_has_clock_node_timg_calibration_clock,
-        soc_has_clock_node_timg0_calibration_clock
-    ))]
+    #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -277,10 +268,7 @@ impl Clocks {
     /// that is measured by a low-frequency clock. This function can be used to calibrate two
     /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
     /// the current frequency of a low-precision RC oscillator.
-    #[cfg(any(
-        soc_has_clock_node_timg_calibration_clock,
-        soc_has_clock_node_timg0_calibration_clock
-    ))]
+    #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: TimgCalibrationClockConfig,
@@ -324,21 +312,12 @@ impl Clocks {
                 clocks::TimgInstance::Timg0.request_function_clock(clocks);
             }
         }
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
-                let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
-                clocks::configure_timg_calibration_clock(clocks, rtc_clock);
-                clocks::request_timg_calibration_clock(clocks);
 
-                let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
-            } else {
-                let current_calib_clock = clocks::TimgInstance::Timg0.calibration_clock_config(clocks);
-                clocks::TimgInstance::Timg0.configure_calibration_clock(clocks, rtc_clock);
-                clocks::TimgInstance::Timg0.request_calibration_clock(clocks);
+        let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
+        clocks::configure_timg_calibration_clock(clocks, rtc_clock);
+        clocks::request_timg_calibration_clock(clocks);
 
-                let calibration_clock_frequency = clocks::TimgInstance::Timg0.calibration_clock_frequency(clocks);
-            }
-        }
+        let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
 
         let effective_calibration_clock_frequency =
             calibration_clock_frequency / calibration_divider;
@@ -411,24 +390,12 @@ impl Clocks {
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
-        // TODO: this would be nicer if we had clock node objects instead of free-standing functions
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
-                if let Some(calib_clock) = current_calib_clock
-                    && calib_clock != rtc_clock
-                {
-                    clocks::configure_timg_calibration_clock(clocks, calib_clock);
-                }
-                clocks::release_timg_calibration_clock(clocks);
-            } else {
-                if let Some(calib_clock) = current_calib_clock
-                    && calib_clock != rtc_clock
-                {
-                    clocks::TimgInstance::Timg0.configure_calibration_clock(clocks, calib_clock);
-                }
-                clocks::TimgInstance::Timg0.release_calibration_clock(clocks);
-            }
+        if let Some(calib_clock) = current_calib_clock
+            && calib_clock != rtc_clock
+        {
+            clocks::configure_timg_calibration_clock(clocks, calib_clock);
         }
+        clocks::release_timg_calibration_clock(clocks);
 
         #[cfg(soc_has_clock_node_timg0_function_clock)]
         {
@@ -443,18 +410,12 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
-    #[cfg(not(any(
-        soc_has_clock_node_timg_calibration_clock,
-        soc_has_clock_node_timg0_calibration_clock
-    )))]
+    #[cfg(not(soc_has_clock_node_timg_calibration_clock))]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
     }
 
-    #[cfg(any(
-        soc_has_clock_node_timg_calibration_clock,
-        soc_has_clock_node_timg0_calibration_clock
-    ))]
+    #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?

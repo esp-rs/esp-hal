@@ -56,6 +56,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
         xtal_clk: None,
@@ -66,6 +67,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
         xtal_clk: None,
@@ -76,6 +78,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        timg_calibration_clock: None,
     };
 }
 
@@ -627,6 +630,27 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
+// TIMG_CALIBRATION_CLOCK
+
+fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+    // bit, which is managed by the calibration process.
+}
+
+fn configure_timg_calibration_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
+) {
+    TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+        w.rtc_cali_clk_sel().bits(match new_config {
+            TimgCalibrationClockConfig::RtcClk => 0,
+            TimgCalibrationClockConfig::RcFastDivClk => 1,
+            TimgCalibrationClockConfig::Xtal32kClk => 2,
+        })
+    });
+}
+
 impl TimgInstance {
     // TIMG_FUNCTION_CLOCK
 
@@ -655,32 +679,6 @@ impl TimgInstance {
         regs.t(1).config().modify(|_, w| {
             w.use_xtal()
                 .bit(new_config == TimgFunctionClockConfig::XtalClk)
-        });
-    }
-
-    // TIMG_CALIBRATION_CLOCK
-
-    fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
-        // bit, which is managed by the calibration process.
-    }
-
-    fn configure_calibration_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<TimgCalibrationClockConfig>,
-        new_config: TimgCalibrationClockConfig,
-    ) {
-        let regs = match self {
-            TimgInstance::Timg0 => TIMG0::regs(),
-            TimgInstance::Timg1 => TIMG1::regs(),
-        };
-        regs.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel().bits(match new_config {
-                TimgCalibrationClockConfig::RtcClk => 0,
-                TimgCalibrationClockConfig::RcFastDivClk => 1,
-                TimgCalibrationClockConfig::Xtal32kClk => 2,
-            })
         });
     }
 }

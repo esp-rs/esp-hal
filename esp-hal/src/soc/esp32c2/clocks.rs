@@ -54,6 +54,7 @@ impl CpuClock {
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+        timg_calibration_clock: None,
     };
     const PRESET_120: ClockConfig = ClockConfig {
         xtal_clk: None,
@@ -64,6 +65,7 @@ impl CpuClock {
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+        timg_calibration_clock: None,
     };
 }
 
@@ -608,6 +610,27 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
+// TIMG_CALIBRATION_CLOCK
+
+fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+    // bit, which is managed by the calibration process.
+}
+
+fn configure_timg_calibration_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
+) {
+    TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+        w.rtc_cali_clk_sel().bits(match new_config {
+            TimgCalibrationClockConfig::RcSlowClk => 0,
+            TimgCalibrationClockConfig::RcFastDivClk => 1,
+            TimgCalibrationClockConfig::Osc32kClk => 2,
+        })
+    });
+}
+
 impl TimgInstance {
     // TIMG_FUNCTION_CLOCK
 
@@ -627,28 +650,6 @@ impl TimgInstance {
         TIMG0::regs().t(0).config().modify(|_, w| {
             w.use_xtal()
                 .bit(new_config == TimgFunctionClockConfig::XtalClk)
-        });
-    }
-
-    // TIMG_CALIBRATION_CLOCK
-
-    fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
-        // bit, which is managed by the calibration process.
-    }
-
-    fn configure_calibration_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<TimgCalibrationClockConfig>,
-        new_config: TimgCalibrationClockConfig,
-    ) {
-        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel().bits(match new_config {
-                TimgCalibrationClockConfig::RcSlowClk => 0,
-                TimgCalibrationClockConfig::RcFastDivClk => 1,
-                TimgCalibrationClockConfig::Osc32kClk => 2,
-            })
         });
     }
 

@@ -976,6 +976,20 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
+/// // TIMG_CALIBRATION_CLOCK
+///
+/// fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_timg_calibration_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<TimgCalibrationClockConfig>,
+///     _new_config: TimgCalibrationClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// impl RmtInstance {
 ///     // RMT_SCLK
 ///
@@ -1004,21 +1018,6 @@ macro_rules! for_each_sha_algorithm {
 ///         _clocks: &mut ClockTree,
 ///         _old_config: Option<TimgFunctionClockConfig>,
 ///         _new_config: TimgFunctionClockConfig,
-///     ) {
-///         todo!()
-///     }
-///
-///     // TIMG_CALIBRATION_CLOCK
-///
-///     fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-///         todo!()
-///     }
-///
-///     fn configure_calibration_clock_impl(
-///         self,
-///         _clocks: &mut ClockTree,
-///         _old_config: Option<TimgCalibrationClockConfig>,
-///         _new_config: TimgCalibrationClockConfig,
 ///     ) {
 ///         todo!()
 ///     }
@@ -1275,6 +1274,17 @@ macro_rules! define_clock_tree_types {
             /// Selects `RTC_SLOW_CLK`.
             RtcSlow,
         }
+        /// The list of clock signals that the `TIMG_CALIBRATION_CLOCK` multiplexer can output.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TimgCalibrationClockConfig {
+            /// Selects `RC_SLOW_CLK`.
+            RcSlowClk,
+            /// Selects `RC_FAST_DIV_CLK`.
+            RcFastDivClk,
+            /// Selects `XTAL32K_CLK`.
+            Xtal32kClk,
+        }
         /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1296,17 +1306,6 @@ macro_rules! define_clock_tree_types {
             XtalClk,
             /// Selects `APB_CLK`.
             ApbClk,
-        }
-        /// The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum TimgCalibrationClockConfig {
-            /// Selects `RC_SLOW_CLK`.
-            RcSlowClk,
-            /// Selects `RC_FAST_DIV_CLK`.
-            RcFastDivClk,
-            /// Selects `XTAL32K_CLK`.
-            Xtal32kClk,
         }
         /// The list of clock signals that the `TIMG0_WDT_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1426,9 +1425,9 @@ macro_rules! define_clock_tree_types {
             rtc_slow_clk: Option<RtcSlowClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
             low_power_clk: Option<LowPowerClkConfig>,
+            timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             rmt_sclk: [Option<RmtSclkConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
-            timg_calibration_clock: [Option<TimgCalibrationClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_mem_clock: [Option<UartMemClockConfig>; 2],
@@ -1442,9 +1441,9 @@ macro_rules! define_clock_tree_types {
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
+            timg_calibration_clock_refcount: u32,
             rmt_sclk_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 2],
-            timg_calibration_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 2],
             uart_mem_clock_refcount: [u32; 2],
@@ -1503,6 +1502,10 @@ macro_rules! define_clock_tree_types {
             pub fn low_power_clk(&self) -> Option<LowPowerClkConfig> {
                 self.low_power_clk
             }
+            /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
+            pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
+                self.timg_calibration_clock
+            }
             /// Returns the current configuration of the RMT_SCLK clock tree node
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
                 self.rmt_sclk[RmtInstance::Rmt as usize]
@@ -1511,10 +1514,6 @@ macro_rules! define_clock_tree_types {
             pub fn timg0_function_clock(&self) -> Option<TimgFunctionClockConfig> {
                 self.timg_function_clock[TimgInstance::Timg0 as usize]
             }
-            /// Returns the current configuration of the TIMG0_CALIBRATION_CLOCK clock tree node
-            pub fn timg0_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
-                self.timg_calibration_clock[TimgInstance::Timg0 as usize]
-            }
             /// Returns the current configuration of the TIMG0_WDT_CLOCK clock tree node
             pub fn timg0_wdt_clock(&self) -> Option<TimgWdtClockConfig> {
                 self.timg_wdt_clock[TimgInstance::Timg0 as usize]
@@ -1522,10 +1521,6 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the TIMG1_FUNCTION_CLOCK clock tree node
             pub fn timg1_function_clock(&self) -> Option<TimgFunctionClockConfig> {
                 self.timg_function_clock[TimgInstance::Timg1 as usize]
-            }
-            /// Returns the current configuration of the TIMG1_CALIBRATION_CLOCK clock tree node
-            pub fn timg1_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
-                self.timg_calibration_clock[TimgInstance::Timg1 as usize]
             }
             /// Returns the current configuration of the TIMG1_WDT_CLOCK clock tree node
             pub fn timg1_wdt_clock(&self) -> Option<TimgWdtClockConfig> {
@@ -1570,9 +1565,9 @@ macro_rules! define_clock_tree_types {
                 rtc_slow_clk: None,
                 rtc_fast_clk: None,
                 low_power_clk: None,
+                timg_calibration_clock: None,
                 rmt_sclk: [None; 1],
                 timg_function_clock: [None; 2],
-                timg_calibration_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 2],
                 uart_mem_clock: [None; 2],
@@ -1586,9 +1581,9 @@ macro_rules! define_clock_tree_types {
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
+                timg_calibration_clock_refcount: 0,
                 rmt_sclk_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
-                timg_calibration_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 2],
                 uart_mem_clock_refcount: [0; 2],
@@ -2285,6 +2280,76 @@ macro_rules! define_clock_tree_types {
         pub fn uart_mem_clk_frequency(clocks: &mut ClockTree) -> u32 {
             xtal_clk_frequency(clocks)
         }
+        pub fn configure_timg_calibration_clock(
+            clocks: &mut ClockTree,
+            new_selector: TimgCalibrationClockConfig,
+        ) {
+            let old_selector = clocks.timg_calibration_clock.replace(new_selector);
+            if clocks.timg_calibration_clock_refcount > 0 {
+                match new_selector {
+                    TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
+                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
+                configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        TimgCalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
+                        TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_div_clk(clocks),
+                        TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                    }
+                }
+            } else {
+                configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn timg_calibration_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<TimgCalibrationClockConfig> {
+            clocks.timg_calibration_clock
+        }
+        pub fn request_timg_calibration_clock(clocks: &mut ClockTree) {
+            trace!("Requesting TIMG_CALIBRATION_CLOCK");
+            if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
+                trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                match unwrap!(clocks.timg_calibration_clock) {
+                    TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
+                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
+                enable_timg_calibration_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_timg_calibration_clock(clocks: &mut ClockTree) {
+            trace!("Releasing TIMG_CALIBRATION_CLOCK");
+            if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
+                trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                enable_timg_calibration_clock_impl(clocks, false);
+                match unwrap!(clocks.timg_calibration_clock) {
+                    TimgCalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_div_clk(clocks),
+                    TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn timg_calibration_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: TimgCalibrationClockConfig,
+        ) -> u32 {
+            match config {
+                TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(clocks),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
+                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            }
+        }
+        pub fn timg_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.timg_calibration_clock {
+                timg_calibration_clock_config_frequency(clocks, config)
+            } else {
+                0
+            }
+        }
         impl RmtInstance {
             pub fn configure_sclk(self, clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
                 let old_selector = clocks.rmt_sclk[RmtInstance::Rmt as usize].replace(new_selector);
@@ -2427,86 +2492,6 @@ macro_rules! define_clock_tree_types {
             pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
                 if let Some(config) = clocks.timg_function_clock[TimgInstance::Timg0 as usize] {
                     self.function_clock_config_frequency(clocks, config)
-                } else {
-                    0
-                }
-            }
-            pub fn configure_calibration_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: TimgCalibrationClockConfig,
-            ) {
-                let old_selector = clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]
-                    .replace(new_selector);
-                if clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
-                    match new_selector {
-                        TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                        TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                        TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                    }
-                    self.configure_calibration_clock_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        match old_selector {
-                            TimgCalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                            TimgCalibrationClockConfig::RcFastDivClk => {
-                                release_rc_fast_div_clk(clocks)
-                            }
-                            TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                        }
-                    }
-                } else {
-                    self.configure_calibration_clock_impl(clocks, old_selector, new_selector);
-                }
-            }
-            pub fn calibration_clock_config(
-                self,
-                clocks: &mut ClockTree,
-            ) -> Option<TimgCalibrationClockConfig> {
-                clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]
-            }
-            pub fn request_calibration_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting TIMG0_CALIBRATION_CLOCK");
-                if increment_reference_count(
-                    &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
-                ) {
-                    trace!("Enabling TIMG0_CALIBRATION_CLOCK");
-                    match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
-                        TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                        TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                        TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                    }
-                    self.enable_calibration_clock_impl(clocks, true);
-                }
-            }
-            pub fn release_calibration_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing TIMG0_CALIBRATION_CLOCK");
-                if decrement_reference_count(
-                    &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
-                ) {
-                    trace!("Disabling TIMG0_CALIBRATION_CLOCK");
-                    self.enable_calibration_clock_impl(clocks, false);
-                    match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
-                        TimgCalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                        TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_div_clk(clocks),
-                        TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                    }
-                }
-            }
-            #[allow(unused_variables)]
-            pub fn calibration_clock_config_frequency(
-                self,
-                clocks: &mut ClockTree,
-                config: TimgCalibrationClockConfig,
-            ) -> u32 {
-                match config {
-                    TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
-                }
-            }
-            pub fn calibration_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.timg_calibration_clock[TimgInstance::Timg0 as usize] {
-                    self.calibration_clock_config_frequency(clocks, config)
                 } else {
                     0
                 }
@@ -2786,6 +2771,8 @@ macro_rules! define_clock_tree_types {
             pub rtc_fast_clk: Option<RtcFastClkConfig>,
             /// `LOW_POWER_CLK` configuration.
             pub low_power_clk: Option<LowPowerClkConfig>,
+            /// `TIMG_CALIBRATION_CLOCK` configuration.
+            pub timg_calibration_clock: Option<TimgCalibrationClockConfig>,
         }
         impl ClockConfig {
             fn apply(&self) {
@@ -2816,6 +2803,9 @@ macro_rules! define_clock_tree_types {
                     }
                     if let Some(config) = self.low_power_clk {
                         configure_low_power_clk(clocks, config);
+                    }
+                    if let Some(config) = self.timg_calibration_clock {
+                        configure_timg_calibration_clock(clocks, config);
                     }
                 });
             }
