@@ -61,7 +61,7 @@ jobs:
       matrix:
         # load-blance runners a bit
         group:
-          - xtensa-riscvimc
+          - xtensa
           - riscv
 
     steps:
@@ -75,7 +75,7 @@ jobs:
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa-riscvimc'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
           version: 1.93.0.0
 
@@ -95,7 +95,7 @@ jobs:
           fi
 
       - name: Build and Check Xtensa and Risc-V (esp32c2/c3)
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa-riscvimc'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         shell: bash
         run: |
           # lints and docs are checked separately
