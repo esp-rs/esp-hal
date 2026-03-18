@@ -390,8 +390,9 @@ fn configure_mcpwm0_function_clock_impl(
 
 fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
-        .timergroup0_timer_clk_conf()
-        .modify(|_, w| w.tg0_timer_clk_en().bit(en));
+        .timergroup(0)
+        .timer_clk_conf()
+        .modify(|_, w| w.timer_clk_en().bit(en));
 }
 
 fn configure_timg0_function_clock_impl(
@@ -401,9 +402,10 @@ fn configure_timg0_function_clock_impl(
 ) {
     // TODO: add variants to PAC
     PCR::regs()
-        .timergroup0_timer_clk_conf()
+        .timergroup(0)
+        .timer_clk_conf()
         .modify(|_, w| unsafe {
-            w.tg0_timer_clk_sel().bits(match new_config {
+            w.timer_clk_sel().bits(match new_config {
                 Timg0FunctionClockConfig::XtalClk => 0,
                 Timg0FunctionClockConfig::RcFastClk => 1,
                 Timg0FunctionClockConfig::PllF48m => 2,
@@ -436,8 +438,9 @@ fn configure_timg0_calibration_clock_impl(
 
 fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
-        .timergroup0_wdt_clk_conf()
-        .modify(|_, w| w.tg0_wdt_clk_en().bit(en));
+        .timergroup(0)
+        .wdt_clk_conf()
+        .modify(|_, w| w.wdt_clk_en().bit(en));
 }
 
 fn configure_timg0_wdt_clock_impl(
@@ -446,9 +449,10 @@ fn configure_timg0_wdt_clock_impl(
     new_config: Timg0WdtClockConfig,
 ) {
     PCR::regs()
-        .timergroup0_wdt_clk_conf()
+        .timergroup(0)
+        .wdt_clk_conf()
         .modify(|_, w| unsafe {
-            w.tg0_wdt_clk_sel().bits(match new_config {
+            w.wdt_clk_sel().bits(match new_config {
                 Timg0WdtClockConfig::XtalClk => 0,
                 Timg0WdtClockConfig::RcFastClk => 1,
                 Timg0WdtClockConfig::PllF48m => 2,
@@ -525,8 +529,9 @@ fn configure_rmt_sclk_impl(
 
 fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
-        .timergroup1_timer_clk_conf()
-        .modify(|_, w| w.tg1_timer_clk_en().bit(en));
+        .timergroup(1)
+        .timer_clk_conf()
+        .modify(|_, w| w.timer_clk_en().bit(en));
 }
 
 fn configure_timg1_function_clock_impl(
@@ -536,9 +541,10 @@ fn configure_timg1_function_clock_impl(
 ) {
     // TODO: add variants to PAC
     PCR::regs()
-        .timergroup1_timer_clk_conf()
+        .timergroup(1)
+        .timer_clk_conf()
         .modify(|_, w| unsafe {
-            w.tg1_timer_clk_sel().bits(match new_config {
+            w.timer_clk_sel().bits(match new_config {
                 Timg0FunctionClockConfig::XtalClk => 0,
                 Timg0FunctionClockConfig::RcFastClk => 1,
                 Timg0FunctionClockConfig::PllF48m => 2,
@@ -571,8 +577,9 @@ fn configure_timg1_calibration_clock_impl(
 
 fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
-        .timergroup1_wdt_clk_conf()
-        .modify(|_, w| w.tg1_wdt_clk_en().bit(en));
+        .timergroup(1)
+        .wdt_clk_conf()
+        .modify(|_, w| w.wdt_clk_en().bit(en));
 }
 
 fn configure_timg1_wdt_clock_impl(
@@ -581,9 +588,10 @@ fn configure_timg1_wdt_clock_impl(
     new_config: Timg0WdtClockConfig,
 ) {
     PCR::regs()
-        .timergroup1_wdt_clk_conf()
+        .timergroup(1)
+        .wdt_clk_conf()
         .modify(|_, w| unsafe {
-            w.tg1_wdt_clk_sel().bits(match new_config {
+            w.wdt_clk_sel().bits(match new_config {
                 Timg0WdtClockConfig::XtalClk => 0,
                 Timg0WdtClockConfig::RcFastClk => 1,
                 Timg0WdtClockConfig::PllF48m => 2,
