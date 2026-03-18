@@ -100,6 +100,8 @@ peripherals = [
     { name = "DMA_CH1", virtual = true },
     { name = "DMA_CH2", virtual = true },
 
+    { name = "ADC1", virtual = true },
+
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
@@ -248,6 +250,7 @@ clocks = { system_clocks = { clock_tree = [
         ] },
     ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
         { name = "RX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
@@ -272,7 +275,8 @@ clocks = { system_clocks = { clock_tree = [
 ] } }
 
 [device.adc]
-support_status = { status = "not_supported", issue = 5174 }
+support_status = "partial"
+instances = [{ name = "adc1" }]
 
 # TODO: define functionality for PSEUDO register
 [device.aes]
