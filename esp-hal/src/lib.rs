@@ -316,6 +316,8 @@ pub mod peripherals;
     any(ecc_driver_supported, hmac_driver_supported, sha_driver_supported)
 ))]
 mod reg_access;
+#[cfg(rng_driver_supported)]
+pub mod rng;
 #[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
 #[cfg_attr(any(esp32c5, esp32c61), allow(dead_code))]
@@ -404,8 +406,6 @@ unstable_driver! {
     pub mod pcnt;
     #[cfg(rmt_driver_supported)]
     pub mod rmt;
-    #[cfg(rng_driver_supported)]
-    pub mod rng;
     #[cfg(rsa_driver_supported)]
     pub mod rsa;
     #[cfg(sha_driver_supported)]
