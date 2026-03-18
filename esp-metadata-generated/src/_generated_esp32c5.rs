@@ -3180,19 +3180,15 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::Timg0 => {
                     crate::peripherals::SYSTEM::regs()
-                        .timergroup0_conf()
-                        .modify(|_, w| w.tg0_clk_en().bit(enable));
-                    crate::peripherals::SYSTEM::regs()
-                        .timergroup0_timer_clk_conf()
-                        .modify(|_, w| w.tg0_timer_clk_en().bit(enable));
+                        .timergroup(0)
+                        .conf()
+                        .modify(|_, w| w.clk_en().bit(enable));
                 }
                 Peripheral::Timg1 => {
                     crate::peripherals::SYSTEM::regs()
-                        .timergroup1_conf()
-                        .modify(|_, w| w.tg1_clk_en().bit(enable));
-                    crate::peripherals::SYSTEM::regs()
-                        .timergroup1_timer_clk_conf()
-                        .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
+                        .timergroup(1)
+                        .conf()
+                        .modify(|_, w| w.clk_en().bit(enable));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -3277,13 +3273,15 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::Timg0 => {
                     crate::peripherals::SYSTEM::regs()
-                        .timergroup0_conf()
-                        .modify(|_, w| w.tg0_rst_en().bit(reset));
+                        .timergroup(0)
+                        .conf()
+                        .modify(|_, w| w.rst_en().bit(reset));
                 }
                 Peripheral::Timg1 => {
                     crate::peripherals::SYSTEM::regs()
-                        .timergroup1_conf()
-                        .modify(|_, w| w.tg1_rst_en().bit(reset));
+                        .timergroup(1)
+                        .conf()
+                        .modify(|_, w| w.rst_en().bit(reset));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::SYSTEM::regs()
