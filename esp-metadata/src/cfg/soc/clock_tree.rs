@@ -247,9 +247,9 @@ impl ManagementProperties {
     }
 
     pub fn refcount_accessor(&self) -> Option<TokenStream> {
-        let accessor = self.accessor.as_ref().into_iter();
+        let receiver = self.receiver.as_ref().into_iter();
         self.refcount_field()
-            .map(|field| quote! { clocks.#field #([#accessor])* })
+            .map(|field| quote! { clocks.#field #([#receiver as usize])* })
     }
 
     pub fn has_enable(&self) -> bool {
@@ -266,16 +266,20 @@ impl ManagementProperties {
     }
 
     /// Returns an expression that accesses the node's current configuration field in the ClockTree
-    /// struct.
-    pub fn config_accessor(&self) -> TokenStream {
-        self.config_accessor_from("clocks")
+    /// struct. This function takes the node's instance as the receiver and uses it to index into
+    /// the configuration array.
+    pub fn indexed_config_accessor(&self) -> TokenStream {
+        let node_field = &self.name;
+        let receiver = self.receiver.as_ref().into_iter();
+        quote! { clocks.#node_field #([#receiver as usize])* }
     }
 
-    pub fn config_accessor_from(&self, field: &str) -> TokenStream {
+    /// Returns an expression that accesses the index's current configuration field in the ClockTree
+    /// struct. This function hardcodes the node's actual variant.
+    pub fn instance_config_accessor(&self) -> TokenStream {
         let node_field = &self.name;
-        let field = format_ident!("{}", field);
         let accessor = self.accessor.as_ref().into_iter();
-        quote! { #field.#node_field #([#accessor])* }
+        quote! { self.#node_field #([#accessor])* }
     }
 }
 
@@ -650,7 +654,7 @@ impl RejectExpression {
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
                 // Only run the assert if the referenced nodes have been configured
-                let config_field = node.properties.config_accessor();
+                let config_field = node.properties.indexed_config_accessor();
                 patterns.push(quote! { #config_field.is_some() });
             }
         });

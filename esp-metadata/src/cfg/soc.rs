@@ -296,7 +296,7 @@ impl ClockTreeNodeInstance {
     fn config_current_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         if self.is_configurable() {
             let ty_name = self.config_type_name();
-            let config_field = self.properties.config_accessor();
+            let config_field = self.properties.indexed_config_accessor();
             let fn_name = self.current_config_function_name();
             let receiver = self.properties.receiver();
             quote! {
@@ -451,7 +451,7 @@ impl ClockTreeNodeInstance {
             frequency: Function {
                 _name: frequency_function_name.to_string(),
                 implementation: if self.is_configurable() {
-                    let config_field = self.properties.config_accessor();
+                    let config_field = self.properties.indexed_config_accessor();
                     quote! {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(#(#receiver,)* clocks: &mut ClockTree, config: #ty_name) -> u32 {
@@ -628,7 +628,7 @@ impl SystemClocks {
                         .to_case(Case::Snake)
                 ));
                 clock_tree_state_func_return_types.push(type_name.clone());
-                clock_tree_state_accessors.push(clock_item.properties.config_accessor_from("self"));
+                clock_tree_state_accessors.push(clock_item.properties.instance_config_accessor());
 
                 clock_tree_node_state_getter_doclines.push(format!(
                     "Returns the current configuration of the {} clock tree node",

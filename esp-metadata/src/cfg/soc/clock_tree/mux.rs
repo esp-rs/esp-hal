@@ -210,7 +210,7 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_field = instance.properties.config_accessor();
+        let config_field = instance.properties.indexed_config_accessor();
         self.impl_request_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
@@ -219,7 +219,7 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_field = instance.properties.config_accessor();
+        let config_field = instance.properties.indexed_config_accessor();
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 }
@@ -247,7 +247,7 @@ impl Multiplexer {
         let ty_name = instance.config_type_name();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        let config_field = instance.properties.config_accessor();
+        let config_field = instance.properties.indexed_config_accessor();
         let receiver = instance.properties.receiver();
 
         let hal_impl = quote! { #(#receiver.)*#hal_impl };

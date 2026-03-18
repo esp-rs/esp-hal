@@ -126,7 +126,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         };
 
         let referred_node = instance.resolve_node(tree, variable.source(source));
-        let config_accessor = referred_node.properties.config_accessor();
+        let config_accessor = referred_node.properties.indexed_config_accessor();
         let name = quote::format_ident!("{}", name.source(source));
         quote! { unwrap!(#config_accessor).#name() }
     }
