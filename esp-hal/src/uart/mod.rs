@@ -3796,7 +3796,7 @@ impl<'t> UartClockGuard<'t> {
             clock.configure_function_clock(clocks, sclk_config);
             clock.request_function_clock(clocks);
             clock.request_baud_rate_generator(clocks);
-            #[cfg(soc_has_clock_node_uart0_mem_clock)]
+            #[cfg(soc_has_clock_node_uart_mem_clock)]
             clock.request_mem_clock(clocks);
         });
 
@@ -3815,7 +3815,7 @@ impl Drop for UartClockGuard<'_> {
         ClockTree::with(|clocks| {
             let clock = self.uart.info().clock_instance;
 
-            #[cfg(soc_has_clock_node_uart0_mem_clock)]
+            #[cfg(soc_has_clock_node_uart_mem_clock)]
             clock.release_mem_clock(clocks);
             clock.release_baud_rate_generator(clocks);
             clock.release_function_clock(clocks);

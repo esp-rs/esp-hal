@@ -49,7 +49,7 @@
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
-#[cfg(soc_has_clock_node_timg0_function_clock)]
+#[cfg(soc_has_clock_node_timg_function_clock)]
 use clocks::TimgFunctionClockConfig;
 
 /// Low-level clock control
@@ -145,7 +145,7 @@ impl RtcClock {
             let (xtal_cycles, _) = Clocks::measure_rtc_clock(
                 clocks,
                 cal_clk,
-                #[cfg(soc_has_clock_node_timg0_function_clock)]
+                #[cfg(soc_has_clock_node_timg_function_clock)]
                 TimgFunctionClockConfig::XtalClk,
                 slowclk_cycles,
             );
@@ -232,11 +232,12 @@ impl Clocks {
             // frequency. In the future, we should turn the MCPWM config structs into
             // plain old data structures and remove this pre-configuration, otherwise we will not be
             // able to select a different clock source.
-            #[cfg(soc_has_clock_node_mcpwm0_function_clock)]
-            clocks::McpwmInstance::Mcpwm0.configure_function_clock(clocks, Default::default());
-            #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
-            clocks::McpwmInstance::Mcpwm1.configure_function_clock(clocks, Default::default());
-
+            #[cfg(soc_has_clock_node_mcpwm_function_clock)]
+            {
+                clocks::McpwmInstance::Mcpwm0.configure_function_clock(clocks, Default::default());
+                #[cfg(soc_has_mcpwm1)]
+                clocks::McpwmInstance::Mcpwm1.configure_function_clock(clocks, Default::default());
+            }
             // Until we have every clock consumer modelled, we should manually keep clocks alive
             #[cfg(soc_has_clock_node_rc_fast_clk)]
             clocks::request_rc_fast_clk(clocks);
@@ -273,7 +274,7 @@ impl Clocks {
         clocks: &mut ClockTree,
         rtc_clock: TimgCalibrationClockConfig,
         // TODO: verify function clock is used, C6 TRM suggests fixed XTAL_CLK
-        #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: TimgFunctionClockConfig,
+        #[cfg(soc_has_clock_node_timg_function_clock)] function_clock: TimgFunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
         use esp_rom_sys::rom::ets_delay_us;
@@ -306,7 +307,7 @@ impl Clocks {
 
         // Make sure we measure the crystal.
         cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+            if #[cfg(soc_has_clock_node_timg_function_clock)] {
                 let current_function_clock = clocks::TimgInstance::Timg0.function_clock_config(clocks);
                 clocks::TimgInstance::Timg0.configure_function_clock(clocks, function_clock);
                 clocks::TimgInstance::Timg0.request_function_clock(clocks);
@@ -397,7 +398,7 @@ impl Clocks {
         }
         clocks::release_timg_calibration_clock(clocks);
 
-        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        #[cfg(soc_has_clock_node_timg_function_clock)]
         {
             if let Some(func_clock) = current_function_clock
                 && func_clock != function_clock

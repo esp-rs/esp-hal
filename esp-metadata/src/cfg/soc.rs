@@ -1234,16 +1234,32 @@ impl DeviceClocks {
     }
 
     fn cfgs(&self, config: &SocConfig) -> Vec<String> {
-        let processed_clocks = self.process(config).unwrap();
+        let mut cfgs = vec![];
 
-        // TODO: output per-template cfgs once we have a single API per template group instead of
-        // per instance
-        processed_clocks
-            .clock_tree
-            .values()
-            .map(|node| node.name().to_case(Case::Snake))
-            .map(|name| format!("soc_has_clock_node_{name}"))
-            .collect::<Vec<_>>()
+        cfgs.extend(config.clocks.system_clocks.clock_tree.iter().map(|node| {
+            format!(
+                "soc_has_clock_node_{}",
+                node.name().from_case(Case::Constant).to_case(Case::Snake)
+            )
+        }));
+        cfgs.extend(
+            config
+                .clocks
+                .system_clocks
+                .template_groups
+                .iter()
+                .flat_map(|group| {
+                    group.clocks.iter().map(|node| {
+                        format!(
+                            "soc_has_clock_node_{}_{}",
+                            group.group.from_case(Case::Constant).to_case(Case::Snake),
+                            node.name().from_case(Case::Constant).to_case(Case::Snake)
+                        )
+                    })
+                }),
+        );
+
+        cfgs
     }
 
     fn macros(&self, config: &SocConfig) -> TokenStream {
