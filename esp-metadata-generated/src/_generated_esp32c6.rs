@@ -3000,11 +3000,11 @@ macro_rules! define_clock_tree_types {
                 clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]
             }
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting MCPWM0_FUNCTION_CLOCK");
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
                 ) {
-                    trace!("Enabling MCPWM0_FUNCTION_CLOCK");
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
                         McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
                         McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3014,11 +3014,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing MCPWM0_FUNCTION_CLOCK");
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
                 ) {
-                    trace!("Disabling MCPWM0_FUNCTION_CLOCK");
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
                         McpwmFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
@@ -3077,11 +3077,11 @@ macro_rules! define_clock_tree_types {
                 clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]
             }
             pub fn request_rx_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting PARL_IO_RX_CLOCK");
+                trace!("Requesting {:?}::RX_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.parl_io_rx_clock_refcount[ParlIoInstance::ParlIo as usize],
                 ) {
-                    trace!("Enabling PARL_IO_RX_CLOCK");
+                    trace!("Enabling {:?}::RX_CLOCK", self);
                     match unwrap!(clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
                         ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3091,11 +3091,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_rx_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing PARL_IO_RX_CLOCK");
+                trace!("Releasing {:?}::RX_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.parl_io_rx_clock_refcount[ParlIoInstance::ParlIo as usize],
                 ) {
-                    trace!("Disabling PARL_IO_RX_CLOCK");
+                    trace!("Disabling {:?}::RX_CLOCK", self);
                     self.enable_rx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3152,11 +3152,11 @@ macro_rules! define_clock_tree_types {
                 clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]
             }
             pub fn request_tx_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting PARL_IO_TX_CLOCK");
+                trace!("Requesting {:?}::TX_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.parl_io_tx_clock_refcount[ParlIoInstance::ParlIo as usize],
                 ) {
-                    trace!("Enabling PARL_IO_TX_CLOCK");
+                    trace!("Enabling {:?}::TX_CLOCK", self);
                     match unwrap!(clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
                         ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3166,11 +3166,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_tx_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing PARL_IO_TX_CLOCK");
+                trace!("Releasing {:?}::TX_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.parl_io_tx_clock_refcount[ParlIoInstance::ParlIo as usize],
                 ) {
-                    trace!("Disabling PARL_IO_TX_CLOCK");
+                    trace!("Disabling {:?}::TX_CLOCK", self);
                     self.enable_tx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3224,11 +3224,11 @@ macro_rules! define_clock_tree_types {
                 clocks.rmt_sclk[RmtInstance::Rmt as usize]
             }
             pub fn request_sclk(self, clocks: &mut ClockTree) {
-                trace!("Requesting RMT_SCLK");
+                trace!("Requesting {:?}::SCLK", self);
                 if increment_reference_count(
                     &mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize],
                 ) {
-                    trace!("Enabling RMT_SCLK");
+                    trace!("Enabling {:?}::SCLK", self);
                     match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
                         RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
                         RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3238,11 +3238,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_sclk(self, clocks: &mut ClockTree) {
-                trace!("Releasing RMT_SCLK");
+                trace!("Releasing {:?}::SCLK", self);
                 if decrement_reference_count(
                     &mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize],
                 ) {
-                    trace!("Disabling RMT_SCLK");
+                    trace!("Disabling {:?}::SCLK", self);
                     self.enable_sclk_impl(clocks, false);
                     match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
                         RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
@@ -3304,11 +3304,11 @@ macro_rules! define_clock_tree_types {
                 clocks.timg_function_clock[TimgInstance::Timg0 as usize]
             }
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting TIMG0_FUNCTION_CLOCK");
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
                 ) {
-                    trace!("Enabling TIMG0_FUNCTION_CLOCK");
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
                         TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
                         TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3318,11 +3318,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing TIMG0_FUNCTION_CLOCK");
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
                 ) {
-                    trace!("Disabling TIMG0_FUNCTION_CLOCK");
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
                         TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3379,11 +3379,11 @@ macro_rules! define_clock_tree_types {
                 clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]
             }
             pub fn request_wdt_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting TIMG0_WDT_CLOCK");
+                trace!("Requesting {:?}::WDT_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
                 ) {
-                    trace!("Enabling TIMG0_WDT_CLOCK");
+                    trace!("Enabling {:?}::WDT_CLOCK", self);
                     match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
                         TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
                         TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
@@ -3393,11 +3393,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_wdt_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing TIMG0_WDT_CLOCK");
+                trace!("Releasing {:?}::WDT_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
                 ) {
-                    trace!("Disabling TIMG0_WDT_CLOCK");
+                    trace!("Disabling {:?}::WDT_CLOCK", self);
                     self.enable_wdt_clock_impl(clocks, false);
                     match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
                         TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3459,11 +3459,11 @@ macro_rules! define_clock_tree_types {
                 clocks.uart_function_clock[UartInstance::Uart0 as usize]
             }
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Requesting UART0_FUNCTION_CLOCK");
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
                 if increment_reference_count(
                     &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
                 ) {
-                    trace!("Enabling UART0_FUNCTION_CLOCK");
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
                         UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
                         UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -3473,11 +3473,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
             pub fn release_function_clock(self, clocks: &mut ClockTree) {
-                trace!("Releasing UART0_FUNCTION_CLOCK");
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
                 if decrement_reference_count(
                     &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
                 ) {
-                    trace!("Disabling UART0_FUNCTION_CLOCK");
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
                         UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
@@ -3521,21 +3521,21 @@ macro_rules! define_clock_tree_types {
                 clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize]
             }
             pub fn request_baud_rate_generator(self, clocks: &mut ClockTree) {
-                trace!("Requesting UART0_BAUD_RATE_GENERATOR");
+                trace!("Requesting {:?}::BAUD_RATE_GENERATOR", self);
                 if increment_reference_count(
                     &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
                 ) {
-                    trace!("Enabling UART0_BAUD_RATE_GENERATOR");
+                    trace!("Enabling {:?}::BAUD_RATE_GENERATOR", self);
                     self.request_function_clock(clocks);
                     self.enable_baud_rate_generator_impl(clocks, true);
                 }
             }
             pub fn release_baud_rate_generator(self, clocks: &mut ClockTree) {
-                trace!("Releasing UART0_BAUD_RATE_GENERATOR");
+                trace!("Releasing {:?}::BAUD_RATE_GENERATOR", self);
                 if decrement_reference_count(
                     &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
                 ) {
-                    trace!("Disabling UART0_BAUD_RATE_GENERATOR");
+                    trace!("Disabling {:?}::BAUD_RATE_GENERATOR", self);
                     self.enable_baud_rate_generator_impl(clocks, false);
                     self.release_function_clock(clocks);
                 }

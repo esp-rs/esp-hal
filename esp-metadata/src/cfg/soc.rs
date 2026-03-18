@@ -337,15 +337,25 @@ impl ClockTreeNodeInstance {
         let frequency_function_impl = self.node_frequency_impl(tree);
         let frequency_function_name = self.frequency_function_name();
         let config_frequency_function_name = self.config_frequency_function_name();
+        let receiver = self.properties.receiver();
 
-        let enable_trace = format!("Enabling {}", self.name_str());
-        let disable_trace = format!("Disabling {}", self.name_str());
+        let log_msg = |msg: &str| {
+            if receiver.is_empty() {
+                let msg = format!("{msg} {}", self.name_str());
+                quote! { #msg }
+            } else {
+                let msg = format!("{msg} {{:?}}::{}", self.node.name());
+                quote! { #msg, #(#receiver)* }
+            }
+        };
 
-        let request_trace = format!("Requesting {}", self.name_str());
-        let release_trace = format!("Releasing {}", self.name_str());
+        let enable_trace = log_msg("Enabling");
+        let disable_trace = log_msg("Disabling");
+
+        let request_trace = log_msg("Requesting");
+        let release_trace = log_msg("Releasing");
 
         let refcount_accessor = self.properties.refcount_accessor();
-        let receiver = self.properties.receiver();
         ClockNodeFunctions {
             impl_type: if self.properties.receiver.is_some() {
                 Some(format_ident!(
