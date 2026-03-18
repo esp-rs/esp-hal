@@ -1258,7 +1258,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_F240M`.
             PllF240m,
         }
-        /// Configures the `CPU_CLK` clock divider.
+        /// Configures the `CPU_CLK` clock node.
         ///
         /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1267,23 +1267,24 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl CpuClkConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the CPU_CLK clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 255u32,
-                    "`CPU_CLK` divisor value must be between 0 and 255 (inclusive)."
+                    divisor <= 255,
+                    "`CPU_CLK` divisor must be between 0 and 255 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
+                self.divisor as u32
             }
         }
-        /// Configures the `AHB_CLK` clock divider.
+        /// Configures the `AHB_CLK` clock node.
         ///
         /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1292,23 +1293,24 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl AhbClkConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the AHB_CLK clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 255u32,
-                    "`AHB_CLK` divisor value must be between 0 and 255 (inclusive)."
+                    divisor <= 255,
+                    "`AHB_CLK` divisor must be between 0 and 255 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
+                self.divisor as u32
             }
         }
-        /// Configures the `APB_CLK` clock divider.
+        /// Configures the `APB_CLK` clock node.
         ///
         /// The output is calculated as `OUTPUT = AHB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1317,20 +1319,21 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl ApbClkConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the APB_CLK clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 255u32,
-                    "`APB_CLK` divisor value must be between 0 and 255 (inclusive)."
+                    divisor <= 255,
+                    "`APB_CLK` divisor must be between 0 and 255 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
+                self.divisor as u32
             }
         }
         /// The list of clock signals that the `LP_FAST_CLK` multiplexer can output.

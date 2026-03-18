@@ -1016,22 +1016,21 @@ impl DeviceClocks {
 
             let refcounted = !(node.always_on() || has_one_direct_dependent);
 
-            tree.management_properties.insert(
-                node.name_str().clone(),
-                ManagementProperties {
-                    name: format_ident!("{}", node.name().to_case(Case::Snake)),
-                    refcounted,
-                    // Always-on clock sources don't need enable functions.
-                    has_enable: !(node.always_on()
-                        && tree.dependency_graph.inputs(node.name_str()).is_empty()),
-                    state_ty: if node.is_configurable() {
-                        Some(node.config_type_name())
-                    } else {
-                        None
-                    },
-                    always_on: node.always_on(),
+            let properties = ManagementProperties {
+                name: format_ident!("{}", node.name().to_case(Case::Snake)),
+                refcounted,
+                // Always-on clock sources don't need enable functions.
+                has_enable: !(node.always_on()
+                    && tree.dependency_graph.inputs(node.name_str()).is_empty()),
+                state_ty: if node.is_configurable() {
+                    Some(node.config_type_name())
+                } else {
+                    None
                 },
-            );
+                always_on: node.always_on(),
+            };
+            tree.management_properties
+                .insert(node.name_str().clone(), properties);
         }
 
         Ok(tree)

@@ -53,16 +53,16 @@ use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
     clock_tree::{
-        divider::Divider,
         expr_compiler::ExprCompiler,
+        generic::Generic,
         mux::Multiplexer,
         source::{DerivedClockSource, Source},
     },
     soc::{ClockTreeNodeInstance, ProcessedClockData},
 };
 
-mod divider;
 mod expr_compiler;
+mod generic;
 mod mux;
 mod source;
 
@@ -266,6 +266,7 @@ fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<
     sorted.into_iter()
 }
 
+#[derive(Debug)]
 pub(crate) struct ManagementProperties {
     pub name: Ident,
     pub state_ty: Option<Ident>,
@@ -277,6 +278,7 @@ pub(crate) struct ManagementProperties {
 }
 
 impl ManagementProperties {
+    /// Name of the node's current configuration field in the ClockTree struct.
     pub fn field_name(&self) -> Ident {
         self.name.clone()
     }
@@ -391,8 +393,8 @@ pub enum ClockTreeItem {
     #[serde(rename = "source")]
     Source(Source),
 
-    #[serde(rename = "divider")]
-    Divider(Divider),
+    #[serde(rename = "generic")]
+    Generic(Generic),
 
     #[serde(rename = "derived")]
     Derived(DerivedClockSource),
@@ -403,7 +405,7 @@ impl ClockTreeItem {
         match self {
             ClockTreeItem::Multiplexer(mux) => mux.name.as_str(),
             ClockTreeItem::Source(src) => src.name.as_str(),
-            ClockTreeItem::Divider(div) => div.name.as_str(),
+            ClockTreeItem::Generic(div) => div.name.as_str(),
             ClockTreeItem::Derived(drv) => drv.source_options.name.as_str(),
         }
     }
@@ -412,7 +414,7 @@ impl ClockTreeItem {
         match self {
             ClockTreeItem::Multiplexer(mux) => Box::new(mux.clone()),
             ClockTreeItem::Source(src) => Box::new(src.clone()),
-            ClockTreeItem::Divider(div) => Box::new(div.clone()),
+            ClockTreeItem::Generic(div) => Box::new(div.clone()),
             ClockTreeItem::Derived(drv) => Box::new(drv.clone()),
         }
     }
