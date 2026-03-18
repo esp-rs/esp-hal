@@ -329,10 +329,9 @@ jobs:
             --verbose
             --no-progress
             --format detailed
-            --timeout 7
-            --max-concurrency 6
-            --retry-wait-time 3
-            --max-retries 6
+            --max-concurrency 4
+            --retry-wait-time 5
+            --max-retries 10
             --accept "200,301,302"
             --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
             --remap "https://github.com/${{ github.repository }}/(?:blob|tree)/[^/]+/(.+) file://$GITHUB_WORKSPACE/\$1"
