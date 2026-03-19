@@ -31,15 +31,11 @@ async fn main(_spawner: Spawner) {
 
     let mut adc1_config = AdcConfig::new();
     let analog_pin1 = peripherals.GPIO4;
-    #[cfg(feature = "esp32c5")]
     let mut pin1 = adc1_config
         .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
             analog_pin1,
             Attenuation::_11dB,
         );
-    #[cfg(not(feature = "esp32c5"))]
-    let mut pin1 = adc1_config.enable_pin(analog_pin1, Attenuation::_11dB);
-
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
 
     cfg_if::cfg_if! {
