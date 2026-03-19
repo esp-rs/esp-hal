@@ -1246,7 +1246,7 @@ pub unsafe extern "C" fn log_writev(
         crate::sys::log::syslog(
             level,
             format as _,
-            core::mem::transmute::<crate::sys::include::va_list, core::ffi::VaListImpl<'_>>(args),
+            core::mem::transmute::<crate::sys::include::va_list, core::ffi::VaList<'_>>(args),
         );
     }
 }
