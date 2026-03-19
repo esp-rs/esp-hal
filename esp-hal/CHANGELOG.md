@@ -83,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::new` now takes a configuration parameter (#5073)
 - It's no longer possible to pass `esp_hal::gpio::Output` to bidirectional peripheral signals (half-duplex SPI, I2C) (#5093)
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
+- `Rng`, `Rng::{random, read}` have been marked stable (#5098)
 
 ### Fixed
 
@@ -136,7 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
-
 
 ### Removed
 
