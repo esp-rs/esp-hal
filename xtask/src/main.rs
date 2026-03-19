@@ -78,7 +78,6 @@ struct CheckChangelogArgs {
     normalize: bool,
 }
 
-
 // ----------------------------------------------------------------------------
 // Application
 
@@ -556,7 +555,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             let result = examples(
                 workspace,
                 ExamplesArgs {
-                    package: Package::EspLpHal,
+                    package: ExamplesPackage::EspLpHal,
                     chip: Some(args.chip),
                     example: Some("all".to_string()),
                     debug: false,
@@ -645,7 +644,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Package::Examples,
+                package: ExamplesPackage::Examples,
                 chip: Some(args.chip),
                 example: Some("all".to_string()),
                 debug: true,
@@ -660,7 +659,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Package::QaTest,
+                package: ExamplesPackage::QaTest,
                 chip: Some(args.chip),
                 example: Some("all".to_string()),
                 debug: true,
