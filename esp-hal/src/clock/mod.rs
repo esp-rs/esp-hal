@@ -51,7 +51,6 @@ use clocks::LpSlowClkConfig;
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use clocks::TimgFunctionClockConfig;
-use esp_rom_sys::rom::ets_delay_us;
 
 /// Low-level clock control
 ///
@@ -289,6 +288,8 @@ impl Clocks {
         #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: TimgFunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
+        use esp_rom_sys::rom::ets_delay_us;
+
         #[cfg(timergroup_rc_fast_calibration_divider)]
         let calibration_divider = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
             && crate::soc::chip_revision_above(property!(
