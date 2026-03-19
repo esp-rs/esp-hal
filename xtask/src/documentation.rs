@@ -472,8 +472,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             continue;
         }
 
-        let package_docs_path = docs_path.join(package.to_string());
-        let mut device_doc_paths = Vec::new();
+        let package_docs_path = docs_path.join(package.as_ref());
 
         // Each path we iterate over should be the directory for a given version of
         // the package's documentation: (except latest)
@@ -500,18 +499,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 continue;
             }
 
+            // Collect all chip directories in this version's docs
+            let mut chips = vec![];
             for path in fs::read_dir(&version_path)
                 .with_context(|| format!("Failed to read {}", version_path.display()))?
             {
                 let path = path?.path();
                 if path.is_dir() {
-                    device_doc_paths.push(path);
-                }
-            }
-
-            let mut chips = device_doc_paths
-                .iter()
-                .map(|path| {
                     let chip = path
                         .components()
                         .next_back()
@@ -519,9 +513,14 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                         .as_os_str()
                         .to_string_lossy();
 
-                    Chip::from_str(&chip, true).unwrap()
-                })
-                .collect::<Vec<_>>();
+                    match Chip::from_str(&chip, true) {
+                        Ok(chip) => chips.push(chip),
+                        Err(e) => {
+                            log::warn!("Folder name is not a valid chip name: {chip} - {e}");
+                        }
+                    }
+                }
+            }
 
             chips.sort();
 
@@ -582,7 +581,10 @@ fn generate_documentation_meta_for_package(
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
-        package.validate_package_chip(chip)?;
+        if let Err(err) = package.validate_package_chip(chip) {
+            log::warn!("{err}");
+            continue;
+        }
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
