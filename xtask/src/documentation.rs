@@ -582,7 +582,10 @@ fn generate_documentation_meta_for_package(
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
-        package.validate_package_chip(chip)?;
+        if let Err(err) = package.validate_package_chip(chip) {
+            log::warn!("{err}");
+            continue;
+        }
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
