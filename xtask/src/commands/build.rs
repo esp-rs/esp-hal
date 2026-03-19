@@ -149,7 +149,7 @@ pub fn build_examples(
     let chip = args.chip.unwrap();
 
     // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&chip)?;
+    let target = args.package.as_package().target_triple(&chip)?;
 
     // Attempt to build each supported example, with all required features enabled:
 

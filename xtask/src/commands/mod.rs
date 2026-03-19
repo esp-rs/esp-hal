@@ -6,12 +6,7 @@ use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
 
-pub use self::{
-    build::*,
-    check_changelog::*,
-    release::*,
-    run::*,
-};
+pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
@@ -196,8 +191,8 @@ pub struct ExamplesArgs {
     #[arg(value_enum, long)]
     pub chip: Option<Chip>,
     /// Package whose examples we wish to act on.
-    #[arg(value_enum, long, default_value_t = Package::Examples)]
-    pub package: Package,
+    #[arg(value_enum, long, default_value_t = ExamplesPackage::Examples)]
+    pub package: ExamplesPackage,
     /// Build examples in debug mode only
     #[arg(long)]
     pub debug: bool,
@@ -209,6 +204,31 @@ pub struct ExamplesArgs {
     /// Emit crate build timings
     #[arg(long)]
     pub timings: bool,
+}
+
+/// The different packages which contain examples, and which the `examples` subcommand can act on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ExamplesPackage {
+    Examples,
+    QaTest,
+    EspLpHal,
+}
+
+impl From<ExamplesPackage> for Package {
+    fn from(ep: ExamplesPackage) -> Self {
+        match ep {
+            ExamplesPackage::Examples => Package::Examples,
+            ExamplesPackage::QaTest => Package::QaTest,
+            ExamplesPackage::EspLpHal => Package::EspLpHal,
+        }
+    }
+}
+
+impl ExamplesPackage {
+    /// Get the underlying Package
+    pub fn as_package(self) -> Package {
+        Package::from(self)
+    }
 }
 
 /// Arguments common to commands which act on doctests.
@@ -270,7 +290,7 @@ pub struct TestsArgs {
 pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
     log::debug!(
         "Running examples for '{}' on '{:?}'",
-        args.package,
+        args.package.as_package(),
         args.chip
     );
     if args.chip.is_none() {
@@ -284,33 +304,26 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     let chip = args.chip.unwrap();
 
     // Ensure that the package/chip combination provided are valid:
-    args.package.validate_package_chip(&chip).with_context(|| {
-        format!(
-            "The package '{0}' does not support the chip '{chip:?}'",
-            args.package
-        )
-    })?;
-
-    // If the 'esp-hal' package is specified, what we *really* want is the
-    // 'examples' package instead:
-    if args.package == Package::EspHal {
-        log::warn!(
-            "Package '{}' specified, using '{}' instead",
-            Package::EspHal,
-            Package::Examples
-        );
-        args.package = Package::Examples;
-    }
+    args.package
+        .as_package()
+        .validate_package_chip(&chip)
+        .with_context(|| {
+            format!(
+                "The package '{0}' does not support the chip '{chip:?}'",
+                args.package.as_package()
+            )
+        })?;
 
     // Absolute path of the package's root:
-    let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
+    let package_path =
+        crate::windows_safe_path(&workspace.join(args.package.as_package().to_string()));
 
     // Load all examples which support the specified chip and parse their metadata.
     //
     // The `examples` directory contains a number of individual projects, and does not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if args.package == Package::Examples {
+    let examples = if args.package.as_package() == Package::Examples {
         crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",
@@ -318,9 +331,8 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             )
         })?
     } else {
-        let example_path = match args.package {
+        let example_path = match args.package.as_package() {
             Package::QaTest => package_path.join("src").join("bin"),
-            Package::HilTest => package_path.join("tests"),
             _ => package_path.join("examples"),
         };
 

@@ -208,7 +208,7 @@ pub fn run_examples(
 
     // At this point, chip can never be `None`, so we can safely unwrap it.
     let chip = args.chip.unwrap();
-    let target = args.package.target_triple(&chip)?;
+    let target = args.package.as_package().target_triple(&chip)?;
 
     examples.sort_by_key(|ex| ex.tag());
 
