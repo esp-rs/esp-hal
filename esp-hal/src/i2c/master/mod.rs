@@ -728,6 +728,9 @@ impl<'d> I2c<'d, Blocking> {
             },
         };
 
+        i2c.with_scl(crate::gpio::Level::High);
+        i2c.with_sda(crate::gpio::Level::High);
+
         i2c.apply_config(&config)?;
 
         Ok(i2c)
