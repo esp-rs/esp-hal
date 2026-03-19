@@ -471,16 +471,12 @@ impl ClockTreeNodeInstance {
 
 impl ProcessedClockData {
     /// Returns a node by its name (e.g. `XTAL_CLK`).
-    ///
-    /// As the clock tree is stored as a vector, this method performs a linear search.
     fn node(&self, name: &str) -> &ClockTreeNodeInstance {
         self.try_get_node(name)
             .unwrap_or_else(|| panic!("Clock node {name} not found"))
     }
 
     /// Returns a node by its name (e.g. `XTAL_CLK`), or None if not found.
-    ///
-    /// As the clock tree is stored as a vector, this method performs a linear search.
     fn try_get_node(&self, name: &str) -> Option<&ClockTreeNodeInstance> {
         self.clock_tree.get(name)
     }
