@@ -268,6 +268,21 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8500000)
     };
+    ("clock_tree.system_pre_div.divisor") => {
+        (0, 1023)
+    };
+    ("clock_tree.ref_tick_xtal.divisor") => {
+        (0, 255)
+    };
+    ("clock_tree.ref_tick_ck8m.divisor") => {
+        (0, 255)
+    };
+    ("clock_tree.uart.baud_rate_generator.fractional") => {
+        (0, 15)
+    };
+    ("clock_tree.uart.baud_rate_generator.integral") => {
+        (0, 1048575)
+    };
     ("spi_master.supports_dma") => {
         true
     };

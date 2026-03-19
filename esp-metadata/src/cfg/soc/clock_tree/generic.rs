@@ -636,6 +636,25 @@ impl ClockTreeNodeType for Generic {
         let config_field = instance.properties.indexed_config_accessor();
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
+
+    fn property_macro_branches(&self, path: &str) -> TokenStream {
+        let mut branches = quote! {};
+        for (param_name, param) in self.params.iter() {
+            if let NodeParameter::Value(values) = param
+                && let Some((from, to)) = values.as_range()
+            {
+                let path = format!("{path}.{param_name}");
+                let from = number(from);
+                let to = number(to);
+                branches.extend(quote! {
+                    (#path) => {
+                        (#from, #to)
+                    };
+                })
+            }
+        }
+        branches
+    }
 }
 
 enum ClockSource<'d> {

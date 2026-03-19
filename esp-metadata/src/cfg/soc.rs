@@ -57,6 +57,10 @@ impl super::GenericProperty for SocConfig {
 
         Some(tokens)
     }
+
+    fn property_macro_branches(&self) -> TokenStream {
+        self.clocks.property_macro_branches()
+    }
 }
 
 /// Memory region.
@@ -825,6 +829,29 @@ impl SystemClocks {
             }
         })
     }
+
+    fn property_macro_branches(&self) -> TokenStream {
+        let mut branches = quote! {};
+        let path = format!("clock_tree");
+        branches.extend(self.clock_tree.iter().map(|node| {
+            let path = format!(
+                "{path}.{}",
+                node.name().from_case(Case::Constant).to_case(Case::Snake)
+            );
+            node.property_macro_branches(&path)
+        }));
+        branches.extend(self.template_groups.iter().flat_map(|group| {
+            group.clocks.iter().map(|node| {
+                let path = format!(
+                    "{path}.{}.{}",
+                    group.group.from_case(Case::Constant).to_case(Case::Snake),
+                    node.name().from_case(Case::Constant).to_case(Case::Snake)
+                );
+                node.property_macro_branches(&path)
+            })
+        }));
+        branches
+    }
 }
 
 /// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
@@ -1294,5 +1321,9 @@ impl DeviceClocks {
             #system_clocks
             #peripheral_clocks
         }
+    }
+
+    fn property_macro_branches(&self) -> TokenStream {
+        self.system_clocks.property_macro_branches()
     }
 }
