@@ -3349,16 +3349,19 @@ impl Info {
 
             // The UART baud rate clock divider is, depending on the device, either a
             // 20.4 bit, or a 12.4 bit divider.
-            // TODO: get this info from metadata, based on something like:
-            // property!("clocks.uart0.baud_rate_generator.fractional.max")
-            const FRAC_BITS: u32 = 4;
+            const FRAC_BITS: u32 = const {
+                let largest_divider: u32 =
+                    property!("clock_tree.uart.baud_rate_generator.fractional").1;
+                ::core::assert!((largest_divider + 1).is_power_of_two());
+                largest_divider.count_ones()
+            };
             const FRAC_MASK: u32 = (1 << FRAC_BITS) - 1;
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
             cfg_if::cfg_if! {
                 if #[cfg(any(uart_has_sclk_divider, soc_has_pcr))] {
-                    const MAX_DIV: u32 = 0b1111_1111_1111 - 1;
+                    const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 
