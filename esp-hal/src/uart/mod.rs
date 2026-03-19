@@ -879,7 +879,6 @@ where
             .conf0()
             .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
 
-        #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
 
         // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
@@ -896,7 +895,6 @@ where
             .conf0()
             .write(|w| unsafe { w.bits(original_conf0.bits()) });
 
-        #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
     }
 
@@ -1260,7 +1258,6 @@ where
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
 
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
 
@@ -3494,7 +3491,6 @@ impl Info {
             RtsConfig::Disabled => self.configure_rts_flow_ctrl(false, None),
         }
 
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
 
