@@ -513,7 +513,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
-        version: 0x02505080,
+        version: 0x02509280,
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
         #[cfg(multi_core)]
@@ -576,16 +576,6 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         connect_en: config.connection,
         scan_en: config.scan,
         ble_aa_check: config.verify_access_address,
-        ble_log_mode_en: if cfg!(feature = "print-logs-from-driver") {
-            4095
-        } else {
-            0
-        },
-        ble_log_level: if cfg!(feature = "print-logs-from-driver") {
-            5
-        } else {
-            0
-        },
         adv_en: config.adv,
         magic: ESP_BT_CTRL_CONFIG_MAGIC_VAL,
     }

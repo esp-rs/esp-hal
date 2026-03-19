@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update ROM symbols to match ESP-IDF 5.5.3 (#5226)
 
 ### Fixed
 

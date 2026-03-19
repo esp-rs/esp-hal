@@ -26,3 +26,6 @@ PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
 
 syscall_table_ptr = 0x4085ffd4;
+
+PROVIDE(s_offchan_tx_progress_in_ptr = 0x4085fc5c);
+PROVIDE(s_phy_get_max_pwr_new_ptr = 0x4085fc58);
