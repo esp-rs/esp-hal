@@ -623,9 +623,8 @@ driver_configs![
             cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
-            #[serde(default)]
-            clocks: DeviceClocks,
-            memory_map: MemoryMap,
+            #[serde(flatten)]
+            config: SocConfig,
         }
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {

@@ -74,6 +74,10 @@ pub struct Source {
 }
 
 impl ClockTreeNodeType for Source {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn always_on(&self) -> bool {
         self.always_on
     }
@@ -296,6 +300,10 @@ pub struct DerivedClockSource {
 }
 
 impl ClockTreeNodeType for DerivedClockSource {
+    fn name(&self) -> &str {
+        self.source_options.name()
+    }
+
     fn input_clocks(
         &self,
         _instance: &ClockTreeNodeInstance,

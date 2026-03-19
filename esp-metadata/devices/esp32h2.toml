@@ -12,6 +12,27 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "swd",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+]
+
+[device.soc]
+cpu_has_csr_pc = true
+cpu_csr_prv_mode = 0xC10
+rc_fast_clk_default = 8_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    { name = "dram2_uninit", start = 0x4083_EFD0, end = 0x4084_FEE0 },
+] }
+
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     { name = "APB_SARADC", dma_peripheral = 8 },
@@ -43,18 +64,18 @@ peripherals = [
     { name = "LP_PERI" },
     { name = "LP_TIMER" },
     { name = "LP_WDT" },
-    { name = "MCPWM0" },
+    { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MEM_MONITOR" },
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
     { name = "OTP_DEBUG" },
-    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, dma_peripheral = 9 },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, dma_peripheral = 9, clock_group = "PARL_IO" },
     { name = "PAU" },
     { name = "PCNT" },
     { name = "PCR" },
     { name = "PLIC_MX" },
     { name = "PMU" },
-    { name = "RMT" },
+    { name = "RMT", clock_group = "RMT" },
     { name = "RNG", virtual = true }, # a) RNG is LP_PERI in truth. b) we need to offset the rng_data register at runtime for newer revisions.
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
@@ -65,12 +86,12 @@ peripherals = [
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     { name = "TRACE0", pac = "TRACE" },
     { name = "TWAI0" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
@@ -93,27 +114,6 @@ peripherals = [
     { name = "MEM2MEM7", virtual = true, dma_peripheral = 14 },
     { name = "MEM2MEM8", virtual = true, dma_peripheral = 15 },
 ]
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-]
-
-[device.soc]
-cpu_has_csr_pc = true
-cpu_csr_prv_mode = 0xC10
-rc_fast_clk_default = 8_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
-    { name = "dram2_uninit", start = 0x4083_EFD0, end = 0x4084_FEE0 },
-] }
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
@@ -156,20 +156,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
-] }, peripheral_clocks = { templates = [
-    # templates
-    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
-    { name = "clk_en_template", value = "{{default_clk_en_template}}" }, # Indirection allows appending to the template for TWAI
-    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
-    # substitutions
-    { name = "control", value = "crate::peripherals::SYSTEM" },
-    { name = "conf_register", value = "{{peripheral}}_conf" },
-    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
-    { name = "rst_field", value = "{{peripheral}}_rst_en" },
-    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
-], peripheral_clocks = [
-    # This list is based on TRM (v1.5) - 7.4.1 PCR Register Summary
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+], template_groups = [
+    { group = "UART", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "PLL_F48M", outputs = "PLL_F48M_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
@@ -177,18 +165,13 @@ clocks = { system_clocks = { clock_tree = [
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
-    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
-    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
-    { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
-    { name = "Uhci0", template_params = { peripheral = "uhci" } },
-    { name = "Rmt", clocks = [
+    { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
     ] },
-    { name = "Ledc" },
-    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+    { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -205,17 +188,7 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F48M",    outputs = "PLL_F48M_CLK" },
         ] },
     ] },
-    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Timg0" },
-    { name = "Systimer", keep_enabled = true },
-    { name = "Twai0", template_params = { clk_en_template = "{{default_clk_en_template}} {{func_clk_template}}", func_clk_template = "{{control}}::regs().twai0_func_clk_conf().modify(|_, w| w.twai0_func_clk_en().bit(enable));" } },
-    { name = "I2s0", template_params = { peripheral = "i2s" } },
-    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } },
-    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
-    { name = "UsbDevice", keep_enabled = true },
-    # { name = "Intmtx" },
-    { name = "Pcnt" },
-    { name = "Etm" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm" }, clocks = [
+    { group = "MCPWM", clocks = [
         # TODO: MCPWM divider?
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
@@ -223,7 +196,7 @@ clocks = { system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
+    { group = "PARL_IO", clocks = [
         { name = "RX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -236,6 +209,39 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
         ] },
     ] },
+] }, peripheral_clocks = { templates = [
+    # templates
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" }, # Indirection allows appending to the template for TWAI
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    # This list is based on TRM (v1.5) - 7.4.1 PCR Register Summary
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
+    { name = "Uhci0", template_params = { peripheral = "uhci" } },
+    { name = "Rmt" },
+    { name = "Ledc" },
+    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Systimer", keep_enabled = true },
+    { name = "Twai0", template_params = { clk_en_template = "{{default_clk_en_template}} {{func_clk_template}}", func_clk_template = "{{control}}::regs().twai0_func_clk_conf().modify(|_, w| w.twai0_func_clk_en().bit(enable));" } },
+    { name = "I2s0", template_params = { peripheral = "i2s" } },
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } },
+    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
+    { name = "UsbDevice", keep_enabled = true },
+    # { name = "Intmtx" },
+    { name = "Pcnt" },
+    { name = "Etm" },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
     { name = "Aes" },

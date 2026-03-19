@@ -164,12 +164,12 @@ impl embedded_io_07::Error for TxError {
 
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use crate::soc::clocks::Uart0FunctionClockSclk as ClockSource;
+pub use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
 #[cfg(not(feature = "unstable"))]
-use crate::soc::clocks::Uart0FunctionClockSclk as ClockSource;
+use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
 use crate::soc::clocks::{
-    Uart0BaudRateGeneratorConfig as BaudRateConfig,
-    Uart0FunctionClockConfig as ClockConfig,
+    UartBaudRateGeneratorConfig as BaudRateConfig,
+    UartFunctionClockConfig as ClockConfig,
 };
 
 /// Number of data bits

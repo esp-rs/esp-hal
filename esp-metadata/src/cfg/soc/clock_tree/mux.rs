@@ -27,6 +27,10 @@ pub struct Multiplexer {
 }
 
 impl ClockTreeNodeType for Multiplexer {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn always_on(&self) -> bool {
         self.always_on
     }

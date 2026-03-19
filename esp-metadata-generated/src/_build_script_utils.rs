@@ -1940,8 +1940,8 @@ impl Chip {
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_crypto_clk",
                     "soc_has_clock_node_timg_calibration_clock",
-                    "soc_has_clock_node_parlio_rx_clock",
-                    "soc_has_clock_node_parlio_tx_clock",
+                    "soc_has_clock_node_parl_io_rx_clock",
+                    "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_wdt_clock",
@@ -2183,8 +2183,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_crypto_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg_calibration_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
@@ -2566,8 +2566,8 @@ impl Chip {
                     "soc_has_clock_node_lp_fast_clk",
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_mcpwm0_function_clock",
-                    "soc_has_clock_node_parlio_rx_clock",
-                    "soc_has_clock_node_parlio_tx_clock",
+                    "soc_has_clock_node_parl_io_rx_clock",
+                    "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
@@ -2845,8 +2845,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
@@ -3401,8 +3401,8 @@ impl Chip {
                     "soc_has_clock_node_lp_fast_clk",
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_mcpwm0_function_clock",
-                    "soc_has_clock_node_parlio_rx_clock",
-                    "soc_has_clock_node_parlio_tx_clock",
+                    "soc_has_clock_node_parl_io_rx_clock",
+                    "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
@@ -3644,8 +3644,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
@@ -5522,8 +5522,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parlio_rx_clock)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parlio_tx_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parl_io_rx_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parl_io_tx_clock)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");

@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, ops::Range, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    ops::Range,
+    str::FromStr,
+};
 
 use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, StateConverter, pattern};
@@ -8,23 +13,50 @@ use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    cfg::{
-        clock_tree::{
-            ClockNodeFunctions,
-            ClockTreeItem,
-            ClockTreeNodeType,
-            ConfiguresExpression,
-            DependencyGraph,
-            Function,
-            ManagementProperties,
-            ValidationContext,
-        },
-        soc::clock_tree::PeripheralClockTreeEntry,
+    PeripheralDef,
+    cfg::clock_tree::{
+        ClockNodeFunctions,
+        ClockTreeItem,
+        ClockTreeNodeType,
+        ConfiguresExpression,
+        DependencyGraph,
+        Function,
+        ManagementProperties,
+        ValidationContext,
     },
     number_hex,
 };
 
 pub mod clock_tree;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SocConfig {
+    #[serde(default)]
+    pub peripherals: Vec<PeripheralDef>,
+    #[serde(default)]
+    pub clocks: DeviceClocks,
+    pub memory_map: MemoryMap,
+}
+
+impl super::GenericProperty for SocConfig {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let mut cfgs = vec![];
+
+        cfgs.extend(self.clocks.cfgs(self));
+        cfgs.extend(self.memory_map.cfgs());
+
+        Some(cfgs)
+    }
+
+    fn macros(&self) -> Option<TokenStream> {
+        let mut tokens = quote! {};
+
+        tokens.extend(self.clocks.macros(self));
+        tokens.extend(self.memory_map.macros());
+
+        Some(tokens)
+    }
+}
 
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -40,8 +72,8 @@ pub struct MemoryMap {
     pub ranges: Vec<MemoryRange>,
 }
 
-impl super::GenericProperty for MemoryMap {
-    fn macros(&self) -> Option<TokenStream> {
+impl MemoryMap {
+    fn macros(&self) -> TokenStream {
         let region_branches = self.ranges.iter().map(|region| {
             let name = region.name.to_uppercase();
             let start = number_hex(region.range.start as usize);
@@ -61,7 +93,7 @@ impl super::GenericProperty for MemoryMap {
             }
         });
 
-        Some(quote! {
+        quote! {
             /// Macro to get the address range of the given memory region.
             ///
             /// This macro provides two syntax options for each memory region:
@@ -73,16 +105,14 @@ impl super::GenericProperty for MemoryMap {
             macro_rules! memory_range {
                 #(#region_branches)*
             }
-        })
+        }
     }
 
-    fn cfgs(&self) -> Option<Vec<String>> {
-        Some(
-            self.ranges
-                .iter()
-                .map(|region| format!("has_{}_region", region.name.to_lowercase()))
-                .collect(),
-        )
+    fn cfgs(&self) -> Vec<String> {
+        self.ranges
+            .iter()
+            .map(|region| format!("has_{}_region", region.name.to_lowercase()))
+            .collect()
     }
 }
 
@@ -90,6 +120,16 @@ impl super::GenericProperty for MemoryMap {
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct SystemClocks {
     clock_tree: Vec<ClockTreeItem>,
+
+    /// Clock template groups.
+    #[serde(default)]
+    template_groups: Vec<ClockGroup>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
+struct ClockGroup {
+    group: String,
+    clocks: Vec<ClockTreeItem>,
 }
 
 pub(crate) struct ProcessedClockData {
@@ -107,26 +147,22 @@ pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
 
     include_in_global_config: bool,
-    is_first_instance: bool,
     force_configurable: bool,
 
     /// Name of the instantiated clock tree node.
     ///
-    /// Must be in CONSTANT_CASE, e.g. FUNCTION_CLOCK.
+    /// Must be in CONSTANT_CASE, e.g. UART0_FUNCTION_CLOCK.
     name: String,
 
     /// Name of the group (e.g. peripheral) this tree node belongs to.
     ///
     /// Must be in CONSTANT_CASE, e.g. UART0.
-    group: String,
+    group_instance: String,
 
-    /// Name of the template used to instantiate this clock tree node.
+    /// Name of the template group used to instantiate this clock tree node.
     ///
-    /// Must be in CONSTANT_CASE, e.g. UART0_FUNCTION_CLOCK.
-    // TODO: we should have methods to modify names in implementation code
-    // (e.g. to make them able to first refer to a peripheral-local clock node, then fall back to a
-    // system node) - fn resolve_clock_node(&self, tree: &ProcessedClockData, name: &str) -> &str
-    template_name: String,
+    /// Must be in CONSTANT_CASE, e.g. UART.
+    group_template: String,
 }
 
 impl ClockTreeNodeInstance {
@@ -145,11 +181,8 @@ impl ClockTreeNodeInstance {
         self.node.is_configurable() || self.force_configurable
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        if !self.is_first_instance || !self.is_configurable() {
-            return None;
-        }
-        Some(self.node.config_type(self))
+    fn config_type(&self) -> TokenStream {
+        self.node.config_type(self)
     }
 
     fn config_documentation(&self) -> Option<String> {
@@ -171,11 +204,14 @@ impl ClockTreeNodeInstance {
     /// Returns the name of the clock configuration type. The corresponding field in the
     /// `ClockConfig` struct will have this type.
     fn config_type_name(&self) -> Ident {
-        let item = self
-            .template_name
-            .from_case(Case::Constant)
-            .to_case(Case::Pascal);
-        quote::format_ident!("{}Config", item)
+        let type_name = if self.group_template.is_empty() {
+            self.node.name().to_string()
+        } else {
+            format!("{}_{}", self.group_template, self.node.name())
+        }
+        .from_case(Case::Constant)
+        .to_case(Case::Pascal);
+        quote::format_ident!("{type_name}Config")
     }
 
     fn apply_configuration(
@@ -422,7 +458,7 @@ impl ClockTreeNodeInstance {
         tree: &'tree ProcessedClockData,
         clock: &str,
     ) -> &'tree ClockTreeNodeInstance {
-        let local_node = format!("{}_{}", self.group, clock);
+        let local_node = format!("{}_{}", self.group_instance, clock);
         if let Some(node) = tree.try_get_node(&local_node) {
             node
         } else {
@@ -469,10 +505,18 @@ impl SystemClocks {
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
         let mut provided_function_doclines = vec![];
+
+        let mut first_instances = HashSet::new();
+
         for clock_item in tree.clock_tree.iter() {
             // Generate code for all clock tree nodes
-            if let Some(config_type) = clock_item.config_type() {
-                clock_tree_node_defs.push(config_type);
+            let is_first_instance = first_instances.insert(format!(
+                "{}_{}",
+                clock_item.group_template,
+                clock_item.node.name()
+            ));
+            if is_first_instance && clock_item.is_configurable() {
+                clock_tree_node_defs.push(clock_item.config_type());
             }
             let node_state = tree.properties(clock_item.name_str());
             if let Some(type_name) = node_state.type_name() {
@@ -658,45 +702,6 @@ pub struct PeripheralClock {
     // outside of clock calibrations when the device has Systimer.
     #[serde(default)]
     keep_enabled: bool,
-
-    /// Peripheral clock source data.
-    ///
-    /// These can be new definitions, or they can reference another `peripheral_clocks` entry, in
-    /// which case the peripherals will use the same data types, and the same API will be
-    /// generated for them.
-    #[serde(default)]
-    #[serde(deserialize_with = "clock_tree::ref_or_def")]
-    clocks: PeripheralClockTreeEntry,
-}
-impl PeripheralClock {
-    fn clock_signals<'a>(&'a self, peripheral_clocks: &'a PeripheralClocks) -> &'a [ClockTreeItem] {
-        match &self.clocks {
-            PeripheralClockTreeEntry::Definition(items) => items.as_slice(),
-            PeripheralClockTreeEntry::Reference(template) => peripheral_clocks
-                .peripheral_clocks
-                .iter()
-                .filter_map(|c| {
-                    if c.name.as_str() != template {
-                        return None;
-                    }
-                    match &c.clocks {
-                        PeripheralClockTreeEntry::Definition(items) => Some(items.as_slice()),
-                        PeripheralClockTreeEntry::Reference(_) => {
-                            panic!("Referenced peripheral must have clock node definitions");
-                        }
-                    }
-                })
-                .next()
-                .unwrap(),
-        }
-    }
-
-    fn template_peripheral_name(&self) -> &str {
-        match &self.clocks {
-            PeripheralClockTreeEntry::Definition(_) => self.name.as_str(),
-            PeripheralClockTreeEntry::Reference(inherit_from) => inherit_from.as_str(),
-        }
-    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -862,7 +867,7 @@ impl PeripheralClocks {
             }
         }
 
-        match proc_macro2::TokenStream::from_str(&template) {
+        match TokenStream::from_str(&template) {
             Ok(tokens) => Ok(tokens),
             Err(err) => anyhow::bail!("Failed to inflate {template_name}: {err}"),
         }
@@ -880,6 +885,7 @@ impl PeripheralClocks {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeviceClocks {
     #[serde(default)]
     pub(crate) system_clocks: SystemClocks,
@@ -890,7 +896,7 @@ pub struct DeviceClocks {
 
 impl DeviceClocks {
     /// Returns an iterator over the clock tree items.
-    fn process(&self) -> Result<ProcessedClockData> {
+    fn process(&self, config: &SocConfig) -> Result<ProcessedClockData> {
         let mut clock_tree = self
             .system_clocks
             .clock_tree
@@ -900,49 +906,45 @@ impl DeviceClocks {
                 let node = ClockTreeNodeInstance {
                     node: node.boxed(),
                     include_in_global_config: true,
-                    is_first_instance: true,
                     force_configurable: false,
                     name: node.name().to_string(),
-                    group: String::new(),
-                    template_name: node.name().to_string(),
+                    group_instance: String::new(),
+                    group_template: String::new(),
                 };
 
                 (node_name.to_string(), RefCell::new(node))
             })
             .collect::<IndexMap<_, _>>();
 
-        // Merge peripheral clock sources into the clock tree
-        let mut peri_clocks = self.peripheral_clocks.peripheral_clocks.clone();
-        peri_clocks.sort_by(|a, b| a.name.cmp(&b.name));
+        for peri in config.peripherals.iter() {
+            let Some(group_name) = peri.clock_group.as_ref() else {
+                // Peripheral doesn't have a clock tree entry.
+                continue;
+            };
 
-        for peri in peri_clocks {
+            // Instantiate template group
+            let peri_name = peri.name.from_case(Case::Ada).to_case(Case::Constant);
+
             // A peripheral can have any number of clock sources. We'll turn them into clock tree
             // nodes here.
-            let template_peripheral = peri.template_peripheral_name();
-            for def in peri.clock_signals(&self.peripheral_clocks) {
+            for def in self
+                .system_clocks
+                .template_groups
+                .iter()
+                .find(|g| g.group == *group_name)
+                .ok_or_else(|| anyhow::anyhow!("Clock group {group_name} not found"))?
+                .clocks
+                .iter()
+            {
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
                     include_in_global_config: false,
-                    is_first_instance: matches!(
-                        peri.clocks,
-                        PeripheralClockTreeEntry::Definition(_)
-                    ),
                     // FIXME peripherals force configurability because we don't have a way to
                     // cfg them out. Decide if we can do better.
                     force_configurable: true,
-                    name: format!(
-                        "{}_{}",
-                        peri.name.from_case(Case::Ada).to_case(Case::Constant),
-                        def.name()
-                    ),
-                    group: peri.name.from_case(Case::Ada).to_case(Case::Constant),
-                    template_name: format!(
-                        "{}_{}",
-                        template_peripheral
-                            .from_case(Case::Ada)
-                            .to_case(Case::Constant),
-                        def.name()
-                    ),
+                    name: format!("{peri_name}_{}", def.name()),
+                    group_instance: peri_name.clone(),
+                    group_template: group_name.clone(),
                 };
 
                 clock_tree.insert(node.name.clone(), RefCell::new(node));
@@ -1016,7 +1018,7 @@ impl DeviceClocks {
 
             // Peripheral nodes are always refcounted, because we can't assume which node is
             // referred to by the drivers.
-            let is_peripheral_node = !node.group.is_empty();
+            let is_peripheral_node = !node.group_instance.is_empty();
             let refcounted = is_peripheral_node || !(node.always_on() || has_one_direct_dependent);
 
             let properties = ManagementProperties {
@@ -1038,24 +1040,22 @@ impl DeviceClocks {
 
         Ok(tree)
     }
-}
 
-impl super::GenericProperty for DeviceClocks {
-    fn cfgs(&self) -> Option<Vec<String>> {
-        let processed_clocks = self.process().unwrap();
+    fn cfgs(&self, config: &SocConfig) -> Vec<String> {
+        let processed_clocks = self.process(config).unwrap();
 
-        let cfgs = processed_clocks
+        // TODO: output per-template cfgs once we have a single API per template group instead of
+        // per instance
+        processed_clocks
             .clock_tree
             .iter()
             .map(|node| node.name().to_case(Case::Snake))
             .map(|name| format!("soc_has_clock_node_{name}"))
-            .collect::<Vec<_>>();
-
-        Some(cfgs)
+            .collect::<Vec<_>>()
     }
 
-    fn macros(&self) -> Option<TokenStream> {
-        let processed_clocks = self.process().unwrap();
+    fn macros(&self, config: &SocConfig) -> TokenStream {
+        let processed_clocks = self.process(config).unwrap();
 
         let system_clocks = match self.system_clocks.generate_macro(&processed_clocks) {
             Ok(tokens) => tokens,
@@ -1072,9 +1072,9 @@ impl super::GenericProperty for DeviceClocks {
             ),
         };
 
-        Some(quote! {
+        quote! {
             #system_clocks
             #peripheral_clocks
-        })
+        }
     }
 }
