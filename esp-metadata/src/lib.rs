@@ -412,14 +412,12 @@ impl Config {
 
     /// The peripherals of the device.
     pub fn peripherals(&self) -> &[PeripheralDef] {
-        &self
-            .device
+        self.device
             .peri_config
             .soc
             .as_ref()
-            .expect("[device.soc] must be defined")
-            .config
-            .peripherals
+            .map(|props| props.config.peripherals.as_slice())
+            .unwrap_or(&[])
     }
 
     /// User-defined symbols for the device.
