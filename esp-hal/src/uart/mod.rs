@@ -2083,11 +2083,11 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.apply_config(&config)?;
-
         // Reset Tx/Rx FIFOs
         self.rx.uart.info().rxfifo_reset();
         self.rx.uart.info().txfifo_reset();
+
+        self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
