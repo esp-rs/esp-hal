@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque as Queue;
 
 use esp_hal::{handler, interrupt::Priority, peripherals::IEEE802154};
-use esp_phy::{PhyClockGuard, PhyController, PhyInitGuard};
+use esp_phy::{PhyClockGuard, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 
 use super::{
@@ -107,10 +107,10 @@ pub(crate) fn esp_ieee802154_enable(
     mut radio: IEEE802154<'_>,
 ) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
-    let phy_clock_guard = radio.enable_phy_clock();
+    let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
 
-    let phy_init_guard = radio.enable_phy();
+    let phy_init_guard = esp_phy::enable_phy();
 
     esp_btbb_enable();
     ieee802154_mac_init(radio);

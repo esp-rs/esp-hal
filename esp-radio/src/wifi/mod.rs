@@ -912,12 +912,10 @@ impl WifiError {
 impl core::error::Error for WifiError {}
 
 #[cfg(esp32)]
-fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
-    use esp_phy::MacTimeExt;
-
+fn set_mac_time_update_cb(_wifi: crate::hal::peripherals::WIFI<'_>) {
     use crate::sys::include::esp_wifi_internal_update_mac_time;
     unsafe {
-        wifi.set_mac_time_update_cb(|duration| {
+        esp_phy::set_mac_time_update_cb(|duration| {
             esp_wifi_internal_update_mac_time(duration.as_micros() as u32);
         });
     }
