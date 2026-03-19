@@ -322,7 +322,9 @@ pub(crate) struct ExtFuncsT {
     os_random: Option<unsafe extern "C" fn() -> u32>,
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
     ecc_gen_dh_key: Option<unsafe extern "C" fn(*const u8, *const u8, *const u8, *const u8) -> i32>,
-    #[cfg(not(any(esp32h2, esp32c5)))]
+    #[cfg(any(esp32c6, esp32h2))]
+    esp_reset_modem: Option<unsafe extern "C" fn(mdl_opts: u8, start: u8)>,
+    #[cfg(esp32c2)]
     esp_reset_rpa_moudle: Option<unsafe extern "C" fn()>,
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: Option<unsafe extern "C" fn()>,
@@ -333,7 +335,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     ext_version: if cfg!(esp32c2) {
         0x20221122
     } else {
-        0x20250415
+        0x20250825
     },
 
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
@@ -358,7 +360,9 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     os_random: Some(os_random),
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
-    #[cfg(not(any(esp32h2, esp32c5)))]
+    #[cfg(any(esp32c6, esp32h2))]
+    esp_reset_modem: Some(self::ble_os_adapter_chip_specific::reset_modem),
+    #[cfg(esp32c2)]
     esp_reset_rpa_moudle: Some(self::ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,

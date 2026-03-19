@@ -26,3 +26,5 @@ EXTERN(__atoi);
 PROVIDE ( strnlen = __strnlen );
 PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
+
+PROVIDE ( ets_update_cpu_frequency = ets_update_cpu_frequency_rom );

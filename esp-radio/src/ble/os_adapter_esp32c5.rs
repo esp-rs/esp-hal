@@ -328,6 +328,10 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ch39_txpwr: 9,
         adv_rsv_cnt: 1,
         conn_rsv_cnt: 2,
+        priority_level_cfg: 1 << 4 | 1 << 2,
+        slv_fst_rx_lat_en: 0,
+        dl_itvl_phy_sync_en: 0,
+        scan_allow_adi_filter: 0,
         config_magic: CONFIG_MAGIC,
     }
 }
