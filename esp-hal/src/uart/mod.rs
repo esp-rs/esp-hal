@@ -941,13 +941,13 @@ where
 
 #[inline(always)]
 fn sync_regs(_register_block: &RegisterBlock) {
-    #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
+    #[cfg(not(any(esp32, esp32s2)))]
     {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32h2))] {
-                let update_reg = _register_block.reg_update();
-            } else {
+            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
                 let update_reg = _register_block.id();
+            } else {
+                let update_reg = _register_block.reg_update();
             }
         }
 
