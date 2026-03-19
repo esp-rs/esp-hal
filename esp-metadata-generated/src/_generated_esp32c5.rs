@@ -3059,6 +3059,8 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AES peripheral clock signal
             Aes,
+            /// APB_SAR_ADC peripheral clock signal
+            ApbSarAdc,
             /// DMA peripheral clock signal
             Dma,
             /// ECC peripheral clock signal
@@ -3094,6 +3096,7 @@ macro_rules! implement_peripheral_clocks {
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
+                Self::ApbSarAdc,
                 Self::Systimer,
                 Self::Timg0,
                 Self::Uart0,
@@ -3103,6 +3106,7 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
+                Self::ApbSarAdc,
                 Self::Dma,
                 Self::Ecc,
                 Self::I2cExt0,
@@ -3127,6 +3131,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .aes_conf()
                         .modify(|_, w| w.aes_clk_en().bit(enable));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .saradc_conf()
+                        .modify(|_, w| w.saradc_reg_clk_en().bit(enable));
                 }
                 Peripheral::Dma => {
                     crate::peripherals::SYSTEM::regs()
@@ -3220,6 +3229,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .aes_conf()
                         .modify(|_, w| w.aes_rst_en().bit(reset));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .saradc_conf()
+                        .modify(|_, w| w.saradc_reg_rst_en().bit(reset));
                 }
                 Peripheral::Dma => {
                     crate::peripherals::SYSTEM::regs()
@@ -3657,10 +3671,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_CH1 peripheral singleton"]
         DMA_CH1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "DMA_CH2 peripheral singleton"] DMA_CH2 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "BT peripheral singleton"] BT <=
-        virtual(LP_TIMER : { bind_lp_timer_interrupt, enable_lp_timer_interrupt,
-        disable_lp_timer_interrupt }, BT_MAC : { bind_mac_interrupt,
-        enable_mac_interrupt, disable_mac_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ADC1 peripheral singleton"]
+        ADC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "BT peripheral singleton"] BT <= virtual(LP_TIMER : { bind_lp_timer_interrupt,
+        enable_lp_timer_interrupt, disable_lp_timer_interrupt }, BT_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
@@ -3758,6 +3773,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
         _for_each_inner_peripheral!((DMA_CH1(unstable)));
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
+        _for_each_inner_peripheral!((ADC1(unstable)));
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
@@ -3953,6 +3969,7 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (@ peri_type #[doc = "DMA_CH1 peripheral singleton"]
         DMA_CH1 <= virtual() (unstable)), (@ peri_type #[doc =
         "DMA_CH2 peripheral singleton"] DMA_CH2 <= virtual() (unstable)), (@ peri_type
+        #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)), (@ peri_type
         #[doc = "BT peripheral singleton"] BT <= virtual(LP_TIMER : {
         bind_lp_timer_interrupt, enable_lp_timer_interrupt, disable_lp_timer_interrupt },
         BT_MAC : { bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt })
@@ -3995,17 +4012,18 @@ macro_rules! for_each_peripheral {
         (RNG(unstable)), (RSA(unstable)), (SHA(unstable)), (SLC(unstable)), (SPI2),
         (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)),
         (TIMG1(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),
-        (SW_INTERRUPT(unstable)), (WIFI), (MEM2MEM0(unstable)), (MEM2MEM1(unstable)),
-        (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
-        (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
-        (MEM2MEM8(unstable)))); _for_each_inner_peripheral!((dma_eligible(MEM2MEM0,
-        Mem2mem0, 0), (SPI2, Spi2, 1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1,
-        Mem2mem1, 4), (MEM2MEM2, Mem2mem2, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC,
-        ApbSaradc, 8), (PARL_IO, ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4,
-        Mem2mem4, 11), (MEM2MEM5, Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7,
-        Mem2mem7, 14), (MEM2MEM8, Mem2mem8, 15)));
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (ADC1(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
+        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI), (MEM2MEM0(unstable)),
+        (MEM2MEM1(unstable)), (MEM2MEM2(unstable)), (MEM2MEM3(unstable)),
+        (MEM2MEM4(unstable)), (MEM2MEM5(unstable)), (MEM2MEM6(unstable)),
+        (MEM2MEM7(unstable)), (MEM2MEM8(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(MEM2MEM0, Mem2mem0, 0), (SPI2, Spi2,
+        1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1, Mem2mem1, 4), (MEM2MEM2,
+        Mem2mem2, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (PARL_IO,
+        ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4, Mem2mem4, 11), (MEM2MEM5,
+        Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7, Mem2mem7, 14), (MEM2MEM8,
+        Mem2mem8, 15)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

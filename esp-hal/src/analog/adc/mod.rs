@@ -259,6 +259,12 @@ trait AdcCalEfuse {
     ///
     /// Returns digital value for reference voltage for a given attenuation
     fn cal_code(atten: Attenuation) -> Option<u16>;
+
+    /// Get the ADC channel specific calibration
+    ///
+    /// Returns digital per channel offset from reference voltage
+    #[cfg(esp32c5)]
+    fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32>;
 }
 
 for_each_analog_function! {
