@@ -111,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
 - Improve LP timer accuracy (#5105, #5115)
 - Increase the size of `irom_seg`/`drom_seg` from 4 MB to 32 MB for the ESP32-S3 (#5121)
+- GPIO pin associations are now correctly reset when creating UART and I2C drivers (#5214)
 
 ### Removed
 
