@@ -446,11 +446,10 @@ where
     fn new(uart: impl Instance + 'd) -> Self {
         let uart = uart.degrade();
 
-        uart.info().tx_signal.connect_to(&crate::gpio::NoPin);
-        uart.info().rts_signal.connect_to(&crate::gpio::NoPin);
-        uart.info().cts_signal.connect_to(&crate::gpio::NoPin);
+        // Make sure inputs are well-defined.
         // Connect RX to an idle high level.
         uart.info().rx_signal.connect_to(&crate::gpio::Level::High);
+        uart.info().cts_signal.connect_to(&crate::gpio::Level::Low);
 
         Self {
             uart,
