@@ -537,7 +537,7 @@ impl Task {
         }
     }
 
-    pub(crate) fn ensure_no_stack_overflow(&self) {
+    pub(crate) fn ensure_no_stack_overflow(&self, _sp: usize) {
         #[cfg(sw_task_overflow_detection)]
         assert_eq!(
             // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
@@ -547,6 +547,22 @@ impl Task {
             "Stack overflow detected in {:?}",
             self as *const Task
         );
+
+        #[cfg(stack_pointer_range_check)]
+        {
+            let len = self.stack.len();
+            let data_ptr = self.stack.cast::<MaybeUninit<u32>>();
+            let stack_bottom = data_ptr as usize;
+            let stack_top = data_ptr.wrapping_add(len) as usize;
+            assert!(
+                _sp > stack_bottom && _sp <= stack_top,
+                "Stack overflow detected in {:?}. Stack pointer: {:x}, Task stack range: {:x} ..= {:x}",
+                self as *const Task,
+                _sp,
+                stack_bottom,
+                stack_top
+            );
+        }
     }
 
     pub(crate) fn set_up_stack_watchpoint(&self) {

@@ -777,6 +777,7 @@ pub fn init(config: Config) -> Peripherals {
         }
     }
 
+    crate::soc::ensure_stack_pointer_in_range();
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
 

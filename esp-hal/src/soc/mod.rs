@@ -254,6 +254,31 @@ fn setup_stack_guard() {
     }
 }
 
+#[cfg(feature = "rt")]
+pub(crate) fn ensure_stack_pointer_in_range() {
+    unsafe extern "C" {
+        static _stack_end_cpu0: u32;
+        static _stack_start_cpu0: u32;
+    }
+    let current_sp: usize;
+    cfg_if::cfg_if! {
+        if #[cfg(xtensa)] {
+            unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
+        } else {
+            unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
+        }
+    }
+    let stack_bottom = (&raw const _stack_end_cpu0) as usize;
+    let stack_top = (&raw const _stack_start_cpu0) as usize;
+    assert!(
+        current_sp > stack_bottom && current_sp <= stack_top,
+        "stack pointer out of range: sp=0x{:x}, bottom=0x{:x}, top=0x{:x}",
+        current_sp,
+        stack_bottom,
+        stack_top
+    );
+}
+
 #[cfg(all(feature = "rt", stack_guard_monitoring))]
 pub(crate) fn enable_main_stack_guard_monitoring() {
     unsafe {
