@@ -146,12 +146,12 @@ impl DependencyGraph {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             dependency_graph.insert(node.name.clone(), Vec::new());
             reverse_dependency_graph.insert(node.name.clone(), Vec::new());
         }
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             let node_name = node.name_str();
 
             for input in node.input_clocks(clock_tree) {
@@ -215,7 +215,7 @@ fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<
 #[derive(Debug)]
 pub(crate) struct ManagementProperties {
     pub name: Ident,
-    pub state_ty: Option<Ident>,
+    pub state_ty: Option<TokenStream>,
     pub refcounted: bool,
     pub has_enable: bool,
 
@@ -229,16 +229,20 @@ impl ManagementProperties {
         self.name.clone()
     }
 
-    pub fn type_name(&self) -> Option<Ident> {
+    pub fn type_name(&self) -> Option<TokenStream> {
         self.state_ty.clone()
     }
 
-    pub fn refcount_field_name(&self) -> Option<Ident> {
+    pub fn refcount_field(&self) -> Option<Ident> {
         if self.refcounted {
             Some(format_ident!("{}_refcount", self.name))
         } else {
             None
         }
+    }
+
+    pub fn refcount_accessor(&self) -> Option<TokenStream> {
+        self.refcount_field().map(|field| quote! { clocks.#field })
     }
 
     pub fn has_enable(&self) -> bool {
@@ -247,6 +251,18 @@ impl ManagementProperties {
 
     pub fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    /// Returns an expression that accesses the node's current configuration field in the ClockTree
+    /// struct.
+    pub fn config_accessor(&self) -> TokenStream {
+        self.config_accessor_from("clocks")
+    }
+
+    pub fn config_accessor_from(&self, field: &str) -> TokenStream {
+        let node_field = &self.name;
+        let field = format_ident!("{}", field);
+        quote! { #field.#node_field }
     }
 }
 
@@ -617,13 +633,12 @@ impl RejectExpression {
             if !variables.contains_key(var) {
                 // Referring to a node by name resolves to its output frequency.
                 let node = instance.resolve_node(tree, var);
-                let properties = tree.properties(node.name_str());
                 let freq_fn = node.frequency_function_name();
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
                 // Only run the assert if the referenced nodes have been configured
-                let node_field = properties.field_name();
-                patterns.push(quote! { clocks.#node_field.is_some() });
+                let config_field = node.properties.config_accessor();
+                patterns.push(quote! { #config_field.is_some() });
             }
         });
 

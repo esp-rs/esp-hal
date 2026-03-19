@@ -210,8 +210,8 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_request_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = instance.properties.config_accessor();
+        self.impl_request_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
     fn release_direct_dependencies(
@@ -219,8 +219,8 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_release_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = instance.properties.config_accessor();
+        self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 }
 
@@ -247,8 +247,7 @@ impl Multiplexer {
         let ty_name = instance.config_type_name();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        let state = tree.properties(instance.name_str()).field_name();
-        let refcount_field = tree.properties(instance.name_str()).refcount_field_name();
+        let config_field = instance.properties.config_accessor();
 
         let request_upstream = self.impl_request_upstream(instance, tree, quote! { new_selector });
         let release_upstream = self.impl_release_upstream(instance, tree, quote! { old_selector });
@@ -300,9 +299,9 @@ impl Multiplexer {
                 #release_upstream
             }
         };
-        let apply_impl = if refcount_field.is_some() {
+        let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
             quote! {
-                if clocks.#refcount_field > 0 {
+                if #refcount_accessor > 0 {
                     #apply_and_switch_input
                 } else {
                     #hal_impl(clocks, old_selector, new_selector);
@@ -314,7 +313,7 @@ impl Multiplexer {
 
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, new_selector: #ty_name) {
-                let old_selector = clocks.#state.replace(new_selector);
+                let old_selector = #config_field.replace(new_selector);
 
                 #configures
 

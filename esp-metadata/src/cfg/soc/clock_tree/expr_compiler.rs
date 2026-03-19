@@ -126,9 +126,8 @@ impl<'ctx> ExprCompiler<'ctx> {
         };
 
         let referred_node = instance.resolve_node(tree, variable.source(source));
-        let node_props = tree.properties(referred_node.name_str());
-        let node_field = quote::format_ident!("{}", node_props.field_name());
+        let config_field = referred_node.properties.config_accessor();
         let name = quote::format_ident!("{}", name.source(source));
-        quote! { unwrap!(clocks.#node_field).#name() }
+        quote! { unwrap!(#config_field).#name() }
     }
 }
