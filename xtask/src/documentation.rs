@@ -511,7 +511,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
             let mut chips = device_doc_paths
                 .iter()
-                .map(|path| {
+                .filter_map(|path| {
                     let chip = path
                         .components()
                         .next_back()
@@ -519,7 +519,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                         .as_os_str()
                         .to_string_lossy();
 
-                    Chip::from_str(&chip, true).unwrap()
+                    match Chip::from_str(&chip, true) {
+                        Ok(chip) => Some(chip),
+                        Err(e) => {
+                            log::warn!("Folder name is not a valid chip name: {chip} - {e}");
+                            None
+                        }
+                    }
                 })
                 .collect::<Vec<_>>();
 
