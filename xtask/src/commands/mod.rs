@@ -6,12 +6,7 @@ use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
 
-pub use self::{
-    build::*,
-    check_changelog::*,
-    release::*,
-    run::*,
-};
+pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
@@ -293,10 +288,10 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
-    if args.package == Package::EspHal {
+    if args.package != Package::QaTest {
         log::warn!(
             "Package '{}' specified, using '{}' instead",
-            Package::EspHal,
+            args.package,
             Package::Examples
         );
         args.package = Package::Examples;
