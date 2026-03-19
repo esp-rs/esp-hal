@@ -954,7 +954,7 @@ fn sync_regs(_register_block: &RegisterBlock) {
         update_reg.modify(|_, w| w.reg_update().set_bit());
 
         while update_reg.read().reg_update().bit_is_set() {
-            // wait
+            core::hint::spin_loop();
         }
     }
 }
