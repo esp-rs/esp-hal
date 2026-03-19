@@ -164,9 +164,13 @@ impl embedded_io_07::Error for TxError {
 
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use crate::soc::clocks::Uart0FunctionClockConfig as ClockSource;
+pub use crate::soc::clocks::Uart0FunctionClockSclk as ClockSource;
 #[cfg(not(feature = "unstable"))]
-use crate::soc::clocks::Uart0FunctionClockConfig as ClockSource;
+use crate::soc::clocks::Uart0FunctionClockSclk as ClockSource;
+use crate::soc::clocks::{
+    Uart0BaudRateGeneratorConfig as BaudRateConfig,
+    Uart0FunctionClockConfig as ClockConfig,
+};
 
 /// Number of data bits
 ///
@@ -934,7 +938,7 @@ where
 
 #[inline(always)]
 fn sync_regs(_register_block: &RegisterBlock) {
-    #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
+    #[cfg(not(any(esp32, esp32s2)))]
     {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c5, esp32c6, esp32h2))] {
@@ -3004,9 +3008,11 @@ pub struct Info {
 
     pub request_uart_clks: fn(&mut ClockTree),
     pub release_uart_clks: fn(&mut ClockTree),
-    pub configure_sclk: fn(&mut ClockTree, ClockSource),
+    pub configure_sclk: fn(&mut ClockTree, ClockConfig),
+    pub configure_baud_rate: fn(&mut ClockTree, BaudRateConfig),
+    pub baud_rate_clock_frequency: fn(&mut ClockTree) -> u32,
     pub sclk_frequency: fn(&mut ClockTree) -> u32,
-    pub sclk_config_frequency: fn(&mut ClockTree, ClockSource) -> u32,
+    pub sclk_config_frequency: fn(&mut ClockTree, ClockConfig) -> u32,
 }
 
 /// Peripheral state for a UART instance.
@@ -3327,75 +3333,78 @@ impl Info {
         Ok(())
     }
 
-    #[cfg(soc_has_pcr)]
-    fn is_instance(&self, other: impl Instance) -> bool {
-        self == other.info()
-    }
-
     fn sync_regs(&self) {
         sync_regs(self.regs());
     }
 
     fn change_baud(&self, config: &Config) -> Result<(), ConfigError> {
         ClockTree::with(|clocks| {
-            let clk = (self.sclk_config_frequency)(clocks, config.clock_source);
+            let source_config = ClockConfig::new(
+                config.clock_source,
+                #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
+                0,
+            );
+            let clk = (self.sclk_config_frequency)(clocks, source_config);
+
+            // The UART baud rate clock divider is, depending on the device, either a
+            // 20.4 bit, or a 12.4 bit divider.
+            // TODO: get this info from metadata, based on something like:
+            // property!("clocks.uart0.baud_rate_generator.fractional.max")
+            const FRAC_BITS: u32 = 4;
+            const FRAC_MASK: u32 = (1 << FRAC_BITS) - 1;
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2))] {
-                    self.regs().conf0().modify(|_, w| {
-                        w.tick_ref_always_on()
-                            .bit(config.clock_source == ClockSource::Apb)
-                    });
-
-                    let divider = (clk << 4) / config.baudrate;
-                } else {
+                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr))] {
                     const MAX_DIV: u32 = 0b1111_1111_1111 - 1;
-                    let clk_div = (clk.div_ceil(MAX_DIV)).div_ceil(config.baudrate);
+                    let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
+                    debug!("SCLK: {} divider: {}", clk, clk_div);
 
-                    // define `conf` in scope for modification below
-                    cfg_if::cfg_if! {
-                        if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                            let conf = self.regs().clk_conf();
-                        } else {
-                            // UART clocks are configured via PCR
-                            let pcr = crate::peripherals::PCR::regs();
-                            let conf = if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
-                                pcr.uart(0).clk_conf()
-                            } else {
-                                pcr.uart(1).clk_conf()
-                            };
-                        }
-                    };
-
-                    // TODO: we should consider a solution that can write this register fully in one go
-                    // as part of the UART_SCLK configuration. Currently this may cause unexpected waveform
-                    // changes in the transmitted data if the clock source is changed, even if the baud
-                    // rate can be kept the same.
-                    conf.modify(|_, w| unsafe {
-                        w.sclk_div_a().bits(0);
-                        w.sclk_div_b().bits(0);
-                        w.sclk_div_num().bits(clk_div as u8 - 1) // TODO: remember the -1
-                    });
-
-                    let divider = (clk << 4) / (config.baudrate * clk_div);
+                    let conf = ClockConfig::new(config.clock_source, clk_div - 1);
+                    let divider = (clk << FRAC_BITS) / (config.baudrate * clk_div);
+                } else {
+                    debug!("SCLK: {}", clk);
+                    let conf = ClockConfig::new(config.clock_source);
+                    let divider = (clk << FRAC_BITS) / config.baudrate;
                 }
             }
 
-            let divider_integer = divider >> 4;
-            let divider_frag = (divider & 0xf) as u8;
+            let divider_integer = divider >> FRAC_BITS;
+            let divider_frag = divider & FRAC_MASK;
+            debug!(
+                "UART CLK divider: {} + {}/16",
+                divider_integer, divider_frag
+            );
 
-            (self.configure_sclk)(clocks, config.clock_source);
-            self.regs().clkdiv().write(|w| unsafe {
-                w.clkdiv().bits(divider_integer as _);
-                w.frag().bits(divider_frag)
-            });
+            (self.configure_sclk)(clocks, conf);
+            (self.configure_baud_rate)(clocks, BaudRateConfig::new(divider_frag, divider_integer));
 
             self.sync_regs();
 
             #[cfg(feature = "unstable")]
-            self.verify_baudrate(clk, config)?;
+            {
+                let deviation_limit = match config.baudrate_tolerance {
+                    BaudrateTolerance::Exact => 1, // Still allow a tiny deviation
+                    BaudrateTolerance::ErrorPercent(percent) => percent as u32,
+                    _ => return Ok(()),
+                };
+
+                let actual_baud = (self.baud_rate_clock_frequency)(clocks);
+                if actual_baud == 0 {
+                    return Err(ConfigError::BaudrateNotAchievable);
+                }
+
+                let deviation = (config.baudrate.abs_diff(actual_baud) * 100) / actual_baud;
+                debug!(
+                    "Nominal baud: {}, actual: {}, deviation: {}%",
+                    config.baudrate, actual_baud, deviation
+                );
+
+                if deviation > deviation_limit {
+                    return Err(ConfigError::BaudrateNotAchievable);
+                }
+            }
 
             Ok(())
         })
@@ -3535,57 +3544,6 @@ impl Info {
 
         txfifo_rst(self.regs(), true);
         txfifo_rst(self.regs(), false);
-    }
-
-    #[cfg(feature = "unstable")]
-    fn verify_baudrate(&self, clk: u32, config: &Config) -> Result<(), ConfigError> {
-        // taken from https://github.com/espressif/esp-idf/blob/c5865270b50529cd32353f588d8a917d89f3dba4/components/hal/esp32c6/include/hal/uart_ll.h#L433-L444
-        // (it's different for different chips)
-        let clkdiv_reg = self.regs().clkdiv().read();
-        let clkdiv_frag = clkdiv_reg.frag().bits() as u32;
-        let clkdiv = clkdiv_reg.clkdiv().bits();
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                let actual_baud = (clk << 4) / ((clkdiv << 4) | clkdiv_frag);
-            } else if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                let sclk_div_num = self.regs().clk_conf().read().sclk_div_num().bits() as u32;
-                let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
-            } else { // esp32c5, esp32c6, esp32h2
-                let pcr = crate::peripherals::PCR::regs();
-                let conf = if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
-                    pcr.uart(0).clk_conf()
-                } else {
-                    pcr.uart(1).clk_conf()
-                };
-                let sclk_div_num = conf.read().sclk_div_num().bits() as u32;
-                let actual_baud = (clk << 4) / ((((clkdiv as u32) << 4) | clkdiv_frag) * (sclk_div_num + 1));
-            }
-        };
-
-        match config.baudrate_tolerance {
-            BaudrateTolerance::Exact => {
-                let deviation = ((config.baudrate as i32 - actual_baud as i32).unsigned_abs()
-                    * 100)
-                    / actual_baud;
-                // We tolerate deviation of 1% from the desired baud value, as it never will be
-                // exactly the same
-                if deviation > 1_u32 {
-                    return Err(ConfigError::BaudrateNotAchievable);
-                }
-            }
-            BaudrateTolerance::ErrorPercent(percent) => {
-                let deviation = ((config.baudrate as i32 - actual_baud as i32).unsigned_abs()
-                    * 100)
-                    / actual_baud;
-                if deviation > percent as u32 {
-                    return Err(ConfigError::BaudrateNotAchievable);
-                }
-            }
-            _ => {}
-        }
-
-        Ok(())
     }
 
     fn current_symbol_length(&self) -> u8 {
@@ -3766,6 +3724,7 @@ for_each_uart! {
                 fn request_uart_clks(clocks: &mut ClockTree) {
                     paste::paste! {
                         clocks:: [< request_ $inst:lower _function_clock >](clocks);
+                        clocks:: [< request_ $inst:lower _baud_rate_generator >](clocks);
                         #[cfg(soc_has_clock_node_uart0_mem_clock)]
                         clocks:: [< request_ $inst:lower _mem_clock >](clocks);
                     }
@@ -3775,6 +3734,7 @@ for_each_uart! {
                     paste::paste! {
                         #[cfg(soc_has_clock_node_uart0_mem_clock)]
                         clocks:: [< release_ $inst:lower _mem_clock >](clocks);
+                        clocks:: [< release_ $inst:lower _baud_rate_generator >](clocks);
                         clocks:: [< release_ $inst:lower _function_clock >](clocks);
                     }
                 }
@@ -3790,6 +3750,8 @@ for_each_uart! {
                     request_uart_clks,
                     release_uart_clks,
                     configure_sclk: paste::paste!(clocks:: [< configure_ $inst:lower _function_clock >]),
+                    configure_baud_rate: paste::paste!(clocks:: [< configure_ $inst:lower _baud_rate_generator >]),
+                    baud_rate_clock_frequency: paste::paste!(clocks:: [< $inst:lower _baud_rate_generator_frequency >]),
                     sclk_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_frequency >]),
                     sclk_config_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_config_frequency >]),
                 };
@@ -3844,7 +3806,13 @@ struct UartClockGuard<'t> {
 impl<'t> UartClockGuard<'t> {
     fn new(uart: AnyUart<'t>) -> Self {
         ClockTree::with(|clocks| {
-            (uart.info().configure_sclk)(clocks, Default::default());
+            // Apply default SCLK configuration
+            let sclk_config = ClockConfig::new(
+                Default::default(),
+                #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
+                0,
+            );
+            (uart.info().configure_sclk)(clocks, sclk_config);
             (uart.info().request_uart_clks)(clocks);
         });
 
