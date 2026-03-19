@@ -472,8 +472,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             continue;
         }
 
-        let package_docs_path = docs_path.join(package.to_string());
-        let mut device_doc_paths = Vec::new();
+        let package_docs_path = docs_path.join(package.as_ref());
 
         // Each path we iterate over should be the directory for a given version of
         // the package's documentation: (except latest)
@@ -500,18 +499,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 continue;
             }
 
+            // Collect all chip directories in this version's docs
+            let mut chips = vec![];
             for path in fs::read_dir(&version_path)
                 .with_context(|| format!("Failed to read {}", version_path.display()))?
             {
                 let path = path?.path();
                 if path.is_dir() {
-                    device_doc_paths.push(path);
-                }
-            }
-
-            let mut chips = device_doc_paths
-                .iter()
-                .filter_map(|path| {
                     let chip = path
                         .components()
                         .next_back()
@@ -520,14 +514,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                         .to_string_lossy();
 
                     match Chip::from_str(&chip, true) {
-                        Ok(chip) => Some(chip),
+                        Ok(chip) => chips.push(chip),
                         Err(e) => {
                             log::warn!("Folder name is not a valid chip name: {chip} - {e}");
-                            None
                         }
                     }
-                })
-                .collect::<Vec<_>>();
+                }
+            }
 
             chips.sort();
 
