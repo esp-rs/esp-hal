@@ -406,8 +406,7 @@ pub fn disable_phy() {
 
 /// Enable the PHY clock and acquire a [PhyClockGuard].
 ///
-/// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
-/// modems were dropped.
+/// The PHY clock will only be disabled once all [PhyClockGuard]s are dropped.
 pub fn enable_phy_clock<'d>() -> PhyClockGuard<'d> {
     increase_phy_clock_ref_count_internal();
     PhyClockGuard {
