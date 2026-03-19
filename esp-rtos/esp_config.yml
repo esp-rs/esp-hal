@@ -14,6 +14,11 @@ options:
     default:
       - value: false
 
+  - name: stack-pointer-range-check
+    description: "Enable range-check based stack overflow detection."
+    default:
+      - value: true
+
   - name: hw-task-overflow-detection
     description: "Enable hardware-based stack overflow detection. The stack watermark is based on the esp-hal stack-guard-offset configuration."
     default:

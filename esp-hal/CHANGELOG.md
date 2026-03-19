@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - It's no longer possible to pass `esp_hal::gpio::Output` to bidirectional peripheral signals (half-duplex SPI, I2C) (#5093)
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
 - `Rng`, `Rng::{random, read}` have been marked stable (#5098)
+- `esp_hal::init` now verifies that the initial stack pointer is in range (#5227)
 
 ### Fixed
 

@@ -234,9 +234,22 @@ impl SchedulerState {
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
 
+        let current_sp: u32;
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
+            } else {
+                unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
+            }
+        }
+
         let current_task = NonNull::new(read_thread_pointer());
         if let Some(current_task) = current_task {
-            unsafe { current_task.as_ref().ensure_no_stack_overflow() };
+            unsafe {
+                current_task
+                    .as_ref()
+                    .ensure_no_stack_overflow(current_sp as usize)
+            };
 
             if current_task.state() == TaskState::Ready {
                 // Current task is still ready, mark it as such.
@@ -297,15 +310,6 @@ impl SchedulerState {
                 {
                     // We're using the current task's stack, for which the watchpoint is already set
                     // up.
-
-                    let current_sp;
-                    cfg_if::cfg_if! {
-                        if #[cfg(xtensa)] {
-                            unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
-                        } else {
-                            unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
-                        }
-                    }
                     current_sp
                 } else {
                     // We're using the main task's stack.
@@ -392,7 +396,16 @@ impl SchedulerState {
     }
 
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
-        unsafe { to_delete.as_ref().ensure_no_stack_overflow() };
+        unsafe {
+            cfg_if::cfg_if! {
+                if #[cfg(xtensa)] {
+                    let saved_sp = to_delete.as_ref().cpu_context.A1 as usize;
+                } else {
+                    let saved_sp = to_delete.as_ref().cpu_context.sp;
+                }
+            }
+            to_delete.as_ref().ensure_no_stack_overflow(saved_sp)
+        };
 
         debug!("Dropping task: {:x}", to_delete.as_ptr() as usize);
         unsafe {
