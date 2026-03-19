@@ -274,6 +274,12 @@ unsafe extern "C" {
     pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
 
     pub(crate) fn coex_pti_v2();
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn scan_stack_initEnv() -> i32;
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn scan_stack_deinitEnv();
 }
 
 #[repr(C)]
@@ -1189,6 +1195,12 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             let res = extAdv_stack_initEnv();
             assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
 
+            #[cfg(not(esp32c2))]
+            {
+                let res = scan_stack_initEnv();
+                assert!(res == 0, "scan_stack_initEnv returned {}", res);
+            }
+
             let res = sync_stack_initEnv();
             assert!(res == 0, "sync_stack_initEnv returned {}", res);
 
@@ -1266,6 +1278,7 @@ pub(crate) fn ble_deinit() {
             npl::r_ble_controller_disable();
             conn_stack_deinitEnv();
             sync_stack_deinitEnv();
+            scan_stack_deinitEnv();
             extAdv_stack_deinitEnv();
             adv_stack_deinitEnv();
             base_stack_deinitEnv();
