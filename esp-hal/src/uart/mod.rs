@@ -448,8 +448,15 @@ where
     Dm: DriverMode,
 {
     fn new(uart: impl Instance + 'd) -> Self {
+        let uart = uart.degrade();
+
+        // Make sure inputs are well-defined.
+        // Connect RX to an idle high level.
+        uart.info().rx_signal.connect_to(&crate::gpio::Level::High);
+        uart.info().cts_signal.connect_to(&crate::gpio::Level::Low);
+
         Self {
-            uart: uart.degrade(),
+            uart,
             phantom: PhantomData,
         }
     }
@@ -876,7 +883,6 @@ where
             .conf0()
             .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
 
-        #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
 
         // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
@@ -893,7 +899,6 @@ where
             .conf0()
             .write(|w| unsafe { w.bits(original_conf0.bits()) });
 
-        #[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
     }
 
@@ -941,17 +946,17 @@ fn sync_regs(_register_block: &RegisterBlock) {
     #[cfg(not(any(esp32, esp32s2)))]
     {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32h2))] {
-                let update_reg = _register_block.reg_update();
-            } else {
+            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
                 let update_reg = _register_block.id();
+            } else {
+                let update_reg = _register_block.reg_update();
             }
         }
 
         update_reg.modify(|_, w| w.reg_update().set_bit());
 
         while update_reg.read().reg_update().bit_is_set() {
-            // wait
+            core::hint::spin_loop();
         }
     }
 }
@@ -1257,7 +1262,6 @@ where
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
 
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
 
@@ -2080,11 +2084,11 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        self.apply_config(&config)?;
-
         // Reset Tx/Rx FIFOs
         self.rx.uart.info().rxfifo_reset();
         self.rx.uart.info().txfifo_reset();
+
+        self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
         // so that bytes written to TX FIFO are always immediately transmitted.
@@ -3496,7 +3500,6 @@ impl Info {
             RtsConfig::Disabled => self.configure_rts_flow_ctrl(false, None),
         }
 
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
 
