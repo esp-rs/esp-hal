@@ -83,6 +83,7 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
 /// Get the channel specific calibration compensation
 ///
 /// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L60>
+#[instability::unstable]
 pub fn rtc_calib_get_chan_compens(
     _unit: AdcCalibUnit,
     channel: u16,
