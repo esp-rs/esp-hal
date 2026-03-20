@@ -6,10 +6,8 @@ use core::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 pub use crate::soc::cpu_control::is_running;
-#[cfg(not(feature = "unstable"))]
-use crate::soc::cpu_control::is_running;
 use crate::{
     peripherals::CPU_CTRL,
     soc::cpu_control::{internal_park_core, start_core1_init},

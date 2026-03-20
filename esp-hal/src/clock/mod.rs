@@ -66,11 +66,8 @@ pub mod ll {
     pub use crate::soc::clocks::*;
 }
 
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
-#[cfg(not(feature = "unstable"))]
-pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
