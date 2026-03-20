@@ -2360,6 +2360,44 @@ mod dma {
 
             Ok(())
         }
+
+        /// Half-duplex write using DMA.
+        ///
+        /// Returns [`DmaError::Overflow`] if the buffer exceeds the DMA Buffer
+        #[instability::unstable]
+        pub async fn half_duplex_write_async(
+            &mut self,
+            data_mode: DataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: &[u8],
+        ) -> Result<(), Error> {
+            if buffer.len() > self.tx_buf.capacity() {
+                return Err(Error::from(DmaError::Overflow));
+            }
+
+            self.spi_dma.wait_for_idle_async().await;
+            self.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
+
+            let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
+
+            unsafe {
+                spi.start_half_duplex_write(
+                    data_mode,
+                    cmd,
+                    address,
+                    dummy,
+                    buffer.len(),
+                    &mut self.tx_buf,
+                )?;
+            }
+
+            spi.wait_for_idle_async().await;
+            spi.defuse();
+
+            Ok(())
+        }
     }
 
     impl<'d, Dm> SpiDmaBus<'d, Dm>
