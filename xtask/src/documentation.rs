@@ -76,9 +76,15 @@ pub fn build_documentation(
             }
         }
 
+        let package_output_path = output_path.join(package.to_string());
+
+        // Create the package subdirectory if it doesn't exist
+        fs::create_dir_all(&package_output_path)
+            .with_context(|| format!("Failed to create {}", package_output_path.display()))?;
+
         // Write out the package manifest JSON file:
         fs::write(
-            output_path.join(package.to_string()).join("manifest.json"),
+            package_output_path.join("manifest.json"),
             serde_json::to_string(&manifest)
                 .with_context(|| format!("Failed to parse {manifest:?}"))?,
         )
