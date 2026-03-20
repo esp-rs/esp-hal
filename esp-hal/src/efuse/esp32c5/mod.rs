@@ -98,7 +98,7 @@ pub fn rtc_calib_get_chan_compens(
         _ => return None,
     });
 
-    Some(get_signed_val(chan_diff as u32, 3) * (4 - atten as i32))
+    Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
 }
 
 /// Get ADC calibration coefficients
