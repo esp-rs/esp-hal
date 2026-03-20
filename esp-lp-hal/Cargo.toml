@@ -49,6 +49,13 @@ esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], option
 esp32s2-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
 esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
 
+# riscv-rt TODOs for adapting esp-lp-hal
+# 1. Check that the overriden _setup_interrupt and _start_trap functions work, 
+#    with the interrupt/exception handling hooks provided by riscv-rt.
+# 2. Add the custom picorv32 assembly instructions somewhere, exported as inlined rust functions
+# 3. Add a critical section implementation
+riscv-rt = { version = "0.17.1", features = ["no-mhartid", "no-xie-xip", "no-xtvec", "single-hart"] }
+
 [dev-dependencies]
 panic-halt = "0.2.0"
 

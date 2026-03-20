@@ -132,27 +132,6 @@ global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
 global_asm!(include_str!("./ulp_riscv_vectors.S"));
 
 #[cfg(any(esp32s2, esp32s3))]
-global_asm!(
-    r#"
-    .balign 0x10
-    .section .init
-    __start:
-        /* setup the stack pointer */
-        la sp, __stack_top
-
-        /* Custom instruction to un-mask the interrupts */
-        /* waitirq_insn zero */
-        maskirq_insn zero, zero
-
-        call ulp_riscv_rescue_from_monitor
-        call rust_main
-
-    loop:
-        j loop
-    "#
-);
-
-#[cfg(any(esp32s2, esp32s3))]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
     // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears

@@ -62,18 +62,22 @@
     addi sp,sp, \cxt_size
 .endm
 
-.section .text.vectors
-.global irq_vector
+.section .init.vectors
 .global reset_vector
+.global ulp_riscv_rescue_from_monitor
+.global _start
+.global _start_trap
+.global _start_trap_rust
+.global _setup_interrupts
 
 /* The reset vector, jumps to startup code */
 reset_vector:
 	/* no more than 16 bytes here ! */
-	j __start
+	j _start
 
 /* Interrupt handler */
 .balign 0x10
-irq_vector:
+_start_trap:
     /* Save the general gurpose register context before handling the interrupt */
     save_general_regs
 
@@ -84,10 +88,19 @@ irq_vector:
      * We do not re-enable interrupts before calling the handler as ULP RISC-V does not
      * support nested interrupts.
      */
-    jal _ulp_riscv_interrupt_handler
+    jal _start_trap_rust
 
     /* Restore the register context after returning from the C interrupt handler */
     restore_general_regs
 
     /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
     retirq_insn
+
+.section .init.rust
+_setup_interrupts:
+    /* Custom instruction to un-mask the interrupts */
+    /* waitirq_insn zero */
+    maskirq_insn zero, zero
+    /* Allow ULP to run */
+    call ulp_riscv_rescue_from_monitor
+    ret
