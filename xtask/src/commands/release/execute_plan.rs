@@ -4,7 +4,6 @@ use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use esp_metadata::Chip;
 use strum::IntoEnumIterator;
-use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
@@ -66,26 +65,12 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             );
         }
 
-        if let Some(metadata) = package.espressif_metadata()
-            && let Some(Item::Value(forever_unstable)) = metadata.get("forever_unstable")
-        {
-            // Special case: some packages are perma-unstable, meaning they won't ever have
-            // a stable release. For these packages, we always use a
-            // patch release.
-            let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
-                *forever_unstable.value()
-            } else {
-                log::warn!("Invalid value for 'forever_unstable' in metadata - must be a boolean");
-                true
-            };
-
-            if forever_unstable && step.bump != VersionBump::Patch {
-                bail!(
-                    "Cannot bump perma-unstable package {} to a non-patch version",
-                    step.package
-                );
-            }
-        };
+        if package.package.is_forever_unstable() && step.bump != VersionBump::Patch {
+            bail!(
+                "Cannot bump perma-unstable package {} to a non-patch version",
+                step.package
+            );
+        }
 
         let new_version = update_package(&mut package, &step.bump, !args.no_dry_run)?;
 
