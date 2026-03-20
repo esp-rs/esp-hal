@@ -362,6 +362,10 @@ pub(crate) trait ClockTreeNodeType: Any {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
+
+    fn property_macro_branches(&self, _path: &str) -> TokenStream {
+        quote! {}
+    }
 }
 
 /// Represents a clock tree item.
@@ -397,6 +401,15 @@ impl ClockTreeItem {
             ClockTreeItem::Source(src) => Box::new(src.clone()),
             ClockTreeItem::Generic(div) => Box::new(div.clone()),
             ClockTreeItem::Derived(drv) => Box::new(drv.clone()),
+        }
+    }
+
+    pub(crate) fn property_macro_branches(&self, path: &str) -> TokenStream {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path),
+            ClockTreeItem::Source(src) => src.property_macro_branches(path),
+            ClockTreeItem::Generic(div) => div.property_macro_branches(path),
+            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path),
         }
     }
 }
