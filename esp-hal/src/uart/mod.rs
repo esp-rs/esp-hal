@@ -2995,6 +2995,9 @@ pub struct Info {
     /// The system peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
+    /// UART clock group instance.
+    pub clock_instance: clocks::UartInstance,
+
     /// Interrupt handler for the asynchronous operations of this UART instance.
     pub async_handler: InterruptHandler,
 
@@ -3009,14 +3012,6 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
-
-    pub request_uart_clks: fn(&mut ClockTree),
-    pub release_uart_clks: fn(&mut ClockTree),
-    pub configure_sclk: fn(&mut ClockTree, ClockConfig),
-    pub configure_baud_rate: fn(&mut ClockTree, BaudRateConfig),
-    pub baud_rate_clock_frequency: fn(&mut ClockTree) -> u32,
-    pub sclk_frequency: fn(&mut ClockTree) -> u32,
-    pub sclk_config_frequency: fn(&mut ClockTree, ClockConfig) -> u32,
 }
 
 /// Peripheral state for a UART instance.
@@ -3343,12 +3338,14 @@ impl Info {
 
     fn change_baud(&self, config: &Config) -> Result<(), ConfigError> {
         ClockTree::with(|clocks| {
+            let clock = self.clock_instance;
+
             let source_config = ClockConfig::new(
                 config.clock_source,
                 #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
                 0,
             );
-            let clk = (self.sclk_config_frequency)(clocks, source_config);
+            let clk = clock.function_clock_config_frequency(clocks, source_config);
 
             // The UART baud rate clock divider is, depending on the device, either a
             // 20.4 bit, or a 12.4 bit divider.
@@ -3381,8 +3378,11 @@ impl Info {
                 divider_integer, divider_frag
             );
 
-            (self.configure_sclk)(clocks, conf);
-            (self.configure_baud_rate)(clocks, BaudRateConfig::new(divider_frag, divider_integer));
+            clock.configure_function_clock(clocks, conf);
+            clock.configure_baud_rate_generator(
+                clocks,
+                BaudRateConfig::new(divider_frag, divider_integer),
+            );
 
             self.sync_regs();
 
@@ -3394,7 +3394,7 @@ impl Info {
                     _ => return Ok(()),
                 };
 
-                let actual_baud = (self.baud_rate_clock_frequency)(clocks);
+                let actual_baud = clock.baud_rate_generator_frequency(clocks);
                 if actual_baud == 0 {
                     return Err(ConfigError::BaudrateNotAchievable);
                 }
@@ -3724,39 +3724,15 @@ for_each_uart! {
                     is_tx_async: AtomicBool::new(false),
                 };
 
-                fn request_uart_clks(clocks: &mut ClockTree) {
-                    paste::paste! {
-                        clocks:: [< request_ $inst:lower _function_clock >](clocks);
-                        clocks:: [< request_ $inst:lower _baud_rate_generator >](clocks);
-                        #[cfg(soc_has_clock_node_uart0_mem_clock)]
-                        clocks:: [< request_ $inst:lower _mem_clock >](clocks);
-                    }
-                }
-
-                fn release_uart_clks(clocks: &mut ClockTree) {
-                    paste::paste! {
-                        #[cfg(soc_has_clock_node_uart0_mem_clock)]
-                        clocks:: [< release_ $inst:lower _mem_clock >](clocks);
-                        clocks:: [< release_ $inst:lower _baud_rate_generator >](clocks);
-                        clocks:: [< release_ $inst:lower _function_clock >](clocks);
-                    }
-                }
-
                 static PERIPHERAL: Info = Info {
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
+                    clock_instance: clocks::UartInstance::$peri,
                     async_handler: irq_handler,
                     tx_signal: OutputSignal::$txd,
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
-                    request_uart_clks,
-                    release_uart_clks,
-                    configure_sclk: paste::paste!(clocks:: [< configure_ $inst:lower _function_clock >]),
-                    configure_baud_rate: paste::paste!(clocks:: [< configure_ $inst:lower _baud_rate_generator >]),
-                    baud_rate_clock_frequency: paste::paste!(clocks:: [< $inst:lower _baud_rate_generator_frequency >]),
-                    sclk_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_frequency >]),
-                    sclk_config_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_config_frequency >]),
                 };
                 (&PERIPHERAL, &STATE)
             }
@@ -3809,14 +3785,19 @@ struct UartClockGuard<'t> {
 impl<'t> UartClockGuard<'t> {
     fn new(uart: AnyUart<'t>) -> Self {
         ClockTree::with(|clocks| {
+            let clock = uart.info().clock_instance;
+
             // Apply default SCLK configuration
             let sclk_config = ClockConfig::new(
                 Default::default(),
                 #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
                 0,
             );
-            (uart.info().configure_sclk)(clocks, sclk_config);
-            (uart.info().request_uart_clks)(clocks);
+            clock.configure_function_clock(clocks, sclk_config);
+            clock.request_function_clock(clocks);
+            clock.request_baud_rate_generator(clocks);
+            #[cfg(soc_has_clock_node_uart_mem_clock)]
+            clock.request_mem_clock(clocks);
         });
 
         Self { uart }
@@ -3831,6 +3812,13 @@ impl Clone for UartClockGuard<'_> {
 
 impl Drop for UartClockGuard<'_> {
     fn drop(&mut self) {
-        ClockTree::with(self.uart.info().release_uart_clks);
+        ClockTree::with(|clocks| {
+            let clock = self.uart.info().clock_instance;
+
+            #[cfg(soc_has_clock_node_uart_mem_clock)]
+            clock.release_mem_clock(clocks);
+            clock.release_baud_rate_generator(clocks);
+            clock.release_function_clock(clocks);
+        });
     }
 }

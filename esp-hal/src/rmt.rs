@@ -213,6 +213,8 @@ use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
+#[cfg(soc_has_clock_node_rmt_sclk)]
+use crate::soc::clocks;
 use crate::{
     Async,
     Blocking,
@@ -1114,12 +1116,12 @@ struct RmtClockGuard;
 impl RmtClockGuard {
     fn new() -> Self {
         #[cfg(soc_has_clock_node_rmt_sclk)]
-        crate::soc::clocks::ClockTree::with(|clocks| {
-            if crate::soc::clocks::rmt_sclk_config(clocks).is_none() {
-                crate::soc::clocks::configure_rmt_sclk(clocks, ClockSource::default().into());
+        clocks::ClockTree::with(|clocks| {
+            if clocks::RmtInstance::Rmt.sclk_config(clocks).is_none() {
+                clocks::RmtInstance::Rmt.configure_sclk(clocks, ClockSource::default().into());
             }
 
-            crate::soc::clocks::request_rmt_sclk(clocks);
+            clocks::RmtInstance::Rmt.request_sclk(clocks);
         });
 
         Self
@@ -1129,7 +1131,7 @@ impl RmtClockGuard {
 impl Drop for RmtClockGuard {
     fn drop(&mut self) {
         #[cfg(soc_has_clock_node_rmt_sclk)]
-        crate::soc::clocks::ClockTree::with(crate::soc::clocks::release_rmt_sclk);
+        clocks::ClockTree::with(|clocks| clocks::RmtInstance::Rmt.release_sclk(clocks));
     }
 }
 
@@ -2255,8 +2257,8 @@ for_each_rmt_clock_source!(
 
                     #[cfg(rmt_supports_rcfast_clock)]
                     ClockSource::RcFast => {
-                        Rate::from_hz(crate::soc::clocks::ClockTree::with(
-                            crate::soc::clocks::rc_fast_clk_frequency,
+                        Rate::from_hz(clocks::ClockTree::with(
+                            clocks::rc_fast_clk_frequency,
                         ))
                     }
 
@@ -2275,7 +2277,7 @@ for_each_rmt_clock_source!(
 );
 
 #[cfg(soc_has_clock_node_rmt_sclk)]
-impl From<ClockSource> for crate::soc::clocks::RmtSclkConfig {
+impl From<ClockSource> for clocks::RmtSclkConfig {
     fn from(value: ClockSource) -> Self {
         match value {
             #[cfg(rmt_supports_apb_clock)]

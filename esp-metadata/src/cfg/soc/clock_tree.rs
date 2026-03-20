@@ -73,6 +73,8 @@ pub(crate) struct Function {
 }
 
 pub(crate) struct ClockNodeFunctions {
+    pub impl_type: Option<Ident>,
+
     pub request: Function,
     pub release: Function,
     pub apply_config: Function,
@@ -221,6 +223,9 @@ pub(crate) struct ManagementProperties {
 
     /// This clock node is considered always running.
     pub always_on: bool,
+
+    pub receiver: Option<TokenStream>,
+    pub accessor: Option<TokenStream>,
 }
 
 impl ManagementProperties {
@@ -242,7 +247,9 @@ impl ManagementProperties {
     }
 
     pub fn refcount_accessor(&self) -> Option<TokenStream> {
-        self.refcount_field().map(|field| quote! { clocks.#field })
+        let receiver = self.receiver.as_ref().into_iter();
+        self.refcount_field()
+            .map(|field| quote! { clocks.#field #([#receiver as usize])* })
     }
 
     pub fn has_enable(&self) -> bool {
@@ -253,16 +260,26 @@ impl ManagementProperties {
         self.always_on
     }
 
-    /// Returns an expression that accesses the node's current configuration field in the ClockTree
-    /// struct.
-    pub fn config_accessor(&self) -> TokenStream {
-        self.config_accessor_from("clocks")
+    /// For peripheral clocks, returns a receiver expression (`self`).
+    pub fn receiver(&self) -> &[TokenStream] {
+        self.receiver.as_slice()
     }
 
-    pub fn config_accessor_from(&self, field: &str) -> TokenStream {
+    /// Returns an expression that accesses the node's current configuration field in the ClockTree
+    /// struct. This function takes the node's instance as the receiver and uses it to index into
+    /// the configuration array.
+    pub fn indexed_config_accessor(&self) -> TokenStream {
         let node_field = &self.name;
-        let field = format_ident!("{}", field);
-        quote! { #field.#node_field }
+        let receiver = self.receiver.as_ref().into_iter();
+        quote! { clocks.#node_field #([#receiver as usize])* }
+    }
+
+    /// Returns an expression that accesses the index's current configuration field in the ClockTree
+    /// struct. This function hardcodes the node's actual variant.
+    pub fn instance_config_accessor(&self) -> TokenStream {
+        let node_field = &self.name;
+        let accessor = self.accessor.as_ref().into_iter();
+        quote! { self.#node_field #([#accessor])* }
     }
 }
 
@@ -637,7 +654,7 @@ impl RejectExpression {
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
                 // Only run the assert if the referenced nodes have been configured
-                let config_field = node.properties.config_accessor();
+                let config_field = node.properties.indexed_config_accessor();
                 patterns.push(quote! { #config_field.is_some() });
             }
         });

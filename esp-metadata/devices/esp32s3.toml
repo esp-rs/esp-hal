@@ -188,6 +188,14 @@ clocks = { system_clocks = { clock_tree = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
+
+    # There are separate clock muxes for each TIMG instance, but esp-hal only uses one. Only modelling
+    # one makes the HAL code simpler.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+    ] },
 ], template_groups = [
     { group = "MCPWM", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
@@ -198,11 +206,6 @@ clocks = { system_clocks = { clock_tree = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
             { name = "APB_CLK",  outputs = "APB_CLK"  },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
         ] },
     ] },
     { group = "RMT", clocks = [

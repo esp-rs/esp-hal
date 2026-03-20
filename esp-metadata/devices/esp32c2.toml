@@ -150,16 +150,17 @@ clocks = { system_clocks = { clock_tree = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
+    # Modelling this separately makes the HAL code simpler.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+        { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
+    ] },
 ], template_groups = [
     { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
             { name = "PLL_40M",  outputs = "PLL_40M" },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
         ] },
         { name = "WDT_CLOCK", type = "mux", variants = [
             { name = "PLL_40M",  outputs = "PLL_40M", default = true },
