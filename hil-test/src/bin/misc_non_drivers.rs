@@ -33,7 +33,6 @@ mod clock_monitor;
 mod critical_section;
 
 #[path = "misc_non_drivers/delay_async.rs"]
-#[cfg(not(esp32c61))] // will be removed after the clocktree is finished for the C61
 #[cfg(timergroup_driver_supported)]
 mod delay_async;
 
