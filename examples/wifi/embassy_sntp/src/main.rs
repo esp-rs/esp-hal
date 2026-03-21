@@ -40,6 +40,7 @@ use esp_radio::wifi::{
 };
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
+use sntpc_net_embassy::UdpSocketWrapper;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -158,6 +159,8 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     socket.bind(123).unwrap();
+
+    let socket = UdpSocketWrapper::new(socket);
 
     // Display initial Rtc time before synchronization
     let now = jiff::Timestamp::from_microsecond(rtc.current_time_us() as i64).unwrap();
