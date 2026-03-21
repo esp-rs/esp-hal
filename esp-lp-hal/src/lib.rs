@@ -38,81 +38,10 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
-// This crate needs to bring in some other global assembly
-// extern crate riscv_rt;
-
-// /// Re-exported interrupt APIs from riscv-rt / riscv crates.
-// pub use riscv_rt::{TrapFrame};
-pub use riscv_rt::{external_interrupt,core_interrupt,exception,TrapFrame};
-use riscv_rt::{InterruptNumber,ExceptionNumber,CoreInterruptNumber};
-
-/// Custom CoreInterrupts for ULP
-#[riscv::pac_enum(unsafe CoreInterruptNumber)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(usize)]
-#[allow(dead_code)]
-pub enum UlpCoreInterrupt {
-    /// Interrupt caused by ULP Timer
-    Timer = 0,
-    /// Interrupt caused by external peripheral (RTC_IO or SENS)
-    Peripheral = 1,
-}
-
-unsafe impl InterruptNumber for UlpCoreInterrupt {
-    const MAX_INTERRUPT_NUMBER: usize = Self::Peripheral as usize;
-
-    #[inline]
-    fn number(self) -> usize {
-        self as usize
-    }
-
-    #[inline]
-    fn from_number(value: usize) -> riscv_rt::result::Result<Self> {
-        match value {
-            0 => Ok(Self::Timer),
-            1 => Ok(Self::Peripheral),
-            _ => Err(riscv_rt::result::Error::InvalidVariant(value)),
-        }
-    }
-}
-
-unsafe impl CoreInterruptNumber for UlpCoreInterrupt {}
-
-/// CPU Exceptions for ULP
-#[riscv::pac_enum(unsafe ExceptionNumber)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(usize)]
-#[allow(dead_code)]
-pub enum UlpException {
-    /// EBREAK, ECALL, or Illegal Instruction
-    Breakpoint = 0,
-    /// Bus Error / Misaligned Load or Store
-    MisalignedAccess = 1,
-}
-
-unsafe impl ExceptionNumber for UlpException {
-    const MAX_EXCEPTION_NUMBER: usize = Self::MisalignedAccess as usize;
-
-    #[inline]
-    fn number(self) -> usize {
-        self as usize
-    }
-
-    #[inline]
-    fn from_number(value: usize) -> riscv_rt::result::Result<Self> {
-        match value {
-            0 => Ok(Self::Breakpoint),
-            1 => Ok(Self::MisalignedAccess),
-            _ => Err(riscv_rt::result::Error::InvalidVariant(value)),
-        }
-    }
-}
-
 /// The prelude
 pub mod prelude {
     pub use procmacros::entry;
 }
-
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
@@ -200,152 +129,37 @@ loop:
 "#
 );
 
-/// ULP version of _riscv_trap_rust handler, adapted from riscv-rt.
-/// This is necessary, because the ULP core does not have an xcause register.
-// #[cfg(any(esp32s2, esp32s3))]
-// #[unsafe(link_section = ".trap.rust")]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn _ulp_trap_rust(trap_frame: *const TrapFrame, irq_bitmask : u32) {
-    // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
-    // them. This function is based on the ESP-IDF implementation found here:
-    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
-
-    // // Provided by riscv-rt
-    // unsafe extern "C" {
-    //     fn _dispatch_core_interrupt(code: usize);
-    //     fn _dispatch_exception(trap_frame: &TrapFrame, code: usize);
-    // }
-
-    // ULP Internal Interrupts & Exceptions
-    if (irq_bitmask & ULP_RISCV_TIMER_INT) > 0 {
-        // // ULP_RISCV_TIMER_INT /* Internal Timer Interrupt */
-        // unsafe {
-        //     _dispatch_core_interrupt(UlpCoreInterrupt::Timer.number());
-        // }
-    }
-    if (irq_bitmask & ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT) > 0 {
-        // // ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT /* EBREAK, ECALL or Illegal instruction */
-        // unsafe {
-        //     _dispatch_exception(&*trap_frame, UlpException::Breakpoint.number())
-        // };
-    }
-    if (irq_bitmask & ULP_RISCV_BUS_ERROR_INT) > 0 {
-        // // ULP_RISCV_BUS_ERROR_INT /* Bus Error (Unaligned Memory Access) */
-        // unsafe {
-        //     // TODO: Inspect instruction to determine if it was instruction, load, or store misalignment.
-        //     // for now, lets assume it was just instruction misaligned.
-        //     _dispatch_exception(&*trap_frame, UlpException::MisalignedAccess.number())
-        // };
-    }
-
-    // External/Peripheral interrupts - marked as MachineExternal.
-    // This core interrupt will need to delegate further to do other interrupt handling I think??? Unsure???
-    if (irq_bitmask & ULP_RISCV_PERIPHERAL_INTERRUPT) > 0 {
-        // RTC Peripheral interrupts
-        let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
-        // RTC IO interrupts
-        let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
-
-        const ADDRESS: u32 = 0x1000;
-        let ptr = ADDRESS as *mut u32;
-        unsafe { ptr.write_volatile(0xABABABAB) };
-
-        // // External interrupt, handler will need to decode it.
-        // unsafe {
-        //     _dispatch_core_interrupt(UlpCoreInterrupt::Peripheral.number());
-        // }
-
-        // Clear the interrupt flags, if they were raised at the start of this ISR call.
-        if cocpu_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::SENS::PTR }
-                .sar_cocpu_int_clr()
-                .write(|w| unsafe { w.bits(cocpu_int_st) });
-        }
-
-        if rtcio_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::RTC_IO::PTR }
-                .status_w1tc()
-                .write(|w| unsafe { w.bits(rtcio_int_st) });
-        }
-    }
-}
-
-
-#[cfg(any(esp32s2, esp32s3))]
 // Include macros which define custom RISCV R-Type instructions, used for interrupt handling.
+#[cfg(any(esp32s2, esp32s3))]
 global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
-
-// Assembly containing the reset_vector and irq_vector instructions.
+// Assembly containing the reset, trap, and startup assembly procedures..
 #[cfg(any(esp32s2, esp32s3))]
 global_asm!(include_str!("./ulp_riscv_vectors.S"));
 
-/// riscv-rt redefinition which unmasks the interrupts.
-/// Called during _start_rust, which is prior to rust_main,
-/// which is prior to main().
+/// Called prior to main(), to prepare ULP core
+/// for execution, and enable interrupts.
 #[cfg(any(esp32s2, esp32s3))]
-#[unsafe(export_name = "_setup_interrupts")]
 #[unsafe(link_section = ".init.rust")]
-pub fn setup_interrupts() {
-    // disable interrupt handling for now...
-    ulp_enable_interrupts();
+#[inline(always)]
+pub fn lp_core_pre_init() {
+    // Exit 'monitor mode'
     unsafe { ulp_riscv_rescue_from_monitor() };
-}
-
-/// Enter a critical section (disable interrupts)
-#[cfg(any(esp32s2, esp32s3))]
-#[inline(always)]
-pub fn ulp_disable_interrupts() {
-    // Enter a critical section by disabling all interrupts
-    // This inline assembly construct uses the t0 register and is equivalent to:
-    // > li t0, 0x80000007
-    // > maskirq_insn(zero, t0) // Mask all interrupt bits
-    //
-    // The mask 0x80000007 represents:
-    //   Bit 31 - RTC peripheral interrupt
-    //   Bit 2  - Bus error
-    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
-    //   Bit 0  - Internal Timer
-    //
-    unsafe {
-        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
-    }
-}
-
-/// Exit a critical section (re-enable interrupts)
-#[cfg(any(esp32s2, esp32s3))]
-#[inline(always)]
-pub fn ulp_enable_interrupts() {
-    // Exit a critical section by enabling all interrupts
-    // This inline assembly construct is equivalent to:
-    // > maskirq_insn(zero, zero)
-    unsafe {
-        core::arch::asm!(".word 0x0600600b");
-    }
-}
-
-/// Wait for any (even unmasked) interrupt
-#[cfg(any(esp32s2, esp32s3))]
-#[inline(always)]
-pub fn ulp_waitirq() -> u32 {
-    // Wait for pending interrupt, return pending interrupt mask
-    // waitirq a0
-    let result: u32;
-    unsafe {
-        core::arch::asm!(".word 0x0800400B", out("a0") result);
-    }
-    result
+    // Unmask the interrupts
+    ulp_interrupts_enable();
 }
 
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
-#[unsafe(export_name = "rust_main")]
+#[unsafe(export_name = "_start_rust")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
+            // This symbol will be provided by the user via `#[entry]`
             fn main();
         }
+
+        #[cfg(any(esp32s2, esp32s3))]
+        lp_core_pre_init();
 
         #[cfg(esp32c6)]
         if (*pac::LP_CLKRST::PTR)
@@ -393,3 +207,232 @@ fn ulp_riscv_halt() -> ! {
         }
     }
 }
+
+/// TODO: Move custom ULP instructions into their own module,
+///       and cleanup the assembly files at the same time.
+/// Disable all interrupts
+#[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
+pub fn ulp_interrupts_disable() {
+    // Enter a critical section by disabling all interrupts
+    // This inline assembly construct uses the t0 register and is equivalent to:
+    // > li t0, 0x80000007
+    // > maskirq_insn(zero, t0) // Mask all interrupt bits
+    // The mask 0x80000007 represents:
+    //   Bit 31 - RTC peripheral interrupt
+    //   Bit 2  - Bus error
+    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
+    //   Bit 0  - Internal Timer
+    //
+    unsafe {
+        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
+    }
+}
+
+/// Enable all interrupts
+#[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
+pub fn ulp_interrupts_enable() {
+    // Exit a critical section by enabling all interrupts
+    // This inline assembly construct is equivalent to:
+    // > maskirq_insn(zero, zero)
+    unsafe {
+        core::arch::asm!(".word 0x0600600b");
+    }
+}
+
+/// Wait for any (masked or unmasked) interrupt
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_waitirq() -> u32 {
+    // Wait for pending interrupt, return pending interrupt mask
+    // waitirq a0
+    let result: u32;
+    unsafe {
+        core::arch::asm!(".word 0x0800400B", out("a0") result);
+    }
+    result
+}
+
+/// TODO: Write store_trap / load_trap functions, to generate the context saving assembly code,
+//        which is currently hand-written in ulp_riscv_vectors.S
+/// Registers saved in trap handler
+#[cfg(any(esp32s2, esp32s3))]
+#[repr(C)]
+#[derive(Debug)]
+pub struct TrapFrame {
+    /// `x1`: return address, stores the address to return to after a function call or interrupt.
+    pub ra: usize,
+    /// `x5`: temporary register `t0`, used for intermediate values.
+    pub t0: usize,
+    /// `x6`: temporary register `t1`, used for intermediate values.
+    pub t1: usize,
+    /// `x7`: temporary register `t2`, used for intermediate values.
+    pub t2: usize,
+    /// `x28`: temporary register `t3`, used for intermediate values.
+    pub t3: usize,
+    /// `x29`: temporary register `t4`, used for intermediate values.
+    pub t4: usize,
+    /// `x30`: temporary register `t5`, used for intermediate values.
+    pub t5: usize,
+    /// `x31`: temporary register `t6`, used for intermediate values.
+    pub t6: usize,
+    /// `x10`: argument register `a0`. Used to pass the first argument to a function.
+    pub a0: usize,
+    /// `x11`: argument register `a1`. Used to pass the second argument to a function.
+    pub a1: usize,
+    /// `x12`: argument register `a2`. Used to pass the third argument to a function.
+    pub a2: usize,
+    /// `x13`: argument register `a3`. Used to pass the fourth argument to a function.
+    pub a3: usize,
+    /// `x14`: argument register `a4`. Used to pass the fifth argument to a function.
+    pub a4: usize,
+    /// `x15`: argument register `a5`. Used to pass the sixth argument to a function.
+    pub a5: usize,
+    /// `x16`: argument register `a6`. Used to pass the seventh argument to a function.
+    pub a6: usize,
+    /// `x17`: argument register `a7`. Used to pass the eighth argument to a function.
+    pub a7: usize,
+}
+
+/// Trap entry point rust (_start_trap_rust)
+/// `irqs` is a bitmask of IRQs to handle.
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(link_section = ".trap.rust")]
+#[unsafe(export_name = "_start_trap_rust")]
+pub extern "C" fn ulp_start_trap_rust(trap_frame: *const TrapFrame, irqs: u32) {
+    unsafe extern "C" {
+        fn trap_handler(regs: &TrapFrame, pending_irqs: u32);
+    }
+
+    unsafe {
+        // dispatch trap to handler
+        trap_handler(&*trap_frame, irqs);
+    }
+}
+
+/// Creates the trap_handler() function.
+/// This is macro is used later in this file.
+/// This style of macro is usually provided
+/// for users to hook their own handlers, but here it's just used
+/// as a quick way to generate the bit-mask code :)
+#[cfg(any(esp32s2, esp32s3))]
+macro_rules! ulp_interrupts {
+    (@interrupt ($n:literal, $pending_irqs:expr, $regs:expr, $handler:ident)) => {
+        if $pending_irqs & (1 << $n) != 0 {
+            #[allow(unused_unsafe)]
+            unsafe { $handler($regs); }
+        }
+    };
+    ( $( $irq:literal : $handler:ident ),* ) => {
+        /// Called by _start_trap_rust, this trap handler will call other interrupt handling
+        /// functions depending on the bits set in pending_irqs.
+        #[unsafe(no_mangle)]
+        pub extern "C" fn trap_handler(regs: *const TrapFrame, pending_irqs: u32) {
+            let regs = unsafe { regs.as_ref().unwrap() };
+            $(
+                ulp_interrupts!(@interrupt($irq, pending_irqs, regs, $handler));
+            )*
+        }
+    };
+}
+
+/// Default timer interrupt handler.
+/// Users may override TimerInterrupt to change this behaviour.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_timer_interrupt(_regs: &TrapFrame) {
+    // Does nothing.
+}
+
+/// Default illegal instruction or bus error exception handler.
+/// Users may override IllegalInstructionException, and/or BusErrorException, to change this
+/// behaviour.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_exception_handler(_regs: &TrapFrame) {
+    panic!("Unhandled exception!");
+}
+
+/// Default interrupt handler for RTC Peripheral interrupts (SENS).
+/// Users may override SensInterrupt to change this behaviour.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_sens_interrupt(_sar_cocpu_int_st: u32) {
+    // does nothing
+}
+
+/// Default interrupt handler for RTC IO interrupts (GPIO).
+/// Users may override GpioInterrupt to change this behaviour.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_gpio_interrupt(_pin_status: u32) {
+    // pin status contains the GPIO irq bits.
+    // it has already been right-shifted by 10,
+    // so Bit 0 of pin_status == GPIO0  :)
+}
+
+unsafe extern "Rust" {
+    fn TimerInterrupt(regs: &TrapFrame);
+    fn IllegalInstructionException(regs: &TrapFrame);
+    fn BusErrorException(regs: &TrapFrame);
+}
+
+/// Peripheral interrupt handler for the IRQ bit 31.
+/// Checks the peripheral interrupt flags, and calls further interrupt handlers as appropriate.
+/// Clears interrupt flags automatically.
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(no_mangle)]
+fn _dispatch_peripheral_interrupt(_regs: &TrapFrame) {
+    // This function is based on the ESP-IDF implementation found here:
+    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
+
+    unsafe extern "Rust" {
+        fn SensInterrupt(sar_cocpu_int_st: u32);
+        fn GpioInterrupt(pin_status: u32);
+    }
+
+    // RTC Peripheral interrupts
+    let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
+    // RTC IO interrupts
+    let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
+
+    // Call handler, and clear the interrupt flags, if they were raised at the start of this ISR
+    // call.
+
+    if cocpu_int_st > 0 {
+        unsafe {
+            SensInterrupt(cocpu_int_st);
+        }
+
+        // Clear the interrupt
+        unsafe { &*pac::SENS::PTR }
+            .sar_cocpu_int_clr()
+            .write(|w| unsafe { w.bits(cocpu_int_st) });
+    }
+
+    if rtcio_int_st > 0 {
+        // Right-shift by 10, to remove the offset, and make it so GPIO0 == Bit 0.
+        unsafe {
+            GpioInterrupt(rtcio_int_st >> 10);
+        }
+
+        // Clear the interrupt
+        unsafe { &*pac::RTC_IO::PTR }
+            .status_w1tc()
+            .write(|w| unsafe { w.bits(rtcio_int_st) });
+    }
+}
+
+// Define the trap_handler function,
+// which calls interrupt symbol names,
+// which may be overriden by the user at link-time.
+ulp_interrupts!(
+    0: TimerInterrupt,
+    1: IllegalInstructionException,
+    2: BusErrorException,
+    31: _dispatch_peripheral_interrupt
+);

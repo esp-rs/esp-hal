@@ -16,21 +16,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     match chip {
         Chip::Esp32c6 => {
             fs::write(out_dir.join("link.x"), include_bytes!("ld/link-lp.x"))?;
-        },
+        }
         Chip::Esp32s2 | Chip::Esp32s3 => {
             fs::write(out_dir.join("link.x"), include_bytes!("ld/link-ulp.x"))?;
-            fs::write(out_dir.join("memory.x"), include_bytes!("ld/memory-ulp.x"))?;
-            fs::write(out_dir.join("interrupts.x"), include_bytes!("ld/interrupts-ulp.x"))?;
-            fs::write(out_dir.join("exceptions.x"), include_bytes!("ld/exceptions-ulp.x"))?;
-        },
+        }
         _ => unreachable!(),
     };
 
     println!("cargo:rerun-if-changed=ld/link-lp.x");
     println!("cargo:rerun-if-changed=ld/link-ulp.x");
-    println!("cargo:rerun-if-changed=ld/memory-ulp.x");
-    println!("cargo:rerun-if-changed=ld/interrupts-ulp.x");
-    println!("cargo:rerun-if-changed=ld/exceptions-ulp.x");
 
     // Done!
     Ok(())

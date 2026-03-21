@@ -65,20 +65,38 @@
     addi sp,sp, \cxt_size
 .endm
 
-.section .init.vectors
-.global reset_vector
+.section .initjmp, "ax"
+.global _initjmp 
+/* Power-on reset vector, placed at address 0x0 */
+_initjmp:
+	/* no more than 16 bytes here */
+	jal zero, _start
+
+/* Initialisation routine */
+.section .init, "ax"
 .global _start
+_start:
+    .cfi_startproc
+    .cfi_undefined ra
+    /* Set the global pointer & thread pointer */
+    .option push
+    .option norelax
+    la gp, __global_pointer$
+    addi tp, gp, 0
+    .option pop
+    /* Set the stack pointer */
+    la sp, _stack_start
+    add s0, sp, zero
+    /* Begin the rust program */
+    jal zero, _start_rust
+    .cfi_endproc
+
+/* Hardware trap vector, placed at address 0x10
+ * Handles all interrupts and exceptions for the ULP core.
+ * Saves registers ra,t0-6,a0-7, then calls _start_trap_rust.
+ */
+.section .trap, "ax"
 .global _start_trap
-.global _ulp_trap_rust
-
-/* The reset vector, jumps to startup code */
-reset_vector:
-	/* no more than 16 bytes here ! */
-	j _start
-
-/* Interrupt handler */
-/* Saves registers ra,t0-6,a0-7, then calls _ulp_trap_rust, which will call _start_trap_rust. */
-.balign 0x10
 _start_trap:
     /* Save the general gurpose register context before handling the interrupt */
     save_general_regs
@@ -101,7 +119,7 @@ _start_trap:
      * We do not re-enable interrupts before calling the handler as ULP RISC-V does not
      * support nested interrupts.
      */
-    jal ra,_ulp_trap_rust
+    jal ra,_start_trap_rust
 
     /* Restore the return address and stack pointer from the q registers */
     getq_insn ra, q2
@@ -112,3 +130,14 @@ _start_trap:
 
     /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
     retirq_insn
+
+/* Default abort function,
+ * places the chip into a loop.
+ */
+.section .init
+.global default_abort
+default_abort:
+    /* Option 1, Infinite loop */
+    j abort
+    /* Option 2, reset to start */
+    /* jal zero,_start */
