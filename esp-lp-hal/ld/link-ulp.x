@@ -37,7 +37,6 @@ PROVIDE(_setup_interrupts = _setup_interrupts);
    is usually defined by final users via the #[riscv_rt::entry] attribute. Using hal_main
    instead of main directly allow HALs to inject code before jumping to user main. */
 /* PROVIDE(hal_main = main); */
-
 /* riscv-rt will jump to the entrypoint of esp-lp-hal, which is rust_main */
 /* rust_main will then jumps to main() */
 /* which itself is wrapped using esp-lp-hal::entry, to add the ULP_MAGIC symbols lol. */
@@ -58,7 +57,7 @@ PROVIDE(DefaultHandler = abort);
    registers, calls the the DefaultHandler ISR, restores caller saved registers and returns.
    Note, however, that this provided implementation cannot be overwritten. We use PROVIDE
    to avoid compilation errors in direct mode, not to allow users to overwrite the symbol. */
-PROVIDE(_start_DefaultHandler_trap = _start_trap);
+/* PROVIDE(_start_DefaultHandler_trap = _start_trap); */
 
 /* # Pre-initialization function */
 /* If the user overrides this using the `#[pre_init]` attribute or by creating a `__pre_init` function,

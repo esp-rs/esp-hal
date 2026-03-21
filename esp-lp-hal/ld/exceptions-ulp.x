@@ -7,17 +7,19 @@
 /* It is possible to define a special handler for each exception type.
    By default, all exceptions are handled by ExceptionHandler. However,
    users can override these alias by defining the symbol themselves */
-PROVIDE(InstructionMisaligned = ExceptionHandler);
-PROVIDE(InstructionFault = ExceptionHandler);
-PROVIDE(IllegalInstruction = ExceptionHandler);
+/* PROVIDE(InstructionMisaligned = ExceptionHandler); */
+/* PROVIDE(InstructionFault = ExceptionHandler); */
+/* PROVIDE(IllegalInstruction = ExceptionHandler); */
+/* PROVIDE(Breakpoint = ExceptionHandler); */
+/* PROVIDE(LoadMisaligned = ExceptionHandler); */
+/* PROVIDE(LoadFault = ExceptionHandler); */
+/* PROVIDE(StoreMisaligned = ExceptionHandler); */
+/* PROVIDE(StoreFault = ExceptionHandler); */
+/* PROVIDE(UserEnvCall = ExceptionHandler); */
+/* PROVIDE(SupervisorEnvCall = ExceptionHandler); */
+/* PROVIDE(MachineEnvCall = ExceptionHandler); */
+/* PROVIDE(InstructionPageFault = ExceptionHandler); */
+/* PROVIDE(LoadPageFault = ExceptionHandler); */
+/* PROVIDE(StorePageFault = ExceptionHandler); */
 PROVIDE(Breakpoint = ExceptionHandler);
-PROVIDE(LoadMisaligned = ExceptionHandler);
-PROVIDE(LoadFault = ExceptionHandler);
-PROVIDE(StoreMisaligned = ExceptionHandler);
-PROVIDE(StoreFault = ExceptionHandler);
-PROVIDE(UserEnvCall = ExceptionHandler);
-PROVIDE(SupervisorEnvCall = ExceptionHandler);
-PROVIDE(MachineEnvCall = ExceptionHandler);
-PROVIDE(InstructionPageFault = ExceptionHandler);
-PROVIDE(LoadPageFault = ExceptionHandler);
-PROVIDE(StorePageFault = ExceptionHandler);
+PROVIDE(MisalignedAccess = ExceptionHandler);

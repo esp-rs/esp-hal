@@ -39,11 +39,74 @@ pub use esp32s2_ulp as pac;
 pub use esp32s3_ulp as pac;
 
 // This crate needs to bring in some other global assembly
-extern crate riscv_rt;
+// extern crate riscv_rt;
 
-/// Re-exported interrupt APIs from riscv-rt / riscv crates.
+// /// Re-exported interrupt APIs from riscv-rt / riscv crates.
+// pub use riscv_rt::{TrapFrame};
 pub use riscv_rt::{external_interrupt,core_interrupt,exception,TrapFrame};
-pub use riscv::interrupt::{Interrupt,Exception};
+use riscv_rt::{InterruptNumber,ExceptionNumber,CoreInterruptNumber};
+
+/// Custom CoreInterrupts for ULP
+#[riscv::pac_enum(unsafe CoreInterruptNumber)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(usize)]
+#[allow(dead_code)]
+pub enum UlpCoreInterrupt {
+    /// Interrupt caused by ULP Timer
+    Timer = 0,
+    /// Interrupt caused by external peripheral (RTC_IO or SENS)
+    Peripheral = 1,
+}
+
+unsafe impl InterruptNumber for UlpCoreInterrupt {
+    const MAX_INTERRUPT_NUMBER: usize = Self::Peripheral as usize;
+
+    #[inline]
+    fn number(self) -> usize {
+        self as usize
+    }
+
+    #[inline]
+    fn from_number(value: usize) -> riscv_rt::result::Result<Self> {
+        match value {
+            0 => Ok(Self::Timer),
+            1 => Ok(Self::Peripheral),
+            _ => Err(riscv_rt::result::Error::InvalidVariant(value)),
+        }
+    }
+}
+
+unsafe impl CoreInterruptNumber for UlpCoreInterrupt {}
+
+/// CPU Exceptions for ULP
+#[riscv::pac_enum(unsafe ExceptionNumber)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(usize)]
+#[allow(dead_code)]
+pub enum UlpException {
+    /// EBREAK, ECALL, or Illegal Instruction
+    Breakpoint = 0,
+    /// Bus Error / Misaligned Load or Store
+    MisalignedAccess = 1,
+}
+
+unsafe impl ExceptionNumber for UlpException {
+    const MAX_EXCEPTION_NUMBER: usize = Self::MisalignedAccess as usize;
+
+    #[inline]
+    fn number(self) -> usize {
+        self as usize
+    }
+
+    #[inline]
+    fn from_number(value: usize) -> riscv_rt::result::Result<Self> {
+        match value {
+            0 => Ok(Self::Breakpoint),
+            1 => Ok(Self::MisalignedAccess),
+            _ => Err(riscv_rt::result::Error::InvalidVariant(value)),
+        }
+    }
+}
 
 /// The prelude
 pub mod prelude {
@@ -66,11 +129,17 @@ cfg_if::cfg_if! {
 // ULP interrupt bitflags from:
 // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32s2,esp32s3))] {
+    if #[cfg(any(esp32s2,esp32s3))]
+    {
+        #[allow(unused)]
         const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt */
+        #[allow(unused)]
         const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or Illegal instruction */
+        #[allow(unused)]
         const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus Error (Unaligned Memory Access) */
+        #[allow(unused)]
         const ULP_RISCV_PERIPHERAL_INTERRUPT              : u32 = 1 << 31;  /* RTC Peripheral Interrupt */
+        #[allow(unused)]
         const ULP_RISCV_INTERNAL_INTERRUPT                : u32 = ULP_RISCV_TIMER_INT | ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT | ULP_RISCV_BUS_ERROR_INT;
     }
 }
@@ -131,6 +200,79 @@ loop:
 "#
 );
 
+/// ULP version of _riscv_trap_rust handler, adapted from riscv-rt.
+/// This is necessary, because the ULP core does not have an xcause register.
+// #[cfg(any(esp32s2, esp32s3))]
+// #[unsafe(link_section = ".trap.rust")]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn _ulp_trap_rust(trap_frame: *const TrapFrame, irq_bitmask : u32) {
+    // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
+    // them. This function is based on the ESP-IDF implementation found here:
+    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
+
+    // // Provided by riscv-rt
+    // unsafe extern "C" {
+    //     fn _dispatch_core_interrupt(code: usize);
+    //     fn _dispatch_exception(trap_frame: &TrapFrame, code: usize);
+    // }
+
+    // ULP Internal Interrupts & Exceptions
+    if (irq_bitmask & ULP_RISCV_TIMER_INT) > 0 {
+        // // ULP_RISCV_TIMER_INT /* Internal Timer Interrupt */
+        // unsafe {
+        //     _dispatch_core_interrupt(UlpCoreInterrupt::Timer.number());
+        // }
+    }
+    if (irq_bitmask & ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT) > 0 {
+        // // ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT /* EBREAK, ECALL or Illegal instruction */
+        // unsafe {
+        //     _dispatch_exception(&*trap_frame, UlpException::Breakpoint.number())
+        // };
+    }
+    if (irq_bitmask & ULP_RISCV_BUS_ERROR_INT) > 0 {
+        // // ULP_RISCV_BUS_ERROR_INT /* Bus Error (Unaligned Memory Access) */
+        // unsafe {
+        //     // TODO: Inspect instruction to determine if it was instruction, load, or store misalignment.
+        //     // for now, lets assume it was just instruction misaligned.
+        //     _dispatch_exception(&*trap_frame, UlpException::MisalignedAccess.number())
+        // };
+    }
+
+    // External/Peripheral interrupts - marked as MachineExternal.
+    // This core interrupt will need to delegate further to do other interrupt handling I think??? Unsure???
+    if (irq_bitmask & ULP_RISCV_PERIPHERAL_INTERRUPT) > 0 {
+        // RTC Peripheral interrupts
+        let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
+        // RTC IO interrupts
+        let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
+
+        const ADDRESS: u32 = 0x1000;
+        let ptr = ADDRESS as *mut u32;
+        unsafe { ptr.write_volatile(0xABABABAB) };
+
+        // // External interrupt, handler will need to decode it.
+        // unsafe {
+        //     _dispatch_core_interrupt(UlpCoreInterrupt::Peripheral.number());
+        // }
+
+        // Clear the interrupt flags, if they were raised at the start of this ISR call.
+        if cocpu_int_st > 0 {
+            // Clear the interrupt
+            unsafe { &*pac::SENS::PTR }
+                .sar_cocpu_int_clr()
+                .write(|w| unsafe { w.bits(cocpu_int_st) });
+        }
+
+        if rtcio_int_st > 0 {
+            // Clear the interrupt
+            unsafe { &*pac::RTC_IO::PTR }
+                .status_w1tc()
+                .write(|w| unsafe { w.bits(rtcio_int_st) });
+        }
+    }
+}
+
+
 #[cfg(any(esp32s2, esp32s3))]
 // Include macros which define custom RISCV R-Type instructions, used for interrupt handling.
 global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
@@ -144,69 +286,11 @@ global_asm!(include_str!("./ulp_riscv_vectors.S"));
 /// which is prior to main().
 #[cfg(any(esp32s2, esp32s3))]
 #[unsafe(export_name = "_setup_interrupts")]
+#[unsafe(link_section = ".init.rust")]
 pub fn setup_interrupts() {
     // disable interrupt handling for now...
-    // ulp_enable_interrupts();
+    ulp_enable_interrupts();
     unsafe { ulp_riscv_rescue_from_monitor() };
-}
-
-// /// Overriden riscv-rt function for _start_trap_rust,
-// /// since ULP core has no xcause register.
-// #[cfg(any(esp32s2, esp32s3))]
-// #[unsafe(link_section = ".trap.rust")]
-// #[unsafe(export_name = "_start_trap_rust")]
-// pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
-//     unsafe extern "C" {
-//         fn _dispatch_core_interrupt(code: usize);
-//         fn _dispatch_exception(trap_frame: &TrapFrame, code: usize);
-//     }
-
-//     // match xcause::read().cause() {
-//     //     #[cfg(not(feature = "v-trap"))]
-//     //     xcause::Trap::Interrupt(code) => _dispatch_core_interrupt(code),
-//     //     xcause::Trap::Exception(code) => _dispatch_exception(&*trap_frame, code),
-//     // }
-// }
-
-#[cfg(any(esp32s2, esp32s3))]
-#[unsafe(no_mangle)]
-// #[unsafe(link_section = ".trap.rust")]
-// #[unsafe(export_name = "_start_trap_rust")]
-unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
-    // TODO: Figure out how to call the riscv-rt interrupt handler,
-    //       instead of/after this custom one! :) 
-
-    // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
-    // them. This function is based on the ESP-IDF implementation found here:
-    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
-
-    // ULP Internal Interrupts
-    if (q1 & ULP_RISCV_INTERNAL_INTERRUPT) > 0 {
-        // TODO
-    }
-
-    // External/Peripheral interrupts
-    if (q1 & ULP_RISCV_PERIPHERAL_INTERRUPT) > 0 {
-        // RTC Peripheral interrupts
-        let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
-
-        if cocpu_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::SENS::PTR }
-                .sar_cocpu_int_clr()
-                .write(|w| unsafe { w.bits(cocpu_int_st) });
-        }
-
-        // RTC IO interrupts
-        let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
-
-        if rtcio_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::RTC_IO::PTR }
-                .status_w1tc()
-                .write(|w| unsafe { w.bits(rtcio_int_st) });
-        }
-    }
 }
 
 /// Enter a critical section (disable interrupts)
