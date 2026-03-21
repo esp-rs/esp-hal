@@ -54,7 +54,8 @@ esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], option
 #    with the interrupt/exception handling hooks provided by riscv-rt.
 # 2. Add the custom picorv32 assembly instructions somewhere, exported as inlined rust functions
 # 3. Add a critical section implementation
-riscv-rt = { version = "0.17.1", features = ["no-mhartid", "no-xie-xip", "no-xtvec", "single-hart"] }
+#riscv-rt = { version = "0.17.1", features = ["no-mhartid", "no-xie-xip", "no-xtvec", "single-hart"], path = "/home/leigh/Git/riscv/riscv-rt" }
+riscv-rt = { version = "0.19.0", features = ["no-mhartid", "no-xie-xip", "no-xtvec", "single-hart"], path = "/home/leigh/Git/riscv/riscv-rt" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"

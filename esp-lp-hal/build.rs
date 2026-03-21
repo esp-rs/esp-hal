@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out_dir.display());
 
-    let source_file = match chip {
+    match chip {
         Chip::Esp32c6 => {
             fs::write(out_dir.join("link.x"), include_bytes!("ld/link-lp.x"))?;
         },

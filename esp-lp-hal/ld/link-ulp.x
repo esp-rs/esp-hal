@@ -36,7 +36,14 @@ PROVIDE(_setup_interrupts = _setup_interrupts);
 /* Default main routine. If no hal_main symbol is provided, then hal_main maps to main, which
    is usually defined by final users via the #[riscv_rt::entry] attribute. Using hal_main
    instead of main directly allow HALs to inject code before jumping to user main. */
-PROVIDE(hal_main = main);
+/* PROVIDE(hal_main = main); */
+
+/* riscv-rt will jump to the entrypoint of esp-lp-hal, which is rust_main */
+/* rust_main will then jumps to main() */
+/* which itself is wrapped using esp-lp-hal::entry, to add the ULP_MAGIC symbols lol. */
+/* SO the full boot procedure is... */
+/* reset_vector --> _start --> _start_rust + (_setup_interrupts) --> $hal_main --> main */
+PROVIDE(hal_main = rust_main);
 
 /* Default exception handler. By default, the exception handler is abort.
    Users can override this alias by defining the symbol themselves */

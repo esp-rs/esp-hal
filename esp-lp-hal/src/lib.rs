@@ -38,10 +38,18 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
+// This crate needs to bring in some other global assembly
+extern crate riscv_rt;
+
+/// Re-exported interrupt APIs from riscv-rt / riscv crates.
+pub use riscv_rt::{external_interrupt,core_interrupt,exception,TrapFrame};
+pub use riscv::interrupt::{Interrupt,Exception};
+
 /// The prelude
 pub mod prelude {
     pub use procmacros::entry;
 }
+
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
@@ -131,9 +139,43 @@ global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
 #[cfg(any(esp32s2, esp32s3))]
 global_asm!(include_str!("./ulp_riscv_vectors.S"));
 
+/// riscv-rt redefinition which unmasks the interrupts.
+/// Called during _start_rust, which is prior to rust_main,
+/// which is prior to main().
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(export_name = "_setup_interrupts")]
+pub fn setup_interrupts() {
+    // disable interrupt handling for now...
+    // ulp_enable_interrupts();
+    unsafe { ulp_riscv_rescue_from_monitor() };
+}
+
+// /// Overriden riscv-rt function for _start_trap_rust,
+// /// since ULP core has no xcause register.
+// #[cfg(any(esp32s2, esp32s3))]
+// #[unsafe(link_section = ".trap.rust")]
+// #[unsafe(export_name = "_start_trap_rust")]
+// pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
+//     unsafe extern "C" {
+//         fn _dispatch_core_interrupt(code: usize);
+//         fn _dispatch_exception(trap_frame: &TrapFrame, code: usize);
+//     }
+
+//     // match xcause::read().cause() {
+//     //     #[cfg(not(feature = "v-trap"))]
+//     //     xcause::Trap::Interrupt(code) => _dispatch_core_interrupt(code),
+//     //     xcause::Trap::Exception(code) => _dispatch_exception(&*trap_frame, code),
+//     // }
+// }
+
 #[cfg(any(esp32s2, esp32s3))]
 #[unsafe(no_mangle)]
+// #[unsafe(link_section = ".trap.rust")]
+// #[unsafe(export_name = "_start_trap_rust")]
 unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
+    // TODO: Figure out how to call the riscv-rt interrupt handler,
+    //       instead of/after this custom one! :) 
+
     // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
     // them. This function is based on the ESP-IDF implementation found here:
     // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
@@ -169,6 +211,7 @@ unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
 
 /// Enter a critical section (disable interrupts)
 #[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
 pub fn ulp_disable_interrupts() {
     // Enter a critical section by disabling all interrupts
     // This inline assembly construct uses the t0 register and is equivalent to:
@@ -188,6 +231,7 @@ pub fn ulp_disable_interrupts() {
 
 /// Exit a critical section (re-enable interrupts)
 #[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
 pub fn ulp_enable_interrupts() {
     // Exit a critical section by enabling all interrupts
     // This inline assembly construct is equivalent to:
@@ -199,6 +243,7 @@ pub fn ulp_enable_interrupts() {
 
 /// Wait for any (even unmasked) interrupt
 #[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
 pub fn ulp_waitirq() -> u32 {
     // Wait for pending interrupt, return pending interrupt mask
     // waitirq a0

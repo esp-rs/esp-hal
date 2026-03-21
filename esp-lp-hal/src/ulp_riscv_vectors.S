@@ -64,11 +64,9 @@
 
 .section .init.vectors
 .global reset_vector
-.global ulp_riscv_rescue_from_monitor
 .global _start
 .global _start_trap
-.global _start_trap_rust
-.global _setup_interrupts
+.global _ulp_riscv_interrupt_handler
 
 /* The reset vector, jumps to startup code */
 reset_vector:
@@ -88,19 +86,10 @@ _start_trap:
      * We do not re-enable interrupts before calling the handler as ULP RISC-V does not
      * support nested interrupts.
      */
-    jal _start_trap_rust
+    jal _ulp_riscv_interrupt_handler
 
     /* Restore the register context after returning from the C interrupt handler */
     restore_general_regs
 
     /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
     retirq_insn
-
-.section .init.rust
-_setup_interrupts:
-    /* Custom instruction to un-mask the interrupts */
-    /* waitirq_insn zero */
-    maskirq_insn zero, zero
-    /* Allow ULP to run */
-    call ulp_riscv_rescue_from_monitor
-    ret
