@@ -190,7 +190,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     quote!(
         #[allow(non_snake_case)]
         #[unsafe(export_name = "main")]
-        pub fn __esp_lp_hal__main() {
+        pub fn __risc_v_rt__main() {
             #[unsafe(export_name = #magic_symbol_name)]
             static ULP_MAGIC: [u32; 0] = [0u32; 0];
 

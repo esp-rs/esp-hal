@@ -65,10 +65,10 @@
     addi sp,sp, \cxt_size
 .endm
 
-.section .initjmp, "ax"
-.global _initjmp 
+.section .reset, "ax"
+.global reset_vector 
 /* Power-on reset vector, placed at address 0x0 */
-_initjmp:
+reset_vector:
 	/* no more than 16 bytes here */
 	jal zero, _start
 
@@ -76,20 +76,17 @@ _initjmp:
 .section .init, "ax"
 .global _start
 _start:
-    .cfi_startproc
-    .cfi_undefined ra
-    /* Set the global pointer & thread pointer */
+    /* Setup the global pointer & thread pointer */
     .option push
     .option norelax
     la gp, __global_pointer$
     addi tp, gp, 0
     .option pop
-    /* Set the stack pointer */
-    la sp, _stack_start
+    /* Setup the stack pointer & frame pointer */
+    la sp, __stack_top
     add s0, sp, zero
     /* Begin the rust program */
-    jal zero, _start_rust
-    .cfi_endproc
+    jal zero, rust_main
 
 /* Hardware trap vector, placed at address 0x10
  * Handles all interrupts and exceptions for the ULP core.
@@ -106,12 +103,12 @@ _start_trap:
     setq_insn q3, sp
 
     /* Store the pointer to the stored registers (TrapFrame) in a0.
-     * This will be the first argument to _ulp_trap_rust.
+     * This will be the first argument to _start_trap_rust.
      */
     addi a0, sp, 0
 
     /* Fetch the interrupt status from the custom q1 register into a1.
-     * This will be the second argumet to _ulp_trap_rust.
+     * This will be the second argumet to _start_trap_rust.
      */
     getq_insn a1, q1
 
@@ -131,13 +128,3 @@ _start_trap:
     /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
     retirq_insn
 
-/* Default abort function,
- * places the chip into a loop.
- */
-.section .init
-.global default_abort
-default_abort:
-    /* Option 1, Infinite loop */
-    j abort
-    /* Option 2, reset to start */
-    /* jal zero,_start */

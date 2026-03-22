@@ -55,24 +55,6 @@ cfg_if::cfg_if! {
     }
 }
 
-// ULP interrupt bitflags from:
-// https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32s2,esp32s3))]
-    {
-        #[allow(unused)]
-        const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt */
-        #[allow(unused)]
-        const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or Illegal instruction */
-        #[allow(unused)]
-        const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus Error (Unaligned Memory Access) */
-        #[allow(unused)]
-        const ULP_RISCV_PERIPHERAL_INTERRUPT              : u32 = 1 << 31;  /* RTC Peripheral Interrupt */
-        #[allow(unused)]
-        const ULP_RISCV_INTERNAL_INTERRUPT                : u32 = ULP_RISCV_TIMER_INT | ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT | ULP_RISCV_BUS_ERROR_INT;
-    }
-}
-
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
@@ -136,21 +118,9 @@ global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
 #[cfg(any(esp32s2, esp32s3))]
 global_asm!(include_str!("./ulp_riscv_vectors.S"));
 
-/// Called prior to main(), to prepare ULP core
-/// for execution, and enable interrupts.
-#[cfg(any(esp32s2, esp32s3))]
-#[unsafe(link_section = ".init.rust")]
-#[inline(always)]
-pub fn lp_core_pre_init() {
-    // Exit 'monitor mode'
-    unsafe { ulp_riscv_rescue_from_monitor() };
-    // Unmask the interrupts
-    ulp_interrupts_enable();
-}
-
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
-#[unsafe(export_name = "_start_rust")]
+#[unsafe(export_name = "rust_main")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
@@ -159,7 +129,10 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         }
 
         #[cfg(any(esp32s2, esp32s3))]
-        lp_core_pre_init();
+        {
+            ulp_riscv_rescue_from_monitor();
+            ulp_interrupts_enable();
+        }
 
         #[cfg(esp32c6)]
         if (*pac::LP_CLKRST::PTR)
@@ -336,74 +309,33 @@ macro_rules! ulp_interrupts {
     };
 }
 
-/// Default timer interrupt handler.
-/// Users may override TimerInterrupt to change this behaviour.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[unsafe(no_mangle)]
-pub fn default_timer_interrupt(_regs: &TrapFrame) {
-    // Does nothing.
-}
-
-/// Default illegal instruction or bus error exception handler.
-/// Users may override IllegalInstructionException, and/or BusErrorException, to change this
-/// behaviour.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[unsafe(no_mangle)]
-pub fn default_exception_handler(_regs: &TrapFrame) {
-    panic!("Unhandled exception!");
-}
-
-/// Default interrupt handler for RTC Peripheral interrupts (SENS).
-/// Users may override SensInterrupt to change this behaviour.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[unsafe(no_mangle)]
-pub fn default_sens_interrupt(_sar_cocpu_int_st: u32) {
-    // does nothing
-}
-
-/// Default interrupt handler for RTC IO interrupts (GPIO).
-/// Users may override GpioInterrupt to change this behaviour.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[unsafe(no_mangle)]
-pub fn default_gpio_interrupt(_pin_status: u32) {
-    // pin status contains the GPIO irq bits.
-    // it has already been right-shifted by 10,
-    // so Bit 0 of pin_status == GPIO0  :)
-}
-
-unsafe extern "Rust" {
-    fn TimerInterrupt(regs: &TrapFrame);
-    fn IllegalInstructionException(regs: &TrapFrame);
-    fn BusErrorException(regs: &TrapFrame);
-}
-
 /// Peripheral interrupt handler for the IRQ bit 31.
 /// Checks the peripheral interrupt flags, and calls further interrupt handlers as appropriate.
 /// Clears interrupt flags automatically.
 #[cfg(any(esp32s2, esp32s3))]
 #[unsafe(no_mangle)]
-fn _dispatch_peripheral_interrupt(_regs: &TrapFrame) {
+fn dispatch_peripheral_interrupt(_regs: &TrapFrame) {
     // This function is based on the ESP-IDF implementation found here:
     // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
 
     unsafe extern "Rust" {
-        fn SensInterrupt(sar_cocpu_int_st: u32);
+        // fn SensInterrupt(sar_cocpu_int_st: u32);
+        fn SensInterrupt(sar_cocpu_int_st: pac::sens::sar_cocpu_int_st::R);
         fn GpioInterrupt(pin_status: u32);
     }
 
     // RTC Peripheral interrupts
-    let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
+    // let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
+    let cocpu_int_st = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read();
+    let cocpu_int_st_bits = cocpu_int_st.bits();
+
     // RTC IO interrupts
     let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
 
     // Call handler, and clear the interrupt flags, if they were raised at the start of this ISR
     // call.
 
-    if cocpu_int_st > 0 {
+    if cocpu_int_st_bits > 0 {
         unsafe {
             SensInterrupt(cocpu_int_st);
         }
@@ -411,11 +343,10 @@ fn _dispatch_peripheral_interrupt(_regs: &TrapFrame) {
         // Clear the interrupt
         unsafe { &*pac::SENS::PTR }
             .sar_cocpu_int_clr()
-            .write(|w| unsafe { w.bits(cocpu_int_st) });
+            .write(|w| unsafe { w.bits(cocpu_int_st_bits) });
     }
 
     if rtcio_int_st > 0 {
-        // Right-shift by 10, to remove the offset, and make it so GPIO0 == Bit 0.
         unsafe {
             GpioInterrupt(rtcio_int_st >> 10);
         }
@@ -427,12 +358,67 @@ fn _dispatch_peripheral_interrupt(_regs: &TrapFrame) {
     }
 }
 
-// Define the trap_handler function,
-// which calls interrupt symbol names,
-// which may be overriden by the user at link-time.
+// ULP interrupt bitflags from:
+// https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
+// const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt
+// */ const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or
+// Illegal instruction */ const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus
+// Error (Unaligned Memory Access) */ const ULP_RISCV_PERIPHERAL_INTERRUPT              : u32 = 1 <<
+// 31;  /* RTC Peripheral Interrupt */
+unsafe extern "Rust" {
+    fn TimerInterrupt(regs: &TrapFrame);
+    fn IllegalInstructionException(regs: &TrapFrame);
+    fn BusErrorException(regs: &TrapFrame);
+}
+// Create the trap_handler function
 ulp_interrupts!(
     0: TimerInterrupt,
     1: IllegalInstructionException,
     2: BusErrorException,
-    31: _dispatch_peripheral_interrupt
+    31: dispatch_peripheral_interrupt
 );
+
+/// Default timer interrupt handler.
+/// Users may override TimerInterrupt to change this behaviour.
+/// This handler is dispatched by the trap_handler() function.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_timer_interrupt(_regs: &TrapFrame) {
+    // Does nothing.
+}
+
+/// Default illegal instruction or bus error exception handler.
+/// Users may override IllegalInstructionException, and/or BusErrorException,
+/// to change this behaviour.
+/// This handler is dispatched by the trap_handler() function.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_exception_handler(_regs: &TrapFrame) {
+    panic!("Unhandled exception!");
+}
+
+/// Default interrupt handler for RTC Peripheral interrupts (SENS).
+/// Users may override SensInterrupt to change this behaviour.
+/// This handler is dispatched by the dispatch_peripheral_interrupt() function,
+/// which is itself called from the trap_handler() function.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_sens_interrupt(_sar_cocpu_int_st: pac::sens::sar_cocpu_int_st::R) {
+    // pub fn default_sens_interrupt(_sar_cocpu_int_st: u32) {
+    // does nothing
+}
+
+/// Default interrupt handler for RTC IO interrupts (GPIO).
+/// Users may override GpioInterrupt to change this behaviour.
+/// This handler is dispatched by the dispatch_peripheral_interrupt() function,
+/// which is itself called from the trap_handler() function.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[unsafe(no_mangle)]
+pub fn default_gpio_interrupt(_pin_status: u32) {
+    // pin status contains the GPIO irq bits,
+    // where bit 0 == GPIO0
+}
