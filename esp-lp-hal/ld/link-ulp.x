@@ -18,12 +18,47 @@ MEMORY
  * TODO: Supply proc-macro attributes to make it easier for users
  *       to override these symbols.
  */
-PROVIDE(TimerInterrupt = default_timer_interrupt);
 PROVIDE(IllegalInstructionException = default_exception_handler);
 PROVIDE(BusErrorException = default_exception_handler);
-PROVIDE(SensInterrupt = default_sens_interrupt);
 PROVIDE(GpioInterrupt = default_gpio_interrupt);
 
+/* External interrupt handlers, all do nothing by default */
+PROVIDE(TOUCH_DONE_INT = noop_interrupt_handler);
+PROVIDE(TOUCH_INACTIVE_INT = noop_interrupt_handler);
+PROVIDE(TOUCH_ACTIVE_INT = noop_interrupt_handler);
+PROVIDE(SARADC1_DONE_INT = noop_interrupt_handler);
+PROVIDE(SARADC2_DONE_INT = noop_interrupt_handler);
+PROVIDE(TSENS_DONE_INT = noop_interrupt_handler);
+PROVIDE(RISCV_START_INT = noop_interrupt_handler);
+PROVIDE(SW_INT = noop_interrupt_handler);
+PROVIDE(SWD_INT = noop_interrupt_handler);
+PROVIDE(TOUCH_TIME_OUT_INT = noop_interrupt_handler);
+PROVIDE(TOUCH_APPROACH_LOOP_DONE_INT = noop_interrupt_handler);
+PROVIDE(TOUCH_SCAN_DONE_INT = noop_interrupt_handler);
+
+/* Default GPIO interrupt handlers */
+PROVIDE(GPIO0 = noop_interrupt_handler);
+PROVIDE(GPIO1 = noop_interrupt_handler);
+PROVIDE(GPIO2 = noop_interrupt_handler);
+PROVIDE(GPIO3 = noop_interrupt_handler);
+PROVIDE(GPIO4 = noop_interrupt_handler);
+PROVIDE(GPIO5 = noop_interrupt_handler);
+PROVIDE(GPIO6 = noop_interrupt_handler);
+PROVIDE(GPIO7 = noop_interrupt_handler);
+PROVIDE(GPIO8 = noop_interrupt_handler);
+PROVIDE(GPIO9 = noop_interrupt_handler);
+PROVIDE(GPIO10 = noop_interrupt_handler);
+PROVIDE(GPIO11 = noop_interrupt_handler);
+PROVIDE(GPIO12 = noop_interrupt_handler);
+PROVIDE(GPIO13 = noop_interrupt_handler);
+PROVIDE(GPIO14 = noop_interrupt_handler);
+PROVIDE(GPIO15 = noop_interrupt_handler);
+PROVIDE(GPIO16 = noop_interrupt_handler);
+PROVIDE(GPIO17 = noop_interrupt_handler);
+PROVIDE(GPIO18 = noop_interrupt_handler);
+PROVIDE(GPIO19 = noop_interrupt_handler);
+PROVIDE(GPIO20 = noop_interrupt_handler);
+PROVIDE(GPIO21 = noop_interrupt_handler);
 
 SECTIONS
 {

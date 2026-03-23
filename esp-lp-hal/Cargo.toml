@@ -46,8 +46,8 @@ procmacros        = { version = "0.21.0", package = "esp-hal-procmacros", path =
 riscv             = { version = "0.15", features = ["critical-section-single-hart"] }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
-esp32s2-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
-esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
+esp32s2-ulp       = { version = "0.3.0", features = ["critical-section","rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
+esp32s3-ulp       = { version = "0.3.0", features = ["critical-section","rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0e83f46" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"
@@ -83,6 +83,10 @@ embedded-io = ["dep:embedded-io-06", "dep:embedded-io-07"]
 [[example]]
 name              = "blinky"
 required-features = []
+
+[[example]]
+name              = "interrupt_counter"
+required-features = ["esp32s3"]
 
 [[example]]
 name              = "i2c"

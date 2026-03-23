@@ -26,10 +26,12 @@
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
         type LpIo = crate::pac::LP_IO;
-        const MAX_GPIO_PIN: u8 = 7;
+        /// Maximum GPIO pin number.
+        pub const MAX_GPIO_PIN: u8 = 7;
     } else {
         type LpIo = crate::pac::RTC_IO;
-        const MAX_GPIO_PIN: u8 = 21;
+        /// Maximum GPIO pin number.
+        pub const MAX_GPIO_PIN: u8 = 21;
     }
 }
 
