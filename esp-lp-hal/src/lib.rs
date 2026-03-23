@@ -37,6 +37,7 @@ pub use esp32c6_lp as pac;
 pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
+#[cfg(any(esp32s2, esp32s3))]
 pub use pac::interrupt as sens_interrupt;
 
 /// The prelude
@@ -399,11 +400,14 @@ pub fn noop_interrupt_handler() {}
 
 // ULP interrupt bitflags from:
 // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
+#[cfg(any(esp32s2, esp32s3))]
 unsafe extern "Rust" {
     fn IllegalInstructionException(regs: &TrapFrame);
     fn BusErrorException(regs: &TrapFrame);
 }
+
 // Create the trap_handler function
+#[cfg(any(esp32s2, esp32s3))]
 ulp_interrupts!(
     1: IllegalInstructionException,
     2: BusErrorException,
