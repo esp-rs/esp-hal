@@ -1016,7 +1016,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn rc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            130000
+            136000
         }
         pub fn request_pll_f20m(clocks: &mut ClockTree) {
             trace!("Requesting PLL_F20M");

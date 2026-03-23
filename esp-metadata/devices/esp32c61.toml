@@ -105,7 +105,7 @@ clocks = { system_clocks = { clock_tree = [
     # Low-speed clocks
     { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
-    { name = "RC_SLOW_CLK",  type = "source", output = "130_000" },
+    { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
 
     # PLL divider taps
     { name = "PLL_F20M",  type = "generic", output = "PLL_CLK / 24" },
@@ -179,7 +179,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true},
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
