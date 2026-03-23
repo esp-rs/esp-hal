@@ -89,6 +89,51 @@ impl From<Level> for bool {
     }
 }
 
+/// Event used to trigger interrupts.
+#[cfg(any(esp32s2, esp32s3))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum Event {
+    /// Interrupts trigger on rising pin edge.
+    RisingEdge  = 1,
+    /// Interrupts trigger on falling pin edge.
+    FallingEdge = 2,
+    /// Interrupts trigger on either rising or falling pin edges.
+    AnyEdge     = 3,
+    /// Interrupts trigger on low level
+    LowLevel    = 4,
+    /// Interrupts trigger on high level
+    HighLevel   = 5,
+}
+
+/// Set GPIO event listening.
+///
+/// - `N`: the pin to configure
+/// - `int_ena`: boolean, enable or disable
+/// - `int_type`: interrupt type, see [Event]
+/// - `_wake_up`: whether to wake up from light sleep
+#[cfg(any(esp32s2, esp32s3))]
+fn set_int_enable<const N: u8>(int_ena: bool, int_type: Event, _wake_up: bool) {
+    // let GPIO_BASE = unsafe { &*LpIo::PTR }.pin0().as_ptr().addr();
+    let gpio_base = 0xa400 + 0x28 + ((N as usize) * 4);
+    let gpio_pin = gpio_base as *mut u32;
+
+    // Bits 7:9 - if set to 0: GPIO interrupt disable,
+    // if set to 1: rising edge trigger,
+    // if set to 2: falling edge trigger,
+    // if set to 3: any edge trigger,
+    // if set to 4: low level trigger,
+    // if set to 5: high level trigger
+    let mut pin_setting = unsafe { gpio_pin.read_volatile() };
+    let int_type_mask: u32 = 0xFFFFFFFF ^ (0x111 << 7);
+    pin_setting &= int_type_mask;
+    if int_ena {
+        pin_setting |= (int_type as u32) << 7;
+    }
+
+    // Bit 10, wakeup enable (not implemented)
+    unsafe { gpio_pin.write_volatile(pin_setting) }
+}
+
 /// Flexible pin driver.
 /// Provides a common implementation for input and output pins.
 pub struct Flex<const PIN: u8> {}
@@ -149,6 +194,18 @@ impl<const PIN: u8> Flex<PIN> {
         let level = self.output_level();
         self.set_level(!level);
     }
+
+    /// Listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn listen(&mut self, event: Event) {
+        set_int_enable::<PIN>(true, event, false);
+    }
+
+    /// Un-listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn unlisten(&mut self) {
+        set_int_enable::<PIN>(false, Event::AnyEdge, false);
+    }
 }
 
 /// Digital input.
@@ -167,6 +224,18 @@ impl<const PIN: u8> Input<PIN> {
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         self.pin.level()
+    }
+
+    /// Listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event);
+    }
+
+    /// Un-listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn unlisten(&mut self) {
+        self.pin.unlisten();
     }
 }
 
@@ -225,6 +294,18 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     /// Toggles the pin output.
     pub fn toggle(&mut self) {
         self.pin.toggle()
+    }
+
+    /// Listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn listen(&mut self, event: Event) {
+        self.pin.listen(event);
+    }
+
+    /// Un-listen for interrupts.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn unlisten(&mut self) {
+        self.pin.unlisten();
     }
 }
 

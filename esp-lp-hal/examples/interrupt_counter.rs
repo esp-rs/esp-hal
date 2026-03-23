@@ -8,8 +8,12 @@ extern crate panic_halt;
 // TODO: I'd prefer if these were proc-macros, which could be used as function attributes.
 //       This would 1) look nicer, and 2) provide better discoverability/type-hinting of the
 // interrupts available for use.
-use esp_lp_hal::sens_interrupt;
-use esp_lp_hal::{gpio::Input, gpio_interrupt, prelude::*};
+use esp_lp_hal::{
+    gpio::{Event, Input},
+    gpio_interrupt,
+    prelude::*,
+    sens_interrupt,
+};
 
 // Shared memory address.
 const ADDRESS: u32 = 0x1000;
@@ -36,19 +40,11 @@ pub fn on_button() {
 gpio_interrupt!(GPIO0, on_button);
 
 #[entry]
-fn main(mut _stomp_pin: Input<0>) {
+fn main(mut boot_pin: Input<0>) {
     // Enable start-up interrupt, called shortly after boot.
     unsafe { &*esp_lp_hal::pac::SENS::PTR }
         .sar_cocpu_int_ena()
         .write(|w| w.sar_cocpu_start_int_ena().set_bit());
-    // Enable PIN0 interrupt, falling edge trigger.
-    //   0: GPIO interrupt disabled
-    //   1: rising edge trigger
-    //   2: falling edge trigger
-    //   3: any edge trigger
-    //   4: low level trigger
-    //   5: high level trigger.
-    unsafe { &*esp_lp_hal::pac::RTC_IO::PTR }
-        .pin0()
-        .write(|w| unsafe { w.int_type().bits(2) });
+
+    boot_pin.listen(Event::FallingEdge);
 }
