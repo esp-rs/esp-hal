@@ -54,6 +54,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    RegisterToggle,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
@@ -2692,24 +2693,21 @@ mod dma {
         }
 
         fn reset_dma(&self) {
-            fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
-                #[cfg(dma_kind = "pdma")]
-                reg_block.dma_conf().modify(|_, w| {
-                    w.out_rst().bit(bit);
-                    w.in_rst().bit(bit);
-                    w.ahbm_fifo_rst().bit(bit);
-                    w.ahbm_rst().bit(bit)
-                });
-                #[cfg(dma_kind = "gdma")]
-                reg_block.dma_conf().modify(|_, w| {
-                    w.rx_afifo_rst().bit(bit);
-                    w.buf_afifo_rst().bit(bit);
-                    w.dma_afifo_rst().bit(bit)
-                });
-            }
+            #[cfg(dma_kind = "pdma")]
+            self.regs().dma_conf().toggle(|w, bit| {
+                w.out_rst().bit(bit);
+                w.in_rst().bit(bit);
+                w.ahbm_fifo_rst().bit(bit);
+                w.ahbm_rst().bit(bit)
+            });
 
-            set_reset_bit(self.regs(), true);
-            set_reset_bit(self.regs(), false);
+            #[cfg(dma_kind = "gdma")]
+            self.regs().dma_conf().toggle(|w, bit| {
+                w.rx_afifo_rst().bit(bit);
+                w.buf_afifo_rst().bit(bit);
+                w.dma_afifo_rst().bit(bit)
+            });
+
             self.clear_dma_interrupts();
         }
 
@@ -3116,8 +3114,7 @@ impl Driver {
         // ESP32, but not on later chips.
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                self.regs().slave().modify(|_, w| w.mode().set_bit());
-                self.regs().slave().modify(|_, w| w.mode().clear_bit());
+                self.regs().slave().toggle(|w, en| w.mode().bit(en));
             } else {
                 self.configure_datalen(1, 1);
             }

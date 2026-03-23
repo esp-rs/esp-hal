@@ -1,4 +1,5 @@
 use super::*;
+use crate::RegisterToggle;
 
 impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
@@ -27,9 +28,7 @@ impl AnyGdmaTxChannel<'_> {
 
 impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn reset(&self) {
-        let conf0 = self.ch().out_conf0();
-        conf0.modify(|_, w| w.out_rst().set_bit());
-        conf0.modify(|_, w| w.out_rst().clear_bit());
+        self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
@@ -276,9 +275,7 @@ impl AnyGdmaRxChannel<'_> {
 
 impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn reset(&self) {
-        let conf0 = self.ch().in_conf0();
-        conf0.modify(|_, w| w.in_rst().set_bit());
-        conf0.modify(|_, w| w.in_rst().clear_bit());
+        self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
