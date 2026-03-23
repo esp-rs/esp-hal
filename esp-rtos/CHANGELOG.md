@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provide implementation for the `_malloc_r` and `_free_r` syscalls when the `alloc` feature is enabled (#4484)
 - Support for ESP32-C5 (#4884)
 - `ESP_RTOS_CONFIG_STACK_POINTER_RANGE_CHECK` to enable another way of stack-overflow detection. Enabled by default (#5227)
+- Support for ESP32-C61 (#5240)
 
 ### Changed
 
