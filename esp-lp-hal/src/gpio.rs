@@ -105,33 +105,72 @@ pub enum Event {
     HighLevel   = 5,
 }
 
+#[cfg(any(esp32s2, esp32s3))]
+impl From<WakeEvent> for Event {
+    fn from(value: WakeEvent) -> Self {
+        match value {
+            WakeEvent::LowLevel => Event::LowLevel,
+            WakeEvent::HighLevel => Event::HighLevel,
+        }
+    }
+}
+
+/// Event used to wake up from light sleep.
+#[cfg(any(esp32s2, esp32s3))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum WakeEvent {
+    /// Wake on low level
+    LowLevel  = 4,
+    /// Wake on high level
+    HighLevel = 5,
+}
+
 /// Set GPIO event listening.
 ///
 /// - `N`: the pin to configure
-/// - `int_ena`: boolean, enable or disable
-/// - `int_type`: interrupt type, see [Event]
-/// - `_wake_up`: whether to wake up from light sleep
+/// - `int_type`: interrupt type code, value from [Event], 0 to disable interrupts. If None, will
+///   leave the int_type setting as-is.
+/// - `wake_up`: whether to wake up from light sleep.
 #[cfg(any(esp32s2, esp32s3))]
-fn set_int_enable<const N: u8>(int_ena: bool, int_type: Event, _wake_up: bool) {
+fn enable_pin_interrupt<const N: u8>(int_type: Option<u8>, wakeup_enable: bool) {
     // let GPIO_BASE = unsafe { &*LpIo::PTR }.pin0().as_ptr().addr();
+    // TODO: Add LpIo::regs().pins(number : usize) to esp-pacs
     let gpio_base = 0xa400 + 0x28 + ((N as usize) * 4);
     let gpio_pin = gpio_base as *mut u32;
 
-    // Bits 7:9 - if set to 0: GPIO interrupt disable,
-    // if set to 1: rising edge trigger,
-    // if set to 2: falling edge trigger,
-    // if set to 3: any edge trigger,
-    // if set to 4: low level trigger,
-    // if set to 5: high level trigger
+    // Read the current setting
     let mut pin_setting = unsafe { gpio_pin.read_volatile() };
-    let int_type_mask: u32 = 0xFFFFFFFF ^ (0x111 << 7);
-    pin_setting &= int_type_mask;
-    if int_ena {
+
+    // Write int_type if specified
+    if let Some(int_type) = int_type {
+        // Bits 7:9
+        // - 0: GPIO interrupt disable
+        // - 1: rising edge trigger
+        // - 2: falling edge trigger
+        // - 3: any edge trigger
+        // - 4: low level trigger
+        // - 5: high level trigger
+        let int_type_mask: u32 = 0xFFFFFFFF ^ (0b111 << 7);
+        pin_setting &= int_type_mask;
         pin_setting |= (int_type as u32) << 7;
     }
 
-    // Bit 10, wakeup enable (not implemented)
+    // Bit 10, wakeup enable.
+    // Used with UlpCoreWakeupSource::Gpio.
+    let wakeup_en_mask: u32 = 0xFFFFFFFF ^ (0b1 << 10);
+    pin_setting &= wakeup_en_mask;
+    if wakeup_enable {
+        pin_setting |= 0b1 << 10;
+    }
+
     unsafe { gpio_pin.write_volatile(pin_setting) }
+}
+
+#[cfg(any(esp32s2, esp32s3))]
+fn clear_pin_interrupt<const N: u8>() {
+    unsafe { &*LpIo::PTR }
+        .status_w1tc()
+        .write(|w| unsafe { w.bits(1 << N) });
 }
 
 /// Flexible pin driver.
@@ -198,13 +237,35 @@ impl<const PIN: u8> Flex<PIN> {
     /// Listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn listen(&mut self, event: Event) {
-        set_int_enable::<PIN>(true, event, false);
+        self.clear_interrupts();
+        enable_pin_interrupt::<PIN>(Some(event as u8), false);
     }
 
     /// Un-listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
-        set_int_enable::<PIN>(false, Event::AnyEdge, false);
+        enable_pin_interrupt::<PIN>(Some(0), false);
+        self.clear_interrupts();
+    }
+
+    /// Clear pin interrupts
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn clear_interrupts(&mut self) {
+        clear_pin_interrupt::<PIN>();
+    }
+
+    /// Enable pin as a wake-up source.
+    /// This will change the interrupt type, when enabling.
+    /// Interrupt type will not be changed, when disabling.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
+        self.clear_interrupts();
+        if enable {
+            let int_evt = Event::from(event);
+            enable_pin_interrupt::<PIN>(Some(int_evt as u8), true);
+        } else {
+            enable_pin_interrupt::<PIN>(None, true);
+        }
     }
 }
 
@@ -220,22 +281,26 @@ impl<const PIN: u8> Input<PIN> {
         let pin = Flex::<PIN>::new();
         Self { pin }
     }
-
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         self.pin.level()
     }
-
     /// Listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
     }
-
     /// Un-listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
+    }
+    /// Enable pin as a wake-up source.
+    /// This will change the interrupt type, when enabling.
+    /// Interrupt type will not be changed, when disabling.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
+        self.pin.wakeup_enable(enable, event);
     }
 }
 
@@ -251,7 +316,6 @@ impl<const PIN: u8> Output<PIN> {
         let pin = Flex::<PIN>::new();
         Self { pin }
     }
-
     /// Set the output level.
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_level(level);
@@ -295,17 +359,22 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     pub fn toggle(&mut self) {
         self.pin.toggle()
     }
-
     /// Listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn listen(&mut self, event: Event) {
         self.pin.listen(event);
     }
-
     /// Un-listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
+    }
+    /// Enable pin as a wake-up source.
+    /// This will change the interrupt type, when enabling.
+    /// Interrupt type will not be changed, when disabling.
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
+        self.pin.wakeup_enable(enable, event);
     }
 }
 

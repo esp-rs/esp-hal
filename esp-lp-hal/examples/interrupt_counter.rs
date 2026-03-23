@@ -2,6 +2,8 @@
 //! Increments a 32 bit counter value at a known point in memory,
 //! whenever the ULP program is run. If GPIO0 is pressed, reset the counter.
 
+//% CHIPS: esp32s3
+
 #![no_std]
 #![no_main]
 extern crate panic_halt;
