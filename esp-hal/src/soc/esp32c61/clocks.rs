@@ -392,26 +392,6 @@ fn configure_lp_slow_clk_impl(
     });
 }
 
-// CRYPTO_CLK
-
-// fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-//     // Nothing to do here.
-// }
-
-// fn configure_crypto_clk_impl(
-//     _clocks: &mut ClockTree,
-//     _old_config: Option<CryptoClkConfig>,
-//     new_config: CryptoClkConfig,
-// ) {
-//     PCR::regs().sec_conf().modify(|_, w| unsafe {
-//         w.sec_clk_sel().bits(match new_config {
-//             CryptoClkConfig::Xtal => 0,
-//             CryptoClkConfig::Fosc => 1,
-//             CryptoClkConfig::PllF480m => 2,
-//         })
-//     });
-// }
-
 // TIMG_CALIBRATION_CLOCK
 
 fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
