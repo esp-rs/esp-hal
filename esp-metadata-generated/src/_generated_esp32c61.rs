@@ -163,6 +163,18 @@ macro_rules! property {
     ("uart.has_sclk_divider") => {
         false
     };
+    ("wifi.has_wifi6") => {
+        true
+    };
+    ("wifi.mac_version") => {
+        3
+    };
+    ("wifi.mac_version", str) => {
+        stringify!(3)
+    };
+    ("wifi.has_5g") => {
+        false
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -2334,7 +2346,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
-        WIFI <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
+        WIFI <= virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt,
+        disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
+        disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
+        disable_pwr_interrupt }))); _for_each_inner_peripheral!((GPIO0));
         _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
         _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
         _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
@@ -2396,9 +2411,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
-        _for_each_inner_peripheral!((WIFI(unstable))); _for_each_inner_peripheral!((all(@
-        peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
-        #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((all(@ peri_type
+        #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
+        "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton"] GPIO2 <= virtual()), (@ peri_type #[doc =
         "GPIO3 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -2585,7 +2600,10 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (@ peri_type #[doc = "LP_CORE peripheral singleton"]
         LP_CORE <= virtual() (unstable)), (@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)), (@
-        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual() (unstable))));
+        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual(WIFI_BB : {
+        bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt }, WIFI_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : {
+        bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt }))));
         _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
@@ -2603,7 +2621,7 @@ macro_rules! for_each_peripheral {
         (RNG(unstable)), (SHA(unstable)), (SLC(unstable)), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI(unstable))));
+        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI)));
         _for_each_inner_peripheral!((dma_eligible));
     };
 }

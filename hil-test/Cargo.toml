@@ -198,7 +198,7 @@ esp32c6 = [
 esp32c61 = [
     "esp-hal/esp32c61",
     "esp-alloc/esp32c61",
-    # "esp-radio?/esp32c61",
+    "esp-radio?/esp32c61",
     "esp-storage?/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-metadata-generated/esp32c61",

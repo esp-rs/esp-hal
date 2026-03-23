@@ -1,5 +1,5 @@
 //% CHIPS(no_wifi): esp32h2
-//% CHIPS(no_ble): esp32s2
+//% CHIPS(no_ble): esp32s2 esp32c61
 //% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
 
 //% FEATURES: unstable esp-alloc embassy
@@ -28,7 +28,7 @@ fn init_heap() {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 48 * 1024);
-        } else if #[cfg(any(esp32c5, esp32h2))] {
+        } else if #[cfg(any(esp32c5, esp32c61, esp32h2))] {
             esp_alloc::heap_allocator!(size: 72 * 1024);
         }
     }

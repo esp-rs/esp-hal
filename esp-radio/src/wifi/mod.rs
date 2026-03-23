@@ -284,6 +284,16 @@ impl SecondaryChannel {
             _ => panic!("Invalid secondary channel value: {}", raw),
         }
     }
+
+    #[cfg(any(feature = "sniffer", feature = "esp-now"))]
+    fn from_raw_or_default(raw: u32) -> Self {
+        match raw {
+            0 => SecondaryChannel::None,
+            1 => SecondaryChannel::Above,
+            2 => SecondaryChannel::Below,
+            _ => SecondaryChannel::None,
+        }
+    }
 }
 
 #[cfg_attr(docsrs, procmacros::doc_replace(
@@ -1447,8 +1457,7 @@ pub struct RxControlInfo {
     pub ampdu_cnt: u32,
     /// Primary channel on which the packet is received.
     pub channel: u32,
-    /// Secondary channel on which the packet is received: 0 for none, 1 for
-    /// above, 2 for below.
+    /// Secondary channel on which the packet is received.
     pub secondary_channel: SecondaryChannel,
     /// Timestamp of when the packet is received, in microseconds. Precise only
     /// if modem sleep or light sleep is not enabled.
@@ -1494,7 +1503,7 @@ pub struct RxControlInfo {
     pub rx_channel_estimate_info_vld: u32,
     /// Length of the channel estimation.
     pub rx_channel_estimate_len: u32,
-    /// The secondary channel if in HT40.
+    /// The secondary channel if in HT40. Otherwise invalid.
     pub secondary_channel: SecondaryChannel,
     /// Primary channel on which the packet is received.
     pub channel: u32,
@@ -1545,7 +1554,7 @@ pub struct RxControlInfo {
     pub rx_channel_estimate_info_vld: u32,
     /// Length of the channel estimation.
     pub rx_channel_estimate_len: u32,
-    /// The secondary channel if in HT40.
+    /// The secondary channel if in HT40. Otherwise invalid.
     pub secondary_channel: SecondaryChannel,
     /// Primary channel on which the packet is received.
     pub channel: u32,
@@ -1592,7 +1601,9 @@ impl RxControlInfo {
                 sgi: (*rx_cntl).sgi(),
                 ampdu_cnt: (*rx_cntl).ampdu_cnt(),
                 channel: (*rx_cntl).channel(),
-                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).secondary_channel()),
+                secondary_channel: SecondaryChannel::from_raw_or_default(
+                    (*rx_cntl).secondary_channel(),
+                ),
                 timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
                 noise_floor: (*rx_cntl).noise_floor(),
                 ant: (*rx_cntl).ant(),
@@ -1613,7 +1624,7 @@ impl RxControlInfo {
                 cur_bb_format: (*rx_cntl).cur_bb_format(),
                 rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
+                secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
                 noise_floor: (*rx_cntl).noise_floor() as _,
                 is_group: (*rx_cntl).is_group(),
@@ -1637,7 +1648,7 @@ impl RxControlInfo {
                 cur_bb_format: (*rx_cntl).cur_bb_format(),
                 rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
+                secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
                 noise_floor: (*rx_cntl).noise_floor() as _,
                 is_group: (*rx_cntl).is_group(),
@@ -2252,7 +2263,7 @@ pub fn new<'d>(
     crate::wifi::wifi_init(device)?;
 
     // At some point the "High-speed ADC" entropy source became available.
-    #[cfg(not(esp32c5))]
+    #[cfg(rng_trng_supported)]
     unsafe {
         esp_hal::rng::TrngSource::increase_entropy_source_counter()
     };
@@ -2316,7 +2327,7 @@ impl Drop for WifiController<'_> {
             set_access_point_state(WifiAccessPointState::Uninitialized);
             set_station_state(WifiStationState::Uninitialized);
 
-            #[cfg(not(esp32c5))]
+            #[cfg(rng_trng_supported)]
             esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
                 esp_hal::Internal::conjure()
             });
@@ -2684,6 +2695,7 @@ band.
     /// Returns the current Wi-Fi channel configuration.
     #[instability::unstable]
     pub fn channel(&self) -> Result<(u8, SecondaryChannel), WifiError> {
+        info!("channel");
         let mut primary = 0;
         let mut secondary = 0;
 

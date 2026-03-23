@@ -94,7 +94,7 @@ peripherals = [
     # { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
-    { name = "WIFI", virtual = true },
+    { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
 ]
 
 clocks = { system_clocks = { clock_tree = [
@@ -351,3 +351,9 @@ instances = [
 ]
 ram_size = 128
 peripheral_controls_mem_clk = true
+
+## Radio
+[device.wifi]
+support_status = "partial"
+has_wifi6 = true
+mac_version = 3
