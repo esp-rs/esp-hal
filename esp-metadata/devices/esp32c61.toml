@@ -12,6 +12,25 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
 
+symbols = [
+    "swd",
+    # ROM capabilities (TODO: verify against esp-idf when implementing)
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+]
+
+[device.soc]
+cpu_has_csr_pc = true # TODO: VERIFY
+cpu_has_prv_mode = true # TODO
+rc_fast_clk_default = 17_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
+    { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
+] }
+
 peripherals = [
     { name = "ASSIST_DEBUG"},
     { name = "CLINT" },
@@ -37,6 +56,7 @@ peripherals = [
     { name = "LP_ANA" },
     { name = "LP_AON" },
     { name = "LP_APM" },
+    { name = "LP_CLKRST" },
     { name = "LPWR", pac = "LP_CLKRST" },
     # { name = "LP_GPIO" }, # TODO: add PAC manually later
     # { name = "LP_I2C0" },
@@ -61,11 +81,11 @@ peripherals = [
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     # { name = "TRACE0", pac = "TRACE" },
-    { name = "UART0", interrupts = { peri = "UART0" } },
-    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "BT", virtual = true },
@@ -76,31 +96,79 @@ peripherals = [
     { name = "WIFI", virtual = true },
 ]
 
-symbols = [
-    "swd",
-    # ROM capabilities (TODO: verify against esp-idf when implementing)
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-]
-
-[device.soc]
-cpu_has_csr_pc = true # TODO: VERIFY
-cpu_has_prv_mode = true # TODO
-rc_fast_clk_default = 17_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
-    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
-    { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
-] }
-
 clocks = { system_clocks = { clock_tree = [
-    { name = "XTAL_CLK", type = "source", output = "40_000_000", always_on = true },
-    { name = "CPU_CLK", type = "source", output = "1", always_on = true },
-    { name = "APB_CLK", type = "source", output = "1", always_on = true },
-    # { name = "RC_FAST_CLK", type = "source", output = "20_000_000" },
-    # { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "x" },
+    # High-speed clock sources
+    { name = "XTAL_CLK",    type = "source", values = "40",     output = "VALUE * 1_000_000", always_on = true },
+    { name = "RC_FAST_CLK", type = "source",                    output = "17_500_000" },
+    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
+
+    # Low-speed clocks
+    { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
+    { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
+    { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
+
+    # PLL divider taps
+    { name = "PLL_F20M",  type = "generic", output = "PLL_CLK / 24" },
+    { name = "PLL_F40M",  type = "generic", output = "PLL_CLK / 12" },
+    { name = "PLL_F48M",  type = "generic", output = "PLL_CLK / 10" },
+    { name = "PLL_F60M",  type = "generic", output = "PLL_CLK / 8"  },
+    { name = "PLL_F80M",  type = "generic", output = "PLL_CLK / 6"  },
+    { name = "PLL_F120M", type = "generic", output = "PLL_CLK / 4"  },
+    { name = "PLL_F160M", type = "generic", output = "PLL_CLK / 3"  },
+
+    # HP SOC clock root (PCR_SOC_CLK_SEL: XTAL, RC_FAST, PLL_F160M)
+    { name = "HP_ROOT_CLK", type = "mux", variants = [
+        { name = "XTAL",      outputs = "XTAL_CLK" },
+        { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
+        { name = "PLL_F160M", outputs = "PLL_F160M" },
+    ] },
+
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    
+    # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 40MHz
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)" },
+
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
+    { name = "LP_FAST_CLK", type = "mux", variants = [
+        { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_D2", outputs = "XTAL_D2_CLK" },
+        { name = "XTAL",    outputs = "XTAL_CLK" },
+    ] },
+    { name = "LP_SLOW_CLK", type = "mux", variants = [
+        { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
+    ] },
+
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "OSC_SLOW_CLK",    outputs = "OSC_SLOW_CLK" },
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+    ] },
+], template_groups = [
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F80M", outputs = "PLL_F80M" }, # in IDF, PLL_F80M is used, but in fact we'll just increase power consumption with it.
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+        ] },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+        ] },
+    ] },
 
 ] }, peripheral_clocks = { templates = [
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -111,10 +179,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [] },
-    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
 
-    { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true, clocks = [] },
+    { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
 ] } }
 
 

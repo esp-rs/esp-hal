@@ -78,7 +78,6 @@ struct CheckChangelogArgs {
     normalize: bool,
 }
 
-
 // ----------------------------------------------------------------------------
 // Application
 
@@ -164,12 +163,10 @@ fn main() -> Result<()> {
         Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
 
         #[cfg(feature = "mcp")]
-        Cli::Mcp => {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()?
-                .block_on(xtask::commands::mcp::run_mcp_server())
-        }
+        Cli::Mcp => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+            .block_on(xtask::commands::mcp::run_mcp_server()),
     }
 }
 
@@ -442,7 +439,8 @@ impl Runner {
         // Output grouped logs
         // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
         println!("::group::{group}");
-        if op().is_err() {
+        if let Err(e) = op() {
+            log::error!("{group} failed: {e:?}");
             self.failed.push(group);
         }
         println!("::endgroup::");
@@ -556,7 +554,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             let result = examples(
                 workspace,
                 ExamplesArgs {
-                    package: Package::EspLpHal,
+                    package: ExamplesPackage::EspLpHal,
                     chip: Some(args.chip),
                     example: Some("all".to_string()),
                     debug: false,
@@ -645,7 +643,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Package::Examples,
+                package: ExamplesPackage::Examples,
                 chip: Some(args.chip),
                 example: Some("all".to_string()),
                 debug: true,
@@ -660,7 +658,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Package::QaTest,
+                package: ExamplesPackage::QaTest,
                 chip: Some(args.chip),
                 example: Some("all".to_string()),
                 debug: true,

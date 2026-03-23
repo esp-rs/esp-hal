@@ -19,7 +19,7 @@
 //! The goal of this test suite is to collect smaller, simpler test cases, to keep the overall
 //! number of test suites low(er).
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
 #![no_std]
@@ -28,6 +28,7 @@
 #[path = "misc_non_drivers/clock_monitor.rs"]
 mod clock_monitor;
 
+#[cfg(not(esp32c61))]
 #[path = "misc_non_drivers/critical_section.rs"]
 mod critical_section;
 
@@ -43,9 +44,11 @@ mod dma_macros;
 #[cfg(all(dma_driver_supported, dma_supports_mem2mem))]
 mod dma_mem2mem;
 
+#[cfg(not(esp32c61))]
 #[path = "misc_non_drivers/init.rs"]
 mod init;
 
+#[cfg(not(esp32c61))]
 #[path = "misc_non_drivers/simple.rs"]
 mod simple;
 

@@ -717,7 +717,7 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
-        let mut i2c = I2c {
+        let i2c = I2c {
             i2c: i2c.degrade(),
             phantom: PhantomData,
             guard,
@@ -727,6 +727,10 @@ impl<'d> I2c<'d, Blocking> {
                 scl_pin,
             },
         };
+
+        // Make sure inputs are well-defined.
+        let i2c = i2c.with_scl(crate::gpio::Level::High);
+        let mut i2c = i2c.with_sda(crate::gpio::Level::High);
 
         i2c.apply_config(&config)?;
 

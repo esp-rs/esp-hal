@@ -27,6 +27,10 @@ pub struct Multiplexer {
 }
 
 impl ClockTreeNodeType for Multiplexer {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn always_on(&self) -> bool {
         self.always_on
     }
@@ -152,11 +156,11 @@ impl ClockTreeNodeType for Multiplexer {
             .variants
             .iter()
             .map(|variant| {
-                let frequency_fn = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .frequency_function_name();
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let frequency_fn = upstream_node.frequency_function_name();
+                let receiver = upstream_node.properties.receiver();
 
-                quote! { #frequency_fn(clocks) }
+                quote! { #(#receiver.)* #frequency_fn(clocks) }
             })
             .collect::<Vec<_>>();
 
@@ -183,17 +187,7 @@ impl ClockTreeNodeType for Multiplexer {
         } else {
             quote! {}
         };
-        let variants = self.variants.iter().map(|v| {
-            let variant = v.config_enum_variant();
-            if v.default {
-                quote! {
-                    #[default]
-                    #variant
-                }
-            } else {
-                variant
-            }
-        });
+        let variants = self.variants.iter().map(|v| v.config_enum_variant());
 
         let docline =
             format!("The list of clock signals that the `{clock_name}` multiplexer can output.");
@@ -216,8 +210,8 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_request_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = instance.properties.indexed_config_accessor();
+        self.impl_request_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
     fn release_direct_dependencies(
@@ -225,8 +219,8 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_release_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = instance.properties.indexed_config_accessor();
+        self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 }
 
@@ -253,8 +247,10 @@ impl Multiplexer {
         let ty_name = instance.config_type_name();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        let state = tree.properties(instance.name_str()).field_name();
-        let refcount_field = tree.properties(instance.name_str()).refcount_field_name();
+        let config_field = instance.properties.indexed_config_accessor();
+        let receiver = instance.properties.receiver();
+
+        let hal_impl = quote! { #(#receiver.)*#hal_impl };
 
         let request_upstream = self.impl_request_upstream(instance, tree, quote! { new_selector });
         let release_upstream = self.impl_release_upstream(instance, tree, quote! { old_selector });
@@ -306,9 +302,9 @@ impl Multiplexer {
                 #release_upstream
             }
         };
-        let apply_impl = if refcount_field.is_some() {
+        let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
             quote! {
-                if clocks.#refcount_field > 0 {
+                if #refcount_accessor > 0 {
                     #apply_and_switch_input
                 } else {
                     #hal_impl(clocks, old_selector, new_selector);
@@ -319,8 +315,8 @@ impl Multiplexer {
         };
 
         quote! {
-            pub fn #apply_fn_name(clocks: &mut ClockTree, new_selector: #ty_name) {
-                let old_selector = clocks.#state.replace(new_selector);
+            pub fn #apply_fn_name(#(#receiver,)* clocks: &mut ClockTree, new_selector: #ty_name) {
+                let old_selector = #config_field.replace(new_selector);
 
                 #configures
 
@@ -339,11 +335,12 @@ impl Multiplexer {
             let ty_name = instance.config_type_name();
             let request_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
-                let function = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .request_fn_name();
+
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let receiver = upstream_node.properties.receiver();
+                let func = upstream_node.request_fn_name();
                 quote! {
-                    #ty_name::#match_arm => #function(clocks)
+                    #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
 
@@ -357,9 +354,10 @@ impl Multiplexer {
                 .variants
                 .first()
                 .map(|variant| {
-                    instance
-                        .resolve_node(tree, &variant.outputs)
-                        .request_fn_name()
+                    let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                    let receiver = upstream_node.properties.receiver();
+                    let func = upstream_node.request_fn_name();
+                    quote! { #(#receiver.)*#func }
                 })
                 .into_iter();
 
@@ -379,11 +377,11 @@ impl Multiplexer {
             let ty_name = instance.config_type_name();
             let release_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
-                let function = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .release_fn_name();
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let receiver = upstream_node.properties.receiver();
+                let func = upstream_node.release_fn_name();
                 quote! {
-                    #ty_name::#match_arm => #function(clocks)
+                    #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
             quote! {
@@ -396,9 +394,10 @@ impl Multiplexer {
                 .variants
                 .first()
                 .map(|variant| {
-                    instance
-                        .resolve_node(tree, &variant.outputs)
-                        .release_fn_name()
+                    let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                    let receiver = upstream_node.properties.receiver();
+                    let func = upstream_node.release_fn_name();
+                    quote! { #(#receiver.)*#func }
                 })
                 .into_iter();
 
@@ -411,12 +410,12 @@ impl Multiplexer {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MultiplexerVariant {
-    name: String,
+    pub name: String,
     pub outputs: String,
     #[serde(default, deserialize_with = "super::list_from_str")]
-    configures: Vec<ConfiguresExpression>,
+    pub configures: Vec<ConfiguresExpression>,
     #[serde(default)]
-    default: bool,
+    pub default: bool,
 }
 impl MultiplexerVariant {
     pub fn config_enum_variant_name(&self) -> Ident {
@@ -436,13 +435,22 @@ impl MultiplexerVariant {
         let docline = format!(" Selects `{}`.", self.outputs);
         let name = self.config_enum_variant_name();
 
+        let default = if self.default {
+            quote! {
+                #[default]
+            }
+        } else {
+            quote! {}
+        };
+
         quote! {
+            #default
             #[doc = #docline]
             #name,
         }
     }
 
-    fn validate_source_data(
+    pub fn validate_source_data(
         &self,
         instance: &ClockTreeNodeInstance,
         ctx: &ValidationContext<'_>,

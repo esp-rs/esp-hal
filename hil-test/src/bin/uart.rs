@@ -15,7 +15,7 @@ mod tests {
         delay::Delay,
         gpio::{AnyPin, Pin},
         time::Duration,
-        uart::{self, ClockSource, Uart},
+        uart::{self, BaudrateTolerance, ClockSource, Uart},
     };
 
     struct Context {
@@ -103,7 +103,8 @@ mod tests {
         ];
 
         for config in configs {
-            uart.apply_config(&config).unwrap();
+            uart.apply_config(&config)
+                .unwrap_or_else(|e| panic!("{:?}: {:?}", e, config));
 
             uart.write(&[0x42]).unwrap();
             let mut byte = [0u8; 1];
@@ -192,16 +193,15 @@ mod tests {
             (5_000_000, fastest_clock_source),
         ];
 
-        // TODO: we need a way to verify these baud rates are actually what we want.
-
         let mut byte_to_write = 0xA5;
         for (baudrate, clock_source) in configs {
             uart.apply_config(
                 &uart::Config::default()
                     .with_baudrate(baudrate)
-                    .with_clock_source(clock_source),
+                    .with_clock_source(clock_source)
+                    .with_baudrate_tolerance(BaudrateTolerance::ErrorPercent(5)),
             )
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{:?}: Failed to apply {:?}@{}", e, clock_source, baudrate));
             uart.write(&[byte_to_write]).unwrap();
             let mut byte = [0u8; 1];
             uart.read(&mut byte).unwrap();

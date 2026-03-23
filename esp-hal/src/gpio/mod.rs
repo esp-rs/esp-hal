@@ -1710,7 +1710,7 @@ impl<'lt> AnyPin<'lt> {
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
+            .write(|w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
 
         // Use RMW to not overwrite sleep configuration
         io_mux_reg(self.number()).modify(|_, w| unsafe {

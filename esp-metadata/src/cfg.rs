@@ -623,9 +623,8 @@ driver_configs![
             cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
-            #[serde(default)]
-            clocks: DeviceClocks,
-            memory_map: MemoryMap,
+            #[serde(flatten)]
+            config: SocConfig,
         }
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {
@@ -693,6 +692,9 @@ driver_configs![
             ram_size: u32,
             #[serde(default)]
             peripheral_controls_mem_clk: bool,
+            // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.
+            #[serde(default)]
+            has_sclk_divider: bool,
         }
     },
     UhciProperties {

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for ESP32-C5 (#4998)
+- Support for ESP32-C61 (#5240)
 
 ### Changed
 

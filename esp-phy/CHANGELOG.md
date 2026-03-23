@@ -14,12 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use drivers from ESP-IDF v5.5.3 (#5226)
+
 
 ### Fixed
 
 
 ### Removed
 
+- The `PhyController` extension traits on the radio peripherals got removed in favor of a free standing `enable_phy` function (#5205)
 
 ## [v0.1.1] - 2025-10-30
 

@@ -4,7 +4,7 @@
 //! PINS
 //! GPIO4 for ADC1
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -17,6 +17,7 @@ use esp_hal::{
     Async,
     analog::adc::{
         Adc,
+        AdcCalBasic,
         AdcCalScheme,
         AdcChannel,
         AdcConfig,
@@ -30,6 +31,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 trait Sensor {
     async fn measure(&mut self) -> u16;
@@ -86,7 +89,11 @@ async fn main(_spawner: Spawner) {
 
     let mut adc1_config = AdcConfig::new();
     let analog_pin1 = peripherals.GPIO4;
-    let pin1 = adc1_config.enable_pin(analog_pin1, Attenuation::_11dB);
+    let pin1 = adc1_config
+        .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
+            analog_pin1,
+            Attenuation::_11dB,
+        );
     let adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
     let mut id = AdcSensor::<_, _, _, Identity>::new(adc1, pin1);
 

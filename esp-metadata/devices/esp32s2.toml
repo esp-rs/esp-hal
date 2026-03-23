@@ -12,6 +12,35 @@ target = "xtensa-esp32s2-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "psram",
+    "psram_dma",
+    "ulp_riscv_core",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_ext0_wakeup",
+    "pm_support_ext1_wakeup",
+    "pm_support_touch_sensor_wakeup",
+    "pm_support_wifi_wakeup",
+    "uart_support_wakeup_int",
+    "ulp_supported",
+    "riscv_coproc_supported",
+]
+
+[device.soc]
+rc_fast_clk_default = 8_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
+    { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
+] }
+
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 4 },
     { name = "APB_SARADC" },
@@ -49,11 +78,11 @@ peripherals = [
     { name = "SYSCON" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     { name = "TWAI0" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 3 },
     { name = "USB0" },
     { name = "USB_WRAP" },
@@ -77,35 +106,6 @@ peripherals = [
     { name = "ULP_RISCV_CORE", virtual = true },
 ]
 
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "psram",
-    "psram_dma",
-    "ulp_riscv_core",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_ext0_wakeup",
-    "pm_support_ext1_wakeup",
-    "pm_support_touch_sensor_wakeup",
-    "pm_support_wifi_wakeup",
-    "uart_support_wakeup_int",
-    "ulp_supported",
-    "riscv_coproc_supported",
-]
-
-[device.soc]
-rc_fast_clk_default = 8_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
-    { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
-] }
-
 clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",                     values = "40",                         output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000" }, # TODO reject = "VALUE == 320_000_000 && CPU_PLL_DIV_OUT == 240_000_000"
@@ -117,14 +117,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL",  outputs = "PLL_CLK" },
         { name = "APLL", outputs = "APLL_CLK" },
     ] },
-    { name = "CPU_PLL_DIV", type = "divider", params = { divisor = "2, 3, 4, 6" }, output = "CPU_PLL_DIV_IN / divisor" }, # TODO reject = "PLL_CLK == 320_000_000 && divisor % 3 == 0"
+    { name = "CPU_PLL_DIV", type = "generic", params = { divisor = "2, 3, 4, 6" }, output = "CPU_PLL_DIV_IN / divisor" }, # TODO reject = "PLL_CLK == 320_000_000 && divisor % 3 == 0"
 
     # Represents SEL0 = 0, 2
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSTEM_PRE_DIV", type = "generic", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -136,7 +136,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # APB options
-    { name = "APB_CLK_CPU_DIV2", type = "divider", output = "CPU_CLK / 2" },
+    { name = "APB_CLK_CPU_DIV2", type = "generic", output = "CPU_CLK / 2" },
     { name = "APB_CLK_80M",      type = "derived", from = "CPU_CLK", output = "80_000_000" },
     { name = "APB_CLK", type = "mux", variants = [
         { name = "PLL",     outputs = "APB_CLK_80M" },
@@ -146,8 +146,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_XTAL", type = "divider", params = { divisor = "0 .. 256" }, output = "XTAL_CLK / (divisor + 1)" },
-    { name = "REF_TICK_CK8M", type = "divider", params = { divisor = "0 .. 256" }, output = "RC_FAST_CLK / (divisor + 1)" },
+    { name = "REF_TICK_XTAL", type = "generic", params = { divisor = "0 .. 256" }, output = "XTAL_CLK / (divisor + 1)" },
+    { name = "REF_TICK_CK8M", type = "generic", params = { divisor = "0 .. 256" }, output = "RC_FAST_CLK / (divisor + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",     outputs = "REF_TICK_XTAL" },
         { name = "APLL",    outputs = "REF_TICK_XTAL" },
@@ -158,8 +158,8 @@ clocks = { system_clocks = { clock_tree = [
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "90_000" },
-    { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
-    { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
+    { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
+    { name = "XTAL_DIV_CLK",    type = "generic", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
         { name = "XTAL32K",    outputs = "XTAL32K_CLK" },
@@ -175,6 +175,29 @@ clocks = { system_clocks = { clock_tree = [
     { name = "UART_MEM_CLK", type = "mux", variants = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
+    ] },
+
+    # There are separate clock muxes for each TIMG instance, but esp-hal only uses one. Only modelling
+    # one makes the HAL code simpler.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+    ] },
+], template_groups = [
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
+            { name = "APB_CLK",  outputs = "APB_CLK" },
+        ] },
+    ] },
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+            { name = "APB",      outputs = "APB_CLK", default = true },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates
@@ -213,19 +236,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2cExt1" },
     { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
     { name = "Spi3" },
-    { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" },
+    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
     #{ name = "Efuse" },
-    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
-            { name = "APB_CLK",  outputs = "APB_CLK" },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK", default = true },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
-        ] },
-    ] },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Uhci1" },
     { name = "Ledc" },
     { name = "Pcnt" },
@@ -233,18 +246,10 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart1" },
     { name = "I2s0" },
     { name = "Wdg" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "APB",      outputs = "APB_CLK", default = true },
-            { name = "REF_TICK", outputs = "REF_TICK" }
-        ] },
-        { name = "MEM_CLOCK", type = "mux", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
-        ] },
-    ] },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

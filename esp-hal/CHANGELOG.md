@@ -48,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A mechanism to hook into linker scripts (#5116)
 - ESP32-S2, ESP32-S3: Add `UlpWakeupSource` so these chips can be woken up by ULP-generated interrupts. (#5132)
 - ESP32-S2, ESP32-S3: `UlpCore.run()` now accepts `UlpCoreWakeupSource::Timer(UlpCoreSleepCycles)` as an argument, allowing ULP applications to be woken up by the ULP Timer. (#5134)
-- Initial ESP32-C61 support (#5187)
+- Initial ESP32-C61 support (#5187, #5237)
+- Add support for ADC1 on ESP32C5. (#5215)
 
 ### Changed
 
@@ -83,6 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::new` now takes a configuration parameter (#5073)
 - It's no longer possible to pass `esp_hal::gpio::Output` to bidirectional peripheral signals (half-duplex SPI, I2C) (#5093)
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
+- `Rng`, `Rng::{random, read}` have been marked stable (#5098)
+- `esp_hal::init` now verifies that the initial stack pointer is in range (#5227)
 
 ### Fixed
 
@@ -111,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
 - Improve LP timer accuracy (#5105, #5115)
 - Increase the size of `irom_seg`/`drom_seg` from 4 MB to 32 MB for the ESP32-S3 (#5121)
+- UART and I2C inputs are now correctly defined when creating drivers (#5214)
 
 ### Removed
 
@@ -136,7 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
-
 
 ### Removed
 

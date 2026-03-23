@@ -140,6 +140,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
             host: armv7
+          - soc: esp32c61
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c61-usb
+            host: aarch64
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
@@ -227,6 +231,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
             host: armv7
+          - soc: esp32c61
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c61-usb
+            host: aarch64
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
@@ -371,6 +379,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
             host: armv7
+          - soc: esp32c61
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c61-usb
+            host: aarch64
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
@@ -457,6 +469,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
             host: armv7
+          - soc: esp32c61
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c61-usb
+            host: aarch64
           - soc: esp32h2
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb

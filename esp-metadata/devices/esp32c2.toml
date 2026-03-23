@@ -12,46 +12,6 @@ target = "riscv32imc-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
-peripherals = [
-    { name = "APB_CTRL" },
-    { name = "APB_SARADC" },
-    { name = "BB" },
-    { name = "ASSIST_DEBUG" },
-    { name = "DMA" },
-    { name = "ECC" },
-    { name = "EFUSE", hidden = true },
-    { name = "EXTMEM" },
-    { name = "GPIO" },
-    { name = "I2C_ANA_MST" },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "INTERRUPT_CORE0" },
-    { name = "IO_MUX" },
-    { name = "LEDC" },
-    { name = "RNG" },
-    { name = "LPWR", pac = "RTC_CNTL" },
-    { name = "MODEM_CLKRST" },
-    { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
-    { name = "SPI0" },
-    { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
-    { name = "SYSTEM" },
-    { name = "SYSTIMER" },
-    { name = "TIMG0" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
-    { name = "XTS_AES" },
-
-    { name = "DMA_CH0", virtual = true },
-
-    { name = "ADC1", virtual = true },
-    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
-    { name = "FLASH", virtual = true },
-    { name = "GPIO_DEDICATED", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
-    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
-]
-
 symbols = [
     # Additional peripherals defined by us (the developers):
     "phy",
@@ -78,6 +38,45 @@ memory_map = { ranges = [
     { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
 ] }
 
+peripherals = [
+    { name = "APB_CTRL" },
+    { name = "APB_SARADC" },
+    { name = "BB" },
+    { name = "ASSIST_DEBUG" },
+    { name = "DMA" },
+    { name = "ECC" },
+    { name = "EFUSE", hidden = true },
+    { name = "EXTMEM" },
+    { name = "GPIO" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
+    { name = "INTERRUPT_CORE0" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "RNG" },
+    { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "MODEM_CLKRST" },
+    { name = "SENSITIVE" },
+    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
+    { name = "XTS_AES" },
+
+    { name = "DMA_CH0", virtual = true },
+
+    { name = "ADC1", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
+    { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
+]
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
@@ -88,15 +87,15 @@ clocks = { system_clocks = { clock_tree = [
     # Low-speed clocks
     { name = "OSC_SLOW_CLK",    type = "source",  output = "32768" }, # external slow clock from GPIO0
     { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" }, # adjustable via RTC_CNTL_ANA_CLK_DIV
-    { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" }, # 256 is just the default value? RTC_CNTL_FOSC_DIV
+    { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" }, # 256 is just the default value? RTC_CNTL_FOSC_DIV
 
     # CPU clock source dividers
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
-    { name = "CPU_PLL_DIV",    type = "divider", params = { divisor = "4, 6" }, output = "PLL_CLK / divisor" },
+    { name = "SYSTEM_PRE_DIV", type = "generic", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    { name = "CPU_PLL_DIV",    type = "generic", params = { divisor = "4, 6" }, output = "PLL_CLK / divisor" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -110,7 +109,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "PLL_40M",  type = "derived", from = "CPU_CLK", output = "40_000_000" }, # PLL / 12
     { name = "PLL_60M",  type = "derived", from = "CPU_CLK", output = "60_000_000" }, # PLL / 8
     { name = "PLL_80M",  type = "derived", from = "CPU_CLK", output = "80_000_000" }, # PLL / 6
-    { name = "CPU_DIV2", type = "divider", output = "CPU_CLK / 2" },
+    { name = "CPU_DIV2", type = "generic", output = "CPU_CLK / 2" },
 
     { name = "APB_CLK", type = "mux", variants = [
         { name = "PLL_40M", outputs = "PLL_40M" },
@@ -126,8 +125,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # Low-power clocks
-    { name = "RC_FAST_CLK_DIV_N", type = "divider", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" }, # RC_DIV
-    { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" }, # XTAL_DIV
+    { name = "RC_FAST_CLK_DIV_N", type = "generic", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" }, # RC_DIV
+    { name = "XTAL_DIV_CLK",      type = "generic", output = "XTAL_CLK / 2" }, # XTAL_DIV
     { name = "RTC_SLOW_CLK", type = "mux", variants = [ # RTC_CNTL_ANA_CLK_RTC_SEL
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
@@ -151,6 +150,32 @@ clocks = { system_clocks = { clock_tree = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
+    # Modelling this separately makes the HAL code simpler.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+        { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
+    ] },
+], template_groups = [
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
+            { name = "PLL_40M",  outputs = "PLL_40M" },
+        ] },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "PLL_40M",  outputs = "PLL_40M", default = true },
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        ] },
+    ] },
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "PLL_F40M", outputs = "PLL_40M" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
+        ], div_num = "0 .. 0x100" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -173,35 +198,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
-    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
-            { name = "PLL_40M",  outputs = "PLL_40M" },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
-        ] },
-        { name = "WDT_CLOCK", type = "mux", variants = [
-            { name = "PLL_40M",  outputs = "PLL_40M", default = true },
-            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
-        ] },
-    ] },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Ledc" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1", clocks = "Uart0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
-            { name = "PLL_F40M", outputs = "PLL_40M" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
-        ] },
-        { name = "MEM_CLOCK", type = "mux", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
-        ] },
-    ] },
+    { name = "Uart1" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     
@@ -436,6 +438,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
+has_sclk_divider = true
 
 [device.rng]
 support_status = "partial"

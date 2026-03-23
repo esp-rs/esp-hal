@@ -9,7 +9,7 @@ use crate::{
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
-    soc::clocks::{ClockTree, CpuClkConfig, HpRootClkConfig, Timg0CalibrationClockConfig},
+    soc::clocks::{ClockTree, CpuClkConfig, HpRootClkConfig, TimgCalibrationClockConfig},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -495,7 +495,7 @@ impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
     fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
+        RtcClock::calibrate(TimgCalibrationClockConfig::RcFastDivClk, slowclk_cycles)
     }
 
     fn new() -> Self {

@@ -5,7 +5,7 @@ use core::{
 };
 
 use esp_hal::time::Instant;
-use esp_phy::{PhyController, PhyInitGuard};
+use esp_phy::PhyInitGuard;
 
 use super::*;
 use crate::{
@@ -274,6 +274,12 @@ unsafe extern "C" {
     pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
 
     pub(crate) fn coex_pti_v2();
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn scan_stack_initEnv() -> i32;
+
+    #[cfg(not(esp32c2))]
+    pub(crate) fn scan_stack_deinitEnv();
 }
 
 #[repr(C)]
@@ -322,7 +328,9 @@ pub(crate) struct ExtFuncsT {
     os_random: Option<unsafe extern "C" fn() -> u32>,
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
     ecc_gen_dh_key: Option<unsafe extern "C" fn(*const u8, *const u8, *const u8, *const u8) -> i32>,
-    #[cfg(not(any(esp32h2, esp32c5)))]
+    #[cfg(any(esp32c6, esp32h2))]
+    esp_reset_modem: Option<unsafe extern "C" fn(mdl_opts: u8, start: u8)>,
+    #[cfg(esp32c2)]
     esp_reset_rpa_moudle: Option<unsafe extern "C" fn()>,
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: Option<unsafe extern "C" fn()>,
@@ -333,7 +341,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     ext_version: if cfg!(esp32c2) {
         0x20221122
     } else {
-        0x20250415
+        0x20250825
     },
 
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
@@ -358,7 +366,9 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     os_random: Some(os_random),
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
-    #[cfg(not(any(esp32h2, esp32c5)))]
+    #[cfg(any(esp32c6, esp32h2))]
+    esp_reset_modem: Some(self::ble_os_adapter_chip_specific::reset_modem),
+    #[cfg(esp32c2)]
     esp_reset_rpa_moudle: Some(self::ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
@@ -1126,7 +1136,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             os_msys_init();
         }
 
-        phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
+        phy_init_guard = esp_phy::enable_phy();
 
         // init bb
         bt_bb_v2_init_cmplx(1);
@@ -1184,6 +1194,12 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
             let res = extAdv_stack_initEnv();
             assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
+
+            #[cfg(not(esp32c2))]
+            {
+                let res = scan_stack_initEnv();
+                assert!(res == 0, "scan_stack_initEnv returned {}", res);
+            }
 
             let res = sync_stack_initEnv();
             assert!(res == 0, "sync_stack_initEnv returned {}", res);
@@ -1262,6 +1278,7 @@ pub(crate) fn ble_deinit() {
             npl::r_ble_controller_disable();
             conn_stack_deinitEnv();
             sync_stack_deinitEnv();
+            scan_stack_deinitEnv();
             extAdv_stack_deinitEnv();
             adv_stack_deinitEnv();
             base_stack_deinitEnv();

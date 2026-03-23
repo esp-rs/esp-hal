@@ -4,7 +4,7 @@
 //! GPIO4 for ADC1
 //! ONLY ESP32-C3: GPIO5 for ADC2
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
@@ -12,7 +12,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    analog::adc::{Adc, AdcConfig, Attenuation},
+    analog::adc::{Adc, AdcCalBasic, AdcConfig, Attenuation},
     delay::Delay,
     interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
@@ -31,7 +31,11 @@ async fn main(_spawner: Spawner) {
 
     let mut adc1_config = AdcConfig::new();
     let analog_pin1 = peripherals.GPIO4;
-    let mut pin1 = adc1_config.enable_pin(analog_pin1, Attenuation::_11dB);
+    let mut pin1 = adc1_config
+        .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
+            analog_pin1,
+            Attenuation::_11dB,
+        );
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
 
     cfg_if::cfg_if! {

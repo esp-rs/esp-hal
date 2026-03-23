@@ -149,7 +149,7 @@ use crate::{
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
     peripherals::{PARL_IO, PCR},
-    soc::clocks::ClockTree,
+    soc::clocks::{ClockTree, ParlIoInstance},
     system::{GenericPeripheralGuard, Peripheral},
     time::Rate,
 };
@@ -1222,7 +1222,7 @@ where
             return Err(ConfigError::UnreachableClockRate);
         }
 
-        let frequency = ClockTree::with(crate::soc::clocks::parlio_tx_clock_frequency);
+        let frequency = ClockTree::with(|clocks| ParlIoInstance::ParlIo.tx_clock_frequency(clocks));
         let divider = frequency / config.frequency.as_hz();
         if divider > 0xFFFF {
             return Err(ConfigError::UnreachableClockRate);
@@ -1385,7 +1385,7 @@ where
             return Err(ConfigError::UnreachableClockRate);
         }
 
-        let frequency = ClockTree::with(crate::soc::clocks::parlio_rx_clock_frequency);
+        let frequency = ClockTree::with(|clocks| ParlIoInstance::ParlIo.rx_clock_frequency(clocks));
         let divider = frequency / config.frequency.as_hz();
         if divider > 0xffff {
             return Err(ConfigError::UnreachableClockRate);
@@ -2086,8 +2086,8 @@ struct ParlIoTxGuard {
 impl ParlIoTxGuard {
     pub fn new(_guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>) -> Self {
         ClockTree::with(|clocks| {
-            crate::soc::clocks::configure_parlio_tx_clock(clocks, Default::default());
-            crate::soc::clocks::request_parlio_tx_clock(clocks);
+            ParlIoInstance::ParlIo.configure_tx_clock(clocks, Default::default());
+            ParlIoInstance::ParlIo.request_tx_clock(clocks);
         });
         Self { _guard }
     }
@@ -2095,7 +2095,7 @@ impl ParlIoTxGuard {
 
 impl Drop for ParlIoTxGuard {
     fn drop(&mut self) {
-        ClockTree::with(crate::soc::clocks::release_parlio_tx_clock);
+        ClockTree::with(|clocks| ParlIoInstance::ParlIo.release_tx_clock(clocks));
     }
 }
 
@@ -2106,8 +2106,8 @@ struct ParlIoRxGuard {
 impl ParlIoRxGuard {
     pub fn new(_guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>) -> Self {
         ClockTree::with(|clocks| {
-            crate::soc::clocks::configure_parlio_rx_clock(clocks, Default::default());
-            crate::soc::clocks::request_parlio_rx_clock(clocks);
+            ParlIoInstance::ParlIo.configure_rx_clock(clocks, Default::default());
+            ParlIoInstance::ParlIo.request_rx_clock(clocks);
         });
         Self { _guard }
     }
@@ -2115,6 +2115,6 @@ impl ParlIoRxGuard {
 
 impl Drop for ParlIoRxGuard {
     fn drop(&mut self) {
-        ClockTree::with(crate::soc::clocks::release_parlio_rx_clock);
+        ClockTree::with(|clocks| ParlIoInstance::ParlIo.release_rx_clock(clocks));
     }
 }

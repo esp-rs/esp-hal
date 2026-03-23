@@ -1,4 +1,5 @@
 INCLUDE "rom/esp32c2.rom.api.ld"
+INCLUDE "rom/esp32c2.rom.ble.ld"
 INCLUDE "rom/esp32c2.rom.heap.ld"
 INCLUDE "rom/esp32c2.rom.ld"
 INCLUDE "rom/esp32c2.rom.libgcc.ld"

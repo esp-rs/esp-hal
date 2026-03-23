@@ -24,6 +24,9 @@ pub struct AdcCalBasic<ADCI> {
     /// Calibration value to set to ADC unit
     cal_val: u16,
 
+    #[cfg(esp32c5)]
+    chan_compens: i32,
+
     _phantom: PhantomData<ADCI>,
 }
 
@@ -41,13 +44,25 @@ where
             AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Gnd)
         });
 
+        #[cfg(esp32c5)]
+        let chan_compens = ADCI::cal_chan_compens(atten, ADCI::ADC_CAL_CHANNEL).unwrap_or(0);
+
         Self {
             cal_val,
+            #[cfg(esp32c5)]
+            chan_compens,
             _phantom: PhantomData,
         }
     }
 
     fn adc_cal(&self) -> u16 {
         self.cal_val
+    }
+
+    // This is default from the trait for other target than esp32c5
+    #[cfg(esp32c5)]
+    fn adc_val(&self, val: u16) -> u16 {
+        val.saturating_sub(self.chan_compens as u16)
+            .clamp(0, ADCI::ADC_VAL_MASK)
     }
 }

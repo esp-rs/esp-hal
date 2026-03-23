@@ -53,16 +53,16 @@ use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
     clock_tree::{
-        divider::Divider,
         expr_compiler::ExprCompiler,
+        generic::Generic,
         mux::Multiplexer,
         source::{DerivedClockSource, Source},
     },
     soc::{ClockTreeNodeInstance, ProcessedClockData},
 };
 
-mod divider;
 mod expr_compiler;
+mod generic;
 mod mux;
 mod source;
 
@@ -73,6 +73,8 @@ pub(crate) struct Function {
 }
 
 pub(crate) struct ClockNodeFunctions {
+    pub impl_type: Option<Ident>,
+
     pub request: Function,
     pub release: Function,
     pub apply_config: Function,
@@ -100,60 +102,6 @@ impl ClockNodeFunctions {
     }
 }
 
-/// Represents the clock input options for a peripheral.
-#[derive(Debug, Clone, Deserialize)]
-pub enum PeripheralClockTreeEntry {
-    /// Defines clock tree items relevant for the current peripheral.
-    Definition(Vec<ClockTreeItem>),
-
-    /// References a clock tree defined in another peripheral. This peripheral will inherit the
-    /// clock tree from the referenced peripheral.
-    Reference(String),
-}
-
-impl Default for PeripheralClockTreeEntry {
-    fn default() -> Self {
-        PeripheralClockTreeEntry::Definition(Vec::new())
-    }
-}
-
-// Based on https://serde.rs/string-or-struct.html
-pub(super) fn ref_or_def<'de, D>(deserializer: D) -> Result<PeripheralClockTreeEntry, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct PeripheralClockTreeEntryVisitor;
-
-    impl<'de> Visitor<'de> for PeripheralClockTreeEntryVisitor {
-        type Value = PeripheralClockTreeEntry;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("string or list")
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<PeripheralClockTreeEntry, E>
-        where
-            E: de::Error,
-        {
-            Ok(PeripheralClockTreeEntry::Reference(value.to_string()))
-        }
-
-        fn visit_seq<S>(self, list: S) -> Result<PeripheralClockTreeEntry, S::Error>
-        where
-            S: SeqAccess<'de>,
-        {
-            // `SeqAccessDeserializer` is a wrapper that turns a `SeqAccess`
-            // into a `Deserializer`, allowing it to be used as the input to T's
-            // `Deserialize` implementation. T then deserializes itself using
-            // the entries from the map visitor.
-            Deserialize::deserialize(de::value::SeqAccessDeserializer::new(list))
-                .map(PeripheralClockTreeEntry::Definition)
-        }
-    }
-
-    deserializer.deserialize_any(PeripheralClockTreeEntryVisitor)
-}
-
 pub struct ValidationContext<'c> {
     pub tree: &'c [&'c ClockTreeNodeInstance],
 }
@@ -164,7 +112,7 @@ impl<'c> ValidationContext<'c> {
     }
 
     fn clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> Option<&ClockTreeNodeInstance> {
-        let local_clk = format!("{}_{}", instance.group, clk);
+        let local_clk = format!("{}_{}", instance.group_instance, clk);
         self.tree
             .iter()
             .cloned()
@@ -200,12 +148,12 @@ impl DependencyGraph {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             dependency_graph.insert(node.name.clone(), Vec::new());
             reverse_dependency_graph.insert(node.name.clone(), Vec::new());
         }
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             let node_name = node.name_str();
 
             for input in node.input_clocks(clock_tree) {
@@ -266,31 +214,42 @@ fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<
     sorted.into_iter()
 }
 
+#[derive(Debug)]
 pub(crate) struct ManagementProperties {
     pub name: Ident,
-    pub state_ty: Option<Ident>,
+    pub state_ty: Option<TokenStream>,
     pub refcounted: bool,
     pub has_enable: bool,
 
     /// This clock node is considered always running.
     pub always_on: bool,
+
+    pub receiver: Option<TokenStream>,
+    pub accessor: Option<TokenStream>,
 }
 
 impl ManagementProperties {
+    /// Name of the node's current configuration field in the ClockTree struct.
     pub fn field_name(&self) -> Ident {
         self.name.clone()
     }
 
-    pub fn type_name(&self) -> Option<Ident> {
+    pub fn type_name(&self) -> Option<TokenStream> {
         self.state_ty.clone()
     }
 
-    pub fn refcount_field_name(&self) -> Option<Ident> {
+    pub fn refcount_field(&self) -> Option<Ident> {
         if self.refcounted {
             Some(format_ident!("{}_refcount", self.name))
         } else {
             None
         }
+    }
+
+    pub fn refcount_accessor(&self) -> Option<TokenStream> {
+        let receiver = self.receiver.as_ref().into_iter();
+        self.refcount_field()
+            .map(|field| quote! { clocks.#field #([#receiver as usize])* })
     }
 
     pub fn has_enable(&self) -> bool {
@@ -300,10 +259,34 @@ impl ManagementProperties {
     pub fn always_on(&self) -> bool {
         self.always_on
     }
+
+    /// For peripheral clocks, returns a receiver expression (`self`).
+    pub fn receiver(&self) -> &[TokenStream] {
+        self.receiver.as_slice()
+    }
+
+    /// Returns an expression that accesses the node's current configuration field in the ClockTree
+    /// struct. This function takes the node's instance as the receiver and uses it to index into
+    /// the configuration array.
+    pub fn indexed_config_accessor(&self) -> TokenStream {
+        let node_field = &self.name;
+        let receiver = self.receiver.as_ref().into_iter();
+        quote! { clocks.#node_field #([#receiver as usize])* }
+    }
+
+    /// Returns an expression that accesses the index's current configuration field in the ClockTree
+    /// struct. This function hardcodes the node's actual variant.
+    pub fn instance_config_accessor(&self) -> TokenStream {
+        let node_field = &self.name;
+        let accessor = self.accessor.as_ref().into_iter();
+        quote! { self.#node_field #([#accessor])* }
+    }
 }
 
 /// Common interface for clock node types.
 pub(crate) trait ClockTreeNodeType: Any {
+    fn name(&self) -> &str;
+
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
     // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
@@ -379,6 +362,10 @@ pub(crate) trait ClockTreeNodeType: Any {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
+
+    fn property_macro_branches(&self, _path: &str) -> TokenStream {
+        quote! {}
+    }
 }
 
 /// Represents a clock tree item.
@@ -391,8 +378,8 @@ pub enum ClockTreeItem {
     #[serde(rename = "source")]
     Source(Source),
 
-    #[serde(rename = "divider")]
-    Divider(Divider),
+    #[serde(rename = "generic")]
+    Generic(Generic),
 
     #[serde(rename = "derived")]
     Derived(DerivedClockSource),
@@ -403,7 +390,7 @@ impl ClockTreeItem {
         match self {
             ClockTreeItem::Multiplexer(mux) => mux.name.as_str(),
             ClockTreeItem::Source(src) => src.name.as_str(),
-            ClockTreeItem::Divider(div) => div.name.as_str(),
+            ClockTreeItem::Generic(div) => div.name.as_str(),
             ClockTreeItem::Derived(drv) => drv.source_options.name.as_str(),
         }
     }
@@ -412,8 +399,17 @@ impl ClockTreeItem {
         match self {
             ClockTreeItem::Multiplexer(mux) => Box::new(mux.clone()),
             ClockTreeItem::Source(src) => Box::new(src.clone()),
-            ClockTreeItem::Divider(div) => Box::new(div.clone()),
+            ClockTreeItem::Generic(div) => Box::new(div.clone()),
             ClockTreeItem::Derived(drv) => Box::new(drv.clone()),
+        }
+    }
+
+    pub(crate) fn property_macro_branches(&self, path: &str) -> TokenStream {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path),
+            ClockTreeItem::Source(src) => src.property_macro_branches(path),
+            ClockTreeItem::Generic(div) => div.property_macro_branches(path),
+            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path),
         }
     }
 }
@@ -667,13 +663,12 @@ impl RejectExpression {
             if !variables.contains_key(var) {
                 // Referring to a node by name resolves to its output frequency.
                 let node = instance.resolve_node(tree, var);
-                let properties = tree.properties(node.name_str());
                 let freq_fn = node.frequency_function_name();
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
                 // Only run the assert if the referenced nodes have been configured
-                let node_field = properties.field_name();
-                patterns.push(quote! { clocks.#node_field.is_some() });
+                let config_field = node.properties.indexed_config_accessor();
+                patterns.push(quote! { #config_field.is_some() });
             }
         });
 

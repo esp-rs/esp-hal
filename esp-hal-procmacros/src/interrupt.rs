@@ -94,6 +94,18 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         .to_compile_error();
     }
 
+    // Preserve user rustdoc on the visible generated symbol (`const <name>`).
+    //
+    // `#[handler]` rewrites the function name to an internal symbol and emits
+    // a const with the original name. Without forwarding docs, rustdoc appears
+    // "lost" because it stays attached to the hidden internal function.
+    let doc_attrs: Vec<Attribute> = f
+        .attrs
+        .iter()
+        .filter(|attr| matches!(get_attr_name(attr).as_deref(), Some("doc")))
+        .cloned()
+        .collect();
+
     f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
     let orig = f.sig.ident;
     let vis = f.vis.clone();
@@ -107,6 +119,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         #f
 
         #[allow(non_upper_case_globals)]
+        #(#doc_attrs)*
         #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
 }
