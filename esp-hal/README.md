@@ -91,7 +91,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          |           |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
+| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | [❌][5162] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      |
