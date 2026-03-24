@@ -1411,7 +1411,9 @@ impl<I, F: FnOnce(I)> DropGuard<I, F> {
         }
     }
 
-    pub(crate) fn defuse(self) {}
+    pub(crate) fn defuse(self) {
+        core::mem::forget(self);
+    }
 }
 
 impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
