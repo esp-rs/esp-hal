@@ -1177,7 +1177,7 @@ where
         self.driver().setup_full_duplex()?;
 
         for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().write(chunk)?;
+            self.driver().write_one(chunk)?;
             // NOTE: While we don't need to flush after the last chunk, changing
             // that would change the behavior of the function.
             self.driver().flush()?;
@@ -1401,7 +1401,7 @@ where
         self.driver().setup_full_duplex()?;
         for chunk in words.chunks(FIFO_SIZE) {
             self.driver().flush()?;
-            self.driver().write(chunk)?;
+            self.driver().write_one(chunk)?;
         }
         Ok(())
     }
@@ -1420,6 +1420,8 @@ where
     }
 
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
@@ -2032,7 +2034,7 @@ impl Driver {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write(&empty_array[0..chunk.len()])?;
+            self.write_one(&empty_array[0..chunk.len()])?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
@@ -2049,7 +2051,8 @@ impl Driver {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_async(&empty_array[0..chunk.len()]).await?;
+            self.write_one(&empty_array[0..chunk.len()])?;
+            self.flush_async().await;
             self.read_from_fifo(chunk)?;
         }
         Ok(())
@@ -2100,7 +2103,7 @@ impl Driver {
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn transfer_in_place(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write(chunk)?;
+            self.write_one(chunk)?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
@@ -2130,9 +2133,9 @@ impl Driver {
                 // Read more than we write, must pad writing part with zeros
                 let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
                 empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                self.write(&empty[..read_inc])?;
+                self.write_one(&empty[..read_inc])?;
             } else {
-                self.write(&write[write_from..][..write_inc])?;
+                self.write_one(&write[write_from..][..write_inc])?;
             }
 
             if read_inc > 0 {
@@ -2155,7 +2158,8 @@ impl Driver {
                 self.abort_transfer();
                 while self.busy() {}
             });
-            let res = self.write_async(chunk).await;
+            let res = self.write_one(chunk);
+            self.flush_async().await;
             cancel_on_drop.defuse();
             res?;
 
@@ -2180,18 +2184,19 @@ impl Driver {
                 break;
             }
 
-            // The write_async implementation waits for the FIFO to drain after writing.
+            self.flush_async().await;
 
             if write_inc < read_inc {
                 // Read more than we write, must pad writing part with zeros
                 let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
                 empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                self.write_async(&empty[..read_inc]).await?;
+                self.write_one(&empty[..read_inc])?;
             } else {
-                self.write_async(&write[write_from..][..write_inc]).await?;
+                self.write_one(&write[write_from..][..write_inc])?;
             }
 
             if read_inc > 0 {
+                self.flush_async().await;
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
 
