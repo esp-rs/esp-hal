@@ -51,7 +51,7 @@ mod dma;
 pub use dma::*;
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-use enumset::{EnumSet, EnumSetType};
+use enumset::{EnumSet, EnumSetType, enum_set};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
@@ -852,7 +852,8 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.driver().flush_async().await
+        self.driver().flush_async().await;
+        Ok(())
     }
 
     #[procmacros::doc_replace]
@@ -885,7 +886,7 @@ impl<'d> Spi<'d, Async> {
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.driver().flush_async().await?;
+        self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
         self.driver().transfer_in_place_async(words).await
@@ -896,7 +897,7 @@ impl<'d> Spi<'d, Async> {
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.flush_async().await?;
+        self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
         self.driver().read_async(words).await
@@ -905,7 +906,7 @@ impl<'d> Spi<'d, Async> {
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.flush_async().await?;
+        self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
         self.driver().write_async(words).await
@@ -1434,7 +1435,7 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush_async().await?;
+        self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
         if read.is_empty() {
@@ -2005,7 +2006,8 @@ impl Driver {
         for chunk in words.chunks(FIFO_SIZE) {
             self.configure_datalen(0, chunk.len());
             self.fill_fifo(chunk);
-            self.execute_operation_async().await;
+            self.start_operation();
+            self.flush_async().await;
         }
         Ok(())
     }
@@ -2072,13 +2074,8 @@ impl Driver {
 
     // Check if the bus is busy and if it is wait for it to be idle
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    async fn flush_async(&self) -> Result<(), Error> {
-        if self.busy() {
-            let future = SpiFuture::setup(self).await;
-            future.await;
-        }
-
-        Ok(())
+    fn flush_async(&self) -> impl Future<Output = ()> {
+        SpiFuture { driver: self }
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -2198,16 +2195,6 @@ impl Driver {
     fn start_operation(&self) {
         self.update();
         self.regs().cmd().modify(|_, w| w.usr().set_bit());
-    }
-
-    /// Starts the operation and waits for it to complete.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    async fn execute_operation_async(&self) {
-        // On ESP32, the interrupt seems to not fire in specific circumstances, when
-        // `listen` is called after `start_operation`. Let's call it before, to be sure.
-        let future = SpiFuture::setup(self).await;
-        self.start_operation();
-        future.await;
     }
 
     fn setup_full_duplex(&self) -> Result<(), Error> {
@@ -2535,41 +2522,29 @@ struct SpiFuture<'a> {
     driver: &'a Driver,
 }
 
-impl<'a> SpiFuture<'a> {
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
-        // Make sure this is called before starting an async operation. On the ESP32,
-        // calling after may cause the interrupt to not fire.
-        core::future::poll_fn(move |cx| {
-            driver.state.waker.register(cx.waker());
-            driver.clear_interrupts(SpiInterrupt::TransferDone.into());
-            driver.enable_listen(SpiInterrupt::TransferDone.into(), true);
-            Poll::Ready(Self { driver })
-        })
-    }
+impl SpiFuture<'_> {
+    const EVENTS: EnumSet<SpiInterrupt> = enum_set!(SpiInterrupt::TransferDone);
 }
 
 impl Future for SpiFuture<'_> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self
-            .driver
-            .interrupts()
-            .contains(SpiInterrupt::TransferDone)
-        {
-            self.driver
-                .clear_interrupts(SpiInterrupt::TransferDone.into());
-            return Poll::Ready(());
-        }
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.driver.busy() {
+            self.driver.state.waker.register(cx.waker());
+            self.driver.enable_listen(Self::EVENTS, true);
 
-        Poll::Pending
+            Poll::Pending
+        } else {
+            self.driver.clear_interrupts(Self::EVENTS);
+            Poll::Ready(())
+        }
     }
 }
 
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
-        self.driver
-            .enable_listen(SpiInterrupt::TransferDone.into(), false);
+        self.driver.enable_listen(Self::EVENTS, false);
     }
 }
