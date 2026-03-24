@@ -1984,6 +1984,18 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn write_one(&self, words: &[u8]) -> Result<(), Error> {
+        if words.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
+        self.configure_datalen(0, words.len());
+        self.fill_fifo(words);
+        self.start_operation();
+        Ok(())
+    }
+
+    /// Write bytes to SPI.
     ///
     /// This function will return before all bytes of the last chunk to transmit
     /// have been sent to the wire. If you must ensure that the whole
@@ -1992,10 +2004,7 @@ impl Driver {
     fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
             self.flush()?;
-            self.configure_datalen(0, chunk.len());
-            self.fill_fifo(chunk);
-
-            self.start_operation();
+            self.write_one(chunk)?;
         }
         Ok(())
     }
@@ -2004,9 +2013,7 @@ impl Driver {
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
-            self.configure_datalen(0, chunk.len());
-            self.fill_fifo(chunk);
-            self.start_operation();
+            self.write_one(chunk)?;
             self.flush_async().await;
         }
         Ok(())
