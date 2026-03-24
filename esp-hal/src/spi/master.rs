@@ -2275,6 +2275,16 @@ mod dma {
             self.spi_dma.wait_for_idle_async().await;
             self.spi_dma.driver().setup_full_duplex()?;
 
+            // If a transfer is below the expected time of a context switch, it's better
+            // to do it synchronously.
+            // TODO: this should be configurable
+            if words.len() <= 4 {
+                self.spi_dma.dma_driver().disable_dma();
+                self.spi_dma.driver().write(words)?;
+                self.spi_dma.driver().flush()?;
+                return Ok(());
+            }
+
             let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
             let chunk_size = self.tx_buf.capacity();
 
@@ -2680,16 +2690,24 @@ mod dma {
             Ok(())
         }
 
-        fn enable_dma(&self) {
+        fn set_dma_enabled(&self, _enabled: bool) {
             #[cfg(dma_kind = "gdma")]
             // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
             self.regs().dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit()
+                w.dma_tx_ena().bit(_enabled);
+                w.dma_rx_ena().bit(_enabled)
             });
 
             #[cfg(dma_kind = "pdma")]
             self.reset_dma();
+        }
+
+        fn enable_dma(&self) {
+            self.set_dma_enabled(true);
+        }
+
+        fn disable_dma(&self) {
+            self.set_dma_enabled(false);
         }
 
         fn reset_dma(&self) {
