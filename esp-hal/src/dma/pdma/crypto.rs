@@ -2,6 +2,7 @@ use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
+    RegisterToggle,
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
@@ -62,15 +63,10 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
     }
 
     fn reset(&self) {
-        self.regs().conf().modify(|_, w| {
-            w.out_rst().set_bit();
-            w.ahbm_rst().set_bit();
-            w.ahbm_fifo_rst().set_bit()
-        });
-        self.regs().conf().modify(|_, w| {
-            w.out_rst().clear_bit();
-            w.ahbm_rst().clear_bit();
-            w.ahbm_fifo_rst().clear_bit()
+        self.regs().conf().toggle(|w, bit| {
+            w.out_rst().bit(bit);
+            w.ahbm_rst().bit(bit);
+            w.ahbm_fifo_rst().bit(bit)
         });
     }
 
@@ -261,15 +257,10 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     }
 
     fn reset(&self) {
-        self.regs().conf().modify(|_, w| {
-            w.in_rst().set_bit();
-            w.ahbm_rst().set_bit();
-            w.ahbm_fifo_rst().set_bit()
-        });
-        self.regs().conf().modify(|_, w| {
-            w.in_rst().clear_bit();
-            w.ahbm_rst().clear_bit();
-            w.ahbm_fifo_rst().clear_bit()
+        self.regs().conf().toggle(|w, bit| {
+            w.in_rst().bit(bit);
+            w.ahbm_rst().bit(bit);
+            w.ahbm_fifo_rst().bit(bit)
         });
     }
 
