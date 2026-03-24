@@ -1270,6 +1270,7 @@ where
             return Err(Error::Unsupported);
         }
 
+        self.flush()?;
         self.driver().setup_half_duplex(
             false,
             cmd,
@@ -1308,6 +1309,8 @@ where
         if buffer.len() > FIFO_SIZE {
             return Err(Error::FifoSizeExeeded);
         }
+
+        self.flush()?;
 
         cfg_if::cfg_if! {
             if #[cfg(all(esp32, spi_address_workaround))] {
