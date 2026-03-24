@@ -15,4 +15,7 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c61 as pac;
 
-pub(crate) fn pre_init() {}
+pub(crate) fn pre_init() {
+    // this is hacky, but for some reason we must reset the output enable register manually
+    crate::peripherals::GPIO::regs().enable().reset();
+}

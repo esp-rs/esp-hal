@@ -855,6 +855,14 @@ impl<'d> OutputSignal<'d> {
 
     #[doc(hidden)]
     #[instability::unstable]
+    #[cfg_attr(
+        not(any(
+            i2c_master_driver_supported,
+            spi_master_driver_supported,
+            uart_driver_supported
+        )),
+        expect(unused)
+    )]
     pub(crate) fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
         signal.connect_to(&self);
         match self.pin {
