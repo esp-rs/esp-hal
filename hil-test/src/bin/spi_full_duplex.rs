@@ -934,7 +934,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     fn transfer_works_after_half_duplex_operation(ctx: Context) {
         let mut spi = ctx.spi;
 
