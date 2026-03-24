@@ -151,6 +151,18 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("uart.peripheral_controls_mem_clk") => {
+        true
+    };
+    ("uart.has_sclk_divider") => {
+        false
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -2052,6 +2064,35 @@ macro_rules! memory_range {
     };
     (size as str, "DRAM2_UNINIT") => {
         "65536"
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the UART driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident,
+/// $rts:ident)`
+///
+/// Macro fragments:
+///
+/// - `$id`: the index of the UART instance
+/// - `$instance`: the name of the UART instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$rx`, `$tx`, `$cts`, `$rts`: signal names.
+///
+/// Example data: `(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_uart {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
+        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
+        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
+        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
     };
 }
 #[macro_export]
