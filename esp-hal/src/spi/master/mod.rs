@@ -43,9 +43,14 @@ use core::{
     task::{Context, Poll},
 };
 
+#[cfg(spi_master_supports_dma)]
+mod dma;
+
 #[instability::unstable]
 #[cfg(spi_master_supports_dma)]
 pub use dma::*;
+use embedded_hal::spi::SpiBus;
+use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::doc_replace;
 
@@ -1341,154 +1346,144 @@ where
     }
 }
 
-#[cfg(spi_master_supports_dma)]
-mod dma;
+impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Error = Error;
+}
 
-mod ehal1 {
-    use embedded_hal::spi::SpiBus;
-    use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-
-    use super::*;
-
-    impl<Dm> embedded_hal::spi::ErrorType for Spi<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        type Error = Error;
+impl<Dm> SpiBus for Spi<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.driver().read(words)
     }
 
-    impl<Dm> SpiBus for Spi<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.driver().read(words)
-        }
-
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.driver().write(words)
-        }
-
-        fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-            // Optimizations
-            if read.is_empty() {
-                return SpiBus::write(self, write);
-            } else if write.is_empty() {
-                return SpiBus::read(self, read);
-            }
-
-            let mut write_from = 0;
-            let mut read_from = 0;
-
-            loop {
-                // How many bytes we write in this chunk
-                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-                // How many bytes we read in this chunk
-                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-                if (write_inc == 0) && (read_inc == 0) {
-                    break;
-                }
-
-                // No need to flush here, `SpiBus::write` will do it for us
-
-                if write_inc < read_inc {
-                    // Read more than we write, must pad writing part with zeros
-                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                    empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                    SpiBus::write(self, &empty[..read_inc])?;
-                } else {
-                    SpiBus::write(self, &write[write_from..][..write_inc])?;
-                }
-
-                if read_inc > 0 {
-                    SpiBus::flush(self)?;
-                    self.driver()
-                        .read_from_fifo(&mut read[read_from..][..read_inc])?;
-                }
-
-                write_from += write_inc;
-                read_from += read_inc;
-            }
-            Ok(())
-        }
-
-        fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.driver().transfer(words)
-        }
-
-        fn flush(&mut self) -> Result<(), Self::Error> {
-            self.driver().flush()
-        }
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.driver().write(words)
     }
 
-    impl SpiBusAsync for Spi<'_, Async> {
-        async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            // We need to flush because the blocking transfer functions may return while a
-            // transfer is still in progress.
-            self.flush_async().await?;
-            self.driver().setup_full_duplex()?;
-            self.driver().read_async(words).await
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        // Optimizations
+        if read.is_empty() {
+            return SpiBus::write(self, write);
+        } else if write.is_empty() {
+            return SpiBus::read(self, read);
         }
 
-        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            // We need to flush because the blocking transfer functions may return while a
-            // transfer is still in progress.
-            self.flush_async().await?;
-            self.driver().setup_full_duplex()?;
-            self.driver().write_async(words).await
-        }
+        let mut write_from = 0;
+        let mut read_from = 0;
 
-        async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-            // Optimizations
-            if read.is_empty() {
-                return SpiBusAsync::write(self, write).await;
-            } else if write.is_empty() {
-                return SpiBusAsync::read(self, read).await;
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
             }
 
-            let mut write_from = 0;
-            let mut read_from = 0;
+            // No need to flush here, `SpiBus::write` will do it for us
 
-            loop {
-                // How many bytes we write in this chunk
-                let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-                // How many bytes we read in this chunk
-                let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-                if (write_inc == 0) && (read_inc == 0) {
-                    break;
-                }
-
-                // No need to flush here, `SpiBusAsync::write` will do it for us
-
-                if write_inc < read_inc {
-                    // Read more than we write, must pad writing part with zeros
-                    let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                    empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                    SpiBusAsync::write(self, &empty[..read_inc]).await?;
-                } else {
-                    SpiBusAsync::write(self, &write[write_from..][..write_inc]).await?;
-                }
-
-                if read_inc > 0 {
-                    self.driver()
-                        .read_from_fifo(&mut read[read_from..][..read_inc])?;
-                }
-
-                write_from += write_inc;
-                read_from += read_inc;
+            if write_inc < read_inc {
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                SpiBus::write(self, &empty[..read_inc])?;
+            } else {
+                SpiBus::write(self, &write[write_from..][..write_inc])?;
             }
-            Ok(())
+
+            if read_inc > 0 {
+                SpiBus::flush(self)?;
+                self.driver()
+                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
+        }
+        Ok(())
+    }
+
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.driver().transfer(words)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.driver().flush()
+    }
+}
+
+impl SpiBusAsync for Spi<'_, Async> {
+    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
+        self.driver().setup_full_duplex()?;
+        self.driver().read_async(words).await
+    }
+
+    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
+        self.driver().setup_full_duplex()?;
+        self.driver().write_async(words).await
+    }
+
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        // Optimizations
+        if read.is_empty() {
+            return SpiBusAsync::write(self, write).await;
+        } else if write.is_empty() {
+            return SpiBusAsync::read(self, read).await;
         }
 
-        async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.transfer_in_place_async(words).await
-        }
+        let mut write_from = 0;
+        let mut read_from = 0;
 
-        async fn flush(&mut self) -> Result<(), Self::Error> {
-            self.flush_async().await
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
+            }
+
+            // No need to flush here, `SpiBusAsync::write` will do it for us
+
+            if write_inc < read_inc {
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                SpiBusAsync::write(self, &empty[..read_inc]).await?;
+            } else {
+                SpiBusAsync::write(self, &write[write_from..][..write_inc]).await?;
+            }
+
+            if read_inc > 0 {
+                self.driver()
+                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
         }
+        Ok(())
+    }
+
+    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place_async(words).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.flush_async().await
     }
 }
 

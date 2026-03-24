@@ -1,8 +1,12 @@
 use core::{
     cmp::min,
     mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
     sync::atomic::{Ordering, fence},
 };
+
+#[cfg(feature = "unstable")]
+use embedded_hal::spi::{ErrorType, SpiBus};
 
 use super::*;
 use crate::{
@@ -18,7 +22,7 @@ use crate::{
         PeripheralDmaChannel,
         asynch::DmaRxFuture,
     },
-    spi::{DmaError, master::dma::asynch::DropGuard},
+    spi::DmaError,
 };
 
 const MAX_DMA_SIZE: usize = 32736;
@@ -1394,116 +1398,99 @@ impl<'d> DmaEligible for AnySpi<'d> {
     }
 }
 
-/// Async functionality
-mod asynch {
-    use core::ops::{Deref, DerefMut};
+pub(crate) struct DropGuard<I, F: FnOnce(I)> {
+    inner: ManuallyDrop<I>,
+    on_drop: ManuallyDrop<F>,
+}
 
-    use super::*;
-
-    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
-    pub(crate) struct DropGuard<I, F: FnOnce(I)> {
-        inner: ManuallyDrop<I>,
-        on_drop: ManuallyDrop<F>,
-    }
-
-    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
-    impl<I, F: FnOnce(I)> DropGuard<I, F> {
-        pub(crate) fn new(inner: I, on_drop: F) -> Self {
-            Self {
-                inner: ManuallyDrop::new(inner),
-                on_drop: ManuallyDrop::new(on_drop),
-            }
-        }
-
-        pub(crate) fn defuse(self) {}
-    }
-
-    impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
-        fn drop(&mut self) {
-            let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
-            let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
-            (on_drop)(inner)
+impl<I, F: FnOnce(I)> DropGuard<I, F> {
+    pub(crate) fn new(inner: I, on_drop: F) -> Self {
+        Self {
+            inner: ManuallyDrop::new(inner),
+            on_drop: ManuallyDrop::new(on_drop),
         }
     }
 
-    impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
-        type Target = I;
+    pub(crate) fn defuse(self) {}
+}
 
-        fn deref(&self) -> &I {
-            &self.inner
-        }
-    }
-
-    impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
-        fn deref_mut(&mut self) -> &mut I {
-            &mut self.inner
-        }
-    }
-
-    #[instability::unstable]
-    impl embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async> {
-        async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.read_async(words).await
-        }
-
-        async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write_async(words).await
-        }
-
-        async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-            self.transfer_async(read, write).await
-        }
-
-        async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.transfer_in_place_async(words).await
-        }
-
-        async fn flush(&mut self) -> Result<(), Self::Error> {
-            // All operations currently flush so this is no-op.
-            Ok(())
-        }
+impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
+    fn drop(&mut self) {
+        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
+        let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
+        (on_drop)(inner)
     }
 }
 
-mod ehal1 {
-    #[cfg(feature = "unstable")]
-    use embedded_hal::spi::{ErrorType, SpiBus};
+impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
+    type Target = I;
 
-    #[cfg(feature = "unstable")]
-    use super::*;
+    fn deref(&self) -> &I {
+        &self.inner
+    }
+}
 
-    #[instability::unstable]
-    impl<Dm> ErrorType for SpiDmaBus<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        type Error = Error;
+impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
+    fn deref_mut(&mut self) -> &mut I {
+        &mut self.inner
+    }
+}
+
+#[instability::unstable]
+impl embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async> {
+    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_async(words).await
     }
 
-    #[instability::unstable]
-    impl<Dm> SpiBus for SpiDmaBus<'_, Dm>
-    where
-        Dm: DriverMode,
-    {
-        fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.read(words)
-        }
+    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write_async(words).await
+    }
 
-        fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-            self.write(words)
-        }
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer_async(read, write).await
+    }
 
-        fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-            self.transfer(read, write)
-        }
+    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place_async(words).await
+    }
 
-        fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.transfer_in_place(words)
-        }
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
+    }
+}
 
-        fn flush(&mut self) -> Result<(), Self::Error> {
-            // All operations currently flush so this is no-op.
-            Ok(())
-        }
+#[instability::unstable]
+impl<Dm> ErrorType for SpiDmaBus<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Error = Error;
+}
+
+#[instability::unstable]
+impl<Dm> SpiBus for SpiDmaBus<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(words)
+    }
+
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write(words)
+    }
+
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer(read, write)
+    }
+
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place(words)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
     }
 }
