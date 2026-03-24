@@ -446,7 +446,7 @@ trait RegisterToggle {
 
     /// Toggles bits in the register, applying the given operation to set and clear them.
     ///
-    /// This method is more efficient than two modify calls, as it will not read back the register
+    /// This method is more efficient than two modify calls, as it will not read the register
     /// value twice.
     fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
 }
