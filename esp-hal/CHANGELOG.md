@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2, ESP32-S3: `UlpCore.run()` now accepts `UlpCoreWakeupSource::Timer(UlpCoreSleepCycles)` as an argument, allowing ULP applications to be woken up by the ULP Timer. (#5134)
 - Initial ESP32-C61 support (#5187, #5237)
 - Add support for ADC1 on ESP32C5. (#5215)
+- ESP32-C61: RNG (#5244)
 
 ### Changed
 
