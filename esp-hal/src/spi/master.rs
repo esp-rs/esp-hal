@@ -2908,10 +2908,8 @@ mod ehal1 {
             loop {
                 // How many bytes we write in this chunk
                 let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-                let write_to = write_from + write_inc;
                 // How many bytes we read in this chunk
                 let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-                let read_to = read_from + read_inc;
 
                 if (write_inc == 0) && (read_inc == 0) {
                     break;
@@ -2919,23 +2917,23 @@ mod ehal1 {
 
                 // No need to flush here, `SpiBus::write` will do it for us
 
-                if write_to < read_to {
+                if write_inc < read_inc {
                     // Read more than we write, must pad writing part with zeros
                     let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
-                    SpiBus::write(self, &empty)?;
+                    empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                    SpiBus::write(self, &empty[..read_inc])?;
                 } else {
-                    SpiBus::write(self, &write[write_from..write_to])?;
+                    SpiBus::write(self, &write[write_from..][..write_inc])?;
                 }
 
                 if read_inc > 0 {
                     SpiBus::flush(self)?;
                     self.driver()
-                        .read_from_fifo(&mut read[read_from..read_to])?;
+                        .read_from_fifo(&mut read[read_from..][..read_inc])?;
                 }
 
-                write_from = write_to;
-                read_from = read_to;
+                write_from += write_inc;
+                read_from += read_inc;
             }
             Ok(())
         }
@@ -2980,10 +2978,8 @@ mod ehal1 {
             loop {
                 // How many bytes we write in this chunk
                 let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-                let write_to = write_from + write_inc;
                 // How many bytes we read in this chunk
                 let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-                let read_to = read_from + read_inc;
 
                 if (write_inc == 0) && (read_inc == 0) {
                     break;
@@ -2991,22 +2987,22 @@ mod ehal1 {
 
                 // No need to flush here, `SpiBusAsync::write` will do it for us
 
-                if write_to < read_to {
+                if write_inc < read_inc {
                     // Read more than we write, must pad writing part with zeros
                     let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                    empty[0..write_inc].copy_from_slice(&write[write_from..write_to]);
-                    SpiBusAsync::write(self, &empty).await?;
+                    empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                    SpiBusAsync::write(self, &empty[..read_inc]).await?;
                 } else {
-                    SpiBusAsync::write(self, &write[write_from..write_to]).await?;
+                    SpiBusAsync::write(self, &write[write_from..][..write_inc]).await?;
                 }
 
                 if read_inc > 0 {
                     self.driver()
-                        .read_from_fifo(&mut read[read_from..read_to])?;
+                        .read_from_fifo(&mut read[read_from..][..read_inc])?;
                 }
 
-                write_from = write_to;
-                read_from = read_to;
+                write_from += write_inc;
+                read_from += read_inc;
             }
             Ok(())
         }
