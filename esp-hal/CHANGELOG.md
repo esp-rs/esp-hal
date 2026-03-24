@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for ADC1 on ESP32C5. (#5215)
 - ESP32-C61: RNG (#5244)
 - C61: Add GPIO support (#5248)
+- C61: Add UART support (#5251)
 
 ### Changed
 
