@@ -14,7 +14,7 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated functions to initiate
+//! - Use the [`SpiBus`] or [`SpiBusAsync`] trait and its associated functions to initiate
 //!   transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice` from
 //!   [`embassy-embedded-hal`].
