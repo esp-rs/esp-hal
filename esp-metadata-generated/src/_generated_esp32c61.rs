@@ -2504,35 +2504,8 @@ macro_rules! for_each_peripheral {
         MODEM_SYSCON() (unstable)), (@ peri_type #[doc = "PAU peripheral singleton"] PAU
         <= PAU() (unstable)), (@ peri_type #[doc = "PCR peripheral singleton"] PCR <=
         PCR() (unstable)), (@ peri_type #[doc = "PMU peripheral singleton"] PMU <= PMU()
+        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG()
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0
-        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
-        INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
-        "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)), (@ peri_type #[doc
-        = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
-        #[doc = "LP_ANA peripheral singleton"] LP_ANA <= LP_ANA() (unstable)), (@
-        peri_type #[doc = "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)),
-        (@ peri_type #[doc = "LP_APM peripheral singleton"] LP_APM <= LP_APM()
-        (unstable)), (@ peri_type #[doc = "LP_CLKRST peripheral singleton"] LP_CLKRST <=
-        LP_CLKRST() (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR
-        <= LP_CLKRST() (unstable)), (@ peri_type #[doc =
-        "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)), (@
-        peri_type #[doc = "LP_PERI peripheral singleton"] LP_PERI <= LPPERI()
-        (unstable)), (@ peri_type #[doc = "LP_TEE peripheral singleton"] LP_TEE <=
-        LP_TEE() (unstable)), (@ peri_type #[doc = "LP_TIMER peripheral singleton"]
-        LP_TIMER <= LP_TIMER() (unstable)), (@ peri_type #[doc =
-        "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)), (@ peri_type #[doc
-        = "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR() (unstable)),
-        (@ peri_type #[doc = "MODEM_LPCON peripheral singleton"] MODEM_LPCON <=
-        MODEM_LPCON() (unstable)), (@ peri_type #[doc =
-        "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <= MODEM_SYSCON() (unstable)),
-        (@ peri_type #[doc = "PAU peripheral singleton"] PAU <= PAU() (unstable)), (@
-        peri_type #[doc = "PCR peripheral singleton"] PCR <= PCR() (unstable)), (@
-        peri_type #[doc = "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@
-        peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@
-        peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()
         (unstable)), (@ peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR()
