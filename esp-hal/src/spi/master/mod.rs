@@ -887,7 +887,28 @@ impl<'d> Spi<'d, Async> {
         // transfer is still in progress.
         self.driver().flush_async().await?;
         self.driver().setup_full_duplex()?;
+
         self.driver().transfer_in_place_async(words).await
+    }
+
+    // TODO: These inherent methods should be public
+
+    async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
+        self.driver().setup_full_duplex()?;
+
+        self.driver().read_async(words).await
+    }
+
+    async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.flush_async().await?;
+        self.driver().setup_full_duplex()?;
+
+        self.driver().write_async(words).await
     }
 }
 
@@ -1151,9 +1172,15 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().setup_full_duplex()?;
-        self.driver().write(words)?;
         self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.driver().write(chunk)?;
+            // NOTE: While we don't need to flush after the last chunk, changing
+            // that would change the behavior of the function.
+            self.driver().flush()?;
+        }
 
         Ok(())
     }
@@ -1182,6 +1209,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().flush()?;
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
@@ -1210,8 +1238,9 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        // TODO: self.driver().flush()?;
         self.driver().setup_full_duplex()?;
-        self.driver().transfer(words)
+        self.driver().transfer_in_place(words)
     }
 
     /// Half-duplex read.
@@ -1358,59 +1387,36 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().read(words)
+        self.read(words)
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.driver().write(words)
-    }
-
-    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        // Optimizations
-        if read.is_empty() {
-            return SpiBus::write(self, write);
-        } else if write.is_empty() {
-            return SpiBus::read(self, read);
-        }
-
-        let mut write_from = 0;
-        let mut read_from = 0;
-
-        loop {
-            // How many bytes we write in this chunk
-            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-            // How many bytes we read in this chunk
-            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-            if (write_inc == 0) && (read_inc == 0) {
-                break;
-            }
-
-            // No need to flush here, `SpiBus::write` will do it for us
-
-            if write_inc < read_inc {
-                // Read more than we write, must pad writing part with zeros
-                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                SpiBus::write(self, &empty[..read_inc])?;
-            } else {
-                SpiBus::write(self, &write[write_from..][..write_inc])?;
-            }
-
-            if read_inc > 0 {
-                SpiBus::flush(self)?;
-                self.driver()
-                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
-            }
-
-            write_from += write_inc;
-            read_from += read_inc;
+        // Do not call the inherent `write` method. The trait impl does not flush after.
+        // Flush before starting to ensure the bus is clear before we reconfigure to full duplex.
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.driver().flush()?;
+            self.driver().write(chunk)?;
         }
         Ok(())
     }
 
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+
+        if read.is_empty() {
+            self.driver().write(write)
+        } else if write.is_empty() {
+            self.driver().read(read)
+        } else {
+            self.driver().transfer(read, write)
+        }
+    }
+
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().transfer(words)
+        self.driver().transfer_in_place(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1420,62 +1426,24 @@ where
 
 impl SpiBusAsync for Spi<'_, Async> {
     async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.flush_async().await?;
-        self.driver().setup_full_duplex()?;
-        self.driver().read_async(words).await
+        self.read_async(words).await
     }
 
     async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.flush_async().await?;
-        self.driver().setup_full_duplex()?;
-        self.driver().write_async(words).await
+        self.write_async(words).await
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        // Optimizations
+        self.driver().flush_async().await?;
+        self.driver().setup_full_duplex()?;
+
         if read.is_empty() {
-            return SpiBusAsync::write(self, write).await;
+            self.driver().write_async(write).await
         } else if write.is_empty() {
-            return SpiBusAsync::read(self, read).await;
+            self.driver().read_async(read).await
+        } else {
+            self.driver().transfer_async(read, write).await
         }
-
-        let mut write_from = 0;
-        let mut read_from = 0;
-
-        loop {
-            // How many bytes we write in this chunk
-            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-            // How many bytes we read in this chunk
-            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-            if (write_inc == 0) && (read_inc == 0) {
-                break;
-            }
-
-            // No need to flush here, `SpiBusAsync::write` will do it for us
-
-            if write_inc < read_inc {
-                // Read more than we write, must pad writing part with zeros
-                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                SpiBusAsync::write(self, &empty[..read_inc]).await?;
-            } else {
-                SpiBusAsync::write(self, &write[write_from..][..write_inc]).await?;
-            }
-
-            if read_inc > 0 {
-                self.driver()
-                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
-            }
-
-            write_from += write_inc;
-            read_from += read_inc;
-        }
-        Ok(())
     }
 
     async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -2021,26 +1989,12 @@ impl Driver {
     /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn write(&self, words: &[u8]) -> Result<(), Error> {
-        let num_chunks = words.len() / FIFO_SIZE;
-
-        // Flush in case previous writes have not completed yet, required as per
-        // embedded-hal documentation (#1369).
-        self.flush()?;
-
-        // The fifo has a limited fixed size, so the data must be chunked and then
-        // transmitted
-        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.flush()?;
             self.configure_datalen(0, chunk.len());
             self.fill_fifo(chunk);
 
             self.start_operation();
-
-            // Wait for all chunks to complete except the last one.
-            // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
-            if i < num_chunks {
-                self.flush()?;
-            }
         }
         Ok(())
     }
@@ -2048,8 +2002,6 @@ impl Driver {
     /// Write bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
-        // The fifo has a limited fixed size, so the data must be chunked and then
-        // transmitted
         for chunk in words.chunks(FIFO_SIZE) {
             self.configure_datalen(0, chunk.len());
             self.fill_fifo(chunk);
@@ -2077,9 +2029,9 @@ impl Driver {
 
     /// Read bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. If you want to read
+    /// the response to something you have written before, consider using
+    /// [`Self::transfer`] instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -2094,23 +2046,21 @@ impl Driver {
     /// Read received bytes from SPI FIFO.
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function
-    /// doesn't perform flushing. If you want to read the response to
+    /// doesn't perform any data transfer. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
-        let reg_block = self.regs();
+        if words.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
 
-        for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len(), 0);
+        for (chunk, w_reg) in words.chunks_mut(4).zip(self.regs().w_iter()) {
+            let reg_val = w_reg.read().bits();
+            let bytes = reg_val.to_le_bytes();
 
-            for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
-                let reg_val = w_reg.read().bits();
-                let bytes = reg_val.to_le_bytes();
-
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-            }
+            let len = chunk.len();
+            chunk.copy_from_slice(&bytes[..len]);
         }
 
         Ok(())
@@ -2141,13 +2091,51 @@ impl Driver {
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn transfer(&self, words: &mut [u8]) -> Result<(), Error> {
+    fn transfer_in_place(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write(chunk)?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
 
+        Ok(())
+    }
+
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn transfer(&self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        let mut write_from = 0;
+        let mut read_from = 0;
+
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
+            }
+
+            self.flush()?;
+
+            if write_inc < read_inc {
+                // FIXME: this always clocks out FIFO_SIZE bytes
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                self.write(&empty[..read_inc])?;
+            } else {
+                self.write(&write[write_from..][..write_inc])?;
+            }
+
+            if read_inc > 0 {
+                self.flush()?;
+                self.read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
+        }
         Ok(())
     }
 
@@ -2167,6 +2155,42 @@ impl Driver {
             self.read_from_fifo(chunk)?;
         }
 
+        Ok(())
+    }
+
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    async fn transfer_async(&self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        let mut write_from = 0;
+        let mut read_from = 0;
+
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
+            }
+
+            // The write_async implementation waits for the FIFO to drain after writing.
+
+            if write_inc < read_inc {
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                self.write_async(&empty[..read_inc]).await?;
+            } else {
+                self.write_async(&write[write_from..][..write_inc]).await?;
+            }
+
+            if read_inc > 0 {
+                self.read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
+        }
         Ok(())
     }
 
