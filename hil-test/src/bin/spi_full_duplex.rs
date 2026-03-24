@@ -999,6 +999,42 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    fn half_duplex_operation_resets_size_before_empty_write(mut ctx: Context) {
+        // SpiBus::write returns before the transfer is complete. This test verifies that
+        // half_duplex functions flush before they reconfigure the peripheral.
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.sclk_input.peripheral_input());
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
+            .unwrap();
+
+        // 32 clock cycles
+        let buffer = [0x00; 4];
+        ctx.spi
+            .half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
+
+        // 8 clock cycles
+        ctx.spi
+            .half_duplex_write(
+                DataMode::Dual,
+                Command::_8Bit(0, DataMode::Single),
+                Address::None,
+                0,
+                &[],
+            )
+            .unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 40);
+    }
+
+    #[test]
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn dma_transfer_works_after_half_duplex_operation(ctx: Context) {
         let mut spi = ctx.spi;

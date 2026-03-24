@@ -1349,11 +1349,11 @@ where
         )?;
 
         if !buffer.is_empty() {
-            // re-using the full-duplex write here
-            self.driver().write(buffer)?;
-        } else {
-            self.driver().start_operation();
+            self.driver().configure_datalen(0, buffer.len());
+            self.driver().fill_fifo(buffer);
         }
+
+        self.driver().start_operation();
 
         self.driver().flush()
     }
