@@ -1239,7 +1239,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // TODO: self.driver().flush()?;
+        self.driver().flush()?;
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
