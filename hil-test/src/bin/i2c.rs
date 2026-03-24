@@ -358,7 +358,7 @@ mod tests {
                 i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data),
                 async {
                     for _ in 0..4 {
-                        spawner.must_spawn(waiting_blocking_task());
+                        spawner.spawn(waiting_blocking_task().unwrap());
                         embassy_futures::yield_now().await;
                     }
                 },

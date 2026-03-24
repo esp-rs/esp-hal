@@ -8,8 +8,8 @@ publish = false
 edge-dhcp = "0.7.0"
 edge-nal = "0.6.0"
 edge-nal-embassy = "0.8.1"
-embassy-executor = "0.9.0"
-embassy-net = { version = "0.8.0", features = [
+embassy-executor = "0.10.0"
+embassy-net = { version = "0.8.0", features = [ # TODO: update to 0.9 once edge-nal allows
     "dhcpv4",
     "medium-ethernet",
     "tcp",

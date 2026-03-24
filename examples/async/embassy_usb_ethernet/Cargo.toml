@@ -5,10 +5,10 @@ edition = "2024"
 publish = false
 
 [dependencies]
-embassy-executor = "0.9.0"
+embassy-executor = "0.10.0"
 embassy-time = "0.5"
-embassy-usb = { version = "0.5.0", default-features = false }
-embassy-net = { version = "0.8", default-features = false, features = [
+embassy-usb = { version = "0.6.0", default-features = false }
+embassy-net = { version = "0.8", default-features = false, features = [ # TODO: update to 0.9 once edge-nal allows
     "proto-ipv4",
     "proto-ipv6",
     "medium-ethernet",

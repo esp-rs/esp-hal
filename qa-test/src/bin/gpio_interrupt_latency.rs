@@ -53,8 +53,8 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(p.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    spawner.must_spawn(toggle(enc_a_clone, enc_b_clone, &SIGNAL));
-    spawner.must_spawn(wait(enc_a, enc_b, &SIGNAL));
+    spawner.spawn(toggle(enc_a_clone, enc_b_clone, &SIGNAL).unwrap());
+    spawner.spawn(wait(enc_a, enc_b, &SIGNAL).unwrap());
 }
 
 #[embassy_executor::task(pool_size = 2)]
