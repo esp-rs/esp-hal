@@ -2131,12 +2131,21 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO11 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO12 peripheral singleton"]
-        GPIO12 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO13 peripheral singleton"] GPIO13 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO14 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "GPIO12 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO12 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "GPIO13 peripheral singleton (Limitations exist)"] #[doc = ""]
+        #[doc = "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO13 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "GPIO14 peripheral singleton (Limitations exist)"] #[doc = ""]
+        #[doc = "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
@@ -2408,8 +2417,18 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO11 <= virtual()), (@ peri_type #[doc =
-        "GPIO12 peripheral singleton"] GPIO12 <= virtual()), (@ peri_type #[doc =
-        "GPIO13 peripheral singleton"] GPIO13 <= virtual()), (@ peri_type #[doc =
+        "GPIO12 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO12 <= virtual()), (@ peri_type #[doc =
+        "GPIO13 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO13 <= virtual()), (@ peri_type #[doc =
         "GPIO14 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
