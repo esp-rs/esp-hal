@@ -629,23 +629,14 @@ impl Config {
     }
 }
 
+const SIO_PIN_COUNT: usize = 4 + cfg!(spi_master_has_octal) as usize * 4;
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct SpiPinGuard {
     sclk_pin: PinGuard,
     cs_pin: PinGuard,
-    sio0_pin: PinGuard,
-    sio1_pin: PinGuard,
-    sio2_pin: PinGuard,
-    sio3_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio4_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio5_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio6_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio7_pin: PinGuard,
+    sio_pins: [PinGuard; SIO_PIN_COUNT],
 }
 
 /// Configuration errors.
@@ -732,18 +723,7 @@ impl<'d> Spi<'d, Blocking> {
             pins: SpiPinGuard {
                 sclk_pin: PinGuard::new_unconnected(),
                 cs_pin: PinGuard::new_unconnected(),
-                sio0_pin: PinGuard::new_unconnected(),
-                sio1_pin: PinGuard::new_unconnected(),
-                sio2_pin: PinGuard::new_unconnected(),
-                sio3_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio4_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio5_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio6_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio7_pin: PinGuard::new_unconnected(),
+                sio_pins: [const { PinGuard::new_unconnected() }; SIO_PIN_COUNT],
             },
             spi: spi.degrade(),
         };
@@ -914,14 +894,14 @@ impl<'d> Spi<'d, Async> {
 }
 
 macro_rules! def_with_sio_pin {
-    ($fn:ident, $field:ident, $n:literal) => {
+    ($fn:ident, $n:literal) => {
         #[doc = concat!(" Assign the SIO", stringify!($n), " pin for the SPI instance.")]
         #[doc = " "]
         #[doc = " Enables both input and output functionality for the pin, and connects it"]
         #[doc = concat!(" to the SIO", stringify!($n), " output and input signals.")]
         #[instability::unstable]
         pub fn $fn(mut self, sio: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.pins.$field = self.connect_sio_pin(sio.into(), $n);
+            self.pins.sio_pins[$n] = self.connect_sio_pin(sio.into(), $n);
 
             self
         }
@@ -1012,7 +992,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
-        self.pins.sio0_pin = self.connect_sio_output_pin(mosi.into(), 0);
+        self.pins.sio_pins[0] = self.connect_sio_output_pin(mosi.into(), 0);
 
         self
     }
@@ -1063,7 +1043,7 @@ where
     /// signal.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.pins.sio0_pin = self.connect_sio_pin(mosi.into(), 0);
+        self.pins.sio_pins[0] = self.connect_sio_pin(mosi.into(), 0);
 
         self
     }
@@ -1081,25 +1061,25 @@ where
     /// signal.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.pins.sio1_pin = self.connect_sio_pin(sio1.into(), 1);
+        self.pins.sio_pins[1] = self.connect_sio_pin(sio1.into(), 1);
 
         self
     }
 
-    def_with_sio_pin!(with_sio2, sio2_pin, 2);
-    def_with_sio_pin!(with_sio3, sio3_pin, 3);
+    def_with_sio_pin!(with_sio2, 2);
+    def_with_sio_pin!(with_sio3, 3);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio4, sio4_pin, 4);
+    def_with_sio_pin!(with_sio4, 4);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio5, sio5_pin, 5);
+    def_with_sio_pin!(with_sio5, 5);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio6, sio6_pin, 6);
+    def_with_sio_pin!(with_sio6, 6);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio7, sio7_pin, 7);
+    def_with_sio_pin!(with_sio7, 7);
 
     /// Assign the CS (Chip Select) pin for the SPI instance.
     ///
@@ -2129,7 +2109,6 @@ impl Driver {
             self.flush()?;
 
             if write_inc < read_inc {
-                // FIXME: this always clocks out FIFO_SIZE bytes
                 // Read more than we write, must pad writing part with zeros
                 let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
                 empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
