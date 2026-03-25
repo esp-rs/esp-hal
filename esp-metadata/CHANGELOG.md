@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DMA properties and peripheral selector values (#4944)
 - Initial ESP32-C61 support (#5187, #5248, #5251, #5258)
 - Initial ESP32-C61 support (#5187, #5248, #5251)
+- Initial ESP32-C61 support (#5187, #5248, #5251, #5258, #5261)
 
 ### Changed
 
