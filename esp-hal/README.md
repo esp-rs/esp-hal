@@ -72,7 +72,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |
-| GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
+| GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ✔️      | ✔️      |
 | HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
 | I2C slave                 | ❌    |          | ❌       | [❌][5156] [^1] | ❌       |           | ❌       | ❌       | ❌       |

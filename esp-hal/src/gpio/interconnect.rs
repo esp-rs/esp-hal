@@ -53,19 +53,22 @@
 //! [split](AnyPin::split) into signals. In this case you need to carefully
 //! ensure that only a single driver configures the split pin, by selectively
 //! [freezing](`InputSignal::freeze`) the signals.
-//!
-//! For example, if you want to route GPIO3 to both a Pulse Counter
-//! input and a [UART](crate::uart::Uart) RX line, you will need to make sure
-//! one of the signals is frozen, otherwise the driver that is configured later
-//! will overwrite the other driver's configuration. Configuring the signals on
-//! multiple cores is undefined behaviour unless you ensure the configuration
-//! does not happen at the same time.
-//!
+#![cfg_attr(
+    uart_driver_supported,
+    doc = "\n\nFor example, if you want to route GPIO3 to both a Pulse Counter
+ input and a [UART](crate::uart::Uart) RX line, you will need to make sure
+ one of the signals is frozen, otherwise the driver that is configured later
+ will overwrite the other driver's configuration. Configuring the signals on
+ multiple cores is undefined behaviour unless you ensure the configuration
+ does not happen at the same time."
+)]
 //! ### Using pins and signals
 //!
 //! A GPIO pin can be configured either with a GPIO driver such as [`Input`], or
 //! by a peripheral driver using a pin assignment method such as
-//! [`Spi::with_mosi`]. The peripheral drivers' preferences can be overridden by
+#![cfg_attr(spi_master_driver_supported, doc = "[`Spi::with_mosi`].")]
+#![cfg_attr(not(spi_master_driver_supported), doc = "`Spi::with_mosi`.")]
+//! The peripheral drivers' preferences can be overridden by
 //! passing a pin driver to the peripheral driver. When converting a driver to
 //! signals, the underlying signals will be initially
 //! [frozen](InputSignal::freeze) to support this use case.
@@ -93,7 +96,10 @@
 //! - A GPIO output can be driven by only one peripheral output.
 //!
 //! [`GPIO0`]: crate::peripherals::GPIO0
-//! [`Spi::with_mosi`]: crate::spi::master::Spi::with_mosi
+#![cfg_attr(
+    spi_master_driver_supported,
+    doc = "[`Spi::with_mosi`]: crate::spi::master::Spi::with_mosi"
+)]
 
 #[cfg(feature = "unstable")]
 use crate::gpio::{Input, Output};
@@ -855,6 +861,14 @@ impl<'d> OutputSignal<'d> {
 
     #[doc(hidden)]
     #[instability::unstable]
+    #[cfg_attr(
+        not(any(
+            i2c_master_driver_supported,
+            spi_master_driver_supported,
+            uart_driver_supported
+        )),
+        expect(unused)
+    )]
     pub(crate) fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
         signal.connect_to(&self);
         match self.pin {

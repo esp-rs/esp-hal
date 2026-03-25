@@ -2977,6 +2977,7 @@ impl Chip {
                     "soc_has_ecdsa",
                     "soc_has_efuse",
                     "soc_has_etm",
+                    "soc_has_gpio",
                     "soc_has_hp_apm",
                     "soc_has_hp_sys",
                     "soc_has_i2c_ana_mst",
@@ -3021,6 +3022,7 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
+                    "gpio_driver_supported",
                     "interrupts_driver_supported",
                     "rng_driver_supported",
                     "soc_driver_supported",
@@ -3028,6 +3030,12 @@ impl Chip {
                     "timergroup_driver_supported",
                     "timergroup_timg0",
                     "timergroup_timg1",
+                    "gpio_gpio_function=\"1\"",
+                    "gpio_constant_0_input=\"96\"",
+                    "gpio_constant_1_input=\"64\"",
+                    "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"100\"",
+                    "gpio_output_signal_max=\"256\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
                     "rng_apb_cycle_wait_num=\"16\"",
@@ -3074,6 +3082,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ecdsa",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_etm",
+                    "cargo:rustc-cfg=soc_has_gpio",
                     "cargo:rustc-cfg=soc_has_hp_apm",
                     "cargo:rustc-cfg=soc_has_hp_sys",
                     "cargo:rustc-cfg=soc_has_i2c_ana_mst",
@@ -3118,6 +3127,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
+                    "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -3125,6 +3135,12 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=timergroup_timg0",
                     "cargo:rustc-cfg=timergroup_timg1",
+                    "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
+                    "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
+                    "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
+                    "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"100\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
@@ -3176,7 +3192,128 @@ impl Chip {
                         ),
                     ],
                 },
-                pins: &[],
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &["strapping", "jtag"],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &["strapping", "jtag"],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &["jtag"],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &["jtag"],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &["bootloader_uart"],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &["bootloader_uart"],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &["usb_jtag"],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &["usb_jtag"],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 22,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 23,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 24,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 25,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 28,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 29,
+                        limitations: &[],
+                    },
+                ],
             },
             Self::Esp32h2 => Config {
                 architecture: "riscv",
