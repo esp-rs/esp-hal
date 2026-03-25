@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for ADC1 on ESP32C5. (#5215)
 - ESP32-C61: RNG (#5244)
 - C61: Add GPIO support (#5248)
+- `lcd_cam`: Added `DmaBounceBuffer` type to enable PSRAM-backed framebuffers for large DPI (RGB) displays via a GDMA EOF interrupt-driven bounce pipeline. (#5262)
 
 ### Changed
 
@@ -91,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `lcd_cam`: Set `lcd_always_out_en` in the DPI (RGB) driver for continuous pixel clock output. (#5262)
 - SHA: Fixed potential unsoundness in `ShaDigest` by requiring exclusive access to the peripheral (#4837)
 - ESP32: ADC1 readings are no longer inverted (#4423)
 - RMT: All blocking methods now return the channel on failure. (#4302)
