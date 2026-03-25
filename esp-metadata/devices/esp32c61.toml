@@ -89,7 +89,7 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
-    { name = "BT", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     # { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
@@ -357,3 +357,7 @@ peripheral_controls_mem_clk = true
 support_status = "partial"
 has_wifi6 = true
 mac_version = 3
+
+[device.bt]
+support_status = "partial"
+controller = "npl"

@@ -52,6 +52,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
     };
+    ("bt.controller") => {
+        "npl"
+    };
     ("gpio.has_bank_1") => {
         false
     };
@@ -2339,7 +2342,9 @@ macro_rules! for_each_peripheral {
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "BT peripheral singleton"] BT <= virtual() (unstable)));
+        "BT peripheral singleton"] BT <= virtual(LP_TIMER : { bind_lp_timer_interrupt,
+        enable_lp_timer_interrupt, disable_lp_timer_interrupt }, BT_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_CORE peripheral singleton"] LP_CORE <= virtual() (unstable)));
@@ -2595,16 +2600,18 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt })), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "BT peripheral singleton"] BT <= virtual()
-        (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
-        virtual() (unstable)), (@ peri_type #[doc = "LP_CORE peripheral singleton"]
-        LP_CORE <= virtual() (unstable)), (@ peri_type #[doc =
-        "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)), (@
-        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual(WIFI_BB : {
-        bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt }, WIFI_MAC : {
-        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : {
-        bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt }))));
-        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
+        (unstable)), (@ peri_type #[doc = "BT peripheral singleton"] BT <=
+        virtual(LP_TIMER : { bind_lp_timer_interrupt, enable_lp_timer_interrupt,
+        disable_lp_timer_interrupt }, BT_MAC : { bind_mac_interrupt,
+        enable_mac_interrupt, disable_mac_interrupt }) (unstable)), (@ peri_type #[doc =
+        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@ peri_type #[doc
+        = "LP_CORE peripheral singleton"] LP_CORE <= virtual() (unstable)), (@ peri_type
+        #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual()
+        (unstable)), (@ peri_type #[doc = "WIFI peripheral singleton"] WIFI <=
+        virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt
+        }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt
+        }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt
+        })))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
         (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
