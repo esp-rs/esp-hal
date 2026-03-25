@@ -609,7 +609,7 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 1,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 2,
@@ -617,7 +617,7 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 3,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 4,
@@ -653,19 +653,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 12,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 13,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 14,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 15,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 16,
@@ -1101,19 +1101,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 4,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 5,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 6,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 7,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 8,
@@ -1161,11 +1161,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                 ],
             },
@@ -1613,19 +1613,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 4,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 5,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 6,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 7,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 8,
@@ -1669,19 +1669,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 18,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 21,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                 ],
             },
@@ -2193,19 +2193,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 2,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 3,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 4,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 5,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 6,
@@ -2229,19 +2229,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 11,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 12,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 13,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 14,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 23,
@@ -2855,19 +2855,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 4,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 5,
-                        limitations: &["strapping"],
+                        limitations: &["strapping", "jtag"],
                     },
                     PinInfo {
                         pin: 6,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 7,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 8,
@@ -2887,11 +2887,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 12,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 13,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 14,
@@ -2903,11 +2903,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 16,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 17,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 18,
@@ -3684,19 +3684,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 2,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 3,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 4,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 5,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 6,
@@ -3740,11 +3740,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 23,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 24,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 25,
@@ -3752,11 +3752,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 26,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 27,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                 ],
             },
@@ -4280,11 +4280,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 21,
@@ -4344,27 +4344,27 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 39,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 40,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 41,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 42,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 43,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 44,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 45,
@@ -4970,11 +4970,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &[],
+                        limitations: &["usb_jtag"],
                     },
                     PinInfo {
                         pin: 21,
@@ -5034,27 +5034,27 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 39,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 40,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 41,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 42,
-                        limitations: &[],
+                        limitations: &["jtag"],
                     },
                     PinInfo {
                         pin: 43,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 44,
-                        limitations: &[],
+                        limitations: &["bootloader_uart"],
                     },
                     PinInfo {
                         pin: 45,
