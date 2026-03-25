@@ -96,12 +96,12 @@
 //! ```
 
 use core::{
-    cell::RefCell,
     marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
 
+#[cfg(feature = "unstable")]
 use critical_section::Mutex;
 
 use crate::{
@@ -133,7 +133,9 @@ use crate::{
     time::Rate,
 };
 
-static BOUNCE_STATE: Mutex<RefCell<Option<DmaBounceBuffer>>> = Mutex::new(RefCell::new(None));
+#[cfg(feature = "unstable")]
+static BOUNCE_STATE: Mutex<core::cell::RefCell<Option<DmaBounceBuffer>>> =
+    Mutex::new(core::cell::RefCell::new(None));
 
 /// Errors that can occur when configuring the DPI peripheral.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -146,6 +148,7 @@ pub enum ConfigError {
     InvalidBounceBufferSize,
 }
 
+#[cfg(feature = "unstable")]
 /// Bounce buffer state for continuous RGB DPI output from a PSRAM framebuffer.
 ///
 /// Holds two SRAM bounce buffers and their circular DMA descriptor chain.
@@ -170,6 +173,7 @@ pub struct DmaBounceBuffer {
     pub(crate) eof_count: usize,
 }
 
+#[cfg(feature = "unstable")]
 #[allow(dead_code)]
 impl DmaBounceBuffer {
     /// Create a new bounce buffer state.
@@ -310,6 +314,7 @@ impl DmaBounceBuffer {
     }
 }
 
+#[cfg(feature = "unstable")]
 // SAFETY: `DmaBounceBuffer` contains a raw pointer (`*mut [DmaDescriptor; 2]`) which prevents
 // auto-derived `Send`/`Sync`. The pointer is constructed from a `&'static mut [DmaDescriptor; 2]`
 // and is valid for the `'static` lifetime. Access to the pointed-to data is controlled
@@ -318,8 +323,10 @@ impl DmaBounceBuffer {
 // and access behind a shared reference when protected by a critical section.
 unsafe impl Send for DmaBounceBuffer {}
 // SAFETY: See the safety rationale above for `Send`.
+#[cfg(feature = "unstable")]
 unsafe impl Sync for DmaBounceBuffer {}
 
+#[cfg(feature = "unstable")]
 /// Refill bounce buffers from the PSRAM framebuffer.
 ///
 /// Called by [`DpiBounceTransfer::poll`] to check for completed DMA
@@ -724,16 +731,16 @@ where
     /// Start a continuous bounce-buffered RGB DPI transfer from a PSRAM framebuffer.
     ///
     /// Sets up a circular two-descriptor DMA chain that continuously streams data from
-    /// `bounce_state`'s framebuffer to the LCD_CAM peripheral, refilling each bounce
-    /// buffer on every GDMA EOF interrupt.
+    /// `bounce_state`'s framebuffer to the LCD_CAM peripheral. Bounce buffers are
+    /// refilled in software as part of the transfer's polling API.
     ///
     /// After calling this method, call [`DpiBounceTransfer::poll`] periodically to
-    /// refill bounce buffers, or rely on the automatically bound GDMA TX interrupt
-    /// handler for interrupt-driven operation.
+    /// refill bounce buffers for continuous operation.
     ///
     /// # Errors
     ///
     /// Returns `(DmaError, Dpi, DmaBounceBuffer)` on DMA setup failure.
+    #[cfg(feature = "unstable")]
     #[instability::unstable]
     pub fn send_bounce_buffered(
         mut self,
@@ -823,6 +830,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable")]
 unsafe impl DmaTxBuffer for DmaBounceBuffer {
     type View = ();
     type Final = ();
@@ -844,6 +852,7 @@ unsafe impl DmaTxBuffer for DmaBounceBuffer {
     fn from_view(_view: Self::View) -> Self::Final {}
 }
 
+#[cfg(feature = "unstable")]
 #[instability::unstable]
 /// Represents an ongoing continuous (bounce-buffered) DPI RGB transfer.
 ///
@@ -854,6 +863,7 @@ pub struct DpiBounceTransfer<'d, Dm: DriverMode> {
     back_buffer: Option<(*mut u8, usize)>,
 }
 
+#[cfg(feature = "unstable")]
 impl<'d, Dm: DriverMode> DpiBounceTransfer<'d, Dm> {
     /// Returns true if the transfer is no longer active.
     #[instability::unstable]
@@ -890,6 +900,13 @@ impl<'d, Dm: DriverMode> DpiBounceTransfer<'d, Dm> {
     /// boundary.
     #[instability::unstable]
     pub fn set_back_buffer(&mut self, buf: &'static mut [u8]) {
+        let valid = critical_section::with(|cs| {
+            BOUNCE_STATE
+                .borrow_ref(cs)
+                .as_ref()
+                .is_some_and(|state| buf.len() == state.fb_len)
+        });
+        assert!(valid, "back buffer length must match front buffer length");
         self.back_buffer = Some((buf.as_mut_ptr(), buf.len()));
     }
 
@@ -921,7 +938,7 @@ impl<'d, Dm: DriverMode> DpiBounceTransfer<'d, Dm> {
         };
 
         loop {
-            if self.poll() {
+            if self.poll() || self.is_done() {
                 break;
             }
         }
@@ -951,6 +968,7 @@ impl<'d, Dm: DriverMode> DpiBounceTransfer<'d, Dm> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<Dm: DriverMode> Drop for DpiBounceTransfer<'_, Dm> {
     fn drop(&mut self) {
         self.stop_peripheral();
