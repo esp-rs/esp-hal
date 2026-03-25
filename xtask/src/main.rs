@@ -425,17 +425,42 @@ fn lint_package(
 struct Runner {
     failed: Vec<&'static str>,
     started_at: Instant,
+    skip_steps: Vec<String>,
+    run_steps: Vec<String>,
 }
 
 impl Runner {
-    fn new() -> Self {
+    fn new(options: &CiArgs) -> Self {
         Self {
             failed: Vec::new(),
             started_at: Instant::now(),
+            skip_steps: {
+                let mut skip = vec![];
+                if options.no_lint {
+                    skip.push(String::from("lint"));
+                }
+                if options.no_docs {
+                    skip.push(String::from("docs"));
+                }
+                if options.no_check_crates {
+                    skip.push(String::from("check"));
+                }
+                skip
+            },
+            run_steps: options.steps.clone(),
         }
     }
 
-    fn run(&mut self, group: &'static str, op: impl FnOnce() -> Result<()>) {
+    fn run(&mut self, id: &str, group: &'static str, op: impl FnOnce() -> Result<()>) {
+        if self.skip_steps.iter().any(|s| s == id) {
+            log::debug!("{group} skipped by user request");
+            return;
+        }
+        if !self.run_steps.is_empty() && !self.run_steps.iter().any(|s| s == id) {
+            log::debug!("{group} skipped by user request");
+            return;
+        }
+
         // Output grouped logs
         // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
         println!("::group::{group}");
@@ -478,40 +503,40 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
     let run_locally = !std::env::var("CI").is_ok();
 
-    let mut runner = Runner::new();
+    let mut runner = Runner::new(&args);
+
+    if !run_locally && args.steps.is_empty() {
+        runner.skip_steps.push(String::from("tests"));
+    }
 
     unsafe {
         std::env::set_var("CI", "true");
     }
 
-    if !args.no_check_crates {
-        runner.run("Check crates", || {
-            check_packages(
-                workspace,
-                CheckPackagesArgs {
-                    packages: Package::iter().collect(),
-                    chips: vec![args.chip],
-                    toolchain: args.toolchain.clone(),
-                },
-            )
-        });
-    }
+    runner.run("check", "Check crates", || {
+        check_packages(
+            workspace,
+            CheckPackagesArgs {
+                packages: Package::iter().collect(),
+                chips: vec![args.chip],
+                toolchain: args.toolchain.clone(),
+            },
+        )
+    });
 
-    if !args.no_lint {
-        runner.run("Lint", || {
-            lint_packages(
-                workspace,
-                LintPackagesArgs {
-                    packages: Package::iter().collect(),
-                    chips: vec![args.chip],
-                    fix: false,
-                    toolchain: args.toolchain.clone(),
-                },
-            )
-        });
-    }
+    runner.run("lint", "Lint", || {
+        lint_packages(
+            workspace,
+            LintPackagesArgs {
+                packages: Package::iter().collect(),
+                chips: vec![args.chip],
+                fix: false,
+                toolchain: args.toolchain.clone(),
+            },
+        )
+    });
 
-    runner.run("Run Doc Test", || {
+    runner.run("doc-tests", "Run Doc Test", || {
         run_doc_tests(
             workspace,
             DocTestArgs {
@@ -521,18 +546,16 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    if !args.no_docs {
-        runner.run("Build Docs", || {
-            build_documentation(
-                workspace,
-                BuildDocumentationArgs {
-                    packages: vec![Package::EspHal, Package::EspRadio, Package::EspRtos],
-                    chips: vec![args.chip],
-                    ..Default::default()
-                },
-            )
-        });
-    }
+    runner.run("docs", "Build Docs", || {
+        build_documentation(
+            workspace,
+            BuildDocumentationArgs {
+                packages: vec![Package::EspHal, Package::EspRadio, Package::EspRtos],
+                chips: vec![args.chip],
+                ..Default::default()
+            },
+        )
+    });
 
     // for chips with esp-lp-hal: Build all supported examples for the low-power
     // core first
@@ -541,7 +564,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // `examples` copies the examples to a folder with the chip name as the last
         // path element then we copy it to the place where the HP core example
         // expects it
-        runner.run("Build LP-HAL Examples", || {
+        runner.run("lp-examples", "Build LP-HAL Examples", || {
             // The LP examples aren't really that demanding, but they need to be at a certain place.
             // Instead of trying to figure out where the results are, let's just make sure the
             // target folder is set up as expected.
@@ -626,22 +649,20 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             result
         });
 
-        if !args.no_docs {
-            // Check documentation
-            runner.run("Build LP-HAL docs", || {
-                build_documentation(
-                    workspace,
-                    BuildDocumentationArgs {
-                        packages: vec![Package::EspLpHal],
-                        chips: vec![args.chip],
-                        ..Default::default()
-                    },
-                )
-            });
-        }
+        // Check documentation
+        runner.run("docs", "Build LP-HAL docs", || {
+            build_documentation(
+                workspace,
+                BuildDocumentationArgs {
+                    packages: vec![Package::EspLpHal],
+                    chips: vec![args.chip],
+                    ..Default::default()
+                },
+            )
+        });
     }
 
-    runner.run("Build examples", || {
+    runner.run("examples", "Build examples", || {
         // The `ota_example` expects a file named `examples/target/ota_image` - it
         // doesn't care about the contents however
         std::fs::create_dir_all("./examples/target")
@@ -663,7 +684,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    runner.run("Build qa-test", || {
+    runner.run("qa-test", "Build qa-test", || {
         examples(
             workspace,
             ExamplesArgs {
@@ -678,24 +699,22 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    if run_locally {
-        // Try-build tests
-        runner.run("Build tests", || {
-            let target_path = workspace.join("target");
+    // Try-build tests
+    runner.run("tests", "Build tests", || {
+        let target_path = workspace.join("target");
 
-            tests(
-                workspace,
-                TestsArgs {
-                    chip: args.chip,
-                    repeat: 1,
-                    test: None,
-                    toolchain: None,
-                    timings: false,
-                },
-                CargoAction::Build(Some(target_path.join("tests"))),
-            )
-        });
-    }
+        tests(
+            workspace,
+            TestsArgs {
+                chip: args.chip,
+                repeat: 1,
+                test: None,
+                toolchain: None,
+                timings: false,
+            },
+            CargoAction::Build(Some(target_path.join("tests"))),
+        )
+    });
 
     runner.finish()
 }

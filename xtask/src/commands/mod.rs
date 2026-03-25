@@ -45,6 +45,10 @@ pub struct CiArgs {
     #[arg(long)]
     pub toolchain: Option<String>,
 
+    /// Steps to run in the CI pipeline.
+    #[arg(long)]
+    pub steps: Vec<String>,
+
     /// Whether to skip running lints
     #[arg(long)]
     pub no_lint: bool,
