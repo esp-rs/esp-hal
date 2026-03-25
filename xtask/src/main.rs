@@ -442,6 +442,8 @@ impl Runner {
         if let Err(e) = op() {
             log::error!("{group} failed: {e:?}");
             self.failed.push(group);
+        } else {
+            log::debug!("{group} succeeded");
         }
         println!("::endgroup::");
     }
@@ -592,6 +594,13 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                         .rsplit_once('-')
                         .map(|(a, _)| a)
                         .unwrap_or(&example_name);
+
+                    log::debug!(
+                        "Copying {} to {}",
+                        example.path().display(),
+                        dir.join(without_fingerprint).display()
+                    );
+
                     // Copy so we don't trigger a rebuild unnecessarily by deleting the original
                     std::fs::copy(example.path(), dir.join(without_fingerprint)).with_context(
                         || {
