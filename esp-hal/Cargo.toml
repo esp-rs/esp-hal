@@ -104,16 +104,15 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-# esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32c61 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/playfulFence/esp-pacs" }
-esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
-esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "663c742" }
+esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
+esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b3a9d42" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
