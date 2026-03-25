@@ -1764,7 +1764,6 @@ impl Driver {
     }
 
     /// Resets asserted interrupts
-    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -2188,6 +2187,7 @@ impl Driver {
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn start_operation(&self) {
         self.update();
+        self.clear_interrupts(SpiInterrupt::TransferDone.into());
         self.regs().cmd().modify(|_, w| w.usr().set_bit());
     }
 
