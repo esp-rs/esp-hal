@@ -3369,12 +3369,22 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO26 peripheral singleton"]
-        GPIO26 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO27 peripheral singleton"] GPIO27 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
-        <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO26 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "GPIO27 peripheral singleton (Limitations exist)"] #[doc = ""]
+        #[doc = "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO27 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
@@ -3683,8 +3693,18 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()), (@ peri_type #[doc =
-        "GPIO26 peripheral singleton"] GPIO26 <= virtual()), (@ peri_type #[doc =
-        "GPIO27 peripheral singleton"] GPIO27 <= virtual()), (@ peri_type #[doc =
+        "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO26 <= virtual()), (@ peri_type #[doc =
+        "GPIO27 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO27 <= virtual()), (@ peri_type #[doc =
         "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)), (@

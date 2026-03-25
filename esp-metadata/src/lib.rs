@@ -14,7 +14,7 @@ use strum::IntoEnumIterator;
 mod support_status;
 
 use crate::{
-    cfg::{PinLimitation, SupportItem, Value},
+    cfg::{SupportItem, Value},
     support_status::SupportStatusLevel,
 };
 
@@ -648,24 +648,7 @@ impl Config {
                 let pin = format_ident!("GPIO{}", gpio.pin);
                 let mut docs = format!("GPIO{} peripheral singleton", gpio.pin);
 
-                let mut limitations = gpio.limitations.clone();
-
-                // Resolve implicit limitations - based on pin alternate functions
-                let implicit: &[(&[&str], PinLimitation)] = &[
-                    (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
-                    (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
-                    (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
-                ];
-
-                for i in 0..6 {
-                    if let Some(func) = gpio.functions.get(i) {
-                        for (pins, limitation) in implicit.iter() {
-                            if pins.contains(&func) {
-                                limitations.push(*limitation);
-                            }
-                        }
-                    }
-                }
+                let limitations = gpio.limitations();
 
                 if !limitations.is_empty() {
                     // Append a marker and an explanation to the short description
@@ -879,7 +862,7 @@ pub fn generate_build_script_utils() -> TokenStream {
                     .iter()
                     .map(|pin| {
                         let num = number(pin.pin);
-                        let limitations = pin.limitations.iter().map(|limitation| {
+                        let limitations = pin.limitations().into_iter().map(|limitation| {
                             TokenStream::from_str(
                                 &basic_toml::to_string(&limitation)
                                     .expect("Serializing limitations should be infallible"),
