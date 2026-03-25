@@ -156,8 +156,8 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 
     fn reset_peripheral() {
-        // FIXME: for TIMG0 do nothing for now because the reset breaks
-        // `time::Instant::now`
+        #[cfg(not(esp32))] // `time::Instant::now` uses TIMG0
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg0);
     }
 
     #[cfg(soc_has_clock_node_timg_wdt_clock)]
