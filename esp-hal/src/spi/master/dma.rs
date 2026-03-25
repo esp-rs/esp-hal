@@ -67,7 +67,7 @@ impl<'d> Spi<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self.spi, self.pins, channel.degrade())
+        SpiDma::new(self.spi, channel.degrade())
     }
 }
 
@@ -115,12 +115,10 @@ pub struct SpiDma<'d, Dm>
 where
     Dm: DriverMode,
 {
-    pub(crate) spi: AnySpi<'d>,
+    spi: SpiWrapper<'d>,
     pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
     #[cfg(all(esp32, spi_address_workaround))]
     address_buffer: DmaTxBuf,
-    guard: PeripheralGuard,
-    pins: SpiPinGuard,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -135,18 +133,12 @@ impl<'d> SpiDma<'d, Blocking> {
             channel: self.channel.into_async(),
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
-            guard: self.guard,
-            pins: self.pins,
         }
     }
 
-    pub(super) fn new(
-        spi: AnySpi<'d>,
-        pins: SpiPinGuard,
-        channel: PeripheralDmaChannel<AnySpi<'d>>,
-    ) -> Self {
+    pub(super) fn new(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi);
+        channel.runtime_ensure_compatible(&spi.spi);
         #[cfg(all(esp32, spi_address_workaround))]
         let address_buffer = {
             use crate::dma::DmaDescriptor;
@@ -167,8 +159,6 @@ impl<'d> SpiDma<'d, Blocking> {
             ))
         };
 
-        let guard = PeripheralGuard::new(spi.info().peripheral);
-
         let (_info, state) = spi.dma_parts();
 
         state.tx_transfer_in_progress.set(false);
@@ -179,8 +169,6 @@ impl<'d> SpiDma<'d, Blocking> {
             channel,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer,
-            guard,
-            pins,
         }
     }
 
@@ -243,8 +231,6 @@ impl<'d> SpiDma<'d, Async> {
             channel: self.channel.into_blocking(),
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
-            guard: self.guard,
-            pins: self.pins,
         }
     }
 
@@ -1537,3 +1523,15 @@ for_each_spi_master!(
         }
     };
 );
+
+impl SpiWrapper<'_> {
+    #[inline(always)]
+    fn dma_parts(&self) -> (&'static Info, &'static State) {
+        self.spi.dma_parts()
+    }
+
+    #[inline(always)]
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        self.spi.dma_peripheral()
+    }
+}
