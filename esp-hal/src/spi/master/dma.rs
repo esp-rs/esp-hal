@@ -1,4 +1,5 @@
 use core::{
+    cell::Cell,
     cmp::min,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -116,8 +117,6 @@ where
 {
     pub(crate) spi: AnySpi<'d>,
     pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
-    tx_transfer_in_progress: bool,
-    rx_transfer_in_progress: bool,
     #[cfg(all(esp32, spi_address_workaround))]
     address_buffer: DmaTxBuf,
     guard: PeripheralGuard,
@@ -134,8 +133,6 @@ impl<'d> SpiDma<'d, Blocking> {
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_async(),
-            tx_transfer_in_progress: self.tx_transfer_in_progress,
-            rx_transfer_in_progress: self.rx_transfer_in_progress,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
             guard: self.guard,
@@ -172,13 +169,16 @@ impl<'d> SpiDma<'d, Blocking> {
 
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
+        let (_info, state) = spi.dma_parts();
+
+        state.tx_transfer_in_progress.set(false);
+        state.rx_transfer_in_progress.set(false);
+
         Self {
             spi,
             channel,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer,
-            tx_transfer_in_progress: false,
-            rx_transfer_in_progress: false,
             guard,
             pins,
         }
@@ -241,8 +241,6 @@ impl<'d> SpiDma<'d, Async> {
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_blocking(),
-            tx_transfer_in_progress: self.tx_transfer_in_progress,
-            rx_transfer_in_progress: self.rx_transfer_in_progress,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
             guard: self.guard,
@@ -251,9 +249,9 @@ impl<'d> SpiDma<'d, Async> {
     }
 
     async fn wait_for_idle_async(&mut self) {
-        if self.rx_transfer_in_progress {
+        if self.dma_driver().state.rx_transfer_in_progress.get() {
             _ = DmaRxFuture::new(&mut self.channel.rx).await;
-            self.rx_transfer_in_progress = false;
+            self.dma_driver().state.rx_transfer_in_progress.set(false);
         }
 
         struct Fut(Driver);
@@ -292,12 +290,12 @@ impl<'d> SpiDma<'d, Async> {
             Fut(self.driver()).await;
         }
 
-        if self.tx_transfer_in_progress {
+        if self.dma_driver().state.tx_transfer_in_progress.get() {
             // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
             if !self.channel.tx.is_done() {
                 self.channel.tx.stop_transfer();
             }
-            self.tx_transfer_in_progress = false;
+            self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
     }
 }
@@ -337,9 +335,11 @@ where
     }
 
     fn dma_driver(&self) -> DmaDriver {
+        let (_info, state) = self.spi.dma_parts();
         DmaDriver {
             driver: self.driver(),
             dma_peripheral: self.spi.dma_peripheral(),
+            state,
         }
     }
 
@@ -347,7 +347,7 @@ where
         if self.driver().busy() {
             return false;
         }
-        if self.rx_transfer_in_progress {
+        if self.dma_driver().state.rx_transfer_in_progress.get() {
             // If this is an asymmetric transfer and the RX side is smaller, the RX channel
             // will never be "done" as it won't have enough descriptors/buffer to receive
             // the EOF bit from the SPI. So instead the RX channel will hit
@@ -366,8 +366,8 @@ where
         while !self.is_done() {
             // Wait for the SPI to become idle
         }
-        self.rx_transfer_in_progress = false;
-        self.tx_transfer_in_progress = false;
+        self.dma_driver().state.rx_transfer_in_progress.set(false);
+        self.dma_driver().state.tx_transfer_in_progress.set(false);
         fence(Ordering::Acquire);
     }
 
@@ -388,8 +388,14 @@ where
             return Err(Error::MaxDmaTransferSizeExceeded);
         }
 
-        self.rx_transfer_in_progress = bytes_to_read > 0;
-        self.tx_transfer_in_progress = bytes_to_write > 0;
+        self.dma_driver()
+            .state
+            .rx_transfer_in_progress
+            .set(bytes_to_read > 0);
+        self.dma_driver()
+            .state
+            .tx_transfer_in_progress
+            .set(bytes_to_write > 0);
         unsafe {
             self.dma_driver().start_transfer_dma(
                 full_duplex,
@@ -432,9 +438,8 @@ where
             address.mode(),
         )?;
 
-        // FIXME: we could use self.start_transfer_dma if the address buffer was part of
-        // the (yet-to-be-created) State struct.
-        self.tx_transfer_in_progress = true;
+        // FIXME: we could use self.start_transfer_dma
+        self.dma_driver().state.tx_transfer_in_progress.set(true);
         unsafe {
             self.dma_driver().start_transfer_dma(
                 false,
@@ -454,17 +459,18 @@ where
         // immediately.
         // 1 seems to stop after transmitting the current byte which is somewhat less
         // impolite.
-        if self.tx_transfer_in_progress || self.rx_transfer_in_progress {
+        let state = self.dma_driver().state;
+        if state.tx_transfer_in_progress.get() || state.rx_transfer_in_progress.get() {
             self.dma_driver().abort_transfer();
 
             // We need to stop the DMA transfer, too.
-            if self.tx_transfer_in_progress {
+            if state.tx_transfer_in_progress.get() {
                 self.channel.tx.stop_transfer();
-                self.tx_transfer_in_progress = false;
+                state.tx_transfer_in_progress.set(false);
             }
-            if self.rx_transfer_in_progress {
+            if state.rx_transfer_in_progress.get() {
                 self.channel.rx.stop_transfer();
-                self.rx_transfer_in_progress = false;
+                state.rx_transfer_in_progress.set(false);
             }
         }
     }
@@ -1247,6 +1253,7 @@ where
 pub(super) struct DmaDriver {
     driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
+    state: &'static State,
 }
 
 impl DmaDriver {
@@ -1389,12 +1396,8 @@ impl<'d> DmaEligible for AnySpi<'d> {
     type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-        }
+        let (info, _state) = self.dma_parts();
+        info.dma_peripheral
     }
 }
 
@@ -1496,3 +1499,41 @@ where
         Ok(())
     }
 }
+
+struct Info {
+    dma_peripheral: crate::dma::DmaPeripheral,
+}
+struct State {
+    tx_transfer_in_progress: Cell<bool>,
+    rx_transfer_in_progress: Cell<bool>,
+}
+
+// SAFETY: State belongs to the currently constructed driver instance. As such, it'll not be
+// accessed concurrently in multiple threads.
+unsafe impl Sync for State {}
+
+for_each_spi_master!(
+    (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
+        impl AnySpi<'_> {
+            #[inline(always)]
+            fn dma_parts(&self) -> (&'static Info, &'static State) {
+                match &self.0 {
+                    $(
+                        super::any::Inner::$sys(_spi) => {
+                            static DMA_INFO: Info = Info {
+                                dma_peripheral: crate::dma::DmaPeripheral::$sys,
+                            };
+
+                            static DMA_STATE: State = State {
+                                tx_transfer_in_progress: Cell::new(false),
+                                rx_transfer_in_progress: Cell::new(false),
+                            };
+
+                            (&DMA_INFO, &DMA_STATE)
+                        }
+                    )*
+                }
+            }
+        }
+    };
+);
