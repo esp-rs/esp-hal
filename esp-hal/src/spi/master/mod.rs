@@ -1160,6 +1160,7 @@ where
             self.driver().write_one(chunk)?;
             // NOTE: While we don't need to flush after the last chunk, changing
             // that would change the behavior of the function.
+            // https://github.com/esp-rs/esp-hal/issues/5257
             self.driver().flush()?;
         }
 
@@ -2173,8 +2174,9 @@ impl Driver {
                 self.write_one(&write[write_from..][..write_inc])?;
             }
 
+            // Preserve previous semantics - see https://github.com/esp-rs/esp-hal/issues/5257
+            self.flush_async().await;
             if read_inc > 0 {
-                self.flush_async().await;
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
 
