@@ -2664,11 +2664,16 @@ macro_rules! for_each_analog_function {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_analog_function!((XTAL_32K_P, GPIO0));
         _for_each_inner_analog_function!((XTAL_32K_N, GPIO1));
+        _for_each_inner_analog_function!((ZCD0, GPIO8));
+        _for_each_inner_analog_function!((ZCD1, GPIO9));
         _for_each_inner_analog_function!((USB_DM, GPIO12));
         _for_each_inner_analog_function!((USB_DP, GPIO13));
+        _for_each_inner_analog_function!(((ZCD0, ZCDn, 0), GPIO8));
+        _for_each_inner_analog_function!(((ZCD1, ZCDn, 1), GPIO9));
         _for_each_inner_analog_function!((all(XTAL_32K_P, GPIO0), (XTAL_32K_N, GPIO1),
-        (USB_DM, GPIO12), (USB_DP, GPIO13)));
-        _for_each_inner_analog_function!((all_expanded));
+        (ZCD0, GPIO8), (ZCD1, GPIO9), (USB_DM, GPIO12), (USB_DP, GPIO13)));
+        _for_each_inner_analog_function!((all_expanded((ZCD0, ZCDn, 0), GPIO8), ((ZCD1,
+        ZCDn, 1), GPIO9)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -2770,50 +2775,51 @@ macro_rules! define_io_mux_signals {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum OutputSignal {
-            LEDC_LS_SIG0 = 0,
-            LEDC_LS_SIG1 = 1,
-            LEDC_LS_SIG2 = 2,
-            LEDC_LS_SIG3 = 3,
-            LEDC_LS_SIG4 = 4,
-            LEDC_LS_SIG5 = 5,
-            U0TXD        = 6,
-            U0RTS        = 7,
-            U0DTR        = 8,
-            U1TXD        = 9,
-            U1RTS        = 10,
-            U1DTR        = 11,
-            I2S_MCLK     = 12,
-            I2SO_BCK     = 13,
-            I2SO_WS      = 14,
-            I2SO_SD      = 15,
-            I2SI_BCK     = 16,
-            I2SI_WS      = 17,
-            I2SO_SD1     = 18,
-            CPU_GPIO_0   = 27,
-            CPU_GPIO_1   = 28,
-            CPU_GPIO_2   = 29,
-            CPU_GPIO_3   = 30,
-            CPU_GPIO_4   = 31,
-            CPU_GPIO_5   = 32,
-            CPU_GPIO_6   = 33,
-            CPU_GPIO_7   = 34,
-            I2CEXT0_SCL  = 46,
-            I2CEXT0_SDA  = 47,
-            FSPICLK      = 64,
-            FSPIQ        = 65,
-            FSPID        = 66,
-            FSPIHD       = 67,
-            FSPIWP       = 68,
-            FSPICS0      = 69,
-            U2TXD        = 72,
-            U2RTS        = 73,
-            U2DTR        = 74,
-            FSPICS1      = 102,
-            FSPICS2      = 103,
-            FSPICS3      = 104,
-            FSPICS4      = 105,
-            FSPICS5      = 106,
-            GPIO         = 256,
+            LEDC_LS_SIG0    = 0,
+            LEDC_LS_SIG1    = 1,
+            LEDC_LS_SIG2    = 2,
+            LEDC_LS_SIG3    = 3,
+            LEDC_LS_SIG4    = 4,
+            LEDC_LS_SIG5    = 5,
+            U0TXD           = 6,
+            U0RTS           = 7,
+            U0DTR           = 8,
+            U1TXD           = 9,
+            U1RTS           = 10,
+            U1DTR           = 11,
+            I2S_MCLK        = 12,
+            I2SO_BCK        = 13,
+            I2SO_WS         = 14,
+            I2SO_SD         = 15,
+            I2SI_BCK        = 16,
+            I2SI_WS         = 17,
+            I2SO_SD1        = 18,
+            CPU_GPIO_0      = 27,
+            CPU_GPIO_1      = 28,
+            CPU_GPIO_2      = 29,
+            CPU_GPIO_3      = 30,
+            CPU_GPIO_4      = 31,
+            CPU_GPIO_5      = 32,
+            CPU_GPIO_6      = 33,
+            CPU_GPIO_7      = 34,
+            I2CEXT0_SCL     = 46,
+            I2CEXT0_SDA     = 47,
+            FSPICLK         = 64,
+            FSPIQ           = 65,
+            FSPID           = 66,
+            FSPIHD          = 67,
+            FSPIWP          = 68,
+            FSPICS0         = 69,
+            U2TXD           = 72,
+            U2RTS           = 73,
+            U2DTR           = 74,
+            FSPICS1         = 102,
+            FSPICS2         = 103,
+            FSPICS3         = 104,
+            FSPICS4         = 105,
+            FSPICS5         = 106,
+            SDIO_TOHOST_INT = 124,
+            GPIO            = 256,
         }
     };
 }
