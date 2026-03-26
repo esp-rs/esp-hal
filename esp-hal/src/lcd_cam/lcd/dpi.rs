@@ -104,7 +104,17 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
+    dma::{
+        ChannelTx,
+        DmaBounceBuffer,
+        DmaBounceBufferView,
+        DmaError,
+        DmaPeripheral,
+        DmaTxBuffer,
+        DmaTxInterrupt,
+        PeripheralTxChannel,
+        TxChannelFor,
+    },
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -147,6 +157,7 @@ where
         config: Config,
     ) -> Result<Self, ConfigError> {
         let tx_channel = ChannelTx::new(channel.degrade());
+        // TODO: set eof_till_data_popped = false via PAC when field is accessible
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -227,6 +238,7 @@ where
             w.lcd_dummy().clear_bit();
 
             // This needs to be explicitly set for RGB mode.
+            w.lcd_always_out_en().set_bit();
             w.lcd_dout().set_bit()
         });
 
@@ -641,6 +653,50 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for DpiTransfer<'_, BUF, Dm> {
             ManuallyDrop::take(&mut self.buffer_view)
         };
         let _ = BUF::from_view(view);
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl<'d, Dm: DriverMode> DpiTransfer<'d, DmaBounceBuffer, Dm> {
+    /// Check for a completed DMA EOF and refill the completed bounce buffer
+    /// from the PSRAM framebuffer.
+    ///
+    /// Returns `true` at each frame boundary (when all bounce-buffer chunks
+    /// for a full frame have been refilled). Call this in a tight loop to
+    /// keep the display refreshed.
+    #[instability::unstable]
+    pub fn poll(&mut self) -> bool {
+        if self
+            .dpi
+            .tx_channel
+            .pending_out_interrupts()
+            .contains(DmaTxInterrupt::Eof)
+        {
+            self.dpi.tx_channel.clear_out(DmaTxInterrupt::Eof);
+            self.buffer_view.refill()
+        } else {
+            false
+        }
+    }
+
+    /// Swap front and back buffers at the next frame boundary.
+    ///
+    /// Spins until a frame boundary is reached (or the DMA stops / hits an
+    /// error), then atomically swaps which framebuffer the bounce-buffer
+    /// pipeline reads from. After this call the old front buffer becomes the
+    /// new back buffer (accessible via [`DmaBounceBufferView::back_buffer`])
+    /// and the old back buffer becomes the new front (displayed on screen).
+    ///
+    /// Does nothing if no back buffer was registered via
+    /// [`DmaBounceBufferView::set_back_buffer`].
+    #[instability::unstable]
+    pub fn swap_buffers(&mut self) {
+        loop {
+            if self.poll() || self.is_done() || self.dpi.tx_channel.has_error() {
+                break;
+            }
+        }
+        DmaBounceBufferView::swap_framebuffer(&mut self.buffer_view);
     }
 }
 

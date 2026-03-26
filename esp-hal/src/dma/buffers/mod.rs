@@ -10,6 +10,11 @@ use crate::soc::is_slice_in_dram;
 #[cfg(psram_dma)]
 use crate::soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address};
 
+#[cfg(feature = "unstable")]
+mod bounce_buffer;
+#[cfg(feature = "unstable")]
+pub use self::bounce_buffer::*;
+
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
