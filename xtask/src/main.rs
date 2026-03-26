@@ -601,16 +601,17 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 .with_context(|| format!("Failed to read examples directory: {}", dir.display()))?;
             for example in examples {
                 let example = example.context("Failed to read example")?;
+                let example_path = example.path();
                 if example
                     .file_type()
                     .with_context(|| {
                         format!(
                             "Failed to get file type for example: {}",
-                            example.path().display()
+                            example_path.display()
                         )
                     })?
                     .is_file()
-                    && example.path().extension().is_none()
+                    && example_path.extension().is_none()
                 {
                     let example_name = example.file_name().to_string_lossy().to_string();
                     let without_fingerprint = example_name
@@ -620,16 +621,30 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
                     let dst = dir.join(without_fingerprint);
 
-                    log::debug!("Copying {} to {}", example.path().display(), dst.display());
+                    log::debug!("Copying {} to {}", example_path.display(), dst.display());
 
                     // Copy so we don't trigger a rebuild unnecessarily by deleting the original
-                    std::fs::copy(example.path(), &dst).with_context(|| {
+                    std::fs::copy(&example_path, &dst).with_context(|| {
                         format!(
                             "Failed to copy example: {} to {}",
-                            example.path().display(),
+                            example_path.display(),
                             dst.display()
                         )
                     })?;
+                    // Check that the destination file matches the source file
+                    let dst_contents = std::fs::read(&dst).with_context(|| {
+                        format!("Failed to read destination file: {}", dst.display())
+                    })?;
+                    let src_contents = std::fs::read(&example_path).with_context(|| {
+                        format!("Failed to read source file: {}", example_path.display())
+                    })?;
+                    if dst_contents != src_contents {
+                        return Err(anyhow::anyhow!(
+                            "Destination file {} does not match source file {}",
+                            dst.display(),
+                            example_path.display()
+                        ));
+                    }
                 }
             }
 
