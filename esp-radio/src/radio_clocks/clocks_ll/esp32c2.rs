@@ -1,5 +1,3 @@
-use esp_hal::clock::Clocks;
-
 // SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
 const SYSTEM_WIFI_CLK_EN: u32 = 0x00FB9FCF;
 
@@ -41,7 +39,7 @@ pub(crate) fn ble_rtc_clk_init() {
         w.lp_timer_sel_rtc_slow().clear_bit()
     });
 
-    let xtal_frequency = Clocks::get().xtal_clock;
+    let xtal_frequency = esp_hal::clock::xtal_clock();
     let bt_lpclk_target = match xtal_frequency.as_mhz() {
         26 => 40000,
         // 40MHz

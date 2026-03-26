@@ -39,7 +39,11 @@ pub(crate) unsafe extern "C" fn __esp_radio_usleep(us: u32) -> c_int {
     crate::preempt::usleep(us);
 
     #[cfg(not(any(feature = "wifi", feature = "ble")))]
-    crate::hal::delay::Delay::new().delay_micros(us);
+    {
+        let start = esp_hal::time::Instant::now();
+        let duration = esp_hal::time::Duration::from_micros(us as u64);
+        while start.elapsed() < duration {}
+    }
 
     0
 }

@@ -302,9 +302,9 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
 
 // We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
 // chip, with BT but without WIFI.
-#[cfg(not(esp32h2))]
+#[cfg(all(not(esp32h2), feature = "unstable"))]
 type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
-#[cfg(esp32h2)]
+#[cfg(all(esp32h2, feature = "unstable"))]
 type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
 
 // Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
