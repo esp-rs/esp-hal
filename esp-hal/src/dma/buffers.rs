@@ -496,7 +496,6 @@ pub enum DmaBounceBufferError {
 ///
 /// Holds two SRAM bounce buffers and their circular DMA descriptor chain.
 #[instability::unstable]
-#[allow(dead_code)]
 pub struct DmaBounceBuffer {
     descriptors: *mut [DmaDescriptor; 2],
     bounce_bufs: [&'static mut [u8]; 2],
@@ -509,7 +508,6 @@ pub struct DmaBounceBuffer {
 }
 
 #[cfg(feature = "unstable")]
-#[allow(dead_code)]
 impl DmaBounceBuffer {
     /// Create a new bounce buffer state.
     #[instability::unstable]
@@ -639,14 +637,12 @@ impl DmaBounceBuffer {
 /// Accessible via `Deref` on transfer types that use [`DmaBounceBuffer`].
 /// Provides methods for double-buffered rendering.
 #[instability::unstable]
-#[allow(dead_code)]
 pub struct DmaBounceBufferView {
     inner: DmaBounceBuffer,
     back_buffer: Option<(*mut u8, usize)>,
 }
 
 #[cfg(feature = "unstable")]
-#[allow(dead_code)]
 impl DmaBounceBufferView {
     /// Register a back buffer for double-buffered rendering.
     ///
