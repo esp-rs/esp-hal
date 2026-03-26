@@ -468,14 +468,14 @@ mod tests {
         for i in 1..4 {
             dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(TRANSFER_SIZE, dma_rx_buf)
+                .read_buffer(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .write(TRANSFER_SIZE, dma_tx_buf)
+                .write_buffer(TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_tx_buf) = transfer.wait();
@@ -506,14 +506,14 @@ mod tests {
         for i in 1..4 {
             dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(TRANSFER_SIZE, dma_rx_buf)
+                .read_buffer(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .transfer(TRANSFER_SIZE, dma_rx_buf, TRANSFER_SIZE, dma_tx_buf)
+                .transfer_buffers(TRANSFER_SIZE, dma_rx_buf, TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
@@ -539,7 +539,7 @@ mod tests {
             dma_tx_buf.as_mut_slice()[0] = i as u8;
             *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i as u8;
             let transfer = spi
-                .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+                .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
 
@@ -565,7 +565,7 @@ mod tests {
 
         let spi = ctx.spi.with_dma(ctx.dma_channel);
         let transfer = spi
-            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
+            .transfer_buffers(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
@@ -579,7 +579,7 @@ mod tests {
         dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
 
         let transfer = spi
-            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
+            .transfer_buffers(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
@@ -777,27 +777,27 @@ mod tests {
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
         let transfer = spi
-            .write(dma_tx_buf.len(), dma_tx_buf)
+            .write_buffer(dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
         let transfer = spi
-            .read(dma_rx_buf.len(), dma_rx_buf)
+            .read_buffer(dma_rx_buf.len(), dma_rx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, mut dma_rx_buf) = transfer.wait();
 
         let transfer = spi
-            .write(dma_tx_buf.len(), dma_tx_buf)
+            .write_buffer(dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, _dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
         let transfer = spi
-            .read(dma_rx_buf.len(), dma_rx_buf)
+            .read_buffer(dma_rx_buf.len(), dma_rx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, dma_rx_buf) = transfer.wait();
@@ -865,7 +865,7 @@ mod tests {
         let spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -888,7 +888,7 @@ mod tests {
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -899,7 +899,7 @@ mod tests {
             .unwrap();
 
         let transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -921,7 +921,7 @@ mod tests {
         let spi = ctx.spi.with_dma(ctx.dma_channel).into_async();
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 

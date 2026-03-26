@@ -597,7 +597,7 @@ where
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn write<TX: DmaTxBuffer>(
+    pub fn write_buffer<TX: DmaTxBuffer>(
         mut self,
         bytes_to_write: usize,
         mut buffer: TX,
@@ -635,7 +635,7 @@ where
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn read<RX: DmaRxBuffer>(
+    pub fn read_buffer<RX: DmaRxBuffer>(
         mut self,
         bytes_to_read: usize,
         mut buffer: RX,
@@ -675,7 +675,7 @@ where
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
+    pub fn transfer_buffers<RX: DmaRxBuffer, TX: DmaTxBuffer>(
         mut self,
         bytes_to_read: usize,
         mut rx_buffer: RX,
@@ -732,7 +732,7 @@ where
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn half_duplex_read<RX: DmaRxBuffer>(
+    pub fn half_duplex_read_buffer<RX: DmaRxBuffer>(
         mut self,
         data_mode: DataMode,
         cmd: Command,
@@ -793,7 +793,7 @@ where
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
-    pub fn half_duplex_write<TX: DmaTxBuffer>(
+    pub fn half_duplex_write_buffer<TX: DmaTxBuffer>(
         mut self,
         data_mode: DataMode,
         cmd: Command,
