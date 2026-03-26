@@ -114,7 +114,7 @@ impl PinGuard {
         Self { pin: pin.number() }
     }
 
-    pub(crate) fn new_unconnected() -> Self {
+    pub(crate) const fn new_unconnected() -> Self {
         Self { pin: u8::MAX }
     }
 

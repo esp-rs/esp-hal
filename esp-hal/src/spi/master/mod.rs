@@ -51,7 +51,7 @@ mod dma;
 pub use dma::*;
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-use enumset::{EnumSet, EnumSetType};
+use enumset::{EnumSet, EnumSetType, enum_set};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
@@ -629,23 +629,14 @@ impl Config {
     }
 }
 
+const SIO_PIN_COUNT: usize = 4 + cfg!(spi_master_has_octal) as usize * 4;
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct SpiPinGuard {
     sclk_pin: PinGuard,
     cs_pin: PinGuard,
-    sio0_pin: PinGuard,
-    sio1_pin: PinGuard,
-    sio2_pin: PinGuard,
-    sio3_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio4_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio5_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio6_pin: PinGuard,
-    #[cfg(spi_master_has_octal)]
-    sio7_pin: PinGuard,
+    sio_pins: [PinGuard; SIO_PIN_COUNT],
 }
 
 /// Configuration errors.
@@ -732,18 +723,7 @@ impl<'d> Spi<'d, Blocking> {
             pins: SpiPinGuard {
                 sclk_pin: PinGuard::new_unconnected(),
                 cs_pin: PinGuard::new_unconnected(),
-                sio0_pin: PinGuard::new_unconnected(),
-                sio1_pin: PinGuard::new_unconnected(),
-                sio2_pin: PinGuard::new_unconnected(),
-                sio3_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio4_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio5_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio6_pin: PinGuard::new_unconnected(),
-                #[cfg(spi_master_has_octal)]
-                sio7_pin: PinGuard::new_unconnected(),
+                sio_pins: [const { PinGuard::new_unconnected() }; SIO_PIN_COUNT],
             },
             spi: spi.degrade(),
         };
@@ -852,7 +832,8 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.driver().flush_async().await
+        self.driver().flush_async().await;
+        Ok(())
     }
 
     #[procmacros::doc_replace]
@@ -885,21 +866,42 @@ impl<'d> Spi<'d, Async> {
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.driver().flush_async().await?;
+        self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
+
         self.driver().transfer_in_place_async(words).await
+    }
+
+    // TODO: These inherent methods should be public
+
+    async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.driver().flush_async().await;
+        self.driver().setup_full_duplex()?;
+
+        self.driver().read_async(words).await
+    }
+
+    async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        // We need to flush because the blocking transfer functions may return while a
+        // transfer is still in progress.
+        self.driver().flush_async().await;
+        self.driver().setup_full_duplex()?;
+
+        self.driver().write_async(words).await
     }
 }
 
 macro_rules! def_with_sio_pin {
-    ($fn:ident, $field:ident, $n:literal) => {
+    ($fn:ident, $n:literal) => {
         #[doc = concat!(" Assign the SIO", stringify!($n), " pin for the SPI instance.")]
         #[doc = " "]
         #[doc = " Enables both input and output functionality for the pin, and connects it"]
         #[doc = concat!(" to the SIO", stringify!($n), " output and input signals.")]
         #[instability::unstable]
         pub fn $fn(mut self, sio: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.pins.$field = self.connect_sio_pin(sio.into(), $n);
+            self.pins.sio_pins[$n] = self.connect_sio_pin(sio.into(), $n);
 
             self
         }
@@ -990,7 +992,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
-        self.pins.sio0_pin = self.connect_sio_output_pin(mosi.into(), 0);
+        self.pins.sio_pins[0] = self.connect_sio_output_pin(mosi.into(), 0);
 
         self
     }
@@ -1041,7 +1043,7 @@ where
     /// signal.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.pins.sio0_pin = self.connect_sio_pin(mosi.into(), 0);
+        self.pins.sio_pins[0] = self.connect_sio_pin(mosi.into(), 0);
 
         self
     }
@@ -1059,25 +1061,25 @@ where
     /// signal.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.pins.sio1_pin = self.connect_sio_pin(sio1.into(), 1);
+        self.pins.sio_pins[1] = self.connect_sio_pin(sio1.into(), 1);
 
         self
     }
 
-    def_with_sio_pin!(with_sio2, sio2_pin, 2);
-    def_with_sio_pin!(with_sio3, sio3_pin, 3);
+    def_with_sio_pin!(with_sio2, 2);
+    def_with_sio_pin!(with_sio3, 3);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio4, sio4_pin, 4);
+    def_with_sio_pin!(with_sio4, 4);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio5, sio5_pin, 5);
+    def_with_sio_pin!(with_sio5, 5);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio6, sio6_pin, 6);
+    def_with_sio_pin!(with_sio6, 6);
 
     #[cfg(spi_master_has_octal)]
-    def_with_sio_pin!(with_sio7, sio7_pin, 7);
+    def_with_sio_pin!(with_sio7, 7);
 
     /// Assign the CS (Chip Select) pin for the SPI instance.
     ///
@@ -1151,9 +1153,16 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().setup_full_duplex()?;
-        self.driver().write(words)?;
         self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.driver().write_one(chunk)?;
+            // NOTE: While we don't need to flush after the last chunk, changing
+            // that would change the behavior of the function.
+            // https://github.com/esp-rs/esp-hal/issues/5257
+            self.driver().flush()?;
+        }
 
         Ok(())
     }
@@ -1182,6 +1191,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().flush()?;
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
@@ -1210,8 +1220,9 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.driver().flush()?;
         self.driver().setup_full_duplex()?;
-        self.driver().transfer(words)
+        self.driver().transfer_in_place(words)
     }
 
     /// Half-duplex read.
@@ -1240,6 +1251,7 @@ where
             return Err(Error::Unsupported);
         }
 
+        self.flush()?;
         self.driver().setup_half_duplex(
             false,
             cmd,
@@ -1279,6 +1291,8 @@ where
             return Err(Error::FifoSizeExeeded);
         }
 
+        self.flush()?;
+
         cfg_if::cfg_if! {
             if #[cfg(all(esp32, spi_address_workaround))] {
                 let mut buffer = buffer;
@@ -1316,11 +1330,11 @@ where
         )?;
 
         if !buffer.is_empty() {
-            // re-using the full-duplex write here
-            self.driver().write(buffer)?;
-        } else {
-            self.driver().start_operation();
+            self.driver().configure_datalen(0, buffer.len());
+            self.driver().fill_fifo(buffer);
         }
+
+        self.driver().start_operation();
 
         self.driver().flush()
     }
@@ -1358,59 +1372,38 @@ where
     Dm: DriverMode,
 {
     fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().read(words)
+        self.read(words)
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.driver().write(words)
-    }
-
-    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        // Optimizations
-        if read.is_empty() {
-            return SpiBus::write(self, write);
-        } else if write.is_empty() {
-            return SpiBus::read(self, read);
-        }
-
-        let mut write_from = 0;
-        let mut read_from = 0;
-
-        loop {
-            // How many bytes we write in this chunk
-            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-            // How many bytes we read in this chunk
-            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-            if (write_inc == 0) && (read_inc == 0) {
-                break;
-            }
-
-            // No need to flush here, `SpiBus::write` will do it for us
-
-            if write_inc < read_inc {
-                // Read more than we write, must pad writing part with zeros
-                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                SpiBus::write(self, &empty[..read_inc])?;
-            } else {
-                SpiBus::write(self, &write[write_from..][..write_inc])?;
-            }
-
-            if read_inc > 0 {
-                SpiBus::flush(self)?;
-                self.driver()
-                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
-            }
-
-            write_from += write_inc;
-            read_from += read_inc;
+        // Do not call the inherent `write` method. The trait impl does not flush after.
+        // Flush before starting to ensure the bus is clear before we reconfigure to full duplex.
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.driver().flush()?;
+            self.driver().write_one(chunk)?;
         }
         Ok(())
     }
 
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+
+        if read.is_empty() {
+            self.driver().write(write)
+        } else if write.is_empty() {
+            self.driver().read(read)
+        } else {
+            self.driver().transfer(read, write)
+        }
+    }
+
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().transfer(words)
+        self.driver().flush()?;
+        self.driver().setup_full_duplex()?;
+        self.driver().transfer_in_place(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1420,62 +1413,24 @@ where
 
 impl SpiBusAsync for Spi<'_, Async> {
     async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.flush_async().await?;
-        self.driver().setup_full_duplex()?;
-        self.driver().read_async(words).await
+        self.read_async(words).await
     }
 
     async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.flush_async().await?;
-        self.driver().setup_full_duplex()?;
-        self.driver().write_async(words).await
+        self.write_async(words).await
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        // Optimizations
+        self.driver().flush_async().await;
+        self.driver().setup_full_duplex()?;
+
         if read.is_empty() {
-            return SpiBusAsync::write(self, write).await;
+            self.driver().write_async(write).await
         } else if write.is_empty() {
-            return SpiBusAsync::read(self, read).await;
+            self.driver().read_async(read).await
+        } else {
+            self.driver().transfer_async(read, write).await
         }
-
-        let mut write_from = 0;
-        let mut read_from = 0;
-
-        loop {
-            // How many bytes we write in this chunk
-            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
-            // How many bytes we read in this chunk
-            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
-
-            if (write_inc == 0) && (read_inc == 0) {
-                break;
-            }
-
-            // No need to flush here, `SpiBusAsync::write` will do it for us
-
-            if write_inc < read_inc {
-                // Read more than we write, must pad writing part with zeros
-                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
-                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
-                SpiBusAsync::write(self, &empty[..read_inc]).await?;
-            } else {
-                SpiBusAsync::write(self, &write[write_from..][..write_inc]).await?;
-            }
-
-            if read_inc > 0 {
-                self.driver()
-                    .read_from_fifo(&mut read[read_from..][..read_inc])?;
-            }
-
-            write_from += write_inc;
-            read_from += read_inc;
-        }
-        Ok(())
     }
 
     async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
@@ -1810,7 +1765,6 @@ impl Driver {
     }
 
     /// Resets asserted interrupts
-    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -2015,32 +1969,27 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn write_one(&self, words: &[u8]) -> Result<(), Error> {
+        if words.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
+        self.configure_datalen(0, words.len());
+        self.fill_fifo(words);
+        self.start_operation();
+        Ok(())
+    }
+
+    /// Write bytes to SPI.
     ///
     /// This function will return before all bytes of the last chunk to transmit
     /// have been sent to the wire. If you must ensure that the whole
     /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn write(&self, words: &[u8]) -> Result<(), Error> {
-        let num_chunks = words.len() / FIFO_SIZE;
-
-        // Flush in case previous writes have not completed yet, required as per
-        // embedded-hal documentation (#1369).
-        self.flush()?;
-
-        // The fifo has a limited fixed size, so the data must be chunked and then
-        // transmitted
-        for (i, chunk) in words.chunks(FIFO_SIZE).enumerate() {
-            self.configure_datalen(0, chunk.len());
-            self.fill_fifo(chunk);
-
-            self.start_operation();
-
-            // Wait for all chunks to complete except the last one.
-            // The function is allowed to return before the bus is idle.
-            // see [embedded-hal flushing](https://docs.rs/embedded-hal/1.0.0/embedded_hal/spi/index.html#flushing)
-            if i < num_chunks {
-                self.flush()?;
-            }
+        for chunk in words.chunks(FIFO_SIZE) {
+            self.flush()?;
+            self.write_one(chunk)?;
         }
         Ok(())
     }
@@ -2048,12 +1997,9 @@ impl Driver {
     /// Write bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
-        // The fifo has a limited fixed size, so the data must be chunked and then
-        // transmitted
         for chunk in words.chunks(FIFO_SIZE) {
-            self.configure_datalen(0, chunk.len());
-            self.fill_fifo(chunk);
-            self.execute_operation_async().await;
+            self.write_one(chunk)?;
+            self.flush_async().await;
         }
         Ok(())
     }
@@ -2068,7 +2014,7 @@ impl Driver {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write(&empty_array[0..chunk.len()])?;
+            self.write_one(&empty_array[0..chunk.len()])?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
@@ -2077,15 +2023,16 @@ impl Driver {
 
     /// Read bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. If you want to read
+    /// the response to something you have written before, consider using
+    /// [`Self::transfer`] instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write_async(&empty_array[0..chunk.len()]).await?;
+            self.write_one(&empty_array[0..chunk.len()])?;
+            self.flush_async().await;
             self.read_from_fifo(chunk)?;
         }
         Ok(())
@@ -2094,23 +2041,21 @@ impl Driver {
     /// Read received bytes from SPI FIFO.
     ///
     /// Copies the contents of the SPI receive FIFO into `words`. This function
-    /// doesn't perform flushing. If you want to read the response to
+    /// doesn't perform any data transfer. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
-        let reg_block = self.regs();
+        if words.len() > FIFO_SIZE {
+            return Err(Error::FifoSizeExeeded);
+        }
 
-        for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.configure_datalen(chunk.len(), 0);
+        for (chunk, w_reg) in words.chunks_mut(4).zip(self.regs().w_iter()) {
+            let reg_val = w_reg.read().bits();
+            let bytes = reg_val.to_le_bytes();
 
-            for (index, w_reg) in (0..chunk.len()).step_by(4).zip(reg_block.w_iter()) {
-                let reg_val = w_reg.read().bits();
-                let bytes = reg_val.to_le_bytes();
-
-                let len = usize::min(chunk.len(), index + 4) - index;
-                chunk[index..(index + len)].clone_from_slice(&bytes[0..len]);
-            }
+            let len = chunk.len();
+            chunk.copy_from_slice(&bytes[..len]);
         }
 
         Ok(())
@@ -2122,13 +2067,8 @@ impl Driver {
 
     // Check if the bus is busy and if it is wait for it to be idle
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    async fn flush_async(&self) -> Result<(), Error> {
-        if self.busy() {
-            let future = SpiFuture::setup(self).await;
-            future.await;
-        }
-
-        Ok(())
+    fn flush_async(&self) -> impl Future<Output = ()> {
+        SpiFuture { driver: self }
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
@@ -2141,13 +2081,50 @@ impl Driver {
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn transfer(&self, words: &mut [u8]) -> Result<(), Error> {
+    fn transfer_in_place(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
-            self.write(chunk)?;
+            self.write_one(chunk)?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
 
+        Ok(())
+    }
+
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn transfer(&self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        let mut write_from = 0;
+        let mut read_from = 0;
+
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
+            }
+
+            self.flush()?;
+
+            if write_inc < read_inc {
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                self.write_one(&empty[..read_inc])?;
+            } else {
+                self.write_one(&write[write_from..][..write_inc])?;
+            }
+
+            if read_inc > 0 {
+                self.flush()?;
+                self.read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
+        }
         Ok(())
     }
 
@@ -2160,7 +2137,8 @@ impl Driver {
                 self.abort_transfer();
                 while self.busy() {}
             });
-            let res = self.write_async(chunk).await;
+            let res = self.write_one(chunk);
+            self.flush_async().await;
             cancel_on_drop.defuse();
             res?;
 
@@ -2171,19 +2149,48 @@ impl Driver {
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn start_operation(&self) {
-        self.update();
-        self.regs().cmd().modify(|_, w| w.usr().set_bit());
+    async fn transfer_async(&self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        let mut write_from = 0;
+        let mut read_from = 0;
+
+        loop {
+            // How many bytes we write in this chunk
+            let write_inc = core::cmp::min(FIFO_SIZE, write.len() - write_from);
+            // How many bytes we read in this chunk
+            let read_inc = core::cmp::min(FIFO_SIZE, read.len() - read_from);
+
+            if (write_inc == 0) && (read_inc == 0) {
+                break;
+            }
+
+            self.flush_async().await;
+
+            if write_inc < read_inc {
+                // Read more than we write, must pad writing part with zeros
+                let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
+                empty[0..write_inc].copy_from_slice(&write[write_from..][..write_inc]);
+                self.write_one(&empty[..read_inc])?;
+            } else {
+                self.write_one(&write[write_from..][..write_inc])?;
+            }
+
+            // Preserve previous semantics - see https://github.com/esp-rs/esp-hal/issues/5257
+            self.flush_async().await;
+            if read_inc > 0 {
+                self.read_from_fifo(&mut read[read_from..][..read_inc])?;
+            }
+
+            write_from += write_inc;
+            read_from += read_inc;
+        }
+        Ok(())
     }
 
-    /// Starts the operation and waits for it to complete.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    async fn execute_operation_async(&self) {
-        // On ESP32, the interrupt seems to not fire in specific circumstances, when
-        // `listen` is called after `start_operation`. Let's call it before, to be sure.
-        let future = SpiFuture::setup(self).await;
-        self.start_operation();
-        future.await;
+    fn start_operation(&self) {
+        self.update();
+        self.clear_interrupts(SpiInterrupt::TransferDone.into());
+        self.regs().cmd().modify(|_, w| w.usr().set_bit());
     }
 
     fn setup_full_duplex(&self) -> Result<(), Error> {
@@ -2511,41 +2518,29 @@ struct SpiFuture<'a> {
     driver: &'a Driver,
 }
 
-impl<'a> SpiFuture<'a> {
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
-        // Make sure this is called before starting an async operation. On the ESP32,
-        // calling after may cause the interrupt to not fire.
-        core::future::poll_fn(move |cx| {
-            driver.state.waker.register(cx.waker());
-            driver.clear_interrupts(SpiInterrupt::TransferDone.into());
-            driver.enable_listen(SpiInterrupt::TransferDone.into(), true);
-            Poll::Ready(Self { driver })
-        })
-    }
+impl SpiFuture<'_> {
+    const EVENTS: EnumSet<SpiInterrupt> = enum_set!(SpiInterrupt::TransferDone);
 }
 
 impl Future for SpiFuture<'_> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self
-            .driver
-            .interrupts()
-            .contains(SpiInterrupt::TransferDone)
-        {
-            self.driver
-                .clear_interrupts(SpiInterrupt::TransferDone.into());
-            return Poll::Ready(());
-        }
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.driver.busy() {
+            self.driver.state.waker.register(cx.waker());
+            self.driver.enable_listen(Self::EVENTS, true);
 
-        Poll::Pending
+            Poll::Pending
+        } else {
+            self.driver.clear_interrupts(Self::EVENTS);
+            Poll::Ready(())
+        }
     }
 }
 
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
-        self.driver
-            .enable_listen(SpiInterrupt::TransferDone.into(), false);
+        self.driver.enable_listen(Self::EVENTS, false);
     }
 }
