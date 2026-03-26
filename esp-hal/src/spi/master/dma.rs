@@ -223,6 +223,9 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
+    // TODO: add a constructor that doesn't rely on the Spi driver. This one requires us to
+    // check DMA channel compatibility in runtime, while a public SpiDma::new(SPI, DMA, config)
+    // could check non-erased inputs in comptime.
     pub(super) fn new(
         spi_driver: Spi<'d, Blocking>,
         channel: PeripheralDmaChannel<AnySpi<'d>>,
@@ -453,14 +456,7 @@ impl<'d> SpiDma<'d, Async> {
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
 
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
-
-        for (read_chunk, write_chunk) in read_common
-            .chunks_mut(chunk_size)
-            .zip(write_common.chunks(chunk_size))
-        {
+        for (read_chunk, write_chunk) in read.chunks_mut(chunk_size).zip(write.chunks(chunk_size)) {
             tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
             unsafe {
@@ -473,13 +469,7 @@ impl<'d> SpiDma<'d, Async> {
 
         spi.defuse();
 
-        if !read_remainder.is_empty() {
-            self.read_async(read_remainder).await
-        } else if !write_remainder.is_empty() {
-            self.write_async(write_remainder).await
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Transfer by writing out a buffer and reading the response from
@@ -673,11 +663,9 @@ where
         unsafe { self.start_dma_transfer(0, bytes_to_write, rx_buffer, buffer) }
     }
 
-    /// Configures the DMA buffers for the SPI instance.
-    ///
-    /// This method sets up both RX and TX buffers for DMA transfers.
-    /// It returns an instance of `SpiDmaBus` that can be used for SPI
-    /// communication.
+    /// Assigns copy buffers to the SPI driver.
+    // TODO: write docs once the driver can actually transfer data without copying - we'll need to
+    // explain when this function is necessary.
     #[instability::unstable]
     pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
         unsafe {
@@ -994,14 +982,7 @@ where
 
         let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
 
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
-
-        for (read_chunk, write_chunk) in read_common
-            .chunks_mut(chunk_size)
-            .zip(write_common.chunks(chunk_size))
-        {
+        for (read_chunk, write_chunk) in read.chunks_mut(chunk_size).zip(write.chunks(chunk_size)) {
             tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
             unsafe {
@@ -1012,13 +993,7 @@ where
             read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
         }
 
-        if !read_remainder.is_empty() {
-            self.read(read_remainder)
-        } else if !write_remainder.is_empty() {
-            self.write(write_remainder)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Transfers data in place on the SPI bus using DMA.
