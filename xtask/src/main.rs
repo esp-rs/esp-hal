@@ -618,22 +618,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                         .map(|(a, _)| a)
                         .unwrap_or(&example_name);
 
-                    log::debug!(
-                        "Copying {} to {}",
-                        example.path().display(),
-                        dir.join(without_fingerprint).display()
-                    );
+                    let dst = dir.join(without_fingerprint);
+
+                    log::debug!("Copying {} to {}", example.path().display(), dst.display());
 
                     // Copy so we don't trigger a rebuild unnecessarily by deleting the original
-                    std::fs::copy(example.path(), dir.join(without_fingerprint)).with_context(
-                        || {
-                            format!(
-                                "Failed to copy example: {} to {}",
-                                example.path().display(),
-                                dir.join(without_fingerprint).display()
-                            )
-                        },
-                    )?;
+                    std::fs::copy(example.path(), &dst).with_context(|| {
+                        format!(
+                            "Failed to copy example: {} to {}",
+                            example.path().display(),
+                            dst.display()
+                        )
+                    })?;
                 }
             }
 
