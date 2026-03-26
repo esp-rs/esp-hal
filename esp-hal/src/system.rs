@@ -65,10 +65,7 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
-        if PeripheralClockControl::enable(p) {
-            PeripheralClockControl::reset(p);
-            init();
-        }
+        PeripheralClockControl::request_peripheral(p, init);
 
         Self { peripheral: p }
     }
@@ -100,14 +97,8 @@ pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new_with(init: fn()) -> Self {
-        let peripheral = const { Peripheral::try_from(P).unwrap() };
-
-        PERIPHERAL_REF_COUNT.with(|ref_counts| {
-            if PeripheralClockControl::enable_with_counts(peripheral, ref_counts) {
-                unsafe { PeripheralClockControl::reset_racey(peripheral) };
-                init();
-            }
-        });
+        let p = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::request_peripheral(p, init);
 
         Self {}
     }
@@ -139,6 +130,15 @@ impl<const P: u8> Drop for GenericPeripheralGuard<P> {
 pub(crate) struct PeripheralClockControl;
 
 impl PeripheralClockControl {
+    fn request_peripheral(p: Peripheral, init: fn()) {
+        PERIPHERAL_REF_COUNT.with(|ref_counts| {
+            if Self::enable_with_counts(p, ref_counts) {
+                unsafe { Self::reset_racey(p) };
+                init();
+            }
+        });
+    }
+
     /// Enables the given peripheral.
     ///
     /// This keeps track of enabling a peripheral - i.e. a peripheral
@@ -165,8 +165,6 @@ impl PeripheralClockControl {
     /// gets disabled when the number of enable/disable attempts is balanced.
     ///
     /// Returns `true` if it actually disabled the peripheral.
-    ///
-    /// Before disabling a peripheral it will also get reset
     pub(crate) fn disable(peripheral: Peripheral) -> bool {
         PERIPHERAL_REF_COUNT.with(|ref_counts| {
             Self::enable_forced_with_counts(peripheral, false, false, ref_counts)
@@ -198,10 +196,6 @@ impl PeripheralClockControl {
             };
         } else if !enable {
             assert!(*ref_count == 0);
-        }
-
-        if !enable {
-            unsafe { Self::reset_racey(peripheral) };
         }
 
         debug!("Enable {:?} {}", peripheral, enable);

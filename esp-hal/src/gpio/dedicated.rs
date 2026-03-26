@@ -177,7 +177,14 @@ for_each_dedicated_gpio!(
 impl DedicatedGpio<'_> {
     #[cfg(dedicated_gpio_needs_initialization)]
     fn initialize() {
-        crate::system::PeripheralClockControl::enable(crate::system::Peripheral::DedicatedGpio);
+        use crate::system::{Peripheral, PeripheralClockControl};
+        if PeripheralClockControl::enable(Peripheral::DedicatedGpio) {
+            PeripheralClockControl::reset(Peripheral::DedicatedGpio);
+        } else {
+            // Refcount was more than 0. Decrement to avoid overflow because we don't handle
+            // dropping the driver.
+            PeripheralClockControl::disable(Peripheral::DedicatedGpio);
+        }
 
         #[cfg(esp32s2)]
         {
