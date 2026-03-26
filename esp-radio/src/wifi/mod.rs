@@ -1654,7 +1654,9 @@ impl RxControlInfo {
 }
 
 #[doc(hidden)]
-// These token doesn't need the debug trait, they aren't needed publicly.
+/// This token is deliberately hidden to avoid polluting the crate namespace with these typically
+/// advanced usage types. We can't make them private, as they're used in various built-in network
+/// stack impls. Once we are ready to stabilize these, we can remove the doc hidden cfg.
 pub struct WifiRxToken {
     mode: InterfaceType,
 }
@@ -1687,7 +1689,9 @@ impl WifiRxToken {
 }
 
 #[doc(hidden)]
-// These token doesn't need the debug trait, they aren't needed publicly.
+/// This token is deliberately hidden to avoid polluting the crate namespace with these typically
+/// advanced usage types. We can't make them private, as they're used in various built-in network
+/// stack impls. Once we are ready to stabilize these, we can remove the doc hidden cfg.
 pub struct WifiTxToken {
     mode: InterfaceType,
 }
