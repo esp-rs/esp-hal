@@ -222,7 +222,13 @@ impl<'d> SystemTimer<'d> {
     /// Create a new instance.
     pub fn new(_systimer: SYSTIMER<'d>) -> Self {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
-        PeripheralClockControl::enable(PeripheralEnable::Systimer);
+        if PeripheralClockControl::enable(PeripheralEnable::Systimer) {
+            PeripheralClockControl::reset(PeripheralEnable::Systimer);
+        } else {
+            // Refcount was more than 0. Decrement to avoid overflow because we don't handle
+            // dropping the driver.
+            PeripheralClockControl::disable(PeripheralEnable::Systimer);
+        }
 
         #[cfg(etm_driver_supported)]
         etm::enable_etm();

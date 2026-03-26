@@ -130,7 +130,7 @@ use crate::{
     asynch::AtomicWaker,
     pac::usb_device::RegisterBlock,
     peripherals::USB_DEVICE,
-    system::PeripheralClockControl,
+    system::{Peripheral, PeripheralClockControl},
 };
 
 /// Custom USB serial error type
@@ -351,7 +351,13 @@ where
     fn new_inner(usb_device: USB_DEVICE<'d>) -> Self {
         // Do NOT reset the peripheral. Doing so will result in a broken USB JTAG
         // connection.
-        PeripheralClockControl::enable(crate::system::Peripheral::UsbDevice);
+        if PeripheralClockControl::enable(Peripheral::UsbDevice) {
+            PeripheralClockControl::reset(Peripheral::UsbDevice);
+        } else {
+            // Refcount was more than 0. Decrement to avoid overflow because we don't handle
+            // dropping the driver.
+            PeripheralClockControl::disable(Peripheral::UsbDevice);
+        }
 
         usb_device.disable_tx_interrupts();
         usb_device.disable_rx_interrupts();

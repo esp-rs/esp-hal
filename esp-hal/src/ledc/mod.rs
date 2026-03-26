@@ -123,6 +123,10 @@ impl<'d> Ledc<'d> {
     pub fn new(_instance: LEDC<'d>) -> Self {
         if PeripheralClockControl::enable(PeripheralEnable::Ledc) {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
+        } else {
+            // Refcount was more than 0. Decrement to avoid overflow because we don't handle
+            // dropping the driver.
+            PeripheralClockControl::disable(PeripheralEnable::Ledc);
         }
 
         let ledc = LEDC::regs();
