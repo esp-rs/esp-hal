@@ -67,7 +67,7 @@ impl<'d> Spi<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self.spi, channel.degrade())
+        SpiDma::new(self, channel.degrade())
     }
 }
 
@@ -126,8 +126,9 @@ impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
 impl<'d> SpiDma<'d, Blocking> {
     /// Converts the SPI instance into async mode.
     #[instability::unstable]
-    pub fn into_async(mut self) -> SpiDma<'d, Async> {
-        self.set_interrupt_handler(self.spi.info().async_handler);
+    pub fn into_async(self) -> SpiDma<'d, Async> {
+        self.spi
+            .set_interrupt_handler(self.spi.info().async_handler);
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_async(),
@@ -136,7 +137,12 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
-    pub(super) fn new(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+    pub(super) fn new(
+        spi_driver: Spi<'d, Blocking>,
+        channel: PeripheralDmaChannel<AnySpi<'d>>,
+    ) -> Self {
+        let spi = spi_driver.spi;
+
         let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(&spi.spi);
         #[cfg(all(esp32, spi_address_workaround))]
@@ -159,7 +165,7 @@ impl<'d> SpiDma<'d, Blocking> {
             ))
         };
 
-        let (_info, state) = spi.dma_parts();
+        let (_info, state) = spi.spi.dma_parts();
 
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
@@ -288,7 +294,7 @@ impl<'d> SpiDma<'d, Async> {
 
 impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
 where
-    Dm: DriverMode,
+    Dm: DriverMode + core::fmt::Debug,
 {
     /// Formats the `SpiDma` instance for debugging purposes.
     ///
@@ -313,6 +319,10 @@ impl<Dm> SpiDma<'_, Dm>
 where
     Dm: DriverMode,
 {
+    fn spi(&self) -> &SpiWrapper<'_> {
+        &self.spi
+    }
+
     fn driver(&self) -> Driver {
         Driver {
             info: self.spi.info(),
@@ -321,11 +331,10 @@ where
     }
 
     fn dma_driver(&self) -> DmaDriver {
-        let (_info, state) = self.spi.dma_parts();
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi.dma_peripheral(),
-            state,
+            dma_peripheral: self.spi().dma_peripheral(),
+            state: self.spi().dma_state(),
         }
     }
 
@@ -439,12 +448,6 @@ where
     }
 
     fn cancel_transfer(&mut self) {
-        // The SPI peripheral is controlling how much data we transfer, so let's
-        // update its counter.
-        // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
-        // immediately.
-        // 1 seems to stop after transmitting the current byte which is somewhat less
-        // impolite.
         let state = self.dma_driver().state;
         if state.tx_transfer_in_progress.get() || state.rx_transfer_in_progress.get() {
             self.dma_driver().abort_transfer();
@@ -1244,6 +1247,12 @@ pub(super) struct DmaDriver {
 
 impl DmaDriver {
     fn abort_transfer(&self) {
+        // The SPI peripheral is controlling how much data we transfer, so let's
+        // update its counter.
+        // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
+        // immediately.
+        // 1 seems to stop after transmitting the current byte which is somewhat less
+        // impolite.
         self.driver.configure_datalen(1, 1);
         self.driver.update();
     }
@@ -1520,14 +1529,25 @@ for_each_spi_master!(
                     )*
                 }
             }
+
+            #[inline(always)]
+            fn dma_state(&self) -> &'static State {
+                let (_, state) = self.dma_parts();
+                state
+            }
+
+            #[inline(always)]
+            fn dma_info(&self) -> &'static Info {
+                let (info, _) = self.dma_parts();
+                info
+            }
         }
     };
 );
 
 impl SpiWrapper<'_> {
-    #[inline(always)]
-    fn dma_parts(&self) -> (&'static Info, &'static State) {
-        self.spi.dma_parts()
+    fn dma_state(&self) -> &'static State {
+        self.spi.dma_state()
     }
 
     #[inline(always)]
