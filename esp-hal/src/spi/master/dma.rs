@@ -116,8 +116,103 @@ where
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
 
+impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
+where
+    Dm: DriverMode + core::fmt::Debug,
+{
+    /// Formats the `SpiDma` instance for debugging purposes.
+    ///
+    /// This method returns a debug struct with the name "SpiDma" without
+    /// exposing internal details.
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SpiDma").field("spi", &self.spi).finish()
+    }
+}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
+    /// Sets the interrupt handler
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> ErrorType for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Error = Error;
+}
+
+#[instability::unstable]
+impl<Dm> SpiBus for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(words)
+    }
+
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write(words)
+    }
+
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer(read, write)
+    }
+
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place(words)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
+    }
+}
+
+#[instability::unstable]
+impl embedded_hal_async::spi::SpiBus for SpiDma<'_, Async> {
+    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_async(words).await
+    }
+
+    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write_async(words).await
+    }
+
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer_async(read, write).await
+    }
+
+    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place_async(words).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
+    }
+}
+
 impl<'d> SpiDma<'d, Blocking> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI driver into async mode.
     #[instability::unstable]
     pub fn into_async(self) -> SpiDma<'d, Async> {
         self.spi
@@ -225,7 +320,7 @@ impl<'d> SpiDma<'d, Blocking> {
 }
 
 impl<'d> SpiDma<'d, Async> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI driver into async mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
         self.spi.disable_peri_interrupt_on_all_cores();
@@ -285,32 +380,139 @@ impl<'d> SpiDma<'d, Async> {
             self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
     }
-}
 
-impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
-where
-    Dm: DriverMode + core::fmt::Debug,
-{
-    /// Formats the `SpiDma` instance for debugging purposes.
-    ///
-    /// This method returns a debug struct with the name "SpiDma" without
-    /// exposing internal details.
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SpiDma").field("spi", &self.spi).finish()
+    /// Fill the given buffer with data from the bus.
+    #[instability::unstable]
+    pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let chunk_size = rx_buffer.capacity();
+
+        for chunk in words.chunks_mut(chunk_size) {
+            let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+
+            unsafe { spi.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)? };
+
+            spi.wait_for_idle_async().await;
+
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+
+            spi.defuse();
+        }
+
+        Ok(())
+    }
+
+    /// Transmit the given buffer to the bus.
+    #[instability::unstable]
+    pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
+        let chunk_size = tx_buffer.capacity();
+
+        for chunk in words.chunks(chunk_size) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe { spi.start_dma_transfer(0, chunk.len(), rx_buffer, tx_buffer)? };
+
+            spi.wait_for_idle_async().await;
+        }
+        spi.defuse();
+
+        Ok(())
+    }
+
+    /// Transfer by writing out a buffer and reading the response from
+    /// the bus into another buffer.
+    #[instability::unstable]
+    pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+
+        let common_length = min(read.len(), write.len());
+        let (read_common, read_remainder) = read.split_at_mut(common_length);
+        let (write_common, write_remainder) = write.split_at(common_length);
+
+        for (read_chunk, write_chunk) in read_common
+            .chunks_mut(chunk_size)
+            .zip(write_common.chunks(chunk_size))
+        {
+            tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+
+            unsafe {
+                spi.start_dma_transfer(read_chunk.len(), write_chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            spi.wait_for_idle_async().await;
+
+            read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
+        }
+
+        spi.defuse();
+
+        if !read_remainder.is_empty() {
+            self.read_async(read_remainder).await
+        } else if !write_remainder.is_empty() {
+            self.write_async(write_remainder).await
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Transfer by writing out a buffer and reading the response from
+    /// the bus into the same buffer.
+    #[instability::unstable]
+    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
+        for chunk in words.chunks_mut(tx_buffer.capacity()) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe {
+                spi.start_dma_transfer(chunk.len(), chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            spi.wait_for_idle_async().await;
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+        }
+
+        spi.defuse();
+
+        Ok(())
     }
 }
 
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
-    /// Sets the interrupt handler
-    ///
-    /// Interrupts are not enabled at the peripheral level here.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
-}
-
-impl<Dm> SpiDma<'_, Dm>
+impl<'d, Dm> SpiDma<'d, Dm>
 where
     Dm: DriverMode,
 {
@@ -455,110 +657,7 @@ where
             }
         }
     }
-}
 
-#[instability::unstable]
-impl<Dm> embassy_embedded_hal::SetConfig for SpiDma<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Config = Config;
-    type ConfigError = ConfigError;
-
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
-    }
-}
-
-/// A structure representing a DMA transfer for SPI.
-///
-/// This structure holds references to the SPI instance, DMA buffers, and
-/// transfer status.
-#[instability::unstable]
-pub struct SpiDmaTransfer<'d, Dm, Buf>
-where
-    Dm: DriverMode,
-{
-    spi_dma: ManuallyDrop<SpiDma<'d, Dm>>,
-    dma_buf: ManuallyDrop<Buf>,
-}
-
-impl<Buf> SpiDmaTransfer<'_, Async, Buf> {
-    /// Waits for the DMA transfer to complete asynchronously.
-    ///
-    /// This method awaits the completion of both RX and TX operations.
-    #[instability::unstable]
-    pub async fn wait_for_done(&mut self) {
-        self.spi_dma.wait_for_idle_async().await;
-    }
-}
-
-impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
-where
-    Dm: DriverMode,
-{
-    fn new(spi_dma: SpiDma<'d, Dm>, dma_buf: Buf) -> Self {
-        Self {
-            spi_dma: ManuallyDrop::new(spi_dma),
-            dma_buf: ManuallyDrop::new(dma_buf),
-        }
-    }
-
-    /// Checks if the transfer is complete.
-    ///
-    /// This method returns `true` if both RX and TX operations are done,
-    /// and the SPI instance is no longer busy.
-    pub fn is_done(&self) -> bool {
-        self.spi_dma.is_done()
-    }
-
-    /// Waits for the DMA transfer to complete.
-    ///
-    /// This method blocks until the transfer is finished and returns the
-    /// `SpiDma` instance and the associated buffer.
-    #[instability::unstable]
-    pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {
-        self.spi_dma.wait_for_idle();
-        let retval = unsafe {
-            (
-                ManuallyDrop::take(&mut self.spi_dma),
-                ManuallyDrop::take(&mut self.dma_buf),
-            )
-        };
-        core::mem::forget(self);
-        retval
-    }
-
-    /// Cancels the DMA transfer.
-    #[instability::unstable]
-    pub fn cancel(&mut self) {
-        if !self.spi_dma.is_done() {
-            self.spi_dma.cancel_transfer();
-        }
-    }
-}
-
-impl<Dm, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf>
-where
-    Dm: DriverMode,
-{
-    fn drop(&mut self) {
-        if !self.is_done() {
-            self.spi_dma.cancel_transfer();
-            self.spi_dma.wait_for_idle();
-
-            unsafe {
-                ManuallyDrop::drop(&mut self.spi_dma);
-                ManuallyDrop::drop(&mut self.dma_buf);
-            }
-        }
-    }
-}
-
-impl<'d, Dm> SpiDma<'d, Dm>
-where
-    Dm: DriverMode,
-{
     /// # Safety:
     ///
     /// The caller must ensure that the buffers are not accessed while the
@@ -831,144 +930,7 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
-}
 
-impl<'d> SpiDma<'d, Async> {
-    /// Fill the given buffer with data from the bus.
-    #[instability::unstable]
-    pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
-        self.driver().setup_full_duplex()?;
-
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 {
-            return Err(Error::from(DmaError::BufferTooSmall));
-        }
-
-        let chunk_size = rx_buffer.capacity();
-
-        for chunk in words.chunks_mut(chunk_size) {
-            let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
-
-            unsafe { spi.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)? };
-
-            spi.wait_for_idle_async().await;
-
-            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
-
-            spi.defuse();
-        }
-
-        Ok(())
-    }
-
-    /// Transmit the given buffer to the bus.
-    #[instability::unstable]
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
-        self.driver().setup_full_duplex()?;
-
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if tx_buffer.capacity() == 0 {
-            return Err(Error::from(DmaError::BufferTooSmall));
-        }
-
-        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
-        let chunk_size = tx_buffer.capacity();
-
-        for chunk in words.chunks(chunk_size) {
-            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe { spi.start_dma_transfer(0, chunk.len(), rx_buffer, tx_buffer)? };
-
-            spi.wait_for_idle_async().await;
-        }
-        spi.defuse();
-
-        Ok(())
-    }
-
-    /// Transfer by writing out a buffer and reading the response from
-    /// the bus into another buffer.
-    #[instability::unstable]
-    pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
-        self.driver().setup_full_duplex()?;
-
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
-            return Err(Error::from(DmaError::BufferTooSmall));
-        }
-
-        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
-
-        for (read_chunk, write_chunk) in read_common
-            .chunks_mut(chunk_size)
-            .zip(write_common.chunks(chunk_size))
-        {
-            tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
-
-            unsafe {
-                spi.start_dma_transfer(read_chunk.len(), write_chunk.len(), rx_buffer, tx_buffer)?;
-            }
-            spi.wait_for_idle_async().await;
-
-            read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
-        }
-
-        spi.defuse();
-
-        if !read_remainder.is_empty() {
-            self.read_async(read_remainder).await
-        } else if !write_remainder.is_empty() {
-            self.write_async(write_remainder).await
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Transfer by writing out a buffer and reading the response from
-    /// the bus into the same buffer.
-    #[instability::unstable]
-    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
-        self.driver().setup_full_duplex()?;
-
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
-            return Err(Error::from(DmaError::BufferTooSmall));
-        }
-
-        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
-        for chunk in words.chunks_mut(tx_buffer.capacity()) {
-            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe {
-                spi.start_dma_transfer(chunk.len(), chunk.len(), rx_buffer, tx_buffer)?;
-            }
-            spi.wait_for_idle_async().await;
-            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
-        }
-
-        spi.defuse();
-
-        Ok(())
-    }
-}
-
-impl<'d, Dm> SpiDma<'d, Dm>
-where
-    Dm: DriverMode,
-{
     /// Reads data from the SPI bus using DMA.
     #[instability::unstable]
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
@@ -1149,6 +1111,91 @@ where
     }
 }
 
+/// A structure representing a DMA transfer for SPI.
+///
+/// This structure holds references to the SPI instance, DMA buffers, and
+/// transfer status.
+#[instability::unstable]
+pub struct SpiDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+{
+    spi_dma: ManuallyDrop<SpiDma<'d, Dm>>,
+    dma_buf: ManuallyDrop<Buf>,
+}
+
+impl<Buf> SpiDmaTransfer<'_, Async, Buf> {
+    /// Waits for the DMA transfer to complete asynchronously.
+    ///
+    /// This method awaits the completion of both RX and TX operations.
+    #[instability::unstable]
+    pub async fn wait_for_done(&mut self) {
+        self.spi_dma.wait_for_idle_async().await;
+    }
+}
+
+impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+{
+    fn new(spi_dma: SpiDma<'d, Dm>, dma_buf: Buf) -> Self {
+        Self {
+            spi_dma: ManuallyDrop::new(spi_dma),
+            dma_buf: ManuallyDrop::new(dma_buf),
+        }
+    }
+
+    /// Checks if the transfer is complete.
+    ///
+    /// This method returns `true` if both RX and TX operations are done,
+    /// and the SPI instance is no longer busy.
+    pub fn is_done(&self) -> bool {
+        self.spi_dma.is_done()
+    }
+
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `SpiDma` instance and the associated buffer.
+    #[instability::unstable]
+    pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {
+        self.spi_dma.wait_for_idle();
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.spi_dma),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
+    }
+
+    /// Cancels the DMA transfer.
+    #[instability::unstable]
+    pub fn cancel(&mut self) {
+        if !self.spi_dma.is_done() {
+            self.spi_dma.cancel_transfer();
+        }
+    }
+}
+
+impl<Dm, Buf> Drop for SpiDmaTransfer<'_, Dm, Buf>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+        if !self.is_done() {
+            self.spi_dma.cancel_transfer();
+            self.spi_dma.wait_for_idle();
+
+            unsafe {
+                ManuallyDrop::drop(&mut self.spi_dma);
+                ManuallyDrop::drop(&mut self.dma_buf);
+            }
+        }
+    }
+}
+
 pub(super) struct DmaDriver {
     driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
@@ -1311,65 +1358,6 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         let (info, _state) = self.dma_parts();
         info.dma_peripheral
-    }
-}
-
-#[instability::unstable]
-impl embedded_hal_async::spi::SpiBus for SpiDma<'_, Async> {
-    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.read_async(words).await
-    }
-
-    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_async(words).await
-    }
-
-    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.transfer_async(read, write).await
-    }
-
-    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.transfer_in_place_async(words).await
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
-        Ok(())
-    }
-}
-
-#[instability::unstable]
-impl<Dm> ErrorType for SpiDma<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> SpiBus for SpiDma<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(words)
-    }
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write(words)
-    }
-
-    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.transfer(read, write)
-    }
-
-    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.transfer_in_place(words)
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
-        Ok(())
     }
 }
 
