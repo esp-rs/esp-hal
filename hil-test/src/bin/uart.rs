@@ -1,6 +1,6 @@
 //! UART Test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -171,7 +171,7 @@ mod tests {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
                 let fastest_clock_source = ClockSource::PllF40m;
-            } else if #[cfg(any(esp32c5, esp32c6))] {
+            } else if #[cfg(any(esp32c5, esp32c6, esp32c61))] {
                 let fastest_clock_source = ClockSource::PllF80m;
             } else if #[cfg(esp32h2)] {
                 let fastest_clock_source = ClockSource::PllF48m;
