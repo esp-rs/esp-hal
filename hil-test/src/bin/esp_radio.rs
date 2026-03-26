@@ -1,13 +1,15 @@
 //% CHIPS(no_wifi): esp32h2
 //% CHIPS(no_ble): esp32s2
-//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32c61 esp32s3 esp32c5
+//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
+//% CHIPS(stable_wifi): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32s2 esp32s3
 
 //% FEATURES: unstable esp-alloc embassy
 // //% FEATURES(no_radio): rtos-radio-driver TODO: restore for P4
-//% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio/unstable
-//% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio/unstable trouble-host
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio/unstable
+//% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio-unstable
+//% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio-unstable trouble-host
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio-unstable
 //% FEATURES(has_wifi_ble): trouble-host
+//% FEATURES(stable_wifi): esp-radio/wifi esp-radio
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test
@@ -46,7 +48,7 @@ mod init_tests;
 
 #[cfg(bt_driver_supported)]
 #[path = "esp_radio/ble_controller.rs"]
-#[cfg(feature = "esp-radio")]
+#[cfg(feature = "esp-radio-unstable")]
 mod ble_controller;
 
 #[cfg(soc_has_wifi)]
