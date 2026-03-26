@@ -686,14 +686,12 @@ impl DmaBounceBufferView {
     }
 
     /// Swap the front and back framebuffer pointers at a frame boundary.
-    /// Returns old front buffer pointer for the caller to store as new back buffer.
-    pub(crate) fn swap_framebuffer(&mut self) -> Option<(*mut u8, usize)> {
-        if let Some((back_ptr, back_len)) = self.back_buffer.take() {
+    pub(crate) fn swap_framebuffer(&mut self) {
+        if let Some((back_ptr, _)) = self.back_buffer.take() {
             let old_front = self.inner.framebuffer;
+            let fb_len = self.inner.fb_len;
             self.inner.set_framebuffer(back_ptr as *const u8);
-            Some((old_front as *mut u8, back_len))
-        } else {
-            None
+            self.back_buffer = Some((old_front as *mut u8, fb_len));
         }
     }
 }
