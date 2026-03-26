@@ -38,7 +38,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::DmaDescriptor,
+    dma::{DmaBounceBuffer, DmaDescriptor},
     gpio::{Level, Output, OutputConfig},
     lcd_cam::{
         LcdCam,
@@ -46,7 +46,7 @@ use esp_hal::{
             ClockMode,
             Phase,
             Polarity,
-            dpi::{Config, DmaBounceBuffer, Dpi, Format, FrameTiming},
+            dpi::{Config, Dpi, Format, FrameTiming},
         },
     },
     main,
@@ -196,10 +196,7 @@ fn main() -> ! {
     };
 
     println!("Initialising");
-    let mut transfer = dpi
-        .send_bounce_buffered(bounce_state)
-        .map_err(|e| e.0)
-        .unwrap();
+    let mut transfer = dpi.send(true, bounce_state).map_err(|e| e.0).unwrap();
     transfer.set_back_buffer(framebuffer1);
     println!("Rendering");
 

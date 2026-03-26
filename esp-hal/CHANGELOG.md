@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for ADC1 on ESP32C5. (#5215)
 - ESP32-C61: RNG (#5244)
 - C61: Add GPIO support (#5248)
-- `lcd_cam`: Added `DmaBounceBuffer` type to enable PSRAM-backed framebuffers for large DPI (RGB) displays via a GDMA EOF interrupt-driven bounce pipeline. (#5262)
+- `dma`: Added `DmaBounceBuffer` and `DmaBounceBufferView` types (in `esp_hal::dma`) for streaming PSRAM-backed framebuffers via a ping-pong SRAM bounce buffer pipeline. Pass a `DmaBounceBuffer` to `Dpi::send(true, bounce_state)` for continuous RGB display output. (#5262)
 
 ### Changed
 

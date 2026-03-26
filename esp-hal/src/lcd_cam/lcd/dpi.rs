@@ -102,14 +102,25 @@ use core::{
 };
 
 use crate::{
-    Blocking, DriverMode,
+    Blocking,
+    DriverMode,
     dma::{
-        ChannelTx, DmaBounceBuffer, DmaBounceBufferView, DmaError, DmaPeripheral, DmaTxBuffer,
-        DmaTxInterrupt, PeripheralTxChannel, TxChannelFor,
+        ChannelTx,
+        DmaBounceBuffer,
+        DmaBounceBufferView,
+        DmaError,
+        DmaPeripheral,
+        DmaTxBuffer,
+        DmaTxInterrupt,
+        PeripheralTxChannel,
+        TxChannelFor,
     },
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
-        BitOrder, ByteOrder, ClockError, calculate_clkm,
+        BitOrder,
+        ByteOrder,
+        ClockError,
+        calculate_clkm,
         lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
     },
     pac,
