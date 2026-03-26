@@ -427,6 +427,7 @@ struct Runner {
     started_at: Instant,
     skip_steps: Vec<String>,
     run_steps: Vec<String>,
+    steps_executed: usize,
 }
 
 impl Runner {
@@ -448,6 +449,7 @@ impl Runner {
                 skip
             },
             run_steps: options.steps.clone(),
+            steps_executed: 0,
         }
     }
 
@@ -460,6 +462,8 @@ impl Runner {
             log::debug!("{group} skipped by user request");
             return;
         }
+
+        self.steps_executed += 1;
 
         // Output grouped logs
         // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
@@ -478,6 +482,19 @@ impl Runner {
             if let Some(summary_file) = std::env::var_os("GITHUB_STEP_SUMMARY") {
                 std::fs::write(summary_file, message).unwrap();
             }
+        }
+
+        let expected_to_run = self
+            .run_steps
+            .iter()
+            .filter(|s| !self.skip_steps.contains(s))
+            .cloned()
+            .collect::<Vec<_>>();
+        if self.steps_executed == 0 && !expected_to_run.is_empty() {
+            bail!(
+                "The following steps were requested but not executed: {}. Perhaps they contain typos?",
+                expected_to_run.join(", ")
+            );
         }
 
         log::info!("CI checks completed in {:?}", self.started_at.elapsed());
