@@ -300,13 +300,6 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-// We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
-// chip, with BT but without WIFI.
-#[cfg(all(not(esp32h2), feature = "unstable"))]
-type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
-#[cfg(all(esp32h2, feature = "unstable"))]
-type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
-
 // Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
 // causing an eventual overflow. Currently we are holding onto a guard ourselves while Wi-Fi/BT is
 // active, so the blobs should not be able to disable the clock anyway.
@@ -316,13 +309,11 @@ type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
 pub(crate) unsafe fn phy_enable_clock() {
     // Stealing the peripheral is safe here, as they must have been passed into the relevant
     // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
-    // let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
-    // core::mem::forget(clock_guard);
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    // unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
+    // No-op, see `phy_enable_clock`.
 }
 
 pub(crate) fn enable_wifi_power_domain() {
