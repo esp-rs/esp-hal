@@ -51,7 +51,6 @@ use esp_hal::{
     },
     main,
     peripherals::Peripherals,
-    psram,
     time::Rate,
 };
 use esp_println::println;
@@ -66,16 +65,6 @@ const BOUNCE_BUF_SIZE: usize = 10 * 800 * 2; // 10 lines × 800 px × 2 bytes
 static mut BOUNCE_BUF0: [u8; BOUNCE_BUF_SIZE] = [0u8; BOUNCE_BUF_SIZE];
 static mut BOUNCE_BUF1: [u8; BOUNCE_BUF_SIZE] = [0u8; BOUNCE_BUF_SIZE];
 
-fn init_psram_heap(start: *mut u8, size: usize) {
-    unsafe {
-        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            start,
-            size,
-            esp_alloc::MemoryCapability::External.into(),
-        ));
-    }
-}
-
 fn rgb565(r: u16, g: u16, b: u16) -> u16 {
     (r << 11) | (g << 5) | b
 }
@@ -85,12 +74,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
-    if size == 0 {
-        panic!("No PSRAM detected");
-    }
-    init_psram_heap(start, size);
+    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     let delay = Delay::new();
 
