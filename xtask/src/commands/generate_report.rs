@@ -67,25 +67,12 @@ pub fn generate_report(workspace: &Path, args: ReportArgs) -> Result<()> {
             &code_fence_re,
             &leading_ws_re,
         );
-        let dhcp_diff = extract_block(
-            &content,
-            "DHCP_DIFF<<EOF",
-            "EOF",
-            &exclude_re,
-            &code_fence_re,
-            &leading_ws_re,
-        );
 
         writeln!(combined, "### `{}`\n", soc)?;
         writeln!(
             combined,
-            "##### sleep-timer Diff (PR vs. Base)\n```\n{}\n```\n",
+            "##### Diff (PR vs. Base)\n```\n{}\n```\n",
             qa_diff
-        )?;
-        writeln!(
-            combined,
-            "##### embassy-dhcp Diff (PR vs. Base)\n```\n{}\n```\n",
-            dhcp_diff
         )?;
     }
 

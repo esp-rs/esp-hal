@@ -7,6 +7,10 @@ on:
         description: "Pull request number to analyze"
         required: true
         type: string
+      example_name:
+        description: "Example directory name to analyze (e.g., embassy_dhcp)"
+        required: true
+        type: string
 
 jobs:
   binary-size:
@@ -22,16 +26,10 @@ jobs:
         target:
           - soc: esp32c3
             rust-target: riscv32imc-unknown-none-elf
-            dir-qa: ./qa-test
-            dir-dhcp: ./examples/wifi/embassy_dhcp
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
-            dir-qa: ./qa-test
-            dir-dhcp: ./examples/wifi/embassy_dhcp
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
-            dir-qa: ./qa-test
-            dir-dhcp: ./examples/wifi/embassy_dhcp
 
     steps:
       - name: Setup Rust
@@ -82,45 +80,82 @@ jobs:
           cd $HOME
           mkdir results
 
-      - name: Build PR QA Binary
-        working-directory: ${{ matrix.target.dir-qa }}
+      - name: Build PR example
         run: |
-          cargo build --release --bin sleep_timer --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
-          cp target/${{ matrix.target.rust-target }}/release/sleep_timer $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf
+          set -euo pipefail
 
-      - name: Build PR DHCP Binary
-        working-directory: ${{ matrix.target.dir-dhcp }}
-        run: |
-          # Build
-          cargo build --release --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
-          # Copy PR binary to parent directory (outside workspace)
-          cp target/${{ matrix.target.rust-target }}/release/embassy-dhcp $HOME/results/pr_dhcp_build_${{ matrix.target.soc }}.elf
+          RAW_INPUT="${{ github.event.inputs.example_name }}"
+          cargo xtask build examples $RAW_INPUT --chip "${{ matrix.target.soc }}"
 
-      # Checkout base (current default branch HEAD) for comparison
+          EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
+          BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
+
+          BIN=$(
+          find target qa-test/target examples -type f \
+            -path "*/release/${BIN_NAME}" \
+            -executable \
+            2>/dev/null | head -n 1 || true
+          )
+
+          # Fallback to `_` instead of `-`
+          if [ -z "$BIN" ]; then
+          BIN=$(find target qa-test/target examples -type f \
+            -path "*/release/${EXAMPLE_NAME}" \
+            -executable \
+            2>/dev/null | head -n 1 || true)
+          fi
+
+          if [ -z "$BIN" ]; then
+            echo "Error: Built PR binary not found"
+            exit 1
+          fi
+
+          cp "$BIN" $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf
+
+      # Checkout base
       - name: Checkout Base Commit
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Build Base QA Binary
-        working-directory: ${{ matrix.target.dir-qa }}
+      - name: Build Base example
         run: |
-          cargo build --release --bin sleep_timer --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
-          cp target/${{ matrix.target.rust-target }}/release/sleep_timer $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf
+          set -euo pipefail
+          cargo clean
 
-      - name: Build Base DHCP Binary
-        working-directory: ${{ matrix.target.dir-dhcp }}
-        run: |
-          cargo build --release --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
-          cp target/${{ matrix.target.rust-target }}/release/embassy-dhcp $HOME/results/base_dhcp_build_${{ matrix.target.soc }}.elf
+          RAW_INPUT="${{ github.event.inputs.example_name }}"
+          cargo xtask build examples $RAW_INPUT --chip "${{ matrix.target.soc }}"
+
+          EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
+          BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
+
+          BIN=$(
+          find target qa-test/target examples -type f \
+            -path "*/release/${BIN_NAME}" \
+            -executable \
+            2>/dev/null | head -n 1 || true
+          )
+
+          # Fallback to `_` instead of `-`
+          if [ -z "$BIN" ]; then
+          BIN=$(find target qa-test/target examples -type f \
+            -path "*/release/${EXAMPLE_NAME}" \
+            -executable \
+            2>/dev/null | head -n 1 || true)
+          fi
+
+          if [ -z "$BIN" ]; then
+            echo "Error: Built BASE binary not found"
+            exit 1
+          fi
+
+          cp "$BIN" $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf
 
       - name: Copy binaries to workspace for Bloaty
         run: |
           # Copy files from $HOME/results to current workspace
           cp $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf ./
           cp $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf ./
-          cp $HOME/results/base_dhcp_build_${{ matrix.target.soc }}.elf ./
-          cp $HOME/results/pr_dhcp_build_${{ matrix.target.soc }}.elf ./
           ls -la *.elf
 
       # Diffs and Artifacts
@@ -139,23 +174,6 @@ jobs:
           echo "${{ steps.bloaty-qa.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.target.soc }}.txt
           echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
           echo "EOF" >> result-pr-${{ matrix.target.soc }}.txt
-
-      - name: Run Bloaty DHCP Diff
-        id: bloaty-dhcp
-        uses: carlosperate/bloaty-action@v1
-        with:
-          bloaty-args: -d sections --domain vm --source-filter "^.text$|^.data|^.bss|^.rwdata|^.rwtext" base_dhcp_build_${{ matrix.target.soc }}.elf -- pr_dhcp_build_${{ matrix.target.soc }}.elf
-          output-to-summary: false
-        continue-on-error: true
-
-      - name: Save Bloaty DHCP output
-        run: |
-          echo "DHCP_DIFF<<EOF" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "${{ steps.bloaty-dhcp.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "EOF" >> result-pr-${{ matrix.target.soc }}.txt
-          cat result-pr-${{ matrix.target.soc }}.txt
 
       - name: Upload Result Artifact
         uses: actions/upload-artifact@v6

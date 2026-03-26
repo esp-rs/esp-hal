@@ -578,6 +578,24 @@ jobs:
       startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
     steps:
+      - name: Extract example name from comment
+        id: extract
+        run: |
+          # Expected format: /test-size example_name
+          COMMENT="${{ github.event.comment.body }}"
+
+          # Remove the /test-size prefix and trim whitespace
+          EXAMPLE_NAME=$(echo "$COMMENT" | sed 's|/test-size||' | xargs)
+
+          if [ -z "$EXAMPLE_NAME" ]; then
+            echo "Error: No example name provided in comment"
+            echo "Expected format: /test-size example_name"
+            exit 1
+          fi
+
+          echo "example_name=$EXAMPLE_NAME" >> $GITHUB_OUTPUT
+          echo "Extracted example name: $EXAMPLE_NAME"
+
       - name: Dispatch Binary Size Analysis
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -585,7 +603,8 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           inputs: |
             {
-              "pr_number": "${{ github.event.issue.number }}"
+              "pr_number": "${{ github.event.issue.number }}",
+              "example_name": "${{ steps.extract.outputs.example_name }}"
             }
 
       - name: Confirm in PR
