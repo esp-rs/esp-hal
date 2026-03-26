@@ -649,7 +649,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             result
         });
 
-        // Check documentation
+        // Check documentation. Reuse the "docs" ID, as the docs build should include all applicable
+        // packages.
         runner.run("docs", "Build LP-HAL docs", || {
             build_documentation(
                 workspace,
