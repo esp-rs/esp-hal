@@ -17,6 +17,7 @@ use crate::{
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
 #[cfg_attr(esp32c5, path = "os_adapter_esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
+#[cfg_attr(esp32c61, path = "os_adapter_esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
