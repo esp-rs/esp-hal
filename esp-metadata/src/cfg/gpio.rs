@@ -141,6 +141,39 @@ pub(crate) struct PinConfig {
     pub limitations: Vec<PinLimitation>,
 }
 
+impl PinConfig {
+    pub(crate) fn limitations(&self) -> Vec<PinLimitation> {
+        let mut limitations = self.limitations.clone();
+
+        // Resolve implicit limitations - based on pin alternate functions
+        let implicit: &[(&[&str], PinLimitation)] = &[
+            (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
+            (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
+            (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
+        ];
+
+        let max = usize::max(FunctionMap::COUNT, AnalogMap::COUNT);
+        for i in 0..max {
+            for (pins, limitation) in implicit.iter() {
+                let mut consider = |func| {
+                    if pins.contains(&func) && !limitations.contains(limitation) {
+                        limitations.push(*limitation);
+                    }
+                };
+
+                if let Some(func) = self.functions.get(i) {
+                    consider(func);
+                }
+                if let Some(func) = self.analog.get(i) {
+                    consider(func);
+                }
+            }
+        }
+
+        limitations
+    }
+}
+
 /// Available alternate functions for a given GPIO pin.
 ///
 /// Alternate functions allow bypassing the GPIO matrix by selecting a different

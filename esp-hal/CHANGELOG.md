@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2, ESP32-S3: `UlpCore.run()` now accepts `UlpCoreWakeupSource::Timer(UlpCoreSleepCycles)` as an argument, allowing ULP applications to be woken up by the ULP Timer. (#5134)
 - Initial ESP32-C61 support (#5187, #5237)
 - Add support for ADC1 on ESP32C5. (#5215)
+- ESP32-C61: RNG (#5244)
+- C61: Add GPIO support (#5248)
+- C61: Add UART support (#5251)
 
 ### Changed
 
@@ -115,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve LP timer accuracy (#5105, #5115)
 - Increase the size of `irom_seg`/`drom_seg` from 4 MB to 32 MB for the ESP32-S3 (#5121)
 - UART and I2C inputs are now correctly defined when creating drivers (#5214)
+- The `SpiBus::transfer` (both from `embedded_hal` and `embedded_hal_async`) implementations of `esp_hal::spi::master::Spi` no longer write more data than they need to (#5245)
+- Fixed a bug in `Spi::half_duplex_{read, write}` where calling these functions aborted previously running writes (#5247)
 
 ### Removed
 

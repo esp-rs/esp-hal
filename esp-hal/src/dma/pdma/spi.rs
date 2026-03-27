@@ -2,6 +2,7 @@ use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
+    RegisterToggle,
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
@@ -67,10 +68,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
     }
 
     fn reset(&self) {
-        self.regs().dma_conf().modify(|_, w| w.out_rst().set_bit());
-        self.regs()
-            .dma_conf()
-            .modify(|_, w| w.out_rst().clear_bit());
+        self.regs().dma_conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
@@ -266,8 +264,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
     }
 
     fn reset(&self) {
-        self.regs().dma_conf().modify(|_, w| w.in_rst().set_bit());
-        self.regs().dma_conf().modify(|_, w| w.in_rst().clear_bit());
+        self.regs().dma_conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}

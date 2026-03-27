@@ -25,6 +25,10 @@ pub struct SemverCheckArgs {
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys])]
     pub packages: Vec<Package>,
 
+    /// Default packages that are not supposed to run, used in CI.
+    #[arg(long, value_enum, value_delimiter = ' ')]
+    pub exclude_packages: Vec<Package>,
+
     /// Chip(s) to target.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     pub chips: Vec<Chip>,
@@ -47,9 +51,12 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
         SemverCheckCmd::GenerateBaseline => {
             checker::generate_baseline(&workspace, args.packages, args.chips)
         }
-        SemverCheckCmd::Check => {
-            checker::check_for_breaking_changes(&workspace, args.packages, args.chips)
-        }
+        SemverCheckCmd::Check => checker::check_for_breaking_changes(
+            &workspace,
+            args.packages,
+            args.exclude_packages,
+            args.chips,
+        ),
         SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, args.packages),
     }
 }
@@ -162,8 +169,19 @@ pub mod checker {
     pub fn check_for_breaking_changes(
         workspace: &Path,
         packages: Vec<Package>,
+        exclude_packages: Vec<Package>,
         chips: Vec<Chip>,
     ) -> anyhow::Result<()> {
+        let mut packages = packages;
+        packages.retain(|pkg| !exclude_packages.contains(pkg));
+
+        if packages.is_empty() {
+            log::info!(
+                "No packages for semver check.\nHint: Double-check the `--exclude-packages` flag"
+            );
+            return anyhow::Ok(());
+        }
+
         let mut semver_incompatible_packages = Vec::new();
 
         for package in packages {

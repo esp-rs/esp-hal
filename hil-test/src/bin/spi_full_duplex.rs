@@ -46,16 +46,24 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: Spi<'static, Blocking>,
+
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     dma_channel: DmaChannel<'static>,
+
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
+
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     rx_descriptors: &'static mut [DmaDescriptor],
     tx_buffer: &'static mut [u8],
+
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     tx_descriptors: &'static mut [DmaDescriptor],
+
     miso_input: Input<'static>,
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    sclk_input: Input<'static>,
+
     #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     pcnt_unit: Unit<'static, 0>,
 }
@@ -71,13 +79,19 @@ mod tests {
         );
 
         let (_, miso) = hil_test::common_test_pins!(peripherals);
+        let sclk = hil_test::unconnected_pin!(peripherals);
 
         // A bit ugly but the peripheral interconnect APIs aren't yet stable.
         let mosi = unsafe { miso.clone_unchecked() };
         let miso_input = unsafe { miso.clone_unchecked() };
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_input = unsafe { sclk.clone_unchecked() };
 
         // Will be used later to detect edges directly or through PCNT.
         let miso_input = Input::new(miso_input, Default::default());
+
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_input = Input::new(sclk_input, Default::default());
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         cfg_if::cfg_if! {
@@ -107,7 +121,7 @@ mod tests {
             Config::default().with_frequency(Rate::from_mhz(10)),
         )
         .unwrap()
-        .with_sck(peripherals.GPIO0)
+        .with_sck(sclk)
         .with_miso(miso)
         .with_mosi(mosi);
 
@@ -121,6 +135,8 @@ mod tests {
                     rx_buffer,
                     tx_buffer,
                     miso_input,
+                    #[cfg(pcnt_driver_supported)]
+                    sclk_input,
                     #[cfg(spi_master_supports_dma)]
                     dma_channel,
                     #[cfg(spi_master_supports_dma)]
@@ -166,25 +182,103 @@ mod tests {
     #[test]
     fn test_asymmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
-        let mut read: [u8; 4] = [0x00; 4];
+        let mut read = [0x00; 2];
 
-        SpiBus::transfer(&mut ctx.spi, &mut read[0..2], &write[..])
-            .expect("Asymmetric transfer failed");
-        assert_eq!(write[0], read[0]);
-        assert_eq!(read[2], 0x00u8);
+        cfg_if::cfg_if! {
+            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+                let unit = ctx.pcnt_unit;
+                unit.channel0
+                    .set_edge_signal(ctx.sclk_input.peripheral_input());
+                unit.channel0
+                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+            }
+        }
+
+        SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
+        assert_eq!(read[0], write[0]);
+        assert_eq!(read[1], write[1]);
+
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        assert_eq!(unit.value(), 4 * 8);
+    }
+
+    #[test]
+    fn test_asymmetric_transfer_read_more(mut ctx: Context) {
+        let write = [0xde, 0xad];
+        let mut read = [0x00; 4];
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+                let unit = ctx.pcnt_unit;
+                unit.channel0
+                    .set_edge_signal(ctx.sclk_input.peripheral_input());
+                unit.channel0
+                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+            }
+        }
+
+        SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
+        assert_eq!(read[0], write[0]);
+        assert_eq!(read[1], write[1]);
+        assert_eq!(read[2], 0x00);
+        assert_eq!(read[3], 0x00);
+
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        assert_eq!(unit.value(), 4 * 8);
     }
 
     #[test]
     async fn test_async_asymmetric_transfer(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
-        let mut read: [u8; 4] = [0x00; 4];
+        let mut read = [0x00; 2];
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+                let unit = ctx.pcnt_unit;
+                unit.channel0
+                    .set_edge_signal(ctx.sclk_input.peripheral_input());
+                unit.channel0
+                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+            }
+        }
 
         let mut spi = ctx.spi.into_async();
-        SpiBusAsync::transfer(&mut spi, &mut read[0..2], &write[..])
+        SpiBusAsync::transfer(&mut spi, &mut read, &write)
             .await
             .expect("Asymmetric transfer failed");
-        assert_eq!(write[0], read[0]);
-        assert_eq!(read[2], 0x00u8);
+        assert_eq!(read[0], write[0]);
+        assert_eq!(read[1], write[1]);
+
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        assert_eq!(unit.value(), 4 * 8);
+    }
+
+    #[test]
+    async fn test_async_asymmetric_transfer_read_more(ctx: Context) {
+        let write = [0xde, 0xad];
+        let mut read = [0x00; 4];
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+                let unit = ctx.pcnt_unit;
+                unit.channel0
+                    .set_edge_signal(ctx.sclk_input.peripheral_input());
+                unit.channel0
+                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+            }
+        }
+
+        let mut spi = ctx.spi.into_async();
+        SpiBusAsync::transfer(&mut spi, &mut read, &write)
+            .await
+            .expect("Asymmetric transfer failed");
+        assert_eq!(read[0], write[0]);
+        assert_eq!(read[1], write[1]);
+        assert_eq!(read[2], 0x00);
+        assert_eq!(read[3], 0x00);
+
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        assert_eq!(unit.value(), 4 * 8);
     }
 
     #[test]
@@ -840,7 +934,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     fn transfer_works_after_half_duplex_operation(ctx: Context) {
         let mut spi = ctx.spi;
 
@@ -861,6 +955,83 @@ mod tests {
         spi.transfer(&mut buffer)
             .expect("Symmetric transfer failed");
         assert_eq!(buffer, DATA);
+    }
+
+    #[test]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    fn half_duplex_operation_works_after_nonblocking_write(mut ctx: Context) {
+        // SpiBus::write returns before the transfer is complete. This test verifies that
+        // half_duplex functions flush before they reconfigure the peripheral.
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.sclk_input.peripheral_input());
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
+            .unwrap();
+
+        // 320 clock cycles
+        let buffer = [0x00; 40];
+        SpiBus::write(&mut ctx.spi, &buffer).expect("Write failed");
+
+        // 160 clock cycles
+        ctx.spi
+            .half_duplex_write(DataMode::Dual, Command::None, Address::None, 0, &buffer)
+            .unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 480);
+
+        ctx.pcnt_unit.clear();
+
+        // 320 clock cycles
+        let mut buffer = [0x00; 40];
+        SpiBus::write(&mut ctx.spi, &buffer).expect("Write failed");
+
+        // 160 clock cycles
+        ctx.spi
+            .half_duplex_read(DataMode::Dual, Command::None, Address::None, 0, &mut buffer)
+            .unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 480);
+    }
+
+    #[test]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    fn half_duplex_operation_resets_size_before_empty_write(mut ctx: Context) {
+        // SpiBus::write returns before the transfer is complete. This test verifies that
+        // half_duplex functions flush before they reconfigure the peripheral.
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.sclk_input.peripheral_input());
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
+            .unwrap();
+
+        // 32 clock cycles
+        let buffer = [0x00; 4];
+        ctx.spi
+            .half_duplex_write(DataMode::Single, Command::None, Address::None, 0, &buffer)
+            .unwrap();
+
+        // 8 clock cycles
+        ctx.spi
+            .half_duplex_write(
+                DataMode::Dual,
+                Command::_8Bit(0, DataMode::Single),
+                Address::None,
+                0,
+                &[],
+            )
+            .unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 40);
     }
 
     #[test]

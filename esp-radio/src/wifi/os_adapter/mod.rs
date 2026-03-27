@@ -3,6 +3,7 @@
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c5, path = "esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
+#[cfg_attr(esp32c61, path = "esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
@@ -1556,7 +1557,7 @@ pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     #[cfg(esp32c2)]
     return 28639;
 
-    #[cfg(any(esp32c6, esp32h2, esp32c5))]
+    #[cfg(any(esp32c6, esp32h2, esp32c5, esp32c61))]
     return 0;
 
     #[cfg(esp32)]

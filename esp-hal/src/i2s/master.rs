@@ -119,6 +119,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    RegisterToggle,
     dma::{
         Channel,
         ChannelRx,
@@ -1673,17 +1674,12 @@ mod private {
         }
 
         fn reset_tx(&self) {
-            self.regs().conf().modify(|_, w| {
-                w.tx_reset().set_bit();
-                w.tx_fifo_reset().set_bit()
-            });
-            self.regs().conf().modify(|_, w| {
-                w.tx_reset().clear_bit();
-                w.tx_fifo_reset().clear_bit()
+            self.regs().conf().toggle(|w, bit| {
+                w.tx_reset().bit(bit);
+                w.tx_fifo_reset().bit(bit)
             });
 
-            self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
-            self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
+            self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
 
             self.regs().int_clr().write(|w| {
                 w.out_done().clear_bit_by_one();
@@ -1712,17 +1708,12 @@ mod private {
         }
 
         fn reset_rx(&self) {
-            self.regs().conf().modify(|_, w| {
-                w.rx_reset().set_bit();
-                w.rx_fifo_reset().set_bit()
-            });
-            self.regs().conf().modify(|_, w| {
-                w.rx_reset().clear_bit();
-                w.rx_fifo_reset().clear_bit()
+            self.regs().conf().toggle(|w, bit| {
+                w.rx_reset().bit(bit);
+                w.rx_fifo_reset().bit(bit)
             });
 
-            self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
-            self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());
+            self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
 
             self.regs().int_clr().write(|w| {
                 w.in_done().clear_bit_by_one();
@@ -2088,23 +2079,16 @@ mod private {
         fn update(&self) {
             self.regs()
                 .tx_conf()
-                .modify(|_, w| w.tx_update().clear_bit());
-            self.regs().tx_conf().modify(|_, w| w.tx_update().set_bit());
-
+                .toggle(|w, bit| w.tx_update().bit(!bit));
             self.regs()
                 .rx_conf()
-                .modify(|_, w| w.rx_update().clear_bit());
-            self.regs().rx_conf().modify(|_, w| w.rx_update().set_bit());
+                .toggle(|w, bit| w.rx_update().bit(!bit));
         }
 
         fn reset_tx(&self) {
-            self.regs().tx_conf().modify(|_, w| {
-                w.tx_reset().set_bit();
-                w.tx_fifo_reset().set_bit()
-            });
-            self.regs().tx_conf().modify(|_, w| {
-                w.tx_reset().clear_bit();
-                w.tx_fifo_reset().clear_bit()
+            self.regs().tx_conf().toggle(|w, bit| {
+                w.tx_reset().bit(bit);
+                w.tx_fifo_reset().bit(bit)
             });
 
             self.regs().int_clr().write(|w| {
@@ -2138,13 +2122,9 @@ mod private {
                 .rx_conf()
                 .modify(|_, w| w.rx_start().clear_bit());
 
-            self.regs().rx_conf().modify(|_, w| {
-                w.rx_reset().set_bit();
-                w.rx_fifo_reset().set_bit()
-            });
-            self.regs().rx_conf().modify(|_, w| {
-                w.rx_reset().clear_bit();
-                w.rx_fifo_reset().clear_bit()
+            self.regs().rx_conf().toggle(|w, bit| {
+                w.rx_reset().bit(bit);
+                w.rx_fifo_reset().bit(bit)
             });
 
             self.regs().int_clr().write(|w| {

@@ -437,6 +437,36 @@ pub mod trapframe {
 // be directly exposed.
 mod soc;
 
+// Some PAC-related utility
+use crate::pac::generic::{Readable, Reg, Resettable, W, Writable};
+
+#[cfg_attr(esp32c61, expect(dead_code))]
+trait RegisterToggle {
+    type Reg: Readable + Resettable + Writable;
+
+    /// Toggles bits in the register, applying the given operation to set and clear them.
+    ///
+    /// This method is more efficient than two modify calls, as it will not read the register
+    /// value twice.
+    fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
+}
+
+impl<REG> RegisterToggle for Reg<REG>
+where
+    REG: Readable + Resettable + Writable,
+{
+    type Reg = REG;
+
+    fn toggle(&self, op: impl Fn(&mut W<REG>, bool) -> &mut W<REG>) {
+        let bits = self.modify(|_, w| op(w, true));
+
+        self.write(|w| {
+            unsafe { w.bits(bits) };
+            op(w, false)
+        });
+    }
+}
+
 #[cfg(is_debug_build)]
 procmacros::warning! {"
 WARNING: use --release

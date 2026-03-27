@@ -99,6 +99,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    RegisterToggle,
     dma::{
         Channel,
         ChannelTx,
@@ -495,22 +496,17 @@ pub trait PrivateInstance: DmaEligible {
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
     fn rx_reset(&self) {
-        self.regs().conf().modify(|_, w| w.rx_reset().set_bit());
-        self.regs().conf().modify(|_, w| w.rx_reset().clear_bit());
+        self.regs().conf().toggle(|w, bit| w.rx_reset().bit(bit));
     }
 
     fn rx_dma_reset(&self) {
-        self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
-        self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());
+        self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
     fn rx_fifo_reset(&self) {
         self.regs()
             .conf()
-            .modify(|_, w| w.rx_fifo_reset().set_bit());
-        self.regs()
-            .conf()
-            .modify(|_, w| w.rx_fifo_reset().clear_bit());
+            .toggle(|w, bit| w.rx_fifo_reset().bit(bit));
     }
 
     fn tx_reset(&self) {
@@ -523,17 +519,13 @@ pub trait PrivateInstance: DmaEligible {
     }
 
     fn tx_dma_reset(&self) {
-        self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
-        self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
+        self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
     fn tx_fifo_reset(&self) {
         self.regs()
             .conf()
-            .modify(|_, w| w.tx_fifo_reset().set_bit());
-        self.regs()
-            .conf()
-            .modify(|_, w| w.tx_fifo_reset().clear_bit());
+            .toggle(|w, bit| w.tx_fifo_reset().bit(bit));
     }
 
     fn tx_clear_interrupts(&self) {

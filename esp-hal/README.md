@@ -63,7 +63,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          |           |          |          |          |
 | Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |           |          |          |          |
-| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      |
+| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      |
 | Camera interface          | ❌    |          |          |          |          |           |          | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |           |          | ⚒️      |          |
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
@@ -72,7 +72,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |
-| GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
+| GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ✔️      | ✔️      |
 | HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
 | I2C slave                 | ❌    |          | ❌       | [❌][5156] [^1] | ❌       |           | ❌       | ❌       | ❌       |
@@ -91,7 +91,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          |           |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
+| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | [❌][5162] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      |
@@ -105,13 +105,13 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |           |          | [❌][1905] [^1] | [❌][1905] [^1] |
 | TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
+| UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      |
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      |
 | ULP (FSM)                 | ⚒️   |          |          |          |          |           |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      |
-| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |          | ⚒️      | ⚒️      |
+| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          | ⚒️      | ⚒️      |
 
  * Empty cell: Not available
  * ❌: Not supported

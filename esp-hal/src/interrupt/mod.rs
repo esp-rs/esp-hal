@@ -368,7 +368,6 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
-#[cfg_attr(esp32c61, expect(unused))] // TODO: remove when more peripherals are supported
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
 }
