@@ -554,6 +554,7 @@ impl From<CsiConfig> for wifi_csi_config_t {
                     config.dump_ack_en,
                     config.reserved,
                     0, // dump_ack_en
+                    0, // lltf_bit_mode
                     0, // reserved
                 ),
             }

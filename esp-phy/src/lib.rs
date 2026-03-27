@@ -101,6 +101,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c5::*;
     #[cfg(esp32c6)]
     pub use esp_wifi_sys_esp32c6::*;
+    #[cfg(esp32c61)]
+    pub use esp_wifi_sys_esp32c61::*;
     #[cfg(esp32h2)]
     pub use esp_wifi_sys_esp32h2::*;
     #[cfg(esp32s2)]
@@ -341,7 +343,9 @@ impl PhyState {
 
 fn is_reset_from_deepsleep() -> bool {
     // feature gated to avoid forgetting to double check the correct value for future chips
-    #[cfg(any(esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3))]
+    #[cfg(any(
+        esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3
+    ))]
     const CORE_DEEP_SLEEP: u32 = 5;
 
     unsafe extern "C" {

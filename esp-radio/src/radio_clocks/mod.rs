@@ -3,6 +3,7 @@
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
 #[cfg_attr(esp32c5, path = "clocks_ll/esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
+#[cfg_attr(esp32c61, path = "clocks_ll/esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]

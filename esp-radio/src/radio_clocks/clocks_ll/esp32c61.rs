@@ -9,31 +9,6 @@ pub(crate) fn enable_wifi(en: bool) {
     });
 }
 
-pub(crate) fn enable_ieee802154(en: bool) {
-    regs!(MODEM_SYSCON).clk_conf().modify(|r, w| {
-        w.clk_etm_en().bit(en);
-        w.clk_zb_apb_en().bit(en);
-        w.clk_zbmac_en().bit(en);
-        w.clk_modem_sec_en().bit(en);
-        w.clk_modem_sec_ecb_en().bit(en);
-        w.clk_modem_sec_ccm_en().bit(en);
-        w.clk_modem_sec_bah_en().bit(en);
-        w.clk_modem_sec_apb_en().bit(en);
-        w.clk_ble_timer_en().bit(en)
-    });
-
-    regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en().bit(en);
-        w.clk_bt_apb_en().bit(en);
-        w.clk_btbb_en().bit(en);
-        w.clk_btmac_en().bit(en);
-        w.clk_fe_20m_en().bit(en);
-        w.clk_fe_40m_en().bit(en);
-        w.clk_fe_80m_en().bit(en);
-        w.clk_fe_160m_en().bit(en)
-    });
-}
-
 pub(crate) fn enable_bt(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_etm_en().bit(en);

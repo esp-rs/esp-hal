@@ -3029,6 +3029,7 @@ impl Chip {
                     "systimer_driver_supported",
                     "timergroup_driver_supported",
                     "uart_driver_supported",
+                    "wifi_driver_supported",
                     "timergroup_timg0",
                     "timergroup_timg1",
                     "uart_uart0",
@@ -3075,6 +3076,8 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
+                    "wifi_has_wifi6",
+                    "wifi_mac_version=\"3\"",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c61",
@@ -3139,6 +3142,7 @@ impl Chip {
                     "cargo:rustc-cfg=systimer_driver_supported",
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=wifi_driver_supported",
                     "cargo:rustc-cfg=timergroup_timg0",
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
@@ -3185,6 +3189,8 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=wifi_has_wifi6",
+                    "cargo:rustc-cfg=wifi_mac_version=\"3\"",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
