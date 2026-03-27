@@ -2695,7 +2695,6 @@ band.
     /// Returns the current Wi-Fi channel configuration.
     #[instability::unstable]
     pub fn channel(&self) -> Result<(u8, SecondaryChannel), WifiError> {
-        info!("channel");
         let mut primary = 0;
         let mut secondary = 0;
 

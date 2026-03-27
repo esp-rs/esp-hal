@@ -10,7 +10,7 @@ pub(crate) fn enable_wifi(en: bool) {
 }
 
 pub(crate) fn enable_bt(en: bool) {
-    regs!(MODEM_SYSCON).clk_conf().modify(|r, w| {
+    regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_etm_en().bit(en);
         w.clk_modem_sec_en().bit(en);
         w.clk_modem_sec_ecb_en().bit(en);
