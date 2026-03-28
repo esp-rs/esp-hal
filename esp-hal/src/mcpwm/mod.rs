@@ -99,12 +99,12 @@ use crate::{
     time::Rate,
 };
 
+/// MCPWM capture channels
+pub mod capture;
 /// MCPWM operators
 pub mod operator;
 /// MCPWM timers
 pub mod timer;
-
-pub mod capture;
 
 type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
@@ -179,7 +179,7 @@ impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
             operator0: Operator::new(guard.clone()),
             operator1: Operator::new(guard.clone()),
             operator2: Operator::new(guard.clone()),
-            capture_timer: CaptureTimer::new(guard.clone());
+            capture_timer: CaptureTimer::new(guard.clone()),
             capture0: CaptureChannel::new(guard.clone()),
             capture1: CaptureChannel::new(guard.clone()),
             capture2: CaptureChannel::new(guard),
