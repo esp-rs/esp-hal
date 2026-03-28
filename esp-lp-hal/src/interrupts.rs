@@ -1,10 +1,8 @@
 //! Interrupt handling for ESP32-S2 & ESP32-S3 RISCV ULP cores.
 //! Uses custom R-type instructions for ESP32-S2 & ESP32-S3 RISCV ULP cores.
-use crate::pac;
+use core::ptr::NonNull;
 
-// #[cfg(any(esp32s2, esp32s3))]
-// pub use pac::interrupt as sens_interrupt;
-// use crate::gpio::MAX_GPIO_PIN;
+use crate::pac;
 
 /// Argument passed to GpioInterrupt handler.
 pub type GpioInterruptPin = u32;
@@ -164,14 +162,18 @@ pub struct TrapFrame {
 #[doc(hidden)]
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(export_name = "_start_trap_rust")]
-pub extern "C" fn ulp_start_trap_rust(trap_frame: *const TrapFrame, irqs: u32) {
+pub extern "C" fn ulp_start_trap_rust(trap_frame: *const u32, irqs: u32) {
     unsafe extern "C" {
         fn trap_handler(regs: &TrapFrame, pending_irqs: u32);
     }
 
     unsafe {
-        // dispatch trap to handler
-        trap_handler(&*trap_frame, irqs);
+        // 'trap_frame' pointer safety:
+        // _start_trap must place a valid address in a0, prior to calling _start_trap_rust.
+        trap_handler(
+            NonNull::new_unchecked(trap_frame as *mut TrapFrame).as_ref(),
+            irqs,
+        );
     }
 }
 
@@ -193,8 +195,7 @@ macro_rules! build_trap_handler {
         /// functions depending on the bits set in pending_irqs.
         #[doc(hidden)]
         #[unsafe(no_mangle)]
-        pub extern "C" fn trap_handler(regs: *const TrapFrame, pending_irqs: u32) {
-            let regs = unsafe { regs.as_ref().unwrap() };
+        pub extern "C" fn trap_handler(regs: &TrapFrame, pending_irqs: u32) {
             $(
                 build_trap_handler!(@interrupt($irq, pending_irqs, regs, $handler));
             )*
@@ -249,16 +250,13 @@ fn dispatch_peripheral_interrupt(_regs: &TrapFrame) {
     // Iterate over the 1 bit positions
     for bit in cocpu_int_st_bits.iterator() {
         // Convert into the named interrupt enumeration
-        match SensInterruptStatus::try_from(bit) {
-            Ok(stat) => {
-                // Call handler, and clear the interrupt bit.
-                unsafe { SensInterrupt(stat) };
+        if let Ok(stat) = SensInterruptStatus::try_from(bit) {
+            // Call handler, and clear the interrupt bit.
+            unsafe { SensInterrupt(stat) };
 
-                unsafe { &*pac::SENS::PTR }
-                    .sar_cocpu_int_clr()
-                    .write(|w| unsafe { w.bits(1 << bit) });
-            }
-            Err(_) => {}
+            unsafe { &*pac::SENS::PTR }
+                .sar_cocpu_int_clr()
+                .write(|w| unsafe { w.bits(1 << bit) });
         }
     }
 
