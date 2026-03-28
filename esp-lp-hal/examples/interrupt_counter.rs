@@ -12,34 +12,37 @@ extern crate panic_halt;
 // interrupts available for use.
 use esp_lp_hal::{
     gpio::{Event, Input},
-    gpio_interrupt,
+    interrupts::{GpioInterruptPin, SensInterruptStatus, gpio_interrupt, sens_interrupt},
     prelude::*,
-    sens_interrupt,
 };
 
 // Shared memory address.
 const ADDRESS: u32 = 0x1000;
 
-pub fn on_start() {
-    // Did we get a startup interrupt? If so, increment counter
-    let ptr = ADDRESS as *mut u32;
-    let i = unsafe { ptr.read_volatile() };
-    unsafe {
-        ptr.write_volatile(i + 1);
+pub fn on_start(status: SensInterruptStatus) {
+    if status == SensInterruptStatus::RISCV_START_INT {
+        // Did we get a startup interrupt? If so, increment counter
+        let ptr = ADDRESS as *mut u32;
+        let i = unsafe { ptr.read_volatile() };
+        unsafe {
+            ptr.write_volatile(i + 1);
+        }
     }
 }
 
-sens_interrupt!(RISCV_START_INT, on_start);
+sens_interrupt!(on_start);
 
-pub fn on_button() {
-    // Reset the counter
-    let ptr = ADDRESS as *mut u32;
-    unsafe {
-        ptr.write_volatile(0);
+pub fn on_button(pin: GpioInterruptPin) {
+    // Reset the counter on GPIO0
+    if pin == 0 {
+        let ptr = ADDRESS as *mut u32;
+        unsafe {
+            ptr.write_volatile(0);
+        }
     }
 }
 
-gpio_interrupt!(GPIO0, on_button);
+gpio_interrupt!(on_button);
 
 #[entry]
 fn main(mut boot_pin: Input<0>) {
