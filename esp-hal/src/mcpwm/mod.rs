@@ -87,8 +87,11 @@
 use operator::Operator;
 use timer::Timer;
 
+#[cfg(soc_has_mcpwm0)]
+use crate::gpio::InputSignal;
 use crate::{
     gpio::OutputSignal,
+    mcpwm::capture::{CaptureChannel, CaptureTimer},
     pac,
     private::OnDrop,
     soc::clocks::{self, ClockTree},
@@ -100,6 +103,8 @@ use crate::{
 pub mod operator;
 /// MCPWM timers
 pub mod timer;
+
+pub mod capture;
 
 type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
@@ -141,6 +146,14 @@ pub struct McPwm<'d, PWM> {
     pub operator1: Operator<'d, 1, PWM>,
     /// Operator2
     pub operator2: Operator<'d, 2, PWM>,
+    /// Capture Timer
+    pub capture_timer: CaptureTimer<'d, PWM>,
+    /// Capture0
+    pub capture0: CaptureChannel<0, PWM>,
+    /// Capture1
+    pub capture1: CaptureChannel<1, PWM>,
+    /// Capture2
+    pub capture2: CaptureChannel<2, PWM>,
 }
 
 impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
@@ -165,7 +178,11 @@ impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
             timer2: Timer::new(guard.clone()),
             operator0: Operator::new(guard.clone()),
             operator1: Operator::new(guard.clone()),
-            operator2: Operator::new(guard),
+            operator2: Operator::new(guard.clone()),
+            capture_timer: CaptureTimer::new(guard.clone());
+            capture0: CaptureChannel::new(guard.clone()),
+            capture1: CaptureChannel::new(guard.clone()),
+            capture2: CaptureChannel::new(guard),
         }
     }
 }
@@ -288,6 +305,8 @@ pub trait PwmPeripheral: crate::private::Sealed {
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
+    // Get operator GPIO mux capture input signal
+    fn capture_input_signal<const CHAN: u8>() -> InputSignal;
     /// Peripheral
     fn peripheral() -> Peripheral;
 }
@@ -306,6 +325,15 @@ impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
             (0, false) => OutputSignal::PWM0_0B,
             (1, false) => OutputSignal::PWM0_1B,
             (2, false) => OutputSignal::PWM0_2B,
+            _ => unreachable!(),
+        }
+    }
+
+    fn capture_input_signal<const CHAN: u8>() -> InputSignal {
+        match CHAN {
+            0 => InputSignal::PWM0_CAP0,
+            1 => InputSignal::PWM0_CAP1,
+            2 => InputSignal::PWM0_CAP2,
             _ => unreachable!(),
         }
     }
@@ -329,6 +357,15 @@ impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
             (0, false) => OutputSignal::PWM1_0B,
             (1, false) => OutputSignal::PWM1_1B,
             (2, false) => OutputSignal::PWM1_2B,
+            _ => unreachable!(),
+        }
+    }
+
+    fn capture_input_signal<const CHAN: u8>() -> InputSignal {
+        match CHAN {
+            0 => InputSignal::PWM1_CAP0,
+            1 => InputSignal::PWM1_CAP1,
+            2 => InputSignal::PWM1_CAP2,
             _ => unreachable!(),
         }
     }
