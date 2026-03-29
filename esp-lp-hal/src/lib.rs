@@ -44,7 +44,7 @@ pub mod interrupt;
 
 /// The prelude
 pub mod prelude {
-    pub use procmacros::entry;
+    pub use procmacros::{entry, handler};
 }
 
 cfg_if::cfg_if! {
@@ -96,6 +96,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         #[cfg(any(esp32s2, esp32s3))]
         {
             ulp_riscv_rescue_from_monitor();
+            interrupt::setup_interrupts();
             interrupt::enable();
         }
 

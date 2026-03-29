@@ -14,8 +14,8 @@ MEMORY
 }
 
 /* Default interrupt handlers */
-PROVIDE(SensInterrupt = DefaultHandler);
-PROVIDE(GpioInterrupt = DefaultHandler);
+PROVIDE(SENS_INT = DefaultHandler);
+PROVIDE(GPIO_INT = DefaultHandler);
 
 SECTIONS
 {

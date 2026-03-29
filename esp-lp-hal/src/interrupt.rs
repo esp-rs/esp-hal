@@ -2,32 +2,66 @@
 //! Uses custom R-type instructions for ESP32-S2 & ESP32-S3 RISCV ULP cores.
 use core::ptr::NonNull;
 
-use portable_atomic::{AtomicPtr, Ordering};
-use procmacros::handler;
-
-use crate::{interrupt, pac};
-
-/// Argument passed to GpioInterrupt handler.
-pub type GpioInterruptPin = u32;
 /// Argument passed to SensInterrupt handler.
 pub use pac::Interrupt as SensInterruptStatus;
+use portable_atomic::{AtomicPtr, Ordering};
+
+// use procmacros::handler;
+use crate::pac;
+/// Argument passed to GpioInterrupt handler.
+pub type GpioInterruptPin = u32;
+
+// Interrupt vector table
+// TODO: Merge back into esp-pacs
+// ALT-TODO: Setup an __INTERRUPTS table in here, which contains a superset of
+// __EXTERNAL_INTERRUPTS,           and other peripheral interrupts not captured by the PAC.
+//           e.g. bits 0..=31 would be for 'external interrupts',
+//           and bits 32..=N would be for 'peripheral interrupts', or similar.
+//           This might allow the interrupt handling code in here to be more portable, maybe...
+unsafe extern "C" {
+    fn GPIO_INT();
+    fn SENS_INT();
+}
+
+/// Default interrupt handler, does nothing.
+#[cfg(any(esp32s2, esp32s3))]
+#[allow(dead_code)]
+#[doc(hidden)]
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub fn DefaultHandler() {}
+
+#[doc(hidden)]
+#[repr(C)]
+pub union Vector {
+    pub _handler: unsafe extern "C" fn(),
+    pub _reserved: usize,
+}
+
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+#[unsafe(no_mangle)]
+pub static __INTERRUPTS: [Vector; Interrupt::len()] =
+    [Vector { _handler: SENS_INT }, Vector { _handler: GPIO_INT }];
 
 #[doc = r"Enumeration of all the interrupts."]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Interrupt {
     #[doc = "0 - SENS"]
     SENS = 0,
     #[doc = "1 - GPIO"]
     GPIO = 1,
+    #[doc(hidden)]
+    __LAST__, // Marker to auto-detect enum length.
 }
 
 #[doc = r" TryFromInterruptError"]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct TryFromInterruptError(());
+
 impl Interrupt {
-    #[doc = r" Attempt to convert a given value into an `Interrupt`"]
+    #[doc = r"Attempt to convert a given value into an `Interrupt`"]
     #[inline]
     pub fn try_from(value: u8) -> Result<Self, TryFromInterruptError> {
         match value {
@@ -36,10 +70,59 @@ impl Interrupt {
             _ => Err(TryFromInterruptError(())),
         }
     }
+
+    #[doc = r"Get the total number of interrupts."]
+    #[inline]
+    pub const fn len() -> usize {
+        Self::__LAST__ as usize
+    }
 }
 
-/// Convenience constant for `Option::None` pin
-pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+const STATUS_WORDS: usize = 1;
+
+/// Representation of peripheral-interrupt status bits.
+#[doc(hidden)]
+#[derive(Clone, Copy, Default, Debug)]
+pub struct InterruptStatus {
+    status: [u32; STATUS_WORDS],
+}
+
+impl InterruptStatus {
+    /// Get status of peripheral interrupts
+    pub fn current() -> Self {
+        let mut status_bits = 0b00;
+        // Check SENS status
+        status_bits |=
+            ((unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits() != 0) as u32) << 0;
+        // Check GPIO status
+        status_bits |= ((unsafe { &*pac::RTC_IO::PTR }.status().read().bits() != 0) as u32) << 1;
+        InterruptStatus::from(status_bits)
+    }
+
+    /// Is the given interrupt bit set
+    pub fn is_set(&self, interrupt: u8) -> bool {
+        (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
+    }
+
+    /// Set the given interrupt status bit
+    pub fn set(&mut self, interrupt: u8) {
+        self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
+    }
+
+    /// Return an iterator over the set interrupt status bits
+    pub fn iterator(&self) -> InterruptStatusIterator {
+        InterruptStatusIterator {
+            status: *self,
+            idx: 0,
+        }
+    }
+}
+
+impl From<u32> for InterruptStatus {
+    fn from(value: u32) -> Self {
+        Self { status: [value] }
+    }
+}
 
 pub(super) struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
@@ -59,81 +142,46 @@ impl CFnPtr {
     }
 }
 
-/// If no handler is allocated, panic.
-#[unsafe(no_mangle)]
-extern "C" fn EspDefaultHandler() {
-    panic!("Unhandled interrupt");
+// /// If no handler is allocated, panic.
+// #[unsafe(no_mangle)]
+// extern "C" fn EspDefaultHandler() {
+//     panic!("Unhandled interrupt");
+// }
+// /// Default (unhandled) interrupt handler
+// pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
+//     {
+//         unsafe extern "C" {
+//             fn EspDefaultHandler();
+//         }
+
+//         unsafe {
+//             core::mem::transmute::<unsafe extern "C" fn(), extern "C" fn()>(EspDefaultHandler)
+//         }
+//     },
+//     Priority::min(),
+// );
+
+// Peripheral interrupt API.
+
+fn vector_entry(interrupt: Interrupt) -> &'static Vector {
+    &__INTERRUPTS[interrupt as usize]
 }
 
-/// Default (unhandled) interrupt handler
-pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
-    {
-        unsafe extern "C" {
-            fn EspDefaultHandler();
+/// Returns the currently bound interrupt handler.
+pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
+    unsafe {
+        let vector = vector_entry(interrupt);
+
+        let addr = vector._handler;
+        if addr as usize == 0 {
+            return None;
         }
 
-        unsafe {
-            core::mem::transmute::<unsafe extern "C" fn(), extern "C" fn()>(EspDefaultHandler)
-        }
-    },
-    Priority::max(),
-);
-
-/// The default GPIO interrupt handler, when the user has not set one.
-///
-/// This handler will disable all pending interrupts and leave the interrupt
-/// status bits unchanged. This enables functions like `is_interrupt_set` to
-/// work correctly.
-#[handler]
-fn default_gpio_interrupt_handler() {
-    // Does nothing.
-    // DEFAULT_INTERRUPT_HANDLER.handler().callback()();
-}
-
-fn bind_default_interrupt_handler() {
-    // We first check if a handler is set in the vector table.
-    // if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
-    // // We only allow binding the default handler if nothing else is bound.
-    // // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-    // if handler != DEFAULT_INTERRUPT_HANDLER.handler() {
-    //     // The user has configured an interrupt handler they wish to use.
-    //     info!("Not using default GPIO interrupt handler: already bound in vector table");
-    //     return;
-    // }
-    // }
-
-    // // The vector table doesn't contain a custom entry. Still, the
-    // // peripheral interrupt may already be bound to something else.
-    // for cpu in cores() {
-    //     if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
-    //         info!("Not using default GPIO interrupt handler: peripheral interrupt already in
-    // use");         return;
-    //     }
-    // }
-
-    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
-
-    // // On ESP32, there are separate interrupt status registers for each core, we need to enable
-    // the // interrupt handler on each core otherwise GPIOs listening on the App CPU will not
-    // receive // interrupts.
-    // #[cfg(esp32)]
-    // crate::interrupt::enable_on_cpu(
-    //     crate::system::Cpu::AppCpu,
-    //     Interrupt::GPIO,
-    //     Priority::Priority1,
-    // );
-}
-
-/// The user GPIO interrupt handler, when the user has set one.
-///
-/// The user handler is responsible for clearing the interrupt status bits or disabling
-/// the interrupts.
-pub extern "C" fn user_gpio_interrupt_handler() {
-    // Call the user handler before clearing interrupts. The user can use the enable
-    // bits to determine which interrupts they are interested in. Clearing the
-    // interrupt status or enable bits have no effect on the rest of the
-    // interrupt handler.
-    USER_INTERRUPT_HANDLER.call();
+        Some(IsrCallback::new(core::mem::transmute::<
+            unsafe extern "C" fn(),
+            extern "C" fn(),
+        >(addr)))
+    }
 }
 
 /// Binds the given handler to a peripheral interrupt.
@@ -143,24 +191,12 @@ pub extern "C" fn user_gpio_interrupt_handler() {
 /// The interrupt handler will be called on the core where it is registered.
 /// Only one interrupt handler can be bound to a peripheral interrupt.
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
-    todo!("Port this function to esp-lp-hal")
-    // unsafe {
-    //     let vector = vector_entry(interrupt);
-    //     let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
-    //     // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
-    //     // If we do, we need to temporarily disable this protection.
-    //     #[cfg(all(riscv, write_vec_table_monitoring))]
-    //     if crate::soc::trap_section_protected() {
-    //         crate::debugger::DEBUGGER_LOCK.lock(|| {
-    //             let wp = crate::debugger::clear_watchpoint(1);
-    //             ptr.write_volatile(handler.handler().address());
-    //             crate::debugger::restore_watchpoint(1, wp);
-    //         });
-    //         enable(interrupt, handler.priority());
-    //         return;
-    //     }
-    //     ptr.write_volatile(handler.handler().address());
-    // }
+    unsafe {
+        let vector = vector_entry(interrupt);
+        let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
+        ptr.write_volatile(handler.handler().address());
+    }
+    // ULP unused
     // enable(interrupt, handler.priority());
 }
 
@@ -259,40 +295,6 @@ impl InterruptHandler {
     }
 }
 
-const STATUS_WORDS: usize = 1;
-/// Representation of peripheral-interrupt status bits.
-#[doc(hidden)]
-#[derive(Clone, Copy, Default, Debug)]
-pub struct InterruptStatus {
-    status: [u32; STATUS_WORDS],
-}
-
-impl InterruptStatus {
-    /// Is the given interrupt bit set
-    pub fn is_set(&self, interrupt: u8) -> bool {
-        (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
-    }
-
-    /// Set the given interrupt status bit
-    pub fn set(&mut self, interrupt: u8) {
-        self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
-    }
-
-    /// Return an iterator over the set interrupt status bits
-    pub fn iterator(&self) -> InterruptStatusIterator {
-        InterruptStatusIterator {
-            status: *self,
-            idx: 0,
-        }
-    }
-}
-
-impl From<u32> for InterruptStatus {
-    fn from(value: u32) -> Self {
-        Self { status: [value] }
-    }
-}
-
 /// Iterator over set interrupt status bits
 #[doc(hidden)]
 #[derive(Debug, Clone)]
@@ -318,8 +320,25 @@ impl Iterator for InterruptStatusIterator {
     }
 }
 
-/// TODO: Move custom ULP instructions into their own module,
-///       and cleanup the assembly files at the same time.
+/// Setup interrupt handlers, including any default ones
+#[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
+pub fn setup_interrupts() {
+    crate::gpio::bind_default_interrupt_handler();
+}
+
+/// Enable all interrupts
+#[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
+pub fn enable() {
+    // Exit a critical section by enabling all interrupts
+    // This inline assembly construct is equivalent to:
+    // > maskirq_insn(zero, zero)
+    unsafe {
+        core::arch::asm!(".word 0x0600600b");
+    }
+}
+
 /// Disable all interrupts
 #[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
@@ -336,18 +355,6 @@ pub fn disable() {
     //
     unsafe {
         core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
-    }
-}
-
-/// Enable all interrupts
-#[cfg(any(esp32s2, esp32s3))]
-#[inline(always)]
-pub fn enable() {
-    // Exit a critical section by enabling all interrupts
-    // This inline assembly construct is equivalent to:
-    // > maskirq_insn(zero, zero)
-    unsafe {
-        core::arch::asm!(".word 0x0600600b");
     }
 }
 
@@ -426,147 +433,174 @@ pub extern "C" fn ulp_start_trap_rust(trap_frame: *const u32, irqs: u32) {
     }
 }
 
-/// Creates the trap_handler() function.
-/// This is macro is used later in this file.
-/// This style of macro is usually provided
-/// for users to hook their own handlers, but here it's just used
-/// as a quick way to generate the bit-mask code :)
-#[cfg(any(esp32s2, esp32s3))]
-macro_rules! build_trap_handler {
-    (@interrupt ($n:literal, $pending_irqs:expr, $regs:expr, $handler:ident)) => {
-        if $pending_irqs & (1 << $n) != 0 {
-            #[allow(unused_unsafe)]
-            unsafe { $handler($regs); }
-        }
-    };
-    ( $( $irq:literal : $handler:ident ),* ) => {
-        /// Called by _start_trap_rust, this trap handler will call other interrupt handling
-        /// functions depending on the bits set in pending_irqs.
-        #[doc(hidden)]
-        #[unsafe(no_mangle)]
-        pub extern "C" fn trap_handler(regs: &TrapFrame, pending_irqs: u32) {
-            $(
-                build_trap_handler!(@interrupt($irq, pending_irqs, regs, $handler));
-            )*
-        }
-    };
-}
-
-/// Default interrupt handler, does nothing.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[doc(hidden)]
-#[allow(non_snake_case)]
-#[unsafe(no_mangle)]
-pub fn DefaultHandler() {}
-
-/// Default illegal instruction or bus error exception handler.
-/// This handler is dispatched by the trap_handler() function.
-#[cfg(any(esp32s2, esp32s3))]
-#[allow(dead_code)]
-#[allow(non_snake_case)]
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub fn DefaultExceptionHandler(_regs: &TrapFrame) {
-    panic!("Unhandled exception!");
-}
-
-// Create the trap_handler function
-#[cfg(any(esp32s2, esp32s3))]
-build_trap_handler!(
-    1: DefaultExceptionHandler,
-    2: DefaultExceptionHandler,
-    31: dispatch_peripheral_interrupt
-);
-
-/// Peripheral interrupt handler for the IRQ bit 31.
-/// Checks the SENS and RTC_IO interrup status, and dispatches further interrupt handlers as
-/// appropriate.
+/// Called by _start_trap_rust, this trap handler will call other interrupt handling
+/// functions depending on the bits set in pending_irqs.
 #[cfg(any(esp32s2, esp32s3))]
 #[doc(hidden)]
 #[unsafe(no_mangle)]
-fn dispatch_peripheral_interrupt(_regs: &TrapFrame) {
-    // This function is based on the ESP-IDF implementation found here:
-    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
-    unsafe extern "Rust" {
-        fn SensInterrupt(status: SensInterruptStatus);
-        fn GpioInterrupt(pin: GpioInterruptPin);
-    }
+pub extern "C" fn trap_handler(_regs: &TrapFrame, pending_irqs: u32) {
+    // Dispatch peripheral interrupt
+    if pending_irqs & (1 << 31) != 0 {
+        let status = InterruptStatus::current();
 
-    // Iterate for any SENS interrupt flags
-    let cocpu_int_st_bits =
-        InterruptStatus::from(unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits());
-    // Iterate over the 1 bit positions
-    for bit in cocpu_int_st_bits.iterator() {
-        // Convert into the named interrupt enumeration
-        if let Ok(stat) = SensInterruptStatus::try_from(bit) {
-            // Call handler, and clear the interrupt bit.
-            unsafe { SensInterrupt(stat) };
+        // Iterate the active interrupts, fetch their handler, and call it if set.
+        for interrupt_nr in status.iterator() {
+            // New, null-ptr-checking code.
+            if let Ok(i) = Interrupt::try_from(interrupt_nr) {
+                if let Some(handler) = bound_handler(i) {
+                    handler.callback()();
+                }
+            }
 
-            unsafe { &*pac::SENS::PTR }
-                .sar_cocpu_int_clr()
-                .write(|w| unsafe { w.bits(1 << bit) });
+            // Original code
+            // unsafe {
+            //     let handler = crate::interrupt::__INTERRUPTS[interrupt_nr as usize]._handler;
+            //     handler();
+            // }
         }
-    }
-
-    // RTC IO interrupts.
-    let rtcio_int_st_bits = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
-    let rtcio_int_st = InterruptStatus::from(rtcio_int_st_bits);
-    // Iterate over the 1 bit positions
-    for bit in rtcio_int_st.iterator() {
-        // Call handler, and clear the interrupt bit.
-        // Pin must have 10 subtracted from it, due to register offset.
-        unsafe { GpioInterrupt((bit - 10) as u32) };
-
-        unsafe { &*pac::RTC_IO::PTR }
-            .status_w1tc()
-            .write(|w| unsafe { w.bits(1 << bit) });
     }
 }
 
-// Macros bind user functions to SensInterrupt and GpioInterrupt.
+// /// Creates the trap_handler() function.
+// /// This is macro is used later in this file.
+// /// This style of macro is usually provided
+// /// for users to hook their own handlers, but here it's just used
+// /// as a quick way to generate the bit-mask code :)
+// #[cfg(any(esp32s2, esp32s3))]
+// macro_rules! build_trap_handler {
+//     (@interrupt ($n:literal, $pending_irqs:expr, $regs:expr, $handler:ident)) => {
+//         if $pending_irqs & (1 << $n) != 0 {
+//             #[allow(unused_unsafe)]
+//             unsafe { $handler($regs); }
+//         }
+//     };
+//     ( $( $irq:literal : $handler:ident ),* ) => {
+//         /// Called by _start_trap_rust, this trap handler will call other interrupt handling
+//         /// functions depending on the bits set in pending_irqs.
+//         #[doc(hidden)]
+//         #[unsafe(no_mangle)]
+//         pub extern "C" fn trap_handler(regs: &TrapFrame, pending_irqs: u32) {
+//             $(
+//                 build_trap_handler!(@interrupt($irq, pending_irqs, regs, $handler));
+//             )*
+//         }
+//     };
+// }
 
-#[macro_export]
-#[doc = r" Assigns a handler to GpioInterrupt"]
-#[doc = r""]
-#[doc = r" This macro takes one argument: path to the function that"]
-#[doc = r" will be used as the handler of that interrupt. The function"]
-#[doc = r" must have signature `fn(pin : GpioInterruptPin)`."]
-#[doc = r""]
-#[doc = r" # Example"]
-#[doc = r""]
-#[doc = r" ``` ignore"]
-#[doc = r" gpio_interrupt!(buttons_handler);"]
-#[doc = r""]
-#[doc = r" fn buttons_handler(_pin : GpioInterruptPin) {"]
-#[doc = r#"     print!("A GPIO pin was pressed!");"#]
-#[doc = r" }"]
-#[doc = r""]
-macro_rules! gpio_interrupt {
-    ($ path : path) => {
-        #[allow(non_snake_case)]
-        #[unsafe(no_mangle)]
-        pub extern "C" fn GpioInterrupt(pin: GpioInterruptPin) {
-            let f: fn(pin: GpioInterruptPin) = $path;
-            f(pin);
-        }
-    };
-}
+// /// Default interrupt handler, does nothing.
+// #[cfg(any(esp32s2, esp32s3))]
+// #[allow(dead_code)]
+// #[doc(hidden)]
+// #[allow(non_snake_case)]
+// #[unsafe(no_mangle)]
+// pub fn DefaultHandler() {}
 
-#[macro_export]
-#[doc = r" Assigns a handler to SensInterrupt"]
-macro_rules! sens_interrupt {
-    ($ path : path) => {
-        #[allow(non_snake_case)]
-        #[unsafe(no_mangle)]
-        pub extern "C" fn SensInterrupt(status: SensInterruptStatus) {
-            let f: fn(status: SensInterruptStatus) = $path;
-            f(status);
-        }
-    };
-}
+// /// Default illegal instruction or bus error exception handler.
+// /// This handler is dispatched by the trap_handler() function.
+// #[cfg(any(esp32s2, esp32s3))]
+// #[allow(dead_code)]
+// #[allow(non_snake_case)]
+// #[doc(hidden)]
+// #[unsafe(no_mangle)]
+// pub fn DefaultExceptionHandler(_regs: &TrapFrame) {
+//     panic!("Unhandled exception!");
+// }
 
-#[allow(unused)]
-pub use gpio_interrupt;
-#[allow(unused)]
-pub use sens_interrupt;
+// // Create the trap_handler function
+// #[cfg(any(esp32s2, esp32s3))]
+// build_trap_handler!(
+//     // 1: DefaultExceptionHandler,
+//     // 2: DefaultExceptionHandler,
+//     31: dispatch_peripheral_interrupt
+// );
+
+// /// Peripheral interrupt handler for the IRQ bit 31.
+// /// Checks the SENS and RTC_IO interrup status, and dispatches further interrupt handlers as
+// /// appropriate.
+// #[cfg(any(esp32s2, esp32s3))]
+// #[doc(hidden)]
+// #[unsafe(no_mangle)]
+// fn dispatch_peripheral_interrupt(_regs: &TrapFrame) {
+//     // This function is based on the ESP-IDF implementation found here:
+//     // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
+//     unsafe extern "Rust" {
+//         fn SensInterrupt(status: SensInterruptStatus);
+//         fn GpioInterrupt(pin: GpioInterruptPin);
+//     }
+
+//     // Iterate for any SENS interrupt flags
+//     let cocpu_int_st_bits = InterruptStatus::from(unsafe { &*pac::SENS::PTR
+// }.sar_cocpu_int_st().read().bits());     // Iterate over the 1 bit positions
+//     for bit in cocpu_int_st_bits.iterator() {
+//         // Convert into the named interrupt enumeration
+//         if let Ok(stat) = SensInterruptStatus::try_from(bit) {
+//             // Call handler, and clear the interrupt bit.
+//             unsafe { SensInterrupt(stat) };
+
+//             unsafe { &*pac::SENS::PTR }
+//                 .sar_cocpu_int_clr()
+//                 .write(|w| unsafe { w.bits(1 << bit) });
+//         }
+//     }
+
+//     // RTC IO interrupts.
+//     let rtcio_int_st_bits = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
+//     let rtcio_int_st = InterruptStatus::from(rtcio_int_st_bits);
+//     // Iterate over the 1 bit positions
+//     for bit in rtcio_int_st.iterator() {
+//         // Call handler, and clear the interrupt bit.
+//         // Pin must have 10 subtracted from it, due to register offset.
+//         unsafe { GpioInterrupt((bit - 10) as u32) };
+
+//         unsafe { &*pac::RTC_IO::PTR }
+//             .status_w1tc()
+//             .write(|w| unsafe { w.bits(1 << bit) });
+//     }
+// }
+
+// // Macros bind user functions to SensInterrupt and GpioInterrupt.
+
+// #[macro_export]
+// #[doc = r" Assigns a handler to GpioInterrupt"]
+// #[doc = r""]
+// #[doc = r" This macro takes one argument: path to the function that"]
+// #[doc = r" will be used as the handler of that interrupt. The function"]
+// #[doc = r" must have signature `fn(pin : GpioInterruptPin)`."]
+// #[doc = r""]
+// #[doc = r" # Example"]
+// #[doc = r""]
+// #[doc = r" ``` ignore"]
+// #[doc = r" gpio_interrupt!(buttons_handler);"]
+// #[doc = r""]
+// #[doc = r" fn buttons_handler(_pin : GpioInterruptPin) {"]
+// #[doc = r#"     print!("A GPIO pin was pressed!");"#]
+// #[doc = r" }"]
+// #[doc = r""]
+// macro_rules! gpio_interrupt {
+//     ($ path : path) => {
+//         #[allow(non_snake_case)]
+//         #[unsafe(no_mangle)]
+//         pub extern "C" fn GpioInterrupt(pin: GpioInterruptPin) {
+//             let f: fn(pin: GpioInterruptPin) = $path;
+//             f(pin);
+//         }
+//     };
+// }
+
+// #[macro_export]
+// #[doc = r" Assigns a handler to SensInterrupt"]
+// macro_rules! sens_interrupt {
+//     ($ path : path) => {
+//         #[allow(non_snake_case)]
+//         #[unsafe(no_mangle)]
+//         pub extern "C" fn SensInterrupt(status: SensInterruptStatus) {
+//             let f: fn(status: SensInterruptStatus) = $path;
+//             f(status);
+//         }
+//     };
+// }
+
+// #[allow(unused)]
+// pub use gpio_interrupt;
+// #[allow(unused)]
+// pub use sens_interrupt;

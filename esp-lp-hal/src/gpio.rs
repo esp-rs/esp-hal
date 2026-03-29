@@ -22,13 +22,11 @@
 //!     }
 //! }
 //! ```
-use crate::interrupt::{
-    Interrupt,
-    InterruptConfigurable,
-    InterruptHandler,
-    Priority,
-    USER_INTERRUPT_HANDLER,
-    user_gpio_interrupt_handler,
+use procmacros::handler;
+
+use crate::{
+    interrupt,
+    interrupt::{CFnPtr, Interrupt, InterruptHandler, Priority},
 };
 
 cfg_if::cfg_if! {
@@ -41,6 +39,38 @@ cfg_if::cfg_if! {
         /// Maximum GPIO pin number.
         pub const MAX_GPIO_PIN: u8 = 21;
     }
+}
+
+/// Convenience constant for `Option::None` pin
+pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+
+/// The user GPIO interrupt handler, when the user has set one.
+///
+/// The user handler is responsible for clearing the interrupt status bits or disabling
+/// the interrupts.
+#[handler]
+fn user_gpio_interrupt_handler() {
+    // Call the user handler before clearing interrupts. The user can use the enable
+    // bits to determine which interrupts they are interested in. Clearing the
+    // interrupt status or enable bits have no effect on the rest of the
+    // interrupt handler.
+    USER_INTERRUPT_HANDLER.call();
+}
+
+/// The default GPIO interrupt handler, when the user has not set one.
+///
+/// This handler will disable all pending interrupts and leave the interrupt
+/// status bits unchanged. This enables functions like `is_interrupt_set` to
+/// work correctly.
+#[handler]
+fn default_gpio_interrupt_handler() {
+    let status = gpio_interrupt_status();
+    gpio_interrupt_disable(status);
+}
+
+#[doc(hidden)]
+pub fn bind_default_interrupt_handler() {
+    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
 }
 
 /// General Purpose Input/Output driver
@@ -77,7 +107,8 @@ impl Io {
 
         crate::interrupt::bind_handler(
             Interrupt::GPIO,
-            InterruptHandler::new(user_gpio_interrupt_handler, Priority::max()),
+            user_gpio_interrupt_handler,
+            // InterruptHandler::new(user_gpio_interrupt_handler, Priority::min()),
         );
     }
 }
@@ -178,6 +209,32 @@ pub enum WakeEvent {
     HighLevel = 5,
 }
 
+/// Read the interrupt status of all pins
+#[cfg(any(esp32s2, esp32s3))]
+#[inline]
+pub fn gpio_interrupt_status() -> u32 {
+    // Bit 0 == GPIO0, in the returned value
+    unsafe { &*LpIo::PTR }.status().read().bits() >> 10
+}
+
+/// Clear the interrupt status for a bit mask of pins
+#[cfg(any(esp32s2, esp32s3))]
+#[inline]
+pub fn gpio_interrupt_clear(pinmask: u32) {
+    // expects pinmask bit 0 == GPIO0
+    unsafe { &*LpIo::PTR }
+        .status_w1tc()
+        .write(|w| unsafe { w.bits(pinmask << 10) });
+}
+
+/// Disable interrupts for a bit mask of pins
+#[cfg(any(esp32s2, esp32s3))]
+#[inline]
+fn gpio_interrupt_disable(_pinmask: u32) {
+    // expects pinmask bit 0 == GPIO0
+    // todo!("Implement masked interrupt disabling.");
+}
+
 /// Set GPIO event listening.
 ///
 /// - `N`: the pin to configure
@@ -188,7 +245,8 @@ pub enum WakeEvent {
 fn enable_pin_interrupt<const N: u8>(int_type: Option<u8>, wakeup_enable: bool) {
     // let GPIO_BASE = unsafe { &*LpIo::PTR }.pin0().as_ptr().addr();
     // TODO: Add LpIo::regs().pins(number : usize) to esp-pacs
-    let gpio_base = 0xa400 + 0x28 + ((N as usize) * 4);
+    let gpio_bank_reg = LpIo::ptr() as usize;
+    let gpio_base = gpio_bank_reg + 0x28 + ((N as usize) * 4);
     let gpio_pin = gpio_base as *mut u32;
 
     // Read the current setting
@@ -221,9 +279,13 @@ fn enable_pin_interrupt<const N: u8>(int_type: Option<u8>, wakeup_enable: bool) 
 
 #[cfg(any(esp32s2, esp32s3))]
 fn clear_pin_interrupt<const N: u8>() {
-    unsafe { &*LpIo::PTR }
-        .status_w1tc()
-        .write(|w| unsafe { w.bits(1 << N) });
+    gpio_interrupt_clear(1 << N);
+}
+
+#[cfg(any(esp32s2, esp32s3))]
+fn is_interrupt_set<const N: u8>() -> bool {
+    let stat = gpio_interrupt_status();
+    (stat & (1 << N)) != 0
 }
 
 /// Flexible pin driver.
@@ -290,7 +352,7 @@ impl<const PIN: u8> Flex<PIN> {
     /// Listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn listen(&mut self, event: Event) {
-        self.clear_interrupts();
+        self.clear_interrupt();
         enable_pin_interrupt::<PIN>(Some(event as u8), false);
     }
 
@@ -298,13 +360,19 @@ impl<const PIN: u8> Flex<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
         enable_pin_interrupt::<PIN>(Some(0), false);
-        self.clear_interrupts();
+        self.clear_interrupt();
     }
 
     /// Clear pin interrupts
     #[cfg(any(esp32s2, esp32s3))]
-    pub fn clear_interrupts(&mut self) {
+    pub fn clear_interrupt(&mut self) {
         clear_pin_interrupt::<PIN>();
+    }
+
+    /// Read pin interrupt
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn is_interrupt_set(&mut self) -> bool {
+        is_interrupt_set::<PIN>()
     }
 
     /// Enable pin as a wake-up source.
@@ -312,7 +380,7 @@ impl<const PIN: u8> Flex<PIN> {
     /// Interrupt type will not be changed, when disabling.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.clear_interrupts();
+        self.clear_interrupt();
         if enable {
             let int_evt = Event::from(event);
             enable_pin_interrupt::<PIN>(Some(int_evt as u8), true);
@@ -347,6 +415,16 @@ impl<const PIN: u8> Input<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
+    }
+    /// Clear pin interrupts
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn clear_interrupt(&mut self) {
+        clear_pin_interrupt::<PIN>();
+    }
+    /// Read pin interrupt
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn is_interrupt_set(&mut self) -> bool {
+        is_interrupt_set::<PIN>()
     }
     /// Enable pin as a wake-up source.
     /// This will change the interrupt type, when enabling.
@@ -421,6 +499,16 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
+    }
+    /// Clear pin interrupts
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn clear_interrupt(&mut self) {
+        clear_pin_interrupt::<PIN>();
+    }
+    /// Read pin interrupt
+    #[cfg(any(esp32s2, esp32s3))]
+    pub fn is_interrupt_set(&mut self) -> bool {
+        is_interrupt_set::<PIN>()
     }
     /// Enable pin as a wake-up source.
     /// This will change the interrupt type, when enabling.
