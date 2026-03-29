@@ -40,7 +40,7 @@ pub use esp32s3_ulp as pac;
 
 /// Interrupt handling for RISCV ULP cores (ESP32-S2,ESP32-S3)
 #[cfg(any(esp32s2, esp32s3))]
-pub mod interrupts;
+pub mod interrupt;
 
 /// The prelude
 pub mod prelude {
@@ -96,7 +96,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         #[cfg(any(esp32s2, esp32s3))]
         {
             ulp_riscv_rescue_from_monitor();
-            interrupts::enable();
+            interrupt::enable();
         }
 
         #[cfg(esp32c6)]

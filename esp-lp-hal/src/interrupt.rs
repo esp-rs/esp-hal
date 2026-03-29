@@ -2,15 +2,264 @@
 //! Uses custom R-type instructions for ESP32-S2 & ESP32-S3 RISCV ULP cores.
 use core::ptr::NonNull;
 
-use crate::pac;
+use portable_atomic::{AtomicPtr, Ordering};
+use procmacros::handler;
+
+use crate::{interrupt, pac};
 
 /// Argument passed to GpioInterrupt handler.
 pub type GpioInterruptPin = u32;
 /// Argument passed to SensInterrupt handler.
 pub use pac::Interrupt as SensInterruptStatus;
 
-const STATUS_WORDS: usize = 1;
+#[doc = r"Enumeration of all the interrupts."]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(u16)]
+pub enum Interrupt {
+    #[doc = "0 - SENS"]
+    SENS = 0,
+    #[doc = "1 - GPIO"]
+    GPIO = 1,
+}
 
+#[doc = r" TryFromInterruptError"]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Copy, Clone)]
+pub struct TryFromInterruptError(());
+impl Interrupt {
+    #[doc = r" Attempt to convert a given value into an `Interrupt`"]
+    #[inline]
+    pub fn try_from(value: u8) -> Result<Self, TryFromInterruptError> {
+        match value {
+            0 => Ok(Interrupt::SENS),
+            1 => Ok(Interrupt::GPIO),
+            _ => Err(TryFromInterruptError(())),
+        }
+    }
+}
+
+/// Convenience constant for `Option::None` pin
+pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+
+pub(super) struct CFnPtr(AtomicPtr<()>);
+impl CFnPtr {
+    pub const fn new() -> Self {
+        Self(AtomicPtr::new(core::ptr::null_mut()))
+    }
+
+    pub fn store(&self, f: extern "C" fn()) {
+        self.0.store(f as *mut (), Ordering::Relaxed);
+    }
+
+    pub fn call(&self) {
+        let ptr = self.0.load(Ordering::Relaxed);
+        if !ptr.is_null() {
+            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+        }
+    }
+}
+
+/// If no handler is allocated, panic.
+#[unsafe(no_mangle)]
+extern "C" fn EspDefaultHandler() {
+    panic!("Unhandled interrupt");
+}
+
+/// Default (unhandled) interrupt handler
+pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
+    {
+        unsafe extern "C" {
+            fn EspDefaultHandler();
+        }
+
+        unsafe {
+            core::mem::transmute::<unsafe extern "C" fn(), extern "C" fn()>(EspDefaultHandler)
+        }
+    },
+    Priority::max(),
+);
+
+/// The default GPIO interrupt handler, when the user has not set one.
+///
+/// This handler will disable all pending interrupts and leave the interrupt
+/// status bits unchanged. This enables functions like `is_interrupt_set` to
+/// work correctly.
+#[handler]
+fn default_gpio_interrupt_handler() {
+    // Does nothing.
+    // DEFAULT_INTERRUPT_HANDLER.handler().callback()();
+}
+
+fn bind_default_interrupt_handler() {
+    // We first check if a handler is set in the vector table.
+    // if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
+    // // We only allow binding the default handler if nothing else is bound.
+    // // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
+    // if handler != DEFAULT_INTERRUPT_HANDLER.handler() {
+    //     // The user has configured an interrupt handler they wish to use.
+    //     info!("Not using default GPIO interrupt handler: already bound in vector table");
+    //     return;
+    // }
+    // }
+
+    // // The vector table doesn't contain a custom entry. Still, the
+    // // peripheral interrupt may already be bound to something else.
+    // for cpu in cores() {
+    //     if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
+    //         info!("Not using default GPIO interrupt handler: peripheral interrupt already in
+    // use");         return;
+    //     }
+    // }
+
+    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
+
+    // // On ESP32, there are separate interrupt status registers for each core, we need to enable
+    // the // interrupt handler on each core otherwise GPIOs listening on the App CPU will not
+    // receive // interrupts.
+    // #[cfg(esp32)]
+    // crate::interrupt::enable_on_cpu(
+    //     crate::system::Cpu::AppCpu,
+    //     Interrupt::GPIO,
+    //     Priority::Priority1,
+    // );
+}
+
+/// The user GPIO interrupt handler, when the user has set one.
+///
+/// The user handler is responsible for clearing the interrupt status bits or disabling
+/// the interrupts.
+pub extern "C" fn user_gpio_interrupt_handler() {
+    // Call the user handler before clearing interrupts. The user can use the enable
+    // bits to determine which interrupts they are interested in. Clearing the
+    // interrupt status or enable bits have no effect on the rest of the
+    // interrupt handler.
+    USER_INTERRUPT_HANDLER.call();
+}
+
+/// Binds the given handler to a peripheral interrupt.
+///
+/// The interrupt handler will be enabled at the specified priority level.
+///
+/// The interrupt handler will be called on the core where it is registered.
+/// Only one interrupt handler can be bound to a peripheral interrupt.
+pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
+    todo!("Port this function to esp-lp-hal")
+    // unsafe {
+    //     let vector = vector_entry(interrupt);
+    //     let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
+    //     // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
+    //     // If we do, we need to temporarily disable this protection.
+    //     #[cfg(all(riscv, write_vec_table_monitoring))]
+    //     if crate::soc::trap_section_protected() {
+    //         crate::debugger::DEBUGGER_LOCK.lock(|| {
+    //             let wp = crate::debugger::clear_watchpoint(1);
+    //             ptr.write_volatile(handler.handler().address());
+    //             crate::debugger::restore_watchpoint(1, wp);
+    //         });
+    //         enable(interrupt, handler.priority());
+    //         return;
+    //     }
+    //     ptr.write_volatile(handler.handler().address());
+    // }
+    // enable(interrupt, handler.priority());
+}
+
+/// Trait implemented by drivers which allow the user to set an
+/// [InterruptHandler]
+pub trait InterruptConfigurable {
+    #[doc = "Registers an interrupt handler for the peripheral."]
+    #[doc = ""]
+    /// Note that this will replace any previously registered interrupt
+    /// handlers. Some peripherals offer a shared interrupt handler for
+    /// multiple purposes. It's the users duty to honor this.
+    ///
+    /// You can restore the default/unhandled interrupt handler by using
+    /// [DEFAULT_INTERRUPT_HANDLER]
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler);
+}
+
+/// Represents an ISR callback function
+#[derive(Copy, Clone)]
+pub struct IsrCallback {
+    f: extern "C" fn(),
+}
+
+impl IsrCallback {
+    /// Construct a new callback from the callback function.
+    pub fn new(f: extern "C" fn()) -> Self {
+        // a valid fn pointer is non zero
+        Self { f }
+    }
+
+    /// Returns the address of the callback.
+    pub fn address(self) -> usize {
+        self.f as usize
+    }
+
+    /// The callback function.
+    ///
+    /// This is aligned and can be called.
+    pub fn callback(self) -> extern "C" fn() {
+        self.f
+    }
+}
+
+impl PartialEq for IsrCallback {
+    fn eq(&self, other: &Self) -> bool {
+        core::ptr::fn_addr_eq(self.callback(), other.callback())
+    }
+}
+
+/// Interrupt priority levels.
+/// For esp-lp-hal there is only one priority level, and this is only included
+/// so that the API is compatible with esp-hal handler macro.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
+#[non_exhaustive]
+pub enum Priority {
+    /// Priority level 1.
+    Priority1 = 1,
+}
+
+impl Priority {
+    /// Maximum interrupt priority
+    pub const fn max() -> Priority {
+        Priority::Priority1
+    }
+
+    /// Minimum interrupt priority
+    pub const fn min() -> Priority {
+        Priority::Priority1
+    }
+}
+
+/// An interrupt handler
+#[derive(Copy, Clone)]
+pub struct InterruptHandler {
+    f: extern "C" fn(),
+    prio: Priority,
+}
+
+impl InterruptHandler {
+    /// Creates a new [InterruptHandler] which will call the given function
+    pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
+        Self { f, prio }
+    }
+
+    /// The Isr callback.
+    #[inline]
+    pub fn handler(&self) -> IsrCallback {
+        IsrCallback::new(self.f)
+    }
+
+    /// Priority to be used when registering the interrupt
+    #[inline]
+    pub fn priority(&self) -> Priority {
+        self.prio
+    }
+}
+
+const STATUS_WORDS: usize = 1;
 /// Representation of peripheral-interrupt status bits.
 #[doc(hidden)]
 #[derive(Clone, Copy, Default, Debug)]

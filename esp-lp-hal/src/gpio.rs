@@ -22,6 +22,14 @@
 //!     }
 //! }
 //! ```
+use crate::interrupt::{
+    Interrupt,
+    InterruptConfigurable,
+    InterruptHandler,
+    Priority,
+    USER_INTERRUPT_HANDLER,
+    user_gpio_interrupt_handler,
+};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
@@ -32,6 +40,51 @@ cfg_if::cfg_if! {
         type LpIo = crate::pac::RTC_IO;
         /// Maximum GPIO pin number.
         pub const MAX_GPIO_PIN: u8 = 21;
+    }
+}
+
+/// General Purpose Input/Output driver
+pub struct Io {
+    _io_peripheral: LpIo,
+}
+
+impl Io {
+    /// Initialize the I/O driver.
+    pub fn new(_io_peripheral: LpIo) -> Self {
+        Io {
+            _io_peripheral: _io_peripheral,
+        }
+    }
+
+    #[doc = "Registers an interrupt handler for all GPIO pins."]
+    /// Note that when using interrupt handlers registered by this function, or
+    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
+    /// **not** clear the interrupt status register or the interrupt enable
+    /// setting for you. Based on your use case, you need to do one of this
+    /// yourself:
+    ///
+    /// - Disabling the interrupt enable setting for the GPIO pin allows you to handle an event once
+    ///   per call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method will return
+    ///   `true` if the interrupt is set even after your handler has finished running.
+    /// - Clearing the interrupt status register allows you to handle an event repeatedly after
+    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] will return `false`
+    ///   after your handler has finished running.
+    ///
+    /// [`listen()`]: Input::listen
+    /// [`is_interrupt_set()`]: Input::is_interrupt_set
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        USER_INTERRUPT_HANDLER.store(handler.handler().callback());
+
+        crate::interrupt::bind_handler(
+            Interrupt::GPIO,
+            InterruptHandler::new(user_gpio_interrupt_handler, Priority::max()),
+        );
+    }
+}
+
+impl crate::interrupt::InterruptConfigurable for Io {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }
 
