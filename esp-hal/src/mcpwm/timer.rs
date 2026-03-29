@@ -139,7 +139,15 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
-    pub fn set_sync_out_selection(&mut self, )
+    pub fn set_sync_out_selection(&mut self, sync_out : SyncOutSelection) {
+        // SAFETY:
+        // We only modify our TIMERx_SYNC register
+        let timer = unsafe { Self::tmr() };
+        // Disable sync input on our timer
+        timer.sync().modify(|_r, w| unsafe {
+            w.synco_sel.bits(sync_out as u8)
+        });
+    }
 
     /// Returns the timers sync_out source
     pub fn get_sync_out(&self) -> SyncOut<'d, PWM> {
@@ -151,18 +159,28 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         // SAFETY:
         // We only modify the PWM TIMER_SYNCI_CFG register
         let pwm = unsafe { &*PWM::block() };
+        // SAFETY:
+        // We only modify our TIMERx_SYNC register
+        let timer = unsafe { Self::tmr() };
+        
+        // Update sync select first
+        let sync_select : SyncSelectionRegister = sync.get_kind().into();
         pwm.timer_synci_cfg().modify(|_r, w| {
-            w.timer0_syncisel()
-        })
+            unsafe {
+                w.timer_syncisel(TIM).bits(sync_select as u8) // Update timer input sync selection
+            }
+        });
 
-        let sync_kind = sync_source.get_kind();
-        let sync_selection : SyncSelectionRegister = sync_kind.into();
-        unsafe {
-            block.cap_timer_cfg().modify(|_r, w| {
-                w.cap_synci_en().set_bit(); // Enable sync input
-                w.cap_synci_sel().bits(sync_selection as u8) // Set the sync selection
-            })
-        }; 
+        // Enable sync input on our timer
+        timer.sync().modify(|_r, w| w.synci_en().set_bit());
+    }
+
+    pub fn clear_sync_in(&mut self) {
+        // SAFETY:
+        // We only modify our TIMERx_SYNC register
+        let timer = unsafe { Self::tmr() };
+        // Disable sync input on our timer
+        timer.sync().modify(|_r, w| w.synci_en().clear_bit());
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
