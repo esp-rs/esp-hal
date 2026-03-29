@@ -90,7 +90,7 @@ use timer::Timer;
 #[cfg(soc_has_mcpwm0)]
 use crate::gpio::InputSignal;
 use crate::{
-    gpio::OutputSignal,
+    gpio::{Input, OutputSignal},
     mcpwm::capture::{CaptureChannel, CaptureTimer},
     pac,
     private::OnDrop,
@@ -103,6 +103,8 @@ use crate::{
 pub mod capture;
 /// MCPWM operators
 pub mod operator;
+/// Sync
+pub mod sync;
 /// MCPWM timers
 pub mod timer;
 
@@ -307,6 +309,8 @@ pub trait PwmPeripheral: crate::private::Sealed {
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
     // Get operator GPIO mux capture input signal
     fn capture_input_signal<const CHAN: u8>() -> InputSignal;
+    // Get operator GPIO mux sync input signal
+    fn sync_input_signal<const SYNC: u8>() -> InputSignal;
     /// Peripheral
     fn peripheral() -> Peripheral;
 }
@@ -334,6 +338,15 @@ impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
             0 => InputSignal::PWM0_CAP0,
             1 => InputSignal::PWM0_CAP1,
             2 => InputSignal::PWM0_CAP2,
+            _ => unreachable!(),
+        }
+    }
+
+    fn sync_input_signal<const SYNC: u8>() -> InputSignal {
+        match SYNC {
+            0 => InputSignal::PWM0_SYNC0,
+            1 => InputSignal::PWM0_SYNC1,
+            2 => InputSignal::PWM0_SYNC2,
             _ => unreachable!(),
         }
     }
@@ -366,6 +379,15 @@ impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
             0 => InputSignal::PWM1_CAP0,
             1 => InputSignal::PWM1_CAP1,
             2 => InputSignal::PWM1_CAP2,
+            _ => unreachable!(),
+        }
+    }
+
+    fn sync_input_signal<const SYNC: u8>() -> InputSignal {
+        match SYNC {
+            0 => InputSignal::PWM1_SYNC0,
+            1 => InputSignal::PWM1_SYNC1,
+            2 => InputSignal::PWM1_SYNC2,
             _ => unreachable!(),
         }
     }

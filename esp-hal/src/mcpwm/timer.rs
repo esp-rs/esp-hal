@@ -8,7 +8,13 @@ use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 use crate::{
-    mcpwm::{FrequencyError, PeripheralClockConfig, PwmClockGuard, PwmPeripheral},
+    mcpwm::{
+        FrequencyError,
+        PeripheralClockConfig,
+        PwmClockGuard,
+        PwmPeripheral,
+        sync::{SyncOut, SyncSource},
+    },
     pac,
     time::Rate,
 };
@@ -60,9 +66,9 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
                 .bits(timer_config.period_updating_method as u8)
         });
 
-        // set timer to continuously run and set the timer working mode
+        // set timer to run with a stop condition
         self.cfg1().write(|w| unsafe {
-            w.start().bits(2);
+            w.start().bits(timer_config.stop_condition as u8);
             w.mod_().bits(timer_config.mode as u8)
         });
     }
@@ -73,18 +79,55 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         self.cfg1().write(|w| unsafe { w.mod_().bits(0) });
     }
 
-    /// Set the timer counter to the provided value
+    //! Set the timer counter to the provided value
+    //! 
+    //! ## Overview
+    //! Internally we set the timers phase and direction
+    //! Then trigger a software sync event.
+    //!
+    //! Note: This triggers a sync out event. If a timer is listening
+    //! to this timers sync out source a sync event will be triggered.
+    //! Refer to how sync events are handled for [`super::CaptureTimer`] or [`Timer`]
+    //! in the their respective documentation.
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
+        self.set_sync_phase(phase);
+        self.set_sync_counter_direction(direction);
+        self.trigger_sync();
+    }
+
+    /// Set the timers sync phase
+    pub fn set_sync_phase(&mut self, phase: u16) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
         let tmr = unsafe { Self::tmr() };
-        let sw = tmr.sync().read().sw().bit_is_set();
-        tmr.sync().write(|w| {
-            w.phase_direction().bit(direction as u8 != 0);
+        tmr.sync().modify(|_r, w| {
             unsafe {
-                w.phase().bits(phase);
+                w.phase().bits(phase)
             }
-            w.sw().bit(!sw)
+        });
+    }
+
+    /// Set the timers sync counter direction
+    /// This specifies how the counter direction will be updated
+    /// during a sync event.
+    pub fn set_sync_counter_direction(&mut self, direction: CounterDirection) {
+        // SAFETY:
+        // We only write to our TIMERx_SYNC register
+        let tmr = unsafe { Self::tmr() };
+        tmr.sync().modify(|_r, w| {
+            w.phase_direction().bit(direction as u8 != 0)
+        });
+    }
+
+    /// Trigger a software sync event
+    /// Note: This always triggers a sync out event even if the
+    /// sync out select is set to when 
+    pub fn trigger_sync(&mut self) {
+        // SAFETY:
+        // We only write to our TIMERx_SYNC register
+        let tmr = unsafe { Self::tmr() };
+        tmr.sync().modify(|r, w| {
+            w.sw().bit(!r.sw().bit())
         });
     }
 
@@ -94,6 +137,32 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         // We only read from our TIMERx_STATUS register
         let reg = unsafe { Self::tmr() }.status().read();
         (reg.value().bits(), reg.direction().bit_is_set().into())
+    }
+
+    pub fn set_sync_out_selection(&mut self, )
+
+    /// Returns the timers sync_out source
+    pub fn get_sync_out(&self) -> SyncOut<'d, PWM> {
+        SyncOut::new::<TIM>()
+    }
+
+    /// Sets the timer sync in source
+    pub fn set_sync_in(&mut self, sync: impl SyncSource) {
+        // SAFETY:
+        // We only modify the PWM TIMER_SYNCI_CFG register
+        let pwm = unsafe { &*PWM::block() };
+        pwm.timer_synci_cfg().modify(|_r, w| {
+            w.timer0_syncisel()
+        })
+
+        let sync_kind = sync_source.get_kind();
+        let sync_selection : SyncSelectionRegister = sync_kind.into();
+        unsafe {
+            block.cap_timer_cfg().modify(|_r, w| {
+                w.cap_synci_en().set_bit(); // Enable sync input
+                w.cap_synci_sel().bits(sync_selection as u8) // Set the sync selection
+            })
+        }; 
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
@@ -114,6 +183,24 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     }
 }
 
+/// Sync out selection for the timer
+/// 
+/// Note: 
+/// During a software sync event triggered by [`Timer::trigger_sync`] or
+/// [`Timer::set_counter`] a sync out is always triggered regardless if
+/// if the timer was configured with [`SyncOutSelection::SyncWhenEqualZero`] or
+/// [`SyncOutSelection::SyncWhenEqualPeriod`].
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub enum SyncOutSelection {
+    /// Sync out is triggered when a timer receives a sync in
+    SyncIn = 0,
+    // Sync out is triggered when the timer equals zero
+    SyncWhenEqualZero = 1,
+    // Sync out is triggered when the timer equals the period
+    SyncWhenEqualPeriod = 2,
+}
+
 /// Clock configuration of a MCPWM timer
 ///
 /// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
@@ -123,6 +210,7 @@ pub struct TimerClockConfig {
     frequency: Rate,
     period: u16,
     period_updating_method: PeriodUpdatingMethod,
+    stop_condition: StopCondition,
     prescaler: u8,
     mode: PwmWorkingMode,
 }
@@ -146,6 +234,7 @@ impl TimerClockConfig {
             prescaler,
             period,
             period_updating_method: PeriodUpdatingMethod::Immediately,
+            stop_condition: StopCondition::RunContinuously,
             mode,
         }
     }
@@ -179,6 +268,7 @@ impl TimerClockConfig {
             prescaler: prescaler as u8,
             period,
             period_updating_method: PeriodUpdatingMethod::Immediately,
+            stop_condition: StopCondition::RunContinuously,
             mode,
         })
     }
@@ -187,6 +277,14 @@ impl TimerClockConfig {
     pub fn with_period_updating_method(self, method: PeriodUpdatingMethod) -> Self {
         Self {
             period_updating_method: method,
+            ..self
+        }
+    }
+
+    // Sets the stop timer conditions
+    pub fn with_stop_conditions(self, condition: StopCondition) -> Self {
+        Self {
+            stop_condition: condition,
             ..self
         }
     }
@@ -213,6 +311,20 @@ pub enum PeriodUpdatingMethod {
     /// The period is updated either when the timer equals zero or on a
     /// synchronization event.
     TimerEqualsZeroOrSync = 3,
+}
+
+/// Method for stop conditions for timers
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub enum StopCondition {
+    /// Defines to start the timer now and run till [`Timer::stop`] is called.
+    RunContinuously = 2,
+    /// Defines to start the timer now and run till the
+    /// next time the timers counts equal zeros
+    StopAtZero = 3,
+    /// Defines to start the timer now and run till the
+    /// next time the timers counts equals period
+    StopAtPeriod = 4,
 }
 
 /// PWM working mode
