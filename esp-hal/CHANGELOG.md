@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C61: Add GPIO support (#5248)
 - C61: Add UART support (#5251)
 - C61: Add I2C support (#5258)
+- Added support for `rand_core 0.10.0` (#5280)
 
 ### Changed
 
