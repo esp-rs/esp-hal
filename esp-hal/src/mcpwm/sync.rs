@@ -12,23 +12,17 @@ use core::marker::PhantomData;
 
 use crate::{gpio::interconnect::PeripheralInput, mcpwm::PwmPeripheral};
 
-/// Must hide the get kind from public facing API
-/// prevents users from creating any sync kind
-mod sealed {
-    /// Repersents the different types of sync sources
-    /// Either from sync lines or from timers sync out
-    #[derive(Clone, Copy)]
-    pub enum SyncKind {
-        SyncLine(u8),
-        TimerSyncOut(u8),
-    }
-
-    pub trait InternalSyncSource {
-        fn get_kind(&self) -> super::SyncKind;
-    }
+/// Repersents the different types of sync sources
+/// Either from sync lines or from timers sync out
+#[derive(Clone, Copy)]
+pub(crate) enum SyncKind {
+    SyncLine(u8),
+    TimerSyncOut(u8),
 }
-/// Give our crate access to the internal sync source and sync kind
-pub(crate) use sealed::{InternalSyncSource, SyncKind};
+
+pub(crate) trait InternalSyncSource: crate::private::Sealed {
+    fn get_kind(&self) -> SyncKind;
+}
 
 /// Public trait to repersent a sync source
 pub trait SyncSource: InternalSyncSource {}
@@ -49,7 +43,8 @@ impl<'d> SyncOut<'d> {
     }
 }
 
-impl<'d> sealed::InternalSyncSource for SyncOut<'d> {
+impl<'d> crate::private::Sealed for SyncOut<'d> {}
+impl<'d> InternalSyncSource for SyncOut<'d> {
     fn get_kind(&self) -> SyncKind {
         SyncKind::TimerSyncOut(self.timer)
     }
@@ -61,9 +56,9 @@ pub struct SyncLine<'d, const SYNC: u8, PWM> {
     _phantom: PhantomData<&'d PWM>,
 }
 
-impl<'d, const SYNC: u8, PWM: PwmPeripheral> sealed::InternalSyncSource
-    for SyncLine<'d, SYNC, PWM>
-{
+impl<'d, const SYNC: u8, PWM: PwmPeripheral> crate::private::Sealed for SyncLine<'d, SYNC, PWM> {}
+
+impl<'d, const SYNC: u8, PWM: PwmPeripheral> InternalSyncSource for SyncLine<'d, SYNC, PWM> {
     fn get_kind(&self) -> SyncKind {
         SyncKind::SyncLine(SYNC)
     }
