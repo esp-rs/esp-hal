@@ -243,39 +243,68 @@ impl Drop for Trng {
     }
 }
 
+/// Compatibility with `rand_core 0.6`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html>.
 #[instability::unstable]
 impl rand_core_06::RngCore for Trng {
     fn next_u32(&mut self) -> u32 {
-        self.rng.next_u32()
+        <Rng as rand_core_06::RngCore>::next_u32(&mut self.rng)
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.rng.next_u64()
+        <Rng as rand_core_06::RngCore>::next_u64(&mut self.rng)
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.rng.fill_bytes(dest)
+        <Rng as rand_core_06::RngCore>::fill_bytes(&mut self.rng, dest)
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core_06::Error> {
-        self.rng.try_fill_bytes(dest)
+        <Rng as rand_core_06::RngCore>::try_fill_bytes(&mut self.rng, dest)
     }
 }
 
+/// Compatibility with `rand_core 0.9`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html>.
 #[instability::unstable]
 impl rand_core_09::RngCore for Trng {
     fn next_u32(&mut self) -> u32 {
-        self.rng.next_u32()
+        <Rng as rand_core_09::RngCore>::next_u32(&mut self.rng)
     }
     fn next_u64(&mut self) -> u64 {
-        self.rng.next_u64()
+        <Rng as rand_core_09::RngCore>::next_u64(&mut self.rng)
     }
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.rng.fill_bytes(dest)
+        <Rng as rand_core_09::RngCore>::fill_bytes(&mut self.rng, dest)
     }
 }
 
+/// Compatibility with `rand_core 0.6`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.6.4/rand_core/trait.CryptoRng.html>.
 #[instability::unstable]
 impl rand_core_06::CryptoRng for Trng {}
+/// Compatibility with `rand_core 0.9`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.9.5/rand_core/trait.CryptoRng.html>.
 #[instability::unstable]
 impl rand_core_09::CryptoRng for Trng {}
+
+// Non-try variants are blanket-implemented when `Error = Infallible`.
+
+/// Compatibility with `rand_core 0.10`
+#[instability::unstable]
+impl rand_core_010::TryRng for Trng {
+    type Error = core::convert::Infallible;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        <Rng as rand_core_010::TryRng>::try_next_u32(&mut self.rng)
+    }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        <Rng as rand_core_010::TryRng>::try_next_u64(&mut self.rng)
+    }
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        <Rng as rand_core_010::TryRng>::try_fill_bytes(&mut self.rng, dest)
+    }
+}
+
+/// Compatibility with `rand_core 0.10`
+#[instability::unstable]
+impl rand_core_010::TryCryptoRng for Trng {}

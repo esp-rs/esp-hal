@@ -99,6 +99,7 @@ embedded-io-07           = { package = "embedded-io", version = "0.7", optional 
 embedded-io-async-07     = { package = "embedded-io-async", version = "0.7", optional = true }
 rand_core-06             = { package = "rand_core", version = "0.6", optional = true }
 rand_core-09             = { package = "rand_core", version = "0.9", optional = true }
+rand_core-010            = { package = "rand_core", version = "0.10", optional = true }
 ufmt-write               = { version = "0.1", optional = true }
 
 # IMPORTANT:
@@ -322,6 +323,7 @@ unstable = [
     "dep:embedded-io-async-07",
     "dep:rand_core-06",
     "dep:rand_core-09",
+    "dep:rand_core-010",
     "dep:nb",
     "dep:ufmt-write",
 ]

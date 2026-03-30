@@ -155,6 +155,8 @@ impl Rng {
 
 // Implement RngCore traits
 
+/// Compatibility with `rand_core 0.6`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html>.
 #[instability::unstable]
 impl rand_core_06::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
@@ -163,7 +165,7 @@ impl rand_core_06::RngCore for Rng {
 
     fn next_u64(&mut self) -> u64 {
         let mut bytes = [0; 8];
-        self.fill_bytes(&mut bytes);
+        self.read(&mut bytes);
         u64::from_le_bytes(bytes)
     }
 
@@ -177,6 +179,8 @@ impl rand_core_06::RngCore for Rng {
     }
 }
 
+/// Compatibility with `rand_core 0.9`. Documentation can be found at
+/// <https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html>.
 #[instability::unstable]
 impl rand_core_09::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
@@ -184,10 +188,28 @@ impl rand_core_09::RngCore for Rng {
     }
     fn next_u64(&mut self) -> u64 {
         let mut bytes = [0; 8];
-        self.fill_bytes(&mut bytes);
+        self.read(&mut bytes);
         u64::from_le_bytes(bytes)
     }
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.read(dest);
+    }
+}
+
+/// Compatibility with `rand_core 0.10`
+#[instability::unstable]
+impl rand_core_010::TryRng for Rng {
+    type Error = core::convert::Infallible;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(self.random())
+    }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        let mut bytes = [0; 8];
+        self.read(&mut bytes);
+        Ok(u64::from_le_bytes(bytes))
+    }
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(dest);
+        Ok(())
     }
 }
