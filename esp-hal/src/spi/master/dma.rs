@@ -67,7 +67,7 @@ impl<'d> Spi<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self, channel.degrade())
+        SpiDma::new_from_spi(self, channel.degrade())
     }
 }
 
@@ -223,12 +223,7 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
-    pub(super) fn new(
-        spi_driver: Spi<'d, Blocking>,
-        channel: PeripheralDmaChannel<AnySpi<'d>>,
-    ) -> Self {
-        let spi = spi_driver.spi;
-
+    fn new_inner(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
         let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(&spi.spi);
 
@@ -268,6 +263,15 @@ impl<'d> SpiDma<'d, Blocking> {
         unsafe { (&mut *state.rx_buffer.get()).write(rx_buffer) };
 
         Self { spi, channel }
+    }
+
+    pub(super) fn new_from_spi(
+        spi_driver: Spi<'d, Blocking>,
+        channel: PeripheralDmaChannel<AnySpi<'d>>,
+    ) -> Self {
+        let spi = spi_driver.spi;
+
+        Self::new_inner(spi, channel)
     }
 
     /// Listen for the given interrupts
