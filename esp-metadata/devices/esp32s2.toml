@@ -82,7 +82,7 @@ peripherals = [
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 3 },
-    { name = "USB0" },
+    { name = "USB0", interrupts = { peri = "USB" } },
     { name = "USB_WRAP" },
     { name = "XTS_AES" },
     { name = "WIFI", interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },

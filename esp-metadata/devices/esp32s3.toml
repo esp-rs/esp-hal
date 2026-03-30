@@ -93,7 +93,7 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 2 },
-    { name = "USB0" },
+    { name = "USB0", interrupts = { peri = "USB" } },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "USB_WRAP" },
     { name = "WCL" },

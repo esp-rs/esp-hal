@@ -14,7 +14,7 @@ use embassy_usb_synopsys_otg::{
     otg_v1::Otg,
 };
 
-use crate::{handler, interrupt::Priority, otg_fs::Usb, peripherals::Interrupt, system::Cpu};
+use crate::{handler, interrupt::Priority, otg_fs::Usb};
 
 #[handler(priority = Priority::max())]
 fn interrupt_handler() {
@@ -49,7 +49,7 @@ impl<'d> Driver<'d> {
         };
 
         Usb::_enable_host();
-        crate::interrupt::bind_handler(Interrupt::USB, interrupt_handler);
+        peri._usb0.bind_peri_interrupt(interrupt_handler);
 
         Self {
             inner: OtgHostDriver::new(instance),
@@ -82,10 +82,7 @@ impl<'d> UsbHostDriver for Driver<'d> {
 
 impl<'d> Drop for Driver<'d> {
     fn drop(&mut self) {
-        crate::interrupt::disable(Cpu::ProCpu, Interrupt::USB);
-
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, Interrupt::USB);
+        self._usb._usb0.disable_peri_interrupt_on_all_cores();
 
         Usb::_disable();
     }
