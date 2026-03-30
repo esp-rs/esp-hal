@@ -105,6 +105,6 @@ async fn main(spawner: Spawner) {
     static SIGNAL: StaticCell<Signal<NoopRawMutex, usize>> = StaticCell::new();
     let signal = &*SIGNAL.init(Signal::new());
 
-    spawner.spawn(reader(rx, &signal)).ok();
-    spawner.spawn(writer(tx, &signal)).ok();
+    spawner.spawn(reader(rx, &signal).unwrap());
+    spawner.spawn(writer(tx, &signal).unwrap());
 }

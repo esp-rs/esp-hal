@@ -82,9 +82,9 @@ async fn main(low_prio_spawner: Spawner) {
     let executor = EXECUTOR.init(executor);
 
     let spawner = executor.start(Priority::Priority3);
-    spawner.must_spawn(high_prio());
+    spawner.spawn(high_prio().unwrap());
 
     println!("Spawning low-priority tasks");
-    low_prio_spawner.must_spawn(low_prio_async());
-    low_prio_spawner.must_spawn(low_prio_blocking());
+    low_prio_spawner.spawn(low_prio_async().unwrap());
+    low_prio_spawner.spawn(low_prio_blocking().unwrap());
 }

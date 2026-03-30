@@ -92,7 +92,7 @@ mod init_tests {
 
         let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiError>>, Signal::new());
 
-        spawner.must_spawn(try_init(signal, p.WIFI));
+        spawner.spawn(try_init(signal, p.WIFI).unwrap());
 
         let _ = signal.wait().await;
     }

@@ -54,7 +54,7 @@ esp32h2 = { version = "0.18", features = ["critical-section"], optional = true, 
 esp32s2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
 esp32s3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
 
-embassy-sync = "0.7.2"
+embassy-sync = "0.8"
 
 defmt = { version = "1.0.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }

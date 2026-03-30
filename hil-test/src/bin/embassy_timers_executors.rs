@@ -203,10 +203,10 @@ mod timers_executors {
         }
 
         let spawner_int = executor.start(Priority::Priority3);
-        spawner_int.must_spawn(test_interrupt_executor_invoker());
+        spawner_int.spawn(test_interrupt_executor_invoker().unwrap());
 
         let spawner = embassy_executor::SendSpawner::for_current_executor().await;
-        spawner.must_spawn(e_task30ms());
+        spawner.spawn(e_task30ms().unwrap());
 
         // The test ends once the interrupt executor's task has finished
         loop {}
@@ -348,7 +348,7 @@ mod interrupt_executor {
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         let spawner = interrupt_executor.start(Priority::Priority3);
-        spawner.must_spawn(responder_task(signal, response));
+        spawner.spawn(responder_task(signal, response).unwrap());
 
         let thread_executor = mk_static!(Executor, Executor::new());
 
@@ -363,7 +363,7 @@ mod interrupt_executor {
 
         thread_executor.run_with_callbacks(
             |spawner| {
-                spawner.must_spawn(tester_task(signal, response));
+                spawner.spawn(tester_task(signal, response).unwrap());
             },
             callbacks,
         )
@@ -377,11 +377,11 @@ mod interrupt_executor {
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         let spawner = interrupt_executor.start(Priority::Priority3);
-        spawner.must_spawn(responder_task(signal, response));
+        spawner.spawn(responder_task(signal, response).unwrap());
 
         let thread_executor = mk_static!(Executor, Executor::new());
         thread_executor.run(|spawner| {
-            spawner.must_spawn(tester_task(signal, response));
+            spawner.spawn(tester_task(signal, response).unwrap());
         })
     }
 
@@ -398,12 +398,12 @@ mod interrupt_executor {
 
             let spawner = interrupt_executor.start(Priority::Priority3);
 
-            spawner.spawn(responder_task(signal, response)).unwrap();
+            spawner.spawn(responder_task(signal, response).unwrap());
         });
 
         let thread_executor = mk_static!(Executor, Executor::new());
         thread_executor.run(|spawner| {
-            spawner.must_spawn(tester_task_multi_core(signal, response));
+            spawner.spawn(tester_task_multi_core(signal, response).unwrap());
         })
     }
 
@@ -417,13 +417,13 @@ mod interrupt_executor {
         esp_rtos::start_second_core(ctx.cpu_control, ctx.sw_int1, app_core_stack, || {
             let executor = mk_static!(Executor, Executor::new());
             executor.run(|spawner| {
-                spawner.spawn(responder_task(signal, response)).ok();
+                spawner.spawn(responder_task(signal, response).unwrap());
             });
         });
 
         let thread_executor = mk_static!(Executor, Executor::new());
         thread_executor.run(|spawner| {
-            spawner.must_spawn(tester_task_multi_core(signal, response));
+            spawner.spawn(tester_task_multi_core(signal, response).unwrap());
         })
     }
 }
@@ -562,9 +562,7 @@ mod interrupt_spi_dma {
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
-        spawner
-            .spawn(interrupt_driven_task(other_peripheral))
-            .unwrap();
+        spawner.spawn(interrupt_driven_task(other_peripheral).unwrap());
 
         let start = Instant::now();
         let mut buffer: [u8; 1024] = [0; 1024];
@@ -681,9 +679,7 @@ mod interrupt_spi_dma {
                 let high_pri_spawner = hp_executor.start(Priority::Priority2);
 
                 // spi runs as high priority task
-                high_pri_spawner
-                    .spawn(run_spi(spi_peripherals, transfer_finished))
-                    .ok();
+                high_pri_spawner.spawn(run_spi(spi_peripherals, transfer_finished).unwrap());
             },
         );
 

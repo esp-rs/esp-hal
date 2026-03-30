@@ -109,8 +109,8 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     // Run the USB device.
-    spawner.must_spawn(usb_task(usb_builder.build()));
-    spawner.must_spawn(usb_ncm_task(runner));
+    spawner.spawn(usb_task(usb_builder.build()).unwrap());
+    spawner.spawn(usb_ncm_task(runner).unwrap());
 
     // Init network stack
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("10.42.0.1");
@@ -127,15 +127,15 @@ async fn main(spawner: Spawner) -> ! {
         RESOURCES.init_with(StackResources::new),
         1234,
     );
-    spawner.must_spawn(net_task(runner));
+    spawner.spawn(net_task(runner).unwrap());
 
     // Start the DHCP server task.
-    spawner.spawn(run_dhcp(stack, gw_ip_addr_str)).unwrap();
+    spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
     // Start the web server tasks.
     let webserver = WEBSERVER.init_with(|| AppBuilder.build_app());
     for task_id in 0..WEB_TASK_POOL_SIZE {
-        spawner.spawn(web_task(task_id, webserver, stack)).unwrap();
+        spawner.spawn(web_task(task_id, webserver, stack).unwrap());
     }
 
     core::future::pending().await

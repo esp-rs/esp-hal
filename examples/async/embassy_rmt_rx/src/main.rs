@@ -72,13 +72,14 @@ async fn main(spawner: Spawner) {
 
     let mut channel = channel.with_pin(peripherals.GPIO4);
 
-    spawner
-        .spawn(signal_task(Output::new(
+    spawner.spawn(
+        signal_task(Output::new(
             peripherals.GPIO5,
             Level::Low,
             OutputConfig::default(),
-        )))
-        .unwrap();
+        ))
+        .unwrap(),
+    );
 
     let mut data = [PulseCode::default(); 48];
 

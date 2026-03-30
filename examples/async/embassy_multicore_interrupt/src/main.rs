@@ -93,7 +93,7 @@ fn main() -> ! {
         .start_app_core(app_core_stack, move || {
             let spawner = executor_core1.start(Priority::Priority1);
 
-            spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+            spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
 
             // Just loop to show that the main thread does not need to poll the executor.
             loop {}
@@ -105,7 +105,7 @@ fn main() -> ! {
     let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
     let spawner = executor_core0.start(Priority::Priority1);
-    spawner.spawn(enable_disable_led(led_ctrl_signal)).ok();
+    spawner.spawn(enable_disable_led(led_ctrl_signal).unwrap());
 
     // Just loop to show that the main thread does not need to poll the executor.
     loop {}

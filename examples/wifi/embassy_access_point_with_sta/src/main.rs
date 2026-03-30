@@ -129,9 +129,9 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(ap_runner)).ok();
-    spawner.spawn(net_task(sta_runner)).ok();
+    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(net_task(ap_runner).unwrap());
+    spawner.spawn(net_task(sta_runner).unwrap());
 
     let sta_address = loop {
         if let Some(config) = sta_stack.config_v4() {
