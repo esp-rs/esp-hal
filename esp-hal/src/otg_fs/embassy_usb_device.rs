@@ -19,15 +19,11 @@ use procmacros::handler;
 
 use crate::{otg_fs::Usb, peripherals::Interrupt, system::Cpu};
 
-// From ESP32-S3 TRM:
-// Six additional endpoints (endpoint numbers 1 to 6), configurable as IN or OUT
-const MAX_EP_COUNT: usize = 7;
-
-static DEVICE_STATE: State<MAX_EP_COUNT> = State::new();
+static DEVICE_STATE: State<{ Usb::MAX_EP_COUNT }> = State::new();
 
 /// Asynchronous USB driver.
 pub struct Driver<'d> {
-    inner: OtgDriver<'d, MAX_EP_COUNT>,
+    inner: OtgDriver<'d, { Usb::MAX_EP_COUNT }>,
     _usb: Usb<'d>,
 }
 
@@ -55,7 +51,7 @@ impl<'d> Driver<'d> {
             state: &DEVICE_STATE,
             fifo_depth_words: Usb::FIFO_DEPTH_WORDS as u16,
             extra_rx_fifo_words: RX_FIFO_EXTRA_SIZE_WORDS,
-            endpoint_count: Usb::ENDPOINT_COUNT,
+            endpoint_count: Usb::MAX_EP_COUNT,
             phy_type: PhyType::InternalFullSpeed,
             calculate_trdt_fn: |_| 5,
         };
@@ -111,7 +107,7 @@ impl<'d> embassy_usb_driver::Driver<'d> for Driver<'d> {
 /// Asynchronous USB bus mainly used internally by `embassy-usb`.
 // We need a custom wrapper implementation to handle custom initialization.
 pub struct Bus<'d> {
-    inner: OtgBus<'d, MAX_EP_COUNT>,
+    inner: OtgBus<'d, { Usb::MAX_EP_COUNT }>,
     _usb: Usb<'d>,
 }
 
@@ -192,5 +188,5 @@ impl Drop for Bus<'_> {
 
 #[handler(priority = crate::interrupt::Priority::max())]
 fn interrupt_handler() {
-    unsafe { on_interrupt(Driver::REGISTERS, &DEVICE_STATE, Usb::ENDPOINT_COUNT) }
+    unsafe { on_interrupt(Driver::REGISTERS, &DEVICE_STATE, Usb::MAX_EP_COUNT) }
 }
