@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C61: Add UART support (#5251)
 - C61: Add I2C support (#5258)
 - C61: Add SPI support (#5261)
+- Added support for `rand_core 0.10.0` (#5280)
 
 ### Changed
 
@@ -91,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
 - `Rng`, `Rng::{random, read}` have been marked stable (#5098)
 - `esp_hal::init` now verifies that the initial stack pointer is in range (#5227)
+- Updated embassy dependencies: embassy-sync to 0.8, embassy-embedded-hal to 0.6 (#5249)
 
 ### Fixed
 

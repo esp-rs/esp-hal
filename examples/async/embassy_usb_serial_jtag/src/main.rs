@@ -79,6 +79,6 @@ async fn main(spawner: Spawner) {
         StaticCell::new();
     let signal = &*SIGNAL.init(Signal::new());
 
-    spawner.spawn(reader(rx, &signal)).unwrap();
-    spawner.spawn(writer(tx, &signal)).unwrap();
+    spawner.spawn(reader(rx, &signal).unwrap());
+    spawner.spawn(writer(tx, &signal).unwrap());
 }

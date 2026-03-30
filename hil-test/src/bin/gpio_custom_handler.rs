@@ -168,8 +168,8 @@ mod tests {
 
         let done = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        interrupt_spawner.must_spawn(sense_pin(gpio1.degrade(), done));
-        interrupt_spawner.must_spawn(drive_pin(gpio2.degrade()));
+        interrupt_spawner.spawn(sense_pin(gpio1.degrade(), done).unwrap());
+        interrupt_spawner.spawn(drive_pin(gpio2.degrade()).unwrap());
 
         done.wait().await;
     }
