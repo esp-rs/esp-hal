@@ -7,6 +7,8 @@
 
 use core::ffi::c_char;
 
+pub(crate) mod reg_access;
+
 #[cfg(feature = "__internal_rom_symbols")]
 pub mod generated_rom_symbols;
 
