@@ -11,6 +11,15 @@ on:
         description: "Example directory name to analyze (e.g., embassy_dhcp)"
         required: true
         type: string
+      package:
+        description: "Optional --package argument (e.g., qa-test)"
+        required: false
+        default: ""
+        type: string
+      chips:
+        description: 'JSON array of chips to test, e.g. ["esp32c3","esp32c6"]'
+        required: true
+        type: string
 
 jobs:
   binary-size:
@@ -23,29 +32,43 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c6
-            rust-target: riscv32imac-unknown-none-elf
-          - soc: esp32
-            rust-target: xtensa-esp32-none-elf
+        soc: ${{ fromJSON(inputs.chips) }}
 
     steps:
-      - name: Setup Rust
-        # Install the Rust toolchain for RISC-V devices:
-        if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
+      # Install the Rust toolchain for RISC-V devices:
+      - name: Resolve Rust target
+        id: target
+        run: |
+          case "${{ matrix.soc }}" in
+            esp32|esp32s2|esp32s3)
+              echo "rust-target=xtensa-${{ matrix.soc }}-none-elf" >> $GITHUB_OUTPUT
+              ;;
+            esp32c2|esp32c3)
+              echo "rust-target=riscv32imc-unknown-none-elf" >> $GITHUB_OUTPUT
+              ;;
+            esp32c5|esp32c6|esp32c61|esp32h2)
+              echo "rust-target=riscv32imac-unknown-none-elf" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "Error: Unknown SoC: ${{ matrix.soc }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Setup Rust (RISC-V)
+        if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc) }}
         uses: dtolnay/rust-toolchain@v1
         with:
-          target: ${{ matrix.target.rust-target }}
+          target: ${{ steps.target.outputs.rust-target }}
           toolchain: stable
           components: rust-src, llvm-tools
 
       # Install the Rust toolchain for Xtensa devices:
-      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
+      - name: Setup Rust (Xtensa)
+        if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc)
         uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          buildtargets: ${{ matrix.target.soc }}
+          buildtargets: ${{ matrix.soc }}
           default: true
           version: 1.93.0.0
 
@@ -59,50 +82,48 @@ jobs:
       - name: Checkout Repo (Initial)
         uses: actions/checkout@v6
 
+      # context https://github.com/actions/checkout/issues/331
       - name: Checkout Pull Request (PR Code at Root)
-        # context https://github.com/actions/checkout/issues/331
         run: hub pr checkout ${{ github.event.inputs.pr_number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Cargo Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/
             ~/.cargo/git/
             ./target/
-          key: ${{ runner.os }}-${{ matrix.target.soc }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.soc }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Dir for result files
-        run: |
-          cd $HOME
-          mkdir results
+        run: mkdir -p $HOME/results
 
       - name: Build PR example
         run: |
           set -euo pipefail
 
           RAW_INPUT="${{ github.event.inputs.example_name }}"
-          cargo xtask build examples $RAW_INPUT --chip "${{ matrix.target.soc }}"
+          PACKAGE="${{ github.event.inputs.package }}"
+          PKG_ARGS=""
+          if [ -n "$PACKAGE" ]; then
+            PKG_ARGS="--package $PACKAGE"
+          fi
+
+          cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
-          BIN=$(
-          find target qa-test/target examples -type f \
-            -path "*/release/${BIN_NAME}" \
-            -executable \
-            2>/dev/null | head -n 1 || true
-          )
+          BIN=$(find target qa-test/target examples -type f \
+            -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
 
           # Fallback to `_` instead of `-`
           if [ -z "$BIN" ]; then
-          BIN=$(find target qa-test/target examples -type f \
-            -path "*/release/${EXAMPLE_NAME}" \
-            -executable \
-            2>/dev/null | head -n 1 || true)
+            BIN=$(find target qa-test/target examples -type f \
+              -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
           fi
 
           if [ -z "$BIN" ]; then
@@ -110,7 +131,7 @@ jobs:
             exit 1
           fi
 
-          cp "$BIN" $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf
+          cp "$BIN" $HOME/results/pr_qa_build_${{ matrix.soc }}.elf
 
       # Checkout base
       - name: Checkout Base Commit
@@ -124,24 +145,24 @@ jobs:
           cargo clean
 
           RAW_INPUT="${{ github.event.inputs.example_name }}"
-          cargo xtask build examples $RAW_INPUT --chip "${{ matrix.target.soc }}"
+          PACKAGE="${{ github.event.inputs.package }}"
+          PKG_ARGS=""
+          if [ -n "$PACKAGE" ]; then
+            PKG_ARGS="--package $PACKAGE"
+          fi
+
+          cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
-          BIN=$(
-          find target qa-test/target examples -type f \
-            -path "*/release/${BIN_NAME}" \
-            -executable \
-            2>/dev/null | head -n 1 || true
-          )
+          BIN=$(find target qa-test/target examples -type f \
+            -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
 
           # Fallback to `_` instead of `-`
           if [ -z "$BIN" ]; then
-          BIN=$(find target qa-test/target examples -type f \
-            -path "*/release/${EXAMPLE_NAME}" \
-            -executable \
-            2>/dev/null | head -n 1 || true)
+            BIN=$(find target qa-test/target examples -type f \
+              -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
           fi
 
           if [ -z "$BIN" ]; then
@@ -149,37 +170,37 @@ jobs:
             exit 1
           fi
 
-          cp "$BIN" $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf
+          cp "$BIN" $HOME/results/base_qa_build_${{ matrix.soc }}.elf
 
       - name: Copy binaries to workspace for Bloaty
         run: |
           # Copy files from $HOME/results to current workspace
-          cp $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf ./
-          cp $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf ./
+          cp $HOME/results/base_qa_build_${{ matrix.soc }}.elf ./
+          cp $HOME/results/pr_qa_build_${{ matrix.soc }}.elf ./
           ls -la *.elf
 
       # Diffs and Artifacts
-      - name: Run Bloaty QA Diff
+      - name: Run Bloaty Diff
         id: bloaty-qa
         uses: carlosperate/bloaty-action@v1
         with:
-          bloaty-args: -d sections --domain vm --source-filter "^.text$|^.data|^.bss|^.rwdata|^.rwtext" pr_qa_build_${{ matrix.target.soc }}.elf -- base_qa_build_${{ matrix.target.soc }}.elf
+          bloaty-args: -d sections --domain vm --source-filter "^.text$|^.data|^.bss|^.rwdata|^.rwtext" pr_qa_build_${{ matrix.soc }}.elf -- base_qa_build_${{ matrix.soc }}.elf
           output-to-summary: false
         continue-on-error: true
 
-      - name: Save Bloaty QA output
+      - name: Save Bloaty output
         run: |
-          echo "QA_DIFF<<EOF" > result-pr-${{ matrix.target.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "${{ steps.bloaty-qa.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
-          echo "EOF" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "EXAMPLE_DIFF<<EOF" > result-pr-${{ matrix.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.soc }}.txt
+          echo "${{ steps.bloaty-qa.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.soc }}.txt
+          echo "EOF" >> result-pr-${{ matrix.soc }}.txt
 
       - name: Upload Result Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: result-${{ matrix.target.soc }}
-          path: result-pr-${{ matrix.target.soc }}.txt
+          name: result-${{ matrix.soc }}
+          path: result-pr-${{ matrix.soc }}.txt
 
   report-results:
     needs: binary-size
@@ -191,6 +212,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v4
         with:
           pattern: result-*
