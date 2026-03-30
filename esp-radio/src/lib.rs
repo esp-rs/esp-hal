@@ -125,7 +125,6 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![cfg_attr(feature = "print-logs-from-driver", feature(c_variadic))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),
