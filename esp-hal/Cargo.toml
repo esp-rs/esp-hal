@@ -73,8 +73,7 @@ procmacros               = { version = "0.22.0", package = "esp-hal-procmacros",
 # They are needed when using the `unstable` feature.
 digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
 embassy-usb-driver       = { version = "0.2", optional = true }
-embassy-usb-host         = { version = "0.2", optional = true }
-embassy-usb-synopsys-otg = { version = "0.3", optional = true }
+embassy-usb-synopsys-otg = { version = "0.3", optional = true, features = ["host"] }
 embedded-can             = { version = "0.4.1", optional = true }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1", optional = true }
@@ -337,7 +336,6 @@ mixed_attributes_style = "allow"
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }
 
-#[patch.crates-io]
-#embassy-usb-driver = { git = "https://github.com/leftger/embassy", branch = "feat/usb-host" }
-#embassy-usb = { git = "https://github.com/leftger/embassy", branch = "feat/usb-host" }
-#embassy-usb-otg-synopsys = { git = "https://github.com/leftger/embassy", branch = "feat/usb-host" }
+[patch.crates-io]
+embassy-usb-driver = { git = "https://github.com/leftger/embassy", branch = "feat/usb-host" }
+embassy-usb-synopsys-otg = { git = "https://github.com/leftger/embassy", branch = "feat/usb-host" }
