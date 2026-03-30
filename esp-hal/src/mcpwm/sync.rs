@@ -42,7 +42,7 @@ impl<'d> SyncOut<'d> {
         }
     }
 }
-
+impl<'d> SyncSource for SyncOut<'d> {}
 impl<'d> crate::private::Sealed for SyncOut<'d> {}
 impl<'d> InternalSyncSource for SyncOut<'d> {
     fn get_kind(&self) -> SyncKind {
@@ -56,8 +56,8 @@ pub struct SyncLine<'d, const SYNC: u8, PWM> {
     _phantom: PhantomData<&'d PWM>,
 }
 
+impl<'d, const SYNC: u8, PWM: PwmPeripheral> SyncSource for SyncLine<'d, SYNC, PWM> {}
 impl<'d, const SYNC: u8, PWM: PwmPeripheral> crate::private::Sealed for SyncLine<'d, SYNC, PWM> {}
-
 impl<'d, const SYNC: u8, PWM: PwmPeripheral> InternalSyncSource for SyncLine<'d, SYNC, PWM> {
     fn get_kind(&self) -> SyncKind {
         SyncKind::SyncLine(SYNC)

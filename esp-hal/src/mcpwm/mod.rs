@@ -90,11 +90,13 @@ use timer::Timer;
 #[cfg(soc_has_mcpwm0)]
 use crate::{
     gpio::{InputSignal, OutputSignal},
+    interrupt::{self, InterruptHandler},
     mcpwm::{
         capture::{CaptureChannel, CaptureTimer},
         sync::SyncLine,
     },
     pac,
+    peripherals::Interrupt,
     private::OnDrop,
     soc::clocks::{self, ClockTree},
     system::{Peripheral, PeripheralGuard},
@@ -197,6 +199,18 @@ impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
             sync1: SyncLine::new(),
             sync2: SyncLine::new(),
         }
+    }
+
+    /// Set the interrupt handler for the MCPWM peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, PWM::interrupt());
+        }
+        interrupt::bind_handler(PWM::interrupt(), handler);
     }
 }
 
@@ -322,6 +336,8 @@ pub trait PwmPeripheral: crate::private::Sealed {
     fn capture_input_signal<const CHAN: u8>() -> InputSignal;
     /// Get operator GPIO mux sync input signal
     fn sync_input_signal<const SYNC: u8>() -> InputSignal;
+    /// Interrupt
+    fn interrupt() -> Interrupt;
     /// Peripheral
     fn peripheral() -> Peripheral;
 }
@@ -330,6 +346,10 @@ pub trait PwmPeripheral: crate::private::Sealed {
 impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
     fn block() -> *const RegisterBlock {
         Self::regs()
+    }
+
+    fn interrupt() -> Interrupt {
+        Interrupt::MCPWM0
     }
 
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
@@ -373,6 +393,10 @@ impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
         Self::regs()
     }
 
+    fn interrupt() -> Interrupt {
+        Interrupt::MCPWM1
+    }
+
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
         match (OP, IS_A) {
             (0, true) => OutputSignal::PWM1_0A,
@@ -405,5 +429,13 @@ impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
 
     fn peripheral() -> Peripheral {
         Peripheral::Mcpwm1
+    }
+}
+
+impl<'d, PWM: PwmPeripheral + 'd> crate::private::Sealed for McPwm<'d, PWM> {}
+#[instability::unstable]
+impl<'d, PWM: PwmPeripheral + 'd> crate::interrupt::InterruptConfigurable for McPwm<'d, PWM> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }

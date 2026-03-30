@@ -255,6 +255,13 @@ impl<'d, const CHAN: u8, PWM: PwmPeripheral> CaptureChannel<'d, CHAN, PWM> {
         block.int_st().read().cap(CHAN as u8).bit()
     }
 
+    pub fn clear_interrupt(&mut self) {
+        // SAFTEY:
+        // We only read from our MCPWM_INT_CLR_REG register
+        let block = unsafe { &*PWM::block() };
+        block.int_clr().write(|w| w.cap(CHAN).bit(true));
+    }
+
     /// Gets the last captured event
     pub fn get_event(&mut self) -> CaptureEvent {
         // SAFTEY:
