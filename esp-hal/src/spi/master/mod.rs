@@ -37,9 +37,10 @@
 #[cfg(esp32)]
 use core::cell::Cell;
 use core::{
-    cell::RefCell,
+    cell::UnsafeCell,
     future::Future,
     marker::PhantomData,
+    mem::MaybeUninit,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -678,17 +679,31 @@ struct SpiWrapper<'d> {
     _guard: PeripheralGuard,
 }
 
-impl SpiWrapper<'_> {
+impl<'d> SpiWrapper<'d> {
+    fn new(spi: impl Instance + 'd) -> Self {
+        let p = spi.info().peripheral;
+        let this = Self {
+            spi: spi.degrade(),
+            _guard: PeripheralGuard::new(p),
+        };
+
+        // Initialize state
+        unsafe {
+            this.state()
+                .pins
+                .get()
+                .write(MaybeUninit::new(SpiPinGuard::new_unconnected()))
+        }
+
+        this
+    }
+
     fn info(&self) -> &'static Info {
         self.spi.info()
     }
 
     fn state(&self) -> &'static State {
         self.spi.state()
-    }
-
-    fn parts(&self) -> (&'static Info, &'static State) {
-        self.spi.parts()
     }
 
     fn disable_peri_interrupt_on_all_cores(&self) {
@@ -698,11 +713,21 @@ impl SpiWrapper<'_> {
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.spi.set_interrupt_handler(handler);
     }
+
+    fn pins(&mut self) -> &mut SpiPinGuard {
+        unsafe {
+            // SAFETY: we "own" the state, we are allowed to borrow it mutably
+            self.state().pins()
+        }
+    }
 }
 
 impl Drop for SpiWrapper<'_> {
     fn drop(&mut self) {
-        self.spi.state().deinit();
+        unsafe {
+            // SAFETY: we "own" the state, we are allowed to deinit it
+            self.spi.state().deinit();
+        }
     }
 }
 
@@ -760,14 +785,9 @@ impl<'d> Spi<'d, Blocking> {
     /// # {after_snippet}
     /// ```
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
-        let _guard = PeripheralGuard::new(spi.info().peripheral);
-
         let mut this = Spi {
             _mode: PhantomData,
-            spi: SpiWrapper {
-                spi: spi.degrade(),
-                _guard,
-            },
+            spi: SpiWrapper::new(spi),
         };
 
         this.driver().init();
@@ -938,9 +958,8 @@ macro_rules! def_with_sio_pin {
         #[doc = " Enables both input and output functionality for the pin, and connects it"]
         #[doc = concat!(" to the SIO", stringify!($n), " output and input signals.")]
         #[instability::unstable]
-        pub fn $fn(self, sio: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.driver().state.pins.borrow_mut().sio_pins[$n] =
-                self.connect_sio_pin(sio.into(), $n);
+        pub fn $fn(mut self, sio: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+            self.spi.pins().sio_pins[$n] = self.connect_sio_pin(sio.into(), $n);
 
             self
         }
@@ -1002,9 +1021,9 @@ where
     ///
     /// # {after_snippet}
     /// ```
-    pub fn with_sck(self, sclk: impl PeripheralOutput<'d>) -> Self {
-        let (info, state) = self.spi.parts();
-        state.pins.borrow_mut().sclk_pin = self.connect_output_pin(sclk.into(), info.sclk);
+    pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
+        let info = self.spi.info();
+        self.spi.pins().sclk_pin = self.connect_output_pin(sclk.into(), info.sclk);
 
         self
     }
@@ -1031,10 +1050,8 @@ where
     ///
     /// # {after_snippet}
     /// ```
-    pub fn with_mosi(self, mosi: impl PeripheralOutput<'d>) -> Self {
-        self.driver().state.pins.borrow_mut().sio_pins[0] =
-            self.connect_sio_output_pin(mosi.into(), 0);
-
+    pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+        self.spi.pins().sio_pins[0] = self.connect_sio_output_pin(mosi.into(), 0);
         self
     }
 
@@ -1083,8 +1100,8 @@ where
     /// See also [Self::with_mosi] when you only need a one-directional MOSI
     /// signal.
     #[instability::unstable]
-    pub fn with_sio0(self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.driver().state.pins.borrow_mut().sio_pins[0] = self.connect_sio_pin(mosi.into(), 0);
+    pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        self.spi.pins().sio_pins[0] = self.connect_sio_pin(mosi.into(), 0);
 
         self
     }
@@ -1101,8 +1118,8 @@ where
     /// See also [Self::with_miso] when you only need a one-directional MISO
     /// signal.
     #[instability::unstable]
-    pub fn with_sio1(self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-        self.driver().state.pins.borrow_mut().sio_pins[1] = self.connect_sio_pin(sio1.into(), 1);
+    pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
+        self.spi.pins().sio_pins[1] = self.connect_sio_pin(sio1.into(), 1);
 
         self
     }
@@ -1134,9 +1151,9 @@ where
     /// be set, regardless of the total number available. There is no
     /// mechanism to select which CS line to use.
     #[instability::unstable]
-    pub fn with_cs(self, cs: impl PeripheralOutput<'d>) -> Self {
-        let (info, state) = self.spi.parts();
-        state.pins.borrow_mut().cs_pin = self.connect_output_pin(cs.into(), info.cs(0));
+    pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
+        let info = self.spi.info();
+        self.spi.pins().cs_pin = self.connect_output_pin(cs.into(), info.cs(0));
 
         self
     }
@@ -2460,7 +2477,7 @@ for_each_spi_master! {
 
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
-                    pins: RefCell::new(SpiPinGuard::new_unconnected()),
+                    pins: UnsafeCell::new(MaybeUninit::uninit()),
 
                     #[cfg(esp32)]
                     esp32_hack: Esp32Hack {
@@ -2486,15 +2503,33 @@ impl QspiInstance for AnySpi<'_> {}
 #[doc(hidden)]
 pub struct State {
     waker: AtomicWaker,
-    pins: RefCell<SpiPinGuard>,
+    pins: UnsafeCell<MaybeUninit<SpiPinGuard>>,
 
     #[cfg(esp32)]
     esp32_hack: Esp32Hack,
 }
 
 impl State {
-    fn deinit(&self) {
-        *self.pins.borrow_mut() = SpiPinGuard::new_unconnected();
+    // Syntactic helper to get a mutable reference to the pin guard.
+    //
+    // Intended to be called in `SpiWrapper::pins` only
+    //
+    // # Safety
+    //
+    // The caller must ensure that Rust's aliasing rules are upheld.
+    #[allow(
+        clippy::mut_from_ref,
+        reason = "Safety requirements ensure this is okay"
+    )]
+    unsafe fn pins(&self) -> &mut SpiPinGuard {
+        unsafe { (&mut *self.pins.get()).assume_init_mut() }
+    }
+
+    unsafe fn deinit(&self) {
+        unsafe {
+            let mut old = self.pins.get().replace(MaybeUninit::uninit());
+            old.assume_init_drop();
+        }
     }
 }
 
