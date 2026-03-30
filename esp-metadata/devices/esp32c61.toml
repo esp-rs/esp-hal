@@ -184,7 +184,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
-    { name = "I2cExt0", template_params = { peripheral = "i2c0" }, stable = true },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" }},
     { name = "Spi2" },
 
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
