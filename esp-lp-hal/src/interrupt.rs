@@ -47,6 +47,7 @@ pub static __INTERRUPTS: [Vector; Interrupt::len()] =
 #[doc = r"Enumeration of all the interrupts."]
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(u16)]
+#[non_exhaustive]
 pub enum Interrupt {
     #[doc = "0 - SENS"]
     SENS = 0,
@@ -92,8 +93,7 @@ impl InterruptStatus {
     pub fn current() -> Self {
         let mut status_bits = 0b00;
         // Check SENS status
-        status_bits |=
-            ((unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits() != 0) as u32) << 0;
+        status_bits |= (unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits() != 0) as u32;
         // Check GPIO status
         status_bits |= ((unsafe { &*pac::RTC_IO::PTR }.status().read().bits() != 0) as u32) << 1;
         InterruptStatus::from(status_bits)

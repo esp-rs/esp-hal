@@ -7,49 +7,49 @@
 #![no_std]
 #![no_main]
 extern crate panic_halt;
-// TODO: I'd prefer if these were proc-macros, which could be used as function attributes.
-//       This would 1) look nicer, and 2) provide better discoverability/type-hinting of the
-// interrupts available for use.
+
 use esp_lp_hal::{
-    gpio::{Event, Input},
-    interrupts::{GpioInterruptPin, SensInterruptStatus, gpio_interrupt, sens_interrupt},
+    gpio::{self, Event, Input, Io},
+    interrupt,
+    pac::Peripherals,
     prelude::*,
 };
 
 // Shared memory address.
 const ADDRESS: u32 = 0x1000;
 
-pub fn on_start(status: SensInterruptStatus) {
-    if status == SensInterruptStatus::RISCV_START_INT {
-        // Did we get a startup interrupt? If so, increment counter
-        let ptr = ADDRESS as *mut u32;
-        let i = unsafe { ptr.read_volatile() };
-        unsafe {
-            ptr.write_volatile(i + 1);
-        }
+fn increment_counter() {
+    let ptr = ADDRESS as *mut u32;
+    let i = unsafe { ptr.read_volatile() };
+    unsafe {
+        ptr.write_volatile(i + 1);
     }
 }
-
-sens_interrupt!(on_start);
-
-pub fn on_button(pin: GpioInterruptPin) {
-    // Reset the counter on GPIO0
-    if pin == 0 {
-        let ptr = ADDRESS as *mut u32;
-        unsafe {
-            ptr.write_volatile(0);
-        }
+fn reset_counter() {
+    let ptr = ADDRESS as *mut u32;
+    unsafe {
+        ptr.write_volatile(0);
     }
 }
-
-gpio_interrupt!(on_button);
 
 #[entry]
-fn main(mut boot_pin: Input<0>) {
-    // Enable start-up interrupt, called shortly after boot.
-    unsafe { &*esp_lp_hal::pac::SENS::PTR }
-        .sar_cocpu_int_ena()
-        .write(|w| w.sar_cocpu_start_int_ena().set_bit());
+fn main(mut boot_button: Input<0>) {
+    // Get the io peripheral, and bind a handler to it.
+    // let peripherals = Peripherals::take().unwrap(); // Requires critical_section
+    let peripherals = unsafe { Peripherals::steal() };
+    let mut io = Io::new(peripherals.RTC_IO);
+    io.set_interrupt_handler(gpio_interrupt_handler);
+    boot_button.listen(Event::FallingEdge);
 
-    boot_pin.listen(Event::FallingEdge);
+    increment_counter();
+}
+
+#[handler]
+fn gpio_interrupt_handler() {
+    // TODO: Create an enum for each GPIO pin? Maybe?
+    let status = gpio::gpio_interrupt_status();
+    if status & (0b1) != 0 {
+        reset_counter();
+    }
+    gpio::gpio_interrupt_clear(status);
 }

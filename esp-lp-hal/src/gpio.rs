@@ -22,11 +22,13 @@
 //!     }
 //! }
 //! ```
+#[cfg(any(esp32s2, esp32s3))]
 use procmacros::handler;
 
+#[cfg(any(esp32s2, esp32s3))]
 use crate::{
     interrupt,
-    interrupt::{CFnPtr, Interrupt, InterruptHandler, Priority},
+    interrupt::{CFnPtr, Interrupt, InterruptHandler},
 };
 
 cfg_if::cfg_if! {
@@ -42,12 +44,14 @@ cfg_if::cfg_if! {
 }
 
 /// Convenience constant for `Option::None` pin
+#[cfg(any(esp32s2, esp32s3))]
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
 
 /// The user GPIO interrupt handler, when the user has set one.
 ///
 /// The user handler is responsible for clearing the interrupt status bits or disabling
 /// the interrupts.
+#[cfg(any(esp32s2, esp32s3))]
 #[handler]
 fn user_gpio_interrupt_handler() {
     // Call the user handler before clearing interrupts. The user can use the enable
@@ -62,12 +66,14 @@ fn user_gpio_interrupt_handler() {
 /// This handler will disable all pending interrupts and leave the interrupt
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
+#[cfg(any(esp32s2, esp32s3))]
 #[handler]
 fn default_gpio_interrupt_handler() {
     let status = gpio_interrupt_status();
     gpio_interrupt_disable(status);
 }
 
+#[cfg(any(esp32s2, esp32s3))]
 #[doc(hidden)]
 pub fn bind_default_interrupt_handler() {
     interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
@@ -81,11 +87,10 @@ pub struct Io {
 impl Io {
     /// Initialize the I/O driver.
     pub fn new(_io_peripheral: LpIo) -> Self {
-        Io {
-            _io_peripheral: _io_peripheral,
-        }
+        Io { _io_peripheral }
     }
 
+    #[cfg(any(esp32s2, esp32s3))]
     #[doc = "Registers an interrupt handler for all GPIO pins."]
     /// Note that when using interrupt handlers registered by this function, or
     /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
@@ -105,14 +110,11 @@ impl Io {
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
 
-        crate::interrupt::bind_handler(
-            Interrupt::GPIO,
-            user_gpio_interrupt_handler,
-            // InterruptHandler::new(user_gpio_interrupt_handler, Priority::min()),
-        );
+        crate::interrupt::bind_handler(Interrupt::GPIO, user_gpio_interrupt_handler);
     }
 }
 
+#[cfg(any(esp32s2, esp32s3))]
 impl crate::interrupt::InterruptConfigurable for Io {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
