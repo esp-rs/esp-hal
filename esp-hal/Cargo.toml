@@ -147,7 +147,7 @@ ufmt-write = { version = "0.1", optional = true }
 esp32 = { features = [
     "critical-section",
     "rt",
-], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc794983b" }
+], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc79498" }
 esp32c2 = { version = "0.28", features = [
     "critical-section",
     "rt",
@@ -163,7 +163,7 @@ esp32c5 = { version = "0.1", features = [
 esp32c6 = { features = [
     "critical-section",
     "rt",
-], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc794983b" }
+], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc79498" }
 esp32c61 = { version = "0.1", features = [
     "critical-section",
     "rt",
@@ -179,7 +179,7 @@ esp32s2 = { version = "0.30", features = [
 esp32s3 = { features = [
     "critical-section",
     "rt",
-], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc794983b" }
+], optional = true, git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "cc79498" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv = { version = "0.15.0" }
