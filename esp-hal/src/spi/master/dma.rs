@@ -35,34 +35,22 @@ impl<'d> Spi<'d, Blocking> {
             _ => "DMA_CH0",
         }
     )]
-    /// Configures the SPI instance to use DMA with the specified channel.
+    /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
     ///
-    /// This method prepares the SPI instance for DMA transfers using SPI
-    /// and returns an instance of `SpiDma` that supports DMA
-    /// operations.
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::{
-    ///     dma::{DmaRxBuf, DmaTxBuf},
-    ///     dma_buffers,
-    ///     spi::{
-    ///         Mode,
-    ///         master::{Config, Spi},
-    ///     },
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
     /// };
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
-    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
-    ///
-    /// let mut spi = Spi::new(
+    /// let mut spi_dma = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default()
     ///         .with_frequency(Rate::from_khz(100))
     ///         .with_mode(Mode::_0),
     /// )?
-    /// .with_dma(peripherals.__dma_channel__)
-    /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// .with_dma(peripherals.__dma_channel__);
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
@@ -77,8 +65,25 @@ impl<'d> Spi<'d, Blocking> {
         _ => "DMA_CH0",
     }
 )]
-/// A DMA-driven SPI instance.
-// TODO
+/// DMA-controlled SPI driver.
+///
+/// This driver uses DMA to transfer data, allowing the CPU to continue working while the SPI
+/// transfer is in progress.
+///
+/// The driver provides two separate approaches to transferring data:
+///
+/// - The slice-based API allows transferring data from/to slices of memory. The data will be copied
+///   into an internal buffer before the transfer begins. These copy buffers must be set up by
+///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins.
+/// - The buffer API allows transferring externally managed buffers. In this mode, you provide the
+///   buffers to be transferred. The buffer objects ensure that data is located in appropriate
+///   memory regions. The buffers and the driver object are are moved into transfer objects for the
+///   duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects as
+///   arguments as well as the number of bytes to transfer, and their names end with `_buffer`.
+///
+/// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
+/// use. `embedded-hal` traits are implemented by the slice-based API's functions.
+///
 /// ```rust, no_run
 /// # {before_snippet}
 /// use esp_hal::{
@@ -89,6 +94,8 @@ impl<'d> Spi<'d, Blocking> {
 ///         master::{Config, Spi},
 ///     },
 /// };
+///
+/// // Optional: create and set up 32000 byte copy buffers.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 ///
 /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
@@ -105,6 +112,7 @@ impl<'d> Spi<'d, Blocking> {
 /// #
 /// # {after_snippet}
 /// ```
+// TODO: update docs once the driver can transfer data without copying
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SpiDma<'d, Dm>
 where
@@ -668,7 +676,12 @@ where
     }
 
     /// Assigns copy buffers to the SPI driver.
-    // TODO: write docs once the driver can actually transfer data without copying - we'll need to
+    ///
+    /// These buffers will be used to copy data when using the slice-based transfer functions.
+    ///
+    /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
+    /// be wasted.
+    // TODO: update docs once the driver can actually transfer data without copying - we'll need to
     // explain when this function is necessary.
     #[instability::unstable]
     pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
