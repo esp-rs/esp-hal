@@ -21,7 +21,7 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     otg_fs::{
         Usb,
-        asynch::{Config, Driver},
+        embassy_usb_device::{Config, Driver},
     },
     timer::timg::TimerGroup,
 };
