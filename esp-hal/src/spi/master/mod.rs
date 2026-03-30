@@ -57,11 +57,12 @@ use enumset::{EnumSet, EnumSetType, enum_set};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
+#[cfg_attr(esp32c61, expect(unused))]
+use crate::RegisterToggle;
 use crate::{
     Async,
     Blocking,
     DriverMode,
-    RegisterToggle,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
@@ -519,7 +520,7 @@ impl Config {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 let _clocks = clocks;
                 Rate::from_mhz(48)
-            } else if #[cfg(esp32c5)] {
+            } else if #[cfg(any(esp32c5, esp32c61))] {
                 // We select the 160MHz PLL as the clock source in the driver. There is a by-2 divider
                 // configured between the PLL and the SPI clock (spi2_clkm_div_num).
                 let _clocks = clocks;

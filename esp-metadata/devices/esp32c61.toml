@@ -78,7 +78,7 @@ peripherals = [
     # { name = "SLCHOST" }, TODO: add PAC manually later
     # { name = "SPI0" },
     # { name = "SPI1" },
-    # { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1, stable = true },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -184,7 +184,8 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
-    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" }},
+    { name = "Spi2" },
 
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
 ] } }
@@ -370,6 +371,21 @@ has_reliable_fsm_reset = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+
+[device.spi_master]
+support_status = "supported"
+supports_dma = false
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+has_clk_pre_div = true
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
+]
 
 ## Radio
 [device.wifi]

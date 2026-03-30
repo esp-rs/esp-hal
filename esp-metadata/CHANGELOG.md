@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Encode pin restrictions in the generated data (#4790)
 - Initial ESP32-C5 support (#4859, #4866)
 - DMA properties and peripheral selector values (#4944)
-- Initial ESP32-C61 support (#5187, #5248, #5251, #5258)
+- Initial ESP32-C61 support (#5187, #5248, #5251, #5258, #5261)
 
 ### Changed
 
