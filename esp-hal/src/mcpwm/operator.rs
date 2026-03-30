@@ -192,7 +192,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     ///
     /// ### Note:
     /// By default TIMER0 is used
-    pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
+    pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<'d, TIM, PWM>) {
         let _ = timer;
         // SAFETY:
         // We only write to our OPERATORx_TIMERSEL register

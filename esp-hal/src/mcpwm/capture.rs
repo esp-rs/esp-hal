@@ -13,13 +13,10 @@
 //! This module provides the flexiability of configuring any GPIO pin as an input
 //! for capturing the rising and/or falling edge of a signal. This module allows
 //! for the ability to trigger software captures.
-//! 
+//!
 //! Capture timer can be configured to sync with a PWM timer during specific events
 //! either when the PWM timer sync out event, or a sync in from an external GPIO pin.
-//! 
-use core::{marker::PhantomData, panic};
-
-use esp_sync::RawMutex;
+use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 pub use crate::pac::mcpwm0::{
@@ -27,39 +24,40 @@ pub use crate::pac::mcpwm0::{
     cap_status::CAP0_EDGE as CaptureEdge,
 };
 use crate::{
-    gpio::{InputSignal, interconnect::PeripheralInput},
-    mcpwm::{PwmClockGuard, PwmPeripheral, sync::{SyncKind, SyncSource, InternalSyncSource, SyncSelectionRegister}},
+    gpio::interconnect::PeripheralInput,
+    mcpwm::{
+        PwmClockGuard,
+        PwmPeripheral,
+        sync::{SyncSelection, SyncSource},
+    },
 };
 
-static MUTEX: RawMutex = RawMutex::new();
-
-//! The MCPWM Capture Timer
-//! 
-//! ## Overview
-//!  - This timer is shared by all instances of [`CaptureChannel`] for a MCPWM.
-//! During capture events on any of the channels the time stored in this timer will be
-//! loaded into the [`CaptureEvent`]'s time.
-//! - This is a timer has the clock source of APB_CLK. 
-//! - A sync source can be selected by calling [`CaptureTimer::set_sync`] with a sync source.
-//! - A sync source can be removed by calling [`CaptureTimer::clear_sync`].
-//! 
-//! During a sync event on this capture timer the counter of the timer is reset.
-//! The value that the timer reset to depends on the sync source:
-//! - If the sync source came from a timer with [`super::Timer::get_sync_out`]
-//! the value that it is reset to the phase value for the given timer.
-//! 
-//! - If the sync sorce came from a sync line in [`super::McPwm`] then the timer
-//! is reset with a value of 0.
-//! 
+/// The MCPWM Capture Timer
+///
+/// ## Overview
+///  - This timer is shared by all instances of [`CaptureChannel`] for a MCPWM.
+/// During capture events on any of the channels the time stored in this timer will be
+/// loaded into the [`CaptureEvent`]'s time.
+/// - This is a timer has the clock source of APB_CLK.
+/// - A sync source can be selected by calling [`CaptureTimer::set_sync`] with a sync source.
+/// - A sync source can be removed by calling [`CaptureTimer::clear_sync`].
+///
+/// During a sync event on this capture timer the counter of the timer is reset.
+/// The value that the timer reset to depends on the sync source:
+/// - If the sync source came from a timer with [`super::Timer::get_sync_out`]
+/// the value that it is reset to the phase value for the given timer.
+///
+/// - If the sync sorce came from a sync line in [`super::McPwm`] then the timer
+/// is reset with a value of 0.
 pub struct CaptureTimer<'d, PWM> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
- 
-impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
+
+impl<'d, PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
     pub(super) fn new(guard: PeripheralGuard) -> Self {
-        Timer {
+        Self {
             phantom: PhantomData,
             _guard: guard,
             _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
@@ -72,7 +70,9 @@ impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
         // We modify our MCPWM_CAP_TIMER_CFG_REG register
         let block = unsafe { &*PWM::block() };
 
-        block.cap_timer_cfg().modify(|w| w.cap_timer_en().set_bit());
+        block
+            .cap_timer_cfg()
+            .modify(|_r, w| w.cap_timer_en().set_bit());
     }
 
     /// Pauses the capture timer
@@ -83,7 +83,7 @@ impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
 
         block
             .cap_timer_cfg()
-            .modify(|w| w.cap_timer_en().clear_bit());
+            .modify(|_r, w| w.cap_timer_en().clear_bit());
     }
 
     /// Clears the captures timer sync source
@@ -94,7 +94,7 @@ impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
         unsafe {
             block.cap_timer_cfg().modify(|_r, w| {
                 w.cap_synci_en().clear_bit(); // Disable sync inputs
-                w.cap_synci_sel().bits(CaptureSyncSelection::None as u8) // No sync input
+                w.cap_synci_sel().bits(SyncSelection::None as u8) // No sync input
             })
         };
     }
@@ -102,14 +102,13 @@ impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
     /// ## Overview
     /// Sets the capture timers sync source. Refer to how sync events are
     /// handled in the [`CaptureTimer`] documentation.
-    /// 
-    pub fn set_sync_in(&mut self, sync_source : impl SyncSource) {
+    pub fn set_sync_in(&mut self, sync_source: impl SyncSource) {
         // SAFETY:
         // We modify our MCPWM_CAP_TIMER_CFG_REG register
         let block = unsafe { &*PWM::block() };
 
         let sync_kind = sync_source.get_kind();
-        let sync_selection : SyncSelectionRegister = sync_kind.into();
+        let sync_selection: SyncSelection = sync_kind.into();
         unsafe {
             block.cap_timer_cfg().modify(|_r, w| {
                 w.cap_synci_en().set_bit(); // Enable sync input
@@ -121,28 +120,31 @@ impl<PWM: PwmPeripheral> CaptureTimer<'d, PWM> {
     /// ## Overview
     /// This triggers a software sync event on the capture timer
     /// Refer to how sync events are handled in the [`CaptureTimer`] documentation.
-    /// 
     pub fn trigger_sync(&mut self) {
         // SAFETY:
         // We modify our MCPWM_CAP_TIMER_CFG_REG register
         let block = unsafe { &*PWM::block() };
         // Trigger a software sync
-        block.cap_timer_cfg().modify(|_r, w| w.cap_sync_sw().set_bit());
+        block
+            .cap_timer_cfg()
+            .modify(|_r, w| w.cap_sync_sw().set_bit());
     }
 }
 
 /// Repersents the capture event
 /// Contains the capture time and the captured edge
 pub struct CaptureEvent {
-    time : u32,
-    edge : CaptureEdge
+    time: u32,
+    edge: CaptureEdge,
 }
 
 impl CaptureEvent {
+    /// Gets the captured time
     pub fn get_time(&self) -> u32 {
         self.time
     }
 
+    /// Gets the captured edge
     pub fn get_edge(&self) -> CaptureEdge {
         self.edge
     }
@@ -154,16 +156,16 @@ impl CaptureEvent {
 /// * Enable/Disable capturing on this channel
 /// * Setting the capture input GPIO pin
 /// * Weather to trigger capture events on rising and/or falling edges
-/// * Read the last capture edge, and the last capture time 
-pub struct CaptureChannel<'d, const CHAN: usize, PWM> {
+/// * Read the last capture edge, and the last capture time
+pub struct CaptureChannel<'d, const CHAN: u8, PWM> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
 
-impl<const CHAN: usize, PWM: PwmPeripheral> CaptureChannel<CHAN, PWM> {
-    pub(super) fn new<const CHAN: usize>(guard: PeripheralGuard) -> Self {
-        Timer {
+impl<'d, const CHAN: u8, PWM: PwmPeripheral> CaptureChannel<'d, CHAN, PWM> {
+    pub(super) fn new(guard: PeripheralGuard) -> Self {
+        Self {
             phantom: PhantomData,
             _guard: guard,
             _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
@@ -171,11 +173,13 @@ impl<const CHAN: usize, PWM: PwmPeripheral> CaptureChannel<CHAN, PWM> {
     }
 
     /// Enables this capture channel
-    pub fn set_enable(&mut self, enable : bool) {
+    pub fn set_enable(&mut self, enable: bool) {
         // SAFETY:
         // We only write to our MCPWM_CAP_CHx_CFG_REG register
         let block = unsafe { &*PWM::block() };
-        block.cap_ch_cfg(CHAN).modify(|_, w| w.en().variant(enable));
+        block
+            .cap_ch_cfg(CHAN as usize)
+            .modify(|_, w| w.en().variant(enable));
     }
 
     /// Set the capture signal (pin/high/low) for this channel
@@ -206,12 +210,14 @@ impl<const CHAN: usize, PWM: PwmPeripheral> CaptureChannel<CHAN, PWM> {
     /// - If configured for both edges, captures occur every Nth edge (rising + falling combined)
     ///
     /// Passing in a value of prescaler = 0 into this function will set the prescaler value of 1
-    pub fn set_prescaler(&mut self, prescaler : u8) {
+    pub fn set_prescaler(&mut self, prescaler: u8) {
         // SAFETY:
         // We only write to our MCPWM_CAP_CHx_CFG_REG register
         let block = unsafe { &*PWM::block() };
         unsafe {
-            block.cap_ch_cfg(CHAN).modify(|_, w| w.prescale().bits(prescaler));
+            block
+                .cap_ch_cfg(CHAN as usize)
+                .modify(|_, w| w.prescale().bits(prescaler));
         }
     }
 
@@ -223,7 +229,7 @@ impl<const CHAN: usize, PWM: PwmPeripheral> CaptureChannel<CHAN, PWM> {
         // We are modifying a shared peripheral interrupt enable register
         let block = unsafe { &*PWM::block() };
         block
-            .cap_ch_cfg(CHAN)
+            .cap_ch_cfg(CHAN as usize)
             .write(|w| w.mode().variant(capture_mode));
 
         // Enable the capture interrupt
@@ -241,24 +247,21 @@ impl<const CHAN: usize, PWM: PwmPeripheral> CaptureChannel<CHAN, PWM> {
         block.int_ena().modify(|_, w| w.cap(CHAN as u8).clear_bit());
     }
 
-    // Checks if the interrupt was set for this channel
-    pub fn is_interupt_set<const CHAN: usize>(&mut self) -> bool {
+    /// If the interrupt was set for this channel
+    pub fn is_interupt_set(&mut self) -> bool {
         // SAFTEY:
         // We only read from our MCPWM_INT_ST_REG register
         let block = unsafe { &*PWM::block() };
         block.int_st().read().cap(CHAN as u8).bit()
     }
 
-    // Gets the captured event
-    pub fn get_event<const CHAN: usize>(&mut self) -> CaptureEvent {
+    /// Gets the last captured event
+    pub fn get_event(&mut self) -> CaptureEvent {
         // SAFTEY:
         // We only read from our MCPWM_INT_ST_REG & MCPWM_CAP_STATUS_REG register
         let block = unsafe { &*PWM::block() };
-        let time = block.cap_ch(CHAN).read().value().bits();
+        let time = block.cap_ch(CHAN as usize).read().value().bits();
         let edge = block.cap_status().read().cap_edge(CHAN as u8).variant();
-        CaptureEvent {
-            time,
-            edge
-        }
+        CaptureEvent { time, edge }
     }
 }

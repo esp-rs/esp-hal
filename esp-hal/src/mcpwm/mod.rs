@@ -88,10 +88,12 @@ use operator::Operator;
 use timer::Timer;
 
 #[cfg(soc_has_mcpwm0)]
-use crate::gpio::InputSignal;
 use crate::{
-    gpio::{Input, OutputSignal},
-    mcpwm::capture::{CaptureChannel, CaptureTimer},
+    gpio::{InputSignal, OutputSignal},
+    mcpwm::{
+        capture::{CaptureChannel, CaptureTimer},
+        sync::SyncLine,
+    },
     pac,
     private::OnDrop,
     soc::clocks::{self, ClockTree},
@@ -137,11 +139,11 @@ impl PwmClockGuard {
 pub struct McPwm<'d, PWM> {
     _inner: PWM,
     /// Timer0
-    pub timer0: Timer<0, PWM>,
+    pub timer0: Timer<'d, 0, PWM>,
     /// Timer1
-    pub timer1: Timer<1, PWM>,
+    pub timer1: Timer<'d, 1, PWM>,
     /// Timer2
-    pub timer2: Timer<2, PWM>,
+    pub timer2: Timer<'d, 2, PWM>,
     /// Operator0
     pub operator0: Operator<'d, 0, PWM>,
     /// Operator1
@@ -151,11 +153,17 @@ pub struct McPwm<'d, PWM> {
     /// Capture Timer
     pub capture_timer: CaptureTimer<'d, PWM>,
     /// Capture0
-    pub capture0: CaptureChannel<0, PWM>,
+    pub capture0: CaptureChannel<'d, 0, PWM>,
     /// Capture1
-    pub capture1: CaptureChannel<1, PWM>,
+    pub capture1: CaptureChannel<'d, 1, PWM>,
     /// Capture2
-    pub capture2: CaptureChannel<2, PWM>,
+    pub capture2: CaptureChannel<'d, 2, PWM>,
+    /// Sync0
+    pub sync0: SyncLine<'d, 0, PWM>,
+    /// Sync1
+    pub sync1: SyncLine<'d, 1, PWM>,
+    /// Sync2
+    pub sync2: SyncLine<'d, 2, PWM>,
 }
 
 impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
@@ -185,6 +193,9 @@ impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
             capture0: CaptureChannel::new(guard.clone()),
             capture1: CaptureChannel::new(guard.clone()),
             capture2: CaptureChannel::new(guard),
+            sync0: SyncLine::new(),
+            sync1: SyncLine::new(),
+            sync2: SyncLine::new(),
         }
     }
 }
@@ -307,9 +318,9 @@ pub trait PwmPeripheral: crate::private::Sealed {
     fn block() -> *const RegisterBlock;
     /// Get operator GPIO mux output signal
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
-    // Get operator GPIO mux capture input signal
+    /// Get operator GPIO mux capture input signal
     fn capture_input_signal<const CHAN: u8>() -> InputSignal;
-    // Get operator GPIO mux sync input signal
+    /// Get operator GPIO mux sync input signal
     fn sync_input_signal<const SYNC: u8>() -> InputSignal;
     /// Peripheral
     fn peripheral() -> Peripheral;

@@ -8,15 +8,9 @@
 //!
 //! This module provides the flexability to map any of the sync line
 //! to any GPIO signal. Aswell to repersent any timer's sync_out source.
-use core::{marker::PhantomData, panic};
+use core::marker::PhantomData;
 
-use esp_sync::RawMutex;
-
-use super::PeripheralGuard;
-use crate::{
-    gpio::{InputSignal, interconnect::PeripheralInput},
-    mcpwm::{PwmClockGuard, PwmPeripheral},
-};
+use crate::{gpio::interconnect::PeripheralInput, mcpwm::PwmPeripheral};
 
 /// Must hide the get kind from public facing API
 /// prevents users from creating any sync kind
@@ -30,24 +24,23 @@ mod sealed {
     }
 
     pub trait InternalSyncSource {
-        fn get_kind(&self) -> SyncKind;
+        fn get_kind(&self) -> super::SyncKind;
     }
 }
-// Give our crate access to the internal sync source
-// and sync kind
+/// Give our crate access to the internal sync source and sync kind
 pub(crate) use sealed::{InternalSyncSource, SyncKind};
 
 /// Public trait to repersent a sync source
-pub trait SyncSource: sealed::InternalSyncSource {}
+pub trait SyncSource: InternalSyncSource {}
 
 /// Sync out for timers
 #[derive(Clone, Copy)]
-pub struct SyncOut<'d, PWM> {
+pub struct SyncOut<'d> {
     timer: u8,
-    _phantom: PhantomData<'d, PWM>,
+    _phantom: PhantomData<&'d u8>,
 }
 
-impl<'d, PWM: PwmPeripheral> SyncOut<'d, PWM> {
+impl<'d> SyncOut<'d> {
     pub(crate) fn new<const TIM: u8>() -> Self {
         Self {
             timer: TIM,
@@ -56,7 +49,7 @@ impl<'d, PWM: PwmPeripheral> SyncOut<'d, PWM> {
     }
 }
 
-impl<'d, PWM: PwmPeripheral> sealed::InternalSyncSource for SyncOut<'d, PWM> {
+impl<'d> sealed::InternalSyncSource for SyncOut<'d> {
     fn get_kind(&self) -> SyncKind {
         SyncKind::TimerSyncOut(self.timer)
     }
@@ -64,11 +57,13 @@ impl<'d, PWM: PwmPeripheral> sealed::InternalSyncSource for SyncOut<'d, PWM> {
 
 /// There are only a limited number sync lines for the MCPWM unit
 #[derive(Clone, Copy)]
-pub struct SyncLine<const SYNC: u8, PWM> {
-    _phantom: PhantomData<PWM>,
+pub struct SyncLine<'d, const SYNC: u8, PWM> {
+    _phantom: PhantomData<&'d PWM>,
 }
 
-impl<const SYNC: u8, PWM: PwmPeripheral> sealed::InternalSyncSource for SyncLine<SYCN, PWM> {
+impl<'d, const SYNC: u8, PWM: PwmPeripheral> sealed::InternalSyncSource
+    for SyncLine<'d, SYNC, PWM>
+{
     fn get_kind(&self) -> SyncKind {
         SyncKind::SyncLine(SYNC)
     }
@@ -97,36 +92,37 @@ impl<'d, const SYNC: u8, PWM: PwmPeripheral> SyncLine<'d, SYNC, PWM> {
     }
 }
 
-// Values for any of the sync selection registers
+/// Values for any of the sync selection registers
 #[repr(u8)]
 #[derive(Copy, Clone)]
-pub(crate) enum SyncSelectionRegister {
-    // Select no sync input for the capture timer
+pub(crate) enum SyncSelection {
+    /// Select no sync input for the capture timer
     None          = 0,
-    // Select the timers sync source for a timer's sync out,
+    /// Select the timers sync source for a timer's sync out,
     Timer0SyncOut = 1,
     Timer1SyncOut = 2,
     Timer2SyncOut = 3,
-    // Select the timers sync source from a sync line
+    /// Select the timers sync source from a sync line
     SyncLine0     = 4,
     SyncLine1     = 5,
     SyncLine2     = 6,
 }
 
-// Provides a simple way of translating the internal SyncKind
-impl From<SyncKind> for SyncSelectionRegister {
+/// Provides a simple way of translating the internal SyncKind to
+/// the value for sync selection used in SYNCI_SEL register fields
+impl From<SyncKind> for SyncSelection {
     fn from(value: SyncKind) -> Self {
         match value {
             SyncKind::SyncLine(line) => match line {
-                0 => SyncSelectionRegister::SyncLine0,
-                1 => SyncSelectionRegister::SyncLine1,
-                2 => SyncSelectionRegister::SyncLine2,
+                0 => SyncSelection::SyncLine0,
+                1 => SyncSelection::SyncLine1,
+                2 => SyncSelection::SyncLine2,
                 _ => unreachable!(),
             },
             SyncKind::TimerSyncOut(timer) => match timer {
-                0 => SyncSelectionRegister::Timer0SyncOut,
-                1 => SyncSelectionRegister::Timer1SyncOut,
-                2 => SyncSelectionRegister::Timer2SyncOut,
+                0 => SyncSelection::Timer0SyncOut,
+                1 => SyncSelection::Timer1SyncOut,
+                2 => SyncSelection::Timer2SyncOut,
                 _ => unreachable!(),
             },
         }
