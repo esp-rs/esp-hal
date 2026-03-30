@@ -2595,8 +2595,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
-        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((all(@ peri_type
-        #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2,
+        1)); _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton"] GPIO2 <= virtual()), (@ peri_type #[doc =
         "GPIO3 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
@@ -2806,10 +2807,11 @@ macro_rules! for_each_peripheral {
         (LP_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
         (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
-        (SLC(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
-        (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (USB_DEVICE(unstable)),
-        (BT(unstable)), (FLASH(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
-        (WIFI))); _for_each_inner_peripheral!((dma_eligible));
+        (SLC(unstable)), (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)),
+        (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1),
+        (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)), (LP_CORE(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI)));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

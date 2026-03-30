@@ -22,11 +22,11 @@ use hil_test as _;
 cfg_if::cfg_if! {
     if #[cfg(feature = "unstable")] {
         use esp_hal::peripherals::SPI2;
+        use esp_hal::spi::master::{Address, Command, DataMode};
 
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
             gpio::{Level, NoPin},
-            spi::master::{Address, Command, DataMode},
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
             dma_buffers,
         };

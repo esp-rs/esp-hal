@@ -55,10 +55,8 @@ use enumset::{EnumSet, EnumSetType, enum_set};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
-
 #[cfg_attr(esp32c61, expect(unused))]
 use crate::RegisterToggle;
-
 use crate::{
     Async,
     Blocking,
