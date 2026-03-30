@@ -1,4 +1,7 @@
-use core::mem::ManuallyDrop;
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 pub trait Sealed {}
 
@@ -24,19 +27,42 @@ impl Internal {
     }
 }
 
-pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
-impl<F: FnOnce()> OnDrop<F> {
-    pub fn new(cb: F) -> Self {
-        Self(ManuallyDrop::new(cb))
+pub(crate) struct DropGuard<I, F: FnOnce(I)> {
+    inner: ManuallyDrop<I>,
+    on_drop: ManuallyDrop<F>,
+}
+
+impl<I, F: FnOnce(I)> DropGuard<I, F> {
+    pub(crate) fn new(inner: I, on_drop: F) -> Self {
+        Self {
+            inner: ManuallyDrop::new(inner),
+            on_drop: ManuallyDrop::new(on_drop),
+        }
     }
 
-    pub fn defuse(self) {
+    pub(crate) fn defuse(self) {
         core::mem::forget(self);
     }
 }
 
-impl<F: FnOnce()> Drop for OnDrop<F> {
+impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
     fn drop(&mut self) {
-        unsafe { (ManuallyDrop::take(&mut self.0))() }
+        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
+        let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
+        (on_drop)(inner)
+    }
+}
+
+impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
+    type Target = I;
+
+    fn deref(&self) -> &I {
+        &self.inner
+    }
+}
+
+impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
+    fn deref_mut(&mut self) -> &mut I {
+        &mut self.inner
     }
 }

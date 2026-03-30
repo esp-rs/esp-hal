@@ -69,7 +69,7 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
-    private::OnDrop,
+    private::DropGuard,
     ram,
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
@@ -1087,7 +1087,7 @@ impl<'d> UartRx<'d, Async> {
             // future resolved.
             let info = self.uart.info();
             unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
-            let _guard = OnDrop::new(|| {
+            let _guard = DropGuard::new((), |_| {
                 unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
             });
 
