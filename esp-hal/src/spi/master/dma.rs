@@ -151,7 +151,7 @@ impl<'d> SpiDma<'d, Blocking> {
             1
         };
 
-        let (_info, state) = spi.spi.dma_parts();
+        let state = spi.spi.dma_state();
 
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
@@ -162,23 +162,20 @@ impl<'d> SpiDma<'d, Blocking> {
             [[DmaDescriptor::EMPTY]; SPI_NUM];
 
         let empty_rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
-        let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(esp32, spi_address_workaround))] {
+                static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
+                let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
+                let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
+            } else {
+                let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
+            }
+        }
 
         // The buffers must be set up when creating the driver.
         unsafe { (&mut *state.empty_tx_buffer.get()).write(empty_tx_buffer) };
         unsafe { (&mut *state.empty_rx_buffer.get()).write(empty_rx_buffer) };
-
-        #[cfg(all(esp32, spi_address_workaround))]
-        {
-            static mut ADDR_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-                [[DmaDescriptor::EMPTY]; SPI_NUM];
-            static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
-            let address_buffer = unwrap!(DmaTxBuf::new(
-                unsafe { &mut ADDR_DESCRIPTORS[id] },
-                crate::dma::as_mut_byte_array!(BUFFERS[id], 4),
-            ));
-            unsafe { (&mut *state.address_buffer.get()).write(address_buffer) };
-        }
 
         Self { spi, channel }
     }
@@ -406,8 +403,12 @@ where
         }
     }
 
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
     #[cfg(all(esp32, spi_address_workaround))]
-    fn set_up_address_workaround(
+    unsafe fn set_up_address_workaround(
         &mut self,
         cmd: Command,
         address: Address,
@@ -419,7 +420,7 @@ where
             return Err(Error::Unsupported);
         }
 
-        let buffer = unsafe { self.dma_driver().esp32_address_buffer() };
+        let buffer = unsafe { self.spi.dma_state().empty_tx_buffer() };
 
         let bytes_to_write = address.width().div_ceil(8);
         // The address register is read in big-endian order,
@@ -769,7 +770,7 @@ where
             // On the ESP32, if we don't have data, the address is always sent
             // on a single line, regardless of its data mode.
             if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
-                return self.set_up_address_workaround(cmd, address, dummy);
+                return unsafe { self.set_up_address_workaround(cmd, address, dummy) };
             }
         }
 
@@ -1268,16 +1269,11 @@ pub(super) struct DmaDriver {
 
 impl DmaDriver {
     unsafe fn empty_rx_buffer(&self) -> &'static mut DmaRxBuf {
-        unsafe { (&mut *self.state.empty_rx_buffer.get()).assume_init_mut() }
+        unsafe { self.state.empty_rx_buffer() }
     }
 
     unsafe fn empty_tx_buffer(&self) -> &'static mut DmaTxBuf {
-        unsafe { (&mut *self.state.empty_tx_buffer.get()).assume_init_mut() }
-    }
-
-    #[cfg(all(esp32, spi_address_workaround))]
-    unsafe fn esp32_address_buffer(&self) -> &'static mut DmaTxBuf {
-        unsafe { (&mut *self.state.address_buffer.get()).assume_init_mut() }
+        unsafe { self.state.empty_tx_buffer() }
     }
 
     fn abort_transfer(&self) {
@@ -1498,9 +1494,34 @@ struct DmaState {
 
     empty_rx_buffer: UnsafeCell<MaybeUninit<DmaRxBuf>>,
     empty_tx_buffer: UnsafeCell<MaybeUninit<DmaTxBuf>>,
+}
 
-    #[cfg(all(esp32, spi_address_workaround))]
-    address_buffer: UnsafeCell<MaybeUninit<DmaTxBuf>>,
+impl DmaState {
+    // Syntactic helper to get a mutable reference to the "empty" RX DMA buffer.
+    //
+    // # Safety
+    //
+    // The caller must ensure that Rust's aliasing rules are upheld.
+    #[allow(
+        clippy::mut_from_ref,
+        reason = "Safety requirements ensure this is okay"
+    )]
+    unsafe fn empty_rx_buffer(&self) -> &mut DmaRxBuf {
+        unsafe { (&mut *self.empty_rx_buffer.get()).assume_init_mut() }
+    }
+
+    // Syntactic helper to get a mutable reference to the "empty" TX DMA buffer.
+    //
+    // # Safety
+    //
+    // The caller must ensure that Rust's aliasing rules are upheld.
+    #[allow(
+        clippy::mut_from_ref,
+        reason = "Safety requirements ensure this is okay"
+    )]
+    unsafe fn empty_tx_buffer(&self) -> &mut DmaTxBuf {
+        unsafe { (&mut *self.empty_tx_buffer.get()).assume_init_mut() }
+    }
 }
 
 // SAFETY: State belongs to the currently constructed driver instance. As such, it'll not be
@@ -1525,9 +1546,6 @@ for_each_spi_master!(
 
                                 empty_rx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                                 empty_tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
-
-                                #[cfg(all(esp32, spi_address_workaround))]
-                                address_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                             };
 
                             (&DMA_INFO, &DMA_STATE)
