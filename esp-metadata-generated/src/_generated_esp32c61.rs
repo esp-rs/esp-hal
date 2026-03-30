@@ -2705,18 +2705,17 @@ macro_rules! for_each_peripheral {
         (GPIO28), (GPIO29), (ASSIST_DEBUG(unstable)), (CLINT(unstable)), (DMA(unstable)),
         (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)), (ETM(unstable)),
         (GPIO(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0(unstable)), (I2S0(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
-        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)),
-        (LP_CLKRST(unstable)), (LPWR(unstable)), (LP_IO_MUX(unstable)),
-        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
-        (LP_WDT(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
-        (MODEM_SYSCON(unstable)), (PAU(unstable)), (PCR(unstable)), (PMU(unstable)),
-        (RNG(unstable)), (SHA(unstable)), (SLC(unstable)), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI)));
-        _for_each_inner_peripheral!((dma_eligible));
+        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
+        (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
+        (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)),
+        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
+        (LP_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
+        (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
+        (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
+        (SLC(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
+        (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (USB_DEVICE(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
+        (WIFI))); _for_each_inner_peripheral!((dma_eligible));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
