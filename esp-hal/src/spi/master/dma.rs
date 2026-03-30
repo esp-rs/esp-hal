@@ -1242,7 +1242,7 @@ where
 pub(super) struct DmaDriver {
     driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
-    state: &'static State,
+    state: &'static DmaState,
 }
 
 impl DmaDriver {
@@ -1495,31 +1495,31 @@ where
     }
 }
 
-struct Info {
+struct DmaInfo {
     dma_peripheral: crate::dma::DmaPeripheral,
 }
-struct State {
+struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
 }
 
 // SAFETY: State belongs to the currently constructed driver instance. As such, it'll not be
 // accessed concurrently in multiple threads.
-unsafe impl Sync for State {}
+unsafe impl Sync for DmaState {}
 
 for_each_spi_master!(
     (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
         impl AnySpi<'_> {
             #[inline(always)]
-            fn dma_parts(&self) -> (&'static Info, &'static State) {
+            fn dma_parts(&self) -> (&'static DmaInfo, &'static DmaState) {
                 match &self.0 {
                     $(
                         super::any::Inner::$sys(_spi) => {
-                            static DMA_INFO: Info = Info {
+                            static DMA_INFO: DmaInfo = DmaInfo {
                                 dma_peripheral: crate::dma::DmaPeripheral::$sys,
                             };
 
-                            static DMA_STATE: State = State {
+                            static DMA_STATE: DmaState = DmaState {
                                 tx_transfer_in_progress: Cell::new(false),
                                 rx_transfer_in_progress: Cell::new(false),
                             };
@@ -1531,13 +1531,13 @@ for_each_spi_master!(
             }
 
             #[inline(always)]
-            fn dma_state(&self) -> &'static State {
+            fn dma_state(&self) -> &'static DmaState {
                 let (_, state) = self.dma_parts();
                 state
             }
 
             #[inline(always)]
-            fn dma_info(&self) -> &'static Info {
+            fn dma_info(&self) -> &'static DmaInfo {
                 let (info, _) = self.dma_parts();
                 info
             }
@@ -1546,7 +1546,7 @@ for_each_spi_master!(
 );
 
 impl SpiWrapper<'_> {
-    fn dma_state(&self) -> &'static State {
+    fn dma_state(&self) -> &'static DmaState {
         self.spi.dma_state()
     }
 
