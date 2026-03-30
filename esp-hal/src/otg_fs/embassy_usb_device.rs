@@ -17,7 +17,7 @@ use embassy_usb_synopsys_otg::{
 };
 use procmacros::handler;
 
-use crate::{otg_fs::Usb, peripherals::Interrupt, system::Cpu};
+use crate::{interrupt::Priority, otg_fs::Usb};
 
 static DEVICE_STATE: State<{ Usb::MAX_EP_COUNT }> = State::new();
 
@@ -137,14 +137,11 @@ impl Bus<'_> {
         // Enable PHY clock
         r.pcgcctl().write(|w| w.0 = 0);
 
-        crate::interrupt::bind_handler(Interrupt::USB, interrupt_handler);
+        self._usb._usb0.bind_peri_interrupt(interrupt_handler);
     }
 
     fn disable(&mut self) {
-        crate::interrupt::disable(Cpu::ProCpu, Interrupt::USB);
-
-        #[cfg(multi_core)]
-        crate::interrupt::disable(Cpu::AppCpu, Interrupt::USB);
+        self._usb._usb0.disable_peri_interrupt_on_all_cores();
 
         Usb::_disable();
     }
@@ -186,7 +183,7 @@ impl Drop for Bus<'_> {
     }
 }
 
-#[handler(priority = crate::interrupt::Priority::max())]
+#[handler(priority = Priority::max())]
 fn interrupt_handler() {
     unsafe { on_interrupt(Driver::REGISTERS, &DEVICE_STATE, Usb::MAX_EP_COUNT) }
 }

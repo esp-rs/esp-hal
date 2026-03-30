@@ -3581,7 +3581,8 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
         UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB0 peripheral singleton"] USB0 <= USB0() (unstable)));
+        "USB0 peripheral singleton"] USB0 <= USB0(USB : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "USB_WRAP peripheral singleton"]
         USB_WRAP <= USB_WRAP() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)));
@@ -3918,10 +3919,11 @@ macro_rules! for_each_peripheral {
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UHCI0 peripheral singleton"]
         UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0() (unstable)), (@ peri_type #[doc = "USB_WRAP peripheral singleton"]
-        USB_WRAP <= USB_WRAP() (unstable)), (@ peri_type #[doc =
-        "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)), (@ peri_type
-        #[doc = "WIFI peripheral singleton"] WIFI <= WIFI(WIFI_MAC : {
+        USB0 <= USB0(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@ peri_type
+        #[doc = "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)), (@
+        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= WIFI(WIFI_MAC : {
         bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : {
         bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt })), (@ peri_type
         #[doc = "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2() (unstable)), (@
