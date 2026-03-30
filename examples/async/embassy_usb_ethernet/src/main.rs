@@ -33,7 +33,7 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     otg_fs::{
         Usb,
-        asynch::{Config, Driver as UsbDriver},
+        embassy_usb_device::{Config, Driver as UsbDriver},
     },
     timer::timg::TimerGroup,
 };

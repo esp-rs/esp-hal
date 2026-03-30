@@ -844,7 +844,7 @@ dependencies = [
 [[package]]
 name = "esp32"
 version = "0.39.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -853,7 +853,7 @@ dependencies = [
 [[package]]
 name = "esp32c2"
 version = "0.28.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -862,7 +862,7 @@ dependencies = [
 [[package]]
 name = "esp32c3"
 version = "0.31.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -871,7 +871,7 @@ dependencies = [
 [[package]]
 name = "esp32c6"
 version = "0.22.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -880,7 +880,7 @@ dependencies = [
 [[package]]
 name = "esp32h2"
 version = "0.18.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -889,7 +889,7 @@ dependencies = [
 [[package]]
 name = "esp32s2"
 version = "0.30.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
@@ -898,7 +898,7 @@ dependencies = [
 [[package]]
 name = "esp32s3"
 version = "0.34.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+source = "git+https://github.com/esp-rs/esp-pacs?rev=879efa6#879efa6a91c6f0e2c7672830a39cf002d8c973bb"
 dependencies = [
  "critical-section",
  "vcell",
