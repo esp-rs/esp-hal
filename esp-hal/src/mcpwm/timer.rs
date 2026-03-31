@@ -6,31 +6,46 @@
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
+
 use super::PeripheralGuard;
 use crate::{
     mcpwm::{
         FrequencyError,
+        Instance,
         PeripheralClockConfig,
         PwmClockGuard,
-        PwmPeripheral,
         sync::{SyncOut, SyncSelection, SyncSource},
     },
     pac,
     time::Rate,
 };
 
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum TimerEvent {
+    /// Event for when a timer stops
+    TimerStop,
+    /// Event for when a timer equals zero
+    TimerEqualZero,
+    /// Event for when a timer equals period
+    TimerEqualPeriod,
+}
+
 /// A MCPWM timer
 ///
 /// Every timer of a particular [`MCPWM`](super::McPwm) peripheral can be used
 /// as a timing reference for every
 /// [`Operator`](super::operator::Operator) of that peripheral
-pub struct Timer<'d, const TIM: u8, PWM> {
+pub struct Timer<'d, const TIM: u8, PWM: Instance> {
     pub(super) phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
 
-impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
+impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     pub(super) fn new(guard: PeripheralGuard) -> Self {
         Timer {
             phantom: PhantomData,
@@ -86,9 +101,9 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     /// Then trigger a software sync event.
     ///
     /// Note: This triggers a sync out event. If a timer is listening
-    /// to this timers sync out source a sync event will be triggered.
-    /// Refer to how sync events are handled for [`super::CaptureTimer`] or [`Timer`]
-    /// in the their respective documentation.
+    /// to this timers sync out. Then a sync event will be propagated.
+    /// Refer to how sync events are handled for [`super::CaptureTimer`]
+    /// or [`Timer`] in the their respective documentation.
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         self.set_sync_phase(phase);
         self.set_sync_counter_direction(direction);
@@ -99,7 +114,7 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     pub fn set_sync_phase(&mut self, phase: u16) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
-        let tmr = unsafe { Self::tmr() };
+        let tmr = Self::tmr();
         tmr.sync().modify(|_r, w| unsafe { w.phase().bits(phase) });
     }
 
@@ -109,18 +124,18 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     pub fn set_sync_counter_direction(&mut self, direction: CounterDirection) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
-        let tmr = unsafe { Self::tmr() };
+        let tmr = Self::tmr();
         tmr.sync()
             .modify(|_r, w| w.phase_direction().bit(direction as u8 != 0));
     }
 
     /// Trigger a software sync event
-    /// Note: This always triggers a sync out event even if the
-    /// sync out select is set to when
+    /// Note: This always triggers a sync out event from
+    /// its [`Timer::get_sync_out`] source.
     pub fn trigger_sync(&mut self) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
-        let tmr = unsafe { Self::tmr() };
+        let tmr = Self::tmr();
         tmr.sync().modify(|r, w| w.sw().bit(!r.sw().bit()));
     }
 
@@ -128,15 +143,15 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     pub fn status(&self) -> (u16, CounterDirection) {
         // SAFETY:
         // We only read from our TIMERx_STATUS register
-        let reg = unsafe { Self::tmr() }.status().read();
+        let reg = Self::tmr().status().read();
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
-    /// Selects the how the timer fires sync events
+    /// Selects the how the timer fires sync out events
     pub fn set_sync_out_selection(&mut self, sync_out: SyncOutSelection) {
         // SAFETY:
         // We only modify our TIMERx_SYNC register
-        let timer = unsafe { Self::tmr() };
+        let timer = Self::tmr();
         // Disable sync input on our timer
         timer
             .sync()
@@ -144,22 +159,23 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     }
 
     /// Returns the timers sync_out source
-    pub fn get_sync_out(&self) -> SyncOut<'d> {
-        SyncOut::new::<TIM>()
+    pub fn get_sync_out(&self) -> SyncOut<'d, TIM, PWM> {
+        SyncOut::new()
     }
 
     /// Sets the timer sync in source
-    pub fn set_sync_in(&mut self, sync: impl SyncSource) {
+    pub fn set_sync_in(&mut self, sync: impl SyncSource<PWM>) {
         // SAFETY:
         // We only modify the PWM TIMER_SYNCI_CFG register
-        let pwm = unsafe { &*PWM::block() };
+        let block = PWM::info().regs();
+
         // SAFETY:
         // We only modify our TIMERx_SYNC register
-        let timer = unsafe { Self::tmr() };
+        let timer = Self::tmr();
 
         // Update sync select first
         let sync_select: SyncSelection = sync.get_kind().into();
-        pwm.timer_synci_cfg().modify(|_r, w| {
+        block.timer_synci_cfg().modify(|_r, w| {
             unsafe {
                 w.timer_syncisel(TIM).bits(sync_select as u8) // Update timer input sync selection
             }
@@ -173,25 +189,85 @@ impl<'d, const TIM: u8, PWM: PwmPeripheral> Timer<'d, TIM, PWM> {
     pub fn clear_sync_in(&mut self) {
         // SAFETY:
         // We only modify our TIMERx_SYNC register
-        let timer = unsafe { Self::tmr() };
+        let timer = Self::tmr();
         // Disable sync input on our timer
         timer.sync().modify(|_r, w| w.synci_en().clear_bit());
+    }
+
+    #[instability::unstable]
+    pub fn listen(&mut self, events: EnumSet<TimerEvent>) {
+        self.enable_interrupts(events, true);
+    }
+
+    #[instability::unstable]
+    pub fn unlisten(&mut self, events: EnumSet<TimerEvent>) {
+        self.enable_interrupts(events, false);
+    }
+
+    #[instability::unstable]
+    pub fn interrupts(&self) -> EnumSet<TimerEvent> {
+        let mut res = EnumSet::new();
+        let reg_block = PWM::info().regs();
+
+        let ints = reg_block.int_st().read();
+        if ints.timer_stop(TIM).bit() {
+            res.insert(TimerEvent::TimerStop);
+        }
+        if ints.timer_tep(TIM).bit() {
+            res.insert(TimerEvent::TimerEqualPeriod);
+        }
+        if ints.timer_tez(TIM).bit() {
+            res.insert(TimerEvent::TimerEqualZero);
+        }
+
+        res
+    }
+
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, events: EnumSet<TimerEvent>) {
+        let reg_block = PWM::info().regs();
+
+        reg_block.int_clr().write(|w| {
+            for event in events {
+                match event {
+                    TimerEvent::TimerStop => w.timer_stop(TIM).variant(true),
+                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).variant(true),
+                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).variant(true),
+                };
+            }
+            w
+        });
+    }
+
+    fn enable_interrupts(&mut self, events: EnumSet<TimerEvent>, value: bool) {
+        let reg_block = PWM::info().regs();
+
+        reg_block.int_ena().modify(|_, w| {
+            for event in events {
+                match event {
+                    TimerEvent::TimerStop => w.timer_stop(TIM).variant(value),
+                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).variant(value),
+                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).variant(value),
+                };
+            }
+            w
+        });
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
-        unsafe { Self::tmr() }.cfg0()
+        Self::tmr().cfg0()
     }
 
     fn cfg1(&mut self) -> &pac::mcpwm0::timer::CFG1 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
-        unsafe { Self::tmr() }.cfg1()
+        Self::tmr().cfg1()
     }
 
-    unsafe fn tmr() -> &'static pac::mcpwm0::TIMER {
-        let block = unsafe { &*PWM::block() };
+    fn tmr() -> &'static pac::mcpwm0::TIMER {
+        let block = PWM::info().regs();
         block.timer(TIM as usize)
     }
 }
