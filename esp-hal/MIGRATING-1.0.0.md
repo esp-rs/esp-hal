@@ -150,6 +150,8 @@ can be read using the `success` method.
 
 ## eFuse Changes
 
+### Module structure change
+
 The `Efuse` struct has been removed. All methods are now free-standing functions
 in the `efuse` module. Some functions have been renamed:
 
@@ -162,3 +164,18 @@ in the `efuse` module. Some functions have been renamed:
 
 `Efuse::read_base_mac_address()` has been removed; use `efuse::base_mac_address()` instead.
 `MacAddress::as_bytes_mut()` has been removed; use `MacAddress::as_bytes()` for read access.
+
+### Chip revision change
+
+`chip_revision` now returns a `ChipRevision` structure. This structure allows more efficient
+operations compared to the old combined u16 - it does not require integer multiplication/division.
+
+The old `u16` revision number is equivalent to `ChipRevision`'s `combined` representation. You
+can use the `from_combined` and `combined` functions to keep working with this representation. A
+new, `packed` representation (also encoded as `u16`) is now available which is less computationally
+expensive.
+
+```diff
+-let revision = chip_revision();
++let revision = chip_revision().combined();
+```

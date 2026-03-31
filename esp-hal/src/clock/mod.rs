@@ -66,6 +66,8 @@ pub mod ll {
     pub use crate::soc::clocks::*;
 }
 
+#[cfg(timergroup_rc_fast_calibration_divider)]
+use crate::efuse::ChipRevision;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use crate::soc::clocks::ClockConfig;
@@ -281,9 +283,9 @@ impl Clocks {
 
         #[cfg(timergroup_rc_fast_calibration_divider)]
         let calibration_divider = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
-            && crate::soc::chip_revision_above(property!(
+            && crate::soc::chip_revision_above(ChipRevision::from_combined(property!(
                 "timergroup.rc_fast_calibration_divider_min_rev"
-            )) {
+            ))) {
             property!("timergroup.rc_fast_calibration_divider")
         } else {
             1
