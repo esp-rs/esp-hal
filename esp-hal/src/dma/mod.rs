@@ -54,7 +54,7 @@
 //!
 //! For convenience you can use the [crate::dma_buffers] macro.
 
-use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fence};
+use core::{fmt::Debug, marker::PhantomData, sync::atomic::compiler_fence};
 
 use enumset::{EnumSet, EnumSetType};
 
@@ -1012,7 +1012,6 @@ impl DescriptorChain {
             unsafe { core::slice::from_raw_parts_mut(data, len) },
             self.descriptors,
             max_chunk_size,
-            circular,
         )?;
         DescriptorSet::set_up_descriptors(
             self.descriptors,
@@ -1034,7 +1033,7 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
     }
 
     if buffer_size < chunk_size {
-        // At least one descriptor is always required.
+        // At least one descriptor is always required, even if buffer_size is 0.
         return 1;
     }
 
@@ -1054,8 +1053,6 @@ impl<'a> DescriptorSet<'a> {
         if !is_slice_in_dram(descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
-
-        descriptors.fill(DmaDescriptor::EMPTY);
 
         Ok(unsafe { Self::new_unchecked(descriptors) })
     }
@@ -1117,7 +1114,7 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         chunk_size: usize,
     ) -> Result<(), DmaBufError> {
-        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size, false)
+        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -1159,10 +1156,9 @@ impl<'a> DescriptorSet<'a> {
     ) -> Result<&mut [DmaDescriptor], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
         let required_descriptors = descriptor_count(len, chunk_size, is_circular);
-        if descriptors.len() < required_descriptors {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-        Ok(&mut descriptors[..required_descriptors])
+        descriptors
+            .get_mut(..required_descriptors)
+            .ok_or(DmaBufError::InsufficientDescriptors)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -1182,7 +1178,8 @@ impl<'a> DescriptorSet<'a> {
         let descriptors =
             Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
 
-        // Link up the descriptors.
+        // Link up the descriptors. This must be done first, because closures can expect the next
+        // pointer to be set.
         let mut next = if is_circular {
             descriptors.as_mut_ptr()
         } else {
@@ -1196,11 +1193,14 @@ impl<'a> DescriptorSet<'a> {
         // Prepare each descriptor.
         let mut remaining_length = len;
         for desc in descriptors.iter_mut() {
-            let chunk_size = min(chunk_size, remaining_length);
+            let chunk_size = chunk_size.min(remaining_length);
             prepare(desc, chunk_size);
             remaining_length -= chunk_size;
         }
-        debug_assert_eq!(remaining_length, 0);
+
+        if remaining_length > 0 {
+            return Err(DmaBufError::InsufficientDescriptors);
+        }
 
         Ok(())
     }
@@ -1220,15 +1220,15 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         descriptors: &mut [DmaDescriptor],
         chunk_size: usize,
-        is_circular: bool,
     ) -> Result<(), DmaBufError> {
-        let descriptors =
-            Self::descriptors_for_buffer_len(descriptors, buffer.len(), chunk_size, is_circular)?;
-
-        let chunks = buffer.chunks_mut(chunk_size);
-        for (desc, chunk) in descriptors.iter_mut().zip(chunks) {
+        let mut chunks = buffer.chunks_mut(chunk_size);
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
             desc.set_size(chunk.len());
             desc.buffer = chunk.as_mut_ptr();
+        }
+
+        if chunks.next().is_some() {
+            return Err(DmaBufError::InsufficientDescriptors);
         }
 
         Ok(())
