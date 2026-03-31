@@ -21,9 +21,11 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 |          | `Wi-Fi`| `BLE` | `Coex (Wi-Fi + BLE)` | `ESP-NOW` | `IEEE 802.15.4`
 | :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: | :-----: |
 |  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
-| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |    
+| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
 | ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
+| ESP32-C5 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |    ✓    |
 | ESP32-C6 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |    ✓    |
+| ESP32-C61|                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
 | ESP32-H2 |                       &mdash;                        |                          ✓                          |                       &mdash;                        | &mdash; |    ✓    |
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    | &mdash; |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
