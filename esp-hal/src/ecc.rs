@@ -14,6 +14,8 @@ use core::{marker::PhantomData, ptr::NonNull};
 
 use procmacros::BuilderLite;
 
+#[cfg(ecc_supports_enhanced_security)]
+use crate::efuse::ChipRevision;
 use crate::{
     Blocking,
     DriverMode,
@@ -547,7 +549,7 @@ impl Info {
                 .bit(config.force_enable_mem_clock);
 
             #[cfg(ecc_supports_enhanced_security)]
-            if !cfg!(esp32h2) || crate::soc::chip_revision_above(102) {
+            if !cfg!(esp32h2) || crate::soc::chip_revision_above(ChipRevision::from_combined(102)) {
                 w.security_mode().bit(config.enhanced_security);
             }
 
