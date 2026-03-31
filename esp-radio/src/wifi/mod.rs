@@ -7,7 +7,8 @@
 #![doc = concat!("- Station mode (aka STA mode or Wi-Fi client mode). ", chip_pretty!(), " connects to an access point.")]
 #![doc = concat!("- AP mode (aka Soft-AP mode or Access Point mode). Stations connect to the ", chip_pretty!(),".")]
 #![doc = concat!("- Station/AP-coexistence mode (", chip_pretty!(), " is concurrently an access point and a station connected to another access point).")]
-//! - Various security modes for the above (WPA, WPA2, etc.)
+//! - Various security modes for the above (WPA, WPA2, ... Please note that WPA3 is currently not
+//!   supported)
 //! - Scanning for access points (active & passive scanning).
 //! - Promiscuous mode for monitoring of IEEE802.11 Wi-Fi packets.
 //!
