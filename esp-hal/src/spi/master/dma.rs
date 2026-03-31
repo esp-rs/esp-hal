@@ -20,6 +20,8 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         PeripheralDmaChannel,
+        ScopedDmaRxBuf,
+        ScopedDmaTxBuf,
         asynch::DmaRxFuture,
     },
     private::DropGuard,
@@ -270,8 +272,8 @@ impl<'d> SpiDma<'d, Blocking> {
         }
 
         // The buffers must be set up when creating the driver.
-        unsafe { (&mut *state.tx_buffer.get()).write(tx_buffer) };
-        unsafe { (&mut *state.rx_buffer.get()).write(rx_buffer) };
+        unsafe { (&mut *state.tx_buffer.get()).write(tx_buffer.into_scoped()) };
+        unsafe { (&mut *state.rx_buffer.get()).write(rx_buffer.into_scoped()) };
 
         Self { spi, channel }
     }
@@ -702,8 +704,8 @@ where
     #[instability::unstable]
     pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
         unsafe {
-            (&mut *self.dma_driver().state.rx_buffer.get()).write(dma_rx_buf);
-            (&mut *self.dma_driver().state.tx_buffer.get()).write(dma_tx_buf);
+            (&mut *self.spi.dma_state().rx_buffer.get()).write(dma_rx_buf.into_scoped());
+            (&mut *self.spi.dma_state().tx_buffer.get()).write(dma_tx_buf.into_scoped());
         }
         self
     }
@@ -1211,11 +1213,11 @@ pub(super) struct DmaDriver {
 }
 
 impl DmaDriver {
-    unsafe fn rx_buffer(&self) -> &'static mut DmaRxBuf {
+    unsafe fn rx_buffer(&self) -> &'static mut ScopedDmaRxBuf<'static> {
         unsafe { self.state.rx_buffer() }
     }
 
-    unsafe fn tx_buffer(&self) -> &'static mut DmaTxBuf {
+    unsafe fn tx_buffer(&self) -> &'static mut ScopedDmaTxBuf<'static> {
         unsafe { self.state.tx_buffer() }
     }
 
@@ -1376,8 +1378,8 @@ struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
 
-    rx_buffer: UnsafeCell<MaybeUninit<DmaRxBuf>>,
-    tx_buffer: UnsafeCell<MaybeUninit<DmaTxBuf>>,
+    rx_buffer: UnsafeCell<MaybeUninit<ScopedDmaRxBuf<'static>>>,
+    tx_buffer: UnsafeCell<MaybeUninit<ScopedDmaTxBuf<'static>>>,
 }
 
 impl DmaState {
@@ -1390,7 +1392,7 @@ impl DmaState {
         clippy::mut_from_ref,
         reason = "Safety requirements ensure this is okay"
     )]
-    unsafe fn rx_buffer(&self) -> &mut DmaRxBuf {
+    unsafe fn rx_buffer(&self) -> &mut ScopedDmaRxBuf<'static> {
         unsafe { (&mut *self.rx_buffer.get()).assume_init_mut() }
     }
 
@@ -1403,7 +1405,7 @@ impl DmaState {
         clippy::mut_from_ref,
         reason = "Safety requirements ensure this is okay"
     )]
-    unsafe fn tx_buffer(&self) -> &mut DmaTxBuf {
+    unsafe fn tx_buffer(&self) -> &mut ScopedDmaTxBuf<'static> {
         unsafe { (&mut *self.tx_buffer.get()).assume_init_mut() }
     }
 }
