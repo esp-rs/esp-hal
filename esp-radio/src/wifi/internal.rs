@@ -13,6 +13,23 @@ use crate::{
     },
 };
 
+#[cfg(feature = "print-logs-from-driver")]
+unsafe extern "C" {
+    pub unsafe fn __esp_radio_log_write(
+        level: crate::sys::c_types::c_uint,
+        tag: *const crate::sys::c_types::c_char,
+        format: *const crate::sys::c_types::c_char,
+        ...
+    );
+
+    pub unsafe fn __esp_radio_log_writev(
+        level: crate::sys::c_types::c_uint,
+        tag: *const crate::sys::c_types::c_char,
+        format: *const crate::sys::c_types::c_char,
+        args: crate::sys::include::va_list,
+    );
+}
+
 #[cfg(all(feature = "coex", wifi_driver_supported, bt_driver_supported))]
 pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_funcs_t =
     crate::sys::include::coex_adapter_funcs_t {
@@ -164,11 +181,11 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _get_time: Some(get_time),
     _random: Some(random),
     #[cfg(feature = "print-logs-from-driver")]
-    _log_write: Some(log_write),
+    _log_write: Some(__esp_radio_log_write),
     #[cfg(not(feature = "print-logs-from-driver"))]
     _log_write: None,
     #[cfg(feature = "print-logs-from-driver")]
-    _log_writev: Some(log_writev),
+    _log_writev: Some(__esp_radio_log_writev),
     #[cfg(not(feature = "print-logs-from-driver"))]
     _log_writev: None,
     _log_timestamp: Some(log_timestamp),
