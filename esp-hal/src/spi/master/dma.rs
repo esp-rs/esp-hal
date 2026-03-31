@@ -402,8 +402,12 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        self.read_async_copied(words).await
+    }
+
+    async fn read_async_copied(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        let rx_buffer = unsafe { self.spi.dma_state().rx_buffer() };
+        let tx_buffer = unsafe { self.spi.dma_state().tx_buffer() };
         if rx_buffer.capacity() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
@@ -412,13 +416,11 @@ impl<'d> SpiDma<'d, Async> {
 
         for chunk in words.chunks_mut(chunk_size) {
             let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
-
             unsafe { spi.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)? };
 
             spi.wait_for_idle_async().await;
 
             chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
-
             spi.defuse();
         }
 
@@ -435,8 +437,12 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        self.write_async_copied(words).await
+    }
+
+    async fn write_async_copied(&mut self, words: &[u8]) -> Result<(), Error> {
+        let rx_buffer = unsafe { self.spi.dma_state().rx_buffer() };
+        let tx_buffer = unsafe { self.spi.dma_state().tx_buffer() };
         if tx_buffer.capacity() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
@@ -467,8 +473,12 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        self.transfer_async_copied(read, write).await
+    }
+
+    async fn transfer_async_copied(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        let rx_buffer = unsafe { self.spi.dma_state().rx_buffer() };
+        let tx_buffer = unsafe { self.spi.dma_state().tx_buffer() };
         if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
@@ -516,8 +526,12 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        self.transfer_in_place_async_copied(words).await
+    }
+
+    async fn transfer_in_place_async_copied(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        let rx_buffer = unsafe { self.spi.dma_state().rx_buffer() };
+        let tx_buffer = unsafe { self.spi.dma_state().tx_buffer() };
         if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
