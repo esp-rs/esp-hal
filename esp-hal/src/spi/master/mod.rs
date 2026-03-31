@@ -77,7 +77,7 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
-    private::{self, OnDrop, Sealed},
+    private::{self, DropGuard, Sealed},
     ram,
     system::PeripheralGuard,
     time::Rate,
@@ -2194,7 +2194,7 @@ impl Driver {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             // Cut the transfer short if the future is dropped. We'll block for a short
             // while to ensure the peripheral is idle.
-            let cancel_on_drop = OnDrop::new(|| {
+            let cancel_on_drop = DropGuard::new((), |_| {
                 self.abort_transfer();
                 while self.busy() {}
             });

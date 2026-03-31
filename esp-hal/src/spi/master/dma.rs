@@ -2,7 +2,6 @@ use core::{
     cell::Cell,
     cmp::min,
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut},
     sync::atomic::{Ordering, fence},
 };
 
@@ -23,6 +22,7 @@ use crate::{
         PeripheralDmaChannel,
         asynch::DmaRxFuture,
     },
+    private::DropGuard,
     spi::DmaError,
 };
 
@@ -1393,46 +1393,6 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         let (info, _state) = self.dma_parts();
         info.dma_peripheral
-    }
-}
-
-pub(crate) struct DropGuard<I, F: FnOnce(I)> {
-    inner: ManuallyDrop<I>,
-    on_drop: ManuallyDrop<F>,
-}
-
-impl<I, F: FnOnce(I)> DropGuard<I, F> {
-    pub(crate) fn new(inner: I, on_drop: F) -> Self {
-        Self {
-            inner: ManuallyDrop::new(inner),
-            on_drop: ManuallyDrop::new(on_drop),
-        }
-    }
-
-    pub(crate) fn defuse(self) {
-        core::mem::forget(self);
-    }
-}
-
-impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
-    fn drop(&mut self) {
-        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
-        let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
-        (on_drop)(inner)
-    }
-}
-
-impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
-    type Target = I;
-
-    fn deref(&self) -> &I {
-        &self.inner
-    }
-}
-
-impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
-    fn deref_mut(&mut self) -> &mut I {
-        &mut self.inner
     }
 }
 

@@ -90,7 +90,7 @@ use timer::Timer;
 use crate::{
     gpio::OutputSignal,
     pac,
-    private::OnDrop,
+    private::DropGuard,
     soc::clocks::{self, ClockTree},
     system::{Peripheral, PeripheralGuard},
     time::Rate,
@@ -104,7 +104,7 @@ pub mod timer;
 type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
 #[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
-struct PwmClockGuard(OnDrop<fn()>);
+struct PwmClockGuard(DropGuard<(), fn(())>);
 
 impl PwmClockGuard {
     fn instance<PWM: PwmPeripheral>() -> clocks::McpwmInstance {
@@ -119,7 +119,7 @@ impl PwmClockGuard {
     pub fn new<PWM: PwmPeripheral>() -> Self {
         ClockTree::with(move |clocks| Self::instance::<PWM>().request_function_clock(clocks));
 
-        Self(OnDrop::new(|| {
+        Self(DropGuard::new((), |_| {
             ClockTree::with(move |clocks| Self::instance::<PWM>().release_function_clock(clocks));
         }))
     }
