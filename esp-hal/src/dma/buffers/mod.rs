@@ -1432,7 +1432,7 @@ impl DerefMut for DmaLoopBuf {
 /// Fow low level use, where none of the pre-made buffers really fit.
 ///
 /// This type likely never should be visible outside of esp-hal.
-pub(crate) struct NoBuffer(Preparation);
+pub(crate) struct NoBuffer(pub(crate) Preparation);
 impl NoBuffer {
     fn prep(&self) -> Preparation {
         Preparation {
@@ -1481,7 +1481,7 @@ unsafe impl DmaRxBuffer for NoBuffer {
 ///
 /// The caller must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
-#[cfg_attr(not(aes_dma), expect(unused))]
+#[cfg_attr(not(any(aes_dma, spi_master_supports_dma)), expect(unused))]
 pub(crate) unsafe fn prepare_for_tx(
     descriptors: &mut [DmaDescriptor],
     mut data: NonNull<[u8]>,
@@ -1549,7 +1549,7 @@ pub(crate) unsafe fn prepare_for_tx(
 ///
 /// The caller must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
-#[cfg_attr(not(aes_dma), expect(unused))]
+#[cfg_attr(not(any(aes_dma, spi_master_supports_dma)), expect(unused))]
 pub(crate) unsafe fn prepare_for_rx(
     descriptors: &mut [DmaDescriptor],
     #[cfg(psram_dma)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
