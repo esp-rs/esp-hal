@@ -393,6 +393,10 @@ impl<'d> SpiDma<'d, Async> {
     /// Fill the given buffer with data from the bus.
     #[instability::unstable]
     pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        if words.is_empty() {
+            return Ok(());
+        }
+
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
@@ -422,6 +426,10 @@ impl<'d> SpiDma<'d, Async> {
     /// Transmit the given buffer to the bus.
     #[instability::unstable]
     pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        if words.is_empty() {
+            return Ok(());
+        }
+
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
@@ -450,6 +458,10 @@ impl<'d> SpiDma<'d, Async> {
     /// the bus into another buffer.
     #[instability::unstable]
     pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        if read.is_empty() && write.is_empty() {
+            return Ok(());
+        }
+
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
@@ -495,6 +507,10 @@ impl<'d> SpiDma<'d, Async> {
     /// the bus into the same buffer.
     #[instability::unstable]
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        if words.is_empty() {
+            return Ok(());
+        }
+
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
