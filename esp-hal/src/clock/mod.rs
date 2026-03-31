@@ -52,27 +52,23 @@ use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg_function_clock)]
 use clocks::TimgFunctionClockConfig;
 
-/// Low-level clock control
+/// # Low-level clock control
 ///
 /// <section class="warning">
 /// This module provides experimental low-level clock control functionality. These functions
 /// can render your device temporarily unusable. Use with caution.
 /// </section>
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[doc = ""]
+#[instability::unstable]
 pub mod ll {
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[instability::unstable]
     pub use crate::soc::clocks::*;
 }
 
 #[cfg(timergroup_rc_fast_calibration_divider)]
 use crate::efuse::ChipRevision;
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
-#[cfg(not(feature = "unstable"))]
-pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
