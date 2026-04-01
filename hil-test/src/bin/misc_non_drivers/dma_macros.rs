@@ -199,8 +199,8 @@ mod tests {
                 Ok(tx_buf) => {
                     core::assert_eq!(tx_buf.len(), size);
                 }
-                Err(_) => {
-                    core::panic!("Failed to create DmaTxBuf");
+                Err(err) => {
+                    core::panic!("Failed to create DmaTxBuf: {:?}", err);
                 }
             }
         }
