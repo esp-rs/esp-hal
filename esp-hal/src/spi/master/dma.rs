@@ -1200,7 +1200,7 @@ where
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -1264,7 +1264,7 @@ where
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut rx_descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -1330,7 +1330,7 @@ where
                 DmaOperationKind::InPlace => (
                     MaybeCopyRxBuf::Direct {
                         descriptors: &mut rx_descriptors,
-                        #[cfg(psram_dma)]
+                        #[cfg(dma_can_access_psram)]
                         align_buffer: [const { None }; 2],
                     },
                     MaybeCopyTxBuf::Direct(&mut tx_descriptors),
