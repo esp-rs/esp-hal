@@ -164,6 +164,12 @@ use crate::heap::Heap;
 #[cfg_attr(feature = "global-allocator", global_allocator)]
 pub static HEAP: EspHeap = EspHeap::empty();
 
+#[cfg(feature = "alloc-hooks")]
+unsafe extern "Rust" {
+    fn _esp_alloc_alloc(heap: &EspHeap, caps: EnumSet<MemoryCapability>, ptr: usize, size: usize);
+    fn _esp_alloc_dealloc(heap: &EspHeap, ptr: usize, size: usize);
+}
+
 const BAR_WIDTH: usize = 35;
 
 fn write_bar(f: &mut core::fmt::Formatter<'_>, usage_percent: usize) -> core::fmt::Result {
@@ -640,17 +646,25 @@ impl EspHeap {
         capabilities: EnumSet<MemoryCapability>,
         layout: Layout,
     ) -> *mut u8 {
-        self.inner
-            .with(|heap| unsafe { heap.alloc_caps(capabilities, layout) })
-    }
-}
+        let ptr = self
+            .inner
+            .with(|heap| unsafe { heap.alloc_caps(capabilities, layout) });
 
-unsafe impl GlobalAlloc for EspHeap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        unsafe { self.alloc_caps(EnumSet::empty(), layout) }
+        #[cfg(feature = "alloc-hooks")]
+        unsafe {
+            _esp_alloc_alloc(self, capabilities, ptr as usize, layout.size());
+        }
+
+        ptr
     }
 
+    /// Deallocate memory.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        #[cfg(feature = "alloc-hooks")]
+        unsafe {
+            _esp_alloc_dealloc(self, ptr as usize, layout.size());
+        }
+
         let Some(ptr) = NonNull::new(ptr) else {
             return;
         };
@@ -677,5 +691,15 @@ unsafe impl GlobalAlloc for EspHeap {
                     .saturating_add((before - this.used()) as u64);
             }
         })
+    }
+}
+
+unsafe impl GlobalAlloc for EspHeap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe { self.alloc_caps(EnumSet::empty(), layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { self.dealloc(ptr, layout) }
     }
 }
