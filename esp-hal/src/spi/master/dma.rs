@@ -10,10 +10,8 @@ use core::{
 use embedded_hal::spi::{ErrorType, SpiBus};
 
 use super::*;
-#[cfg(psram_dma)]
-use crate::dma::ManualWritebackBuffer;
-#[cfg(psram)]
-use crate::soc::is_slice_in_psram;
+#[cfg(dma_can_access_psram)]
+use crate::{dma::ManualWritebackBuffer, soc::is_slice_in_psram};
 use crate::{
     dma::{
         CHUNK_SIZE,
@@ -425,7 +423,7 @@ impl<'d> SpiDma<'d, Async> {
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -500,7 +498,7 @@ impl<'d> SpiDma<'d, Async> {
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut rx_descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -559,7 +557,7 @@ impl<'d> SpiDma<'d, Async> {
                 DmaOperationKind::InPlace => (
                     MaybeCopyRxBuf::Direct {
                         descriptors: &mut rx_descriptors,
-                        #[cfg(psram_dma)]
+                        #[cfg(dma_can_access_psram)]
                         align_buffer: [const { None }; 2],
                     },
                     MaybeCopyTxBuf::Direct(&mut tx_descriptors),
@@ -622,7 +620,7 @@ impl<'a> MaybeCopyTxBuf<'a> {
                 NoBuffer(tx_buffer.prepare())
             }
             MaybeCopyTxBuf::Direct(descriptors) => {
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 if crate::psram::psram_range().contains(&data.addr().get()) {
                     unsafe {
                         crate::soc::cache_writeback_addr(
@@ -649,7 +647,7 @@ enum MaybeCopyRxBuf<'a> {
     Copy(&'a mut ScopedDmaRxBuf<'static>),
     Direct {
         descriptors: &'a mut [DmaDescriptor; LINK_DESCRIPTOR_COUNT],
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         align_buffer: [Option<ManualWritebackBuffer>; 2],
     },
 }
@@ -660,13 +658,13 @@ impl<'a> MaybeCopyRxBuf<'a> {
             MaybeCopyRxBuf::Copy(rx_buffer) => NoBuffer(rx_buffer.prepare()),
             MaybeCopyRxBuf::Direct {
                 descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer,
             } => {
                 let (buffer, _) = unsafe {
                     prepare_for_rx(
                         &mut **descriptors,
-                        #[cfg(psram_dma)]
+                        #[cfg(dma_can_access_psram)]
                         align_buffer,
                         data,
                     )
@@ -689,11 +687,11 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 chunk.copy_from_slice(&buffer.as_slice()[..chunk.len()]);
             }
             MaybeCopyRxBuf::Direct {
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer,
                 ..
             } => {
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
                     // Avoid copying the write_back buffer
                     if let Some(buffer) = buffer.as_ref() {
@@ -720,7 +718,7 @@ impl DmaOperationKind {
             if is_slice_in_dram(buffer) {
                 return true;
             }
-            #[cfg(psram)]
+            #[cfg(dma_can_access_psram)]
             if is_slice_in_psram(buffer) {
                 return true;
             }
@@ -1195,7 +1193,7 @@ where
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -1259,7 +1257,7 @@ where
             }
             DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
                 descriptors: &mut rx_descriptors,
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 align_buffer: [const { None }; 2],
             },
         };
@@ -1312,7 +1310,7 @@ where
                 DmaOperationKind::InPlace => (
                     MaybeCopyRxBuf::Direct {
                         descriptors: &mut rx_descriptors,
-                        #[cfg(psram_dma)]
+                        #[cfg(dma_can_access_psram)]
                         align_buffer: [const { None }; 2],
                     },
                     MaybeCopyTxBuf::Direct(&mut tx_descriptors),
