@@ -1533,7 +1533,7 @@ pub(crate) unsafe fn prepare_for_tx(
             direction: TransferDirection::Out,
             burst_transfer: BurstConfig::DEFAULT,
             check_owner: None,
-            auto_write_back: true,
+            auto_write_back: false,
             #[cfg(psram_dma)]
             accesses_psram: data_in_psram,
         }),
