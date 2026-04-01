@@ -307,6 +307,9 @@ impl Clocks {
                 }
             }
         }
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start_cycling().clear_bit());
 
         use esp_rom_sys::rom::ets_delay_us;
 
