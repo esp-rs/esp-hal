@@ -107,7 +107,7 @@ mod tests {
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
         let transfer = spi
-            .half_duplex_write(
+            .half_duplex_write_buffer(
                 DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
         let transfer = spi
-            .half_duplex_write(
+            .half_duplex_write_buffer(
                 DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,

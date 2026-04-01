@@ -1,7 +1,7 @@
 use core::{
-    cell::Cell,
+    cell::{Cell, UnsafeCell},
     cmp::min,
-    mem::ManuallyDrop,
+    mem::{ManuallyDrop, MaybeUninit},
     sync::atomic::{Ordering, fence},
 };
 
@@ -13,12 +13,12 @@ use crate::{
     dma::{
         Channel,
         DmaChannelFor,
+        DmaDescriptor,
         DmaEligible,
         DmaRxBuf,
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
-        EmptyBuf,
         PeripheralDmaChannel,
         asynch::DmaRxFuture,
     },
@@ -35,39 +35,27 @@ impl<'d> Spi<'d, Blocking> {
             _ => "DMA_CH0",
         }
     )]
-    /// Configures the SPI instance to use DMA with the specified channel.
+    /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
     ///
-    /// This method prepares the SPI instance for DMA transfers using SPI
-    /// and returns an instance of `SpiDma` that supports DMA
-    /// operations.
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::{
-    ///     dma::{DmaRxBuf, DmaTxBuf},
-    ///     dma_buffers,
-    ///     spi::{
-    ///         Mode,
-    ///         master::{Config, Spi},
-    ///     },
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
     /// };
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
-    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
-    ///
-    /// let mut spi = Spi::new(
+    /// let mut spi_dma = Spi::new(
     ///     peripherals.SPI2,
     ///     Config::default()
     ///         .with_frequency(Rate::from_khz(100))
     ///         .with_mode(Mode::_0),
     /// )?
-    /// .with_dma(peripherals.__dma_channel__)
-    /// .with_buffers(dma_rx_buf, dma_tx_buf);
+    /// .with_dma(peripherals.__dma_channel__);
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self, channel.degrade())
+        SpiDma::new_from_spi(self, channel.degrade())
     }
 }
 
@@ -77,13 +65,25 @@ impl<'d> Spi<'d, Blocking> {
         _ => "DMA_CH0",
     }
 )]
-/// A DMA capable SPI instance.
+/// DMA-controlled SPI driver.
 ///
-/// Using `SpiDma` is not recommended unless you wish
-/// to manage buffers yourself. It's recommended to use
-/// [`SpiDmaBus`] via `with_buffers` to get access
-/// to a DMA capable SPI bus that implements the
-/// embedded-hal traits.
+/// This driver uses DMA to transfer data, allowing the CPU to continue working while the SPI
+/// transfer is in progress.
+///
+/// The driver provides two separate approaches to transferring data:
+///
+/// - The slice-based API allows transferring data from/to slices of memory. The data will be copied
+///   into an internal buffer before the transfer begins. These copy buffers must be set up by
+///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins.
+/// - The buffer API allows transferring externally managed buffers. In this mode, you provide the
+///   buffers to be transferred. The buffer objects ensure that data is located in appropriate
+///   memory regions. The buffers and the driver object are are moved into transfer objects for the
+///   duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects as
+///   arguments as well as the number of bytes to transfer, and their names end with `_buffer`.
+///
+/// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
+/// use. `embedded-hal` traits are implemented by the slice-based API's functions.
+///
 /// ```rust, no_run
 /// # {before_snippet}
 /// use esp_hal::{
@@ -94,6 +94,8 @@ impl<'d> Spi<'d, Blocking> {
 ///         master::{Config, Spi},
 ///     },
 /// };
+///
+/// // Optional: create and set up 32000 byte copy buffers.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 ///
 /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
@@ -110,6 +112,7 @@ impl<'d> Spi<'d, Blocking> {
 /// #
 /// # {after_snippet}
 /// ```
+// TODO: update docs once the driver can transfer data without copying
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SpiDma<'d, Dm>
 where
@@ -117,14 +120,107 @@ where
 {
     spi: SpiWrapper<'d>,
     pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
-    #[cfg(all(esp32, spi_address_workaround))]
-    address_buffer: DmaTxBuf,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
 
+impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
+where
+    Dm: DriverMode + core::fmt::Debug,
+{
+    /// Formats the `SpiDma` instance for debugging purposes.
+    ///
+    /// This method returns a debug struct with the name "SpiDma" without
+    /// exposing internal details.
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SpiDma").field("spi", &self.spi).finish()
+    }
+}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
+    /// Sets the interrupt handler
+    ///
+    /// Interrupts are not enabled at the peripheral level here.
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> ErrorType for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Error = Error;
+}
+
+#[instability::unstable]
+impl<Dm> SpiBus for SpiDma<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(words)
+    }
+
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write(words)
+    }
+
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer(read, write)
+    }
+
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place(words)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
+    }
+}
+
+#[instability::unstable]
+impl embedded_hal_async::spi::SpiBus for SpiDma<'_, Async> {
+    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_async(words).await
+    }
+
+    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write_async(words).await
+    }
+
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer_async(read, write).await
+    }
+
+    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place_async(words).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // All operations currently flush so this is no-op.
+        Ok(())
+    }
+}
+
 impl<'d> SpiDma<'d, Blocking> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI driver into async mode.
     #[instability::unstable]
     pub fn into_async(self) -> SpiDma<'d, Async> {
         self.spi
@@ -132,50 +228,61 @@ impl<'d> SpiDma<'d, Blocking> {
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_async(),
-            #[cfg(all(esp32, spi_address_workaround))]
-            address_buffer: self.address_buffer,
         }
     }
 
-    pub(super) fn new(
+    // TODO: add a constructor that doesn't rely on the Spi driver. This one requires us to
+    // check DMA channel compatibility in runtime, while a public SpiDma::new(SPI, DMA, config)
+    // could check non-erased inputs in comptime.
+    fn new_inner(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+        let channel = Channel::new(channel);
+        channel.runtime_ensure_compatible(&spi.spi);
+
+        for_each_spi_master!((all $($inst:tt),*) => {
+            const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
+        };);
+        let id = if spi.info() == unsafe { crate::peripherals::SPI2::steal().info() } {
+            0
+        } else {
+            1
+        };
+
+        let state = spi.spi.dma_state();
+
+        state.tx_transfer_in_progress.set(false);
+        state.rx_transfer_in_progress.set(false);
+
+        static mut TX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
+            [[DmaDescriptor::EMPTY]; SPI_NUM];
+        static mut RX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
+            [[DmaDescriptor::EMPTY]; SPI_NUM];
+
+        let rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(esp32, spi_address_workaround))] {
+                static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
+                let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
+                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
+            } else {
+                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
+            }
+        }
+
+        // The buffers must be set up when creating the driver.
+        unsafe { (&mut *state.tx_buffer.get()).write(tx_buffer) };
+        unsafe { (&mut *state.rx_buffer.get()).write(rx_buffer) };
+
+        Self { spi, channel }
+    }
+
+    pub(super) fn new_from_spi(
         spi_driver: Spi<'d, Blocking>,
         channel: PeripheralDmaChannel<AnySpi<'d>>,
     ) -> Self {
         let spi = spi_driver.spi;
 
-        let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi.spi);
-        #[cfg(all(esp32, spi_address_workaround))]
-        let address_buffer = {
-            use crate::dma::DmaDescriptor;
-            const SPI_NUM: usize = 2;
-            static mut DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-                [[DmaDescriptor::EMPTY]; SPI_NUM];
-            static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0; 1]; SPI_NUM];
-
-            let id = if spi.info() == unsafe { crate::peripherals::SPI2::steal().info() } {
-                0
-            } else {
-                1
-            };
-
-            unwrap!(DmaTxBuf::new(
-                unsafe { &mut DESCRIPTORS[id] },
-                crate::dma::as_mut_byte_array!(BUFFERS[id], 4)
-            ))
-        };
-
-        let (_info, state) = spi.spi.dma_parts();
-
-        state.tx_transfer_in_progress.set(false);
-        state.rx_transfer_in_progress.set(false);
-
-        Self {
-            spi,
-            channel,
-            #[cfg(all(esp32, spi_address_workaround))]
-            address_buffer,
-        }
+        Self::new_inner(spi, channel)
     }
 
     /// Listen for the given interrupts
@@ -228,15 +335,13 @@ impl<'d> SpiDma<'d, Blocking> {
 }
 
 impl<'d> SpiDma<'d, Async> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI driver into async mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
         self.spi.disable_peri_interrupt_on_all_cores();
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_blocking(),
-            #[cfg(all(esp32, spi_address_workaround))]
-            address_buffer: self.address_buffer,
         }
     }
 
@@ -290,32 +395,126 @@ impl<'d> SpiDma<'d, Async> {
             self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
     }
-}
 
-impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
-where
-    Dm: DriverMode + core::fmt::Debug,
-{
-    /// Formats the `SpiDma` instance for debugging purposes.
-    ///
-    /// This method returns a debug struct with the name "SpiDma" without
-    /// exposing internal details.
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SpiDma").field("spi", &self.spi).finish()
+    /// Fill the given buffer with data from the bus.
+    #[instability::unstable]
+    pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let chunk_size = rx_buffer.capacity();
+
+        for chunk in words.chunks_mut(chunk_size) {
+            let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+
+            unsafe { spi.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)? };
+
+            spi.wait_for_idle_async().await;
+
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+
+            spi.defuse();
+        }
+
+        Ok(())
+    }
+
+    /// Transmit the given buffer to the bus.
+    #[instability::unstable]
+    pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
+        let chunk_size = tx_buffer.capacity();
+
+        for chunk in words.chunks(chunk_size) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe { spi.start_dma_transfer(0, chunk.len(), rx_buffer, tx_buffer)? };
+
+            spi.wait_for_idle_async().await;
+        }
+        spi.defuse();
+
+        Ok(())
+    }
+
+    /// Transfer by writing out a buffer and reading the response from
+    /// the bus into another buffer.
+    #[instability::unstable]
+    pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+
+        for (read_chunk, write_chunk) in read.chunks_mut(chunk_size).zip(write.chunks(chunk_size)) {
+            tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+
+            unsafe {
+                spi.start_dma_transfer(read_chunk.len(), write_chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            spi.wait_for_idle_async().await;
+
+            read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
+        }
+
+        spi.defuse();
+
+        Ok(())
+    }
+
+    /// Transfer by writing out a buffer and reading the response from
+    /// the bus into the same buffer.
+    #[instability::unstable]
+    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
+        for chunk in words.chunks_mut(tx_buffer.capacity()) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe {
+                spi.start_dma_transfer(chunk.len(), chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            spi.wait_for_idle_async().await;
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+        }
+
+        spi.defuse();
+
+        Ok(())
     }
 }
 
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
-    /// Sets the interrupt handler
-    ///
-    /// Interrupts are not enabled at the peripheral level here.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
-}
-
-impl<Dm> SpiDma<'_, Dm>
+impl<'d, Dm> SpiDma<'d, Dm>
 where
     Dm: DriverMode,
 {
@@ -403,8 +602,12 @@ where
         }
     }
 
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
     #[cfg(all(esp32, spi_address_workaround))]
-    fn set_up_address_workaround(
+    unsafe fn set_up_address_workaround(
         &mut self,
         cmd: Command,
         address: Address,
@@ -416,12 +619,14 @@ where
             return Err(Error::Unsupported);
         }
 
+        let buffer = unsafe { self.dma_driver().tx_buffer() };
+
         let bytes_to_write = address.width().div_ceil(8);
         // The address register is read in big-endian order,
         // we have to prepare the emulated write in the same way.
         let addr_bytes = address.value().to_be_bytes();
         let addr_bytes = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-        self.address_buffer.fill(addr_bytes);
+        buffer.fill(addr_bytes);
 
         self.driver().setup_half_duplex(
             true,
@@ -433,18 +638,9 @@ where
             address.mode(),
         )?;
 
-        // FIXME: we could use self.start_transfer_dma
-        self.dma_driver().state.tx_transfer_in_progress.set(true);
-        unsafe {
-            self.dma_driver().start_transfer_dma(
-                false,
-                0,
-                bytes_to_write,
-                &mut EmptyBuf,
-                &mut self.address_buffer,
-                &mut self.channel,
-            )
-        }
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+
+        unsafe { self.start_transfer_dma(false, 0, bytes_to_write, rx_buffer, buffer) }
     }
 
     fn cancel_transfer(&mut self) {
@@ -463,18 +659,447 @@ where
             }
         }
     }
-}
 
-#[instability::unstable]
-impl<Dm> embassy_embedded_hal::SetConfig for SpiDma<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Config = Config;
-    type ConfigError = ConfigError;
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    unsafe fn start_dma_write(
+        &mut self,
+        bytes_to_write: usize,
+        buffer: &mut impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
 
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
+        unsafe { self.start_dma_transfer(0, bytes_to_write, rx_buffer, buffer) }
+    }
+
+    /// Assigns copy buffers to the SPI driver.
+    ///
+    /// These buffers will be used to copy data when using the slice-based transfer functions.
+    ///
+    /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
+    /// be wasted.
+    // TODO: update docs once the driver can actually transfer data without copying - we'll need to
+    // explain when this function is necessary.
+    #[instability::unstable]
+    pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
+        unsafe {
+            (&mut *self.dma_driver().state.rx_buffer.get()).write(dma_rx_buf);
+            (&mut *self.dma_driver().state.tx_buffer.get()).write(dma_tx_buf);
+        }
+        self
+    }
+
+    /// Perform a DMA write.
+    ///
+    /// This will return a [SpiDmaTransfer] owning the buffer and the
+    /// SPI instance. The maximum amount of data to be sent is 32736
+    /// bytes.
+    #[allow(clippy::type_complexity)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn write_buffer<TX: DmaTxBuffer>(
+        mut self,
+        bytes_to_write: usize,
+        mut buffer: TX,
+    ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
+        self.wait_for_idle();
+        if let Err(e) = self.driver().setup_full_duplex() {
+            return Err((e, self, buffer));
+        };
+        match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Err(e) => Err((e, self, buffer)),
+        }
+    }
+
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    unsafe fn start_dma_read(
+        &mut self,
+        bytes_to_read: usize,
+        buffer: &mut impl DmaRxBuffer,
+    ) -> Result<(), Error> {
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+
+        unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, tx_buffer) }
+    }
+
+    /// Perform a DMA read.
+    ///
+    /// This will return a [SpiDmaTransfer] owning the buffer and
+    /// the SPI instance. The maximum amount of data to be
+    /// received is 32736 bytes.
+    #[allow(clippy::type_complexity)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn read_buffer<RX: DmaRxBuffer>(
+        mut self,
+        bytes_to_read: usize,
+        mut buffer: RX,
+    ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
+        self.wait_for_idle();
+        if let Err(e) = self.driver().setup_full_duplex() {
+            return Err((e, self, buffer));
+        };
+        match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Err(e) => Err((e, self, buffer)),
+        }
+    }
+
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    unsafe fn start_dma_transfer(
+        &mut self,
+        bytes_to_read: usize,
+        bytes_to_write: usize,
+        rx_buffer: &mut impl DmaRxBuffer,
+        tx_buffer: &mut impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        unsafe {
+            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
+        }
+    }
+
+    /// Perform a DMA transfer
+    ///
+    /// This will return a [SpiDmaTransfer] owning the buffers and
+    /// the SPI instance. The maximum amount of data to be
+    /// sent/received is 32736 bytes.
+    #[allow(clippy::type_complexity)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn transfer_buffers<RX: DmaRxBuffer, TX: DmaTxBuffer>(
+        mut self,
+        bytes_to_read: usize,
+        mut rx_buffer: RX,
+        bytes_to_write: usize,
+        mut tx_buffer: TX,
+    ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX)>, (Error, Self, RX, TX)> {
+        self.wait_for_idle();
+        if let Err(e) = self.driver().setup_full_duplex() {
+            return Err((e, self, rx_buffer, tx_buffer));
+        };
+        match unsafe {
+            self.start_dma_transfer(
+                bytes_to_read,
+                bytes_to_write,
+                &mut rx_buffer,
+                &mut tx_buffer,
+            )
+        } {
+            Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer))),
+            Err(e) => Err((e, self, rx_buffer, tx_buffer)),
+        }
+    }
+
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    unsafe fn start_half_duplex_read(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_read: usize,
+        buffer: &mut impl DmaRxBuffer,
+    ) -> Result<(), Error> {
+        self.driver().setup_half_duplex(
+            false,
+            cmd,
+            address,
+            false,
+            dummy,
+            bytes_to_read == 0,
+            data_mode,
+        )?;
+
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+
+        unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, tx_buffer) }
+    }
+
+    /// Perform a half-duplex read operation using DMA.
+    #[allow(clippy::type_complexity)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn half_duplex_read_buffer<RX: DmaRxBuffer>(
+        mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_read: usize,
+        mut buffer: RX,
+    ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
+        self.wait_for_idle();
+
+        match unsafe {
+            self.start_half_duplex_read(data_mode, cmd, address, dummy, bytes_to_read, &mut buffer)
+        } {
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Err(e) => Err((e, self, buffer)),
+        }
+    }
+
+    /// # Safety:
+    ///
+    /// The caller must ensure that the buffers are not accessed while the
+    /// transfer is in progress. Moving the buffers is allowed.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    unsafe fn start_half_duplex_write(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_write: usize,
+        buffer: &mut impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        #[cfg(all(esp32, spi_address_workaround))]
+        {
+            // On the ESP32, if we don't have data, the address is always sent
+            // on a single line, regardless of its data mode.
+            if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
+                return unsafe { self.set_up_address_workaround(cmd, address, dummy) };
+            }
+        }
+
+        self.driver().setup_half_duplex(
+            true,
+            cmd,
+            address,
+            false,
+            dummy,
+            bytes_to_write == 0,
+            data_mode,
+        )?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+
+        unsafe { self.start_transfer_dma(false, 0, bytes_to_write, rx_buffer, buffer) }
+    }
+
+    /// Perform a half-duplex write operation using DMA.
+    #[allow(clippy::type_complexity)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    #[instability::unstable]
+    pub fn half_duplex_write_buffer<TX: DmaTxBuffer>(
+        mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_write: usize,
+        mut buffer: TX,
+    ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
+        self.wait_for_idle();
+
+        match unsafe {
+            self.start_half_duplex_write(
+                data_mode,
+                cmd,
+                address,
+                dummy,
+                bytes_to_write,
+                &mut buffer,
+            )
+        } {
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Err(e) => Err((e, self, buffer)),
+        }
+    }
+
+    /// Change the bus configuration.
+    ///
+    /// # Errors
+    ///
+    /// If frequency passed in config exceeds
+    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
+    #[cfg_attr(esp32h2, doc = " 48MHz")]
+    /// or is below 70kHz,
+    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
+    #[instability::unstable]
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.driver().apply_config(config)
+    }
+
+    /// Reads data from the SPI bus using DMA.
+    #[instability::unstable]
+    pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle();
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        for chunk in words.chunks_mut(rx_buffer.capacity()) {
+            unsafe {
+                self.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)?;
+            }
+
+            self.wait_for_idle();
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+        }
+
+        Ok(())
+    }
+
+    /// Writes data to the SPI bus using DMA.
+    #[instability::unstable]
+    pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle();
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        for chunk in words.chunks(tx_buffer.capacity()) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe {
+                self.start_dma_transfer(0, chunk.len(), rx_buffer, tx_buffer)?;
+            }
+
+            self.wait_for_idle();
+        }
+
+        Ok(())
+    }
+
+    /// Transfers data to and from the SPI bus simultaneously using DMA.
+    #[instability::unstable]
+    pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        self.wait_for_idle();
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+
+        for (read_chunk, write_chunk) in read.chunks_mut(chunk_size).zip(write.chunks(chunk_size)) {
+            tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+
+            unsafe {
+                self.start_dma_transfer(read_chunk.len(), write_chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            self.wait_for_idle();
+
+            read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
+        }
+
+        Ok(())
+    }
+
+    /// Transfers data in place on the SPI bus using DMA.
+    #[instability::unstable]
+    pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.wait_for_idle();
+        self.driver().setup_full_duplex()?;
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+
+        for chunk in words.chunks_mut(chunk_size) {
+            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+            unsafe {
+                self.start_dma_transfer(chunk.len(), chunk.len(), rx_buffer, tx_buffer)?;
+            }
+            self.wait_for_idle();
+            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+        }
+
+        Ok(())
+    }
+
+    /// Half-duplex read.
+    #[instability::unstable]
+    pub fn half_duplex_read(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle();
+
+        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
+        if rx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > rx_buffer.capacity() {
+            return Err(Error::from(DmaError::Overflow));
+        }
+
+        unsafe {
+            self.start_half_duplex_read(data_mode, cmd, address, dummy, buffer.len(), rx_buffer)?;
+        }
+
+        self.wait_for_idle();
+
+        buffer.copy_from_slice(&rx_buffer.as_slice()[..buffer.len()]);
+
+        Ok(())
+    }
+
+    /// Half-duplex write.
+    #[instability::unstable]
+    pub fn half_duplex_write(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle();
+
+        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
+        if tx_buffer.capacity() == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > tx_buffer.capacity() {
+            return Err(Error::from(DmaError::Overflow));
+        }
+
+        tx_buffer.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
+
+        unsafe {
+            self.start_half_duplex_write(data_mode, cmd, address, dummy, buffer.len(), tx_buffer)?;
+        }
+
+        self.wait_for_idle();
+
+        Ok(())
     }
 }
 
@@ -563,682 +1188,6 @@ where
     }
 }
 
-impl<'d, Dm> SpiDma<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    /// # Safety:
-    ///
-    /// The caller must ensure that the buffers are not accessed while the
-    /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_dma_write(
-        &mut self,
-        bytes_to_write: usize,
-        buffer: &mut impl DmaTxBuffer,
-    ) -> Result<(), Error> {
-        unsafe { self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer) }
-    }
-
-    /// Configures the DMA buffers for the SPI instance.
-    ///
-    /// This method sets up both RX and TX buffers for DMA transfers.
-    /// It returns an instance of `SpiDmaBus` that can be used for SPI
-    /// communication.
-    #[instability::unstable]
-    pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDmaBus<'d, Dm> {
-        SpiDmaBus::new(self, dma_rx_buf, dma_tx_buf)
-    }
-
-    /// Perform a DMA write.
-    ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and the
-    /// SPI instance. The maximum amount of data to be sent is 32736
-    /// bytes.
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn write<TX: DmaTxBuffer>(
-        mut self,
-        bytes_to_write: usize,
-        mut buffer: TX,
-    ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
-        self.wait_for_idle();
-        if let Err(e) = self.driver().setup_full_duplex() {
-            return Err((e, self, buffer));
-        };
-        match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
-            Err(e) => Err((e, self, buffer)),
-        }
-    }
-
-    /// # Safety:
-    ///
-    /// The caller must ensure that the buffers are not accessed while the
-    /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_dma_read(
-        &mut self,
-        bytes_to_read: usize,
-        buffer: &mut impl DmaRxBuffer,
-    ) -> Result<(), Error> {
-        unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf) }
-    }
-
-    /// Perform a DMA read.
-    ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and
-    /// the SPI instance. The maximum amount of data to be
-    /// received is 32736 bytes.
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn read<RX: DmaRxBuffer>(
-        mut self,
-        bytes_to_read: usize,
-        mut buffer: RX,
-    ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
-        self.wait_for_idle();
-        if let Err(e) = self.driver().setup_full_duplex() {
-            return Err((e, self, buffer));
-        };
-        match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
-            Err(e) => Err((e, self, buffer)),
-        }
-    }
-
-    /// # Safety:
-    ///
-    /// The caller must ensure that the buffers are not accessed while the
-    /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_dma_transfer(
-        &mut self,
-        bytes_to_read: usize,
-        bytes_to_write: usize,
-        rx_buffer: &mut impl DmaRxBuffer,
-        tx_buffer: &mut impl DmaTxBuffer,
-    ) -> Result<(), Error> {
-        unsafe {
-            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
-        }
-    }
-
-    /// Perform a DMA transfer
-    ///
-    /// This will return a [SpiDmaTransfer] owning the buffers and
-    /// the SPI instance. The maximum amount of data to be
-    /// sent/received is 32736 bytes.
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
-        mut self,
-        bytes_to_read: usize,
-        mut rx_buffer: RX,
-        bytes_to_write: usize,
-        mut tx_buffer: TX,
-    ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX)>, (Error, Self, RX, TX)> {
-        self.wait_for_idle();
-        if let Err(e) = self.driver().setup_full_duplex() {
-            return Err((e, self, rx_buffer, tx_buffer));
-        };
-        match unsafe {
-            self.start_dma_transfer(
-                bytes_to_read,
-                bytes_to_write,
-                &mut rx_buffer,
-                &mut tx_buffer,
-            )
-        } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer))),
-            Err(e) => Err((e, self, rx_buffer, tx_buffer)),
-        }
-    }
-
-    /// # Safety:
-    ///
-    /// The caller must ensure that the buffers are not accessed while the
-    /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_half_duplex_read(
-        &mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        bytes_to_read: usize,
-        buffer: &mut impl DmaRxBuffer,
-    ) -> Result<(), Error> {
-        self.driver().setup_half_duplex(
-            false,
-            cmd,
-            address,
-            false,
-            dummy,
-            bytes_to_read == 0,
-            data_mode,
-        )?;
-
-        unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf) }
-    }
-
-    /// Perform a half-duplex read operation using DMA.
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn half_duplex_read<RX: DmaRxBuffer>(
-        mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        bytes_to_read: usize,
-        mut buffer: RX,
-    ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
-        self.wait_for_idle();
-
-        match unsafe {
-            self.start_half_duplex_read(data_mode, cmd, address, dummy, bytes_to_read, &mut buffer)
-        } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
-            Err(e) => Err((e, self, buffer)),
-        }
-    }
-
-    /// # Safety:
-    ///
-    /// The caller must ensure that the buffers are not accessed while the
-    /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_half_duplex_write(
-        &mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        bytes_to_write: usize,
-        buffer: &mut impl DmaTxBuffer,
-    ) -> Result<(), Error> {
-        #[cfg(all(esp32, spi_address_workaround))]
-        {
-            // On the ESP32, if we don't have data, the address is always sent
-            // on a single line, regardless of its data mode.
-            if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
-                return self.set_up_address_workaround(cmd, address, dummy);
-            }
-        }
-
-        self.driver().setup_half_duplex(
-            true,
-            cmd,
-            address,
-            false,
-            dummy,
-            bytes_to_write == 0,
-            data_mode,
-        )?;
-
-        unsafe { self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer) }
-    }
-
-    /// Perform a half-duplex write operation using DMA.
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    #[instability::unstable]
-    pub fn half_duplex_write<TX: DmaTxBuffer>(
-        mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        bytes_to_write: usize,
-        mut buffer: TX,
-    ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
-        self.wait_for_idle();
-
-        match unsafe {
-            self.start_half_duplex_write(
-                data_mode,
-                cmd,
-                address,
-                dummy,
-                bytes_to_write,
-                &mut buffer,
-            )
-        } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
-            Err(e) => Err((e, self, buffer)),
-        }
-    }
-
-    /// Change the bus configuration.
-    ///
-    /// # Errors
-    ///
-    /// If frequency passed in config exceeds
-    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
-    #[cfg_attr(esp32h2, doc = " 48MHz")]
-    /// or is below 70kHz,
-    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
-    #[instability::unstable]
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.driver().apply_config(config)
-    }
-}
-
-/// A DMA-capable SPI bus.
-///
-/// This structure is responsible for managing SPI transfers using DMA
-/// buffers.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub struct SpiDmaBus<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    spi_dma: SpiDma<'d, Dm>,
-    rx_buf: DmaRxBuf,
-    tx_buf: DmaTxBuf,
-}
-
-impl<Dm> crate::private::Sealed for SpiDmaBus<'_, Dm> where Dm: DriverMode {}
-
-impl<'d> SpiDmaBus<'d, Blocking> {
-    /// Converts the SPI instance into async mode.
-    #[instability::unstable]
-    pub fn into_async(self) -> SpiDmaBus<'d, Async> {
-        SpiDmaBus {
-            spi_dma: self.spi_dma.into_async(),
-            rx_buf: self.rx_buf,
-            tx_buf: self.tx_buf,
-        }
-    }
-
-    /// Listen for the given interrupts
-    #[instability::unstable]
-    pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-        self.spi_dma.listen(interrupts.into());
-    }
-
-    /// Unlisten the given interrupts
-    #[instability::unstable]
-    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-        self.spi_dma.unlisten(interrupts.into());
-    }
-
-    /// Gets asserted interrupts
-    #[instability::unstable]
-    pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
-        self.spi_dma.interrupts()
-    }
-
-    /// Resets asserted interrupts
-    #[instability::unstable]
-    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
-        self.spi_dma.clear_interrupts(interrupts.into());
-    }
-}
-
-impl<'d> SpiDmaBus<'d, Async> {
-    /// Converts the SPI instance into async mode.
-    #[instability::unstable]
-    pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking> {
-        SpiDmaBus {
-            spi_dma: self.spi_dma.into_blocking(),
-            rx_buf: self.rx_buf,
-            tx_buf: self.tx_buf,
-        }
-    }
-
-    /// Fill the given buffer with data from the bus.
-    #[instability::unstable]
-    pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.spi_dma.wait_for_idle_async().await;
-        self.spi_dma.driver().setup_full_duplex()?;
-        let chunk_size = self.rx_buf.capacity();
-
-        for chunk in words.chunks_mut(chunk_size) {
-            let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-
-            unsafe { spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)? };
-
-            spi.wait_for_idle_async().await;
-
-            chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
-
-            spi.defuse();
-        }
-
-        Ok(())
-    }
-
-    /// Transmit the given buffer to the bus.
-    #[instability::unstable]
-    pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.spi_dma.wait_for_idle_async().await;
-        self.spi_dma.driver().setup_full_duplex()?;
-
-        let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-        let chunk_size = self.tx_buf.capacity();
-
-        for chunk in words.chunks(chunk_size) {
-            self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe { spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)? };
-
-            spi.wait_for_idle_async().await;
-        }
-        spi.defuse();
-
-        Ok(())
-    }
-
-    /// Transfer by writing out a buffer and reading the response from
-    /// the bus into another buffer.
-    #[instability::unstable]
-    pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-        self.spi_dma.wait_for_idle_async().await;
-        self.spi_dma.driver().setup_full_duplex()?;
-
-        let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-        let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
-
-        for (read_chunk, write_chunk) in read_common
-            .chunks_mut(chunk_size)
-            .zip(write_common.chunks(chunk_size))
-        {
-            self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
-
-            unsafe {
-                spi.start_dma_transfer(
-                    read_chunk.len(),
-                    write_chunk.len(),
-                    &mut self.rx_buf,
-                    &mut self.tx_buf,
-                )?;
-            }
-            spi.wait_for_idle_async().await;
-
-            read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
-        }
-
-        spi.defuse();
-
-        if !read_remainder.is_empty() {
-            self.read_async(read_remainder).await
-        } else if !write_remainder.is_empty() {
-            self.write_async(write_remainder).await
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Transfer by writing out a buffer and reading the response from
-    /// the bus into the same buffer.
-    #[instability::unstable]
-    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.spi_dma.wait_for_idle_async().await;
-        self.spi_dma.driver().setup_full_duplex()?;
-
-        let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-        for chunk in words.chunks_mut(self.tx_buf.capacity()) {
-            self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe {
-                spi.start_dma_transfer(
-                    chunk.len(),
-                    chunk.len(),
-                    &mut self.rx_buf,
-                    &mut self.tx_buf,
-                )?;
-            }
-            spi.wait_for_idle_async().await;
-            chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
-        }
-
-        spi.defuse();
-
-        Ok(())
-    }
-}
-
-impl<'d, Dm> SpiDmaBus<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    /// Creates a new `SpiDmaBus` with the specified SPI instance and DMA
-    /// buffers.
-    pub fn new(spi_dma: SpiDma<'d, Dm>, rx_buf: DmaRxBuf, tx_buf: DmaTxBuf) -> Self {
-        Self {
-            spi_dma,
-            rx_buf,
-            tx_buf,
-        }
-    }
-
-    /// Splits [SpiDmaBus] back into [SpiDma], [DmaRxBuf] and [DmaTxBuf].
-    #[instability::unstable]
-    pub fn split(mut self) -> (SpiDma<'d, Dm>, DmaRxBuf, DmaTxBuf) {
-        self.wait_for_idle();
-        (self.spi_dma, self.rx_buf, self.tx_buf)
-    }
-
-    fn wait_for_idle(&mut self) {
-        self.spi_dma.wait_for_idle();
-    }
-
-    /// Change the bus configuration.
-    ///
-    /// # Errors
-    ///
-    /// If frequency passed in config exceeds
-    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
-    #[cfg_attr(esp32h2, doc = " 48MHz")]
-    /// or is below 70kHz,
-    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
-    #[instability::unstable]
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        self.spi_dma.apply_config(config)
-    }
-
-    /// Reads data from the SPI bus using DMA.
-    #[instability::unstable]
-    pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle();
-        self.spi_dma.driver().setup_full_duplex()?;
-        for chunk in words.chunks_mut(self.rx_buf.capacity()) {
-            unsafe {
-                self.spi_dma
-                    .start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)?;
-            }
-
-            self.wait_for_idle();
-            chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
-        }
-
-        Ok(())
-    }
-
-    /// Writes data to the SPI bus using DMA.
-    #[instability::unstable]
-    pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle();
-        self.spi_dma.driver().setup_full_duplex()?;
-        for chunk in words.chunks(self.tx_buf.capacity()) {
-            self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe {
-                self.spi_dma
-                    .start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)?;
-            }
-
-            self.wait_for_idle();
-        }
-
-        Ok(())
-    }
-
-    /// Transfers data to and from the SPI bus simultaneously using DMA.
-    #[instability::unstable]
-    pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle();
-        self.spi_dma.driver().setup_full_duplex()?;
-        let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
-
-        for (read_chunk, write_chunk) in read_common
-            .chunks_mut(chunk_size)
-            .zip(write_common.chunks(chunk_size))
-        {
-            self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
-
-            unsafe {
-                self.spi_dma.start_dma_transfer(
-                    read_chunk.len(),
-                    write_chunk.len(),
-                    &mut self.rx_buf,
-                    &mut self.tx_buf,
-                )?;
-            }
-            self.wait_for_idle();
-
-            read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
-        }
-
-        if !read_remainder.is_empty() {
-            self.read(read_remainder)
-        } else if !write_remainder.is_empty() {
-            self.write(write_remainder)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Transfers data in place on the SPI bus using DMA.
-    #[instability::unstable]
-    pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle();
-        self.spi_dma.driver().setup_full_duplex()?;
-        let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
-
-        for chunk in words.chunks_mut(chunk_size) {
-            self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
-
-            unsafe {
-                self.spi_dma.start_dma_transfer(
-                    chunk.len(),
-                    chunk.len(),
-                    &mut self.rx_buf,
-                    &mut self.tx_buf,
-                )?;
-            }
-            self.wait_for_idle();
-            chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
-        }
-
-        Ok(())
-    }
-
-    /// Half-duplex read.
-    #[instability::unstable]
-    pub fn half_duplex_read(
-        &mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        buffer: &mut [u8],
-    ) -> Result<(), Error> {
-        if buffer.len() > self.rx_buf.capacity() {
-            return Err(Error::from(DmaError::Overflow));
-        }
-        self.wait_for_idle();
-
-        unsafe {
-            self.spi_dma.start_half_duplex_read(
-                data_mode,
-                cmd,
-                address,
-                dummy,
-                buffer.len(),
-                &mut self.rx_buf,
-            )?;
-        }
-
-        self.wait_for_idle();
-
-        buffer.copy_from_slice(&self.rx_buf.as_slice()[..buffer.len()]);
-
-        Ok(())
-    }
-
-    /// Half-duplex write.
-    #[instability::unstable]
-    pub fn half_duplex_write(
-        &mut self,
-        data_mode: DataMode,
-        cmd: Command,
-        address: Address,
-        dummy: u8,
-        buffer: &[u8],
-    ) -> Result<(), Error> {
-        if buffer.len() > self.tx_buf.capacity() {
-            return Err(Error::from(DmaError::Overflow));
-        }
-        self.wait_for_idle();
-        self.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
-
-        unsafe {
-            self.spi_dma.start_half_duplex_write(
-                data_mode,
-                cmd,
-                address,
-                dummy,
-                buffer.len(),
-                &mut self.tx_buf,
-            )?;
-        }
-
-        self.wait_for_idle();
-
-        Ok(())
-    }
-}
-
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for SpiDmaBus<'_, Blocking> {
-    /// Sets the interrupt handler
-    ///
-    /// Interrupts are not enabled at the peripheral level here.
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.spi_dma.set_interrupt_handler(handler);
-    }
-}
-
-#[instability::unstable]
-impl<Dm> embassy_embedded_hal::SetConfig for SpiDmaBus<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Config = Config;
-    type ConfigError = ConfigError;
-
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
-    }
-}
-
 pub(super) struct DmaDriver {
     driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
@@ -1246,6 +1195,14 @@ pub(super) struct DmaDriver {
 }
 
 impl DmaDriver {
+    unsafe fn rx_buffer(&self) -> &'static mut DmaRxBuf {
+        unsafe { self.state.rx_buffer() }
+    }
+
+    unsafe fn tx_buffer(&self) -> &'static mut DmaTxBuf {
+        unsafe { self.state.tx_buffer() }
+    }
+
     fn abort_transfer(&self) {
         // The SPI peripheral is controlling how much data we transfer, so let's
         // update its counter.
@@ -1396,71 +1353,43 @@ impl<'d> DmaEligible for AnySpi<'d> {
     }
 }
 
-#[instability::unstable]
-impl embedded_hal_async::spi::SpiBus for SpiDmaBus<'_, Async> {
-    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.read_async(words).await
-    }
-
-    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write_async(words).await
-    }
-
-    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.transfer_async(read, write).await
-    }
-
-    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.transfer_in_place_async(words).await
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
-        Ok(())
-    }
-}
-
-#[instability::unstable]
-impl<Dm> ErrorType for SpiDmaBus<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Error = Error;
-}
-
-#[instability::unstable]
-impl<Dm> SpiBus for SpiDmaBus<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.read(words)
-    }
-
-    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        self.write(words)
-    }
-
-    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.transfer(read, write)
-    }
-
-    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.transfer_in_place(words)
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
-        Ok(())
-    }
-}
-
 struct DmaInfo {
     dma_peripheral: crate::dma::DmaPeripheral,
 }
 struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
+
+    rx_buffer: UnsafeCell<MaybeUninit<DmaRxBuf>>,
+    tx_buffer: UnsafeCell<MaybeUninit<DmaTxBuf>>,
+}
+
+impl DmaState {
+    // Syntactic helper to get a mutable reference to the "empty" RX DMA buffer.
+    //
+    // # Safety
+    //
+    // The caller must ensure that Rust's aliasing rules are upheld.
+    #[allow(
+        clippy::mut_from_ref,
+        reason = "Safety requirements ensure this is okay"
+    )]
+    unsafe fn rx_buffer(&self) -> &mut DmaRxBuf {
+        unsafe { (&mut *self.rx_buffer.get()).assume_init_mut() }
+    }
+
+    // Syntactic helper to get a mutable reference to the "empty" TX DMA buffer.
+    //
+    // # Safety
+    //
+    // The caller must ensure that Rust's aliasing rules are upheld.
+    #[allow(
+        clippy::mut_from_ref,
+        reason = "Safety requirements ensure this is okay"
+    )]
+    unsafe fn tx_buffer(&self) -> &mut DmaTxBuf {
+        unsafe { (&mut *self.tx_buffer.get()).assume_init_mut() }
+    }
 }
 
 // SAFETY: State belongs to the currently constructed driver instance. As such, it'll not be
@@ -1482,6 +1411,9 @@ for_each_spi_master!(
                             static DMA_STATE: DmaState = DmaState {
                                 tx_transfer_in_progress: Cell::new(false),
                                 rx_transfer_in_progress: Cell::new(false),
+
+                                rx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
+                                tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                             };
 
                             (&DMA_INFO, &DMA_STATE)
