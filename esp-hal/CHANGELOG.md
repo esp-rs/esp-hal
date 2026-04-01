@@ -96,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated embassy dependencies: embassy-sync to 0.8, embassy-embedded-hal to 0.6 (#5249)
 - `esp_hal::efuse::chip_revision` has been marked stable (#5287)
 - `esp_hal::efuse::chip_revision` now returns `ChipRevision` (#5287)
+- The embassy-usb device drivers has been moved from `esp_hal::otg_fs::asynch` to `esp_hal::otg_fs::device`. (#5283)
 
 ### Fixed
 
