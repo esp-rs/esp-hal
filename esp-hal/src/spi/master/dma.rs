@@ -439,7 +439,7 @@ impl<'d> SpiDma<'d, Async> {
             let rx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(&mut *chunk)) };
             let tx_buffer = unsafe { NoBuffer(self.spi.dma_state().tx_buffer().prepare()) };
 
-            self.transfer_buffers_dma(read_bytes, 0, rx_buffer, tx_buffer)
+            self.transfer_buffers_dma_async(read_bytes, 0, rx_buffer, tx_buffer)
                 .await?;
 
             maybe_copy_buffer.finish(chunk);
@@ -475,7 +475,7 @@ impl<'d> SpiDma<'d, Async> {
             let rx_buffer = unsafe { NoBuffer(self.spi.dma_state().rx_buffer().prepare()) };
             let tx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(chunk)) };
 
-            self.transfer_buffers_dma(0, write_bytes, rx_buffer, tx_buffer)
+            self.transfer_buffers_dma_async(0, write_bytes, rx_buffer, tx_buffer)
                 .await?;
         }
 
@@ -528,7 +528,7 @@ impl<'d> SpiDma<'d, Async> {
             let tx_buffer = unsafe { maybe_copy_tx_buffer.setup(NonNull::from(write_chunk)) };
             let rx_buffer = unsafe { maybe_copy_rx_buffer.setup(NonNull::from(&mut *read_chunk)) };
 
-            self.transfer_buffers_dma(read_bytes, write_bytes, rx_buffer, tx_buffer)
+            self.transfer_buffers_dma_async(read_bytes, write_bytes, rx_buffer, tx_buffer)
                 .await?;
 
             maybe_copy_rx_buffer.finish(read_chunk);
@@ -581,7 +581,7 @@ impl<'d> SpiDma<'d, Async> {
             let tx_buffer = unsafe { maybe_copy_tx_buffer.setup(ptr) };
             let rx_buffer = unsafe { maybe_copy_rx_buffer.setup(ptr) };
 
-            self.transfer_buffers_dma(bytes, bytes, rx_buffer, tx_buffer)
+            self.transfer_buffers_dma_async(bytes, bytes, rx_buffer, tx_buffer)
                 .await?;
 
             maybe_copy_rx_buffer.finish(chunk);
@@ -590,7 +590,7 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
-    async fn transfer_buffers_dma(
+    async fn transfer_buffers_dma_async(
         &mut self,
         read_bytes: usize,
         write_bytes: usize,
@@ -1168,25 +1168,50 @@ where
         self.driver().apply_config(config)
     }
 
+    fn transfer_buffers_dma(
+        &mut self,
+        read_bytes: usize,
+        write_bytes: usize,
+        mut rx_buffer: impl DmaRxBuffer,
+        mut tx_buffer: impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        unsafe {
+            self.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
+        }
+        self.wait_for_idle();
+        Ok(())
+    }
+
     /// Reads data from the SPI bus using DMA.
     #[instability::unstable]
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 {
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_buffer = match DmaOperationKind::for_read(words) {
+            DmaOperationKind::Copied => {
+                MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
+                descriptors: &mut descriptors,
+                #[cfg(psram_dma)]
+                align_buffer: [const { None }; 2],
+            },
+        };
+
+        if maybe_copy_buffer.chunk_size() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        for chunk in words.chunks_mut(rx_buffer.capacity()) {
-            unsafe {
-                self.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)?;
-            }
+        for chunk in words.chunks_mut(maybe_copy_buffer.chunk_size()) {
+            let read_bytes = chunk.len();
+            let rx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(&mut *chunk)) };
+            let tx_buffer = unsafe { NoBuffer(self.spi.dma_state().tx_buffer().prepare()) };
 
-            self.wait_for_idle();
-            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+            self.transfer_buffers_dma(read_bytes, 0, rx_buffer, tx_buffer)?;
+
+            maybe_copy_buffer.finish(chunk);
         }
 
         Ok(())
@@ -1198,20 +1223,24 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if tx_buffer.capacity() == 0 {
+        let mut descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut maybe_copy_buffer = match DmaOperationKind::for_write(words) {
+            DmaOperationKind::Copied => {
+                MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyTxBuf::Direct(&mut descriptors),
+        };
+
+        if maybe_copy_buffer.chunk_size() == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        for chunk in words.chunks(tx_buffer.capacity()) {
-            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+        for chunk in words.chunks(maybe_copy_buffer.chunk_size()) {
+            let write_bytes = chunk.len();
+            let rx_buffer = unsafe { NoBuffer(self.spi.dma_state().rx_buffer().prepare()) };
+            let tx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(chunk)) };
 
-            unsafe {
-                self.start_dma_transfer(0, chunk.len(), rx_buffer, tx_buffer)?;
-            }
-
-            self.wait_for_idle();
+            self.transfer_buffers_dma(0, write_bytes, rx_buffer, tx_buffer)?;
         }
 
         Ok(())
@@ -1223,23 +1252,44 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+        let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
+            DmaOperationKind::Copied => {
+                MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
+                descriptors: &mut rx_descriptors,
+                #[cfg(psram_dma)]
+                align_buffer: [const { None }; 2],
+            },
+        };
+
+        let mut tx_descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
+            DmaOperationKind::Copied => {
+                MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyTxBuf::Direct(&mut tx_descriptors),
+        };
+
+        let chunk_size = min(
+            maybe_copy_rx_buffer.chunk_size(),
+            maybe_copy_tx_buffer.chunk_size(),
+        );
+
+        if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
-
         for (read_chunk, write_chunk) in read.chunks_mut(chunk_size).zip(write.chunks(chunk_size)) {
-            tx_buffer.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+            let read_bytes = read_chunk.len();
+            let write_bytes = write_chunk.len();
+            let tx_buffer = unsafe { maybe_copy_tx_buffer.setup(NonNull::from(write_chunk)) };
+            let rx_buffer = unsafe { maybe_copy_rx_buffer.setup(NonNull::from(&mut *read_chunk)) };
 
-            unsafe {
-                self.start_dma_transfer(read_chunk.len(), write_chunk.len(), rx_buffer, tx_buffer)?;
-            }
-            self.wait_for_idle();
+            self.transfer_buffers_dma(read_bytes, write_bytes, rx_buffer, tx_buffer)?;
 
-            read_chunk.copy_from_slice(&rx_buffer.as_slice()[..read_chunk.len()]);
+            maybe_copy_rx_buffer.finish(read_chunk);
         }
 
         Ok(())
@@ -1251,22 +1301,42 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
-        let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
-        let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
-        if rx_buffer.capacity() == 0 || tx_buffer.capacity() == 0 {
+        let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let (mut maybe_copy_rx_buffer, mut maybe_copy_tx_buffer) =
+            match DmaOperationKind::for_write(words) {
+                DmaOperationKind::Copied => (
+                    MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() }),
+                    MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() }),
+                ),
+                DmaOperationKind::InPlace => (
+                    MaybeCopyRxBuf::Direct {
+                        descriptors: &mut rx_descriptors,
+                        #[cfg(psram_dma)]
+                        align_buffer: [const { None }; 2],
+                    },
+                    MaybeCopyTxBuf::Direct(&mut tx_descriptors),
+                ),
+            };
+
+        let chunk_size = min(
+            maybe_copy_rx_buffer.chunk_size(),
+            maybe_copy_tx_buffer.chunk_size(),
+        );
+
+        if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
-
         for chunk in words.chunks_mut(chunk_size) {
-            tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+            let bytes = chunk.len();
+            let ptr = NonNull::from(&mut *chunk);
+            let tx_buffer = unsafe { maybe_copy_tx_buffer.setup(ptr) };
+            let rx_buffer = unsafe { maybe_copy_rx_buffer.setup(ptr) };
 
-            unsafe {
-                self.start_dma_transfer(chunk.len(), chunk.len(), rx_buffer, tx_buffer)?;
-            }
-            self.wait_for_idle();
-            chunk.copy_from_slice(&rx_buffer.as_slice()[..chunk.len()]);
+            self.transfer_buffers_dma(bytes, bytes, rx_buffer, tx_buffer)?;
+
+            maybe_copy_rx_buffer.finish(chunk);
         }
 
         Ok(())
