@@ -15,11 +15,12 @@ doc-config = { features = ["defmt"] }
 check-configs = [
     { features = [] },
     { features = ["defmt"] },
+    { features = ["alloc-hooks"] },
     { features = ["internal-heap-stats"] },
     { features = ["defmt", "internal-heap-stats"] },
 ]
 clippy-configs = [
-    { features = ["defmt", "internal-heap-stats"] },
+    { features = ["defmt", "internal-heap-stats", "alloc-hooks"] },
 ]
 
 [package.metadata.docs.rs]
@@ -77,6 +78,31 @@ compat = []
 
 ## Enable the `#[global_allocator]` attribute for `EspHeap`.
 global-allocator = []
+
+## Enable observing allocation events via hook functions.
+##
+## This option requires the following functions to be implemented:
+##
+## ```rust,no_run
+## use esp_alloc::{EspHeap, MemoryCapability};
+## use enumset::EnumSet; // from `enumset = "1"`
+##
+## #[unsafe(no_mangle)]
+## unsafe extern "Rust" fn _esp_alloc_alloc(
+##     _heap: &EspHeap,
+##     _caps: EnumSet<MemoryCapability>,
+##     ptr: usize,
+##     size: usize,
+## ) {
+##     todo!()
+## }
+##
+## #[unsafe(no_mangle)]
+## unsafe extern "Rust" fn _esp_alloc_dealloc(_heap: &EspHeap, ptr: usize, size: usize) {
+##     todo!()
+## }
+## ```
+alloc-hooks = []
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
