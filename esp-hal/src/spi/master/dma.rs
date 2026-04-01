@@ -717,6 +717,13 @@ enum DmaOperationKind {
 impl DmaOperationKind {
     fn compute(buffer: &[u8]) -> Self {
         fn is_dma_compatible(buffer: &[u8]) -> bool {
+            // FIXME: lazy workaround for ESP32 TX DMA alignment requirements.
+            // `prepare_for_tx` and `prepare_for_rx` should be updated to handle ESP32.
+            #[cfg(esp32)]
+            if !(buffer.as_ptr() as usize).is_multiple_of(4) {
+                return false;
+            }
+
             if is_slice_in_dram(buffer) {
                 return true;
             }
