@@ -2,14 +2,14 @@
 //! Increments a 32 bit counter value at a known point in memory,
 //! whenever the ULP program is run. If GPIO0 is pressed, reset the counter.
 
-//% CHIPS: esp32s3
+//% CHIPS: esp32s2, esp32s3
 
 #![no_std]
 #![no_main]
 extern crate panic_halt;
 
 use esp_lp_hal::{
-    gpio::{self, Event, Input, Io},
+    gpio::{Event, Input, Io, gpio_interrupt_clear, gpio_interrupt_status},
     interrupt,
     pac::Peripherals,
     prelude::*,
@@ -34,10 +34,10 @@ fn reset_counter() {
 
 #[entry]
 fn main(mut boot_button: Input<0>) {
-    // Get the io peripheral, and bind a handler to it.
     let peripherals = Peripherals::take();
     let mut io = Io::new(peripherals.RTC_IO);
     io.set_interrupt_handler(gpio_interrupt_handler);
+
     boot_button.listen(Event::FallingEdge);
 
     increment_counter();
@@ -45,10 +45,9 @@ fn main(mut boot_button: Input<0>) {
 
 #[handler]
 fn gpio_interrupt_handler() {
-    // TODO: Create an enum for each GPIO pin? Maybe?
-    let status = gpio::gpio_interrupt_status();
+    let status = gpio_interrupt_status();
     if status & (0b1) != 0 {
         reset_counter();
     }
-    gpio::gpio_interrupt_clear(status);
+    gpio_interrupt_clear(status);
 }

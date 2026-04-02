@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* Provides interrupt vector symbols */
+INCLUDE device.x
+
 ENTRY(reset_vector)
 
 CONFIG_ULP_COPROC_RESERVE_MEM = 8 * 1024;
