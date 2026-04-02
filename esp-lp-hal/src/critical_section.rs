@@ -2,19 +2,17 @@ use critical_section::RawRestoreState;
 
 use crate::interrupt;
 
-struct CriticalSection;
-critical_section::set_impl!(CriticalSection);
+struct UlpCriticalSection;
+critical_section::set_impl!(UlpCriticalSection);
 
-unsafe impl critical_section::Impl for CriticalSection {
+unsafe impl critical_section::Impl for UlpCriticalSection {
     unsafe fn acquire() -> RawRestoreState {
-        interrupt::disable();
-        true
+        interrupt::disable()
     }
 
-    unsafe fn release(was_active: RawRestoreState) {
-        // Only re-enable interrupts if they were enabled before the critical section.
-        if was_active {
-            interrupt::enable();
-        }
+    unsafe fn release(previous_state: RawRestoreState) {
+        // Only re-enable interrupts if that were enabled before the critical section.
+        // interrupt::enable();
+        interrupt::maskirq(previous_state);
     }
 }

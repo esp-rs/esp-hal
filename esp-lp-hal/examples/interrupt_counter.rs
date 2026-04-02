@@ -35,8 +35,7 @@ fn reset_counter() {
 #[entry]
 fn main(mut boot_button: Input<0>) {
     // Get the io peripheral, and bind a handler to it.
-    // let peripherals = Peripherals::take().unwrap(); // Requires critical_section
-    let peripherals = unsafe { Peripherals::steal() };
+    let peripherals = Peripherals::take();
     let mut io = Io::new(peripherals.RTC_IO);
     io.set_interrupt_handler(gpio_interrupt_handler);
     boot_button.listen(Event::FallingEdge);

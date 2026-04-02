@@ -142,25 +142,6 @@ impl CFnPtr {
     }
 }
 
-// /// If no handler is allocated, panic.
-// #[unsafe(no_mangle)]
-// extern "C" fn EspDefaultHandler() {
-//     panic!("Unhandled interrupt");
-// }
-// /// Default (unhandled) interrupt handler
-// pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
-//     {
-//         unsafe extern "C" {
-//             fn EspDefaultHandler();
-//         }
-
-//         unsafe {
-//             core::mem::transmute::<unsafe extern "C" fn(), extern "C" fn()>(EspDefaultHandler)
-//         }
-//     },
-//     Priority::min(),
-// );
-
 // Peripheral interrupt API.
 
 fn vector_entry(interrupt: Interrupt) -> &'static Vector {
@@ -196,7 +177,8 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
         ptr.write_volatile(handler.handler().address());
     }
-    // ULP unused
+    // Unused, because ULP does not have distinct
+    // interrupt sources for every interrupt type we want to handle
     // enable(interrupt, handler.priority());
 }
 
@@ -327,35 +309,43 @@ pub fn setup_interrupts() {
     crate::gpio::bind_default_interrupt_handler();
 }
 
-/// Enable all interrupts
+/// Set the IRQ Mask, returns the previous mask value.
+#[cfg(any(esp32s2, esp32s3))]
+#[inline(always)]
+pub fn maskirq(new_mask: u32) -> u32 {
+    let old_mask: u32;
+    unsafe {
+        // This instruction copies the value of the register IRQ Mask to the register rd,
+        // and copies the value of register rs to IRQ Mask.
+        core::arch::asm!(
+            "maskirq_insn {}, {}",
+            out(reg) old_mask,
+            in(reg) new_mask
+        );
+    }
+    old_mask
+}
+
+/// Enable all interrupts by setting IRQ mask
 #[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
 pub fn enable() {
-    // Exit a critical section by enabling all interrupts
-    // This inline assembly construct is equivalent to:
-    // > maskirq_insn(zero, zero)
-    unsafe {
-        core::arch::asm!(".word 0x0600600b");
-    }
+    maskirq(0x0);
 }
 
-/// Disable all interrupts
+/// Disable all interrupts by clearing IRQ mask,
+/// returns the previous IRQ Mask
 #[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
-pub fn disable() {
-    // Enter a critical section by disabling all interrupts
-    // This inline assembly construct uses the t0 register and is equivalent to:
-    // > li t0, 0x80000007
-    // > maskirq_insn(zero, t0) // Mask all interrupt bits
-    // The mask 0x80000007 represents:
-    //   Bit 31 - RTC peripheral interrupt
-    //   Bit 2  - Bus error
-    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
-    //   Bit 0  - Internal Timer
-    //
-    unsafe {
-        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
-    }
+pub fn disable() -> u32 {
+    // Enter a critical section by disabling all interrupts.
+    // Type     Bit     Description
+    // Internal 0       Internal timer interrupt
+    // Internal 1       EBREAK/ECALL or Illegal Instruction
+    // Internal 2       BUS Error (Unaligned Memory Access)
+    // External 31      RTC peripheral interrupts
+    let mask = (1 << 31) | (1 << 2) | (1 << 1) | (1 << 0);
+    maskirq(mask)
 }
 
 /// Wait for any (masked or unmasked) interrupt
@@ -445,18 +435,11 @@ pub extern "C" fn trap_handler(_regs: &TrapFrame, pending_irqs: u32) {
 
         // Iterate the active interrupts, fetch their handler, and call it if set.
         for interrupt_nr in status.iterator() {
-            // New, null-ptr-checking code.
             if let Ok(i) = Interrupt::try_from(interrupt_nr) {
                 if let Some(handler) = bound_handler(i) {
                     handler.callback()();
                 }
             }
-
-            // Original code
-            // unsafe {
-            //     let handler = crate::interrupt::__INTERRUPTS[interrupt_nr as usize]._handler;
-            //     handler();
-            // }
         }
     }
 }
