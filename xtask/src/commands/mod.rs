@@ -10,6 +10,7 @@ pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
+    radio_hil_runner::{extract_radio_tests, get_test_pair, run_radio_test},
 };
 mod build;
 mod check_changelog;
@@ -285,6 +286,9 @@ pub struct TestsArgs {
     /// Emit crate build timings
     #[arg(long)]
     pub timings: bool,
+
+    /// "hil-test" or "hil-test-radio"
+    pub package: Option<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -408,8 +412,18 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
 /// Execute the given action on the specified HIL tests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
-    // Absolute path of the 'hil-test' package's root:
-    let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
+    // Determine which package to load (default to hil-test if not specified)
+    let package_name = args.package.as_deref().unwrap_or("hil-test");
+
+    // Absolute path of the appropriate package's root:
+    let package_path = match package_name {
+        "hil-test" => crate::windows_safe_path(&workspace.join("hil-test")),
+        "hil-test-radio" => crate::windows_safe_path(&workspace.join("hil-test-radio")),
+        other => bail!(
+            "Unknown package: {}. Use 'hil-test' or 'hil-test-radio'",
+            other
+        ),
+    };
 
     // Determine the appropriate build target for the given package and chip:
     let target = Package::HilTest.target_triple(&args.chip)?;
@@ -422,6 +436,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
     // Sort all tests by name:
     tests.sort_by_key(|a| a.binary_name());
+
+    if tests.is_empty() {
+        bail!("No tests found in {} for {}", package_name, args.chip);
+    }
+
+    // Determine if this package uses radio tests (requires custom orchestrator runner)
+    let is_radio_package = package_name == "hil-test-radio";
 
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
@@ -515,12 +536,77 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             "Command: cargo {}",
             c.command.join(" ").replace("---", "\n    ---")
         );
-        for i in 0..repeat {
-            if repeat != 1 {
-                log::info!("Run {}/{}", i + 1, repeat);
+
+        // If this is a radio package and we're running (not just building),
+        // use the custom orchestrator runner instead of standard probe-rs
+        if is_radio_package && matches!(action, CargoAction::Run) {
+            for i in 0..repeat {
+                if repeat != 1 {
+                    log::info!("Run {}/{}", i + 1, repeat);
+                }
+
+                // Build the radio test binary
+                let mut build_cmd = c.clone();
+
+                // Change "run" to "build" in the command
+                if let Some(pos) = build_cmd.command.iter().position(|x| x == "run") {
+                    build_cmd.command[pos] = "build".to_string();
+                }
+
+                // Ensure --release is set
+                if !build_cmd.command.iter().any(|x| x == "--release") {
+                    build_cmd.command.push("--release".to_string());
+                }
+
+                log::info!(
+                    "Building radio test with command: {}",
+                    build_cmd.command.join(" ")
+                );
+
+                if build_cmd.run(false).is_err() {
+                    failed.push(c.artifact_name.clone());
+                    log::error!("Failed to build radio test");
+                    break;
+                }
+
+                let base_binary_name = c
+                    .artifact_name
+                    .split('_')
+                    .take_while(|part| *part != "has" && *part != "no") // Stop at config markers
+                    .collect::<Vec<_>>()
+                    .join("_");
+
+                let binary_path = workspace
+                    .join("target")
+                    .join(&target)
+                    .join("release")
+                    .join(&base_binary_name);
+
+                log::info!("Looking for binary at: {}", binary_path.display());
+
+                if !binary_path.exists() {
+                    bail!("Radio test binary not found: {}", binary_path.display());
+                }
+
+                let test_names = extract_radio_tests(&binary_path)?;
+                let (ap_test, sta_test) = get_test_pair(&test_names)?;
+
+                // Run with custom orchestrator
+                if let Err(e) = run_radio_test(&binary_path, &ap_test, &sta_test, 120, None) {
+                    failed.push(c.artifact_name.clone());
+                    log::error!("Radio test failed: {}", e);
+                    break;
+                }
             }
-            if c.run(false).is_err() {
-                failed.push(c.artifact_name.clone());
+        } else {
+            // For HAL tests or build action, use standard probe-rs runner
+            for i in 0..repeat {
+                if repeat != 1 {
+                    log::info!("Run {}/{}", i + 1, repeat);
+                }
+                if c.run(false).is_err() {
+                    failed.push(c.artifact_name.clone());
+                }
             }
         }
     }

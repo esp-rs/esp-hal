@@ -25,6 +25,7 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
+pub mod radio_hil_runner;
 
 // ---------------------------------------------------------------------------
 // MCP tool registration

@@ -7,7 +7,7 @@
 //% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio/unstable
 //% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio/unstable trouble-host
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio/unstable
-//% FEATURES(has_wifi_ble): trouble-host
+//% FEATURES(has_wifi_ble): trouble-host esp-radio/defmt
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test
@@ -37,23 +37,23 @@ fn init_heap() {
 #[cfg(multi_core)]
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
-#[path = "esp_radio/esp_rtos.rs"]
+#[path = "radio_basic/esp_rtos.rs"]
 mod esp_rtos;
 
-#[path = "esp_radio/init_tests.rs"]
+#[path = "radio_basic/init_tests.rs"]
 #[cfg(feature = "esp-radio")]
 mod init_tests;
 
 #[cfg(bt_driver_supported)]
-#[path = "esp_radio/ble_controller.rs"]
+#[path = "radio_basic/ble_controller.rs"]
 #[cfg(feature = "esp-radio")]
 mod ble_controller;
 
 #[cfg(soc_has_wifi)]
-#[path = "esp_radio/wifi_controller.rs"]
+#[path = "radio_basic/wifi_controller.rs"]
 #[cfg(feature = "esp-radio")]
 mod wifi_controller;
 
 #[cfg(xtensa)]
-#[path = "esp_radio/fpu.rs"]
+#[path = "radio_basic/fpu.rs"]
 mod fpu;
