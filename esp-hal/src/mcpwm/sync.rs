@@ -13,7 +13,7 @@
 //! # MCPWM Sync Module
 //!
 //! ## Overview
-//! The `Sync` is resposible for managing the different ways
+//! The `Sync` is responsible for managing the different ways
 //! MCPWM can listen to sync events. There are 2 different types of
 //! sync sources. One is a [`SyncOut`] that comes from [`super::Timer::get_sync_out`],
 //! or from a [`SyncLine`].
@@ -101,7 +101,8 @@ impl<'d, const SYNC: u8, PWM: Instance> SyncLine<'d, SYNC, PWM> {
     /// Set the input signal for the sync line
     pub fn set_signal(&mut self, source: impl PeripheralInput<'d>) {
         // configure GPIO matrix → SYNC
-        let signal = PWM::info().sync_input_signal::<SYNC>();
+        let (info, _) = PWM::split();
+        let signal = info.sync_input_signal::<SYNC>();
 
         if signal as usize <= property!("gpio.input_signal_max") {
             let source = source.into();
@@ -111,9 +112,19 @@ impl<'d, const SYNC: u8, PWM: Instance> SyncLine<'d, SYNC, PWM> {
             warn!("Signal {:?} out of range", signal);
         }
     }
+
+    /// Inverts the input signal from the supplied input source
+    /// If invert is true sync events are triggered on falling edges.
+    /// If invert is false sync events are triggered on rising edges.
+    pub fn set_invert(&mut self, invert: bool) {
+        let (info, _) = PWM::split();
+        info.regs()
+            .timer_synci_cfg()
+            .modify(|_, w| w.external_synci_invert(SYNC).variant(invert));
+    }
 }
 
-/// Repersents the different types of sync sources
+/// Represents the different types of sync sources
 /// Either from sync lines or from timers sync out.
 ///
 /// Shall only be created from this file
@@ -124,7 +135,7 @@ pub(crate) enum SyncKind {
 }
 
 /// Internal trait to repersent which pwm unit and
-/// sync out it came from. Broadly repersents sync lines,
+/// sync out it came from. Broadly represents sync lines,
 /// and timer sync out.
 pub(crate) trait InternalSyncSource: crate::private::Sealed {
     fn get_kind(&self) -> SyncKind;

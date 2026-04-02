@@ -1,8 +1,25 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
+
 //! # MCPWM Timer Module
 //!
 //! ## Overview
 //! The `timer` module provides an interface to configure and use timers for
 //! generating `PWM` signals used in motor control and other applications.
+//!
+//! The `timer` module allows the configuration of setting the sync in source
+//! for the timer, and the ability to get their sync out to given to other timers
+//! as their sync in.
+//!
+//! ### Software Sync Events
+//! The `timer` module supports the software triggering of syncs from Timers.
+#![cfg_attr(
+    soc_has_mcpwm_swsync_can_propagate,
+    doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
+)]
+#![cfg_attr(
+    not(soc_has_mcpwm_swsync_can_propagate),
+    doc = "**Note:** Software triggered sync events do not propagate to other timers on this chip."
+)]
 
 use core::marker::PhantomData;
 
@@ -11,6 +28,7 @@ use enumset::{EnumSet, EnumSetType};
 use super::PeripheralGuard;
 use crate::{
     mcpwm::{
+        Event,
         FrequencyError,
         Instance,
         PeripheralClockConfig,
@@ -32,6 +50,16 @@ pub enum TimerEvent {
     TimerEqualZero,
     /// Event for when a timer equals period
     TimerEqualPeriod,
+}
+
+impl Into<Event> for TimerEvent {
+    fn into(self) -> Event {
+        match self {
+            TimerEvent::TimerEqualPeriod => Event::TimerEqualPeriod,
+            TimerEvent::TimerEqualZero => Event::TimerEqualZero,
+            TimerEvent::TimerStop => Event::TimerStop,
+        }
+    }
 }
 
 /// A MCPWM timer
@@ -99,11 +127,6 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// ## Overview
     /// Internally we set the timers phase and direction
     /// Then trigger a software sync event.
-    ///
-    /// Note: This triggers a sync out event. If a timer is listening
-    /// to this timers sync out. Then a sync event will be propagated.
-    /// Refer to how sync events are handled for [`super::CaptureTimer`]
-    /// or [`Timer`] in the their respective documentation.
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         self.set_sync_phase(phase);
         self.set_sync_counter_direction(direction);
@@ -130,8 +153,6 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Trigger a software sync event
-    /// Note: This always triggers a sync out event from
-    /// its [`Timer::get_sync_out`] source.
     pub fn trigger_sync(&mut self) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
@@ -148,7 +169,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Selects the how the timer fires sync out events
-    pub fn set_sync_out_selection(&mut self, sync_out: SyncOutSelection) {
+    pub fn set_sync_out_selection(&mut self, sync_out: SyncOutSelect) {
         // SAFETY:
         // We only modify our TIMERx_SYNC register
         let timer = Self::tmr();
@@ -164,18 +185,15 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Sets the timer sync in source
-    pub fn set_sync_in(&mut self, sync: impl SyncSource<PWM>) {
-        // SAFETY:
-        // We only modify the PWM TIMER_SYNCI_CFG register
-        let block = PWM::info().regs();
-
-        // SAFETY:
-        // We only modify our TIMERx_SYNC register
+    pub fn set_sync(&mut self, sync: &impl SyncSource<PWM>) {
+        let (info, _) = PWM::split();
         let timer = Self::tmr();
 
         // Update sync select first
         let sync_select: SyncSelection = sync.get_kind().into();
-        block.timer_synci_cfg().modify(|_r, w| {
+        // SAFETY:
+        // We only modify the PWM TIMER_SYNCI_CFG register
+        info.regs().timer_synci_cfg().modify(|_r, w| {
             unsafe {
                 w.timer_syncisel(TIM).bits(sync_select as u8) // Update timer input sync selection
             }
@@ -186,7 +204,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Clears the sync in for the timer and disables sync input
-    pub fn clear_sync_in(&mut self) {
+    pub fn clear_sync(&mut self) {
         // SAFETY:
         // We only modify our TIMERx_SYNC register
         let timer = Self::tmr();
@@ -196,20 +214,20 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     #[instability::unstable]
     pub fn listen(&mut self, events: EnumSet<TimerEvent>) {
-        self.enable_interrupts(events, true);
+        self.enable_listen(events, true);
     }
 
     #[instability::unstable]
     pub fn unlisten(&mut self, events: EnumSet<TimerEvent>) {
-        self.enable_interrupts(events, false);
+        self.enable_listen(events, false);
     }
 
     #[instability::unstable]
     pub fn interrupts(&self) -> EnumSet<TimerEvent> {
         let mut res = EnumSet::new();
-        let reg_block = PWM::info().regs();
+        let (info, _) = PWM::split();
 
-        let ints = reg_block.int_st().read();
+        let ints = info.regs().int_st().read();
         if ints.timer_stop(TIM).bit() {
             res.insert(TimerEvent::TimerStop);
         }
@@ -225,33 +243,27 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, events: EnumSet<TimerEvent>) {
-        let reg_block = PWM::info().regs();
-
-        reg_block.int_clr().write(|w| {
+        let (info, _) = PWM::split();
+        info.regs().int_clr().write(|w| {
             for event in events {
                 match event {
-                    TimerEvent::TimerStop => w.timer_stop(TIM).variant(true),
-                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).variant(true),
-                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).variant(true),
+                    TimerEvent::TimerStop => w.timer_stop(TIM).bit(true),
+                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).bit(true),
+                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).bit(true),
                 };
             }
             w
         });
     }
 
-    fn enable_interrupts(&mut self, events: EnumSet<TimerEvent>, value: bool) {
-        let reg_block = PWM::info().regs();
+    fn enable_listen(&mut self, events: EnumSet<TimerEvent>, value: bool) {
+        let (info, state) = PWM::split();
+        let mut int_events = EnumSet::new();
+        for timer_event in events {
+            int_events.insert(timer_event.into());
+        }
 
-        reg_block.int_ena().modify(|_, w| {
-            for event in events {
-                match event {
-                    TimerEvent::TimerStop => w.timer_stop(TIM).variant(value),
-                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).variant(value),
-                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).variant(value),
-                };
-            }
-            w
-        });
+        state.enable_listen::<TIM>(info, int_events, value);
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
@@ -267,21 +279,22 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     fn tmr() -> &'static pac::mcpwm0::TIMER {
-        let block = PWM::info().regs();
-        block.timer(TIM as usize)
+        let (info, _) = PWM::split();
+        info.regs().timer(TIM as usize)
     }
 }
 
 /// Sync out selection for the timer
 ///
-/// Note:
+/// Note: For chips ESP32-S3, ESP32-C5, ESP32-C6, and ESP32-H2
+///
 /// During a software sync event triggered by [`Timer::trigger_sync`] or
-/// [`Timer::set_counter`] a sync out is always triggered regardless if
-/// if the timer was configured with [`SyncOutSelection::SyncWhenEqualZero`] or
-/// [`SyncOutSelection::SyncWhenEqualPeriod`].
+/// [`Timer::set_counter`]. A software triggered sync event will
+/// propagate to the sync out regardless if the timer was configured
+/// with [`SyncOutSelection::SyncWhenEqualZero`] or [`SyncOutSelection::SyncWhenEqualPeriod`].
 #[derive(Clone, Copy)]
 #[repr(u8)]
-pub enum SyncOutSelection {
+pub enum SyncOutSelect {
     /// Sync out is triggered when a timer receives a sync in
     SyncIn              = 0,
     /// Sync out is triggered when the timer equals zero
