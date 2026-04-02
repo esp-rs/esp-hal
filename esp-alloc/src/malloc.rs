@@ -35,8 +35,6 @@ pub unsafe extern "C" fn free(ptr: *mut u8) {
         return;
     }
 
-    use core::alloc::GlobalAlloc;
-
     unsafe {
         let ptr = ptr.offset(-4);
         let total_size = *(ptr as *const usize);
