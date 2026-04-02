@@ -257,9 +257,7 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
         Self::cfg().modify(|_, w| {
             w.mode().variant(config.capture_mode);
             w.in_invert().variant(config.invert);
-            unsafe {
-                w.prescale().bits(config.prescaler);
-            }
+            unsafe { w.prescale().bits(config.prescaler) }
         });
     }
 

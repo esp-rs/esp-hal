@@ -24,7 +24,8 @@ symbols = [
     "rom_md5_bsd",
 
     # MCPWM capabilites
-    "soc_has_mcpwm_capture_clk_from_group",
+    "soc_mcpwm_swsync_can_propagate",
+    "soc_mcpwm_capture_clk_from_group",
 
     # Wakeup SOC based on ESP-IDF:
     "pm_support_wifi_wakeup",

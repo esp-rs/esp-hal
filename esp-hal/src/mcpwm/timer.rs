@@ -13,11 +13,11 @@
 //! ### Software Sync Events
 //! The `timer` module supports the software triggering of syncs from Timers.
 #![cfg_attr(
-    soc_has_mcpwm_swsync_can_propagate,
+    soc_mcpwm_swsync_can_propagate,
     doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
 )]
 #![cfg_attr(
-    not(soc_has_mcpwm_swsync_can_propagate),
+    not(soc_mcpwm_swsync_can_propagate),
     doc = "**Note:** Software triggered sync events do not propagate to other timers on this chip."
 )]
 

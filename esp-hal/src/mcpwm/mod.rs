@@ -61,16 +61,16 @@
 //!     * A hardware sync or software sync can trigger a reload on the capture timer with the set
 //!       phase.
 #![cfg_attr(
-    soc_has_mcpwm_capture_clk_from_group,
+    soc_mcpwm_capture_clk_from_group,
     doc = "     * Capture timer's clock source is the same as the PWM timers clock source"
 )]
 #![cfg_attr(
-    not(soc_has_mcpwm_capture_clk_from_group),
+    not(soc_mcpwm_capture_clk_from_group),
     doc = "     * Capture timer's has it's own independent clock source from the MCPWM peripheral."
 )]
 //! * Fault Detection Module (Not yet implemented)
 #![cfg_attr(
-    not(soc_has_mcpwm_capture_clk_from_group),
+    not(soc_mcpwm_capture_clk_from_group),
     doc = "\nCapture clock source is `ADB-CLK (80 MHz)` by default.\n"
 )]
 //! Clock source is `__clock_src__`` by default.
