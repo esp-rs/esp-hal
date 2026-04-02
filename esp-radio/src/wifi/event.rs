@@ -146,6 +146,7 @@ macro_rules! impl_wifi_event {
     ($newtype:ident) => {
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
+        #[instability::unstable]
         pub struct $newtype;
 
         impl Event for $newtype {
@@ -159,6 +160,7 @@ macro_rules! impl_wifi_event {
         use crate::sys::include::$data;
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
+        #[instability::unstable]
         pub struct $newtype<'a>(&'a $data);
 
         impl Event for $newtype<'_> {
@@ -1340,6 +1342,7 @@ impl<'a> EventSubscriber<'a> {
     }
 
     /// Wait for a published event
+    #[instability::unstable]
     pub async fn next_event(&mut self) -> MessageResult {
         match self.inner.next_message().await {
             embassy_sync::pubsub::WaitResult::Lagged(missed) => MessageResult::Lagged(missed),
@@ -1348,6 +1351,7 @@ impl<'a> EventSubscriber<'a> {
     }
 
     /// Wait for a published event (ignoring lag results)
+    #[instability::unstable]
     pub async fn next_event_pure(&mut self) -> EventInfo {
         self.inner.next_message_pure().await
     }

@@ -96,6 +96,7 @@ enum Ieee802154TxRxScene {
 /// A raw payload received on some channel
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct RawReceived {
     /// Payload
     pub data: [u8; FRAME_SIZE],
@@ -104,7 +105,7 @@ pub struct RawReceived {
 }
 
 pub(crate) fn esp_ieee802154_enable(
-    mut radio: IEEE802154<'_>,
+    radio: IEEE802154<'_>,
 ) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = esp_phy::enable_phy_clock();

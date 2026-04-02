@@ -349,6 +349,8 @@ impl EspNowWifiInterface {
 }
 
 /// Manages the `EspNow` instance lifecycle while ensuring it remains active.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
@@ -538,6 +540,8 @@ impl EspNowManager<'_> {
 /// **DO NOT USE** a lock implementation that disables interrupts since the
 /// completion of a sending requires waiting for a callback invoked in an
 /// interrupt.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct EspNowSender<'d> {
     _rc: EspNowRc<'d>,
@@ -603,6 +607,8 @@ impl Drop for SendWaiter<'_> {
 
 /// This is the receiver part of ESP-NOW. You can get this receiver by splitting
 /// an `EspNow` instance.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
@@ -618,9 +624,21 @@ impl EspNowReceiver<'_> {
 
 /// The reference counter for properly deinit espnow after all parts are
 /// dropped.
+#[derive(Debug)]
 struct EspNowRc<'d> {
     rc: &'static AtomicU8,
     inner: PhantomData<EspNow<'d>>,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for EspNowRc<'_> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "EspNowRc {{ rc: {}, inner: ... }}",
+            self.rc.load(Ordering::Relaxed)
+        );
+    }
 }
 
 impl EspNowRc<'_> {
@@ -667,6 +685,8 @@ impl Drop for EspNowRc<'_> {
 ///
 /// For convenience, by default there will be a broadcast peer added on the station
 /// interface.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct EspNow<'d> {
     manager: EspNowManager<'d>,

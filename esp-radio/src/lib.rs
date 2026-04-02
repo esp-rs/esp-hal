@@ -331,6 +331,7 @@ pub(crate) fn deinit() {
 /// Management of the global reference count
 /// and conditional hardware initialization/deinitialization.
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct RadioRefGuard {
     _private: PhantomData<()>,
 }
