@@ -251,8 +251,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseTests } = require('./.github/scripts/hil-parse.js');
-            core.setOutput('tests', parseTests(context.payload.comment.body));
+            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const body = context.payload.comment.body;
+
+            core.setOutput('tests', parseTests(body));
+            core.setOutput('package', parsePackage(body));
 
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
@@ -267,6 +270,7 @@ jobs:
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "",
               "tests": "${{ steps.parse-tests.outputs.tests }}"
+              "package": "${{ steps.parse-tests.outputs.package }}"
             }
 
       - name: Find HIL run URL (quick)
