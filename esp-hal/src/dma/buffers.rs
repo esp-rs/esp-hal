@@ -321,6 +321,9 @@ impl BurstConfig {
         buffer: &[u8],
         direction: TransferDirection,
     ) -> Result<(), DmaBufError> {
+        if buffer.is_empty() {
+            return Ok(());
+        }
         // buffer can be either DRAM or PSRAM (if supported)
         let is_in_dram = is_slice_in_dram(buffer);
         cfg_if::cfg_if! {
