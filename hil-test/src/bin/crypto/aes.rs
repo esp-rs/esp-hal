@@ -565,7 +565,7 @@ mod tests {
 
         // Start task before we'd start the AES operation
         let spawner = SendSpawner::for_current_executor().await;
-        spawner.must_spawn(aes_task(signal));
+        spawner.spawn(aes_task(signal).unwrap());
 
         signal.wait().await;
 

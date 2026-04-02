@@ -232,11 +232,7 @@ async fn main(spawner: Spawner) {
     let connected_signal = &*CONNECTED_SIGNAL.init(Signal::new());
 
     // Tasks
-    spawner.spawn(net_task(runner)).ok();
-    spawner
-        .spawn(connection_manager(controller, connected_signal))
-        .ok();
-    spawner
-        .spawn(i2s_dma_drain(i2s_rx, rx_buffer, connected_signal))
-        .ok();
+    spawner.spawn(net_task(runner).unwrap());
+    spawner.spawn(connection_manager(controller, connected_signal).unwrap());
+    spawner.spawn(i2s_dma_drain(i2s_rx, rx_buffer, connected_signal).unwrap());
 }

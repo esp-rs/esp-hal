@@ -22,28 +22,36 @@ jobs:
     uses: ./.github/workflows/get-labels.yml
   baseline-check:
     needs: get-labels
-    if: |
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change')
     runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping"
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
+        if: env.SKIP_CI != 'true'
         with:
           version: 1.93.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
+        if: env.SKIP_CI != 'true'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
 
       - name: Semver-Check
+        if: env.SKIP_CI != 'true'
         run: |
           cargo xcheck semver-check download-baselines
           PACKAGES="${{ needs.get-labels.outputs.packages }}"

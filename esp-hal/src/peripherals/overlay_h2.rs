@@ -1,6 +1,7 @@
 use core::ops::Deref;
 
 use super::*;
+use crate::efuse::ChipRevision;
 
 // RNG must be marked `virtual` for this to work.
 impl RNG<'_> {
@@ -37,7 +38,7 @@ impl RngRegisterBlock {
     #[instability::unstable]
     pub fn data(&self) -> &pac::rng::DATA {
         let ptr = unsafe { pac::RNG::steal().data() as *const pac::rng::DATA };
-        if crate::soc::chip_revision_above(102) {
+        if crate::soc::chip_revision_above(ChipRevision::from_combined(102)) {
             // On H2-ECO5+ the LPPERI peripherals contains an additional register inserted before
             // the `rng_data` register.
             // https://github.com/espressif/esp-idf/commit/4c5e1a03414a6d55be4b42ba071b30ad228414f6#diff-bc8f2eca37e32ee4ba21ac812e4934998e764132a400479c4d091eb6f7e2e444

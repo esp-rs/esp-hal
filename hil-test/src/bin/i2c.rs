@@ -1,6 +1,6 @@
 //! I2C test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -358,7 +358,7 @@ mod tests {
                 i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data),
                 async {
                     for _ in 0..4 {
-                        spawner.must_spawn(waiting_blocking_task());
+                        spawner.spawn(waiting_blocking_task().unwrap());
                         embassy_futures::yield_now().await;
                     }
                 },

@@ -119,7 +119,7 @@ where
 ///     runner.run().await;
 /// }
 ///
-/// spawner.must_spawn(ble_task(runner));
+/// spawner.spawn(ble_task(runner).unwrap());
 /// ```
 async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
     loop {

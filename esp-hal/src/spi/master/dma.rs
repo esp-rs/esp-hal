@@ -1,7 +1,7 @@
 use core::{
+    cell::Cell,
     cmp::min,
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut},
     sync::atomic::{Ordering, fence},
 };
 
@@ -22,6 +22,7 @@ use crate::{
         PeripheralDmaChannel,
         asynch::DmaRxFuture,
     },
+    private::DropGuard,
     spi::DmaError,
 };
 
@@ -66,7 +67,7 @@ impl<'d> Spi<'d, Blocking> {
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self.spi, self.pins, channel.degrade())
+        SpiDma::new(self, channel.degrade())
     }
 }
 
@@ -114,14 +115,10 @@ pub struct SpiDma<'d, Dm>
 where
     Dm: DriverMode,
 {
-    pub(crate) spi: AnySpi<'d>,
+    spi: SpiWrapper<'d>,
     pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
-    tx_transfer_in_progress: bool,
-    rx_transfer_in_progress: bool,
     #[cfg(all(esp32, spi_address_workaround))]
     address_buffer: DmaTxBuf,
-    guard: PeripheralGuard,
-    pins: SpiPinGuard,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -129,27 +126,25 @@ impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
 impl<'d> SpiDma<'d, Blocking> {
     /// Converts the SPI instance into async mode.
     #[instability::unstable]
-    pub fn into_async(mut self) -> SpiDma<'d, Async> {
-        self.set_interrupt_handler(self.spi.info().async_handler);
+    pub fn into_async(self) -> SpiDma<'d, Async> {
+        self.spi
+            .set_interrupt_handler(self.spi.info().async_handler);
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_async(),
-            tx_transfer_in_progress: self.tx_transfer_in_progress,
-            rx_transfer_in_progress: self.rx_transfer_in_progress,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
-            guard: self.guard,
-            pins: self.pins,
         }
     }
 
     pub(super) fn new(
-        spi: AnySpi<'d>,
-        pins: SpiPinGuard,
+        spi_driver: Spi<'d, Blocking>,
         channel: PeripheralDmaChannel<AnySpi<'d>>,
     ) -> Self {
+        let spi = spi_driver.spi;
+
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi);
+        channel.runtime_ensure_compatible(&spi.spi);
         #[cfg(all(esp32, spi_address_workaround))]
         let address_buffer = {
             use crate::dma::DmaDescriptor;
@@ -170,17 +165,16 @@ impl<'d> SpiDma<'d, Blocking> {
             ))
         };
 
-        let guard = PeripheralGuard::new(spi.info().peripheral);
+        let (_info, state) = spi.spi.dma_parts();
+
+        state.tx_transfer_in_progress.set(false);
+        state.rx_transfer_in_progress.set(false);
 
         Self {
             spi,
             channel,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer,
-            tx_transfer_in_progress: false,
-            rx_transfer_in_progress: false,
-            guard,
-            pins,
         }
     }
 
@@ -241,19 +235,15 @@ impl<'d> SpiDma<'d, Async> {
         SpiDma {
             spi: self.spi,
             channel: self.channel.into_blocking(),
-            tx_transfer_in_progress: self.tx_transfer_in_progress,
-            rx_transfer_in_progress: self.rx_transfer_in_progress,
             #[cfg(all(esp32, spi_address_workaround))]
             address_buffer: self.address_buffer,
-            guard: self.guard,
-            pins: self.pins,
         }
     }
 
     async fn wait_for_idle_async(&mut self) {
-        if self.rx_transfer_in_progress {
+        if self.dma_driver().state.rx_transfer_in_progress.get() {
             _ = DmaRxFuture::new(&mut self.channel.rx).await;
-            self.rx_transfer_in_progress = false;
+            self.dma_driver().state.rx_transfer_in_progress.set(false);
         }
 
         struct Fut(Driver);
@@ -292,19 +282,19 @@ impl<'d> SpiDma<'d, Async> {
             Fut(self.driver()).await;
         }
 
-        if self.tx_transfer_in_progress {
+        if self.dma_driver().state.tx_transfer_in_progress.get() {
             // In case DMA TX buffer is bigger than what the SPI consumes, stop the DMA.
             if !self.channel.tx.is_done() {
                 self.channel.tx.stop_transfer();
             }
-            self.tx_transfer_in_progress = false;
+            self.dma_driver().state.tx_transfer_in_progress.set(false);
         }
     }
 }
 
 impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
 where
-    Dm: DriverMode,
+    Dm: DriverMode + core::fmt::Debug,
 {
     /// Formats the `SpiDma` instance for debugging purposes.
     ///
@@ -329,6 +319,10 @@ impl<Dm> SpiDma<'_, Dm>
 where
     Dm: DriverMode,
 {
+    fn spi(&self) -> &SpiWrapper<'_> {
+        &self.spi
+    }
+
     fn driver(&self) -> Driver {
         Driver {
             info: self.spi.info(),
@@ -339,7 +333,8 @@ where
     fn dma_driver(&self) -> DmaDriver {
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi.dma_peripheral(),
+            dma_peripheral: self.spi().dma_peripheral(),
+            state: self.spi().dma_state(),
         }
     }
 
@@ -347,7 +342,7 @@ where
         if self.driver().busy() {
             return false;
         }
-        if self.rx_transfer_in_progress {
+        if self.dma_driver().state.rx_transfer_in_progress.get() {
             // If this is an asymmetric transfer and the RX side is smaller, the RX channel
             // will never be "done" as it won't have enough descriptors/buffer to receive
             // the EOF bit from the SPI. So instead the RX channel will hit
@@ -366,8 +361,8 @@ where
         while !self.is_done() {
             // Wait for the SPI to become idle
         }
-        self.rx_transfer_in_progress = false;
-        self.tx_transfer_in_progress = false;
+        self.dma_driver().state.rx_transfer_in_progress.set(false);
+        self.dma_driver().state.tx_transfer_in_progress.set(false);
         fence(Ordering::Acquire);
     }
 
@@ -388,8 +383,14 @@ where
             return Err(Error::MaxDmaTransferSizeExceeded);
         }
 
-        self.rx_transfer_in_progress = bytes_to_read > 0;
-        self.tx_transfer_in_progress = bytes_to_write > 0;
+        self.dma_driver()
+            .state
+            .rx_transfer_in_progress
+            .set(bytes_to_read > 0);
+        self.dma_driver()
+            .state
+            .tx_transfer_in_progress
+            .set(bytes_to_write > 0);
         unsafe {
             self.dma_driver().start_transfer_dma(
                 full_duplex,
@@ -432,9 +433,8 @@ where
             address.mode(),
         )?;
 
-        // FIXME: we could use self.start_transfer_dma if the address buffer was part of
-        // the (yet-to-be-created) State struct.
-        self.tx_transfer_in_progress = true;
+        // FIXME: we could use self.start_transfer_dma
+        self.dma_driver().state.tx_transfer_in_progress.set(true);
         unsafe {
             self.dma_driver().start_transfer_dma(
                 false,
@@ -448,23 +448,18 @@ where
     }
 
     fn cancel_transfer(&mut self) {
-        // The SPI peripheral is controlling how much data we transfer, so let's
-        // update its counter.
-        // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
-        // immediately.
-        // 1 seems to stop after transmitting the current byte which is somewhat less
-        // impolite.
-        if self.tx_transfer_in_progress || self.rx_transfer_in_progress {
+        let state = self.dma_driver().state;
+        if state.tx_transfer_in_progress.get() || state.rx_transfer_in_progress.get() {
             self.dma_driver().abort_transfer();
 
             // We need to stop the DMA transfer, too.
-            if self.tx_transfer_in_progress {
+            if state.tx_transfer_in_progress.get() {
                 self.channel.tx.stop_transfer();
-                self.tx_transfer_in_progress = false;
+                state.tx_transfer_in_progress.set(false);
             }
-            if self.rx_transfer_in_progress {
+            if state.rx_transfer_in_progress.get() {
                 self.channel.rx.stop_transfer();
-                self.rx_transfer_in_progress = false;
+                state.rx_transfer_in_progress.set(false);
             }
         }
     }
@@ -1247,10 +1242,17 @@ where
 pub(super) struct DmaDriver {
     driver: Driver,
     dma_peripheral: crate::dma::DmaPeripheral,
+    state: &'static DmaState,
 }
 
 impl DmaDriver {
     fn abort_transfer(&self) {
+        // The SPI peripheral is controlling how much data we transfer, so let's
+        // update its counter.
+        // 0 doesn't take effect on ESP32 and cuts the currently transmitted byte
+        // immediately.
+        // 1 seems to stop after transmitting the current byte which is somewhat less
+        // impolite.
         self.driver.configure_datalen(1, 1);
         self.driver.update();
     }
@@ -1389,52 +1391,8 @@ impl<'d> DmaEligible for AnySpi<'d> {
     type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-        }
-    }
-}
-
-pub(crate) struct DropGuard<I, F: FnOnce(I)> {
-    inner: ManuallyDrop<I>,
-    on_drop: ManuallyDrop<F>,
-}
-
-impl<I, F: FnOnce(I)> DropGuard<I, F> {
-    pub(crate) fn new(inner: I, on_drop: F) -> Self {
-        Self {
-            inner: ManuallyDrop::new(inner),
-            on_drop: ManuallyDrop::new(on_drop),
-        }
-    }
-
-    pub(crate) fn defuse(self) {
-        core::mem::forget(self);
-    }
-}
-
-impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
-    fn drop(&mut self) {
-        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
-        let on_drop = unsafe { ManuallyDrop::take(&mut self.on_drop) };
-        (on_drop)(inner)
-    }
-}
-
-impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
-    type Target = I;
-
-    fn deref(&self) -> &I {
-        &self.inner
-    }
-}
-
-impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
-    fn deref_mut(&mut self) -> &mut I {
-        &mut self.inner
+        let (info, _state) = self.dma_parts();
+        info.dma_peripheral
     }
 }
 
@@ -1494,5 +1452,66 @@ where
     fn flush(&mut self) -> Result<(), Self::Error> {
         // All operations currently flush so this is no-op.
         Ok(())
+    }
+}
+
+struct DmaInfo {
+    dma_peripheral: crate::dma::DmaPeripheral,
+}
+struct DmaState {
+    tx_transfer_in_progress: Cell<bool>,
+    rx_transfer_in_progress: Cell<bool>,
+}
+
+// SAFETY: State belongs to the currently constructed driver instance. As such, it'll not be
+// accessed concurrently in multiple threads.
+unsafe impl Sync for DmaState {}
+
+for_each_spi_master!(
+    (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
+        impl AnySpi<'_> {
+            #[inline(always)]
+            fn dma_parts(&self) -> (&'static DmaInfo, &'static DmaState) {
+                match &self.0 {
+                    $(
+                        super::any::Inner::$sys(_spi) => {
+                            static DMA_INFO: DmaInfo = DmaInfo {
+                                dma_peripheral: crate::dma::DmaPeripheral::$sys,
+                            };
+
+                            static DMA_STATE: DmaState = DmaState {
+                                tx_transfer_in_progress: Cell::new(false),
+                                rx_transfer_in_progress: Cell::new(false),
+                            };
+
+                            (&DMA_INFO, &DMA_STATE)
+                        }
+                    )*
+                }
+            }
+
+            #[inline(always)]
+            fn dma_state(&self) -> &'static DmaState {
+                let (_, state) = self.dma_parts();
+                state
+            }
+
+            #[inline(always)]
+            fn dma_info(&self) -> &'static DmaInfo {
+                let (info, _) = self.dma_parts();
+                info
+            }
+        }
+    };
+);
+
+impl SpiWrapper<'_> {
+    fn dma_state(&self) -> &'static DmaState {
+        self.spi.dma_state()
+    }
+
+    #[inline(always)]
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        self.spi.dma_peripheral()
     }
 }

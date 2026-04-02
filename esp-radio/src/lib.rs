@@ -5,16 +5,8 @@
 //! # Wireless support for Espressif ESP32 devices.
 //!
 //! This documentation is built for the
-#![cfg_attr(esp32, doc = "**ESP32**")]
-#![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
-#![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
-#![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
-#![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
-#![cfg_attr(esp32c5, doc = "**ESP32-C5**")]
-#![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
-#![cfg_attr(esp32c61, doc = "**ESP32-C61**")]
-#![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
-//! . Please ensure you are reading the correct documentation for your target
+#![doc = concat!("**", chip_pretty!(), "**")]
+//! . Please ensure you are reading the correct [documentation](https://docs.espressif.com/projects/rust/esp-radio/latest/) for your target
 //! device.
 //!
 //! ## Usage
@@ -133,7 +125,6 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![cfg_attr(feature = "print-logs-from-driver", feature(c_variadic))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),
@@ -160,11 +151,8 @@ pub(crate) mod reg_access;
 use core::marker::PhantomData;
 
 use esp_hal as hal;
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 pub use esp_phy::CalibrationResult;
-#[cfg(not(feature = "unstable"))]
-use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
 #[cfg(all(esp32, feature = "unstable"))]
 use hal::analog::adc::{release_adc2, try_claim_adc2};

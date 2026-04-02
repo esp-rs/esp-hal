@@ -32,7 +32,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    spawner.spawn(run()).ok();
+    spawner.spawn(run().unwrap());
 
     loop {
         defmt::info!("Bing!");

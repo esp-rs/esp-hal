@@ -1069,7 +1069,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[allow(static_mut_refs)]
         #[cfg(all(feature = "print-logs-from-driver", esp32c2))]
         {
-            extern "C" {
+            unsafe extern "C" {
                 static mut g_ble_plf_log_level: u32;
             }
 

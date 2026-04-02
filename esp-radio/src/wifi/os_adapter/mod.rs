@@ -1191,66 +1191,6 @@ pub unsafe extern "C" fn get_time(_t: *mut c_void) -> c_int {
 }
 
 /// **************************************************************************
-/// Name: esp_log_write
-///
-/// Description:
-///   Output log with by format string and its arguments
-///
-/// Input Parameters:
-///   level  - log level, no mean here
-///   tag    - log TAG, no mean here
-///   format - format string
-///
-/// Returned Value:
-///   None
-///
-/// *************************************************************************
-#[cfg(feature = "print-logs-from-driver")]
-pub unsafe extern "C" fn log_write(
-    level: u32,
-    _tag: *const c_char,
-    format: *const c_char,
-    args: ...
-) {
-    unsafe {
-        crate::sys::log::syslog(level, format as _, args);
-    }
-}
-
-/// **************************************************************************
-/// Name: esp_log_writev
-///
-/// Description:
-///   Output log with by format string and its arguments
-///
-/// Input Parameters:
-///   level  - log level, no mean here
-///   tag    - log TAG, no mean here
-///   format - format string
-///   args   - arguments list
-///
-/// Returned Value:
-///   None
-///
-/// *************************************************************************
-#[cfg(feature = "print-logs-from-driver")]
-#[allow(improper_ctypes_definitions)]
-pub unsafe extern "C" fn log_writev(
-    level: u32,
-    _tag: *const c_char,
-    format: *const c_char,
-    args: crate::sys::include::va_list,
-) {
-    unsafe {
-        crate::sys::log::syslog(
-            level,
-            format as _,
-            core::mem::transmute::<crate::sys::include::va_list, core::ffi::VaListImpl<'_>>(args),
-        );
-    }
-}
-
-/// **************************************************************************
 /// Name: esp_log_timestamp
 ///
 /// Description:

@@ -72,7 +72,7 @@ async fn main(_spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+                spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
             });
         },
     );

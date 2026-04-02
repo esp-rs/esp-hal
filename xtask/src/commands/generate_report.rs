@@ -59,9 +59,9 @@ pub fn generate_report(workspace: &Path, args: ReportArgs) -> Result<()> {
         let content =
             fs::read_to_string(&path).with_context(|| format!("Failed to read {:?}", path))?;
 
-        let qa_diff = extract_block(
+        let diff = extract_block(
             &content,
-            "QA_DIFF<<EOF",
+            "EXAMPLE_DIFF<<EOF",
             "EOF",
             &exclude_re,
             &code_fence_re,
@@ -69,11 +69,7 @@ pub fn generate_report(workspace: &Path, args: ReportArgs) -> Result<()> {
         );
 
         writeln!(combined, "### `{}`\n", soc)?;
-        writeln!(
-            combined,
-            "##### Diff (PR vs. Base)\n```\n{}\n```\n",
-            qa_diff
-        )?;
+        writeln!(combined, "##### Diff (PR vs. Base)\n```\n{}\n```\n", diff)?;
     }
 
     Ok(())
