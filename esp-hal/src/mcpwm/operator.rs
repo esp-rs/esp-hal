@@ -30,7 +30,8 @@ pub enum PWMStream {
 
 /// Configuration for MCPWM Operator DeadTime
 /// It's recommended to reference the technical manual for configuration
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DeadTimeCfg {
     cfg_reg: u32,
 }
@@ -178,12 +179,7 @@ where
 
 impl<'d, const OP: u8, PWM: Instance> Operator<'d, OP, PWM> {
     pub(super) fn new(guard: PeripheralGuard) -> Self {
-        // Side note:
-        // It would have been nice to deselect any timer reference on peripheral
-        // initialization.
-        // However experimentation (ESP32-S3) showed that writing `3` to timersel
-        // will not disable the timer reference but instead act as though `2` was
-        // written.
+        // NOTE: Writing 3 to timersel does not disable timer reference (hardware limitation)
         Operator {
             _phantom: PhantomData,
             _guard: guard,

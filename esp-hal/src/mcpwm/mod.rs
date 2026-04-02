@@ -61,16 +61,16 @@
 //!     * A hardware sync or software sync can trigger a reload on the capture timer with the set
 //!       phase.
 #![cfg_attr(
-    soc_mcpwm_capture_clk_from_group,
+    soc_has_mcpwm_capture_clk_from_group,
     doc = "     * Capture timer's clock source is the same as the PWM timers clock source"
 )]
 #![cfg_attr(
-    not(soc_mcpwm_capture_clk_from_group),
+    not(soc_has_mcpwm_capture_clk_from_group),
     doc = "     * Capture timer's has it's own independent clock source from the MCPWM peripheral."
 )]
 //! * Fault Detection Module (Not yet implemented)
 #![cfg_attr(
-    not(soc_mcpwm_capture_clk_from_group),
+    not(soc_has_mcpwm_capture_clk_from_group),
     doc = "\nCapture clock source is `ADB-CLK (80 MHz)` by default.\n"
 )]
 //! Clock source is `__clock_src__`` by default.
@@ -334,9 +334,17 @@ impl PeripheralClockConfig {
 
 /// Target frequency could not be set.
 /// Check how the frequency is calculated in the corresponding method docs.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrequencyError;
+
+impl core::fmt::Display for FrequencyError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Target frequency could not be set")
+    }
+}
+
+impl core::error::Error for FrequencyError {}
 
 type RegisterBlock = pac::mcpwm0::RegisterBlock;
 
@@ -371,39 +379,57 @@ pub struct State {
 }
 
 unsafe impl Sync for State {}
+
+/// Dispatches event to register bit getter for interrupt status checks
+macro_rules! dispatch_event_bit {
+    ($int_register:expr, $event:expr, $unit:expr) => {
+        match $event {
+            Event::TimerStop => $int_register.timer_stop($unit).bit(),
+            Event::TimerEqualZero => $int_register.timer_tez($unit).bit(),
+            Event::TimerEqualPeriod => $int_register.timer_tep($unit).bit(),
+            Event::Capture => $int_register.cap($unit).bit(),
+            Event::CompareA => $int_register.cmpr_tea($unit).bit(),
+            Event::CompareB => $int_register.cmpr_teb($unit).bit(),
+            Event::Fault => $int_register.fault($unit).bit(),
+            Event::FaultClear => $int_register.fault_clr($unit).bit(),
+            Event::FaultCycleByCycle => $int_register.tz_cbc($unit).bit(),
+            Event::FaultOneShotMode => $int_register.tz_ost($unit).bit(),
+        }
+    };
+}
+
+/// Dispatches event to register bit setter for interrupt control
+macro_rules! dispatch_event_write {
+    ($int_register:expr, $event:expr, $unit:expr, $value:expr) => {
+        match $event {
+            Event::TimerStop => $int_register.timer_stop($unit).bit($value),
+            Event::TimerEqualZero => $int_register.timer_tez($unit).bit($value),
+            Event::TimerEqualPeriod => $int_register.timer_tep($unit).bit($value),
+            Event::Capture => $int_register.cap($unit).bit($value),
+            Event::CompareA => $int_register.cmpr_tea($unit).bit($value),
+            Event::CompareB => $int_register.cmpr_teb($unit).bit($value),
+            Event::Fault => $int_register.fault($unit).bit($value),
+            Event::FaultClear => $int_register.fault_clr($unit).bit($value),
+            Event::FaultCycleByCycle => $int_register.tz_cbc($unit).bit($value),
+            Event::FaultOneShotMode => $int_register.tz_ost($unit).bit($value),
+        }
+    };
+}
+
 impl State {
     /// Return if the interrupt for an event is set
     pub fn interrupt_set<const UNIT: u8>(&self, info: &Info, event: Event) -> bool {
         let regs = info.regs();
         let int_st = regs.int_st().read();
-        match event {
-            Event::TimerStop => int_st.timer_stop(UNIT).bit(),
-            Event::TimerEqualPeriod => int_st.timer_tep(UNIT).bit(),
-            Event::TimerEqualZero => int_st.timer_tez(UNIT).bit(),
-            Event::Capture => int_st.cap(UNIT).bit(),
-            Event::CompareA => int_st.cmpr_tea(UNIT).bit(),
-            Event::CompareB => int_st.cmpr_teb(UNIT).bit(),
-            Event::Fault => int_st.fault(UNIT).bit(),
-            Event::FaultClear => int_st.fault_clr(UNIT).bit(),
-            Event::FaultCycleByCycle => int_st.tz_cbc(UNIT).bit(),
-            Event::FaultOneShotMode => int_st.tz_ost(UNIT).bit(),
-        }
+        dispatch_event_bit!(int_st, event, UNIT)
     }
 
     /// Clear the interrupt for an event on a specific UNIT #
     pub fn clear_interrupt<const UNIT: u8>(&self, info: &Info, event: Event) {
         let regs = info.regs();
-        regs.int_clr().write(|w| match event {
-            Event::TimerStop => w.timer_stop(UNIT).bit(true),
-            Event::TimerEqualPeriod => w.timer_tep(UNIT).bit(true),
-            Event::TimerEqualZero => w.timer_tez(UNIT).bit(true),
-            Event::Capture => w.cap(UNIT).bit(true),
-            Event::CompareA => w.cmpr_tea(UNIT).bit(true),
-            Event::CompareB => w.cmpr_teb(UNIT).bit(true),
-            Event::Fault => w.fault(UNIT).bit(true),
-            Event::FaultClear => w.fault_clr(UNIT).bit(true),
-            Event::FaultCycleByCycle => w.tz_cbc(UNIT).bit(true),
-            Event::FaultOneShotMode => w.tz_ost(UNIT).bit(true),
+        regs.int_clr().write(|w| {
+            dispatch_event_write!(w, event, UNIT, true);
+            w
         });
     }
 
@@ -417,18 +443,7 @@ impl State {
                 unsafe { w.bits(int_ena.take()) };
 
                 for event in events {
-                    match event {
-                        Event::TimerStop => w.timer_stop(UNIT).bit(value),
-                        Event::TimerEqualPeriod => w.timer_tep(UNIT).bit(value),
-                        Event::TimerEqualZero => w.timer_tez(UNIT).bit(value),
-                        Event::Capture => w.cap(UNIT).bit(value),
-                        Event::CompareA => w.cmpr_tea(UNIT).bit(value),
-                        Event::CompareB => w.cmpr_teb(UNIT).bit(value),
-                        Event::Fault => w.fault(UNIT).bit(value),
-                        Event::FaultClear => w.fault_clr(UNIT).bit(value),
-                        Event::FaultCycleByCycle => w.tz_cbc(UNIT).bit(value),
-                        Event::FaultOneShotMode => w.tz_ost(UNIT).bit(value),
-                    };
+                    dispatch_event_write!(w, event, UNIT, value);
                 }
 
                 w

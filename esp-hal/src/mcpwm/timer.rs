@@ -13,11 +13,11 @@
 //! ### Software Sync Events
 //! The `timer` module supports the software triggering of syncs from Timers.
 #![cfg_attr(
-    soc_mcpwm_swsync_can_propagate,
+    soc_has_mcpwm_swsync_can_propagate,
     doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
 )]
 #![cfg_attr(
-    not(soc_mcpwm_swsync_can_propagate),
+    not(soc_has_mcpwm_swsync_can_propagate),
     doc = "**Note:** Software triggered sync events do not propagate to other timers on this chip."
 )]
 
@@ -68,7 +68,7 @@ impl Into<Event> for TimerEvent {
 /// as a timing reference for every
 /// [`Operator`](super::operator::Operator) of that peripheral
 pub struct Timer<'d, const TIM: u8, PWM: Instance> {
-    pub(super) phantom: PhantomData<&'d PWM>,
+    _phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
@@ -135,8 +135,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     /// Set the timers sync phase
     pub fn set_sync_phase(&mut self, phase: u16) {
-        // SAFETY:
-        // We only write to our TIMERx_SYNC register
+        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
         let tmr = Self::tmr();
         tmr.sync().modify(|_r, w| unsafe { w.phase().bits(phase) });
     }
@@ -145,8 +144,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// This specifies how the counter direction will be updated
     /// during a sync event.
     pub fn set_sync_counter_direction(&mut self, direction: CounterDirection) {
-        // SAFETY:
-        // We only write to our TIMERx_SYNC register
+        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
         let tmr = Self::tmr();
         tmr.sync()
             .modify(|_r, w| w.phase_direction().bit(direction as u8 != 0));
@@ -154,26 +152,22 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     /// Trigger a software sync event
     pub fn trigger_sync(&mut self) {
-        // SAFETY:
-        // We only write to our TIMERx_SYNC register
+        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
         let tmr = Self::tmr();
         tmr.sync().modify(|r, w| w.sw().bit(!r.sw().bit()));
     }
 
     /// Read the counter value and counter direction of the timer
     pub fn status(&self) -> (u16, CounterDirection) {
-        // SAFETY:
-        // We only read from our TIMERx_STATUS register
+        // SAFETY: Only read TIMERx_STATUS; unique per TIM const
         let reg = Self::tmr().status().read();
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
     /// Selects the how the timer fires sync out events
     pub fn set_sync_out_selection(&mut self, sync_out: SyncOutSelect) {
-        // SAFETY:
-        // We only modify our TIMERx_SYNC register
+        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
         let timer = Self::tmr();
-        // Disable sync input on our timer
         timer
             .sync()
             .modify(|_r, w| unsafe { w.synco_sel().bits(sync_out as u8) });
@@ -185,31 +179,14 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Sets the timer sync in source
-    pub fn set_sync(&mut self, sync: &impl SyncSource<PWM>) {
-        let (info, _) = PWM::split();
-        let timer = Self::tmr();
-
-        // Update sync select first
+    pub fn set_sync_in(&mut self, sync: &impl SyncSource<PWM>) {
         let sync_select: SyncSelection = sync.get_kind().into();
-        // SAFETY:
-        // We only modify the PWM TIMER_SYNCI_CFG register
-        info.regs().timer_synci_cfg().modify(|_r, w| {
-            unsafe {
-                w.timer_syncisel(TIM).bits(sync_select as u8) // Update timer input sync selection
-            }
-        });
-
-        // Enable sync input on our timer
-        timer.sync().modify(|_r, w| w.synci_en().set_bit());
+        self.enable_sync_in(sync_select, true);
     }
 
     /// Clears the sync in for the timer and disables sync input
-    pub fn clear_sync(&mut self) {
-        // SAFETY:
-        // We only modify our TIMERx_SYNC register
-        let timer = Self::tmr();
-        // Disable sync input on our timer
-        timer.sync().modify(|_r, w| w.synci_en().clear_bit());
+    pub fn clear_sync_in(&mut self) {
+        self.enable_sync_in(SyncSelection::None, false);
     }
 
     #[instability::unstable]
@@ -256,6 +233,17 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
         });
     }
 
+    fn enable_sync_in(&mut self, sync_sel: SyncSelection, enable: bool) {
+        let (info, _) = PWM::split();
+        let timer = Self::tmr();
+
+        // SAFETY: Only TIMER_SYNCI_CFG and TIMERx_SYNC accessed
+        info.regs()
+            .timer_synci_cfg()
+            .modify(|_r, w| unsafe { w.timer_syncisel(TIM).bits(sync_sel as u8) });
+        timer.sync().modify(|_r, w| w.synci_en().bit(enable));
+    }
+
     fn enable_listen(&mut self, events: EnumSet<TimerEvent>, value: bool) {
         let (info, state) = PWM::split();
         let mut int_events = EnumSet::new();
@@ -267,14 +255,12 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
-        // SAFETY:
-        // We only grant access to our CFG0 register with the lifetime of &mut self
+        // SAFETY: Unique register access per TIM
         Self::tmr().cfg0()
     }
 
     fn cfg1(&mut self) -> &pac::mcpwm0::timer::CFG1 {
-        // SAFETY:
-        // We only grant access to our CFG0 register with the lifetime of &mut self
+        // SAFETY: Unique register access per TIM
         Self::tmr().cfg1()
     }
 
@@ -292,7 +278,8 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 /// [`Timer::set_counter`]. A software triggered sync event will
 /// propagate to the sync out regardless if the timer was configured
 /// with [`SyncOutSelection::SyncWhenEqualZero`] or [`SyncOutSelection::SyncWhenEqualPeriod`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum SyncOutSelect {
     /// Sync out is triggered when a timer receives a sync in

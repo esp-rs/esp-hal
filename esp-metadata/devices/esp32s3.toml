@@ -22,7 +22,7 @@ symbols = [
     "ulp_riscv_core",
 
     # MCPWM capabilities
-    "soc_mcpwm_swsync_can_propagate",
+    "soc_has_mcpwm_swsync_can_propagate",
 
     # ROM capabilities
     "rom_crc_le",

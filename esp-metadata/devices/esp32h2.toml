@@ -18,8 +18,10 @@ symbols = [
     "swd",
 
     # MCPWM capabilites
-    "soc_mcpwm_swsync_can_propagate",
-    "soc_mcpwm_capture_clk_from_group",
+    "soc_has_mcpwm_swsync_can_propagate",
+    "soc_has_mcpwm_capture_clk_from_group",
+    "soc_has_mcpwm_support_etm",
+    "soc_has_mcpwm_support_sleep_retention",
 
     # ROM capabilities
     "rom_crc_le",

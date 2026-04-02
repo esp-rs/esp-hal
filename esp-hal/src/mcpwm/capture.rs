@@ -97,8 +97,7 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
 
     /// Set the sync phase
     pub fn set_sync_phase(&mut self, phase: u32) {
-        // SAFETY:
-        // We write to our MCPWM_CAP_TIMER_PHASE register
+        // SAFETY: Only CAP_TIMER_PHASE accessed; unique per PWM instance
         Self::phase().write(|w| unsafe { w.cap_phase().bits(phase) });
     }
 
@@ -108,20 +107,18 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
     }
 
     /// Clears the captures timer sync source
-    pub fn clear_sync(&mut self) {
-        self.set_sync_enable(SyncSelection::None, false);
+    pub fn clear_sync_in(&mut self) {
+        self.enable_sync_in(SyncSelection::None, false);
     }
 
-    /// ## Overview
     /// Sets the capture timers sync source. Refer to how sync events are
     /// handled in the [`CaptureTimer`] documentation.
-    pub fn set_sync(&mut self, sync_source: &impl SyncSource<PWM>) {
+    pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
         let sync_kind = sync_source.get_kind();
-        self.set_sync_enable(sync_kind.into(), false);
+        self.enable_sync_in(sync_kind.into(), false);
     }
 
-    /// ## Overview
-    /// This triggers a software sync event on the capture timer
+    /// Triggers a software sync event on the capture timer.
     /// Refer to how sync events are handled in the [`CaptureTimer`] documentation.
     pub fn trigger_sync(&mut self) {
         Self::cfg().modify(|_r, w| w.cap_sync_sw().set_bit());
@@ -131,13 +128,12 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
         Self::cfg().modify(|_r, w| w.cap_timer_en().bit(enable));
     }
 
-    fn set_sync_enable(&mut self, selection: SyncSelection, enable: bool) {
-        unsafe {
-            Self::cfg().modify(|_r, w| {
-                w.cap_synci_en().bit(enable); // Disable sync inputs
-                w.cap_synci_sel().bits(selection as u8) // No sync input
-            })
-        };
+    fn enable_sync_in(&mut self, sync_sel: SyncSelection, enable: bool) {
+        // SAFETY: Only CAP_TIMER_CFG accessed; unique per PWM instance
+        Self::cfg().modify(|_r, w| {
+            w.cap_synci_en().bit(enable);
+            unsafe { w.cap_synci_sel().bits(sync_sel as u8) }
+        });
     }
 
     fn cfg() -> &'static crate::Reg<pac::mcpwm0::cap_timer_cfg::CAP_TIMER_CFG_SPEC> {
@@ -153,6 +149,8 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
 
 /// Represents the capture event
 /// Contains the capture time and the captured edge
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureEvent {
     time: u32,
     edge: CaptureEdge,
@@ -160,18 +158,19 @@ pub struct CaptureEvent {
 
 impl CaptureEvent {
     /// Gets the captured time
-    pub fn get_time(&self) -> u32 {
+    pub const fn time(&self) -> u32 {
         self.time
     }
 
     /// Gets the captured edge
-    pub fn get_edge(&self) -> CaptureEdge {
+    pub const fn edge(&self) -> CaptureEdge {
         self.edge
     }
 }
 
 /// Configuration for capture channel
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 // Hash cannot be implemented for CaptureMode
 pub struct CaptureChannelConfig {
     invert: bool,
@@ -184,7 +183,6 @@ impl CaptureChannelConfig {
     pub fn with_invert(self, invert: bool) -> Self {
         Self { invert, ..self }
     }
-
     /// Sets the capture mode for the config
     pub fn with_capture_mode(self, capture_mode: CaptureMode) -> Self {
         Self {
@@ -192,7 +190,6 @@ impl CaptureChannelConfig {
             ..self
         }
     }
-
     /// Sets the prescaler for the config
     pub fn with_prescaler(self, prescaler: u8) -> Self {
         Self { prescaler, ..self }

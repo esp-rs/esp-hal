@@ -1772,8 +1772,11 @@ impl Chip {
                     "soc_has_mem2mem6",
                     "soc_has_mem2mem7",
                     "soc_has_mem2mem8",
-                    "soc_mcpwm_swsync_can_propagate",
-                    "soc_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_swsync_can_propagate",
+                    "soc_has_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_support_etm",
+                    "soc_has_mcpwm_support_event_comparator",
+                    "soc_has_mcpwm_support_sleep_retention",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -2013,8 +2016,11 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_mem2mem6",
                     "cargo:rustc-cfg=soc_has_mem2mem7",
                     "cargo:rustc-cfg=soc_has_mem2mem8",
-                    "cargo:rustc-cfg=soc_mcpwm_swsync_can_propagate",
-                    "cargo:rustc-cfg=soc_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=soc_has_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_etm",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_event_comparator",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_sleep_retention",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -2375,8 +2381,10 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
-                    "soc_mcpwm_swsync_can_propagate",
-                    "soc_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_swsync_can_propagate",
+                    "soc_has_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_support_etm",
+                    "soc_has_mcpwm_support_sleep_retention",
                     "pm_support_wifi_wakeup",
                     "pm_support_beacon_wakeup",
                     "pm_support_bt_wakeup",
@@ -2651,8 +2659,10 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
-                    "cargo:rustc-cfg=soc_mcpwm_swsync_can_propagate",
-                    "cargo:rustc-cfg=soc_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=soc_has_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_etm",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_sleep_retention",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
                     "cargo:rustc-cfg=pm_support_beacon_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
@@ -3429,8 +3439,10 @@ impl Chip {
                     "soc_has_mem2mem8",
                     "phy",
                     "swd",
-                    "soc_mcpwm_swsync_can_propagate",
-                    "soc_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_swsync_can_propagate",
+                    "soc_has_mcpwm_capture_clk_from_group",
+                    "soc_has_mcpwm_support_etm",
+                    "soc_has_mcpwm_support_sleep_retention",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -3669,8 +3681,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_mem2mem8",
                     "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
-                    "cargo:rustc-cfg=soc_mcpwm_swsync_can_propagate",
-                    "cargo:rustc-cfg=soc_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=soc_has_mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_etm",
+                    "cargo:rustc-cfg=soc_has_mcpwm_support_sleep_retention",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -4627,7 +4641,7 @@ impl Chip {
                     "octal_psram",
                     "swd",
                     "ulp_riscv_core",
-                    "soc_mcpwm_swsync_can_propagate",
+                    "soc_has_mcpwm_swsync_can_propagate",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -4876,7 +4890,7 @@ impl Chip {
                     "cargo:rustc-cfg=octal_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=ulp_riscv_core",
-                    "cargo:rustc-cfg=soc_mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=soc_has_mcpwm_swsync_can_propagate",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -5612,8 +5626,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
-    println!("cargo:rustc-check-cfg=cfg(soc_mcpwm_swsync_can_propagate)");
-    println!("cargo:rustc-check-cfg=cfg(soc_mcpwm_capture_clk_from_group)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm_swsync_can_propagate)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm_capture_clk_from_group)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm_support_etm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm_support_event_comparator)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm_support_sleep_retention)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");

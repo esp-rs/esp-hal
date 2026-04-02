@@ -70,7 +70,8 @@ use crate::{gpio::interconnect::PeripheralInput, mcpwm::Instance};
 pub trait SyncSource<PWM: Instance>: InternalSyncSource {}
 
 /// Sync out created by timers
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SyncOut<'d, const TIM: u8, PWM: Instance> {
     _phantom: PhantomData<&'d PWM>,
 }
@@ -85,7 +86,8 @@ impl<'d, const TIM: u8, PWM: Instance> SyncOut<'d, TIM, PWM> {
 }
 
 /// There are only a limited number sync lines for the MCPWM unit
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SyncLine<'d, const SYNC: u8, PWM: Instance> {
     _phantom: PhantomData<&'d PWM>,
 }
@@ -177,7 +179,7 @@ pub(crate) enum SyncSelection {
 impl From<SyncKind> for SyncSelection {
     fn from(value: SyncKind) -> Self {
         match value {
-            // SAFTEY for panic:
+            // SAFETY: Const generics ensure TIM and SYNC are valid (0-2)
             // Runtime values for line, and timer are only created
             // from generic constants
             SyncKind::SyncLine(line) => match line {
