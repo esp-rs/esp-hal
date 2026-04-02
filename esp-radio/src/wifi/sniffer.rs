@@ -22,6 +22,8 @@ use crate::{
 };
 
 /// Represents a Wi-Fi packet in promiscuous mode.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PromiscuousPkt<'a> {
     /// Control information related to packet reception.
@@ -72,6 +74,8 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 }
 
 /// A Wi-Fi sniffer.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub struct Sniffer<'d> {

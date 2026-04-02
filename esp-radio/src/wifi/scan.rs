@@ -76,7 +76,9 @@ impl ScanTypeConfig {
 }
 
 /// Scan configuration.
-#[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct ScanConfig {
     /// SSID to filter for.
     /// If [`None`] is passed, all SSIDs will be returned.
@@ -119,6 +121,9 @@ impl ScanConfig {
 }
 
 /// Wi-Fi scan results.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct ScanResults<'d> {
     /// Number of APs to return
     remaining: usize,
@@ -172,6 +177,8 @@ impl Iterator for ScanResults<'_> {
 }
 
 /// AP list on-drop guard.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) struct FreeApListOnDrop;
 
 impl FreeApListOnDrop {
