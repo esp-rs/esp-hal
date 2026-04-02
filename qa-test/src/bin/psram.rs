@@ -1,11 +1,11 @@
 //! This shows how to use PSRAM as heap-memory via esp-alloc
 //!
-//! You need an ESP32, ESP32-S2 or ESP32-S3 with at least 2 MB of PSRAM memory.
+//! You need a supported target with at least 2 MB of PSRAM memory.
 //!
 //! On ESP32-S3 you might want to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal` if
 //! the device comes with octal-SPIRAM
 
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c5
 //% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 
 #![no_std]

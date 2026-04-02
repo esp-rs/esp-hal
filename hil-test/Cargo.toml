@@ -105,12 +105,12 @@ embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
-esp-hal            = { path = "../esp-hal", features = ["defmt"] }
+esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
-esp-rtos           = { path = "../esp-rtos", features = ["defmt"], optional = true }
+esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
-esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
+esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
@@ -126,8 +126,7 @@ primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-# Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting", "defmt"] }
+embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
@@ -143,7 +142,8 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt"]
+# Add the `embedded-test/defmt` feature for more verbose testing
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos/defmt", "esp-radio/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
