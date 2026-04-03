@@ -171,6 +171,7 @@ impl Iterator for InterruptStatusIterator {
 /// Ergonomic C function pointer wrapper, with null-pointer checking
 pub struct CFnPtr(AtomicPtr<()>);
 
+#[allow(clippy::new_without_default)]
 impl CFnPtr {
     /// Create a new null pointer
     pub const fn new() -> Self {

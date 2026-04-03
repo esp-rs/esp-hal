@@ -19,7 +19,7 @@ fn current_interrupts() -> u32 {
     let mut status_bits: u32 = 0b0;
     // Add the SENS peripheral status, which is broken out into individual bit flags
     let sens_status = unsafe { &*crate::pac::SENS::PTR }.sar_cocpu_int_st().read();
-    status_bits |= (sens_status.cocpu_touch_done_int_st().bit_is_set() as u32) << 0;
+    status_bits |= sens_status.cocpu_touch_done_int_st().bit_is_set() as u32;
     status_bits |= (sens_status.cocpu_touch_inactive_int_st().bit_is_set() as u32) << 1;
     status_bits |= (sens_status.cocpu_touch_active_int_st().bit_is_set() as u32) << 2;
     status_bits |= (sens_status.cocpu_saradc1_int_st().bit_is_set() as u32) << 3;
@@ -40,7 +40,7 @@ fn current_interrupts() -> u32 {
     let mut status_bits: u32 = 0b0;
     // Add the SENS peripheral status, which is broken out into individual bit flags
     let sens_status = unsafe { &*crate::pac::SENS::PTR }.sar_cocpu_int_st().read();
-    status_bits |= (sens_status.sar_cocpu_touch_done_int_st().bit_is_set() as u32) << 0;
+    status_bits |= sens_status.sar_cocpu_touch_done_int_st().bit_is_set() as u32;
     status_bits |= (sens_status.sar_cocpu_touch_inactive_int_st().bit_is_set() as u32) << 1;
     status_bits |= (sens_status.sar_cocpu_touch_active_int_st().bit_is_set() as u32) << 2;
     status_bits |= (sens_status.sar_cocpu_saradc1_int_st().bit_is_set() as u32) << 3;
