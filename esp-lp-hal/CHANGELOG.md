@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add `wake_hp_core` for ESP32-S2 and ESP32-S3 (#5133)
 - Add `OutputOpenDrain` GPIO type (#5131)
+- ESP32-S2, ESP32-S3: Added ULP interrupt support (#5134)
 
 ### Changed
 - Changed ULP entrypoint to allow `main()` to return, and halt, to the ULP Timer can be used (#5134)
