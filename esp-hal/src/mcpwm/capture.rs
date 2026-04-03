@@ -46,22 +46,42 @@ use crate::{
     mcpwm::{
         Instance,
         PwmClockGuard,
-        sync::{SyncSelection, SyncSource},
+        sync::{SyncInSelect, SyncSource},
     },
     pac,
 };
+
+/// Configuration for capture timer
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CaptureTimerConfig {
+    sync_phase: u32,
+}
+
+impl CaptureTimerConfig {
+    /// Sets the sync phase for the capture timer
+    pub fn with_sync_phase(self, sync_phase: u32) -> Self {
+        Self { sync_phase, ..self }
+    }
+}
+
+impl Default for CaptureTimerConfig {
+    fn default() -> Self {
+        Self { sync_phase: 0 }
+    }
+}
 
 /// The MCPWM Capture Timer
 ///
 /// ## Overview
 /// This timer is used for all [`CaptureChannel`]'s for a given MCPWM instance.
-/// * This timer can be configured with a sync source by calling [`CaptureTimer::set_sync`], and
-///   cleared by calling [`CaptureTimer::clear_sync_in`].
+/// * This timer can be configured with a sync source with [`CaptureTimerConfig`].
 ///
 /// ### Sync Events
-/// When this timer receives a sync event the counter of the timer is reset.
-/// The value that the timer is set to is dependent on [`CaptureTimer::set_sync_phase`]
-/// This timer always counts up towards a the positive direction.
+/// When this timer receives a sync event the counter of the timer is reset
+/// to the phase value set in [`CaptureTimerConfig`].
+///
+/// **Note:** This timer always counts up towards a the positive direction.
 pub struct CaptureTimer<'d, PWM: Instance> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
@@ -77,7 +97,7 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
         }
     }
 
-    /// Start the capture timer counting at APB_CLK
+    /// Start the capture timer to being counting and capturing events
     pub fn start(&mut self) {
         self.set_enable(true);
     }
@@ -95,27 +115,9 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
         self.trigger_sync();
     }
 
-    /// Set the sync phase
-    pub fn set_sync_phase(&mut self, phase: u32) {
-        // SAFETY: Only CAP_TIMER_PHASE accessed; unique per PWM instance
-        Self::phase().write(|w| unsafe { w.cap_phase().bits(phase) });
-    }
-
-    /// Get the sync phase
-    pub fn get_sync_phase(&mut self) -> u32 {
-        Self::phase().read().cap_phase().bits()
-    }
-
-    /// Clears the captures timer sync source
-    pub fn clear_sync_in(&mut self) {
-        self.enable_sync_in(SyncSelection::None, false);
-    }
-
-    /// Sets the capture timers sync source. Refer to how sync events are
-    /// handled in the [`CaptureTimer`] documentation.
-    pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
-        let sync_kind = sync_source.get_kind();
-        self.enable_sync_in(sync_kind.into(), false);
+    /// Configure the capture timer with the provided config
+    pub fn set_config(&mut self, config: CaptureTimerConfig) {
+        self.set_sync_phase(config.sync_phase);
     }
 
     /// Triggers a software sync event on the capture timer.
@@ -124,14 +126,30 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
         Self::cfg().modify(|_r, w| w.cap_sync_sw().set_bit());
     }
 
+    /// Sets the capture timers sync source. Refer to how sync events are
+    /// handled in the [`CaptureTimer`] documentation.
+    pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
+        let sync_in = sync_source.get_kind().into();
+        self.set_sync_in_select(sync_in);
+    }
+
+    /// Clears the sync in
+    pub fn clear_sync_in(&mut self) {
+        self.set_sync_in_select(SyncInSelect::None);
+    }
+
     fn set_enable(&mut self, enable: bool) {
         Self::cfg().modify(|_r, w| w.cap_timer_en().bit(enable));
     }
 
-    fn enable_sync_in(&mut self, sync_sel: SyncSelection, enable: bool) {
+    fn set_sync_phase(&mut self, sync_phase: u32) {
+        Self::phase().write(|w| unsafe { w.cap_phase().bits(sync_phase) });
+    }
+
+    fn set_sync_in_select(&mut self, sync_sel: SyncInSelect) {
         // SAFETY: Only CAP_TIMER_CFG accessed; unique per PWM instance
         Self::cfg().modify(|_r, w| {
-            w.cap_synci_en().bit(enable);
+            w.cap_synci_en().bit(sync_sel != SyncInSelect::None);
             unsafe { w.cap_synci_sel().bits(sync_sel as u8) }
         });
     }

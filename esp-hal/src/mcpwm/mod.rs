@@ -194,9 +194,9 @@ impl<'d, PWM: Instance> McPwm<'d, PWM> {
 
         Self {
             _phantom: PhantomData,
-            timer0: Timer::new(guard.clone()),
-            timer1: Timer::new(guard.clone()),
-            timer2: Timer::new(guard.clone()),
+            timer0: Timer::new(guard.clone(), &peripheral_clock),
+            timer1: Timer::new(guard.clone(), &peripheral_clock),
+            timer2: Timer::new(guard.clone(), &peripheral_clock),
             operator0: Operator::new(guard.clone()),
             operator1: Operator::new(guard.clone()),
             operator2: Operator::new(guard.clone()),

@@ -160,8 +160,8 @@ impl<'d, const SYNC: u8, PWM: Instance> InternalSyncSource for SyncLine<'d, SYNC
 /// Values for any of the sync selection registers
 /// This is the internal value used by capture timer, and timers
 #[repr(u8)]
-#[derive(Copy, Clone)]
-pub(crate) enum SyncSelection {
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(crate) enum SyncInSelect {
     /// Select no sync input for the capture timer
     None          = 0,
     /// Select the timers sync source for a timer's sync out,
@@ -176,22 +176,22 @@ pub(crate) enum SyncSelection {
 
 /// Provides a simple way of translating the internal SyncKind to
 /// the value for sync selection used in SYNCI_SEL register fields
-impl From<SyncKind> for SyncSelection {
+impl From<SyncKind> for SyncInSelect {
     fn from(value: SyncKind) -> Self {
         match value {
             // SAFETY: Const generics ensure TIM and SYNC are valid (0-2)
             // Runtime values for line, and timer are only created
             // from generic constants
             SyncKind::SyncLine(line) => match line {
-                0 => SyncSelection::SyncLine0,
-                1 => SyncSelection::SyncLine1,
-                2 => SyncSelection::SyncLine2,
+                0 => SyncInSelect::SyncLine0,
+                1 => SyncInSelect::SyncLine1,
+                2 => SyncInSelect::SyncLine2,
                 _ => panic!("Invalid sync line"),
             },
             SyncKind::TimerSyncOut(timer) => match timer {
-                0 => SyncSelection::Timer0SyncOut,
-                1 => SyncSelection::Timer1SyncOut,
-                2 => SyncSelection::Timer2SyncOut,
+                0 => SyncInSelect::Timer0SyncOut,
+                1 => SyncInSelect::Timer1SyncOut,
+                2 => SyncInSelect::Timer2SyncOut,
                 _ => panic!("Invalid timer for sync out"),
             },
         }
