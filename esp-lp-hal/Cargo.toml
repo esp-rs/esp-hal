@@ -87,13 +87,7 @@ name              = "blinky"
 required-features = []
 
 [[example]]
-name              = "interrupt_counter_s2"
-path              = "./examples/interrupt_counter.rs"
-required-features = ["esp32s2"]
-
-[[example]]
-name              = "interrupt_counter_s3"
-path              = "./examples/interrupt_counter.rs"
+name              = "interrupt_counter"
 required-features = ["esp32s3"]
 
 [[example]]
