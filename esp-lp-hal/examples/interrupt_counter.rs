@@ -12,7 +12,7 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use esp_lp_hal::{
     gpio::{Event, Input, Io},
-    interrupt,
+    interrupt::{self, Interrupt},
     pac::Peripherals,
     prelude::*,
 };
@@ -44,7 +44,7 @@ fn main(mut button: Input<0>) {
     let mut io = Io::new(peripherals.RTC_IO);
     io.set_interrupt_handler(gpio_interrupt_handler);
 
-    increment_counter();
+    interrupt::bind_handler(Interrupt::RISCV_START_INT, startup_interrupt_handler);
 
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);
@@ -61,4 +61,10 @@ fn gpio_interrupt_handler() {
 
     // Clear the interrupt
     critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).clear_interrupt());
+}
+
+#[handler]
+fn startup_interrupt_handler() {
+    increment_counter();
+    interrupt::disable(Interrupt::RISCV_START_INT);
 }

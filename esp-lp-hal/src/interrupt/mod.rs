@@ -61,13 +61,12 @@ fn current_interrupts() -> u32 {
     status_bits
 }
 
-/// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
+/// Enables a peripheral interrupt.
 ///
 /// Note that interrupts still need to be enabled globally for interrupts
 /// to be serviced.
 ///
-/// Internally, this function maps the interrupt to the appropriate CPU interrupt
-/// for the specified priority level.
+/// Internally, this function maps the interrupt to the appropriate CPU interrupt.
 #[inline]
 pub fn enable(interrupt: Interrupt, _level: Priority) {
     #[cfg(esp32s3)]
@@ -140,6 +139,88 @@ pub fn enable(interrupt: Interrupt, _level: Priority) {
         Interrupt::SWD_INT => unsafe { &*crate::pac::SENS::PTR }
             .sar_cocpu_int_ena()
             .write(|w| w.cocpu_swd_int_ena().set_bit()),
+        Interrupt::GPIO_INT => 0,
+    };
+}
+
+/// Disables a peripheral interrupt.
+///
+/// Note that interrupts still need to be enabled globally for interrupts
+/// to be serviced.
+///
+/// Internally, this function maps the interrupt to the appropriate CPU interrupt.
+#[inline]
+pub fn disable(interrupt: Interrupt) {
+    #[cfg(esp32s3)]
+    match interrupt {
+        Interrupt::TOUCH_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_done_int_ena().clear_bit()),
+        Interrupt::TOUCH_INACTIVE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_inactive_int_ena().clear_bit()),
+        Interrupt::TOUCH_ACTIVE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_active_int_ena().clear_bit()),
+        Interrupt::SARADC1_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_saradc1_int_ena().clear_bit()),
+        Interrupt::SARADC2_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_saradc2_int_ena().clear_bit()),
+        Interrupt::TSENS_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_tsens_int_ena().clear_bit()),
+        Interrupt::RISCV_START_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_start_int_ena().clear_bit()),
+        Interrupt::SW_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_sw_int_ena().clear_bit()),
+        Interrupt::SWD_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_swd_int_ena().clear_bit()),
+        Interrupt::TOUCH_TIME_OUT_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_timeout_int_ena().clear_bit()),
+        Interrupt::TOUCH_APPROACH_LOOP_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_approach_loop_done_int_ena().clear_bit()),
+        Interrupt::TOUCH_SCAN_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.sar_cocpu_touch_scan_done_int_ena().clear_bit()),
+        Interrupt::GPIO_INT => 0,
+    };
+
+    #[cfg(esp32s2)]
+    match interrupt {
+        Interrupt::TOUCH_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_touch_done_int_ena().clear_bit()),
+        Interrupt::TOUCH_INACTIVE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_touch_inactive_int_ena().clear_bit()),
+        Interrupt::TOUCH_ACTIVE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_touch_active_int_ena().clear_bit()),
+        Interrupt::SARADC1_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_saradc1_int_ena().clear_bit()),
+        Interrupt::SARADC2_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_saradc2_int_ena().clear_bit()),
+        Interrupt::TSENS_DONE_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_tsens_int_ena().clear_bit()),
+        Interrupt::RISCV_START_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_start_int_ena().clear_bit()),
+        Interrupt::SW_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_sw_int_ena().clear_bit()),
+        Interrupt::SWD_INT => unsafe { &*crate::pac::SENS::PTR }
+            .sar_cocpu_int_ena()
+            .write(|w| w.cocpu_swd_int_ena().clear_bit()),
         Interrupt::GPIO_INT => 0,
     };
 }
