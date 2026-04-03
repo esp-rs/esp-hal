@@ -2264,7 +2264,7 @@ pub fn new<'d>(
     crate::wifi::wifi_init(device)?;
 
     // At some point the "High-speed ADC" entropy source became available.
-    #[cfg(rng_trng_supported)]
+    #[cfg(all(rng_trng_supported, feature = "unstable"))]
     unsafe {
         esp_hal::rng::TrngSource::increase_entropy_source_counter()
     };
@@ -2328,7 +2328,7 @@ impl Drop for WifiController<'_> {
             set_access_point_state(WifiAccessPointState::Uninitialized);
             set_station_state(WifiStationState::Uninitialized);
 
-            #[cfg(rng_trng_supported)]
+            #[cfg(all(rng_trng_supported, feature = "unstable"))]
             esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
                 esp_hal::Internal::conjure()
             });

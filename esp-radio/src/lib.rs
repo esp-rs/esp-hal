@@ -13,8 +13,8 @@
 //!
 //! ### Importing
 //!
-//! Note that this crate currently requires you to enable the `unstable` feature
-//! on `esp-hal`.
+//! Enabling the `unstable` feature on `esp-radio` requires you to also enable
+//! the `unstable` feature on `esp-hal` in the final binary crate.
 //!
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!

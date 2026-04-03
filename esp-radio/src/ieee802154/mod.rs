@@ -6,8 +6,8 @@
 //! This module is intended to be used to implement support for higher-level
 //! communication protocols, for example [openthread].
 //!
-//! Note that this module currently requires you to enable the `unstable` feature
-//! on `esp-hal`.
+//! Note that this module requires the `unstable` feature on both `esp-radio`
+//! and `esp-hal`.
 //!
 //! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
 //! things will break.

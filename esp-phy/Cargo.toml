@@ -10,12 +10,12 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
-doc-config = { features = ["esp-hal/unstable", "defmt"] }
+doc-config = { features = ["defmt"] }
 check-configs = [
-    { features = ["esp-hal/unstable"] },
+    { features = [] },
 ]
 clippy-configs = [
-    { features = ["esp-hal/unstable", "defmt"] },
+    { features = ["defmt"] },
 ]
 
 [package.metadata.docs.rs]
