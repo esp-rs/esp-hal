@@ -16,10 +16,6 @@ MEMORY
     ram(RW) : ORIGIN = 0, LENGTH = CONFIG_ULP_COPROC_RESERVE_MEM
 }
 
-/* Default interrupt handlers */
-PROVIDE(SENS_INT = DefaultHandler);
-PROVIDE(GPIO_INT = DefaultHandler);
-
 SECTIONS
 {
   . = ORIGIN(ram);
