@@ -68,6 +68,19 @@ struct Context {
     pcnt_unit: Unit<'static, 0>,
 }
 
+#[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+macro_rules! set_up_pcnt {
+    ($ctx:expr, $input:ident) => {{
+        $ctx.pcnt_unit
+            .channel0
+            .set_edge_signal($ctx.$input.peripheral_input());
+        $ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        $ctx.pcnt_unit
+    }};
+}
+
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
@@ -184,22 +197,15 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
         assert_eq!(read[1], write[1]);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -207,15 +213,8 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -224,7 +223,7 @@ mod tests {
         assert_eq!(read[3], 0x00);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -232,15 +231,8 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -250,7 +242,7 @@ mod tests {
         assert_eq!(read[1], write[1]);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -258,15 +250,8 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -278,7 +263,7 @@ mod tests {
         assert_eq!(read[3], 0x00);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -286,18 +271,13 @@ mod tests {
     fn test_asymmetric_write(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         SpiBus::write(&mut ctx.spi, &write[..]).expect("Asymmetric write failed");
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -305,19 +285,14 @@ mod tests {
     async fn test_async_asymmetric_write(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::write(&mut spi, &write[..])
             .await
             .expect("Asymmetric write failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -325,12 +300,7 @@ mod tests {
     async fn async_write_after_sync_write_waits_for_flush(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
 
@@ -343,7 +313,7 @@ mod tests {
             .await
             .expect("Async write failed");
 
-        assert_eq!(unit.value(), 34);
+        assert_eq!(miso_pulse_counter.value(), 34);
     }
 
     #[test]
@@ -351,18 +321,13 @@ mod tests {
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut [], &write[..]).expect("Asymmetric transfer failed");
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -370,19 +335,14 @@ mod tests {
     async fn test_async_asymmetric_write_transfer(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut [], &write[..])
             .await
             .expect("Asymmetric transfer failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -454,13 +414,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
@@ -479,7 +435,7 @@ mod tests {
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -492,13 +448,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
@@ -517,7 +469,7 @@ mod tests {
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -597,12 +549,7 @@ mod tests {
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx
             .spi
@@ -620,7 +567,7 @@ mod tests {
             assert_eq!(rx_buf, [0; TRANSFER_SIZE]);
 
             spi.write(&tx_buf).unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -700,12 +647,7 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut receive = [0; TRANSFER_SIZE];
 
@@ -718,7 +660,7 @@ mod tests {
             assert_eq!(receive, [0; TRANSFER_SIZE]);
 
             SpiBusAsync::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -736,12 +678,7 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut receive = [0; TRANSFER_SIZE];
 
@@ -756,7 +693,7 @@ mod tests {
             SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
                 .await
                 .unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
             assert_eq!(receive, [0b0110_1010; TRANSFER_SIZE]);
         }
     }
@@ -962,12 +899,7 @@ mod tests {
     fn half_duplex_operation_works_after_nonblocking_write(mut ctx: Context) {
         // SpiBus::write returns before the transfer is complete. This test verifies that
         // half_duplex functions flush before they reconfigure the peripheral.
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.sclk_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
@@ -982,9 +914,9 @@ mod tests {
             .half_duplex_write(DataMode::Dual, Command::None, Address::None, 0, &buffer)
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 480);
+        assert_eq!(sclk_counter.value(), 480);
 
-        ctx.pcnt_unit.clear();
+        sclk_counter.clear();
 
         // 320 clock cycles
         let mut buffer = [0x00; 40];
@@ -995,7 +927,7 @@ mod tests {
             .half_duplex_read(DataMode::Dual, Command::None, Address::None, 0, &mut buffer)
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 480);
+        assert_eq!(sclk_counter.value(), 480);
     }
 
     #[test]
@@ -1003,12 +935,7 @@ mod tests {
     fn half_duplex_operation_resets_size_before_empty_write(mut ctx: Context) {
         // SpiBus::write returns before the transfer is complete. This test verifies that
         // half_duplex functions flush before they reconfigure the peripheral.
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.sclk_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
@@ -1031,7 +958,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 40);
+        assert_eq!(sclk_counter.value(), 40);
     }
 
     #[test]
