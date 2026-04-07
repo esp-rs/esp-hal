@@ -154,6 +154,11 @@ use core::{
     ptr::{self, NonNull},
 };
 
+/// Re-exported crates.
+pub mod export {
+    pub use enumset;
+}
+
 pub use allocators::*;
 use enumset::{EnumSet, EnumSetType};
 use esp_sync::NonReentrantMutex;
