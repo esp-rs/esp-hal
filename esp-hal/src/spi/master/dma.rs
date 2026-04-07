@@ -27,6 +27,7 @@ use crate::{
         PeripheralDmaChannel,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
+        TransferDirection,
         asynch::DmaRxFuture,
         prepare_for_rx,
         prepare_for_tx,
@@ -707,8 +708,8 @@ enum DmaOperationKind {
 }
 
 impl DmaOperationKind {
-    fn compute(buffer: &[u8]) -> Self {
-        fn is_dma_compatible(buffer: &[u8]) -> bool {
+    fn compute(buffer: &[u8], direction: TransferDirection) -> Self {
+        fn is_dma_compatible(buffer: &[u8], _direction: TransferDirection) -> bool {
             // FIXME: lazy workaround for ESP32 TX DMA alignment requirements.
             // `prepare_for_tx` and `prepare_for_rx` should be updated to handle ESP32.
             #[cfg(esp32)]
@@ -721,6 +722,10 @@ impl DmaOperationKind {
             }
             #[cfg(dma_can_access_psram)]
             if is_slice_in_psram(buffer) {
+                if _direction == TransferDirection::In && cfg!(esp32s2) {
+                    // FIXME: S2 has various weird issues when transferring to PSRAM
+                    return false;
+                }
                 return true;
             }
 
@@ -729,7 +734,7 @@ impl DmaOperationKind {
             false
         }
 
-        if is_dma_compatible(buffer) {
+        if is_dma_compatible(buffer, direction) {
             Self::InPlace
         } else {
             Self::Copied
@@ -737,11 +742,11 @@ impl DmaOperationKind {
     }
 
     fn for_read(buffer: &mut [u8]) -> Self {
-        Self::compute(buffer)
+        Self::compute(buffer, TransferDirection::In)
     }
 
     fn for_write(buffer: &[u8]) -> Self {
-        Self::compute(buffer)
+        Self::compute(buffer, TransferDirection::Out)
     }
 }
 
@@ -919,6 +924,11 @@ where
         esp32,
         doc = "On ESP32, transferring from internal SRAM requires copying the entire buffer if it is
         not 4-byte aligned. This is a limitation of the current implementation."
+    )]
+    #[cfg_attr(
+        esp32,
+        doc = "On ESP32-S2, transferring to PSRAM requires copying the entire buffer. This is a
+        limitation of the current implementation."
     )]
     #[doc = ""]
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
