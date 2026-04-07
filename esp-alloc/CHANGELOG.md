@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `global-allocator` Cargo feature to opt in to the `#[global_allocator]`, this feature is enabled by default. (#4703)
 - Support for ESP32-C5 (#4884)
 - Support for ESP32-C61 (#5240)
+- Allocation hook callbacks via the `alloc-hooks` feature (#5296)
+- The `enumset` crate has been re-exported as `esp_alloc::export::enumset` (#5296)
 
 ### Changed
 
