@@ -112,14 +112,14 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }
@@ -296,14 +296,14 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }

@@ -1,4 +1,4 @@
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 use core::ops::Range;
 use core::{
     ops::{Deref, DerefMut},
@@ -7,7 +7,7 @@ use core::{
 
 use super::*;
 use crate::soc::is_slice_in_dram;
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 use crate::soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address};
 
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
@@ -48,7 +48,7 @@ impl From<DmaAlignmentError> for DmaBufError {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(psram_dma)] {
+    if #[cfg(dma_can_access_psram)] {
         /// Burst size used when transferring to and from external memory.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -169,7 +169,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 impl ExternalBurstConfig {
     const fn min_psram_alignment(self, direction: TransferDirection) -> usize {
         // S2 TRM: Specifically, size and buffer address pointer in receive descriptors
@@ -236,7 +236,7 @@ const fn max(a: usize, b: usize) -> usize {
 
 impl BurstConfig {
     delegate::delegate! {
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         to self.internal_memory {
             pub(super) const fn min_dram_alignment(self, direction: TransferDirection) -> usize;
             pub(super) fn is_burst_enabled(self) -> bool;
@@ -253,7 +253,7 @@ impl BurstConfig {
         let out_alignment = self.min_dram_alignment(TransferDirection::Out);
         let alignment = max(in_alignment, out_alignment);
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         let alignment = max(alignment, self.external_memory as usize);
 
         alignment
@@ -279,7 +279,7 @@ impl BurstConfig {
         let alignment = self.min_dram_alignment(direction);
 
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 let mut alignment = alignment;
                 if is_valid_psram_address(_buffer.as_ptr() as usize) {
                     alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
@@ -327,7 +327,7 @@ impl BurstConfig {
         // buffer can be either DRAM or PSRAM (if supported)
         let is_in_dram = is_slice_in_dram(buffer);
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)]{
+            if #[cfg(dma_can_access_psram)]{
                 let is_in_psram = is_slice_in_psram(buffer);
             } else {
                 let is_in_psram = false;
@@ -365,7 +365,7 @@ pub struct Preparation {
     pub direction: TransferDirection,
 
     /// Must be `true` if any of the DMA descriptors contain data in PSRAM.
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     pub accesses_psram: bool,
 
     /// Configures the DMA to transfer data in bursts.
@@ -642,7 +642,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 
     fn prepare(&mut self) -> Preparation {
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
                     unsafe {
@@ -658,7 +658,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         Preparation {
             start: self.descriptors.head(),
             direction: TransferDirection::Out,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
@@ -853,7 +853,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
@@ -870,7 +870,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
         Preparation {
             start: self.descriptors.head(),
             direction: TransferDirection::In,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
@@ -1036,7 +1036,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
@@ -1053,7 +1053,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.tx_descriptors.head(),
             direction: TransferDirection::Out,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
@@ -1080,7 +1080,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
@@ -1097,7 +1097,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
         Preparation {
             start: self.rx_descriptors.head(),
             direction: TransferDirection::In,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
             check_owner: None,
@@ -1235,7 +1235,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
         Preparation {
             start: self.descriptors.as_mut_ptr(),
             direction: TransferDirection::In,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: self.burst,
 
@@ -1445,7 +1445,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         Preparation {
             start: core::ptr::addr_of_mut!(EMPTY).cast(),
             direction: TransferDirection::Out,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: BurstConfig::default(),
 
@@ -1475,7 +1475,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         Preparation {
             start: core::ptr::addr_of_mut!(EMPTY).cast(),
             direction: TransferDirection::In,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: BurstConfig::default(),
 
@@ -1551,7 +1551,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     fn prepare(&mut self) -> Preparation {
         Preparation {
             start: self.descriptor,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             direction: TransferDirection::Out,
             burst_transfer: BurstConfig::default(),
@@ -1597,7 +1597,7 @@ impl NoBuffer {
         Preparation {
             start: self.0.start,
             direction: self.0.direction,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: self.0.accesses_psram,
             burst_transfer: self.0.burst_transfer,
             check_owner: self.0.check_owner,
@@ -1665,7 +1665,7 @@ pub(crate) unsafe fn prepare_for_tx(
     let data_len = data.len().min(chunk_size * descriptors.len());
 
     cfg_if::cfg_if! {
-        if #[cfg(psram_dma)] {
+        if #[cfg(dma_can_access_psram)] {
             let data_addr = data.addr().get();
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
@@ -1693,7 +1693,7 @@ pub(crate) unsafe fn prepare_for_tx(
             burst_transfer: BurstConfig::DEFAULT,
             check_owner: None,
             auto_write_back: true,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: data_in_psram,
         }),
         data_len,
@@ -1711,7 +1711,7 @@ pub(crate) unsafe fn prepare_for_tx(
 #[cfg_attr(not(aes_dma), expect(unused))]
 pub(crate) unsafe fn prepare_for_rx(
     descriptors: &mut [DmaDescriptor],
-    #[cfg(psram_dma)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
+    #[cfg(dma_can_access_psram)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
     mut data: NonNull<[u8]>,
 ) -> (NoBuffer, usize) {
     let chunk_size =
@@ -1722,7 +1722,7 @@ pub(crate) unsafe fn prepare_for_rx(
     // - it may not have a length that is a multiple of the external memory block size
 
     cfg_if::cfg_if! {
-        if #[cfg(psram_dma)] {
+        if #[cfg(dma_can_access_psram)] {
             let data_addr = data.addr().get();
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
         } else {
@@ -1733,7 +1733,7 @@ pub(crate) unsafe fn prepare_for_rx(
     let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
     let data_len = if data_in_psram {
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 // This could use a better API, but right now we'll have to build the descriptor list by
                 // hand.
                 let consumed_bytes = build_descriptor_list_for_psram(
@@ -1773,14 +1773,14 @@ pub(crate) unsafe fn prepare_for_rx(
             burst_transfer: BurstConfig::DEFAULT,
             check_owner: None,
             auto_write_back: true,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: data_in_psram,
         }),
         data_len,
     )
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 fn build_descriptor_list_for_psram(
     descriptors: &mut DescriptorSet<'_>,
     copy_buffers: &mut [Option<ManualWritebackBuffer>; 2],
@@ -1870,19 +1870,19 @@ fn build_descriptor_list_for_psram(
     consumed
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 fn get_range(ptr: NonNull<[u8]>, range: Range<usize>) -> NonNull<[u8]> {
     let len = range.end - range.start;
     NonNull::slice_from_raw_parts(unsafe { ptr.cast().byte_add(range.start) }, len)
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 struct DescriptorChainingIter<'a> {
     /// index of the next element to emit
     index: usize,
     descriptors: &'a mut [DmaDescriptor],
 }
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 impl<'a> DescriptorChainingIter<'a> {
     fn new(descriptors: &'a mut [DmaDescriptor]) -> Self {
         Self {
@@ -1914,21 +1914,21 @@ impl<'a> DescriptorChainingIter<'a> {
     }
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 const MIN_LAST_DMA_LEN: usize = if cfg!(esp32s2) { 5 } else { 1 };
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 const BUF_LEN: usize = 16 + 2 * (MIN_LAST_DMA_LEN - 1); // 2x makes aligning short buffers simpler
 
 /// PSRAM helper. DMA can write data of any alignment into this buffer, and it can be written by
 /// the CPU back to PSRAM.
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 pub(crate) struct ManualWritebackBuffer {
     dst_address: NonNull<u8>,
     buffer: [u8; BUF_LEN],
     n_bytes: u8,
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 impl ManualWritebackBuffer {
     pub fn new(ptr: NonNull<[u8]>) -> Self {
         assert!(ptr.len() <= BUF_LEN);

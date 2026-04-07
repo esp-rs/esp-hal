@@ -15,7 +15,6 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_tech
 symbols = [
     # Additional peripherals defined by us (the developers):
     "phy",
-    "psram",
     "touch",
 
     # ROM capabilities

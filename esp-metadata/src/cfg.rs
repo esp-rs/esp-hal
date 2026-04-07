@@ -342,6 +342,8 @@ driver_configs![
             #[serde(default)]
             supports_mem2mem: bool,
             #[serde(default)]
+            can_access_psram: bool,
+            #[serde(default)]
             separate_in_out_interrupts: bool,
             #[serde(default)]
             max_priority: Option<u32>,

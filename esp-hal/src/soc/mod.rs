@@ -30,13 +30,13 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
 }
 
 #[allow(unused)]
-#[cfg(psram)]
+#[cfg(soc_has_psram)]
 pub(crate) fn is_valid_psram_address(address: usize) -> bool {
     addr_in_range(address, crate::psram::psram_range())
 }
 
 #[allow(unused)]
-#[cfg(psram)]
+#[cfg(soc_has_psram)]
 pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
     slice_in_range(slice, crate::psram::psram_range())
 }
@@ -46,7 +46,7 @@ pub(crate) fn is_valid_memory_address(address: usize) -> bool {
     if is_valid_ram_address(address) {
         return true;
     }
-    #[cfg(psram)]
+    #[cfg(soc_has_psram)]
     if is_valid_psram_address(address) {
         return true;
     }
