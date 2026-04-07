@@ -14,7 +14,6 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 [package.metadata.espressif]
 semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
-    { if = 'chip_has("soc_has_psram")', features = ["psram"] },
     { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
     { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
 ] }
@@ -22,14 +21,12 @@ check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
-    { features = ["unstable", "rt", "psram"], if = 'chip_has("soc_has_psram")' },
     { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
-        { if = 'chip_has("soc_has_psram")', features = ["psram"] },
         { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
         { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
     ] },
@@ -304,14 +301,6 @@ defmt = [
     "xtensa-lx-rt?/defmt",
     "esp-sync/defmt"
 ]
-
-#DOC_IF has("soc_has_psram")
-#! ### PSRAM Feature Flags
-
-## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
-psram = []
-
-#DOC_ENDIF
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

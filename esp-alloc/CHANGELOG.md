@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `psram_allocator` macro now has branches to allow passing PSRAM configuration, or a pre-configured PSRAM driver (#5310)
 
 ### Fixed
 

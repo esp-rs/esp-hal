@@ -7,7 +7,7 @@
 //% ENV(llff_octal, tlsf_octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
 //% ENV(llff_octal, llff_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf_octal, tlsf_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
-//% FEATURES: unstable psram esp-storage esp-alloc/nightly
+//% FEATURES: unstable esp-storage esp-alloc/nightly
 
 #![no_std]
 #![no_main]

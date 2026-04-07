@@ -46,17 +46,15 @@
 
 use core::ops::Range;
 
-#[cfg(feature = "psram")]
-#[cfg_attr(docsrs, doc(cfg(feature = "psram")))]
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(any(esp32c5, esp32c61), path = "esp32c5_c61.rs")]
 pub(crate) mod implem;
 
-#[cfg(feature = "psram")]
-#[cfg_attr(docsrs, doc(cfg(feature = "psram")))]
 pub use implem::*;
+
+use crate::peripherals::PSRAM;
 
 /// Size of PSRAM
 ///
@@ -73,7 +71,6 @@ pub enum PsramSize {
 }
 
 impl PsramSize {
-    #[cfg_attr(not(feature = "psram"), expect(unused))]
     pub(crate) fn get(&self) -> usize {
         match self {
             PsramSize::AutoDetect => 0,
@@ -81,17 +78,9 @@ impl PsramSize {
         }
     }
 
-    #[cfg_attr(not(feature = "psram"), expect(unused))]
     pub(crate) fn is_auto(&self) -> bool {
         matches!(self, PsramSize::AutoDetect)
     }
-}
-
-/// Returns the address and size of the available in external memory.
-#[cfg(feature = "psram")]
-pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM<'_>) -> (*mut u8, usize) {
-    let range = psram_range();
-    (range.start as *mut u8, range.end - range.start)
 }
 
 // Using static mut should be fine since we are only writing to it once during
@@ -100,21 +89,34 @@ pub fn psram_raw_parts(_psram: &crate::peripherals::PSRAM<'_>) -> (*mut u8, usiz
 // the HAL. This will access the PSRAM range, returning an empty range - which
 // is, at that point, true. The user has no (safe) means to allocate in PSRAM
 // before initializing the HAL.
-#[cfg(feature = "psram")]
 static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
 
 pub(crate) fn psram_range() -> Range<usize> {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "psram")] {
-            #[allow(static_mut_refs)]
-            unsafe { MAPPED_PSRAM.memory_range.clone() }
-        } else {
-            0..0
-        }
+    #[allow(static_mut_refs)]
+    unsafe {
+        MAPPED_PSRAM.memory_range.clone()
     }
 }
 
-#[cfg(feature = "psram")]
 pub(crate) struct MappedPsram {
     memory_range: Range<usize>,
+}
+
+/// Enables externally-connected Pseudo-static RAM.
+pub struct Psram {
+    _peri: PSRAM<'static>,
+}
+
+impl Psram {
+    /// Initializes PSRAM.
+    pub fn new(peri: PSRAM<'static>, config: PsramConfig) -> Self {
+        init_psram(config);
+        Self { _peri: peri }
+    }
+
+    /// Returns the address and size of the available in external memory.
+    pub fn raw_parts(&self) -> (*mut u8, usize) {
+        let range = psram_range();
+        (range.start as *mut u8, range.end - range.start)
+    }
 }
