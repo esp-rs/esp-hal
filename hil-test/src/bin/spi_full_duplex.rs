@@ -544,6 +544,8 @@ mod tests {
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_read_write_pcnt(ctx: Context) {
+        use esp_hal::spi::master::SpiDma;
+
         const TRANSFER_SIZE: usize = 4;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -556,19 +558,46 @@ mod tests {
             .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
+        // Count the number of positive edges in the buffer for PCNT
+        fn count_edges(buf: &[u8]) -> i16 {
+            let mut count = 0;
+
+            let mut prev_bit = 0;
+            for byte in buf {
+                for i in 0..8 {
+                    let bit = (byte >> i) & 1;
+                    if bit == 1 && prev_bit == 0 {
+                        count += 1;
+                    }
+                    prev_bit = bit;
+                }
+            }
+
+            count
+        }
+
+        fn test_write(
+            spi: &mut SpiDma<'_, Blocking>,
+            miso_pulse_counter: &Unit<'_, 0>,
+            tx_buf: &[u8],
+            rx_buf: &mut [u8],
+        ) {
+            for _ in 1..4 {
+                miso_pulse_counter.clear();
+                // Preset as 5, expect 0 repeated receive
+                rx_buf.fill(5);
+                spi.read(rx_buf).unwrap();
+                assert!(rx_buf.iter().all(|&b| b == 0));
+
+                spi.write(tx_buf).unwrap();
+                assert_eq!(miso_pulse_counter.value(), count_edges(tx_buf));
+            }
+        }
+
         // Fill the buffer where each byte has 3 pos edges.
         let tx_buf = [0b0110_1010; TRANSFER_SIZE];
         let mut rx_buf = [0; TRANSFER_SIZE];
-
-        for i in 1..4 {
-            // Preset as 5, expect 0 repeated receive
-            rx_buf.copy_from_slice(&[5; TRANSFER_SIZE]);
-            spi.read(&mut rx_buf).unwrap();
-            assert_eq!(rx_buf, [0; TRANSFER_SIZE]);
-
-            spi.write(&tx_buf).unwrap();
-            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
-        }
+        test_write(&mut spi, &miso_pulse_counter, &tx_buf, &mut rx_buf);
     }
 
     #[test]
