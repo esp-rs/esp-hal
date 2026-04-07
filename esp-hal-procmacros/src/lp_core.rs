@@ -355,10 +355,6 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
                 static #rtc_code_start: u32;
             }
 
-            unsafe {
-                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &#rtc_code_start as *const u32 as *mut u8, LP_CODE.len());
-            }
-
             impl LpCoreCode {
                 pub fn run(
                     &self,
@@ -366,6 +362,9 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
                     wakeup_source: LpCoreWakeupSource,
                     #(_: #args),*
                 ) {
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &#rtc_code_start as *const u32 as *mut u8, LP_CODE.len());
+                    }
                     lp_core.run(wakeup_source);
                 }
             }
