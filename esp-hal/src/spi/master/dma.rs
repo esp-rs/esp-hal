@@ -82,9 +82,11 @@ impl<'d> Spi<'d, Blocking> {
 ///
 /// The driver provides two separate approaches to transferring data:
 ///
-/// - The slice-based API allows transferring data from/to slices of memory. The data will be copied
-///   into an internal buffer before the transfer begins. These copy buffers must be set up by
-///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins.
+/// - The slice-based API allows transferring data from/to slices of memory. The data may be copied
+///   into an internal buffer before the transfer begins. A pair of copy buffers can be set up by
+///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins. For
+///   more details on when copying is necessary, see the documentation of the
+///   [`with_buffers`](SpiDma::with_buffers) method.
 /// - The buffer API allows transferring externally managed buffers. In this mode, you provide the
 ///   buffers to be transferred. The buffer objects ensure that data is located in appropriate
 ///   memory regions. The buffers and the driver object are are moved into transfer objects for the
@@ -93,6 +95,8 @@ impl<'d> Spi<'d, Blocking> {
 ///
 /// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
 /// use. `embedded-hal` traits are implemented by the slice-based API's functions.
+///
+/// ## Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -105,7 +109,7 @@ impl<'d> Spi<'d, Blocking> {
 ///     },
 /// };
 ///
-/// // Optional: create and set up 32000 byte copy buffers.
+/// // Optional: create and set up copy buffers.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 ///
 /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
@@ -122,7 +126,6 @@ impl<'d> Spi<'d, Blocking> {
 /// #
 /// # {after_snippet}
 /// ```
-// TODO: update docs once the driver can transfer data without copying
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SpiDma<'d, Dm>
 where
@@ -916,10 +919,21 @@ where
     ///
     /// These buffers will be used to copy data when using the slice-based transfer functions.
     ///
+    /// Data is copied in two cases:
+    ///   - When the buffer is not located in a memory region that can be accessed by the DMA.
+    #[cfg_attr(not(any(esp32c5, esp32c61)), doc = "The DMA cannot read flash memory.")]
+    ///   - When the alignment of the buffer does not meet the DMA's requirements, the unaligned
+    ///     parts of the buffer are copied.
+    #[cfg_attr(
+        esp32,
+        doc = "On ESP32, transferring from internal SRAM requires copying the entire buffer if it is
+        not 4-byte aligned. This is a limitation of the current implementation."
+    )]
+    #[doc = ""]
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
     /// be wasted.
-    // TODO: update docs once the driver can actually transfer data without copying - we'll need to
-    // explain when this function is necessary.
+    ///
+    /// For an example of how to create these buffers, see the [`SpiDma`] documentation.
     #[instability::unstable]
     pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
         unsafe {
