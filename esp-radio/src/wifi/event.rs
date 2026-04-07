@@ -9,10 +9,6 @@ use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
 
 use super::Ssid;
-use crate::wifi::include::{
-    wifi_event_sta_wps_er_success_t__bindgen_ty_1,
-    wifi_ftm_report_entry_t,
-};
 
 static WIFI_EVENT_ENABLE_MASK: NonReentrantMutex<EnumSet<WifiEvent>> =
     NonReentrantMutex::new(enumset::enum_set!());
@@ -253,6 +249,11 @@ impl_wifi_event!(
 );
 impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StationNeighborRep, wifi_event_neighbor_report_t);
+impl_wifi_event!(
+    AccessPointCredential,
+    wifi_event_sta_wps_er_success_t__bindgen_ty_1
+);
+impl_wifi_event!(FineTimingMeasurementReportEntry, wifi_ftm_report_entry_t);
 
 impl AccessPointStationConnected<'_> {
     /// Get the MAC address of the connected station.
@@ -369,11 +370,7 @@ impl StationDisconnected<'_> {
     }
 }
 
-/// All access point credentials received from WPS handshake.
-#[repr(transparent)]
-pub struct AccessPointCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
-
-impl AccessPointCredential {
+impl AccessPointCredential<'_> {
     /// Get the SSID of an access point.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
@@ -404,10 +401,10 @@ impl StationWifiProtectedStatusEnrolleeSuccess<'_> {
     }
 
     /// Get all access point credentials received.
-    pub fn access_point_cred(&self) -> &[AccessPointCredential] {
-        let array_ref: &[AccessPointCredential; 3] =
+    pub fn access_point_cred(&self) -> &[AccessPointCredential<'_>] {
+        let array_ref: &[AccessPointCredential<'_>; 3] =
             // cast reference of fixed-size array to wrapper type
-            unsafe { &*(&self.0.ap_cred as *const _ as *const [AccessPointCredential; 3]) };
+            unsafe { &*(&self.0.ap_cred as *const _ as *const [AccessPointCredential<'_>; 3]) };
 
         &array_ref[..]
     }
@@ -419,10 +416,6 @@ impl StationWifiProtectedStatusEnrolleePin<'_> {
         &self.0.pin_code
     }
 }
-
-/// A safe, read-only wrapper for a single FTM report entry.
-#[repr(transparent)]
-pub struct FineTimingMeasurementReportEntry<'a>(&'a wifi_ftm_report_entry_t);
 
 impl FineTimingMeasurementReportEntry<'_> {
     /// Gets the Dialog Token of the FTM frame.
