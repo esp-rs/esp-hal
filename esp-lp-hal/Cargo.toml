@@ -45,11 +45,11 @@ nb                = { version = "1.1.0",  optional = true }
 procmacros        = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv             = { version = "0.15" }
 portable-atomic = { version = "1", default-features = false }
-critical-section = { version = "1.1.1", features = ["restore-state-u32"], optional = true }
+critical-section = { version = "1.2.0", features = ["restore-state-u32"], optional = true }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
-esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "250be223" }
-esp32s2-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "250be223" }
-esp32s3-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "250be223" }
+esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5ff8e30e" }
+esp32s2-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5ff8e30e" }
+esp32s3-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5ff8e30e" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"

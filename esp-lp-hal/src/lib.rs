@@ -96,7 +96,17 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         unsafe extern "Rust" {
             // This symbol will be provided by the user via `#[entry]`
             fn main();
+
+            // This variable is provided by the PAC, and used to
+            // detect multiple calls to Peripherals::take().
+            static mut DEVICE_PERIPHERALS: bool;
         }
+
+        // The pac::DEVICE_PERIPHERALS variable is re-zero-ed on start,
+        // to prevent it from persisting between calls to main().
+        // This prevents ULP-Timer-triggered-main()-calls from panicking
+        // on their second loop.
+        DEVICE_PERIPHERALS = false;
 
         #[cfg(any(esp32s2, esp32s3))]
         {
