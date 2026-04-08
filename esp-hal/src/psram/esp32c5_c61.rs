@@ -196,7 +196,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     };
 
     unsafe {
-        super::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+        super::set_psram_range(start as usize..start as usize + config.size.get());
     }
 }
 

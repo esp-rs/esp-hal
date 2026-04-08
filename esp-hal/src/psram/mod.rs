@@ -50,6 +50,7 @@ use core::ops::Range;
 pub(crate) mod implem;
 
 pub use implem::*;
+use portable_atomic::{AtomicUsize, Ordering};
 
 use crate::peripherals::PSRAM;
 
@@ -80,23 +81,21 @@ impl PsramSize {
     }
 }
 
-// Using static mut should be fine since we are only writing to it once during
-// initialization. As other tasks and interrupts are not running yet, the worst
-// that can happen is, that the user creates a DMA buffer before initializing
-// the HAL. This will access the PSRAM range, returning an empty range - which
-// is, at that point, true. The user has no (safe) means to allocate in PSRAM
-// before initializing the HAL.
-static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
+static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
+static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn psram_range() -> Range<usize> {
-    #[allow(static_mut_refs)]
-    unsafe {
-        MAPPED_PSRAM.memory_range.clone()
-    }
+    let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
+    let start = MAPPED_PSRAM_START.load(Ordering::Relaxed);
+    if end < start { 0..0 } else { start..end }
 }
 
-pub(crate) struct MappedPsram {
-    memory_range: Range<usize>,
+/// # Safety
+///
+/// This function must only be called once.
+unsafe fn set_psram_range(range: Range<usize>) {
+    MAPPED_PSRAM_START.store(range.start, Ordering::Relaxed);
+    MAPPED_PSRAM_END.store(range.end, Ordering::Release);
 }
 
 /// Enables externally-connected Pseudo-static RAM.
