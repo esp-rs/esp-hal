@@ -156,7 +156,7 @@ impl<'a> Ieee802154<'a> {
 
         if let Some(ext_addr) = cfg.ext_addr {
             let mut address = [0u8; IEEE802154_FRAME_EXT_ADDR_SIZE];
-            address.copy_from_slice(&ext_addr.to_be_bytes()); // LE or BE?
+            address.copy_from_slice(&ext_addr.to_le_bytes());
 
             set_extended_address(0, address);
         }
