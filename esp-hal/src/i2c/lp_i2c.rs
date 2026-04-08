@@ -112,9 +112,8 @@ impl LpI2c {
             lp_io.gpio(ionum).modify(|_, w|
                 // Disable the internal weak pull-down
                 w.fun_wpd().clear_bit()
-                // Configure the pull-up
-                 .fun_wpu().variant(pullup_en)
-            );
+                // Configure the internal weak pull-up
+                 .fun_wpu().bit(pullup_en));
         }
     }
 
