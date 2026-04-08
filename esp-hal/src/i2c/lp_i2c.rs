@@ -83,7 +83,7 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
-    unsafe fn lp_i2c_configure_io(ionum: usize, pullup_en: bool) {
+    fn lp_i2c_configure_io(ionum: usize, pullup_en: bool) {
         let lp_io = LP_IO::regs();
         let lp_aon = LP_AON::regs();
         unsafe {
@@ -97,7 +97,6 @@ impl LpI2c {
             lp_aon
                 .gpio_mux()
                 .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << ionum)));
-            lp_io.gpio(ionum).modify(|_, w| w.mcu_sel().bits(1)); // TODO
 
             // Set output mode to Open Drain
             lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
