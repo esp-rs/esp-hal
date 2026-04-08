@@ -857,6 +857,8 @@ pub struct AccessPointStationDisconnectedInfo {
 }
 
 /// Either the [AccessPointStationConnectedInfo] or [AccessPointStationDisconnectedInfo].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AccessPointStationEventInfo {
     /// Information about a station connected to the access point.
     Connected(AccessPointStationConnectedInfo),
@@ -1154,8 +1156,6 @@ pub(crate) fn wifi_start_scan(
 mod private {
     use super::*;
 
-    #[derive(Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     /// Take care not to drop this while in a critical section.
     ///
     /// Dropping an PacketBuffer will call
@@ -1163,6 +1163,8 @@ mod private {
     /// internal mutex. If the mutex is already taken, the function will try
     /// to trigger a context switch, which will fail if we are in a critical
     /// section.
+    #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct PacketBuffer {
         pub(crate) buffer: *mut c_types::c_void,
         pub(crate) len: u16,
@@ -1186,7 +1188,7 @@ mod private {
 }
 
 /// Wi-Fi interface mode.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum InterfaceType {
     /// Station mode.
@@ -1310,6 +1312,9 @@ impl InterfaceType {
 }
 
 /// Wi-Fi interface.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct Interface<'d> {
     _phantom: PhantomData<&'d ()>,
     mode: InterfaceType,
@@ -1876,10 +1881,10 @@ pub(crate) mod embassy {
 }
 
 /// Power saving mode settings for the modem.
-#[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
+#[non_exhaustive]
 pub enum PowerSaveMode {
     /// No power saving.
     #[default]
@@ -1904,6 +1909,8 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
 }
 
 /// Represents the Wi-Fi controller and its associated interfaces.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Interfaces<'d> {
     /// Station mode Wi-Fi device.
@@ -2051,6 +2058,7 @@ impl CountryInfo {
 /// Wi-Fi configuration.
 #[derive(Clone, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub struct ControllerConfig {
     /// Country info.
     #[builder_lite(into)]
@@ -2309,6 +2317,8 @@ pub fn new<'d>(
 ///
 /// When the controller is dropped, the Wi-Fi driver is
 /// deinitialized and Wi-Fi is stopped.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
