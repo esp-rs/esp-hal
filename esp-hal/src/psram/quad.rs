@@ -1,6 +1,6 @@
 use procmacros::ram;
 
-use super::{PsramConfig, PsramLlCsIdT, PsramSize, SpiTimingConfigCoreClock, ctrlr_ll::*};
+use super::{PsramConfig, PsramLlCsIdT, PsramSize, ctrlr_ll::*};
 use crate::peripherals::{IO_MUX, SPI1};
 
 const CS_PSRAM_SEL: u8 = 1 << 1;
@@ -26,7 +26,7 @@ pub(super) enum CommandMode {
     PsramCmdSpi = 1,
 }
 
-pub(super) enum MspiTimingSpeedModeT {
+pub(super) enum MspiTimingSpeedMode {
     /// Low performance speed mode, this mode is safe for all the scenarios, unless the MSPI
     /// attached devices (Flash, PSRAM) are powered down.
     ///
@@ -165,43 +165,19 @@ fn mspi_timing_psram_tuning() {
 /// or `calculate_best_flash_tuning_config`
 #[ram]
 fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {
-    let core_clock: SpiTimingConfigCoreClock = mspi_core_clock(config);
-    let flash_div: u32 = flash_clock_divider(config);
-    let psram_div: u32 = psram_clock_divider(config);
-
-    debug!(
-        "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
-        core_clock, flash_div, psram_div
-    );
-
     super::mspi_timing_config_set_flash_clock(
         config.flash_frequency.mhz(),
-        MspiTimingSpeedModeT::MspiTimingSpeedModeNormalPerf,
+        MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,
     );
     super::mspi_timing_config_set_psram_clock(
         config.ram_frequency.mhz(),
-        MspiTimingSpeedModeT::MspiTimingSpeedModeNormalPerf,
+        MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,
     );
 
     if config.ram_frequency.need_timing_tuning() {
         mspi_timing_flash_config_set_tuning_regs(config);
         mspi_timing_psram_config_set_tuning_regs(config);
     }
-}
-
-#[ram]
-fn mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
-    config.core_clock.unwrap_or_default()
-}
-
-#[ram]
-fn flash_clock_divider(config: &PsramConfig) -> u32 {
-    config.core_clock.unwrap_or_default() as u32 / config.flash_frequency as u32
-}
-
-#[ram]
-fn psram_clock_divider(config: &PsramConfig) -> u32 {
-    config.core_clock.unwrap_or_default() as u32 / config.ram_frequency as u32
 }
 
 // send reset command to psram, in spi mode
@@ -475,11 +451,11 @@ fn mspi_timing_enter_low_speed_mode() {
     let low_speed_freq_mhz = 20;
     super::mspi_timing_config_set_flash_clock(
         low_speed_freq_mhz,
-        MspiTimingSpeedModeT::MspiTimingSpeedModeLowPerf,
+        MspiTimingSpeedMode::MspiTimingSpeedModeLowPerf,
     );
     super::mspi_timing_config_set_psram_clock(
         low_speed_freq_mhz,
-        MspiTimingSpeedModeT::MspiTimingSpeedModeLowPerf,
+        MspiTimingSpeedMode::MspiTimingSpeedModeLowPerf,
     );
 
     // #if MSPI_TIMING_FLASH_NEEDS_TUNING || MSPI_TIMING_PSRAM_NEEDS_TUNING

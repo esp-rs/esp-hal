@@ -1,5 +1,8 @@
 use super::PsramSize;
-use crate::peripherals::{SPI0, SPI1};
+use crate::{
+    peripherals::{SPI0, SPI1},
+    psram::implem::quad::MspiTimingSpeedMode,
+};
 
 mod quad;
 
@@ -66,15 +69,6 @@ impl SpiRamFreq {
     }
 }
 
-/// Core timing configuration
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SpiTimingConfigCoreClock {
-    /// Core clock 80 MHz
-    #[default]
-    SpiTimingConfigCoreClock80m = 80,
-}
-
 /// MSPI timing tuning parameters.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct MspiTimingTuningParam {
@@ -92,8 +86,6 @@ pub struct MspiTimingTuningParam {
 pub struct PsramConfig {
     /// PSRAM size
     pub size: PsramSize,
-    /// Core timing configuration
-    pub core_clock: Option<SpiTimingConfigCoreClock>,
     /// Frequency of flash memory
     pub flash_frequency: FlashFreq,
     /// Flash timing tuning configuration.
@@ -110,7 +102,6 @@ impl Default for PsramConfig {
     fn default() -> Self {
         Self {
             size: Default::default(),
-            core_clock: Default::default(),
             flash_frequency: Default::default(),
             flash_tuning: MspiTimingTuningParam {
                 spi_din_mode: 3,
@@ -197,6 +188,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
     unsafe {
         super::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
     }
+}
+
+fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {
+    // in all cases (low and high speed) we use an MSPI clock of 80 MHz on this target
+    80
 }
 
 mod ctrlr_ll {
@@ -306,11 +302,8 @@ mod ctrlr_ll {
 }
 
 #[ram]
-fn mspi_timing_config_set_flash_clock(
-    flash_freq_mhz: u32,
-    _speed_mode: quad::MspiTimingSpeedModeT,
-) {
-    let core_clock_mhz = 80;
+fn mspi_timing_config_set_flash_clock(flash_freq_mhz: u32, speed_mode: quad::MspiTimingSpeedMode) {
+    let core_clock_mhz = core_clock_for_mode(speed_mode);
     // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
     mspi_timing_ll_set_core_clock(core_clock_mhz);
 
@@ -360,12 +353,9 @@ fn mspi_timing_ll_set_flash_clock(mspi_id: u32, clock_conf: u32) {
 }
 
 #[ram]
-fn mspi_timing_config_set_psram_clock(
-    psram_freq_mhz: u32,
-    _speed_mode: quad::MspiTimingSpeedModeT,
-) {
+fn mspi_timing_config_set_psram_clock(psram_freq_mhz: u32, speed_mode: quad::MspiTimingSpeedMode) {
     // bool control_both_mspi = true
-    let core_clock_mhz = 80;
+    let core_clock_mhz = core_clock_for_mode(speed_mode);
 
     // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
     mspi_timing_ll_set_core_clock(core_clock_mhz);
