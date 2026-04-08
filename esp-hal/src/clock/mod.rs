@@ -275,8 +275,8 @@ impl Clocks {
         #[cfg(soc_has_clock_node_timg_function_clock)] function_clock: TimgFunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
-        // There may be another calibration process already running during we call this function,
-        // so we should wait the last process is done.
+        // There may already be another calibration process running when we call this function,
+        // so we should wait until the previous process is finished.
         #[cfg(not(esp32))]
         if TIMG0::regs()
             .rtccalicfg()
@@ -284,9 +284,9 @@ impl Clocks {
             .rtc_cali_start_cycling()
             .bit()
         {
-            // Set a small timeout threshold to accelerate the generation of timeout.
-            // The internal circuit will be reset when the timeout occurs and will not affect the
-            // next calibration.
+            // Set a small timeout threshold to speed up timeout occurrence.
+            // The internal circuit will be reset when the timeout occurs and will not affect
+            // the next calibration.
             TIMG0::regs()
                 .rtccalicfg2()
                 .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
