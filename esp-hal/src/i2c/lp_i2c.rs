@@ -106,14 +106,15 @@ impl LpI2c {
             lp_io
                 .out_enable_w1ts()
                 .write(|w| w.enable_w1ts().bits(1 << ionum));
-            // Enable input
-            lp_io.gpio(ionum).modify(|_, w| w.fun_ie().set_bit());
 
-            lp_io.gpio(ionum).modify(|_, w|
+            lp_io.gpio(ionum).modify(|_, w| {
+                // Enable input
+                w.fun_ie().set_bit();
                 // Disable the internal weak pull-down
-                w.fun_wpd().clear_bit()
+                w.fun_wpd().clear_bit();
                 // Configure the internal weak pull-up
-                 .fun_wpu().bit(pullup_en));
+                w.fun_wpu().bit(pullup_en)
+            });
         }
     }
 
