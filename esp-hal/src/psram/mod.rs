@@ -1,38 +1,35 @@
-#![cfg_attr(docsrs, procmacros::doc_replace(
-    "octal" => {
-        cfg(psram_octal_spi) => "Either `Octal` or `Quad` PSRAM will be used, depending on the setting of `ESP_HAL_CONFIG_PSRAM_MODE`.",
-        _ => ""
-    }
-))]
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # PSRAM (Pseudo-static RAM, SPI RAM) driver
 //!
 //! ## Overview
 //!
-//! The `PSRAM` module provides support for accessing and controlling the
-//! `Pseudo Static Random Access Memory (PSRAM)`. `PSRAM` provides additional
-//! external memory to supplement the internal memory of the MCU, allowing for
-//! increased storage capacity and improved performance in certain applications.
-//!
-//! The mapped start address for PSRAM depends on the amount of mapped flash
-//! memory.
-//!
+//! This module provides support to interface with `PSRAM` devices connected to the MCU.
+//! PSRAM provides additional external memory to supplement the internal memory of the MCU,
+//! allowing for increased storage capacity and improved performance in certain applications.
+#![doc = ""]
+#![cfg_attr(
+    psram_octal_spi,
+    doc = concat!("The ", chip_pretty!(), " can use either Quad SPI or Octal SPI to interface with PSRAM.
+        You need to configure the correct interface type using `ESP_HAL_CONFIG_PSRAM_MODE`.")
+)]
+#![doc = ""]
 //! ## Examples
 //!
 //! ### PSRAM as heap memory
 //!
 //! This example shows how to use PSRAM as heap-memory via esp-alloc.
-//! You need an MCU with at least 2 MB of PSRAM memory.
-//! # {octal}
 //!
-//! > The PSRAM example **must** be built in release mode!
+//! <section class="warning">
+//! The PSRAM example <em>must</em> be built in release mode!
+//! </section>
 //!
 //! ```rust, ignore
 //! # {before_snippet}
-//! # extern crate alloc;
-//! # use alloc::{string::String, vec::Vec};
-//! #
+//! extern crate alloc;
+//! use alloc::{string::String, vec::Vec};
+//!
 //! // Add PSRAM to the heap.
-//! esp_alloc::psram_allocator!(&peripherals.PSRAM, esp_hal::psram);
+//! esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 //!
 //! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
 //!
