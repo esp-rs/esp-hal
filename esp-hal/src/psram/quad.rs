@@ -71,10 +71,10 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
             return;
         }
 
-        info!("chip id = {:x}", dev_id);
+        info!("Detected PSRAM chip id = {:x}", dev_id);
 
         let density = (((dev_id >> 16) & 0xff) >> 5) & 7;
-        info!("density = {}", density);
+        info!("Detected PSRAM chip density = {}", density);
 
         let size = match density {
             0 => 2 * 1024 * 1024,
@@ -85,7 +85,7 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
             _ => 2 * 1024 * 1024,
         };
 
-        info!("size is {}", size);
+        info!("PSRAM size is {}", size);
 
         config.size = PsramSize::Size(size);
     }
@@ -169,7 +169,7 @@ fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {
     let flash_div: u32 = flash_clock_divider(config);
     let psram_div: u32 = psram_clock_divider(config);
 
-    info!(
+    debug!(
         "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
         core_clock, flash_div, psram_div
     );
@@ -525,7 +525,7 @@ fn mspi_timing_flash_config_set_tuning_regs(cfg: &PsramConfig) {
 
     let timing_tuning_config = cfg.flash_tuning;
 
-    info!(
+    debug!(
         "mspi_timing_flash_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
         timing_tuning_config.spi_din_mode,
         timing_tuning_config.spi_din_num,
@@ -544,7 +544,7 @@ fn mspi_timing_flash_config_set_tuning_regs(cfg: &PsramConfig) {
 
     let (spi0_usr_dummy, spi0_extra_dummy) = super::mspi_timing_ll_get_flash_dummy(0);
     let (spi1_usr_dummy, spi1_extra_dummy) = super::mspi_timing_ll_get_flash_dummy(1);
-    info!(
+    debug!(
         "flash, spi0_usr_dummy: {}, spi0_extra_dummy: {}, spi1_usr_dummy: {}, spi1_extra_dummy: {}",
         spi0_usr_dummy, spi0_extra_dummy, spi1_usr_dummy, spi1_extra_dummy
     );
@@ -555,7 +555,7 @@ fn mspi_timing_psram_config_set_tuning_regs(cfg: &PsramConfig) {
 
     let timing_tuning_config = cfg.ram_tuning;
 
-    info!(
+    debug!(
         "mspi_timing_psram_config_set_tuning_regs spi_din_mode {}, spi_din_num {}, extra_dummy_len {}",
         timing_tuning_config.spi_din_mode,
         timing_tuning_config.spi_din_num,
@@ -570,7 +570,7 @@ fn mspi_timing_psram_config_set_tuning_regs(cfg: &PsramConfig) {
     s_set_psram_extra_dummy(0, timing_tuning_config.extra_dummy_len);
 
     let (spi0_usr_rdummy, spi0_extra_dummy) = super::mspi_timing_ll_get_psram_dummy(0);
-    info!(
+    debug!(
         "psram, spi0_usr_rdummy: {}, spi0_extra_dummy: {}",
         spi0_usr_rdummy, spi0_extra_dummy
     );

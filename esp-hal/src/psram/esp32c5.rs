@@ -326,7 +326,7 @@ fn mspi_timing_config_set_flash_clock(
     mspi_timing_ll_set_core_clock(core_clock_mhz);
 
     let freqdiv: u32 = core_clock_mhz / flash_freq_mhz;
-    info!("flash freqdiv: {}", freqdiv);
+    debug!("flash freqdiv: {}", freqdiv);
     assert!(freqdiv > 0);
     let reg_val: u32 = mspi_timing_ll_calculate_clock_reg(freqdiv);
     mspi_timing_ll_set_flash_clock(0, reg_val);
@@ -382,7 +382,7 @@ fn mspi_timing_config_set_psram_clock(
     mspi_timing_ll_set_core_clock(core_clock_mhz);
 
     let freqdiv: u32 = core_clock_mhz / psram_freq_mhz;
-    info!("psram freqdiv: {}", freqdiv);
+    debug!("psram freqdiv: {}", freqdiv);
     assert!(freqdiv > 0);
     let reg_val: u32 = mspi_timing_ll_calculate_clock_reg(freqdiv);
     mspi_timing_ll_set_psram_clock(reg_val);
