@@ -169,7 +169,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
         let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
-        for i in 0..config.size.get() as u32 / 1024 / 64 {
+        for i in 0..config.size.get() as u32 / MMU_PAGE_SIZE {
             write_mmu_entry(i + mapped_pages, MMU_VALID + MMU_ACCESS_SPIRAM + i)
         }
 
