@@ -15,7 +15,6 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_t
 symbols = [
     # Additional peripherals defined by us (the developers):
     # "lp_core",
-    "psram",
 
     # ROM capabilities
     "rom_crc_le",
