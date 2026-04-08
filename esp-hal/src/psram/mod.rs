@@ -1,6 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "octal" => {
-        cfg(octal_psram) => "Either `Octal` or `Quad` PSRAM will be used, depending on the setting of `ESP_HAL_CONFIG_PSRAM_MODE`.",
+        cfg(psram_octal_spi) => "Either `Octal` or `Quad` PSRAM will be used, depending on the setting of `ESP_HAL_CONFIG_PSRAM_MODE`.",
         _ => ""
     }
 ))]

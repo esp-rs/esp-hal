@@ -128,14 +128,14 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.regs()
             .conf1()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }
@@ -318,14 +318,14 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.regs()
             .conf1()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }

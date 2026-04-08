@@ -349,7 +349,7 @@ unstable_module! {
     pub mod etm;
     #[cfg(usb_otg_driver_supported)]
     pub mod otg_fs;
-    #[cfg(psram)] // DMA needs some things from here
+    #[cfg(soc_has_psram)] // DMA needs some things from here
     pub mod psram;
 }
 

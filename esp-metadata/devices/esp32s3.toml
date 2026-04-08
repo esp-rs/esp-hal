@@ -15,9 +15,6 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_t
 symbols = [
     # Additional peripherals defined by us (the developers):
     "phy",
-    "psram",
-    "psram_dma",
-    "octal_psram",
     "swd",
     "ulp_riscv_core",
 
@@ -306,6 +303,7 @@ gdma_version = 1
 separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 9
+can_access_psram = true
 
 [device.gpio]
 support_status = "supported"
@@ -879,6 +877,8 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+octal_spi = true
+
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]

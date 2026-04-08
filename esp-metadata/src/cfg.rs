@@ -342,6 +342,8 @@ driver_configs![
             #[serde(default)]
             supports_mem2mem: bool,
             #[serde(default)]
+            can_access_psram: bool,
+            #[serde(default)]
             separate_in_out_interrupts: bool,
             #[serde(default)]
             max_priority: Option<u32>,
@@ -520,7 +522,10 @@ driver_configs![
     PsramProperties {
         driver: psram,
         name: "PSRAM",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            octal_spi: bool,
+        }
     },
     RgbProperties {
         driver: rgb_display,

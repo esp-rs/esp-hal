@@ -85,6 +85,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.can_access_psram") => {
+        false
+    };
     ("dma.separate_in_out_interrupts") => {
         true
     };
@@ -234,6 +237,9 @@ macro_rules! property {
     };
     ("phy.combo_module") => {
         true
+    };
+    ("psram.octal_spi") => {
+        false
     };
     ("rmt.ram_start") => {
         1610638336
