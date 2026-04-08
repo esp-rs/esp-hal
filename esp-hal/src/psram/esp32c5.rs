@@ -234,22 +234,11 @@ mod ctrlr_ll {
     pub(crate) fn psram_ctrlr_ll_set_read_mode(mspi_id: u32, read_mode: CommandMode) {
         assert!(mspi_id == 0);
 
-        match read_mode {
-            CommandMode::PsramCmdSpi => {
-                SPI0::regs().cache_sctrl().modify(|_, w| {
-                    w.usr_sram_dio().set_bit();
-                    w.usr_sram_qio().clear_bit();
-                    w
-                });
-            }
-            CommandMode::PsramCmdQpi => {
-                SPI0::regs().cache_sctrl().modify(|_, w| {
-                    w.usr_sram_dio().clear_bit();
-                    w.usr_sram_qio().set_bit();
-                    w
-                });
-            }
-        }
+        SPI0::regs().cache_sctrl().modify(|_, w| {
+            w.usr_sram_dio().bit(read_mode == CommandMode::PsramCmdSpi);
+            w.usr_sram_qio().bit(read_mode == CommandMode::PsramCmdQpi);
+            w
+        });
     }
 
     /// Set PSRAM write cmd
