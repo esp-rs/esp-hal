@@ -109,7 +109,7 @@ impl LpI2c {
             // Enable input
             lp_io.gpio(ionum).modify(|_, w| w.fun_ie().set_bit());
 
-            // Disable pulldown (enable internal weak pull-down)
+            // Disable the internal weak pull-down
             lp_io.gpio(ionum).modify(|_, w| w.fun_wpd().clear_bit());
             if pullup_en {
                 // Enable pullup
