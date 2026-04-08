@@ -465,20 +465,18 @@ pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8)
                 w
             });
         }
+    } else if extra_dummy > 0 {
+        SPI1::regs().timing_cali().modify(|_, w| {
+            w.timing_cali().set_bit();
+            unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
+            w
+        });
     } else {
-        if extra_dummy > 0 {
-            SPI1::regs().timing_cali().modify(|_, w| {
-                w.timing_cali().set_bit();
-                unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
-                w
-            });
-        } else {
-            SPI1::regs().timing_cali().modify(|_, w| {
-                w.timing_cali().clear_bit();
-                unsafe { w.extra_dummy_cyclelen().bits(0) };
-                w
-            });
-        }
+        SPI1::regs().timing_cali().modify(|_, w| {
+            w.timing_cali().clear_bit();
+            unsafe { w.extra_dummy_cyclelen().bits(0) };
+            w
+        });
     }
 
     SPI0::regs()
