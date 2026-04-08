@@ -1622,18 +1622,15 @@ impl Instance for AnyTwai<'_> {}
 mod asynch {
     use core::{future::poll_fn, task::Poll};
 
-    use embassy_sync::{
-        blocking_mutex::raw::CriticalSectionRawMutex,
-        channel::Channel,
-        waitqueue::AtomicWaker,
-    };
+    use embassy_sync::{channel::Channel, waitqueue::AtomicWaker};
+    use esp_sync::RawMutex;
 
     use super::*;
 
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
-        pub rx_queue: Channel<CriticalSectionRawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
+        pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
     }
 
     impl Default for TwaiAsyncState {
