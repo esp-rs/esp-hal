@@ -400,6 +400,7 @@ fn mspi_timing_ll_set_psram_clock(clock_conf: u32) {
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
     assert!(mspi_id == 0);
+    assert!(din_mode <= 7);
 
     SPI0::regs().din_mode().modify(|_, w| {
         unsafe {
@@ -426,6 +427,7 @@ pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
     assert!(mspi_id == 0);
+    assert!(din_num <= 3);
 
     SPI0::regs().din_num().modify(|_, w| {
         unsafe {
@@ -452,29 +454,15 @@ pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
     if mspi_id == 0 {
-        if extra_dummy > 0 {
-            SPI0::regs().timing_cali().modify(|_, w| {
-                w.timing_cali().set_bit();
-                unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
-                w
-            });
-        } else {
-            SPI0::regs().timing_cali().modify(|_, w| {
-                w.timing_cali().clear_bit();
-                unsafe { w.extra_dummy_cyclelen().bits(0) };
-                w
-            });
-        }
-    } else if extra_dummy > 0 {
-        SPI1::regs().timing_cali().modify(|_, w| {
-            w.timing_cali().set_bit();
+        SPI0::regs().timing_cali().modify(|_, w| {
+            w.timing_cali().bit(extra_dummy > 0);
             unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
             w
         });
     } else {
         SPI1::regs().timing_cali().modify(|_, w| {
-            w.timing_cali().clear_bit();
-            unsafe { w.extra_dummy_cyclelen().bits(0) };
+            w.timing_cali().bit(extra_dummy > 0);
+            unsafe { w.extra_dummy_cyclelen().bits(extra_dummy) };
             w
         });
     }
@@ -488,6 +476,7 @@ pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8)
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
     assert!(mspi_id == 0);
+    assert!(din_mode <= 7);
 
     SPI0::regs().smem_din_mode().modify(|_, w| {
         unsafe {
@@ -514,6 +503,7 @@ pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
     assert!(mspi_id == 0);
+    assert!(din_num <= 3);
 
     SPI0::regs().smem_din_num().modify(|_, w| {
         unsafe {
@@ -541,19 +531,11 @@ pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
 pub(crate) fn mspi_timing_ll_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
     assert!(mspi_id == 0);
 
-    if extra_dummy > 0 {
-        SPI0::regs().smem_timing_cali().modify(|_, w| {
-            w.smem_timing_cali().set_bit();
-            unsafe { w.smem_extra_dummy_cyclelen().bits(extra_dummy) };
-            w
-        });
-    } else {
-        SPI0::regs().smem_timing_cali().modify(|_, w| {
-            w.smem_timing_cali().clear_bit();
-            unsafe { w.smem_extra_dummy_cyclelen().bits(0) };
-            w
-        });
-    }
+    SPI0::regs().smem_timing_cali().modify(|_, w| {
+        w.smem_timing_cali().bit(extra_dummy > 0);
+        unsafe { w.smem_extra_dummy_cyclelen().bits(extra_dummy) };
+        w
+    });
 
     SPI0::regs()
         .timing_cali()
