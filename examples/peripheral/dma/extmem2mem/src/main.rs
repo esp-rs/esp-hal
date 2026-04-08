@@ -46,24 +46,12 @@ macro_rules! dma_alloc_buffer {
     }};
 }
 
-fn init_heap(psram: &esp_hal::peripherals::PSRAM<'_>) {
-    let (start, size) = esp_hal::psram::psram_raw_parts(psram);
-    info!("init_heap: start: {:p}", start);
-    unsafe {
-        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            start,
-            size,
-            esp_alloc::MemoryCapability::External.into(),
-        ));
-    }
-}
-
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    init_heap(&peripherals.PSRAM);
+    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     let delay = Delay::new();
 
