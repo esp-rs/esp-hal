@@ -136,13 +136,12 @@ impl LpI2c {
         // NOTE: We always initialize the SCL pin (GPIO7) first, then the
         // SDA (GPIO6) pin. This order of initialization is important to
         // avoid any spurious I2C start conditions on the bus.
+        Self::lp_i2c_configure_io(7, true);
+        Self::lp_i2c_configure_io(6, true);
         unsafe {
             let lp_io = LP_IO::regs();
-            Self::lp_i2c_configure_io(7, true);
-            Self::lp_i2c_configure_io(6, true);
             // Select LP I2C function for the SDA and SCL pins
             lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
-            // Select LP I2C function for the SDA and SCL pins
             lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1));
         }
 
