@@ -812,7 +812,7 @@ where
     ///
     /// If this function returns `true`, [`Self::write`] will not block.
     #[instability::unstable]
-    pub fn write_ready(&mut self) -> bool {
+    pub fn write_ready(&self) -> bool {
         self.uart.info().tx_fifo_count() < Info::UART_FIFO_SIZE
     }
 
@@ -1293,7 +1293,7 @@ where
     ///
     /// If this function returns `true`, [`Self::read`] will not block.
     #[instability::unstable]
-    pub fn read_ready(&mut self) -> bool {
+    pub fn read_ready(&self) -> bool {
         self.uart.info().rx_fifo_count() > 0
     }
 
@@ -1826,7 +1826,7 @@ where
     /// }
     /// # {after_snippet}
     /// ```
-    pub fn write_ready(&mut self) -> bool {
+    pub fn write_ready(&self) -> bool {
         self.tx.write_ready()
     }
 
@@ -1910,7 +1910,7 @@ where
     ///
     /// # {after_snippet}
     /// ```
-    pub fn read_ready(&mut self) -> bool {
+    pub fn read_ready(&self) -> bool {
         self.rx.read_ready()
     }
 

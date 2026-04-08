@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `efuse::read_base_mac_address()` has been renamed to `efuse::base_mac_address()` (#5104)
 - Renamed `efuse::set_mac_address` to `efuse::override_mac_address` (#5104)
 - UART: `read_ready` and `write_ready` are now stable (#4600)
+- UART: `{Uart, UartRx}::read_ready` and `{Uart, UartTx}::write_ready` now take `&self` instead of `&mut self`. (#5320)
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
