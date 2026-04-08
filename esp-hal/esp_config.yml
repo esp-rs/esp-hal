@@ -51,7 +51,7 @@ options:
           validator: enumeration
           value:
             - "quad"
-    active: 'feature("psram")'
+    active: 'feature("soc_has_psram")'
 
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
