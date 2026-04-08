@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for `rand_core 0.10.0` (#5280)
 - `esp_hal::efuse::ChipRevision` (#5287)
 - Cache configuration options for ESP32-S2 (#5306)
+- C5: Add PSRAM support (#5317)
 
 ### Changed
 

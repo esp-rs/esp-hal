@@ -1,7 +1,7 @@
 //! Allocator and PSRAM-related tests
 
 //% CHIPS:
-//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2
+//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2 esp32c5
 // The S3 dev kit in the HIL-tester has octal PSRAM.
 //% CHIPS(llff_octal, tlsf_octal): esp32s3
 //% ENV(llff_octal, tlsf_octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
