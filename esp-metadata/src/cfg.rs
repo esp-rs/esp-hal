@@ -522,7 +522,10 @@ driver_configs![
     PsramProperties {
         driver: psram,
         name: "PSRAM",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            octal_spi: bool,
+        }
     },
     RgbProperties {
         driver: rgb_display,

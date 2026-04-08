@@ -4652,7 +4652,6 @@ impl Chip {
                     "soc_has_ulp_riscv_core",
                     "soc_has_wifi",
                     "phy",
-                    "octal_psram",
                     "swd",
                     "ulp_riscv_core",
                     "rom_crc_le",
@@ -4760,6 +4759,7 @@ impl Chip {
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
+                    "psram_octal_spi",
                     "rmt_ram_start=\"1610704896\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -4899,7 +4899,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
                     "cargo:rustc-cfg=soc_has_wifi",
                     "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=octal_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
@@ -5007,6 +5006,7 @@ impl Chip {
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
+                    "cargo:rustc-cfg=psram_octal_spi",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610704896\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5729,8 +5729,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_wcl)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
-    println!("cargo:rustc-check-cfg=cfg(octal_psram)");
     println!("cargo:rustc-check-cfg=cfg(camera_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_dma)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_d2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_80m)");

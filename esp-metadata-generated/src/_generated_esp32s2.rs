@@ -187,6 +187,9 @@ macro_rules! property {
     ("phy.combo_module") => {
         false
     };
+    ("psram.octal_spi") => {
+        false
+    };
     ("rmt.ram_start") => {
         1061250048
     };

@@ -208,6 +208,9 @@ macro_rules! property {
     ("phy.backed_up_digital_register_count", str) => {
         stringify!(21)
     };
+    ("psram.octal_spi") => {
+        true
+    };
     ("rmt.ram_start") => {
         1610704896
     };

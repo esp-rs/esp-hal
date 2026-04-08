@@ -678,6 +678,8 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+# octal_spi = true
+
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]

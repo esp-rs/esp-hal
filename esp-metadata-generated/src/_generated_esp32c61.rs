@@ -154,6 +154,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("psram.octal_spi") => {
+        false
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };

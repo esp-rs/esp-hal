@@ -40,13 +40,13 @@ options:
     default:
       - value: '"quad"'
     constraints:
-      - if: 'feature("octal_psram")'
+      - if: 'feature("psram_octal_spi")'
         type:
           validator: enumeration
           value:
             - "quad"
             - "octal"
-      - if: '!feature("octal_psram")'
+      - if: '!feature("psram_octal_spi")'
         type:
           validator: enumeration
           value:
