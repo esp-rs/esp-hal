@@ -34,39 +34,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
-    #[allow(unused)]
-    enum CacheLayout {
-        Invalid    = 0,
-        ICacheLow  = 1 << 0,
-        ICacheHigh = 1 << 1,
-        DCacheLow  = 1 << 2,
-        DCacheHigh = 1 << 3,
-    }
-
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
-    const CACHE_SIZE_8KB: u32 = 0;
-    const CACHE_4WAYS_ASSOC: u32 = 0;
-    const CACHE_LINE_SIZE_16B: u32 = 0;
-
     unsafe extern "C" {
-        /// Allocate memory to used by ICache and DCache.
-        ///
-        /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
-        /// can be CACHE_MEMORY_INVALID,
-        /// CACHE_MEMORY_ICACHE_LOW,
-        /// CACHE_MEMORY_ICACHE_HIGH, CACHE_MEMORY_DCACHE_LOW and
-        /// CACHE_MEMORY_DCACHE_HIGH
-        /// [`sram1_layout`]: the usage of second 8KB internal memory block,
-        /// [`sram2_layout`]: the usage of third 8KB internal memory block
-        /// [`sram3_layout`]: the usage of forth 8KB internal memory block
-        fn Cache_Allocate_SRAM(
-            sram0_layout: u32,
-            sram1_layout: u32,
-            sram2_layout: u32,
-            sram3_layout: u32,
-        );
-
         /// Set DCache mmu mapping.
         ///
         /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
@@ -83,28 +53,9 @@ pub(crate) fn init_psram(config: PsramConfig) {
             num: u32,
             fixed: u32,
         ) -> i32;
-
-        /// Set DCache modes: cache size, associate ways and cache line size.
-        ///
-        /// [`cache_size`]: u32 the cache size, can be CACHE_SIZE_HALF and CACHE_SIZE_FULL
-        /// [`ways`]: u32 the associate ways of cache, can only be CACHE_4WAYS_ASSOC
-        /// [`cache_line_size`]: u32 the cache line size, can be CACHE_LINE_SIZE_16B, CACHE_LINE_SIZE_32B
-        fn Cache_Set_DCache_Mode(cache_size: u32, ways: u32, cache_line_size: u32);
-
-        /// Invalidate all cache items in DCache.
-        fn Cache_Invalidate_DCache_All();
     }
 
     unsafe {
-        Cache_Allocate_SRAM(
-            CacheLayout::ICacheLow as u32,
-            CacheLayout::DCacheLow as u32,
-            CacheLayout::Invalid as u32,
-            CacheLayout::Invalid as u32,
-        );
-        Cache_Set_DCache_Mode(CACHE_SIZE_8KB, CACHE_4WAYS_ASSOC, CACHE_LINE_SIZE_16B);
-        Cache_Invalidate_DCache_All();
-
         const START_PAGE: u32 = 0;
 
         if cache_dbus_mmu_set(

@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-search={}", out.display());
 
         if chip.is_xtensa() {
-            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            #[cfg(feature = "esp32")]
             File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
             let (irtc, drtc) = if cfg!(feature = "esp32s3") {
@@ -259,24 +259,6 @@ fn generate_memory_extras() -> Vec<u8> {
         "
     /* reserved at the start of DRAM for e.g. the BT stack */
     RESERVE_DRAM = {reserve_dram};
-        "
-    )
-    .as_bytes()
-    .to_vec()
-}
-
-#[cfg(all(feature = "esp32s2", feature = "rt"))]
-fn generate_memory_extras() -> Vec<u8> {
-    let reserved_cache = if cfg!(feature = "psram") {
-        "0x4000"
-    } else {
-        "0x2000"
-    };
-
-    format!(
-        "
-        /* reserved at the start of DRAM/IRAM */
-        RESERVE_CACHES = {reserved_cache};
         "
     )
     .as_bytes()
