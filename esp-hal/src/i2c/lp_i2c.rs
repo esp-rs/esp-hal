@@ -83,6 +83,45 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
+    unsafe fn lp_i2c_configure_io(ionum: usize, pullup_en: bool) {
+        let lp_io = LP_IO::regs();
+        let lp_aon = LP_AON::regs();
+        unsafe {
+            // Set the IO pin to high to avoid them from toggling from Low to
+            // High state during initialization. This can register a spurious
+            // I2C start condition.
+            lp_io
+                .out_data_w1ts()
+                .write(|w| w.out_data_w1ts().bits(1 << ionum));
+
+            lp_aon
+                .gpio_mux()
+                .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << ionum)));
+            lp_io.gpio(ionum).modify(|_, w| w.mcu_sel().bits(1)); // TODO
+
+            // Set output mode to Open Drain
+            lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
+
+            // Enable output (writing to write-1-to-set register, then internally the
+            // `GPIO_OUT_REG` will be set)
+            lp_io
+                .out_enable_w1ts()
+                .write(|w| w.enable_w1ts().bits(1 << ionum));
+            // Enable input
+            lp_io.gpio(ionum).modify(|_, w| w.fun_ie().set_bit());
+
+            // Disable pulldown (enable internal weak pull-down)
+            lp_io.gpio(ionum).modify(|_, w| w.fun_wpd().clear_bit());
+            if pullup_en {
+                // Enable pullup
+                lp_io.gpio(ionum).modify(|_, w| w.fun_wpu().set_bit());
+            } else {
+                // Disable pullup
+                lp_io.gpio(ionum).modify(|_, w| w.fun_wpu().clear_bit());
+            }
+        }
+    }
+
     /// Creates a new instance of the `LpI2c` peripheral.
     pub fn new(
         i2c: LP_I2C0<'static>,
@@ -93,55 +132,19 @@ impl LpI2c {
         let me = Self { i2c };
 
         // Configure LP I2C GPIOs
+
         // Initialize IO Pins
-        let lp_io = LP_IO::regs();
-        let lp_aon = LP_AON::regs();
-        let lp_peri = LP_PERI::regs();
-
+        // NOTE: We always initialize the SCL pin (GPIO7) first, then the
+        // SDA (GPIO6) pin. This order of initialization is important to
+        // avoid any spurious I2C start conditions on the bus.
         unsafe {
-            // FIXME: use GPIO APIs to configure pins
-            lp_aon
-                .gpio_mux()
-                .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << 6)));
-            lp_aon
-                .gpio_mux()
-                .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << 7)));
-            lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1)); // TODO
-
+            let lp_io = LP_IO::regs();
+            Self::lp_i2c_configure_io(7, true);
+            Self::lp_i2c_configure_io(6, true);
+            // Select LP I2C function for the SDA and SCL pins
             lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
-
-            // Set output mode to Normal
-            lp_io.pin(6).modify(|_, w| w.pad_driver().set_bit());
-            // Enable output (writing to write-1-to-set register, then internally the
-            // `GPIO_OUT_REG` will be set)
-            lp_io
-                .out_enable_w1ts()
-                .write(|w| w.enable_w1ts().bits(1 << 6));
-            // Enable input
-            lp_io.gpio(6).modify(|_, w| w.fun_ie().set_bit());
-
-            // Disable pulldown (enable internal weak pull-down)
-            lp_io.gpio(6).modify(|_, w| w.fun_wpd().clear_bit());
-            // Enable pullup
-            lp_io.gpio(6).modify(|_, w| w.fun_wpu().set_bit());
-
-            // Same process for SCL pin
-            lp_io.pin(7).modify(|_, w| w.pad_driver().set_bit());
-            // Enable output (writing to write-1-to-set register, then internally the
-            // `GPIO_OUT_REG` will be set)
-            lp_io
-                .out_enable_w1ts()
-                .write(|w| w.enable_w1ts().bits(1 << 7));
-            // Enable input
-            lp_io.gpio(7).modify(|_, w| w.fun_ie().set_bit());
-            // Disable pulldown (enable internal weak pull-down)
-            lp_io.gpio(7).modify(|_, w| w.fun_wpd().clear_bit());
-            // Enable pullup
-            lp_io.gpio(7).modify(|_, w| w.fun_wpu().set_bit());
-
             // Select LP I2C function for the SDA and SCL pins
             lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1));
-            lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
         }
 
         // Initialize LP I2C HAL */
@@ -150,6 +153,7 @@ impl LpI2c {
             .clk_conf()
             .modify(|_, w| w.sclk_active().set_bit());
 
+        let lp_peri = LP_PERI::regs();
         // Enable LP I2C controller clock
         lp_peri
             .clk_en()
