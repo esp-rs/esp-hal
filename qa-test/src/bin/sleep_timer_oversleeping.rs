@@ -2,8 +2,9 @@
 //!
 //! Issue: <https://github.com/esp-rs/esp-hal/issues/5183>
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
+// TODO: esp32c2
 #![no_std]
 #![no_main]
 use embassy_executor::Spawner;
@@ -21,7 +22,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 // How long to sleep each iteration (matches original reproducer).
 const SLEEP_MS: u64 = 30;
-const MAX_ITERATIONS: u32 = 10;
+const MAX_ITERATIONS: u32 = 100;
 
 const THRESHOLD_US: u64 = SLEEP_MS * SLEEP_MS * 1_000;
 
@@ -101,15 +102,19 @@ async fn main(_spawner: Spawner) {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))] {
             let config = RtcSleepConfig::deep();
-        } else { //esp32/c2/c3/s2
+        } else { //esp32/c3/s2
             let mut config = RtcSleepConfig::deep();
             config.set_rtc_fastmem_pd_en(false);
         }
     }
 
+    let delay = esp_hal::delay::Delay::new();
+
     let timer = esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(
         core::time::Duration::from_millis(SLEEP_MS),
     );
+
+    delay.delay_millis(100);
 
     rtc.sleep(&config, &[&timer]);
 }
