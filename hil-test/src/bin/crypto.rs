@@ -8,7 +8,7 @@
 //% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
 //% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
-//% FEATURES(quad, octal): psram
+//% FEATURES(quad, octal):
 //% FEATURES: unstable esp-alloc/nightly
 
 #![no_std]
