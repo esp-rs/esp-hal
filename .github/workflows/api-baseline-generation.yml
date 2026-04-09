@@ -125,10 +125,17 @@ jobs:
             fi
 
             if [ -n "$PACKAGES" ]; then
-              echo "Breaking change detected for package(s): $PACKAGES"
-              echo "should_generate=true" >> "$GITHUB_OUTPUT"
-              echo "trigger_reason=breaking_change" >> "$GITHUB_OUTPUT"
-              echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+              # skip-semver-checks indicates a compiler upgrade
+              if echo "$LABELS" | grep -q "^skip-semver-checks$"; then
+                echo "skip-semver-checks label found, suppressing auto-regeneration"
+                echo "should_generate=false" >> "$GITHUB_OUTPUT"
+                echo "trigger_reason=skip_semver_checks" >> "$GITHUB_OUTPUT"
+              else
+                echo "Breaking change detected for package(s): $PACKAGES"
+                echo "should_generate=true" >> "$GITHUB_OUTPUT"
+                echo "trigger_reason=breaking_change" >> "$GITHUB_OUTPUT"
+                echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+              fi
             else
               echo "No breaking-change-* labels found"
               echo "should_generate=false" >> "$GITHUB_OUTPUT"
@@ -215,6 +222,10 @@ jobs:
         if: steps.check-generation.outputs.should_generate == 'false'
         shell: bash
         run: |
-          echo "## No Baseline Generation Needed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "No breaking change detected in the merged PR. API baselines will not be regenerated." >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check-generation.outputs.trigger_reason }}" = "skip_semver_checks" ]; then
+            echo "## Baseline Generation Suppressed" >> $GITHUB_STEP_SUMMARY
+            echo "The \`skip-semver-checks\` label was found. Automatic regeneration was skipped to allow for manual baseline targeting." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## No Baseline Generation Needed" >> $GITHUB_STEP_SUMMARY
+            echo "No breaking change detected." >> $GITHUB_STEP_SUMMARY
+          fi
