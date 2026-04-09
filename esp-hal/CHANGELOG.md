@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::efuse::ChipRevision` (#5287)
 - Cache configuration options for ESP32-S2 (#5306)
 - C5: Add PSRAM support (#5317)
+- C61: Add PSRAM support (#5325)
 
 ### Changed
 
