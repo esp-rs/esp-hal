@@ -191,19 +191,11 @@ impl<'d, const OP: u8, PWM: Instance> Operator<'d, OP, PWM> {
     ///
     /// ### Note:
     /// By default TIMER0 is used
-    pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<'d, TIM, PWM>) {
-        let _ = timer;
+    pub fn set_timer<const TIM: u8>(&mut self, _timer: &Timer<'d, TIM, PWM>) {
         // SAFETY:
         // We only write to our OPERATORx_TIMERSEL register
-        let (info, _) = PWM::split();
-        info.regs().operator_timersel().modify(|_, w| match OP {
-            0 => unsafe { w.operator0_timersel().bits(TIM) },
-            1 => unsafe { w.operator1_timersel().bits(TIM) },
-            2 => unsafe { w.operator2_timersel().bits(TIM) },
-            _ => {
-                unreachable!()
-            }
-        });
+        let timer_select = unsafe { Self::timesel() };
+        timer_select.modify(|_, w| unsafe { w.operator_timersel(OP).bits(TIM) });
     }
 
     /// Use the A output with the given pin and configuration
@@ -248,6 +240,13 @@ impl<'d, const OP: u8, PWM: Instance> Operator<'d, OP, PWM> {
         config_dt: DeadTimeCfg,
     ) -> LinkedPins<'d, PWM, OP> {
         LinkedPins::new(pin_a, config_a, pin_b, config_b, config_dt)
+    }
+
+    /// Unsafe access to the OPERATORx_TIMERSEL register
+    /// Caller must ensure they only write to the bits corresponding to their operator
+    unsafe fn timesel() -> &'static pac::mcpwm0::OPERATOR_TIMERSEL {
+        let (info, _) = PWM::split();
+        info.regs().operator_timersel()
     }
 }
 

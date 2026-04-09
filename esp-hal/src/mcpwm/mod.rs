@@ -142,6 +142,61 @@ pub mod sync;
 /// MCPWM timers
 pub mod timer;
 
+/// Provides nice types for public API
+#[cfg(soc_has_mcpwm0)]
+pub mod mcpwm0 {
+    use crate::{mcpwm::*, peripherals::MCPWM0 as MCPWMPerfipheral};
+
+    /// MCPWM Driver for MCPWM0
+    pub type McPwm<'d> = super::McPwm<'d, MCPWMPerfipheral<'d>>;
+    /// Capture channel creator for MCPWM0
+    pub type CaptureChannelCreator<'d, const NUM: u8> =
+        capture::CaptureChannelCreator<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Capture Channel for MCPWM0
+    pub type CaptureChannel<'d, const NUM: u8> =
+        capture::CaptureChannel<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Capture timer for MCPWM0
+    pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPerfipheral<'d>>;
+    /// Timer for MCPWM0
+    pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Operator for MCPWM0
+    pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Pwm Pin for MCPWM0
+    pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
+        operator::PwmPin<'d, MCPWMPerfipheral<'d>, NUM, IS_A>;
+    /// Linked Pins for MCPWM0
+    pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPerfipheral<'d>, NUM>;
+    /// Sync source for MCPWM0
+    pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPerfipheral<'d>>;
+}
+
+/// Provides nice types for public API
+#[cfg(soc_has_mcpwm1)]
+pub mod mcpwm1 {
+    use crate::{mcpwm::*, peripherals::MCPWM1 as MCPWMPerfipheral};
+    /// MCPWM Driver for MCPWM1
+    pub type McPwm<'d> = super::McPwm<'d, MCPWMPerfipheral<'d>>;
+    /// Capture channel creator for MCPWM1
+    pub type CaptureChannelCreator<'d, const NUM: u8> =
+        capture::CaptureChannelCreator<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Capture Channel for MCPWM1
+    pub type CaptureChannel<'d, const NUM: u8> =
+        capture::CaptureChannel<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Capture timer for MCPWM1
+    pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPerfipheral<'d>>;
+    /// Timer for MCPWM1
+    pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Operator for MCPWM1
+    pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPerfipheral<'d>>;
+    /// Pwm Pin for MCPWM1
+    pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
+        operator::PwmPin<'d, MCPWMPerfipheral<'d>, NUM, IS_A>;
+    /// Linked Pins for MCPWM1
+    pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPerfipheral<'d>, NUM>;
+    /// Sync source for MCPWM1
+    pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPerfipheral<'d>>;
+}
+
 /// The MCPWM peripheral
 #[non_exhaustive]
 pub struct McPwm<'d, PWM: Instance> {
@@ -179,7 +234,7 @@ pub struct McPwm<'d, PWM: Instance> {
 }
 
 impl<'d, PWM: Instance> McPwm<'d, PWM> {
-    /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
+    /// Create a new instance generics
     pub fn new(_peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
         let (info, _) = PWM::split();
         let guard = PeripheralGuard::new(info.peripheral());

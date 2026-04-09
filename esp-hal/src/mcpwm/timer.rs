@@ -215,6 +215,14 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
         });
     }
 
+    /// Update period of the timer on the fly. How the new period is applied depends on the
+    /// [`PeriodUpdatingMethod`] set in the [`TimerClockConfig`].
+    #[doc(hidden)]
+    pub fn update_period(&mut self, new_period: u16) {
+        self.cfg0()
+            .modify(|_r, w| unsafe { w.period().bits(new_period) });
+    }
+
     fn configure(&mut self) {
         // write prescaler and period
         let (prescaler, period, period_updating_method) = (
