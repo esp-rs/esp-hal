@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
-      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+      SKIP_CI:
+        ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change')
+        || contains(needs.get-labels.outputs.labels, 'skip-semver-checks') }}
 
     steps:
       - name: Skip CI
