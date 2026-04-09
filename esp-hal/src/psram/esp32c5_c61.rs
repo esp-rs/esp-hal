@@ -11,12 +11,22 @@ use quad::CommandMode;
 
 const EXTMEM_ORIGIN: u32 = 0x42000000;
 
-const PSRAM_CS_IO: u8 = 15;
-const SPI_CS1_GPIO_NUM: u8 = 15;
 const FUNC_SPICS1_SPICS1: u8 = 0;
-const SPICS1_OUT_IDX: u8 = 101;
 const PIN_FUNC_GPIO: u8 = 1;
-const PSRAM_SPIWP_SD3_IO: u8 = 18;
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32c61)] {
+        const PSRAM_CS_IO: u8 = 14;
+        const SPI_CS1_GPIO_NUM: u8 = 14;
+        const SPICS1_OUT_IDX: u8 = 102;
+        const PSRAM_SPIWP_SD3_IO: u8 = 17;
+    } else if #[cfg(esp32c5)] {
+        const PSRAM_CS_IO: u8 = 15;
+        const SPI_CS1_GPIO_NUM: u8 = 15;
+        const SPICS1_OUT_IDX: u8 = 101;
+        const PSRAM_SPIWP_SD3_IO: u8 = 18;
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PsramLlCsIdT {

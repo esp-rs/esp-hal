@@ -76,8 +76,8 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLC" },
     # { name = "SLCHOST" }, TODO: add PAC manually later
-    # { name = "SPI0" },
-    # { name = "SPI1" },
+    { name = "SPI0" },
+    { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1, stable = true },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
@@ -95,6 +95,7 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
+    { name = "PSRAM", virtual = true },
 ]
 
 clocks = { system_clocks = { clock_tree = [
@@ -125,7 +126,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
-    
+
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 40MHz
     { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)" },
 
@@ -373,7 +374,6 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.psram]
-support_status = { status = "not_supported", issue = 5294 }
 
 [device.spi_master]
 support_status = "supported"
