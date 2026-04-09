@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Ota::new()` now takes `FlashRegion` by value (#4413)
 - The section of `ESP_APP_DESC` has been changed to `.flash.appdesc` to align with the behavior of esptool (#4745)
+- `esp_app_desc!` macro now accepts a `secure_version` argument (#5326)
 
 ### Fixed
 
