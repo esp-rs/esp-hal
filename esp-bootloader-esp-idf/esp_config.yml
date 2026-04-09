@@ -26,3 +26,11 @@ options:
       PARTITION_TABLE_OFFSET value."
     default:
       - value: 32768
+
+  - name: secure_version
+    description: "Secure version. Used to enforce anti-rollback protection."
+    default:
+      - value: 0
+    constraints:
+      - type:
+          validator: non_negative_integer
