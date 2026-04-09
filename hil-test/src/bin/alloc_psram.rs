@@ -1,7 +1,7 @@
 //! Allocator and PSRAM-related tests
 
 //% CHIPS:
-//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2 esp32c5
+//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2 esp32c5 esp32c61
 // The S3 dev kit in the HIL-tester has octal PSRAM.
 //% CHIPS(llff_octal, tlsf_octal): esp32s3
 //% ENV(llff_octal, tlsf_octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
@@ -11,9 +11,6 @@
 
 #![no_std]
 #![no_main]
-// TODO: this test is Xtensa-only, so we can enable allocator_api unconditionally. This will not
-// always be the case. Will this need a //% TOOLCHAIN?
-#![feature(allocator_api)]
 
 use hil_test as _;
 

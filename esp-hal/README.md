@@ -88,7 +88,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | ⚒️      |          | [❌][5294] [^1] |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
@@ -139,7 +139,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5170]: https://github.com/esp-rs/esp-hal/issues/5170
 [5171]: https://github.com/esp-rs/esp-hal/issues/5171
 [5172]: https://github.com/esp-rs/esp-hal/issues/5172
-[5294]: https://github.com/esp-rs/esp-hal/issues/5294
 <!-- end chip support table -->
 
 ## `unstable` feature

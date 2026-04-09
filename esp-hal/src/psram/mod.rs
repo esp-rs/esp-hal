@@ -51,7 +51,7 @@ use core::ops::Range;
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
-#[cfg_attr(esp32c5, path = "esp32c5.rs")]
+#[cfg_attr(any(esp32c5, esp32c61), path = "esp32c5_c61.rs")]
 pub(crate) mod implem;
 
 #[cfg(feature = "psram")]
