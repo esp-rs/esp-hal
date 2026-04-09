@@ -123,6 +123,15 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         .into_compile_error();
     }
 
+    #[cfg(not(feature = "rtc-fast"))]
+    if rtc_fast {
+        return syn::Error::new(
+            Span::call_site(),
+            "rtc_fast is not available for this target",
+        )
+        .into_compile_error();
+    }
+
     let is_fn = matches!(item, Item::Fn(_));
     let section_name = match (is_fn, rtc_fast, rtc_slow, dram2_uninit, persistent, zeroed) {
         (true, false, false, false, false, false) => Ok(".rwtext"),
@@ -219,6 +228,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_text() {
         let result = ram(
@@ -288,6 +298,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_data() {
         let result = ram(
@@ -359,6 +370,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_data_zeroed() {
         let result = ram(
@@ -383,6 +395,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_data_persistent() {
         let result = ram(
@@ -545,7 +558,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "rtc-slow")]
+    #[cfg(all(feature = "rtc-slow", feature = "rtc-fast"))]
     #[test]
     fn test_illegal_arg5() {
         let result = ram(
@@ -590,6 +603,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_data_persistent_on_local_var() {
         let result = ram(
@@ -612,6 +626,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rtc-fast")]
     #[test]
     fn test_rtc_fast_data_persistent_on_non_static() {
         let result = ram(
