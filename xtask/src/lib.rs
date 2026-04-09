@@ -545,7 +545,9 @@ impl Package {
     }
 }
 
-#[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::Display, clap::ValueEnum, Serialize, Deserialize,
+)]
 #[strum(serialize_all = "lowercase")]
 /// Represents the versioning scheme for a package.
 pub enum Version {

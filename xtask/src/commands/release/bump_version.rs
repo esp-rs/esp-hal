@@ -21,28 +21,72 @@ use crate::{
 };
 
 /// How to bump the version of a package.
+///
+/// This is a direct reflection of the `bump-version` CLI arguments. The four
+/// combinations of `base` and `pre` each mean something different; see
+/// [`do_version_bump`] for the full state table.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub enum VersionBump {
-    PreRelease(String),
-    Patch,
-    Minor,
-    Major,
+pub struct VersionBump {
+    /// Bump the base `major.minor.patch` by this amount. `None` means keep
+    /// the current base.
+    pub base: Option<Version>,
+    /// Apply or continue this pre-release identifier (e.g. `"alpha"`).
+    /// `None` means a stable release.
+    pub pre: Option<String>,
+}
+
+impl VersionBump {
+    pub fn major() -> Self {
+        Self {
+            base: Some(Version::Major),
+            pre: None,
+        }
+    }
+    pub fn minor() -> Self {
+        Self {
+            base: Some(Version::Minor),
+            pre: None,
+        }
+    }
+    pub fn patch() -> Self {
+        Self {
+            base: Some(Version::Patch),
+            pre: None,
+        }
+    }
+    pub fn pre(id: impl Into<String>) -> Self {
+        Self {
+            base: None,
+            pre: Some(id.into()),
+        }
+    }
+    pub fn base_and_pre(base: Version, id: impl Into<String>) -> Self {
+        Self {
+            base: Some(base),
+            pre: Some(id.into()),
+        }
+    }
 }
 
 /// Arguments for bumping the version of packages.
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
-    /// How much to bump the version by.
+    /// How much to bump the base version by.
     ///
-    /// If the version is a pre-release, this will just remove the pre-release
-    /// version tag.
+    /// - Without `--pre`: a regular stable bump. If the current version is a pre-release, the
+    ///   pre-release tag is dropped (finalizing the cycle) and `amount` is ignored.
+    /// - With `--pre`: start (or restart) a pre-release cycle on the bumped base, e.g.
+    ///   `bump-version minor --pre alpha` on `1.0.0` produces `1.1.0-alpha.0`.
     #[arg(value_enum)]
-    amount: Version,
-    /// Pre-release version to append to the version.
+    amount: Option<Version>,
+    /// Pre-release identifier to apply.
     ///
-    /// If the package is already a pre-release, this will ignore `amount`. If
-    /// the package is not a pre-release, this will bump the version by
-    /// `amount` and append the pre-release version as `<pre>.0`.
+    /// - Without `amount`: continue the pre-release cycle on the *current* base. If the current
+    ///   version already carries this identifier the counter is incremented; if it carries a
+    ///   different one the counter is reset to `<pre>.0`. Starting a pre-release cycle from a
+    ///   stable version without also passing `amount` is an error, as it would produce a version
+    ///   lower than the current one.
+    /// - With `amount`: bump the base then append `<pre>.0`.
     #[arg(long)]
     pre: Option<String>,
     /// Package(s) to target.
@@ -52,19 +96,15 @@ pub struct BumpVersionArgs {
 
 /// Bump the version of the specified packages by the specified amount.
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
-    // Bump the version by the specified amount for each given package:
+    let bump = VersionBump {
+        base: args.amount,
+        pre: args.pre,
+    };
+
+    // Bump the version for each given package:
     for package in args.packages {
-        let version = if let Some(pre) = &args.pre {
-            VersionBump::PreRelease(pre.clone())
-        } else {
-            match args.amount {
-                Version::Major => VersionBump::Major,
-                Version::Minor => VersionBump::Minor,
-                Version::Patch => VersionBump::Patch,
-            }
-        };
         let mut package = CargoToml::new(workspace, package)?;
-        update_package(&mut package, &version, false)?;
+        update_package(&mut package, &bump, false)?;
     }
 
     Ok(())
@@ -244,47 +284,88 @@ fn bump_crate_version(
     Ok(version)
 }
 
-/// Perform the actual version bump logic.
-pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
-    fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
-        log::debug!("Bumping version number: {version} by {amount:?}");
-        match amount {
-            VersionBump::Major => {
-                version.major += 1;
-                version.minor = 0;
-                version.patch = 0;
-            }
-            VersionBump::Minor => {
-                version.minor += 1;
-                version.patch = 0;
-            }
-            VersionBump::Patch => {
-                version.patch += 1;
-            }
-            VersionBump::PreRelease(_) => unreachable!(),
+/// Bump only the base version (`major.minor.patch`).
+fn bump_base(version: &mut semver::Version, amount: Version) {
+    log::debug!("Bumping base version: {version} by {amount:?}");
+    match amount {
+        Version::Major => {
+            version.major += 1;
+            version.minor = 0;
+            version.patch = 0;
+        }
+        Version::Minor => {
+            version.minor += 1;
+            version.patch = 0;
+        }
+        Version::Patch => {
+            version.patch += 1;
         }
     }
+}
+
+/// Perform the actual version bump logic.
+pub fn do_version_bump(version: &semver::Version, bump: &VersionBump) -> Result<semver::Version> {
     let mut version = version.clone();
 
-    match amount {
-        VersionBump::Major | VersionBump::Minor | VersionBump::Patch => {
-            // If the version is a pre-release, we need to remove it
+    // The four `(base, pre)` combinations each mean something different:
+    //
+    // | `base` | `pre`   | Behavior                                                          |
+    // |--------|---------|-------------------------------------------------------------------|
+    // | None   | None    | Error — nothing to do.                                            |
+    // | Some   | None    | Stable bump. If currently pre, drop the pre tag (finalize).       |
+    // | Some   | Some    | Start / restart a pre-release cycle on a freshly-bumped base.     |
+    // | None   | Some    | Continue a pre-release cycle on the current base. Bails if the    |
+    // |        |         | current version is stable, as it would produce a lower version.   |
+    match (bump.base, bump.pre.as_deref()) {
+        (None, None) => bail!("nothing to bump: specify an amount and/or --pre"),
+
+        // Stable bump. If currently a pre-release, finalize by dropping the
+        // pre tag and ignore `amount` (matches historical behavior).
+        (Some(amount), None) => {
             if !version.pre.is_empty() {
                 version.pre = Prerelease::EMPTY;
             } else {
-                // If the version is not a pre-release, we need to bump the version
-                bump_version_number(&mut version, &amount);
+                bump_base(&mut version, amount);
             }
         }
-        VersionBump::PreRelease(pre) => {
-            if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
-                let pre_version = pre_version.parse::<u32>()?;
-                version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1)).unwrap();
+
+        // Start / restart a pre-release cycle on a freshly-bumped base.
+        // e.g. 1.0.0 + (Minor, alpha) -> 1.1.0-alpha.0
+        //      1.1.0-alpha.5 + (Minor, alpha) -> 1.2.0-alpha.0
+        (Some(amount), Some(pre)) => {
+            version.pre = Prerelease::EMPTY;
+            bump_base(&mut version, amount);
+            version.pre = Prerelease::new(&format!("{pre}.0"))
+                .with_context(|| format!("invalid pre-release identifier {pre:?}"))?;
+        }
+
+        // Pre-release work on the *current* base.
+        (None, Some(pre)) => {
+            if version.pre.is_empty() {
+                bail!(
+                    "cannot start pre-release {pre:?} from stable version {version}: \
+                     the result would be semver-less than the current version. \
+                     Pass a bump amount as well, e.g. `bump-version minor --pre {pre}`."
+                );
+            } else if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}."))
+            {
+                // Same identifier -> increment counter.
+                let pre_version = pre_version.parse::<u32>().with_context(|| {
+                    format!(
+                        "could not parse pre-release counter from {:?}",
+                        version.pre.as_str()
+                    )
+                })?;
+                // This branch is structurally safe: the strip_prefix match above
+                // requires the current version's pre to already start with "{pre}.",
+                // so `pre` has already been accepted by `Prerelease::new` once.
+                version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1))
+                    .with_context(|| format!("invalid pre-release identifier {pre:?}"))?;
             } else {
-                // if the pre version is _not_ the same as the one we had, it's a new pre-release
-                // use the new pre and reset the bump to 0
-                // equally, if the version is not a pre-release, we need to append the pre-release
-                version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
+                // Different identifier on same base -> reset counter.
+                // e.g. 1.1.0-alpha.5 + (None, beta) -> 1.1.0-beta.0
+                version.pre = Prerelease::new(&format!("{pre}.0"))
+                    .with_context(|| format!("invalid pre-release identifier {pre:?}"))?;
             }
         }
     }
@@ -383,33 +464,141 @@ mod tests {
     #[test]
     fn test_version_bump() {
         let test_cases = vec![
-            ("0.1.0", VersionBump::Patch, "0.1.1"),
-            ("0.1.0", VersionBump::Minor, "0.2.0"),
-            ("0.1.0", VersionBump::Major, "1.0.0"),
-            // amount is ignored, assuming same release cycle
-            ("0.1.0-beta.0", VersionBump::Minor, "0.1.0"),
-            ("0.1.0-beta.0", VersionBump::Major, "0.1.0"),
+            // --- Stable bumps from stable versions ---
+            ("0.1.0", VersionBump::patch(), "0.1.1"),
+            ("0.1.0", VersionBump::minor(), "0.2.0"),
+            ("0.1.0", VersionBump::major(), "1.0.0"),
+            ("1.0.0", VersionBump::patch(), "1.0.1"),
+            ("1.0.0", VersionBump::minor(), "1.1.0"),
+            ("1.0.0", VersionBump::major(), "2.0.0"),
+            // --- Finalizing a pre-release: amount is ignored, pre is dropped ---
+            ("0.1.0-beta.0", VersionBump::minor(), "0.1.0"),
+            ("0.1.0-beta.0", VersionBump::major(), "0.1.0"),
+            ("1.1.0-alpha.5", VersionBump::minor(), "1.1.0"),
+            // --- Continuing a pre-release cycle on the *same* base ---
+            // Same identifier -> increment counter.
+            ("0.1.0-beta.0", VersionBump::pre("beta"), "0.1.0-beta.1"),
+            ("0.1.0-beta.7", VersionBump::pre("beta"), "0.1.0-beta.8"),
+            ("1.1.0-alpha.0", VersionBump::pre("alpha"), "1.1.0-alpha.1"),
+            // Different identifier on same base -> reset counter.
+            ("0.1.0-beta.0", VersionBump::pre("rc"), "0.1.0-rc.0"),
+            ("1.1.0-alpha.5", VersionBump::pre("beta"), "1.1.0-beta.0"),
+            // --- Starting a new pre-release cycle on a freshly-bumped base ---
+            // This is the scenario from esp-rs/esp-hal#3801.
             (
-                "0.1.0-beta.0",
-                VersionBump::PreRelease("beta".to_string()),
-                "0.1.0-beta.1",
+                "1.0.0",
+                VersionBump::base_and_pre(Version::Minor, "alpha"),
+                "1.1.0-alpha.0",
             ),
             (
-                "0.1.0-beta.0",
-                VersionBump::PreRelease("beta".to_string()),
-                "0.1.0-beta.1",
+                "1.0.0",
+                VersionBump::base_and_pre(Version::Major, "alpha"),
+                "2.0.0-alpha.0",
             ),
             (
-                "0.1.0-beta.0",
-                VersionBump::PreRelease("rc".to_string()),
-                "0.1.0-rc.0",
+                "1.0.0",
+                VersionBump::base_and_pre(Version::Patch, "alpha"),
+                "1.0.1-alpha.0",
+            ),
+            // Restart a cycle from an existing pre-release onto a new base.
+            (
+                "1.1.0-alpha.5",
+                VersionBump::base_and_pre(Version::Minor, "alpha"),
+                "1.2.0-alpha.0",
+            ),
+            (
+                "1.1.0-alpha.5",
+                VersionBump::base_and_pre(Version::Major, "beta"),
+                "2.0.0-beta.0",
+            ),
+            // Starting a pre-release on a 0.x package.
+            (
+                "0.5.0",
+                VersionBump::base_and_pre(Version::Minor, "alpha"),
+                "0.6.0-alpha.0",
             ),
         ];
 
         for (version, amount, expected) in test_cases {
             let version = semver::Version::parse(version).unwrap();
             let new_version = do_version_bump(&version, &amount).unwrap();
-            assert_eq!(new_version.to_string(), expected);
+            assert_eq!(
+                new_version.to_string(),
+                expected,
+                "bump {amount:?} of {version}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_version_bump_empty_is_error() {
+        let version = semver::Version::parse("1.0.0").unwrap();
+        let bump = VersionBump {
+            base: None,
+            pre: None,
+        };
+        let err = do_version_bump(&version, &bump).unwrap_err();
+        assert!(
+            err.to_string().contains("nothing to bump"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_pre_release_from_stable_without_base_is_error() {
+        // This is the exact bug from esp-rs/esp-hal#3801: producing `1.0.0-alpha.0`
+        // from `1.0.0` would be semver-less than the current version. The engine
+        // must refuse, pointing the user at the combined `amount + --pre` form.
+        let version = semver::Version::parse("1.0.0").unwrap();
+        let bump = VersionBump::pre("alpha");
+        let err = do_version_bump(&version, &bump).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("cannot start pre-release") && msg.contains("bump-version minor --pre"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_invalid_pre_identifier_is_error() {
+        // Valid identifiers should pass through `do_version_bump` cleanly.
+        let stable = semver::Version::parse("1.0.0").unwrap();
+        for ok in ["alpha", "rc1", "beta-2", "rc-0", "pre"] {
+            do_version_bump(&stable, &VersionBump::base_and_pre(Version::Minor, ok))
+                .unwrap_or_else(|e| panic!("expected {ok:?} to be valid: {e}"));
+        }
+
+        // Invalid identifiers must produce a clean error, not a panic.
+        //
+        // Two code paths construct a `Prerelease` from a user-supplied identifier:
+        //
+        //   1. `(Some(base), Some(pre))` — start / restart a cycle on a bumped base.
+        //   2. `(None, Some(pre))` with a different identifier on the current base — reset the
+        //      counter.
+        //
+        // The third site (same-identifier increment) is structurally safe: the
+        // strip_prefix match requires `pre` to already be present in the current
+        // version's pre-release, meaning `Prerelease::new` has accepted it before.
+        for bad in ["foo@bar", "has space", "trailing.", "", "dot..dot"] {
+            // Path 1: (Some, Some).
+            let err = do_version_bump(&stable, &VersionBump::base_and_pre(Version::Minor, bad))
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("invalid pre-release identifier"),
+                "unexpected error for (Some, Some) with {bad:?}: {err}"
+            );
+
+            // Path 2: (None, Some) with a different identifier, forcing the
+            // reset-counter branch.
+            let pre_version = semver::Version::parse("1.0.0-alpha.0").unwrap();
+            let err = do_version_bump(&pre_version, &VersionBump::pre(bad))
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("invalid pre-release identifier"),
+                "unexpected error for (None, Some) with {bad:?}: {err}"
+            );
         }
     }
 
