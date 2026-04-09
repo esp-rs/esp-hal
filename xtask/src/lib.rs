@@ -869,6 +869,7 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                         "has-lp-core".into(),
                         "is-lp-core".into(),
                         "rtc-slow".into(),
+                        "rtc-fast".into(),
                     ])
                     .build(),
                 &package_path,
