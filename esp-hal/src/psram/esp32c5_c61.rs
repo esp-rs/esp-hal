@@ -1,6 +1,6 @@
 use super::PsramSize;
 use crate::{
-    peripherals::{SPI0, SPI1},
+    peripherals::{CACHE, SPI0, SPI1},
     psram::implem::quad::MspiTimingSpeedMode,
 };
 
@@ -139,27 +139,29 @@ pub(crate) fn init_psram(config: PsramConfig) {
 
     const MMU_ACCESS_SPIRAM: u32 = 1 << 9;
 
-    let start = unsafe {
+    let start = {
         const MMU_PAGE_SIZE: u32 = 0x10000;
         const FLASH_MMU_TABLE_SIZE: u32 = 512;
         const MMU_VALID: u32 = 1 << 10;
 
-        // TODO add the used registers to the PAC and use them
-        const SPI_MEM_MMU_ITEM_INDEX: *mut u32 = (0x60002000 + 0x380) as *mut u32;
-        const SPI_MEM_MMU_ITEM_CONTENT: *mut u32 = (0x60002000 + 0x37c) as *mut u32;
-
         fn read_mmu_entry(i: u32) -> u32 {
-            unsafe {
-                SPI_MEM_MMU_ITEM_INDEX.write_volatile(i);
-                SPI_MEM_MMU_ITEM_CONTENT.read_volatile()
-            }
+            SPI0::regs()
+                .mmu_item_index()
+                .write(|w| unsafe { w.mmu_item_index().bits(i) });
+            SPI0::regs()
+                .mmu_item_content()
+                .read()
+                .mmu_item_content()
+                .bits()
         }
 
         fn write_mmu_entry(i: u32, entry: u32) {
-            unsafe {
-                SPI_MEM_MMU_ITEM_INDEX.write_volatile(i);
-                SPI_MEM_MMU_ITEM_CONTENT.write_volatile(entry);
-            }
+            SPI0::regs()
+                .mmu_item_index()
+                .write(|w| unsafe { w.mmu_item_index().bits(i) });
+            SPI0::regs()
+                .mmu_item_content()
+                .write(|w| unsafe { w.mmu_item_content().bits(entry) });
         }
 
         // calculate the PSRAM start address to map
@@ -184,13 +186,10 @@ pub(crate) fn init_psram(config: PsramConfig) {
         }
 
         // enable busses
-        const CACHE_L1_CACHE_CTRL_REG: *mut u32 = (0x600C8000 + 4) as *mut u32;
-        const CACHE_L1_CACHE_SHUT_BUS0: u32 = 1 << 0;
-        const CACHE_L1_CACHE_SHUT_BUS1: u32 = 1 << 1;
-        CACHE_L1_CACHE_CTRL_REG.write_volatile(
-            CACHE_L1_CACHE_CTRL_REG.read_volatile()
-                & !(CACHE_L1_CACHE_SHUT_BUS0 | CACHE_L1_CACHE_SHUT_BUS1),
-        );
+        CACHE::regs().cache_ctrl().modify(|_, w| {
+            w.cache_shut_bus0().clear_bit();
+            w.cache_shut_bus1().clear_bit()
+        });
 
         start
     };

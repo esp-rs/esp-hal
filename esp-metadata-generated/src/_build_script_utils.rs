@@ -1693,6 +1693,7 @@ impl Chip {
                     "soc_has_aes",
                     "soc_has_assist_debug",
                     "soc_has_apb_saradc",
+                    "soc_has_cache",
                     "soc_has_clint",
                     "soc_has_dma",
                     "soc_has_ds",
@@ -1937,6 +1938,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_aes",
                     "cargo:rustc-cfg=soc_has_assist_debug",
                     "cargo:rustc-cfg=soc_has_apb_saradc",
+                    "cargo:rustc-cfg=soc_has_cache",
                     "cargo:rustc-cfg=soc_has_clint",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ds",
@@ -2980,6 +2982,7 @@ impl Chip {
                     "single_core",
                     "soc_has_assist_debug",
                     "soc_has_clint",
+                    "soc_has_cache",
                     "soc_has_dma",
                     "soc_has_ecc",
                     "soc_has_ecdsa",
@@ -3121,6 +3124,7 @@ impl Chip {
                     "cargo:rustc-cfg=single_core",
                     "cargo:rustc-cfg=soc_has_assist_debug",
                     "cargo:rustc-cfg=soc_has_clint",
+                    "cargo:rustc-cfg=soc_has_cache",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ecc",
                     "cargo:rustc-cfg=soc_has_ecdsa",
@@ -5616,6 +5620,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_160m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rmt_sclk)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_cache)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clint)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ecdsa)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");
