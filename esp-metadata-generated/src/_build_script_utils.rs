@@ -4709,7 +4709,6 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
-                    "mcpwm_swsync_can_propagate",
                     "pm_support_ext0_wakeup",
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
@@ -4960,7 +4959,6 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
-                    "cargo:rustc-cfg=mcpwm_swsync_can_propagate",
                     "cargo:rustc-cfg=pm_support_ext0_wakeup",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
@@ -5797,7 +5795,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_wcl)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
-    println!("cargo:rustc-check-cfg=cfg(mcpwm_swsync_can_propagate)");
     println!("cargo:rustc-check-cfg=cfg(camera_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_dma)");
