@@ -102,15 +102,18 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
-esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "879efa6" }
+
+## Once (#415) pull request is accepted update the commit hash to
+## point to the latest commit on the main branch of esp-pacs
+esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -335,15 +338,3 @@ mixed_attributes_style = "allow"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }
-
-## Temp patch till esp-pacs-mcpwm pull request is accepted.
-[patch."https://github.com/esp-rs/esp-pacs"]
-esp32 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32c2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32c3 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32c5 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32c6 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32c61 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32h2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32s2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
-esp32s3 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }

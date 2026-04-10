@@ -9,7 +9,7 @@
 //! ## Overview
 //! The `Sync` is responsible for managing the different ways
 //! MCPWM can listen to sync events. There are 2 different types of
-//! sync sources. One is a [`SyncOut`] that comes from [`super::Timer::get_sync_out`],
+//! sync sources. One is a [`SyncOut`] that comes from [`super::Timer::sync_out`],
 //! or from a [`SyncLine`].
 //!
 //! This module provides the flexibility to map any of the
@@ -20,11 +20,14 @@
 //! ### Configuring a SyncLine signal
 //! For configuring a [`SyncLine`] input signal, and then connecting
 //! it to timer 0's sync in event. This is useful when you need to sync
-//! the timers phase from an external signal such as a zero-cross event
-//! for 3 phase PWM.
+//! the timers phase from an external signal, such as a zero-cross event
+//! for 3-phase PWM.
 //!
 //! ```rust, no_run
-//! use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
+//! use esp_hal::{
+//!     mcpwm::{McPwm, PeripheralClockConfig},
+//!     time::Rate,
+//! };
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;

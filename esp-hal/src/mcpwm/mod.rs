@@ -25,7 +25,6 @@
 //! - Generate Space Vector PWM (SVPWM) signals for Field Oriented Control (FOC)
 //!
 //! ## Configuration
-//!
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
 //!     * The 16-bit counter in the PWM timer can work in count-up mode, count-down mode or
@@ -44,15 +43,13 @@
 //!     * Configurable dead-time on rising and falling edges; each set up independently. (Not yet
 //!       implemented)
 //!     * All events can trigger CPU interrupts. (Not yet implemented)
-//!     * Modulating of PWM output by high-frequency carrier signals, useful when gate drivers are
-//!       insulated with a transformer. (Not yet implemented)
 //!     * Period, time stamps and important control registers have shadow registers with flexible
 //!       updating methods.
 //! * Capture Channels 0, 1 and 2
 //!     * Every capture channel has one signal input. With an optional invert filter
 //!     * Each capture module can be configured to detect rising and (or), falling edges on an
 //!       external signal.
-//!     * Each capture channel can trigger software capture event recoding the capture counter. The
+//!     * Each capture channel can trigger software capture event recording the capture counter. The
 //!       edge that is captured is UNSPECIFIED for software captures.
 //!     * Each capture channel can be configured with a 8-bit pre-scaler. Which only triggers
 //!       capture events every Nth edge captured. ( Useful for high frequencies )
@@ -66,14 +63,14 @@
 )]
 #![cfg_attr(
     not(soc_has_mcpwm_capture_clk_from_group),
-    doc = "     * Capture timer's has it's own independent clock source from the MCPWM peripheral."
+    doc = "     * Capture timer has its own independent clock source from the MCPWM peripheral."
 )]
 //! * Fault Detection Module (Not yet implemented)
 #![cfg_attr(
     not(soc_has_mcpwm_capture_clk_from_group),
     doc = "\nCapture clock source is `ADB-CLK (80 MHz)` by default.\n"
 )]
-//! Clock source is `__clock_src__`` by default.
+//! Clock source is `__clock_src__` by default.
 //!
 //! ## Examples
 //!
@@ -104,7 +101,9 @@
 //! // of 20 kHz
 //! let timer_clock_cfg = clock_cfg
 //!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase,
-//! Rate::from_khz(20))?; mcpwm.timer0.start(timer_clock_cfg);
+//! Rate::from_khz(20))?;
+//! mcpwm.timer0.set_config(timer_clock_cfg);
+//! mcpwm.timer0.start();
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
@@ -385,6 +384,19 @@ impl PeripheralClockConfig {
     ) -> Result<timer::TimerClockConfig, FrequencyError> {
         timer::TimerClockConfig::with_frequency(self, period, mode, target_freq)
     }
+
+    /// Get a timer clock configuration with the default values.
+    ///
+    /// ### Note:
+    /// - Prescaler defaults to the minimum value of `0`.
+    /// - Period defaults to the maximum value of `u16::MAX`.
+    /// - PWM working mode defaults to `PwmWorkingMode::Increase`.
+    ///
+    /// The frequency is calculated with the formula described in
+    ///   [`PeripheralClockConfig::timer_clock_with_prescaler`] with the default prescaler value.
+    pub fn timer_clock_default(&self) -> timer::TimerClockConfig {
+        timer::TimerClockConfig::default(self)
+    }
 }
 
 /// Target frequency could not be set.
@@ -494,15 +506,13 @@ impl State {
             let int_ena = self.int_ena.borrow(cs);
             let regs = info.regs();
 
-            int_ena.set(regs.int_ena().write(|w| {
-                unsafe { w.bits(int_ena.take()) };
-
+            let new_int_ena = regs.int_ena().modify(|_, w| {
                 for event in events {
                     dispatch_event_write!(w, event, UNIT, value);
                 }
-
                 w
-            }));
+            });
+            int_ena.set(new_int_ena);
         });
     }
 }
@@ -660,7 +670,7 @@ impl Instance for crate::peripherals::MCPWM1<'_> {
 }
 
 #[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
-struct PwmClockGuard(DropGuard<fn()>);
+struct PwmClockGuard(DropGuard<(), fn(())>);
 
 impl PwmClockGuard {
     fn instance<PWM: Instance>() -> clocks::McpwmInstance {
@@ -676,7 +686,7 @@ impl PwmClockGuard {
     pub fn new<PWM: Instance>() -> Self {
         ClockTree::with(move |clocks| Self::instance::<PWM>().request_function_clock(clocks));
 
-        Self(DropGuard::new(|| {
+        Self(DropGuard::new((), |_| {
             ClockTree::with(move |clocks| Self::instance::<PWM>().release_function_clock(clocks));
         }))
     }

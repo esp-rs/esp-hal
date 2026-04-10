@@ -52,12 +52,12 @@ pub enum TimerEvent {
     TimerEqualPeriod,
 }
 
-impl Into<Event> for TimerEvent {
-    fn into(self) -> Event {
-        match self {
-            TimerEvent::TimerEqualPeriod => Event::TimerEqualPeriod,
-            TimerEvent::TimerEqualZero => Event::TimerEqualZero,
+impl From<TimerEvent> for Event {
+    fn from(value: TimerEvent) -> Self {
+        match value {
             TimerEvent::TimerStop => Event::TimerStop,
+            TimerEvent::TimerEqualZero => Event::TimerEqualZero,
+            TimerEvent::TimerEqualPeriod => Event::TimerEqualPeriod,
         }
     }
 }
@@ -79,12 +79,7 @@ pub struct Timer<'d, const TIM: u8, PWM: Instance> {
 impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     pub(super) fn new(guard: PeripheralGuard, peripheral_clock: &PeripheralClockConfig) -> Self {
         // Default configuration for the timer
-        let config = TimerClockConfig::with_prescaler(
-            peripheral_clock,
-            u16::MAX,
-            PwmWorkingMode::Increase,
-            0,
-        );
+        let config = TimerClockConfig::default(peripheral_clock);
 
         let mut timer = Timer {
             sync_out: SyncOut::new(),
@@ -135,7 +130,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// ## Overview
     /// Internally we set the timers phase and direction
     /// Then trigger a software sync event.
-    #[cfg_attr(soc_has_mcpwm_swsync_can_propagate, doc(hidden))]
+    #[cfg_attr(docsrs, doc(cfg(soc_has_mcpwm_swsync_can_propagate)))]
     /// **Note** This will cause the timer to fire a sync out event to other timers
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         self.set_sync_phase(phase);
@@ -144,7 +139,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Trigger a software sync event
-    #[cfg_attr(soc_has_mcpwm_swsync_can_propagate, doc(hidden))]
+    #[cfg_attr(docsrs, doc(cfg(soc_has_mcpwm_swsync_can_propagate)))]
     /// **Note** This will cause the timer to fire a sync out event to other timers
     pub fn trigger_sync(&mut self) {
         // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
@@ -401,6 +396,11 @@ impl TimerClockConfig {
             sync_phase: 0,
             sync_direction: CounterDirection::Increasing,
         })
+    }
+
+    /// Default configuration for the timer with the provided clock configuration
+    pub(super) fn default(clock: &PeripheralClockConfig) -> Self {
+        Self::with_prescaler(clock, u16::MAX, PwmWorkingMode::Increase, 0)
     }
 
     /// Set the method for updating the PWM period

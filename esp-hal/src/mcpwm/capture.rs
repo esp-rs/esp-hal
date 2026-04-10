@@ -13,7 +13,7 @@
 //!
 //! ### Capture events can be triggered in 2 ways:
 //! 1. During a falling and/or Rising edge of a preconfigured GPIO pin.
-//! 2. Software triggered captures though [`CaptureChannel::trigger_capture`].
+//! 2. Software triggered captures through [`CaptureChannel::trigger_capture`].
 //!
 //! ### Configuration
 //! This module provides the flexibility of configuring any GPIO pin as an input
