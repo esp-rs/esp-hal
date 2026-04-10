@@ -110,9 +110,8 @@
 //! # {after_snippet}
 //! ```
 
-use core::{cell::Cell, marker::PhantomData};
+use core::marker::PhantomData;
 
-use critical_section::Mutex;
 use enumset::{EnumSet, EnumSetType};
 
 #[cfg(soc_has_mcpwm0)]
@@ -235,7 +234,7 @@ pub struct McPwm<'d, PWM: Instance> {
 impl<'d, PWM: Instance> McPwm<'d, PWM> {
     /// Create a new instance generics
     pub fn new(_peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let guard = PeripheralGuard::new(info.peripheral());
 
         // set prescaler for timer (0-2)
@@ -270,7 +269,7 @@ impl<'d, PWM: Instance> McPwm<'d, PWM> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let interrupt = info.interrupt();
 
         for core in crate::system::Cpu::other() {
@@ -437,16 +436,6 @@ pub struct Info {
     operator_b_output: [OutputSignal; 3],
 }
 
-/// Peripheral state for an MCPWM instance.
-#[doc(hidden)]
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct State {
-    int_ena: Mutex<Cell<u32>>,
-}
-
-unsafe impl Sync for State {}
-
 /// Dispatches event to register bit getter for interrupt status checks
 macro_rules! dispatch_event_bit {
     ($int_register:expr, $event:expr, $unit:expr) => {
@@ -481,40 +470,6 @@ macro_rules! dispatch_event_write {
             Event::FaultOneShotMode => $int_register.tz_ost($unit).bit($value),
         }
     };
-}
-
-impl State {
-    /// Return if the interrupt for an event is set
-    pub fn interrupt_set<const UNIT: u8>(&self, info: &Info, event: Event) -> bool {
-        let regs = info.regs();
-        let int_st = regs.int_st().read();
-        dispatch_event_bit!(int_st, event, UNIT)
-    }
-
-    /// Clear the interrupt for an event on a specific UNIT #
-    pub fn clear_interrupt<const UNIT: u8>(&self, info: &Info, event: Event) {
-        let regs = info.regs();
-        regs.int_clr().write(|w| {
-            dispatch_event_write!(w, event, UNIT, true);
-            w
-        });
-    }
-
-    /// Enables listening for an event on a specific UNIT #
-    pub fn enable_listen<const UNIT: u8>(&self, info: &Info, events: EnumSet<Event>, value: bool) {
-        critical_section::with(|cs| {
-            let int_ena = self.int_ena.borrow(cs);
-            let regs = info.regs();
-
-            let new_int_ena = regs.int_ena().modify(|_, w| {
-                for event in events {
-                    dispatch_event_write!(w, event, UNIT, value);
-                }
-                w
-            });
-            int_ena.set(new_int_ena);
-        });
-    }
 }
 
 /// Event types for MCPWM
@@ -577,6 +532,35 @@ impl Info {
     pub fn capture_input_signal<const CHAN: u8>(&self) -> InputSignal {
         self.capture_input[CHAN as usize]
     }
+
+    /// Return if the interrupt for an event is set
+    pub fn interrupt_set<const UNIT: u8>(&self, event: Event) -> bool {
+        let regs = self.regs();
+        let int_st = regs.int_st().read();
+        dispatch_event_bit!(int_st, event, UNIT)
+    }
+
+    /// Clear the interrupt for an event on a specific UNIT #
+    pub fn clear_interrupt<const UNIT: u8>(&self, event: Event) {
+        let regs = self.regs();
+        regs.int_clr().write(|w| {
+            dispatch_event_write!(w, event, UNIT, true);
+            w
+        });
+    }
+
+    /// Enables listening for an event on a specific UNIT #
+    pub fn enable_listen<const UNIT: u8>(&self, events: EnumSet<Event>, value: bool) {
+        let regs = self.regs();
+        critical_section::with(|_| {
+            regs.int_ena().modify(|r, w| {
+                for event in events {
+                    dispatch_event_write!(w, event, UNIT, value);
+                }
+                w
+            });
+        });
+    }
 }
 
 impl PartialEq for Info {
@@ -591,13 +575,13 @@ unsafe impl Sync for Info {}
 pub trait Instance: crate::private::Sealed {
     #[doc(hidden)]
     /// Returns the peripheral data and state.
-    fn split() -> (&'static Info, &'static State);
+    fn info() -> &'static Info;
 }
 
 #[cfg(soc_has_mcpwm0)]
 impl Instance for crate::peripherals::MCPWM0<'_> {
     /// Returns peripheral data for MCPWM 0
-    fn split() -> (&'static Info, &'static State) {
+    fn info() -> &'static Info {
         static INFO: Info = Info {
             register_block: crate::peripherals::MCPWM0::regs(),
             _peripheral: crate::system::Peripheral::Mcpwm0,
@@ -624,17 +608,13 @@ impl Instance for crate::peripherals::MCPWM0<'_> {
             ],
         };
 
-        static STATE: State = State {
-            int_ena: Mutex::new(Cell::new(0)),
-        };
-
-        (&INFO, &STATE)
+        &INFO
     }
 }
 
 #[cfg(soc_has_mcpwm1)]
 impl Instance for crate::peripherals::MCPWM1<'_> {
-    fn split() -> (&'static Info, &'static State) {
+    fn info() -> &'static Info {
         static INFO: Info = Info {
             register_block: crate::peripherals::MCPWM1::regs(),
             _peripheral: crate::system::Peripheral::Mcpwm1,
@@ -661,11 +641,7 @@ impl Instance for crate::peripherals::MCPWM1<'_> {
             ],
         };
 
-        static STATE: State = State {
-            int_ena: Mutex::new(Cell::new(0)),
-        };
-
-        (&INFO, &STATE)
+        &INFO
     }
 }
 
@@ -674,7 +650,7 @@ struct PwmClockGuard(DropGuard<(), fn(())>);
 
 impl PwmClockGuard {
     fn instance<PWM: Instance>() -> clocks::McpwmInstance {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         match info.peripheral() {
             Peripheral::Mcpwm0 => clocks::McpwmInstance::Mcpwm0,
             #[cfg(soc_has_mcpwm1)]

@@ -245,7 +245,7 @@ impl<'d, const OP: u8, PWM: Instance> Operator<'d, OP, PWM> {
     /// Unsafe access to the OPERATORx_TIMERSEL register
     /// Caller must ensure they only write to the bits corresponding to their operator
     unsafe fn timesel() -> &'static pac::mcpwm0::OPERATOR_TIMERSEL {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().operator_timersel()
     }
 }
@@ -291,7 +291,7 @@ pub struct PwmPin<'d, PWM: Instance, const OP: u8, const IS_A: bool> {
 impl<'d, PWM: Instance, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
     fn new(pin: impl PeripheralOutput<'d>, config: PwmPinConfig<IS_A>) -> Self {
         let pin = pin.into();
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let guard = PeripheralGuard::new(info.peripheral());
 
         let mut pin = PwmPin {
@@ -392,7 +392,7 @@ impl<'d, PWM: Instance, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A
     pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
-        let (info, _) = PWM::split();
+        let info = PWM::info();
 
         let tim_select = info.regs().operator_timersel().read();
         let tim = match OP {
@@ -416,7 +416,7 @@ impl<'d, PWM: Instance, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A
     }
 
     unsafe fn ch() -> &'static pac::mcpwm0::CH {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().ch(OP as usize)
     }
 }
@@ -574,7 +574,7 @@ impl<'d, PWM: Instance, const OP: u8> LinkedPins<'d, PWM, OP> {
     }
 
     unsafe fn ch() -> &'static pac::mcpwm0::CH {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().ch(OP as usize)
     }
 }

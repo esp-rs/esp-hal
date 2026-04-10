@@ -179,7 +179,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     #[instability::unstable]
     pub fn interrupts(&self) -> EnumSet<TimerEvent> {
         let mut res = EnumSet::new();
-        let (info, _) = PWM::split();
+        let info = PWM::info();
 
         let ints = info.regs().int_st().read();
         if ints.timer_stop(TIM).bit() {
@@ -197,7 +197,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, events: EnumSet<TimerEvent>) {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().int_clr().write(|w| {
             for event in events {
                 match event {
@@ -260,7 +260,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     fn set_sync_in_select(&mut self, sync_sel: SyncInSelect) {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
 
         // SAFETY: Only TIMER_SYNCI_CFG and TIMERx_SYNC accessed
         info.regs()
@@ -271,13 +271,13 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     fn enable_listen(&mut self, events: EnumSet<TimerEvent>, value: bool) {
-        let (info, state) = PWM::split();
+        let info = PWM::info();
         let mut int_events = EnumSet::new();
         for timer_event in events {
             int_events.insert(timer_event.into());
         }
 
-        state.enable_listen::<TIM>(info, int_events, value);
+        info.enable_listen::<TIM>(int_events, value);
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
@@ -298,7 +298,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     // Marked unsafe as the caller must ensure that only one timer
     // is accessing the registers for a given TIM const
     unsafe fn tmr() -> &'static pac::mcpwm0::TIMER {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().timer(TIM as usize)
     }
 }

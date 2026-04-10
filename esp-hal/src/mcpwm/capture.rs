@@ -200,12 +200,12 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
     }
 
     fn cfg() -> &'static crate::Reg<pac::mcpwm0::cap_timer_cfg::CAP_TIMER_CFG_SPEC> {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().cap_timer_cfg()
     }
 
     fn phase() -> &'static crate::Reg<pac::mcpwm0::cap_timer_phase::CAP_TIMER_PHASE_SPEC> {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().cap_timer_phase()
     }
 }
@@ -323,7 +323,7 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
 
     /// Assign the input signal for the capture
     pub fn with_signal_input<'a>(self, input: impl PeripheralInput<'a>) -> Self {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let input_signal = info.capture_input_signal::<CHAN>();
 
         if input_signal as usize <= property!("gpio.input_signal_max") {
@@ -356,42 +356,42 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
     /// This channel can listen to Falling, and/or Rising edges on any of the GPIO pins.
     #[instability::unstable]
     pub fn listen(&mut self) {
-        let (info, state) = PWM::split();
-        state.enable_listen::<CHAN>(info, EnumSet::only(Event::Capture), true);
+        let info = PWM::info();
+        info.enable_listen::<CHAN>(EnumSet::only(Event::Capture), true);
     }
 
     /// Stops listening to events on this channel
     #[instability::unstable]
     pub fn unlisten(&mut self) {
-        let (info, state) = PWM::split();
-        state.enable_listen::<CHAN>(info, EnumSet::only(Event::Capture), false);
+        let info = PWM::info();
+        info.enable_listen::<CHAN>(EnumSet::only(Event::Capture), false);
     }
 
     /// If the interrupt was set for this channel
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
-        let (info, state) = PWM::split();
-        state.interrupt_set::<CHAN>(info, Event::Capture)
+        let info = PWM::info();
+        info.interrupt_set::<CHAN>(Event::Capture)
     }
 
     /// Clear the interrupt
     #[instability::unstable]
     pub fn clear_interrupt(&self) {
-        let (info, state) = PWM::split();
-        state.clear_interrupt::<CHAN>(info, Event::Capture);
+        let info = PWM::info();
+        info.clear_interrupt::<CHAN>(Event::Capture);
     }
 
     /// Gets the last captured event
     #[instability::unstable]
     pub fn events(&self) -> CaptureEvent {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let time = info.regs().cap_ch(CHAN as usize).read().value().bits();
         let edge = info.regs().cap_status().read().cap_edge(CHAN).variant();
         CaptureEvent { time, edge }
     }
 
     fn cfg() -> &'static crate::Reg<pac::mcpwm0::cap_ch_cfg::CAP_CH_CFG_SPEC> {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs().cap_ch_cfg(CHAN as usize)
     }
 }

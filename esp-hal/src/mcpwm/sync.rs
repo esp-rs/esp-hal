@@ -98,7 +98,7 @@ impl<'d, const SYNC: u8, PWM: Instance> SyncLine<'d, SYNC, PWM> {
     /// Set the input signal for the sync line
     pub fn set_signal(&mut self, source: impl PeripheralInput<'d>) {
         // configure GPIO matrix → SYNC
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         let signal = info.sync_input_signal::<SYNC>();
 
         if signal as usize <= property!("gpio.input_signal_max") {
@@ -114,7 +114,7 @@ impl<'d, const SYNC: u8, PWM: Instance> SyncLine<'d, SYNC, PWM> {
     /// If invert is true sync events are triggered on falling edges.
     /// If invert is false sync events are triggered on rising edges.
     pub fn set_invert(&mut self, invert: bool) {
-        let (info, _) = PWM::split();
+        let info = PWM::info();
         info.regs()
             .timer_synci_cfg()
             .modify(|_, w| w.external_synci_invert(SYNC).variant(invert));
