@@ -7,14 +7,14 @@
 //! ## Configuration
 //! This module provides flexibility in configuring the PWM outputs. Its
 //! implementation allows for motor control and other applications that demand
-//! accurate pulse timing and sophisticated modulation techniques.
+//! accurate pulse timing and modulation techniques.
 
 use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 use crate::{
     gpio::interconnect::{OutputSignal, PeripheralOutput},
-    mcpwm::{PwmClockGuard, PwmPeripheral, timer::Timer},
+    mcpwm::{Instance, PwmClockGuard, timer::Timer},
     pac,
 };
 
@@ -30,7 +30,8 @@ pub enum PWMStream {
 
 /// Configuration for MCPWM Operator DeadTime
 /// It's recommended to reference the technical manual for configuration
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DeadTimeCfg {
     cfg_reg: u32,
 }
@@ -167,22 +168,20 @@ impl DeadTimeCfg {
 ///   implemented)
 /// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet implemented)
 /// * Handles response under fault conditions. (Not yet implemented)
-pub struct Operator<'d, const OP: u8, PWM> {
-    phantom: PhantomData<&'d PWM>,
+pub struct Operator<'d, const OP: u8, PWM>
+where
+    PWM: Instance,
+{
+    _phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
 
-impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
+impl<'d, const OP: u8, PWM: Instance> Operator<'d, OP, PWM> {
     pub(super) fn new(guard: PeripheralGuard) -> Self {
-        // Side note:
-        // It would have been nice to deselect any timer reference on peripheral
-        // initialization.
-        // However experimentation (ESP32-S3) showed that writing `3` to timersel
-        // will not disable the timer reference but instead act as though `2` was
-        // written.
+        // NOTE: Writing 3 to timersel does not disable timer reference (hardware limitation)
         Operator {
-            phantom: PhantomData,
+            _phantom: PhantomData,
             _guard: guard,
             _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
         }
@@ -192,19 +191,11 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     ///
     /// ### Note:
     /// By default TIMER0 is used
-    pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
-        let _ = timer;
+    pub fn set_timer<const TIM: u8>(&mut self, _timer: &Timer<'d, TIM, PWM>) {
         // SAFETY:
         // We only write to our OPERATORx_TIMERSEL register
-        let block = unsafe { &*PWM::block() };
-        block.operator_timersel().modify(|_, w| match OP {
-            0 => unsafe { w.operator0_timersel().bits(TIM) },
-            1 => unsafe { w.operator1_timersel().bits(TIM) },
-            2 => unsafe { w.operator2_timersel().bits(TIM) },
-            _ => {
-                unreachable!()
-            }
-        });
+        let timer_select = unsafe { Self::timesel() };
+        timer_select.modify(|_, w| unsafe { w.operator_timersel(OP).bits(TIM) });
     }
 
     /// Use the A output with the given pin and configuration
@@ -250,6 +241,13 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     ) -> LinkedPins<'d, PWM, OP> {
         LinkedPins::new(pin_a, config_a, pin_b, config_b, config_dt)
     }
+
+    /// Unsafe access to the OPERATORx_TIMERSEL register
+    /// Caller must ensure they only write to the bits corresponding to their operator
+    unsafe fn timesel() -> &'static pac::mcpwm0::OPERATOR_TIMERSEL {
+        let (info, _) = PWM::split();
+        info.regs().operator_timersel()
+    }
 }
 
 /// Configuration describing how the operator generates a signal on a connected
@@ -284,17 +282,17 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 }
 
 /// A pin driven by an MCPWM operator
-pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
+pub struct PwmPin<'d, PWM: Instance, const OP: u8, const IS_A: bool> {
     pin: OutputSignal<'d>,
     phantom: PhantomData<PWM>,
     _guard: PeripheralGuard,
 }
 
-impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
+impl<'d, PWM: Instance, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
     fn new(pin: impl PeripheralOutput<'d>, config: PwmPinConfig<IS_A>) -> Self {
         let pin = pin.into();
-
-        let guard = PeripheralGuard::new(PWM::peripheral());
+        let (info, _) = PWM::split();
+        let guard = PeripheralGuard::new(info.peripheral());
 
         let mut pin = PwmPin {
             pin,
@@ -304,7 +302,8 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        PWM::output_signal::<OP, IS_A>().connect_to(&pin.pin);
+        let signal = info.operator_output_signal::<OP, IS_A>();
+        signal.connect_to(&pin.pin);
         pin.pin.set_output_enable(true);
 
         pin
@@ -393,9 +392,9 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
-        let block = unsafe { &*PWM::block() };
+        let (info, _) = PWM::split();
 
-        let tim_select = block.operator_timersel().read();
+        let tim_select = info.regs().operator_timersel().read();
         let tim = match OP {
             0 => tim_select.operator0_timersel().bits(),
             1 => tim_select.operator1_timersel().bits(),
@@ -408,24 +407,29 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         // SAFETY:
         // The CFG0 registers are identical for all timers so we can pretend they're
         // TIMER0_CFG0
-        block.timer(tim as usize).cfg0().read().period().bits()
+        info.regs()
+            .timer(tim as usize)
+            .cfg0()
+            .read()
+            .period()
+            .bits()
     }
 
     unsafe fn ch() -> &'static pac::mcpwm0::CH {
-        let block = unsafe { &*PWM::block() };
-        block.ch(OP as usize)
+        let (info, _) = PWM::split();
+        info.regs().ch(OP as usize)
     }
 }
 
 /// Implement no error type for the PwmPin because the method are infallible
-impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
+impl<PWM: Instance, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
     for PwmPin<'_, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
 
 /// Implement the trait SetDutyCycle for PwmPin
-impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
+impl<PWM: Instance, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
     for PwmPin<'_, PWM, OP, IS_A>
 {
     /// Get the max duty of the PwmPin
@@ -486,12 +490,12 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// // pin_b: ------_________-----------_________-----
 /// # {after_snippet}
 /// ```
-pub struct LinkedPins<'d, PWM, const OP: u8> {
+pub struct LinkedPins<'d, PWM: Instance, const OP: u8> {
     pin_a: PwmPin<'d, PWM, OP, true>,
     pin_b: PwmPin<'d, PWM, OP, false>,
 }
 
-impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
+impl<'d, PWM: Instance, const OP: u8> LinkedPins<'d, PWM, OP> {
     fn new(
         pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
@@ -540,7 +544,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_b(&mut self, value: u16) {
-        self.pin_a.set_timestamp(value)
+        self.pin_b.set_timestamp(value)
     }
 
     /// Configure the deadtime generator
@@ -570,8 +574,8 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     }
 
     unsafe fn ch() -> &'static pac::mcpwm0::CH {
-        let block = unsafe { &*PWM::block() };
-        block.ch(OP as usize)
+        let (info, _) = PWM::split();
+        info.regs().ch(OP as usize)
     }
 }
 

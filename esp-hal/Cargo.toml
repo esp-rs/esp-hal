@@ -335,3 +335,15 @@ mixed_attributes_style = "allow"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }
+
+## Temp patch till esp-pacs-mcpwm pull request is accepted.
+[patch."https://github.com/esp-rs/esp-pacs"]
+esp32 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32c2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32c3 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32c5 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32c6 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32c61 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32h2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32s2 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
+esp32s3 = { git = "https://github.com/Alex3404/esp-pacs-mcpwm", rev = "a0e6861" }
