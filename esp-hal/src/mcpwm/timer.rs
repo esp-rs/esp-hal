@@ -118,7 +118,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// If the timer is already running you might want to call [`Timer::stop`] first.
     ///
     /// If your [`PeriodUpdatingMethod`] is set to [`PeriodUpdatingMethod::Immediately`]
-    /// and if your new period is larger than the current counter value as this will cause weird
+    /// and if your new period is smaller than the current counter value as this will cause weird
     /// behavior.
     pub fn set_config(&mut self, config: TimerClockConfig) {
         self.config = config;
