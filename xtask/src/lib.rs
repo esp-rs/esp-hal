@@ -883,7 +883,8 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     }
 }
 
-fn format_package_path(
+/// Format a package directory in the workspace using `cargo fmt`.
+pub fn format_package_path(
     workspace: &Path,
     package_path: &Path,
     check: bool,

@@ -181,6 +181,13 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
         xtask::format_package(workspace, package, args.check, None)?;
     }
 
+    // Keep formatting "helper" crates that are intentionally not in
+    // the Package enum.
+    for package_path in ["xtask", "xtask-mcp-macros"] {
+        log::info!("Formatting package: {}", package_path);
+        xtask::format_package_path(workspace, &workspace.join(package_path), args.check, None)?;
+    }
+
     // format ymls in .github/
     xtask::format_yml(args.check, "./.github")?;
 
