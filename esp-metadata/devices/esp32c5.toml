@@ -40,7 +40,7 @@ peripherals = [
     { name = "APB_SARADC", dma_peripheral = 8 },
     # { name = "AVC" },
     # { name = "BITSCRAMBLER" },
-    # { name = "CACHE" },
+    { name = "CACHE" },
     { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },

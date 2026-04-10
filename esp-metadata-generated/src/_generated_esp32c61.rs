@@ -2449,18 +2449,20 @@ macro_rules! for_each_peripheral {
         "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CLINT peripheral singleton"]
         CLINT <= CLINT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "DMA peripheral singleton"] DMA <= DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "ECC peripheral singleton"] ECC
-        <= ECC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ETM peripheral singleton"] ETM <= SOC_ETM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
-        GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
-        HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DMA peripheral singleton"] DMA
+        <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ECC peripheral singleton"] ECC <= ECC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECDSA peripheral singleton"]
+        ECDSA <= ECDSA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETM peripheral singleton"] ETM
+        <= SOC_ETM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2C0 peripheral singleton"]
         I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
@@ -2557,6 +2559,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO28)); _for_each_inner_peripheral!((GPIO29));
         _for_each_inner_peripheral!((ASSIST_DEBUG(unstable)));
         _for_each_inner_peripheral!((CLINT(unstable)));
+        _for_each_inner_peripheral!((CACHE(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((ECC(unstable)));
         _for_each_inner_peripheral!((ECDSA(unstable)));
@@ -2738,6 +2741,7 @@ macro_rules! for_each_peripheral {
         "GPIO29 peripheral singleton"] GPIO29 <= virtual()), (@ peri_type #[doc =
         "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)),
         (@ peri_type #[doc = "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)),
+        (@ peri_type #[doc = "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)),
         (@ peri_type #[doc = "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@
         peri_type #[doc = "ECC peripheral singleton"] ECC <= ECC() (unstable)), (@
         peri_type #[doc = "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable)), (@
@@ -2811,19 +2815,20 @@ macro_rules! for_each_peripheral {
         (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18),
         (GPIO19), (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26),
         (GPIO27), (GPIO28), (GPIO29), (ASSIST_DEBUG(unstable)), (CLINT(unstable)),
-        (DMA(unstable)), (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)),
-        (ETM(unstable)), (GPIO(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
-        (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
-        (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)),
-        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
-        (LP_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
-        (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
-        (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
-        (SLC(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI), (PSRAM(unstable))));
+        (CACHE(unstable)), (DMA(unstable)), (ECC(unstable)), (ECDSA(unstable)),
+        (EFUSE(unstable)), (ETM(unstable)), (GPIO(unstable)), (HP_APM(unstable)),
+        (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)),
+        (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
+        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)),
+        (LP_CLKRST(unstable)), (LPWR(unstable)), (LP_IO_MUX(unstable)),
+        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
+        (LP_WDT(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
+        (MODEM_SYSCON(unstable)), (PAU(unstable)), (PCR(unstable)), (PMU(unstable)),
+        (RNG(unstable)), (SHA(unstable)), (SLC(unstable)), (SPI0(unstable)),
+        (SPI1(unstable)), (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)),
+        (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1),
+        (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)), (LP_CORE(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI), (PSRAM(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1)));
     };
 }
