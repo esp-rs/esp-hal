@@ -5,7 +5,7 @@
 //! On ESP32-S3 you might want to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal` if
 //! the device comes with octal-SPIRAM
 
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c5
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c5 esp32c61
 //% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 
 #![no_std]
