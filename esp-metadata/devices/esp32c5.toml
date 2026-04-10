@@ -713,11 +713,11 @@ support_status = { status = "not_supported", issue = 5172 }
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5169 }
 
-[device.temp_sensor]
-support_status = { status = "not_supported", issue = 5153 }
-
 [device.ulp_riscv]
 support_status = { status = "not_supported", issue = 5160 }
 
 [device.lp_timer]
 support_status = { status = "not_supported", issue = 5162 }
+
+[device.temp_sensor]
+support_status = { status = "not_supported", issue = 5153 }
