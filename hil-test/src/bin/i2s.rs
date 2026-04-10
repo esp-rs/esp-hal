@@ -162,7 +162,7 @@ mod tests {
         enable_loopback();
 
         let mut rx_transfer = i2s_rx.read_dma_circular_async(rx_buffer).unwrap();
-        spawner.must_spawn(writer(tx_buffer, i2s_tx));
+        spawner.spawn(writer(tx_buffer, i2s_tx).unwrap());
 
         let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;

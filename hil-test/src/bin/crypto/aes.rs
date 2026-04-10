@@ -487,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(aes_dma, psram))]
+    #[cfg(all(aes_dma, soc_has_psram))]
     fn test_aes_dma_work_queue_psram() {
         use allocator_api2::vec::Vec;
 
@@ -565,7 +565,7 @@ mod tests {
 
         // Start task before we'd start the AES operation
         let spawner = SendSpawner::for_current_executor().await;
-        spawner.must_spawn(aes_task(signal));
+        spawner.spawn(aes_task(signal).unwrap());
 
         signal.wait().await;
 

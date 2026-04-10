@@ -50,6 +50,7 @@ pub(crate) mod implem;
 
 #[instability::unstable]
 pub use implem::*;
+use procmacros::doc_replace;
 
 /// The bit field for get access to efuse data
 #[derive(Debug, Clone, Copy)]
@@ -275,13 +276,134 @@ pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
     mac
 }
 
-/// Returns the hardware revision
+#[doc_replace]
+/// Returns the hardware revision.
 ///
-/// The chip version is calculated using the following
-/// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-#[instability::unstable]
-pub fn chip_revision() -> u16 {
-    major_chip_version() as u16 * 100 + minor_chip_version() as u16
+/// ## Examples
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// let rev = esp_hal::efuse::chip_revision();
+/// println!("Chip revision: {}.{}", rev.major, rev.minor);
+/// # {after_snippet}
+/// ```
+#[inline]
+pub fn chip_revision() -> ChipRevision {
+    ChipRevision {
+        major: major_chip_version(),
+        minor: minor_chip_version(),
+    }
+}
+
+#[doc_replace]
+/// Represents the hardware revision.
+///
+/// The type supports converting between two separate u16-based representations:
+///
+/// - Combined: a `u16` calculated as `major * 100 + minor`. The combined representation is more
+///   often used by ESP-IDF, and working with it involves integer division. Note that the combined
+///   representation assumes minor is less than 100.
+/// - Packed: a `u16` with the major revision in the high byte and the minor revision in the low
+///   byte.
+///
+/// ## Examples
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_hal::efuse::ChipRevision;
+///
+/// let rev = esp_hal::efuse::chip_revision();
+/// println!("Chip revision: {}.{}", rev.major, rev.minor);
+///
+/// // You can compare against other ChipRevision objects
+/// if rev < ChipRevision::from_combined(300) {
+///     // You can print a debug representation
+///     println!("Chip revision is too old: {:?}", rev);
+/// }
+/// if rev >= ChipRevision::from_packed(0x400) {
+///     println!("Chip revision is too new: {:?}", rev);
+/// }
+///
+/// // You can convert into two different numeric representations.
+/// assert!(rev.packed() >= 0x300);
+/// assert!(rev.combined() >= 300);
+/// # {after_snippet}
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ChipRevision {
+    /// The major revision number.
+    pub major: u8,
+
+    /// The minor revision number.
+    pub minor: u8,
+}
+
+impl PartialOrd for ChipRevision {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ChipRevision {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        match self.major.cmp(&other.major) {
+            cmp::Ordering::Equal => self.minor.cmp(&other.minor),
+            ord => ord,
+        }
+    }
+}
+
+impl ChipRevision {
+    /// Creates a new [`ChipRevision`] from a combined revision value.
+    #[inline]
+    pub const fn from_combined(revision: u16) -> Self {
+        let major = revision / 100;
+        let minor = revision % 100;
+        ::core::assert!(
+            major <= u8::MAX as u16 && minor <= u8::MAX as u16,
+            "`ChipRevision` cannot represent revision",
+        );
+        Self {
+            major: major as u8,
+            minor: minor as u8,
+        }
+    }
+
+    /// Returns the combined revision value as a `u16`.
+    ///
+    /// The combined revision value is a `u16` calculated as `major * 100 + minor`.
+    #[inline]
+    pub const fn combined(self) -> u16 {
+        ::core::assert!(
+            self.minor < 100,
+            "`ChipRevision` cannot be represented using the combined representation",
+        );
+        (self.major as u16) * 100 + (self.minor as u16)
+    }
+
+    /// Creates a new [`ChipRevision`] from a packed revision value.
+    ///
+    /// The packed revision value is a `u16` with the major revision in the high byte and the minor
+    /// revision in the low byte.
+    #[inline]
+    pub const fn from_packed(packed: u16) -> Self {
+        Self {
+            major: ((packed >> 8) & 0xFF) as u8,
+            minor: (packed & 0xFF) as u8,
+        }
+    }
+
+    /// Returns the packed revision value as a `u16`.
+    ///
+    /// The packed revision value is a `u16` with the major revision in the high byte and the minor
+    /// revision in the low byte.
+    #[inline]
+    pub const fn packed(self) -> u16 {
+        (self.major as u16) << 8 | (self.minor as u16)
+    }
 }
 
 // Indicates the state of setting the mac address

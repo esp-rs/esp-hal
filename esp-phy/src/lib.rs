@@ -199,7 +199,7 @@ impl PhyState {
     fn calibrate(&mut self) {
         #[cfg(esp32s2)]
         unsafe {
-            sys::include::phy_eco_version_sel(esp_hal::efuse::major_chip_version());
+            sys::include::phy_eco_version_sel(esp_hal::efuse::chip_revision().major);
         }
         // Causes headaches for some reason.
         // See: https://github.com/esp-rs/esp-hal/issues/4015
@@ -406,6 +406,10 @@ pub fn enable_phy<'d>() -> PhyInitGuard<'d> {
 /// This is only useful if you [core::mem::forget] the [PhyInitGuard].
 pub fn disable_phy() {
     PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
+    // Balance the PhyClockGuard that was mem::forget'd with PhyInitGuard.
+    // Without this, PHY_CLOCK_REF_COUNTER (u8) leaks on every phy_enable/phy_disable
+    // cycle from the WiFi blob C-callback interface, overflowing after ~9 TCP connects.
+    decrease_phy_clock_ref_count_internal();
 }
 
 /// Enable the PHY clock and acquire a [PhyClockGuard].

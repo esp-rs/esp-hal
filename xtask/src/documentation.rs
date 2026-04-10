@@ -260,13 +260,25 @@ fn cargo_doc_without_pre_processing(
     // Special case: `esp-metadata` requires `std`, and we get some really confusing
     // errors if we try to pass `-Zbuild-std=core`:
     if package.needs_build_std() {
-        builder = builder.arg("-Zbuild-std=alloc,core");
+        builder.add_arg("-Zbuild-std=alloc,core");
     }
 
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    let mut envs = vec![("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")];
+    let rustdocflags = vec![
+        "--cfg docsrs",
+        "--cfg not_really_docsrs",
+        // Activating this would redirect *all* rand_core version to 0.10.0, which is wrong.
+        // "--extern-html-root-takes-precedence",
+        // While we could use --extern-html-root-url to remap rand_core links, it doesn't seem to
+        // support multiple versions of the same crate. We could redirect everything to 0.10.0,
+        // which isn't ideal.
+        // "--extern-html-root-url rand_core-09=https://docs.rs/rand_core/0.9.5/",
+    ];
+
+    let rustdocflags = rustdocflags.join(" ");
+    let mut envs = vec![("RUSTDOCFLAGS", rustdocflags.as_str())];
     // Special case: `esp-storage` requires the optimization level to be 2 or 3:
     if package == Package::EspStorage {
         envs.push(("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3"));

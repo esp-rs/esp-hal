@@ -95,9 +95,9 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(runner)).ok();
-    spawner.spawn(run_dhcp(stack, gw_ip_addr_str)).ok();
+    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(net_task(runner).unwrap());
+    spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];

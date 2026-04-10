@@ -483,7 +483,7 @@ mod async_tests {
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         let spawner = interrupt_executor.start(Priority::Priority3);
-        spawner.must_spawn(long_string_reader(rx, signal));
+        spawner.spawn(long_string_reader(rx, signal).unwrap());
 
         tx.write_str(LONG_TEST_STRING).unwrap();
 

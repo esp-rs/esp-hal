@@ -74,7 +74,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ✔️      | ✔️      |
 | HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
+| I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      |
 | I2C slave                 | ❌    |          | ❌       | [❌][5156] [^1] | ❌       |           | ❌       | ❌       | ❌       |
 | I2S                       | ⚒️   |          | ⚒️      | [❌][5172] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
@@ -88,7 +88,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          |           |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
@@ -98,8 +98,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      |           |          |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      |           | ✔️      | ✔️      | ✔️      |
-| SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
+| SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      |
+| SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
@@ -121,7 +121,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
-[5141]: https://github.com/esp-rs/esp-hal/issues/5141
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155

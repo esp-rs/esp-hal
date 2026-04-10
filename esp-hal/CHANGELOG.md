@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C61: RNG (#5244)
 - C61: Add GPIO support (#5248)
 - C61: Add UART support (#5251)
+- C61: Add I2C support (#5258)
+- C61: Add SPI support (#5261)
+- Added support for `rand_core 0.10.0` (#5280)
+- `esp_hal::efuse::ChipRevision` (#5287)
+- Cache configuration options for ESP32-S2 (#5306)
+- C5: Add PSRAM support (#5317)
+- C61: Add PSRAM support (#5325)
 
 ### Changed
 
@@ -60,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `efuse::read_base_mac_address()` has been renamed to `efuse::base_mac_address()` (#5104)
 - Renamed `efuse::set_mac_address` to `efuse::override_mac_address` (#5104)
 - UART: `read_ready` and `write_ready` are now stable (#4600)
+- UART: `read_ready` and `write_ready` now take `&self` instead of `&mut self` (#5329)
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
@@ -89,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
 - `Rng`, `Rng::{random, read}` have been marked stable (#5098)
 - `esp_hal::init` now verifies that the initial stack pointer is in range (#5227)
+- Updated embassy dependencies: embassy-sync to 0.8, embassy-embedded-hal to 0.6 (#5249)
+- `esp_hal::efuse::chip_revision` has been marked stable (#5287)
+- `esp_hal::efuse::chip_revision` now returns `ChipRevision` (#5287)
+- DMA buffers can now be created using empty buffer slices (#5266)
 
 ### Fixed
 
@@ -120,6 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART and I2C inputs are now correctly defined when creating drivers (#5214)
 - The `SpiBus::transfer` (both from `embedded_hal` and `embedded_hal_async`) implementations of `esp_hal::spi::master::Spi` no longer write more data than they need to (#5245)
 - Fixed a bug in `Spi::half_duplex_{read, write}` where calling these functions aborted previously running writes (#5247)
+- LP I2C: prevent spurious I2C start during the initialization of LpI2c (#5311)
+- Fixed a bug in `TWAI` that may cause the driver to hang (#5318)
 
 ### Removed
 
@@ -134,6 +148,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::map` (#4996, #5007)
 - `InterruptHandler::new_not_nested` (#5000)
 - `esp_hal::interrupt::Priority::None` (#4996)
+- The `psram` feature has been replaced by a `Psram` driver object. esp-alloc has been updated so that no user code changes should be necessary when using `esp_alloc::psram_allocator!` (#5310)
+- The `esp_hal::psram::psram_raw_parts` function has been removed. Use `esp_alloc::psram_allocator`, or `Psram::raw_parts`. (#5310)
 
 ## [v1.0.0] - 2025-10-30
 

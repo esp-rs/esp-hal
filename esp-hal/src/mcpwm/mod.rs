@@ -127,7 +127,7 @@ use crate::{
     gpio::{InputSignal, OutputSignal},
     interrupt::{self, InterruptHandler},
     pac,
-    private::OnDrop,
+    private::DropGuard,
     soc::clocks::{self, ClockTree},
     system::{Peripheral, PeripheralGuard},
     time::Rate,
@@ -660,7 +660,7 @@ impl Instance for crate::peripherals::MCPWM1<'_> {
 }
 
 #[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
-struct PwmClockGuard(OnDrop<fn()>);
+struct PwmClockGuard(DropGuard<fn()>);
 
 impl PwmClockGuard {
     fn instance<PWM: Instance>() -> clocks::McpwmInstance {
@@ -676,7 +676,7 @@ impl PwmClockGuard {
     pub fn new<PWM: Instance>() -> Self {
         ClockTree::with(move |clocks| Self::instance::<PWM>().request_function_clock(clocks));
 
-        Self(OnDrop::new(|| {
+        Self(DropGuard::new(|| {
             ClockTree::with(move |clocks| Self::instance::<PWM>().release_function_clock(clocks));
         }))
     }

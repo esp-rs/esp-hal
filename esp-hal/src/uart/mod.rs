@@ -69,7 +69,7 @@ use crate::{
     handler,
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
-    private::OnDrop,
+    private::DropGuard,
     ram,
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
@@ -162,11 +162,8 @@ impl embedded_io_07::Error for TxError {
     }
 }
 
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 pub use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
-#[cfg(not(feature = "unstable"))]
-use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
 use crate::soc::clocks::{
     UartBaudRateGeneratorConfig as BaudRateConfig,
     UartFunctionClockConfig as ClockConfig,
@@ -815,7 +812,7 @@ where
     ///
     /// If this function returns `true`, [`Self::write`] will not block.
     #[instability::unstable]
-    pub fn write_ready(&mut self) -> bool {
+    pub fn write_ready(&self) -> bool {
         self.uart.info().tx_fifo_count() < Info::UART_FIFO_SIZE
     }
 
@@ -1087,7 +1084,7 @@ impl<'d> UartRx<'d, Async> {
             // future resolved.
             let info = self.uart.info();
             unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
-            let _guard = OnDrop::new(|| {
+            let _guard = DropGuard::new((), |_| {
                 unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
             });
 
@@ -1296,7 +1293,7 @@ where
     ///
     /// If this function returns `true`, [`Self::read`] will not block.
     #[instability::unstable]
-    pub fn read_ready(&mut self) -> bool {
+    pub fn read_ready(&self) -> bool {
         self.uart.info().rx_fifo_count() > 0
     }
 
@@ -1829,7 +1826,7 @@ where
     /// }
     /// # {after_snippet}
     /// ```
-    pub fn write_ready(&mut self) -> bool {
+    pub fn write_ready(&self) -> bool {
         self.tx.write_ready()
     }
 
@@ -1913,7 +1910,7 @@ where
     ///
     /// # {after_snippet}
     /// ```
-    pub fn read_ready(&mut self) -> bool {
+    pub fn read_ready(&self) -> bool {
         self.rx.read_ready()
     }
 
@@ -2275,7 +2272,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.read_ready())
+        Ok(UartRx::read_ready(self))
     }
 }
 
@@ -2313,7 +2310,7 @@ where
     Dm: DriverMode,
 {
     fn write_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.write_ready())
+        Ok(UartTx::write_ready(self))
     }
 }
 
@@ -2378,7 +2375,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.read_ready())
+        Ok(UartRx::read_ready(self))
     }
 }
 
@@ -2416,7 +2413,7 @@ where
     Dm: DriverMode,
 {
     fn write_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.write_ready())
+        Ok(UartTx::write_ready(self))
     }
 }
 

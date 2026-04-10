@@ -38,6 +38,9 @@ termcolor         = "1.4"
 ## Indicates the target device has RTC slow memory available.
 rtc-slow = []
 
+## Indicates the target device has RTC fast memory available.
+rtc-fast = []
+
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.
 has-lp-core = ["dep:object"]

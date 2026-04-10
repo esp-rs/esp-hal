@@ -84,7 +84,7 @@ mod tests {
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        spawner.must_spawn(try_init(p.TIMG0, sw_ints.software_interrupt0));
+        spawner.spawn(try_init(p.TIMG0, sw_ints.software_interrupt0).unwrap());
     }
 
     #[test]
@@ -502,7 +502,7 @@ mod tests {
                 static CORE1_EXECUTOR: StaticCell<Executor> = StaticCell::new();
                 let executor = CORE1_EXECUTOR.init(Executor::new());
                 executor.run(|spawner| {
-                    spawner.must_spawn(task());
+                    spawner.spawn(task().unwrap());
                 });
             },
         );

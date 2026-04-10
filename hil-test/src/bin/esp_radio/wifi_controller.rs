@@ -17,6 +17,7 @@ mod tests {
     }
 
     #[cfg(rng_trng_supported)]
+    #[cfg(feature = "esp-radio-unstable")]
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);

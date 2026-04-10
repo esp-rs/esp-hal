@@ -374,6 +374,15 @@ unsafe impl embassy_sync_07::blocking_mutex::raw::RawMutex for RawMutex {
     }
 }
 
+unsafe impl embassy_sync_08::blocking_mutex::raw::RawMutex for RawMutex {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self = Self::new();
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock(f)
+    }
+}
+
 /// A non-reentrant (panicking) mutex.
 ///
 /// This is largely equivalent to a `critical_section::Mutex<RefCell<T>>`, but accessing the inner

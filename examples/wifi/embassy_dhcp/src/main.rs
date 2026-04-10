@@ -42,6 +42,28 @@ use reqwless::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+#[cfg(feature = "alloc-hooks")]
+use enumset::EnumSet;
+#[cfg(feature = "alloc-hooks")]
+use esp_alloc::{EspHeap, MemoryCapability};
+
+#[cfg(feature = "alloc-hooks")]
+#[unsafe(no_mangle)]
+unsafe extern "Rust" fn _esp_alloc_alloc(
+    _heap: &EspHeap,
+    _caps: EnumSet<MemoryCapability>,
+    ptr: usize,
+    size: usize,
+) {
+    println!("Allocated {} bytes: {:x}", size, ptr);
+}
+
+#[cfg(feature = "alloc-hooks")]
+#[unsafe(no_mangle)]
+unsafe extern "Rust" fn _esp_alloc_dealloc(_heap: &EspHeap, ptr: usize, size: usize) {
+    println!("Deallocated {} bytes: {:x}", size, ptr);
+}
+
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -104,8 +126,8 @@ async fn main(spawner: Spawner) -> ! {
         println!("{:?}", ap);
     }
 
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(runner)).ok();
+    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(net_task(runner).unwrap());
 
     stack.wait_config_up().await;
 

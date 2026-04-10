@@ -97,7 +97,10 @@ fn toolchain_folder(toolchain: &str) -> Result<PathBuf> {
 
     match parsed.iter().find(|(name, _)| name == toolchain) {
         Some((_, folder)) => Ok(PathBuf::from(folder)),
-        None => Err(anyhow::anyhow!("Toolchain {toolchain} not found. Found {:?}", parsed)),
+        None => Err(anyhow::anyhow!(
+            "Toolchain {toolchain} not found. Found {:?}",
+            parsed
+        )),
     }
 }
 

@@ -238,28 +238,6 @@ macro_rules! unstable_module {
     };
 }
 
-// we can't use instability because it mucks up the short description in rustdoc
-#[doc(hidden)]
-macro_rules! unstable_reexport {
-    ($(
-        $(#[$meta:meta])*
-        pub use $path:path;
-    )*) => {
-        $(
-            $(#[$meta])*
-            #[cfg(feature = "unstable")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            pub use $path;
-
-            $(#[$meta])*
-            #[cfg(not(feature = "unstable"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            #[allow(unused)]
-            pub(crate) use $path;
-        )*
-    };
-}
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 // we don't want unstable drivers to be compiled even, unless enabled
 #[doc(hidden)]
@@ -304,6 +282,8 @@ pub(crate) use peripherals::pac;
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
+pub(crate) mod private;
+
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
 #[cfg(gpio_driver_supported)]
@@ -330,20 +310,19 @@ mod macros;
 
 #[cfg(feature = "rt")]
 pub use procmacros::blocking_main as main;
+#[instability::unstable]
+pub use procmacros::handler;
+#[instability::unstable]
+#[cfg(any(lp_core, ulp_riscv_core))]
+pub use procmacros::load_lp_code;
 pub use procmacros::ram;
 
-unstable_reexport! {
-    pub use procmacros::handler;
-
-    #[cfg(any(lp_core, ulp_riscv_core))]
-    pub use procmacros::load_lp_code;
-
-    #[cfg(lp_core)]
-    pub use self::soc::lp_core;
-
-    #[cfg(ulp_riscv_core)]
-    pub use self::soc::ulp_core;
-}
+#[instability::unstable]
+#[cfg(lp_core)]
+pub use self::soc::lp_core;
+#[instability::unstable]
+#[cfg(ulp_riscv_core)]
+pub use self::soc::ulp_core;
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
@@ -370,7 +349,7 @@ unstable_module! {
     pub mod etm;
     #[cfg(usb_otg_driver_supported)]
     pub mod otg_fs;
-    #[cfg(psram)] // DMA needs some things from here
+    #[cfg(soc_has_psram)] // DMA needs some things from here
     pub mod psram;
 }
 
@@ -572,52 +551,6 @@ impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
-pub(crate) mod private {
-    use core::mem::ManuallyDrop;
-
-    pub trait Sealed {}
-
-    #[non_exhaustive]
-    #[doc(hidden)]
-    /// Magical incantation to gain access to internal APIs.
-    pub struct Internal;
-
-    impl Internal {
-        /// Obtain magical powers to access internal APIs.
-        ///
-        /// # Safety
-        ///
-        /// By calling this function, you accept that you are using an internal
-        /// API that is not guaranteed to be documented, stable, working
-        /// and may change at any time.
-        ///
-        /// You declare that you have tried to look for other solutions, that
-        /// you have opened a feature request or an issue to discuss the
-        /// need for this function.
-        pub unsafe fn conjure() -> Self {
-            Self
-        }
-    }
-
-    pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
-    #[cfg_attr(esp32c61, expect(unused))] // TODO: remove when more peripherals are supported
-    impl<F: FnOnce()> OnDrop<F> {
-        pub fn new(cb: F) -> Self {
-            Self(ManuallyDrop::new(cb))
-        }
-
-        pub fn defuse(self) {
-            core::mem::forget(self);
-        }
-    }
-
-    impl<F: FnOnce()> Drop for OnDrop<F> {
-        fn drop(&mut self) {
-            unsafe { (ManuallyDrop::take(&mut self.0))() }
-        }
-    }
-}
-
 #[doc(hidden)]
 pub use private::Internal;
 
@@ -718,13 +651,6 @@ pub struct Config {
     /// The CPU clock configuration.
     #[builder_lite(skip)]
     cpu_clock: ClockConfig,
-
-    /// PSRAM configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[cfg(feature = "psram")]
-    #[builder_lite(unstable)]
-    psram: psram::PsramConfig,
 }
 
 impl Config {
@@ -839,9 +765,6 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(gpio_driver_supported)]
     crate::gpio::interrupt::bind_default_interrupt_handler();
-
-    #[cfg(feature = "psram")]
-    crate::psram::init_psram(config.psram);
 
     unsafe {
         esp_rom_sys::init_syscall_table();

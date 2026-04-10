@@ -97,6 +97,54 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("i2c_master.has_fsm_timeouts") => {
+        true
+    };
+    ("i2c_master.has_hw_bus_clear") => {
+        true
+    };
+    ("i2c_master.has_bus_timeout_enable") => {
+        true
+    };
+    ("i2c_master.separate_filter_config_registers") => {
+        false
+    };
+    ("i2c_master.can_estimate_nack_reason") => {
+        true
+    };
+    ("i2c_master.has_conf_update") => {
+        true
+    };
+    ("i2c_master.has_reliable_fsm_reset") => {
+        true
+    };
+    ("i2c_master.has_arbitration_en") => {
+        true
+    };
+    ("i2c_master.has_tx_fifo_watermark") => {
+        true
+    };
+    ("i2c_master.bus_timeout_is_exponential") => {
+        true
+    };
+    ("i2c_master.max_bus_timeout") => {
+        31
+    };
+    ("i2c_master.max_bus_timeout", str) => {
+        stringify!(31)
+    };
+    ("i2c_master.ll_intr_mask") => {
+        262143
+    };
+    ("i2c_master.ll_intr_mask", str) => {
+        stringify!(262143)
+    };
+    ("i2c_master.fifo_size") => {
+        32
+    };
+    ("i2c_master.fifo_size", str) => {
+        stringify!(32)
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -105,6 +153,9 @@ macro_rules! property {
     };
     ("interrupts.disabled_interrupt") => {
         0
+    };
+    ("psram.octal_spi") => {
+        false
     };
     ("rng.apb_cycle_wait_num") => {
         16
@@ -147,6 +198,24 @@ macro_rules! property {
     };
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
+    };
+    ("spi_master.supports_dma") => {
+        false
+    };
+    ("spi_master.has_octal") => {
+        false
+    };
+    ("spi_master.has_app_interrupts") => {
+        true
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        true
+    };
+    ("spi_master.has_clk_pre_div") => {
+        true
+    };
+    ("spi_slave.supports_dma") => {
+        false
     };
     ("timergroup.timg_has_timer1") => {
         false
@@ -1968,6 +2037,10 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
+            /// I2C_EXT0 peripheral clock signal
+            I2cExt0,
+            /// SPI2 peripheral clock signal
+            Spi2,
             /// SYSTIMER peripheral clock signal
             Systimer,
             /// TIMG0 peripheral clock signal
@@ -1983,6 +2056,8 @@ macro_rules! implement_peripheral_clocks {
             const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
+                Self::I2cExt0,
+                Self::Spi2,
                 Self::Systimer,
                 Self::Timg0,
                 Self::Timg1,
@@ -1992,6 +2067,16 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_clk_en().bit(enable));
+                }
                 Peripheral::Systimer => {
                     crate::peripherals::SYSTEM::regs()
                         .systimer_conf()
@@ -2025,6 +2110,16 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_rst_en().bit(reset));
+                }
                 Peripheral::Systimer => {
                     crate::peripherals::SYSTEM::regs()
                         .systimer_conf()
@@ -2081,6 +2176,32 @@ macro_rules! memory_range {
         "65536"
     };
 }
+/// This macro can be used to generate code for each peripheral instance of the I2C master driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $scl:ident, $sda:ident)`
+///
+/// Macro fragments:
+/// - `$id`: the index of the I2C instance
+/// - `$instance`: the name of the I2C instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$scl`, `$sda`: peripheral signal names.
+///
+/// Example data: `(0, I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_i2c_master {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2c_master { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_i2c_master!((0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA)); _for_each_inner_i2c_master!((all(0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA)));
+    };
+}
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
@@ -2108,6 +2229,63 @@ macro_rules! for_each_uart {
         _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
         _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
         UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the SPI master driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident [$($cs:ident),*] [$($sio:ident),*]
+/// $($is_qspi:literal)?)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the SPI instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$cs`, `$sio`: chip select and SIO signal names.
+/// - `$is_qspi`: a `true` literal present if the SPI instance supports QSPI.
+///
+/// Example data:
+/// - `(SPI2, Spi2, FSPICLK [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ,
+///   FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7], true)`
+/// - `(SPI3, Spi3, SPI3_CLK [SPI3_CS0, SPI3_CS1, SPI3_CS2] [SPI3_D, SPI3_Q])`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_master {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_master { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_spi_master!((SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1,
+        FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD], true));
+        _for_each_inner_spi_master!((all(SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1, FSPICS2,
+        FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD], true)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the SPI instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$sclk`, `$mosi`, `$miso`, `$cs`: signal names.
+///
+/// Example data: `(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_slave {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_slave { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_spi_slave!((SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0));
+        _for_each_inner_spi_slave!((all(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)));
     };
 }
 #[macro_export]
@@ -2286,8 +2464,8 @@ macro_rules! for_each_peripheral {
         "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2C0 peripheral singleton"]
         I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
@@ -2326,19 +2504,25 @@ macro_rules! for_each_peripheral {
         <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SLC peripheral singleton"] SLC <= SLC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
-        SYSTEM <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TEE peripheral singleton"] TEE
-        <= TEE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
-        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
-        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI0 peripheral singleton"]
+        SPI0 <= SPI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI2 peripheral singleton"]
+        SPI2 <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTIMER peripheral singleton"]
+        SYSTIMER <= SYSTIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
+        TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
+        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -2354,22 +2538,23 @@ macro_rules! for_each_peripheral {
         WIFI <= virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt,
         disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
         disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
-        disable_pwr_interrupt }))); _for_each_inner_peripheral!((GPIO0));
-        _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
-        _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
-        _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
-        _for_each_inner_peripheral!((GPIO7)); _for_each_inner_peripheral!((GPIO8));
-        _for_each_inner_peripheral!((GPIO9)); _for_each_inner_peripheral!((GPIO10));
-        _for_each_inner_peripheral!((GPIO11)); _for_each_inner_peripheral!((GPIO12));
-        _for_each_inner_peripheral!((GPIO13)); _for_each_inner_peripheral!((GPIO14));
-        _for_each_inner_peripheral!((GPIO15)); _for_each_inner_peripheral!((GPIO16));
-        _for_each_inner_peripheral!((GPIO17)); _for_each_inner_peripheral!((GPIO18));
-        _for_each_inner_peripheral!((GPIO19)); _for_each_inner_peripheral!((GPIO20));
-        _for_each_inner_peripheral!((GPIO21)); _for_each_inner_peripheral!((GPIO22));
-        _for_each_inner_peripheral!((GPIO23)); _for_each_inner_peripheral!((GPIO24));
-        _for_each_inner_peripheral!((GPIO25)); _for_each_inner_peripheral!((GPIO26));
-        _for_each_inner_peripheral!((GPIO27)); _for_each_inner_peripheral!((GPIO28));
-        _for_each_inner_peripheral!((GPIO29));
+        disable_pwr_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
+        _for_each_inner_peripheral!((GPIO0)); _for_each_inner_peripheral!((GPIO1));
+        _for_each_inner_peripheral!((GPIO2)); _for_each_inner_peripheral!((GPIO3));
+        _for_each_inner_peripheral!((GPIO4)); _for_each_inner_peripheral!((GPIO5));
+        _for_each_inner_peripheral!((GPIO6)); _for_each_inner_peripheral!((GPIO7));
+        _for_each_inner_peripheral!((GPIO8)); _for_each_inner_peripheral!((GPIO9));
+        _for_each_inner_peripheral!((GPIO10)); _for_each_inner_peripheral!((GPIO11));
+        _for_each_inner_peripheral!((GPIO12)); _for_each_inner_peripheral!((GPIO13));
+        _for_each_inner_peripheral!((GPIO14)); _for_each_inner_peripheral!((GPIO15));
+        _for_each_inner_peripheral!((GPIO16)); _for_each_inner_peripheral!((GPIO17));
+        _for_each_inner_peripheral!((GPIO18)); _for_each_inner_peripheral!((GPIO19));
+        _for_each_inner_peripheral!((GPIO20)); _for_each_inner_peripheral!((GPIO21));
+        _for_each_inner_peripheral!((GPIO22)); _for_each_inner_peripheral!((GPIO23));
+        _for_each_inner_peripheral!((GPIO24)); _for_each_inner_peripheral!((GPIO25));
+        _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
+        _for_each_inner_peripheral!((GPIO28)); _for_each_inner_peripheral!((GPIO29));
         _for_each_inner_peripheral!((ASSIST_DEBUG(unstable)));
         _for_each_inner_peripheral!((CLINT(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
@@ -2381,7 +2566,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((HP_APM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((I2C_ANA_MST(unstable)));
-        _for_each_inner_peripheral!((I2C0(unstable)));
+        _for_each_inner_peripheral!((I2C0));
         _for_each_inner_peripheral!((I2S0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTPRI(unstable)));
@@ -2405,6 +2590,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
         _for_each_inner_peripheral!((SLC(unstable)));
+        _for_each_inner_peripheral!((SPI0(unstable)));
+        _for_each_inner_peripheral!((SPI1(unstable)));
+        _for_each_inner_peripheral!((SPI2));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((SYSTIMER(unstable)));
         _for_each_inner_peripheral!((TEE(unstable)));
@@ -2416,9 +2604,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
-        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((all(@ peri_type
-        #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
-        "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
+        _for_each_inner_peripheral!((WIFI));
+        _for_each_inner_peripheral!((PSRAM(unstable)));
+        _for_each_inner_peripheral!((SPI2, Spi2, 1)); _for_each_inner_peripheral!((all(@
+        peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
+        #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton"] GPIO2 <= virtual()), (@ peri_type #[doc =
         "GPIO3 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -2559,10 +2749,10 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST
         <= I2C_ANA_MST() (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"]
         I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type #[doc = "I2S0 peripheral singleton"]
+        I2S0 <= I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
+        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
         INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
         <= IO_MUX() (unstable)), (@ peri_type #[doc = "LP_ANA peripheral singleton"]
@@ -2588,12 +2778,16 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()
-        (unstable)), (@ peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR()
-        (unstable)), (@ peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <=
-        SYSTIMER() (unstable)), (@ peri_type #[doc = "TEE peripheral singleton"] TEE <=
-        TEE() (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <=
-        TIMG0() (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <=
-        TIMG1() (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <=
+        (unstable)), (@ peri_type #[doc = "SPI0 peripheral singleton"] SPI0 <= SPI0()
+        (unstable)), (@ peri_type #[doc = "SPI1 peripheral singleton"] SPI1 <= SPI1()
+        (unstable)), (@ peri_type #[doc = "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)), (@
+        peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER()
+        (unstable)), (@ peri_type #[doc = "TEE peripheral singleton"] TEE <= TEE()
+        (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0()
+        (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1()
+        (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <=
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
@@ -2611,25 +2805,26 @@ macro_rules! for_each_peripheral {
         virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt
         }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt
         }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt
-        })))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
-        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
-        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO28), (GPIO29), (ASSIST_DEBUG(unstable)), (CLINT(unstable)), (DMA(unstable)),
-        (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)), (ETM(unstable)),
-        (GPIO(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0(unstable)), (I2S0(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
-        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)),
-        (LP_CLKRST(unstable)), (LPWR(unstable)), (LP_IO_MUX(unstable)),
-        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
-        (LP_WDT(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
-        (MODEM_SYSCON(unstable)), (PAU(unstable)), (PCR(unstable)), (PMU(unstable)),
-        (RNG(unstable)), (SHA(unstable)), (SLC(unstable)), (SYSTEM(unstable)),
+        })), (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
+        (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2),
+        (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
+        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18),
+        (GPIO19), (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26),
+        (GPIO27), (GPIO28), (GPIO29), (ASSIST_DEBUG(unstable)), (CLINT(unstable)),
+        (DMA(unstable)), (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)),
+        (ETM(unstable)), (GPIO(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
+        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
+        (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
+        (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)),
+        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
+        (LP_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
+        (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
+        (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
+        (SLC(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI)));
-        _for_each_inner_peripheral!((dma_eligible));
+        (LP_CORE(unstable)), (SW_INTERRUPT(unstable)), (WIFI), (PSRAM(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

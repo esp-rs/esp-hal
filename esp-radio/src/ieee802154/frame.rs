@@ -13,6 +13,7 @@ const FRAME_VERSION_MASK: u8 = 0x30;
 
 /// IEEE 802.15.4 MAC frame
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[instability::unstable]
 pub struct Frame {
     /// Header
     pub header: Header,
@@ -42,6 +43,7 @@ impl defmt::Format for Frame {
 /// IEEE 802.15.4 MAC frame which has been received
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct ReceivedFrame {
     /// Frame
     pub frame: Frame,

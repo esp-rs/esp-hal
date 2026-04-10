@@ -558,8 +558,8 @@ jobs:
             Usage:
             - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
             - `/hil full`  — run the full HIL matrix for all supported chips
-            - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
-            - `/test-size <example_name>` — run binary size analysis for this PR for specified example, for `qa-test` example use `<example_name> --package qa-test`
+            - `/hil <chip1> [<chip2> ...]` — run the full HIL tests **only** for the listed chips
+            - `/test-size <example_name> [--package <pkg>] <chip1> [chip2 ...]` — run binary size analysis for the specified example on one or more chips. Example: `/test-size embassy_hello_world esp32c3 esp32c6` or `/test-size sleep_timer --package qa-test esp32c3`
             - You can optionally append `--test <name>[,<name>...]` to any `/hil` command to only run selected tests.
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
@@ -578,34 +578,68 @@ jobs:
       startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
     steps:
-      - name: Extract example name from comment
+      - name: Extract parameters from comment
         id: extract
         run: |
-          # Expected format: /test-size example_name
+          # Expected format: /test-size example_name chip(s)
           COMMENT="${{ github.event.comment.body }}"
+          # Strip the /test-size prefix
+          ARGS=$(echo "$COMMENT" | sed 's|/test-size[[:space:]]*||')
 
-          # Remove the /test-size prefix and trim whitespace
-          EXAMPLE_NAME=$(echo "$COMMENT" | sed 's|/test-size||' | xargs)
+          # Extract --package value if present
+          PACKAGE=""
+          if echo "$ARGS" | grep -q '\-\-package'; then
+            PACKAGE=$(echo "$ARGS" | sed 's/.*--package[[:space:]]\+\([^[:space:]]\+\).*/\1/')
+            # Remove --package <value> from ARGS for further parsing
+            ARGS=$(echo "$ARGS" | sed 's/--package[[:space:]]\+[^[:space:]]\+//')
+          fi
+
+          # Known chips — everything matching these is a chip, first token is the example
+          KNOWN_CHIPS="esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32s2 esp32s3"
+
+          EXAMPLE_NAME=""
+          CHIPS_JSON="["
+          FIRST=true
+
+          for token in $ARGS; do
+            if echo "$KNOWN_CHIPS" | grep -qw "$token"; then
+              if [ "$FIRST" = "true" ]; then
+                CHIPS_JSON="${CHIPS_JSON}\"${token}\""
+                FIRST=false
+              else
+                CHIPS_JSON="${CHIPS_JSON},\"${token}\""
+              fi
+            elif [ -z "$EXAMPLE_NAME" ]; then
+              EXAMPLE_NAME="$token"
+            fi
+          done
+          CHIPS_JSON="${CHIPS_JSON}]"
 
           if [ -z "$EXAMPLE_NAME" ]; then
-            echo "Error: No example name provided in comment"
-            echo "Expected format: /test-size example_name"
+            echo "Error: No example name provided."
+            echo "Expected: /test-size example_name [--package pkg] chip1 [chip2 ...]"
+            exit 1
+          fi
+
+          if [ "$CHIPS_JSON" = "[]" ]; then
+            echo "Error: No valid chip names provided."
+            echo "Valid chips: $KNOWN_CHIPS"
             exit 1
           fi
 
           echo "example_name=$EXAMPLE_NAME" >> $GITHUB_OUTPUT
-          echo "Extracted example name: $EXAMPLE_NAME"
+          echo "package=$PACKAGE"           >> $GITHUB_OUTPUT
+          echo "chips=$CHIPS_JSON"          >> $GITHUB_OUTPUT
+          CHIPS_ESCAPED=$(echo "$CHIPS_JSON" | sed 's/"/\\"/g')
+          echo "chips_escaped=$CHIPS_ESCAPED" >> $GITHUB_OUTPUT
+          echo "Parsed — example: $EXAMPLE_NAME | package: $PACKAGE | chips: $CHIPS_JSON"
 
       - name: Dispatch Binary Size Analysis
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: binary-size.yml
           ref: ${{ github.event.repository.default_branch }}
-          inputs: |
-            {
-              "pr_number": "${{ github.event.issue.number }}",
-              "example_name": "${{ steps.extract.outputs.example_name }}"
-            }
+          inputs: '{"pr_number":"${{ github.event.issue.number }}","example_name":"${{ steps.extract.outputs.example_name }}","package":"${{ steps.extract.outputs.package }}","chips":"${{ steps.extract.outputs.chips_escaped }}"}'
 
       - name: Confirm in PR
         uses: peter-evans/create-or-update-comment@v4
@@ -613,4 +647,7 @@ jobs:
           issue-number: ${{ github.event.issue.number }}
           body: >
             Triggered binary size analysis for
-            #${{ github.event.issue.number }}. Results will be posted as a comment when ready.
+            `${{ steps.extract.outputs.example_name }}`
+            on chips `${{ steps.extract.outputs.chips }}`
+            for #${{ github.event.issue.number }}.
+            Results will be posted as a comment when ready.

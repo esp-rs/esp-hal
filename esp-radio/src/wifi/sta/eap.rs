@@ -139,6 +139,7 @@ pub struct EapStationConfig {
 
 impl EapStationConfig {
     /// Set the SSID of the access point.
+    #[instability::unstable]
     pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
         self.ssid = ssid.into();
         self

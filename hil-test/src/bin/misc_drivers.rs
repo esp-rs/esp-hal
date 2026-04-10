@@ -660,6 +660,8 @@ mod twai {
 
     #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
     mod async_tests {
+        use esp_hal::gpio::NoPin;
+
         use super::*;
 
         #[init]
@@ -741,6 +743,33 @@ mod twai {
             transmit_frames(&mut ctx, &frame, NUM_ASYNC_SENT_FRAMES).await;
 
             receive_frames(&mut ctx, NUM_SENT_FRAMES + NUM_ASYNC_SENT_FRAMES).await;
+        }
+
+        fn no_init() {}
+
+        #[test(init = no_init)]
+        #[ignore]
+        // Regression test for https://github.com/esp-rs/esp-hal/issues/5307
+        async fn test_write_into_the_void() {
+            let peripherals = esp_hal::init(esp_hal::Config::default());
+
+            let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+            let timg0 = TimerGroup::new(peripherals.TIMG0);
+            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+            let config = twai::TwaiConfiguration::new(
+                peripherals.TWAI0,
+                NoPin,
+                NoPin,
+                twai::BaudRate::B1000K,
+                TwaiMode::Normal,
+            );
+
+            let mut twai = config.into_async().start();
+
+            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+
+            twai.transmit_async(&frame).await.unwrap();
         }
     }
 }

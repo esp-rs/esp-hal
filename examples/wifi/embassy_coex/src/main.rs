@@ -143,9 +143,9 @@ async fn main(spawner: Spawner) -> ! {
         println!("{:?}", ap);
     }
 
-    spawner.spawn(ble_task(ble_controller)).ok();
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(runner)).ok();
+    spawner.spawn(ble_task(ble_controller).unwrap());
+    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(net_task(runner).unwrap());
 
     stack.wait_config_up().await;
     if let Some(config) = stack.config_v4() {

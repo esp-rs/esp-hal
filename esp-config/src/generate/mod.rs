@@ -349,7 +349,12 @@ pub fn generate_config_internal<'a>(
 
     for (_, option, value) in configs.iter() {
         if let Some(ref validator) = option.constraint {
-            validator.validate(value).unwrap();
+            validator.validate(value).unwrap_or_else(|err| {
+                panic!(
+                    "Validation error for crate {}, option {}: {err}",
+                    crate_name, option.name
+                )
+            });
         }
     }
 

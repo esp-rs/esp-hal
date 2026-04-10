@@ -65,8 +65,8 @@ async fn main(spawner: Spawner) -> ! {
         Mutex::<NoopRawMutex, _>::new(sender)
     );
 
-    spawner.spawn(listener(manager, receiver)).ok();
-    spawner.spawn(broadcaster(sender)).ok();
+    spawner.spawn(listener(manager, receiver).unwrap());
+    spawner.spawn(broadcaster(sender).unwrap());
 
     let mut ticker = Ticker::every(Duration::from_millis(500));
     loop {

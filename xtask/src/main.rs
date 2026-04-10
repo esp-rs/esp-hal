@@ -181,6 +181,13 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
         xtask::format_package(workspace, package, args.check, None)?;
     }
 
+    // Keep formatting "helper" crates that are intentionally not in
+    // the Package enum.
+    for package_path in ["xtask", "xtask-mcp-macros"] {
+        log::info!("Formatting package: {}", package_path);
+        xtask::format_package_path(workspace, &workspace.join(package_path), args.check, None)?;
+    }
+
     // format ymls in .github/
     xtask::format_yml(args.check, "./.github")?;
 
@@ -631,10 +638,17 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     && example_path.extension().is_none()
                 {
                     let example_name = example.file_name().to_string_lossy().to_string();
-                    let without_fingerprint = example_name
-                        .rsplit_once('-')
-                        .map(|(a, _)| a)
-                        .unwrap_or(&example_name);
+                    let Some((without_fingerprint, fingerprint)) = example_name.rsplit_once('-')
+                    else {
+                        // Skip non-fingerprinted files to avoid self-copying
+                        // artifacts (for example "blinky" -> "blinky").
+                        continue;
+                    };
+                    // Cargo fingerprints are hexadecimal, so only rewrite files
+                    // that actually look like fingerprinted artifacts.
+                    if !fingerprint.chars().all(|c| c.is_ascii_hexdigit()) {
+                        continue;
+                    }
 
                     let dst = dir.join(without_fingerprint);
 
