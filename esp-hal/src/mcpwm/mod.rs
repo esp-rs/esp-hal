@@ -486,7 +486,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Returns the periperal
+    /// Returns the peripheral
     pub fn peripheral(&self) -> crate::system::Peripheral {
         self._peripheral
     }
@@ -567,9 +567,9 @@ for_each_mcpwm!(
                 /// Returns peripheral data for MCPWM $id
                 fn info() -> &'static Info {
                     static INFO: Info = Info {
-                        register_block: crate::peripherals::MCPWM0::regs(),
-                        _peripheral: crate::system::Peripheral::Mcpwm0,
-                        _interrupt: crate::peripherals::Interrupt::MCPWM0,
+                        register_block: crate::peripherals::$inst::regs(),
+                        _peripheral: crate::system::Peripheral::$sys,
+                        _interrupt: crate::peripherals::Interrupt::$inst,
                         sync_input: [
                             InputSignal::[<PWM $id _SYNC0>],
                             InputSignal::[<PWM $id _SYNC1>],
