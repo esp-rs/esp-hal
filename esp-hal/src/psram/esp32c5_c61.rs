@@ -57,7 +57,6 @@ impl FlashFreq {
 /// Frequency of PSRAM memory
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum SpiRamFreq {
     /// PSRAM frequency 40 MHz
     #[default]
@@ -81,6 +80,7 @@ impl SpiRamFreq {
 
 /// MSPI timing tuning parameters.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MspiTimingTuningParam {
     /// Input signal delay mode
     pub spi_din_mode: u8,
@@ -196,7 +196,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     };
 
     unsafe {
-        super::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+        super::set_psram_range(start as usize..start as usize + config.size.get());
     }
 }
 

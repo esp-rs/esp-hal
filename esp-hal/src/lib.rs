@@ -651,13 +651,6 @@ pub struct Config {
     /// The CPU clock configuration.
     #[builder_lite(skip)]
     cpu_clock: ClockConfig,
-
-    /// PSRAM configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[cfg(feature = "psram")]
-    #[builder_lite(unstable)]
-    psram: psram::PsramConfig,
 }
 
 impl Config {
@@ -772,9 +765,6 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(gpio_driver_supported)]
     crate::gpio::interrupt::bind_default_interrupt_handler();
-
-    #[cfg(feature = "psram")]
-    crate::psram::init_psram(config.psram);
 
     unsafe {
         esp_rom_sys::init_syscall_table();

@@ -91,7 +91,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     }
 
     unsafe {
-        super::MAPPED_PSRAM.memory_range = EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get();
+        super::set_psram_range(EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get());
     }
 }
 

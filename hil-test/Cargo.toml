@@ -10,7 +10,6 @@ name = "hil_test"
 [[bin]]
 name              = "alloc_psram"
 harness           = false
-required-features = ["psram"]
 
 [[bin]]
 name              = "crypto"
@@ -235,7 +234,7 @@ esp32s3 = [
     "esp-rtos?/esp32s3",
 ]
 
-psram = ["esp-hal/psram", "esp-alloc"]
+psram = ["esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.

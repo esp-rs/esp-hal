@@ -30,7 +30,7 @@ To demonstrate, in `src/bin/psram.rs` you will see the following:
 
 ```rust
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
+//% FEATURES: esp-alloc/internal-heap-stats
 ```
 
 Another thing to be aware of is the GPIO pins being used. We have tried to use pins available on the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
