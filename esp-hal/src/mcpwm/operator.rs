@@ -7,7 +7,7 @@
 //! ## Configuration
 //! This module provides flexibility in configuring the PWM outputs. Its
 //! implementation allows for motor control and other applications that demand
-//! accurate pulse timing and sophisticated modulation techniques.
+//! accurate pulse timing and modulation techniques.
 
 use core::marker::PhantomData;
 

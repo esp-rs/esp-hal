@@ -31,7 +31,56 @@
 //! This example shows configuring MCPWM for receiving
 //! rising and falling edges from a GPIO pin.
 //!
-//! TODO Write code example for this
+//! ```rust, no_run
+//! use critical_section::Mutex;
+//! use esp_hal::{
+//!     mcpwm::{
+//!         McPwm,
+//!         PeripheralClockConfig,
+//!         capture::{CaptureChannelConfig, CaptureMode, CaptureTimerConfig},
+//!         mcpwm0,
+//!     },
+//!     time::Rate,
+//! };
+//!
+//! static CAP0: Mutex<RefCell<Option<mcpwm0::CaptureChannel<'static, 0>>>> =
+//!     Mutex::new(RefCell::new(None));
+//!
+//! // initialize peripheral
+//! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
+//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//!
+//! // capture rising edges
+//! let capture_cfg = CaptureChannelConfig::default().with_capture_mode(CaptureMode::RisingEdge);
+//!
+//! // initalize capture timer
+//! let cap_timer_cfg = CaptureTimerConfig::default();
+//! mcpwm.capture_timer.set_config(cap_timer_cfg);
+//! mcpwm.capture_timer.start();
+//!
+//! // create capture channel with given config and `pin`
+//! let mut capture = mcpwm.capture0.configure(capture_cfg).with_signal_input(pin);
+//! capture.set_enable(true);
+//! capture.listen();
+//!
+//! critical_section::with(|cs| CAP0.borrow_ref_mut(cs).replace(capture));
+//!
+//! #[esp_hal::handler]
+//! fn interrupt_handler() {
+//!     critical_section::with(|cs| {
+//!         let mut capture = CAP0.borrow_ref_mut(cs);
+//!         if let Some(capture) = capture.as_mut() {
+//!             if capture.interrupt_is_set() {
+//!                 let event = capture.events();
+//!                 let time = event.time();
+//!                 let edge = event.edge();
+//!                 // do something with edge and time
+//!                 capture.reset_interrupt();
+//!             }
+//!         }
+//!     });
+//! }
+//! ```
 use core::marker::PhantomData;
 
 use enumset::EnumSet;
@@ -338,7 +387,7 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
 
     /// Gets the last captured event
     #[instability::unstable]
-    pub fn get_event(&self) -> CaptureEvent {
+    pub fn events(&self) -> CaptureEvent {
         let (info, _) = PWM::split();
         let time = info.regs().cap_ch(CHAN as usize).read().value().bits();
         let edge = info.regs().cap_status().read().cap_edge(CHAN).variant();

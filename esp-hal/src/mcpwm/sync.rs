@@ -30,7 +30,7 @@
 //! for 3 phase PWM.
 //!
 //! ```rust, no_run
-//! use esp_hal::mcpwm::{McPwm, PeripheralClockConfig, Sync::SyncLine};
+//! use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
@@ -38,13 +38,13 @@
 //!
 //! // connect sync line 0 to take input from `pin`
 //! mcpwm.sync0.set_signal(pin);
+//!
 //! // connecting sync line 0 for a timer0's sync in
-//! mcpwm.timer0.set_sync_in(mcpwm.sync0);
+//! mcpwm.timer0.set_sync_in(&mcpwm.sync0);
 //! ```
 //!
 //! ### Chaining 2 or more timers sync events
-//! This shows how to configure timer 1 and timer 2 to take in
-//! sync events from timer 0. This is useful when many timers require
+//! This is useful when many timers require
 //! to be phase aligned for proper timing.
 //!
 //! ```rust, no_run
@@ -54,12 +54,10 @@
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
-//! // get timer0's sync out
-//! let sync_out = mcpwm.timer0.get_sync_out();
-//! // set timer1's sync in source from timer0's sync out
-//! mcpwm.timer1.set_sync_in(sync_out);
-//! // Optionally set timer2's sync in
-//! mcpwm.timer2.set_sync_in(sync_out);
+//! // set timer1's sync in
+//! mcpwm.timer1.set_sync_in(&mcpwm.timer0.sync_out);
+//! // set timer2's sync in
+//! mcpwm.timer2.set_sync_in(&mcpwm.timer1.sync_out);
 //! ```
 use core::marker::PhantomData;
 
