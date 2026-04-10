@@ -22,7 +22,6 @@ pub enum FlashFreq {
 /// Frequency of PSRAM memory
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum SpiRamFreq {
     /// PSRAM frequency 40 MHz
     #[default]
