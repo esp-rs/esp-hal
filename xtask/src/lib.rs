@@ -223,6 +223,7 @@ impl Package {
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
                 | EspRtos
+                | EspStorage
         )
     }
 
