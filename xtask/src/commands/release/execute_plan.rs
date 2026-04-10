@@ -7,9 +7,8 @@ use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
 
 use crate::{
-    Version,
     cargo::CargoToml,
-    commands::{checker::generate_baseline, release::plan::Plan, update_package},
+    commands::{VersionBump, checker::generate_baseline, release::plan::Plan, update_package},
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -80,11 +79,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
                 true
             };
 
-            // Perma-unstable packages are stable-patch only: no major/minor and no
-            // pre-release cycles. (The previous code accidentally let pre-release
-            // bumps through; this is the stricter, intended rule.)
-            let is_stable_patch = step.bump.pre.is_none() && step.bump.base == Some(Version::Patch);
-            if forever_unstable && !is_stable_patch {
+            if forever_unstable && step.bump != VersionBump::patch() {
                 bail!(
                     "Cannot bump perma-unstable package {} to a non-patch version",
                     step.package

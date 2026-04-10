@@ -77,7 +77,7 @@ pub struct BumpVersionArgs {
     ///   pre-release tag is dropped (finalizing the cycle) and `amount` is ignored.
     /// - With `--pre`: start (or restart) a pre-release cycle on the bumped base, e.g.
     ///   `bump-version minor --pre alpha` on `1.0.0` produces `1.1.0-alpha.0`.
-    #[arg(value_enum)]
+    #[arg(value_enum, required_unless_present = "pre")]
     amount: Option<Version>,
     /// Pre-release identifier to apply.
     ///
@@ -317,7 +317,10 @@ pub fn do_version_bump(version: &semver::Version, bump: &VersionBump) -> Result<
     // | None   | Some    | Continue a pre-release cycle on the current base. Bails if the    |
     // |        |         | current version is stable, as it would produce a lower version.   |
     match (bump.base, bump.pre.as_deref()) {
-        (None, None) => bail!("nothing to bump: specify an amount and/or --pre"),
+        (None, None) => bail!(
+            "invalid bump request: neither an amount nor `--pre` was specified; \
+             pass a bump amount (`major`/`minor`/`patch`) and/or `--pre <id>`"
+        ),
 
         // Stable bump. If currently a pre-release, finalize by dropping the
         // pre tag and ignore `amount` (matches historical behavior).
@@ -539,7 +542,7 @@ mod tests {
         };
         let err = do_version_bump(&version, &bump).unwrap_err();
         assert!(
-            err.to_string().contains("nothing to bump"),
+            err.to_string().contains("invalid bump request"),
             "unexpected error: {err}"
         );
     }

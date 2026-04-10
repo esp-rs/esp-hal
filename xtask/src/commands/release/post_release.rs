@@ -73,48 +73,46 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         }
 
         // Backport branch management: only for stable minor/major bumps on stable releases
-        // (**major** >= 1). We do not maintain backport branches for `0.{minor}.x` versions,
-        // and we do not create them for pre-releases.
-        let is_stable_minor_or_major = package_plan.bump.pre.is_none()
-            && matches!(
-                package_plan.bump.base,
-                Some(crate::Version::Minor | crate::Version::Major)
-            );
-        if is_stable_minor_or_major {
-            if version.major >= 1 {
-                let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
+        // (**major** >= 1), we do not have and do not maintain backport branches for
+        // `0.{minor}.x` versions, and we do not create them for pre-releases.
+        match package_plan.bump.base {
+            Some(crate::Version::Minor | crate::Version::Major)
+                if package_plan.bump.pre.is_none() =>
+            {
+                if version.major >= 1 {
+                    let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
-                // Check if branch already exists on origin
-                let branch_exists = Command::new("git")
-                    .args([
-                        "ls-remote",
-                        "--exit-code",
-                        "--heads",
-                        "origin",
-                        &branch_name,
-                    ])
-                    .current_dir(workspace)
-                    .status()
-                    .map(|status| status.success())
-                    .unwrap_or(false);
-
-                if branch_exists {
-                    log::info!(
-                        "Backport branch already exists on origin: {branch_name}, skipping creation"
-                    );
-                } else {
-                    // We want the backport branch to start at the released tag for this
-                    // package.
-                    let tag_name = &package_plan.tag_name;
-
-                    let tag_exists = Command::new("git")
-                        .args(["rev-parse", "--verify", "--quiet", tag_name])
+                    // Check if branch already exists on origin
+                    let branch_exists = Command::new("git")
+                        .args([
+                            "ls-remote",
+                            "--exit-code",
+                            "--heads",
+                            "origin",
+                            &branch_name,
+                        ])
                         .current_dir(workspace)
                         .status()
                         .map(|status| status.success())
                         .unwrap_or(false);
 
-                    let create_status = if tag_exists {
+                    if branch_exists {
+                        log::info!(
+                            "Backport branch already exists on origin: {branch_name}, skipping creation"
+                        );
+                    } else {
+                        // We want the backport branch to start at the released tag for this
+                        // package.
+                        let tag_name = &package_plan.tag_name;
+
+                        let tag_exists = Command::new("git")
+                            .args(["rev-parse", "--verify", "--quiet", tag_name])
+                            .current_dir(workspace)
+                            .status()
+                            .map(|status| status.success())
+                            .unwrap_or(false);
+
+                        let create_status = if tag_exists {
                             // Create branch from the release tag (preferred).
                             Command::new("git")
                                 .arg("branch")
@@ -135,85 +133,92 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                         }
                         .with_context(|| format!("Failed to create backport branch {branch_name}"))?;
 
-                    if !create_status.success() {
-                        return Err(anyhow::anyhow!("`git branch {}` failed", branch_name));
+                        if !create_status.success() {
+                            return Err(anyhow::anyhow!("`git branch {}` failed", branch_name));
+                        }
+
+                        let push_status = Command::new("git")
+                            .arg("push")
+                            .arg("origin")
+                            .arg(&branch_name)
+                            .current_dir(workspace)
+                            .status()
+                            .with_context(|| {
+                                format!("Failed to push backport branch {branch_name}")
+                            })?;
+
+                        if !push_status.success() {
+                            return Err(anyhow::anyhow!(
+                                "`git push origin {}` failed",
+                                branch_name
+                            ));
+                        }
+
+                        log::info!(
+                            "Created backport branch {branch_name} for {} v{}",
+                            package,
+                            version_str
+                        );
                     }
 
-                    let push_status = Command::new("git")
-                        .arg("push")
-                        .arg("origin")
-                        .arg(&branch_name)
-                        .current_dir(workspace)
-                        .status()
-                        .with_context(|| format!("Failed to push backport branch {branch_name}"))?;
+                    // If there was a previous minor branch (e.g. 1.1.x when creating 1.2.x),
+                    // delete it on origin if it exists.
+                    if version.minor > 0 {
+                        let prev_branch_name =
+                            format!("{}-{}.{}.x", package, version.major, version.minor - 1);
 
-                    if !push_status.success() {
-                        return Err(anyhow::anyhow!("`git push origin {}` failed", branch_name));
+                        let prev_exists = Command::new("git")
+                            .args([
+                                "ls-remote",
+                                "--exit-code",
+                                "--heads",
+                                "origin",
+                                &prev_branch_name,
+                            ])
+                            .current_dir(workspace)
+                            .status()
+                            .map(|status| status.success())
+                            .unwrap_or(false);
+
+                        if prev_exists {
+                            let delete_status = Command::new("git")
+                                .arg("push")
+                                .arg("origin")
+                                .arg(format!(":{}", prev_branch_name))
+                                .current_dir(workspace)
+                                .status()
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to delete previous backport branch {prev_branch_name}"
+                                    )
+                                })?;
+
+                            if delete_status.success() {
+                                log::info!(
+                                    "Deleted previous backport branch {prev_branch_name} on origin"
+                                );
+                            } else {
+                                log::warn!(
+                                    "Failed to delete previous backport branch {prev_branch_name} on origin"
+                                );
+                            }
+                        }
                     }
-
+                } else {
                     log::info!(
-                        "Created backport branch {branch_name} for {} v{}",
+                        "Skipping backport branch creation for {} v{} (major < 1)",
                         package,
                         version_str
                     );
                 }
-
-                // If there was a previous minor branch (e.g. 1.1.x when creating 1.2.x),
-                // delete it on origin if it exists.
-                if version.minor > 0 {
-                    let prev_branch_name =
-                        format!("{}-{}.{}.x", package, version.major, version.minor - 1);
-
-                    let prev_exists = Command::new("git")
-                        .args([
-                            "ls-remote",
-                            "--exit-code",
-                            "--heads",
-                            "origin",
-                            &prev_branch_name,
-                        ])
-                        .current_dir(workspace)
-                        .status()
-                        .map(|status| status.success())
-                        .unwrap_or(false);
-
-                    if prev_exists {
-                        let delete_status = Command::new("git")
-                            .arg("push")
-                            .arg("origin")
-                            .arg(format!(":{}", prev_branch_name))
-                            .current_dir(workspace)
-                            .status()
-                            .with_context(|| {
-                                format!(
-                                    "Failed to delete previous backport branch {prev_branch_name}"
-                                )
-                            })?;
-
-                        if delete_status.success() {
-                            log::info!(
-                                "Deleted previous backport branch {prev_branch_name} on origin"
-                            );
-                        } else {
-                            log::warn!(
-                                "Failed to delete previous backport branch {prev_branch_name} on origin"
-                            );
-                        }
-                    }
-                }
-            } else {
+            }
+            _ => {
                 log::info!(
-                    "Skipping backport branch creation for {} v{} (major < 1)",
+                    "Skipping backport branch creation for {} v{} (bump is not a stable minor/major)",
                     package,
                     version_str
                 );
             }
-        } else {
-            log::info!(
-                "Skipping backport branch creation for {} v{} (bump is not stable minor/major)",
-                package,
-                version_str
-            );
         }
     }
 
