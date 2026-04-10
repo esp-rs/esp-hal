@@ -2,12 +2,6 @@
     "mcpwm_freq" => {
         cfg(not(esp32h2)) => "40",
         cfg(esp32h2) => "32"
-    },
-    "clock_src" => {
-        cfg(esp32) => "ADB-CLK (80 MHz)",
-        cfg(esp32s3) => "ADB-CLK (80 MHz)",
-        cfg(esp32c6) => "ADB-CLK (80 MHz)",
-        cfg(esp32h2) => "ADB-CLK (80 MHz)",
     }
 ))]
 //! # MCPWM Capture Module
@@ -32,6 +26,8 @@
 //! rising and falling edges from a GPIO pin.
 //!
 //! ```rust, no_run
+//! use core::cell::RefCell;
+//!
 //! use critical_section::Mutex;
 //! use esp_hal::{
 //!     mcpwm::{
@@ -53,7 +49,7 @@
 //! // capture rising edges
 //! let capture_cfg = CaptureChannelConfig::default().with_capture_mode(CaptureMode::RisingEdge);
 //!
-//! // initalize capture timer
+//! // initialize capture timer
 //! let cap_timer_cfg = CaptureTimerConfig::default();
 //! mcpwm.capture_timer.set_config(cap_timer_cfg);
 //! mcpwm.capture_timer.start();
@@ -70,12 +66,12 @@
 //!     critical_section::with(|cs| {
 //!         let mut capture = CAP0.borrow_ref_mut(cs);
 //!         if let Some(capture) = capture.as_mut() {
-//!             if capture.interrupt_is_set() {
+//!             if capture.is_interrupt_set() {
 //!                 let event = capture.events();
 //!                 let time = event.time();
 //!                 let edge = event.edge();
 //!                 // do something with edge and time
-//!                 capture.reset_interrupt();
+//!                 capture.clear_interrupt();
 //!             }
 //!         }
 //!     });

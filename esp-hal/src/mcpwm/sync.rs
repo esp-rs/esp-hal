@@ -2,12 +2,6 @@
     "mcpwm_freq" => {
         cfg(not(esp32h2)) => "40",
         cfg(esp32h2) => "32"
-    },
-    "clock_src" => {
-        cfg(esp32) => "PLL_F160M (160 MHz)",
-        cfg(esp32s3) => "CRYPTO_PWM_CLK (160 MHz)",
-        cfg(esp32c6) => "PLL_F160M (160 MHz)",
-        cfg(esp32h2) => "PLL_F96M_CLK (96 MHz)",
     }
 ))]
 //! # MCPWM Sync Module
@@ -18,7 +12,7 @@
 //! sync sources. One is a [`SyncOut`] that comes from [`super::Timer::get_sync_out`],
 //! or from a [`SyncLine`].
 //!
-//! This module provides the flexability to map any of the
+//! This module provides the flexibility to map any of the
 //! MCPWM's [`SyncLine`] to any GPIO signal.
 //!
 //! ## Example
@@ -64,7 +58,7 @@ use core::marker::PhantomData;
 use crate::{gpio::interconnect::PeripheralInput, mcpwm::Instance};
 
 #[allow(private_bounds)]
-/// Public trait to repersent a sync source for a PWM
+/// Public trait to represent a sync source for a PWM
 pub trait SyncSource<PWM: Instance>: InternalSyncSource {}
 
 /// Sync out created by timers
@@ -134,7 +128,7 @@ pub(crate) enum SyncKind {
     TimerSyncOut(u8),
 }
 
-/// Internal trait to repersent which pwm unit and
+/// Internal trait to represent which pwm unit and
 /// sync out it came from. Broadly represents sync lines,
 /// and timer sync out.
 pub(crate) trait InternalSyncSource: crate::private::Sealed {

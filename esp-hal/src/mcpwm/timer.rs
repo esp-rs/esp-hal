@@ -98,7 +98,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
         timer
     }
 
-    /// Start the given timer with the provided configurationn
+    /// Start the given timer with the provided configuration
     pub fn start(&mut self) {
         // set timer to run with a stop condition
         let stop_condition = self.config.stop_condition as u8;
@@ -135,7 +135,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// ## Overview
     /// Internally we set the timers phase and direction
     /// Then trigger a software sync event.
-    #[cfg(soc_has_mcpwm_swsync_can_propagate)]
+    #[cfg_attr(soc_has_mcpwm_swsync_can_propagate, doc(hidden))]
     /// **Note** This will cause the timer to fire a sync out event to other timers
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         self.set_sync_phase(phase);
@@ -144,7 +144,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Trigger a software sync event
-    #[cfg(soc_has_mcpwm_swsync_can_propagate)]
+    #[cfg_attr(soc_has_mcpwm_swsync_can_propagate, doc(hidden))]
     /// **Note** This will cause the timer to fire a sync out event to other timers
     pub fn trigger_sync(&mut self) {
         // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
