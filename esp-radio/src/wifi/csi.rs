@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use esp_hal::time::{Duration, Instant};
 
-use super::{WifiError, c_types::c_void, esp_wifi_result};
+use super::{WifiError, c_types::c_void};
 #[cfg(any(wifi_mac_version = "2", wifi_mac_version = "3"))]
 use crate::sys::include::wifi_csi_acquire_config_t;
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
         wifi_csi_config_t,
         wifi_csi_info_t,
     },
-    wifi::SecondaryChannel,
+    wifi::{SecondaryChannel, esp_wifi_result},
 };
 
 /// CSI (Channel State Information) packet metadata and associated packet details.
