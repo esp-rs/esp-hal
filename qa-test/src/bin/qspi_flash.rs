@@ -98,7 +98,7 @@ fn main() -> ! {
     // write enable
     dma_tx_buf.set_length(0);
     let transfer = spi
-        .half_duplex_write(
+        .half_duplex_write_buffer(
             DataMode::SingleTwoDataLines,
             Command::_8Bit(0x06, DataMode::SingleTwoDataLines),
             Address::None,
@@ -113,7 +113,7 @@ fn main() -> ! {
 
     // erase sector
     let transfer = spi
-        .half_duplex_write(
+        .half_duplex_write_buffer(
             DataMode::SingleTwoDataLines,
             Command::_8Bit(0x20, DataMode::SingleTwoDataLines),
             Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
@@ -128,7 +128,7 @@ fn main() -> ! {
 
     // write enable
     let transfer = spi
-        .half_duplex_write(
+        .half_duplex_write_buffer(
             DataMode::SingleTwoDataLines,
             Command::_8Bit(0x06, DataMode::SingleTwoDataLines),
             Address::None,
@@ -146,7 +146,7 @@ fn main() -> ! {
     dma_tx_buf.as_mut_slice().fill(b'!');
     dma_tx_buf.as_mut_slice()[0..][..5].copy_from_slice(&b"Hello"[..]);
     let transfer = spi
-        .half_duplex_write(
+        .half_duplex_write_buffer(
             DataMode::Quad,
             Command::_8Bit(0x32, DataMode::SingleTwoDataLines),
             Address::_24Bit(0x000000, DataMode::SingleTwoDataLines),
@@ -162,7 +162,7 @@ fn main() -> ! {
     loop {
         // quad fast read
         let transfer = spi
-            .half_duplex_read(
+            .half_duplex_read_buffer(
                 DataMode::Quad,
                 Command::_8Bit(0xeb, DataMode::SingleTwoDataLines),
                 Address::_32Bit(0x000000 << 8, DataMode::Quad),
