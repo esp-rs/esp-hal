@@ -330,10 +330,7 @@ impl Clocks {
         #[cfg(not(timergroup_rc_fast_calibration_divider))]
         let calibration_divider = 1;
 
-        #[cfg(all(
-            timergroup_rc_fast_calibration_divider,
-            timergroup_rc_fast_calibration_tick_enable
-        ))]
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
         let use_rc_fast_calibration_divider = rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
             && crate::soc::chip_revision_above(ChipRevision::from_combined(property!(
                 "timergroup.rc_fast_calibration_divider_min_rev"
@@ -367,10 +364,7 @@ impl Clocks {
         clocks::request_timg_calibration_clock(clocks);
 
         // Align with IDF ECO2+ RC_FAST calibration flow.
-        #[cfg(all(
-            timergroup_rc_fast_calibration_divider,
-            timergroup_rc_fast_calibration_tick_enable
-        ))]
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
         if use_rc_fast_calibration_divider {
             PCR::regs()
                 .ctrl_tick_conf()
@@ -451,10 +445,7 @@ impl Clocks {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         // Align with IDF ECO2+ RC_FAST calibration flow.
-        #[cfg(all(
-            timergroup_rc_fast_calibration_divider,
-            timergroup_rc_fast_calibration_tick_enable
-        ))]
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
         if use_rc_fast_calibration_divider {
             PCR::regs()
                 .ctrl_tick_conf()
