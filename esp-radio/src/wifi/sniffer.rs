@@ -7,7 +7,6 @@ use esp_sync::NonReentrantMutex;
 use super::RxControlInfo;
 use crate::{
     WifiError,
-    esp_wifi_result,
     sys::include::{
         esp_wifi_80211_tx,
         esp_wifi_set_promiscuous,
@@ -19,6 +18,7 @@ use crate::{
         wifi_promiscuous_pkt_t,
         wifi_promiscuous_pkt_type_t,
     },
+    wifi::esp_wifi_result,
 };
 
 /// Represents a Wi-Fi packet in promiscuous mode.

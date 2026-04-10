@@ -6,13 +6,13 @@ use esp_hal::time::Duration;
 use procmacros::BuilderLite;
 
 use crate::{
-    esp_wifi_result,
     sys::include,
     wifi::{
         Ssid,
         WifiController,
         WifiError,
         ap::{AccessPointInfo, convert_ap_info},
+        esp_wifi_result,
     },
 };
 

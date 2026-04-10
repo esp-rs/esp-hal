@@ -80,7 +80,6 @@ use self::{
 };
 use crate::{
     RadioRefGuard,
-    esp_wifi_result,
     hal::ram,
     sys::{
         c_types,
@@ -1354,7 +1353,7 @@ impl Interface<'_> {
 }
 
 /// Supported Wi-Fi protocols for each band.
-#[derive(Debug, Clone, Copy, PartialEq, Hash, BuilderLite)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Bandwidths {
@@ -1772,8 +1771,6 @@ fn dump_packet_info(_buffer: &mut [u8]) {
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! esp_wifi_result {
     ($value:expr) => {{
         use num_traits::FromPrimitive;
@@ -1792,6 +1789,7 @@ macro_rules! esp_wifi_result {
         }
     }};
 }
+pub(crate) use esp_wifi_result;
 
 pub(crate) mod embassy {
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
