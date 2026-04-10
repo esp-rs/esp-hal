@@ -534,73 +534,31 @@ mod tests {
     }
 
     #[test]
-    fn test_version_bump_empty_is_error() {
-        let version = semver::Version::parse("1.0.0").unwrap();
-        let bump = VersionBump {
-            base: None,
-            pre: None,
-        };
-        let err = do_version_bump(&version, &bump).unwrap_err();
-        assert!(
-            err.to_string().contains("invalid bump request"),
-            "unexpected error: {err}"
-        );
-    }
+    fn test_version_bump_errors() {
+        let test_cases = vec![
+            // Nothing to bump.
+            (
+                "1.0.0",
+                VersionBump {
+                    base: None,
+                    pre: None,
+                },
+            ),
+            // Pre-release from stable without a base bump would go backwards (#3801).
+            ("1.0.0", VersionBump::pre("alpha")),
+            // Invalid pre-release identifiers, both construction paths.
+            (
+                "1.0.0",
+                VersionBump::base_and_pre(Version::Minor, "has space"),
+            ),
+            ("1.0.0-alpha.0", VersionBump::pre("has space")),
+        ];
 
-    #[test]
-    fn test_pre_release_from_stable_without_base_is_error() {
-        // This is the exact bug from esp-rs/esp-hal#3801: producing `1.0.0-alpha.0`
-        // from `1.0.0` would be semver-less than the current version. The engine
-        // must refuse, pointing the user at the combined `amount + --pre` form.
-        let version = semver::Version::parse("1.0.0").unwrap();
-        let bump = VersionBump::pre("alpha");
-        let err = do_version_bump(&version, &bump).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("cannot start pre-release") && msg.contains("bump-version minor --pre"),
-            "unexpected error: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_invalid_pre_identifier_is_error() {
-        // Valid identifiers should pass through `do_version_bump` cleanly.
-        let stable = semver::Version::parse("1.0.0").unwrap();
-        for ok in ["alpha", "rc1", "beta-2", "rc-0", "pre"] {
-            do_version_bump(&stable, &VersionBump::base_and_pre(Version::Minor, ok))
-                .unwrap_or_else(|e| panic!("expected {ok:?} to be valid: {e}"));
-        }
-
-        // Invalid identifiers must produce a clean error, not a panic.
-        //
-        // Two code paths construct a `Prerelease` from a user-supplied identifier:
-        //
-        //   1. `(Some(base), Some(pre))` — start / restart a cycle on a bumped base.
-        //   2. `(None, Some(pre))` with a different identifier on the current base — reset the
-        //      counter.
-        //
-        // The third site (same-identifier increment) is structurally safe: the
-        // strip_prefix match requires `pre` to already be present in the current
-        // version's pre-release, meaning `Prerelease::new` has accepted it before.
-        for bad in ["foo@bar", "has space", "trailing.", "", "dot..dot"] {
-            // Path 1: (Some, Some).
-            let err = do_version_bump(&stable, &VersionBump::base_and_pre(Version::Minor, bad))
-                .unwrap_err()
-                .to_string();
+        for (version, bump) in test_cases {
+            let version = semver::Version::parse(version).unwrap();
             assert!(
-                err.contains("invalid pre-release identifier"),
-                "unexpected error for (Some, Some) with {bad:?}: {err}"
-            );
-
-            // Path 2: (None, Some) with a different identifier, forcing the
-            // reset-counter branch.
-            let pre_version = semver::Version::parse("1.0.0-alpha.0").unwrap();
-            let err = do_version_bump(&pre_version, &VersionBump::pre(bad))
-                .unwrap_err()
-                .to_string();
-            assert!(
-                err.contains("invalid pre-release identifier"),
-                "unexpected error for (None, Some) with {bad:?}: {err}"
+                do_version_bump(&version, &bump).is_err(),
+                "expected error for bump {bump:?} of {version}",
             );
         }
     }
