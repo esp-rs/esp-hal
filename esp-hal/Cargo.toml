@@ -105,15 +105,15 @@ ufmt-write               = { version = "0.1", optional = true }
 
 ## Once (#415) pull request is accepted update the commit hash to
 ## point to the latest commit on the main branch of esp-pacs
-esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
-esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "refs/pull/415/head" }
+esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32c61 = { version = "0.1", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
+esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "64db7c2018e25b0f5084f62a1c77b77015be237a" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }

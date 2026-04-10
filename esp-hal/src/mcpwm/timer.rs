@@ -130,8 +130,11 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// ## Overview
     /// Internally we set the timers phase and direction
     /// Then trigger a software sync event.
-    #[cfg_attr(docsrs, doc(cfg(soc_has_mcpwm_swsync_can_propagate)))]
-    /// **Note** This will cause the timer to fire a sync out event to other timers
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(soc_has_mcpwm_swsync_can_propagate)),
+        doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
+    )]
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         self.set_sync_phase(phase);
         self.set_sync_counter_direction(direction);
@@ -139,8 +142,11 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     }
 
     /// Trigger a software sync event
-    #[cfg_attr(docsrs, doc(cfg(soc_has_mcpwm_swsync_can_propagate)))]
-    /// **Note** This will cause the timer to fire a sync out event to other timers
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(soc_has_mcpwm_swsync_can_propagate)),
+        doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
+    )]
     pub fn trigger_sync(&mut self) {
         // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
         let tmr = unsafe { Self::tmr() };
@@ -154,7 +160,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
-    /// Sets the capture timers sync source. Refer to how sync events are
+    /// Sets the timers sync source. Refer to how sync events are
     /// handled in the [`Timer`] documentation.
     pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
         let sync_in_sel = sync_source.get_kind().into();
@@ -412,7 +418,7 @@ impl TimerClockConfig {
     }
 
     /// Sets the stop timer conditions
-    pub fn with_stop_conditions(self, condition: StopCondition) -> Self {
+    pub fn with_stop_condition(self, condition: StopCondition) -> Self {
         Self {
             stop_condition: condition,
             ..self

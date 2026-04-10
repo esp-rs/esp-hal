@@ -31,7 +31,7 @@
 //!       count-up-down mode.
 //!     * A hardware sync or software sync can trigger a reload on the PWM timer with a phase
 //!       register.
-//!     * Timers run until a perconfigured [`timer::StopCondition`], this enum also specifies
+//!     * Timers run until a preconfigured [`timer::StopCondition`], this enum also specifies
 //!       running continuously.
 //!     * Timers can generate [`timer::TimerEvent`] during specific conditions.
 //!     * Timers [`sync::SyncOut`] can be configured to fire at specific conditions configured by
@@ -199,6 +199,7 @@ pub mod mcpwm1 {
 #[non_exhaustive]
 pub struct McPwm<'d, PWM: Instance> {
     _phantom: PhantomData<&'d PWM>,
+    _instance: PWM,
 
     /// Timer0
     pub timer0: Timer<'d, 0, PWM>,
@@ -247,6 +248,7 @@ impl<'d, PWM: Instance> McPwm<'d, PWM> {
 
         Self {
             _phantom: PhantomData,
+            _instance: _peripheral,
             timer0: Timer::new(guard.clone(), &peripheral_clock),
             timer1: Timer::new(guard.clone(), &peripheral_clock),
             timer2: Timer::new(guard.clone(), &peripheral_clock),

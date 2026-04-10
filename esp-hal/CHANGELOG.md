@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::efuse::chip_revision` now returns `ChipRevision` (#5287)
 - DMA buffers can now be created using empty buffer slices (#5266)
 - MCPWM: `esp_hal::mcpwm::timer::Timer::start` is now parameterless. Instead, use `esp_hal::mcpwm::timer::Timer::set_config` to apply a config to a timer. (#5344)
-- MCPWM: timers default to the config given by `esp_hal::mcpwm::timer::TimerClockConfig::default`. (#5344)
+- MCPWM: timers default to the config given by `PeripheralClockConfig::timer_clock_default()`. (#5344)
 
 ### Fixed
 

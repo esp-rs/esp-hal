@@ -126,7 +126,7 @@ impl Default for CaptureTimerConfig {
 /// When this timer receives a sync event the counter of the timer is reset
 /// to the phase value set in [`CaptureTimerConfig`].
 ///
-/// **Note:** This timer always counts up towards a the positive direction.
+/// **Note:** This timer always counts up.
 pub struct CaptureTimer<'d, PWM: Instance> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
@@ -142,7 +142,7 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
         }
     }
 
-    /// Start the capture timer to being counting and capturing events
+    /// Start the capture timer
     pub fn start(&mut self) {
         self.set_enable(true);
     }
