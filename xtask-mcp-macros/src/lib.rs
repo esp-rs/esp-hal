@@ -2,7 +2,14 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{
-    Attribute, Expr, Ident, ItemStruct, Lit, Meta, Token, Type,
+    Attribute,
+    Expr,
+    Ident,
+    ItemStruct,
+    Lit,
+    Meta,
+    Token,
+    Type,
     parse::Parser,
     parse_macro_input,
     punctuated::Punctuated,
@@ -183,9 +190,7 @@ enum CliKind {
     RequiredPositional,
 }
 
-fn build_field_desc(
-    field: &syn::Field,
-) -> Option<FieldDesc> {
+fn build_field_desc(field: &syn::Field) -> Option<FieldDesc> {
     let ident = field.ident.as_ref()?.clone();
     let arg = parse_arg_attrs(&field.attrs);
     let doc = extract_doc(&field.attrs);
@@ -208,10 +213,7 @@ fn build_field_desc(
     let flag = format!("--{flag_name}");
 
     let (mcp_ty, cli_kind) = match tc {
-        TypeClass::Bool => (
-            quote! { Option<bool> },
-            CliKind::BoolFlag,
-        ),
+        TypeClass::Bool => (quote! { Option<bool> }, CliKind::BoolFlag),
         TypeClass::Option => {
             if arg.has_long {
                 (quote! { Option<String> }, CliKind::NamedOpt)
@@ -368,8 +370,8 @@ fn gen_cli_push(fd: &FieldDesc) -> TokenStream2 {
 ///
 /// The macro generates:
 /// 1. A `MyArgsMcpInput` struct (`Deserialize` + `JsonSchema`)
-/// 2. A helper function `my_args_mcp_to_cli_args` that converts the input to
-///    a `Vec<String>` of CLI arguments.
+/// 2. A helper function `my_args_mcp_to_cli_args` that converts the input to a `Vec<String>` of CLI
+///    arguments.
 /// 3. An `inventory::submit!` block that registers the tool.
 #[proc_macro_attribute]
 pub fn mcp_tool(attrs: TokenStream, input: TokenStream) -> TokenStream {
@@ -420,13 +422,13 @@ fn parse_mcp_tool_attrs(attrs: TokenStream2) -> syn::Result<McpToolAttrs> {
         )
     })?;
 
-    Ok(McpToolAttrs { description, command })
+    Ok(McpToolAttrs {
+        description,
+        command,
+    })
 }
 
-fn expand_mcp_tool(
-    attrs: McpToolAttrs,
-    item: &ItemStruct,
-) -> syn::Result<TokenStream2> {
+fn expand_mcp_tool(attrs: McpToolAttrs, item: &ItemStruct) -> syn::Result<TokenStream2> {
     let struct_name = &item.ident;
     let input_type_name = format_ident!("{}McpInput", struct_name);
 
@@ -434,11 +436,18 @@ fn expand_mcp_tool(
     let tool_name = attrs.command.replace(' ', "_").replace('-', "_");
 
     // Split the command string into individual CLI tokens.
-    let command_parts: Vec<String> = attrs.command.split_whitespace().map(str::to_string).collect();
+    let command_parts: Vec<String> = attrs
+        .command
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
     let command_parts_lit = command_parts.iter().map(|p| quote! { #p.to_string(), });
 
     let syn::Fields::Named(fields) = &item.fields else {
-        return Err(syn::Error::new_spanned(struct_name, "mcp_tool only supports structs with named fields"));
+        return Err(syn::Error::new_spanned(
+            struct_name,
+            "mcp_tool only supports structs with named fields",
+        ));
     };
 
     let mut mcp_fields = Vec::new();
