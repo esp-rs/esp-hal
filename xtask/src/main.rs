@@ -631,10 +631,17 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     && example_path.extension().is_none()
                 {
                     let example_name = example.file_name().to_string_lossy().to_string();
-                    let without_fingerprint = example_name
-                        .rsplit_once('-')
-                        .map(|(a, _)| a)
-                        .unwrap_or(&example_name);
+                    let Some((without_fingerprint, fingerprint)) = example_name.rsplit_once('-')
+                    else {
+                        // Skip non-fingerprinted files to avoid self-copying
+                        // artifacts (for example "blinky" -> "blinky").
+                        continue;
+                    };
+                    // Cargo fingerprints are hexadecimal, so only rewrite files
+                    // that actually look like fingerprinted artifacts.
+                    if !fingerprint.chars().all(|c| c.is_ascii_hexdigit()) {
+                        continue;
+                    }
 
                     let dst = dir.join(without_fingerprint);
 
