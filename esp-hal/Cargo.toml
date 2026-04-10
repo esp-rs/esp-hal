@@ -337,4 +337,3 @@ requires-unstable = []
 mixed_attributes_style = "allow"
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }
