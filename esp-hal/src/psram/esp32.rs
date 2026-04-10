@@ -49,8 +49,6 @@ pub struct PsramConfig {
 }
 
 /// Initializes the PSRAM memory on supported devices.
-///
-/// Returns the start of the mapped memory and the size
 pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
 

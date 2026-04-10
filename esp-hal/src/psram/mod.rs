@@ -10,7 +10,7 @@
 #![cfg_attr(
     psram_octal_spi,
     doc = concat!("The ", chip_pretty!(), " can use either Quad SPI or Octal SPI to interface with PSRAM.
-        You need to configure the correct interface type using `ESP_HAL_CONFIG_PSRAM_MODE`.")
+        `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
 #![doc = ""]
 //! ## Examples
