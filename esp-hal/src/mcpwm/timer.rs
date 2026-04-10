@@ -13,11 +13,11 @@
 //! ### Software Sync Events
 //! The `timer` module supports the software triggering of syncs from Timers.
 #![cfg_attr(
-    soc_has_mcpwm_swsync_can_propagate,
+    mcpwm_swsync_can_propagate,
     doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
 )]
 #![cfg_attr(
-    not(soc_has_mcpwm_swsync_can_propagate),
+    not(mcpwm_swsync_can_propagate),
     doc = "**Note:** Software triggered sync events do not propagate to other timers on this chip."
 )]
 
@@ -132,7 +132,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// Then trigger a software sync event.
     #[cfg_attr(
         docsrs,
-        doc(cfg(soc_has_mcpwm_swsync_can_propagate)),
+        doc(cfg(mcpwm_swsync_can_propagate)),
         doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
     )]
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
@@ -144,7 +144,7 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     /// Trigger a software sync event
     #[cfg_attr(
         docsrs,
-        doc(cfg(soc_has_mcpwm_swsync_can_propagate)),
+        doc(cfg(mcpwm_swsync_can_propagate)),
         doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
     )]
     pub fn trigger_sync(&mut self) {

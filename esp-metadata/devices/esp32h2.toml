@@ -17,12 +17,6 @@ symbols = [
     "phy",
     "swd",
 
-    # MCPWM capabilities
-    "soc_has_mcpwm_swsync_can_propagate",
-    "soc_has_mcpwm_capture_clk_from_group",
-    "soc_has_mcpwm_support_etm",
-    "soc_has_mcpwm_support_sleep_retention",
-
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
@@ -645,6 +639,16 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 
+[device.mcpwm]
+support_status = "partial"
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_sleep_retention = true
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+]
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -653,7 +657,6 @@ deep_sleep = true
 ## Interfaces
 [device.i2s]
 [device.ledc]
-[device.mcpwm]
 [device.pcnt]
 [device.twai]
 [device.usb_serial_jtag]

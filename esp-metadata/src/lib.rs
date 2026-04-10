@@ -618,6 +618,9 @@ impl Config {
         if let Some(peri) = self.device.peri_config.uart.as_ref() {
             tokens.extend(cfg::generate_uart_peripherals(peri));
         }
+        if let Some(peri) = self.device.peri_config.mcpwm.as_ref() {
+            tokens.extend(cfg::generate_mcpwm_peripherals(peri));
+        }
         if let Some(peri) = self.device.peri_config.spi_master.as_ref() {
             tokens.extend(cfg::generate_spi_master_peripherals(peri));
         };

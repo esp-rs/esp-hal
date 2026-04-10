@@ -24,7 +24,7 @@ symbols = [
     "rom_md5_bsd",
 
     # MCPWM capabilities
-    "soc_has_mcpwm_swsync_can_propagate",
+    "mcpwm_swsync_can_propagate",
 
     # Wakeup SOC based on ESP-IDF:
     "pm_support_ext0_wakeup",
@@ -860,6 +860,14 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 
+[device.mcpwm]
+support_status = "partial"
+swsync_can_propagate = true
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+    { name = "mcpwm1", sys_instance = "Mcpwm1" },
+]
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -870,7 +878,6 @@ deep_sleep = true
 [device.camera]
 [device.rgb_display]
 [device.ledc]
-[device.mcpwm]
 [device.pcnt]
 [device.sd_host]
 [device.twai]

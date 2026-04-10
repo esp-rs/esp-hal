@@ -16,13 +16,6 @@ symbols = [
     # Additional peripherals defined by us (the developers):
     # "lp_core",
 
-    # MCPWM capabilities
-    "soc_has_mcpwm_swsync_can_propagate",
-    "soc_has_mcpwm_capture_clk_from_group",
-    "soc_has_mcpwm_support_etm",
-    "soc_has_mcpwm_support_event_comparator",
-    "soc_has_mcpwm_support_sleep_retention",
-
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
@@ -690,6 +683,12 @@ support_status = { status = "not_supported", issue = 5161 }
 
 [device.mcpwm]
 support_status = { status = "not_supported", issue = 5154 }
+# Although mcpwm is not supported these features are worth noting for future implementation
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_event_comparator = true
+support_sleep_retention = true
 
 [device.sleep]
 support_status = { status = "not_supported", issue = 5165 }

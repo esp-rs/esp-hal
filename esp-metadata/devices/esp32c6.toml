@@ -23,12 +23,6 @@ symbols = [
     "rom_crc_be",
     "rom_md5_bsd",
 
-    # MCPWM capabilities
-    "soc_has_mcpwm_swsync_can_propagate",
-    "soc_has_mcpwm_capture_clk_from_group",
-    "soc_has_mcpwm_support_etm",
-    "soc_has_mcpwm_support_sleep_retention",
-
     # Wakeup SOC based on ESP-IDF:
     "pm_support_wifi_wakeup",
     "pm_support_beacon_wakeup",
@@ -750,6 +744,16 @@ deep_sleep = true
 support_status = "partial"
 version = 1
 
+[device.mcpwm]
+support_status = "partial"
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_sleep_retention = true
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+]
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -758,7 +762,6 @@ version = 1
 ## Interfaces
 [device.i2s]
 [device.ledc]
-[device.mcpwm]
 
 [device.pcnt]
 [device.sd_slave]

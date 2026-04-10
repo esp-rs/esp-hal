@@ -217,6 +217,21 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         31
     };
+    ("mcpwm.swsync_can_propagate") => {
+        true
+    };
+    ("mcpwm.capture_clk_from_group") => {
+        true
+    };
+    ("mcpwm.support_etm") => {
+        true
+    };
+    ("mcpwm.support_sleep_retention") => {
+        true
+    };
+    ("mcpwm.support_event_comparator") => {
+        false
+    };
     ("parl_io.version") => {
         2
     };
@@ -3222,6 +3237,31 @@ macro_rules! for_each_uart {
         _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
         _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
         UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the MCPWM driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident)`
+///
+/// Macro fragments:
+///
+/// - `$id`: the index of the MCPWM instance
+/// - `$instance`: the name of the MCPWM instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+///
+/// Example data: `(0, MCPWM0, Mcpwm0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mcpwm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mcpwm { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_mcpwm!((0, MCPWM0, Mcpwm0)); _for_each_inner_mcpwm!((all(0,
+        MCPWM0, Mcpwm0)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

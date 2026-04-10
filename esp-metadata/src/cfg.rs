@@ -3,6 +3,7 @@ pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
 pub(crate) mod interrupt;
+pub(crate) mod mcpwm;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sha;
@@ -17,6 +18,7 @@ pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use interrupt::*;
+pub(crate) use mcpwm::*;
 pub(crate) use rmt::*;
 pub(crate) use sha::*;
 pub(crate) use soc::*;
@@ -491,10 +493,21 @@ driver_configs![
             ram_size: u32,
         }
     },
-    McpwmProperties {
+    McpwmProperties<McpwmInstanceConfig> {
         driver: mcpwm,
         name: "MCPWM",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            swsync_can_propagate: bool,
+            #[serde(default)]
+            capture_clk_from_group: bool,
+            #[serde(default)]
+            support_etm: bool,
+            #[serde(default)]
+            support_sleep_retention: bool,
+            #[serde(default)]
+            support_event_comparator: bool,
+        }
     },
     ParlIoProperties {
         driver: parl_io,

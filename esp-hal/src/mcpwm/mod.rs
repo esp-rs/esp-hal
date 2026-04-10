@@ -58,16 +58,16 @@
 //!     * A hardware sync or software sync can trigger a reload on the capture timer with the set
 //!       phase.
 #![cfg_attr(
-    soc_has_mcpwm_capture_clk_from_group,
+    mcpwm_capture_clk_from_group,
     doc = "     * Capture timer's clock source is the same as the PWM timers clock source"
 )]
 #![cfg_attr(
-    not(soc_has_mcpwm_capture_clk_from_group),
+    not(mcpwm_capture_clk_from_group),
     doc = "     * Capture timer has its own independent clock source from the MCPWM peripheral."
 )]
 //! * Fault Detection Module (Not yet implemented)
 #![cfg_attr(
-    not(soc_has_mcpwm_capture_clk_from_group),
+    not(mcpwm_capture_clk_from_group),
     doc = "\nCapture clock source is `ADB-CLK (80 MHz)` by default.\n"
 )]
 //! Clock source is `__clock_src__` by default.
@@ -113,6 +113,7 @@
 use core::marker::PhantomData;
 
 use enumset::{EnumSet, EnumSetType};
+use paste::paste;
 
 #[cfg(soc_has_mcpwm0)]
 use crate::mcpwm::{
@@ -140,60 +141,38 @@ pub mod sync;
 /// MCPWM timers
 pub mod timer;
 
-/// Provides nice types for public API
-#[cfg(soc_has_mcpwm0)]
-pub mod mcpwm0 {
-    use crate::{mcpwm::*, peripherals::MCPWM0 as MCPWMPeripheral};
+for_each_mcpwm!(
+    ($id:literal, $inst:ident, $sys:ident) => {
+        paste! {
+            /// Provides nice types for public API
+            pub mod [<$inst:lower>] {
+                use crate::{mcpwm::*, peripherals::[<$inst>] as MCPWMPeripheral};
 
-    /// MCPWM Driver for MCPWM0
-    pub type McPwm<'d> = super::McPwm<'d, MCPWMPeripheral<'d>>;
-    /// Capture channel creator for MCPWM0
-    pub type CaptureChannelCreator<'d, const NUM: u8> =
-        capture::CaptureChannelCreator<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Capture Channel for MCPWM0
-    pub type CaptureChannel<'d, const NUM: u8> =
-        capture::CaptureChannel<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Capture timer for MCPWM0
-    pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPeripheral<'d>>;
-    /// Timer for MCPWM0
-    pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Operator for MCPWM0
-    pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Pwm Pin for MCPWM0
-    pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
-        operator::PwmPin<'d, MCPWMPeripheral<'d>, NUM, IS_A>;
-    /// Linked Pins for MCPWM0
-    pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPeripheral<'d>, NUM>;
-    /// Sync source for MCPWM0
-    pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPeripheral<'d>>;
-}
-
-/// Provides nice types for public API
-#[cfg(soc_has_mcpwm1)]
-pub mod mcpwm1 {
-    use crate::{mcpwm::*, peripherals::MCPWM1 as MCPWMPeripheral};
-    /// MCPWM Driver for MCPWM1
-    pub type McPwm<'d> = super::McPwm<'d, MCPWMPeripheral<'d>>;
-    /// Capture channel creator for MCPWM1
-    pub type CaptureChannelCreator<'d, const NUM: u8> =
-        capture::CaptureChannelCreator<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Capture Channel for MCPWM1
-    pub type CaptureChannel<'d, const NUM: u8> =
-        capture::CaptureChannel<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Capture timer for MCPWM1
-    pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPeripheral<'d>>;
-    /// Timer for MCPWM1
-    pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Operator for MCPWM1
-    pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPeripheral<'d>>;
-    /// Pwm Pin for MCPWM1
-    pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
-        operator::PwmPin<'d, MCPWMPeripheral<'d>, NUM, IS_A>;
-    /// Linked Pins for MCPWM1
-    pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPeripheral<'d>, NUM>;
-    /// Sync source for MCPWM1
-    pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPeripheral<'d>>;
-}
+                /// MCPWM Driver for MCPWM<$id>
+                pub type McPwm<'d> = super::McPwm<'d, MCPWMPeripheral<'d>>;
+                /// Capture channel creator for MCPWM<$id>
+                pub type CaptureChannelCreator<'d, const NUM: u8> =
+                    capture::CaptureChannelCreator<'d, NUM, MCPWMPeripheral<'d>>;
+                /// Capture Channel for MCPWM<$id>
+                pub type CaptureChannel<'d, const NUM: u8> =
+                    capture::CaptureChannel<'d, NUM, MCPWMPeripheral<'d>>;
+                /// Capture timer for MCPWM<$id>
+                pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPeripheral<'d>>;
+                /// Timer for MCPWM<$id>
+                pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPeripheral<'d>>;
+                /// Operator for MCPWM<$id>
+                pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPeripheral<'d>>;
+                /// Pwm Pin for MCPWM<$id>
+                pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
+                    operator::PwmPin<'d, MCPWMPeripheral<'d>, NUM, IS_A>;
+                /// Linked Pins for MCPWM<$id>
+                pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPeripheral<'d>, NUM>;
+                /// Sync source for MCPWM<$id>
+                pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPeripheral<'d>> + 'd;
+            }
+        }
+    };
+);
 
 /// The MCPWM peripheral
 #[non_exhaustive]
@@ -555,7 +534,7 @@ impl Info {
     pub fn enable_listen<const UNIT: u8>(&self, events: EnumSet<Event>, value: bool) {
         let regs = self.regs();
         critical_section::with(|_| {
-            regs.int_ena().modify(|r, w| {
+            regs.int_ena().modify(|_, w| {
                 for event in events {
                     dispatch_event_write!(w, event, UNIT, value);
                 }
@@ -580,72 +559,45 @@ pub trait Instance: crate::private::Sealed {
     fn info() -> &'static Info;
 }
 
-#[cfg(soc_has_mcpwm0)]
-impl Instance for crate::peripherals::MCPWM0<'_> {
-    /// Returns peripheral data for MCPWM 0
-    fn info() -> &'static Info {
-        static INFO: Info = Info {
-            register_block: crate::peripherals::MCPWM0::regs(),
-            _peripheral: crate::system::Peripheral::Mcpwm0,
-            _interrupt: crate::peripherals::Interrupt::MCPWM0,
-            sync_input: [
-                InputSignal::PWM0_SYNC0,
-                InputSignal::PWM0_SYNC1,
-                InputSignal::PWM0_SYNC2,
-            ],
-            capture_input: [
-                InputSignal::PWM0_CAP0,
-                InputSignal::PWM0_CAP1,
-                InputSignal::PWM0_CAP2,
-            ],
-            operator_a_output: [
-                OutputSignal::PWM0_0A,
-                OutputSignal::PWM0_1A,
-                OutputSignal::PWM0_2A,
-            ],
-            operator_b_output: [
-                OutputSignal::PWM0_0B,
-                OutputSignal::PWM0_1B,
-                OutputSignal::PWM0_2B,
-            ],
-        };
+// Create an `Instance` impl for each MCPWM peripheral
+for_each_mcpwm!(
+    ($id:literal, $inst:ident, $sys:ident) => {
+        paste::paste! {
+            impl Instance for crate::peripherals::$inst<'_> {
+                /// Returns peripheral data for MCPWM $id
+                fn info() -> &'static Info {
+                    static INFO: Info = Info {
+                        register_block: crate::peripherals::MCPWM0::regs(),
+                        _peripheral: crate::system::Peripheral::Mcpwm0,
+                        _interrupt: crate::peripherals::Interrupt::MCPWM0,
+                        sync_input: [
+                            InputSignal::[<PWM $id _SYNC0>],
+                            InputSignal::[<PWM $id _SYNC1>],
+                            InputSignal::[<PWM $id _SYNC2>],
+                        ],
+                        capture_input: [
+                            InputSignal::[<PWM $id _CAP0>],
+                            InputSignal::[<PWM $id _CAP1>],
+                            InputSignal::[<PWM $id _CAP2>],
+                        ],
+                        operator_a_output: [
+                            OutputSignal::[<PWM $id _0A>],
+                            OutputSignal::[<PWM $id _1A>],
+                            OutputSignal::[<PWM $id _2A>],
+                        ],
+                        operator_b_output: [
+                            OutputSignal::[<PWM $id _0B>],
+                            OutputSignal::[<PWM $id _1B>],
+                            OutputSignal::[<PWM $id _2B>],
+                        ],
+                    };
 
-        &INFO
+                    &INFO
+                }
+            }
     }
-}
-
-#[cfg(soc_has_mcpwm1)]
-impl Instance for crate::peripherals::MCPWM1<'_> {
-    fn info() -> &'static Info {
-        static INFO: Info = Info {
-            register_block: crate::peripherals::MCPWM1::regs(),
-            _peripheral: crate::system::Peripheral::Mcpwm1,
-            _interrupt: crate::peripherals::Interrupt::MCPWM1,
-            sync_input: [
-                InputSignal::PWM1_SYNC0,
-                InputSignal::PWM1_SYNC1,
-                InputSignal::PWM1_SYNC2,
-            ],
-            capture_input: [
-                InputSignal::PWM1_CAP0,
-                InputSignal::PWM1_CAP1,
-                InputSignal::PWM1_CAP2,
-            ],
-            operator_a_output: [
-                OutputSignal::PWM1_0A,
-                OutputSignal::PWM1_1A,
-                OutputSignal::PWM1_2A,
-            ],
-            operator_b_output: [
-                OutputSignal::PWM1_0B,
-                OutputSignal::PWM1_1B,
-                OutputSignal::PWM1_2B,
-            ],
-        };
-
-        &INFO
-    }
-}
+    };
+);
 
 #[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
 struct PwmClockGuard(DropGuard<(), fn(())>);

@@ -874,12 +874,18 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 
+[device.mcpwm]
+support_status = "partial"
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+    { name = "mcpwm1", sys_instance = "Mcpwm1" },
+]
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Interfaces
 [device.i2s]
 [device.ledc]
-[device.mcpwm]
 [device.pcnt]
 [device.sd_host]
 [device.sd_slave]
