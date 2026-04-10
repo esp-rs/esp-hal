@@ -94,7 +94,7 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa and Risc-V (esp32c2/c3)
+      - name: Build and Check Xtensa and Risc-V (esp32c2)
         if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         shell: bash
         run: |
@@ -103,13 +103,13 @@ jobs:
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
 
       - name: Build and Check RISC-V
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
