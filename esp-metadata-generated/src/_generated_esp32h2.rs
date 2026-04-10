@@ -364,6 +364,9 @@ macro_rules! property {
     ("timergroup.rc_fast_calibration_divider") => {
         32
     };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        true
+    };
     ("uart.ram_size") => {
         128
     };

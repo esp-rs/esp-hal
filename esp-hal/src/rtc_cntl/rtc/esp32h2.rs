@@ -1,6 +1,9 @@
 use strum::FromRepr;
 
-use crate::{peripherals::PMU, soc::regi2c};
+use crate::{
+    peripherals::{PCR, PMU},
+    soc::regi2c,
+};
 
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
@@ -69,6 +72,10 @@ pub(crate) fn init() {
         pmu.slp_wakeup_cntl7()
             .modify(|_, w| w.ana_wait_target().bits(1700));
     }
+
+    PCR::regs()
+        .ctrl_tick_conf()
+        .modify(|_, w| unsafe { w.fosc_tick_num().bits(255) });
 }
 
 // Terminology:

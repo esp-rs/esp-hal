@@ -67,6 +67,11 @@ pub mod ll {
 
 #[cfg(timergroup_rc_fast_calibration_divider)]
 use crate::efuse::ChipRevision;
+#[cfg(all(
+    soc_has_clock_node_timg_calibration_clock,
+    timergroup_rc_fast_calibration_tick_enable
+))]
+use crate::peripherals::PCR;
 #[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
@@ -325,6 +330,12 @@ impl Clocks {
         #[cfg(not(timergroup_rc_fast_calibration_divider))]
         let calibration_divider = 1;
 
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        let use_rc_fast_calibration_divider = rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
+            && crate::soc::chip_revision_above(ChipRevision::from_combined(property!(
+                "timergroup.rc_fast_calibration_divider_min_rev"
+            )));
+
         // On some revisions calibration uses a divided RC_FAST tick.
         let calibration_cycles = (slow_cycles / calibration_divider).max(1);
 
@@ -351,6 +362,14 @@ impl Clocks {
         let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
         clocks::configure_timg_calibration_clock(clocks, rtc_clock);
         clocks::request_timg_calibration_clock(clocks);
+
+        // Align with IDF ECO2+ RC_FAST calibration flow.
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        if use_rc_fast_calibration_divider {
+            PCR::regs()
+                .ctrl_tick_conf()
+                .modify(|_, w| w.tick_enable().set_bit());
+        }
 
         let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
 
@@ -424,6 +443,14 @@ impl Clocks {
         TIMG0::regs()
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        // Align with IDF ECO2+ RC_FAST calibration flow.
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        if use_rc_fast_calibration_divider {
+            PCR::regs()
+                .ctrl_tick_conf()
+                .modify(|_, w| w.tick_enable().clear_bit());
+        }
 
         if let Some(calib_clock) = current_calib_clock
             && calib_clock != rtc_clock

@@ -3632,6 +3632,7 @@ impl Chip {
                     "spi_slave_supports_dma",
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_divider",
+                    "timergroup_rc_fast_calibration_tick_enable",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
@@ -3870,6 +3871,7 @@ impl Chip {
                     "cargo:rustc-cfg=spi_slave_supports_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_tick_enable",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
@@ -5720,6 +5722,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f48m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_lp_clk)");
+    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_tick_enable)");
     println!("cargo:rustc-check-cfg=cfg(esp32s2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
