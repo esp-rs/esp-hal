@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache configuration options for ESP32-S2 (#5306)
 - C5: Add PSRAM support (#5317)
 - C61: Add PSRAM support (#5325)
+- A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
 
 ### Changed
 
@@ -139,6 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Efuse` struct has been removed. Use free-standing functions in the `efuse` module instead. (#5104)
 - The `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration option has been removed (#4517)
+- The `ESP_HAL_CONFIG_PSRAM_MODE` configuration option has been removed (#5334)
 - `Clocks::{i2c_clock, pwm_clock, crypto_clock}` fields (#4636, #4647)
 - `RtcClock::xtal_freq()` and the `XtalClock` enum (#4724)
 - `Rtc::estimate_xtal_frequency()` (#4851)

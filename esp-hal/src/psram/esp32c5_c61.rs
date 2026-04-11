@@ -129,8 +129,6 @@ impl Default for PsramConfig {
 }
 
 /// Initialize PSRAM to be used for data.
-///
-/// Returns the start of the mapped memory and the size
 #[procmacros::ram]
 pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
