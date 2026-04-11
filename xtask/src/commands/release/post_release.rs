@@ -72,13 +72,20 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
             );
         }
 
-        // Backport branch management: only for stable minor/major bumps on stable releases
-        // (**major** >= 1), we do not have and do not maintain backport branches for
-        // `0.{minor}.x` versions, and we do not create them for pre-releases.
+        // Backport branch management: only for minor/major bumps on stable releases (**major** >=
+        // 1), we do not have and do not maintain backport branches for `0.{minor}.x`
+        // versions. Pre-release cycles also don't get backport branches.
+        if package_plan.bump.pre.is_some() {
+            log::info!(
+                "Skipping backport branch creation for {} v{} (pre-release cycle)",
+                package,
+                version_str
+            );
+            continue;
+        }
+
         match package_plan.bump.base {
-            Some(crate::Version::Minor | crate::Version::Major)
-                if package_plan.bump.pre.is_none() =>
-            {
+            Some(crate::Version::Minor) | Some(crate::Version::Major) => {
                 if version.major >= 1 {
                     let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
@@ -214,7 +221,7 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
             }
             _ => {
                 log::info!(
-                    "Skipping backport branch creation for {} v{} (bump is not a stable minor/major)",
+                    "Skipping backport branch creation for {} v{} (bump is not minor/major)",
                     package,
                     version_str
                 );

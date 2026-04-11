@@ -29,9 +29,11 @@ use crate::{
 pub struct VersionBump {
     /// Bump the base `major.minor.patch` by this amount. `None` means keep
     /// the current base.
+    #[serde(default)]
     pub base: Option<Version>,
     /// Apply or continue this pre-release identifier (e.g. `"alpha"`).
     /// `None` means a stable release.
+    #[serde(default)]
     pub pre: Option<String>,
 }
 
@@ -522,13 +524,13 @@ mod tests {
             ),
         ];
 
-        for (version, amount, expected) in test_cases {
+        for (version, bump, expected) in test_cases {
             let version = semver::Version::parse(version).unwrap();
-            let new_version = do_version_bump(&version, &amount).unwrap();
+            let new_version = do_version_bump(&version, &bump).unwrap();
             assert_eq!(
                 new_version.to_string(),
                 expected,
-                "bump {amount:?} of {version}",
+                "bump {bump:?} of {version}",
             );
         }
     }
