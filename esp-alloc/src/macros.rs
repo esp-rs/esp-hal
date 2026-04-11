@@ -45,9 +45,16 @@ macro_rules! heap_allocator {
 /// or indirectly. Be very careful when using PSRAM in your global allocator.
 #[macro_export]
 macro_rules! psram_allocator {
-    ($peripheral:expr, $psram_module:path) => {{
+    ($peripheral:expr, $psram_module:path) => {
+        $crate::psram_allocator!($peripheral, $psram_module, Default::default());
+    };
+    ($peripheral:expr, $psram_module:path, $config:expr) => {{
         use $psram_module as _psram;
-        let (start, size) = _psram::psram_raw_parts(&$peripheral);
+        let psram = _psram::Psram::new($peripheral, $config);
+        $crate::psram_allocator!(&psram);
+    }};
+    (&$psram:ident) => {
+        let (start, size) = $psram.raw_parts();
         unsafe {
             $crate::HEAP.add_region($crate::HeapRegion::new(
                 start,
@@ -55,5 +62,5 @@ macro_rules! psram_allocator {
                 $crate::MemoryCapability::External.into(),
             ));
         }
-    }};
+    };
 }

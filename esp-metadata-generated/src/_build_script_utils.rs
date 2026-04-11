@@ -257,7 +257,6 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_touch",
                     "phy",
-                    "psram",
                     "touch",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -455,7 +454,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_touch",
                     "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=psram",
                     "cargo:rustc-cfg=touch",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -1695,6 +1693,7 @@ impl Chip {
                     "soc_has_aes",
                     "soc_has_assist_debug",
                     "soc_has_apb_saradc",
+                    "soc_has_cache",
                     "soc_has_clint",
                     "soc_has_dma",
                     "soc_has_ds",
@@ -1743,6 +1742,8 @@ impl Chip {
                     "soc_has_rsa",
                     "soc_has_sha",
                     "soc_has_slc",
+                    "soc_has_spi0",
+                    "soc_has_spi1",
                     "soc_has_spi2",
                     "soc_has_system",
                     "soc_has_systimer",
@@ -1772,6 +1773,7 @@ impl Chip {
                     "soc_has_mem2mem6",
                     "soc_has_mem2mem7",
                     "soc_has_mem2mem8",
+                    "soc_has_psram",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -1791,6 +1793,7 @@ impl Chip {
                     "parl_io_driver_supported",
                     "pcnt_driver_supported",
                     "phy_driver_supported",
+                    "psram_driver_supported",
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
@@ -1935,6 +1938,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_aes",
                     "cargo:rustc-cfg=soc_has_assist_debug",
                     "cargo:rustc-cfg=soc_has_apb_saradc",
+                    "cargo:rustc-cfg=soc_has_cache",
                     "cargo:rustc-cfg=soc_has_clint",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ds",
@@ -1983,6 +1987,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_rsa",
                     "cargo:rustc-cfg=soc_has_sha",
                     "cargo:rustc-cfg=soc_has_slc",
+                    "cargo:rustc-cfg=soc_has_spi0",
+                    "cargo:rustc-cfg=soc_has_spi1",
                     "cargo:rustc-cfg=soc_has_spi2",
                     "cargo:rustc-cfg=soc_has_system",
                     "cargo:rustc-cfg=soc_has_systimer",
@@ -2012,6 +2018,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_mem2mem6",
                     "cargo:rustc-cfg=soc_has_mem2mem7",
                     "cargo:rustc-cfg=soc_has_mem2mem8",
+                    "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -2031,6 +2038,7 @@ impl Chip {
                     "cargo:rustc-cfg=parl_io_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=phy_driver_supported",
+                    "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
@@ -2974,6 +2982,7 @@ impl Chip {
                     "single_core",
                     "soc_has_assist_debug",
                     "soc_has_clint",
+                    "soc_has_cache",
                     "soc_has_dma",
                     "soc_has_ecc",
                     "soc_has_ecdsa",
@@ -3007,6 +3016,8 @@ impl Chip {
                     "soc_has_rng",
                     "soc_has_sha",
                     "soc_has_slc",
+                    "soc_has_spi0",
+                    "soc_has_spi1",
                     "soc_has_spi2",
                     "soc_has_system",
                     "soc_has_systimer",
@@ -3021,6 +3032,7 @@ impl Chip {
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
+                    "soc_has_psram",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -3029,6 +3041,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
+                    "psram_driver_supported",
                     "rng_driver_supported",
                     "soc_driver_supported",
                     "spi_master_driver_supported",
@@ -3111,6 +3124,7 @@ impl Chip {
                     "cargo:rustc-cfg=single_core",
                     "cargo:rustc-cfg=soc_has_assist_debug",
                     "cargo:rustc-cfg=soc_has_clint",
+                    "cargo:rustc-cfg=soc_has_cache",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ecc",
                     "cargo:rustc-cfg=soc_has_ecdsa",
@@ -3144,6 +3158,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_rng",
                     "cargo:rustc-cfg=soc_has_sha",
                     "cargo:rustc-cfg=soc_has_slc",
+                    "cargo:rustc-cfg=soc_has_spi0",
+                    "cargo:rustc-cfg=soc_has_spi1",
                     "cargo:rustc-cfg=soc_has_spi2",
                     "cargo:rustc-cfg=soc_has_system",
                     "cargo:rustc-cfg=soc_has_systimer",
@@ -3158,6 +3174,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
+                    "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -3166,6 +3183,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
+                    "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
@@ -3618,6 +3636,7 @@ impl Chip {
                     "spi_slave_supports_dma",
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_divider",
+                    "timergroup_rc_fast_calibration_tick_enable",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
@@ -3856,6 +3875,7 @@ impl Chip {
                     "cargo:rustc-cfg=spi_slave_supports_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_tick_enable",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
@@ -4031,8 +4051,6 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_ulp_riscv_core",
                     "phy",
-                    "psram",
-                    "psram_dma",
                     "ulp_riscv_core",
                     "rom_crc_le",
                     "rom_md5_bsd",
@@ -4103,6 +4121,7 @@ impl Chip {
                     "dedicated_gpio_needs_initialization",
                     "dma_kind=\"pdma\"",
                     "dma_supports_mem2mem",
+                    "dma_can_access_psram",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -4242,8 +4261,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
                     "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=psram",
-                    "cargo:rustc-cfg=psram_dma",
                     "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -4314,6 +4331,7 @@ impl Chip {
                     "cargo:rustc-cfg=dedicated_gpio_needs_initialization",
                     "cargo:rustc-cfg=dma_kind=\"pdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -4656,9 +4674,6 @@ impl Chip {
                     "soc_has_ulp_riscv_core",
                     "soc_has_wifi",
                     "phy",
-                    "psram",
-                    "psram_dma",
-                    "octal_psram",
                     "swd",
                     "ulp_riscv_core",
                     "rom_crc_le",
@@ -4738,6 +4753,7 @@ impl Chip {
                     "dedicated_gpio_needs_initialization",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_can_access_psram",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
@@ -4765,6 +4781,7 @@ impl Chip {
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
+                    "psram_octal_spi",
                     "rmt_ram_start=\"1610704896\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -4904,9 +4921,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
                     "cargo:rustc-cfg=soc_has_wifi",
                     "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=psram",
-                    "cargo:rustc-cfg=psram_dma",
-                    "cargo:rustc-cfg=octal_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
@@ -4986,6 +5000,7 @@ impl Chip {
                     "cargo:rustc-cfg=dedicated_gpio_needs_initialization",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -5013,6 +5028,7 @@ impl Chip {
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
+                    "cargo:rustc-cfg=psram_octal_spi",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610704896\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5402,7 +5418,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_sw_interrupt)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_touch)");
     println!("cargo:rustc-check-cfg=cfg(phy)");
-    println!("cargo:rustc-check-cfg=cfg(psram)");
     println!("cargo:rustc-check-cfg=cfg(touch)");
     println!("cargo:rustc-check-cfg=cfg(rom_crc_le)");
     println!("cargo:rustc-check-cfg=cfg(rom_crc_be)");
@@ -5605,6 +5620,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_160m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rmt_sclk)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_cache)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clint)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ecdsa)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");
@@ -5711,6 +5727,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f48m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_lp_clk)");
+    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_tick_enable)");
     println!("cargo:rustc-check-cfg=cfg(esp32s2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
@@ -5720,12 +5737,12 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
-    println!("cargo:rustc-check-cfg=cfg(psram_dma)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
+    println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");
@@ -5736,8 +5753,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_wcl)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
-    println!("cargo:rustc-check-cfg=cfg(octal_psram)");
     println!("cargo:rustc-check-cfg=cfg(camera_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_dma)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_d2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_80m)");

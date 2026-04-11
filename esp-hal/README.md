@@ -88,7 +88,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          | [❌][5294] [^1] |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
@@ -121,7 +121,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
-[5141]: https://github.com/esp-rs/esp-hal/issues/5141
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155
@@ -140,7 +139,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5170]: https://github.com/esp-rs/esp-hal/issues/5170
 [5171]: https://github.com/esp-rs/esp-hal/issues/5171
 [5172]: https://github.com/esp-rs/esp-hal/issues/5172
-[5294]: https://github.com/esp-rs/esp-hal/issues/5294
 <!-- end chip support table -->
 
 ## `unstable` feature

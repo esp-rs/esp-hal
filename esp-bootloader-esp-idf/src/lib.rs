@@ -61,7 +61,9 @@
 //!     // Minimal eFuse block revision supported by image. Format: major * 100 + minor
 //!     0,
 //!     // Maximum eFuse block revision supported by image. Format: major * 100 + minor
-//!     u16::MAX
+//!     u16::MAX,
+//!     // Secure version
+//!     0
 //! );
 //!
 //! #[esp_hal::main]
@@ -175,10 +177,11 @@ impl EspAppDesc {
         min_efuse_blk_rev_full: u16,
         max_efuse_blk_rev_full: u16,
         mmu_page_size: u32,
+        secure_version: u32,
     ) -> Self {
         Self {
             magic_word: ESP_APP_DESC_MAGIC_WORD,
-            secure_version: 0,
+            secure_version,
             reserv1: [0; 2],
             version: str_to_cstr_array(version),
             project_name: str_to_cstr_array(project_name),
@@ -349,6 +352,10 @@ pub const MMU_PAGE_SIZE: u32 = {
     }
 };
 
+/// Secure version.
+pub const SECURE_VERSION: u32 =
+    esp_config::esp_config_int!(u32, "ESP_BOOTLOADER_ESP_IDF_CONFIG_SECURE_VERSION");
+
 /// The (pretended) ESP-IDF version
 pub const ESP_IDF_COMPATIBLE_VERSION: &str =
     esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_ESP_IDF_VERSION");
@@ -368,7 +375,8 @@ macro_rules! esp_app_desc {
             $crate::ESP_IDF_COMPATIBLE_VERSION,
             $crate::MMU_PAGE_SIZE,
             0,
-            u16::MAX
+            u16::MAX,
+            $crate::SECURE_VERSION
         );
     };
 
@@ -380,7 +388,8 @@ macro_rules! esp_app_desc {
      $idf_ver: expr,
      $mmu_page_size: expr,
      $min_efuse_blk_rev_full: expr,
-     $max_efuse_blk_rev_full: expr
+     $max_efuse_blk_rev_full: expr,
+     $secure_version: expr
     ) => {
         #[unsafe(export_name = "esp_app_desc")]
         #[unsafe(link_section = ".flash.appdesc")]
@@ -395,6 +404,7 @@ macro_rules! esp_app_desc {
             $min_efuse_blk_rev_full,
             $max_efuse_blk_rev_full,
             $mmu_page_size,
+            $secure_version,
         );
     };
 }

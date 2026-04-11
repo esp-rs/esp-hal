@@ -1622,18 +1622,15 @@ impl Instance for AnyTwai<'_> {}
 mod asynch {
     use core::{future::poll_fn, task::Poll};
 
-    use embassy_sync::{
-        blocking_mutex::raw::CriticalSectionRawMutex,
-        channel::Channel,
-        waitqueue::AtomicWaker,
-    };
+    use embassy_sync::{channel::Channel, waitqueue::AtomicWaker};
+    use esp_sync::RawMutex;
 
     use super::*;
 
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
-        pub rx_queue: Channel<CriticalSectionRawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
+        pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
     }
 
     impl Default for TwaiAsyncState {
@@ -1694,6 +1691,7 @@ mod asynch {
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
             self.twai.async_state().tx_waker.register(cx.waker());
+            self.twai.listen(EnumSet::all());
 
             let regs = self.twai.register_block();
             let status = regs.status().read();
@@ -1736,7 +1734,6 @@ mod asynch {
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
-            self.twai.listen(EnumSet::all());
             TransmitFuture::new(self.twai.reborrow(), frame).await
         }
     }
@@ -1744,9 +1741,9 @@ mod asynch {
     impl TwaiRx<'_, Async> {
         /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
-            self.twai.listen(EnumSet::all());
             poll_fn(|cx| {
                 self.twai.async_state().err_waker.register(cx.waker());
+                self.twai.listen(EnumSet::all());
 
                 if let Poll::Ready(result) = self.twai.async_state().rx_queue.poll_receive(cx) {
                     return Poll::Ready(result);

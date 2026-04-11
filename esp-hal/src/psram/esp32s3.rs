@@ -22,7 +22,6 @@ pub enum FlashFreq {
 /// Frequency of PSRAM memory
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum SpiRamFreq {
     /// PSRAM frequency 40 MHz
     #[default]
@@ -176,7 +175,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     };
 
     unsafe {
-        super::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+        super::set_psram_range(start as usize..start as usize + config.size.get());
     }
 }
 

@@ -7,7 +7,6 @@ use esp_sync::NonReentrantMutex;
 use super::RxControlInfo;
 use crate::{
     WifiError,
-    esp_wifi_result,
     sys::include::{
         esp_wifi_80211_tx,
         esp_wifi_set_promiscuous,
@@ -19,9 +18,12 @@ use crate::{
         wifi_promiscuous_pkt_t,
         wifi_promiscuous_pkt_type_t,
     },
+    wifi::esp_wifi_result,
 };
 
 /// Represents a Wi-Fi packet in promiscuous mode.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PromiscuousPkt<'a> {
     /// Control information related to packet reception.
@@ -72,6 +74,8 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 }
 
 /// A Wi-Fi sniffer.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub struct Sniffer<'d> {

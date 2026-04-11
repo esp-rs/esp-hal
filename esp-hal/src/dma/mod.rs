@@ -1236,7 +1236,7 @@ impl<'a> DescriptorSet<'a> {
 }
 
 /// Block size for transfers to/from PSRAM
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DmaExtMemBKSize {
     /// External memory block size of 16 bytes.
@@ -1247,7 +1247,7 @@ pub enum DmaExtMemBKSize {
     Size64 = 2,
 }
 
-#[cfg(psram_dma)]
+#[cfg(dma_can_access_psram)]
 impl From<ExternalBurstConfig> for DmaExtMemBKSize {
     fn from(size: ExternalBurstConfig) -> Self {
         match size {
@@ -1821,12 +1821,12 @@ where
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         if preparation.accesses_psram && !self.rx_impl.can_access_psram() {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         self.rx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
@@ -1870,7 +1870,7 @@ where
         // not. TRM section 3.4.9
         // Note that DmaBuffer implementations are required to do this for us.
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 let mut uses_psram = false;
                 let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
@@ -1895,7 +1895,7 @@ where
         let preparation = Preparation {
             start: chain.first().cast_mut(),
             direction: TransferDirection::In,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
@@ -2083,12 +2083,12 @@ where
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         if preparation.accesses_psram && !self.tx_impl.can_access_psram() {
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         self.tx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
@@ -2133,9 +2133,9 @@ where
         // We check each descriptor buffer that points to PSRAM for
         // alignment and writeback the cache for that buffer.
         // Note that DmaBuffer implementations are required to do this for us.
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
+            if #[cfg(dma_can_access_psram)] {
                 let mut uses_psram = false;
                 let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
@@ -2160,7 +2160,7 @@ where
         let preparation = Preparation {
             start: chain.first().cast_mut(),
             direction: TransferDirection::Out,
-            #[cfg(psram_dma)]
+            #[cfg(dma_can_access_psram)]
             accesses_psram: uses_psram,
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
@@ -2283,13 +2283,13 @@ pub trait RegisterAccess: crate::private::Sealed {
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     #[cfg(dma_kind = "pdma")]
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
 }
 

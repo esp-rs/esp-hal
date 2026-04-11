@@ -345,7 +345,7 @@ pub mod dma {
 
     use procmacros::{handler, ram};
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     use crate::dma::ManualWritebackBuffer;
     use crate::{
         Blocking,
@@ -405,7 +405,7 @@ pub mod dma {
 
     // If we can process from PSRAM, we need 2 extra descriptors. One will store the unaligned head,
     // one will store the unaligned tail.
-    const OUT_DESCR_COUNT: usize = 1 + 2 * cfg!(psram_dma) as usize;
+    const OUT_DESCR_COUNT: usize = 1 + 2 * cfg!(dma_can_access_psram) as usize;
 
     /// A DMA capable AES instance.
     #[instability::unstable]
@@ -749,7 +749,7 @@ pub mod dma {
         dma: PeripheralDmaChannel<AES<'d>>,
         state: DriverState<'d>,
 
-        #[cfg(psram_dma)]
+        #[cfg(dma_can_access_psram)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
         input_descriptors: [DmaDescriptor; 1],
         output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
@@ -789,7 +789,7 @@ pub mod dma {
                 dma: dma.degrade(),
                 state: DriverState::None,
 
-                #[cfg(psram_dma)]
+                #[cfg(dma_can_access_psram)]
                 unaligned_data_buffers: [const { None }; 2],
                 input_descriptors: [DmaDescriptor::EMPTY; 1],
                 output_descriptors: [DmaDescriptor::EMPTY; OUT_DESCR_COUNT],
@@ -929,7 +929,7 @@ pub mod dma {
                     driver.clear_interrupt();
 
                     // Write out PSRAM data if needed:
-                    #[cfg(psram_dma)]
+                    #[cfg(dma_can_access_psram)]
                     for buffer in self.unaligned_data_buffers.iter_mut() {
                         // Avoid copying the write_back buffer
                         if let Some(buffer) = buffer.as_ref() {
@@ -937,7 +937,7 @@ pub mod dma {
                         }
                         *buffer = None;
                     }
-                    #[cfg(psram_dma)]
+                    #[cfg(dma_can_access_psram)]
                     if crate::psram::psram_range().contains(&item.buffers.output.addr().get()) {
                         unsafe {
                             crate::soc::cache_writeback_addr(
@@ -1004,7 +1004,7 @@ pub mod dma {
             let (output_buffer, rx_data_len) = unsafe {
                 prepare_for_rx(
                     &mut self.output_descriptors,
-                    #[cfg(psram_dma)]
+                    #[cfg(dma_can_access_psram)]
                     &mut self.unaligned_data_buffers,
                     // Truncate data based on how much the TX buffer can read.
                     NonNull::slice_from_raw_parts(work_item.buffers.output.cast::<u8>(), data_len),

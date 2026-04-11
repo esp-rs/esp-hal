@@ -67,6 +67,11 @@ pub mod ll {
 
 #[cfg(timergroup_rc_fast_calibration_divider)]
 use crate::efuse::ChipRevision;
+#[cfg(all(
+    soc_has_clock_node_timg_calibration_clock,
+    timergroup_rc_fast_calibration_tick_enable
+))]
+use crate::peripherals::PCR;
 #[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
@@ -275,6 +280,42 @@ impl Clocks {
         #[cfg(soc_has_clock_node_timg_function_clock)] function_clock: TimgFunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
+        // There may already be another calibration process running when we call this function,
+        // so we should wait until the previous process is finished.
+        #[cfg(not(esp32))]
+        if TIMG0::regs()
+            .rtccalicfg()
+            .read()
+            .rtc_cali_start_cycling()
+            .bit()
+        {
+            // Set a small timeout threshold to speed up timeout occurrence.
+            // The internal circuit will be reset when the timeout occurs and will not affect
+            // the next calibration.
+            TIMG0::regs()
+                .rtccalicfg2()
+                .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
+
+            loop {
+                if TIMG0::regs()
+                    .rtccalicfg()
+                    .read()
+                    .rtc_cali_rdy()
+                    .bit_is_set()
+                    || TIMG0::regs()
+                        .rtccalicfg2()
+                        .read()
+                        .rtc_cali_timeout()
+                        .bit_is_set()
+                {
+                    break;
+                }
+            }
+        }
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start_cycling().clear_bit());
+
         use esp_rom_sys::rom::ets_delay_us;
 
         #[cfg(timergroup_rc_fast_calibration_divider)]
@@ -288,6 +329,12 @@ impl Clocks {
         };
         #[cfg(not(timergroup_rc_fast_calibration_divider))]
         let calibration_divider = 1;
+
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        let use_rc_fast_calibration_divider = rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
+            && crate::soc::chip_revision_above(ChipRevision::from_combined(property!(
+                "timergroup.rc_fast_calibration_divider_min_rev"
+            )));
 
         // On some revisions calibration uses a divided RC_FAST tick.
         let calibration_cycles = (slow_cycles / calibration_divider).max(1);
@@ -315,6 +362,14 @@ impl Clocks {
         let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
         clocks::configure_timg_calibration_clock(clocks, rtc_clock);
         clocks::request_timg_calibration_clock(clocks);
+
+        // Align with IDF ECO2+ RC_FAST calibration flow.
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        if use_rc_fast_calibration_divider {
+            PCR::regs()
+                .ctrl_tick_conf()
+                .modify(|_, w| w.tick_enable().set_bit());
+        }
 
         let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
 
@@ -388,6 +443,14 @@ impl Clocks {
         TIMG0::regs()
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        // Align with IDF ECO2+ RC_FAST calibration flow.
+        #[cfg(timergroup_rc_fast_calibration_tick_enable)]
+        if use_rc_fast_calibration_divider {
+            PCR::regs()
+                .ctrl_tick_conf()
+                .modify(|_, w| w.tick_enable().clear_bit());
+        }
 
         if let Some(calib_clock) = current_calib_clock
             && calib_clock != rtc_clock

@@ -223,6 +223,7 @@ impl Package {
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
                 | EspRtos
+                | EspStorage
         )
     }
 
@@ -869,6 +870,7 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                         "has-lp-core".into(),
                         "is-lp-core".into(),
                         "rtc-slow".into(),
+                        "rtc-fast".into(),
                     ])
                     .build(),
                 &package_path,
@@ -881,7 +883,8 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     }
 }
 
-fn format_package_path(
+/// Format a package directory in the workspace using `cargo fmt`.
+pub fn format_package_path(
     workspace: &Path,
     package_path: &Path,
     check: bool,

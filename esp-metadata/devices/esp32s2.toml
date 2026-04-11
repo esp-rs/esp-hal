@@ -15,8 +15,6 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_t
 symbols = [
     # Additional peripherals defined by us (the developers):
     "phy",
-    "psram",
-    "psram_dma",
     "ulp_riscv_core",
 
     # ROM capabilities
@@ -286,6 +284,7 @@ instances = [
 support_status = "partial"
 kind = "pdma"
 supports_mem2mem = true
+can_access_psram = true
 
 [device.gpio]
 support_status = "supported"
@@ -679,6 +678,8 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+# octal_spi = true
+
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]

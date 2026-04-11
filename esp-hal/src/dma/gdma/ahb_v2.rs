@@ -73,7 +73,7 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }
@@ -285,7 +285,7 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(psram_dma)]
+    #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }

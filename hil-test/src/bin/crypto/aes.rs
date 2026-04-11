@@ -487,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(aes_dma, psram))]
+    #[cfg(all(aes_dma, soc_has_psram))]
     fn test_aes_dma_work_queue_psram() {
         use allocator_api2::vec::Vec;
 

@@ -85,6 +85,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.can_access_psram") => {
+        false
+    };
     ("dma.separate_in_out_interrupts") => {
         true
     };
@@ -363,6 +366,9 @@ macro_rules! property {
     };
     ("timergroup.rc_fast_calibration_divider") => {
         32
+    };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        false
     };
     ("uart.ram_size") => {
         128

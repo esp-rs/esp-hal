@@ -40,18 +40,18 @@ options:
     default:
       - value: '"quad"'
     constraints:
-      - if: 'feature("octal_psram")'
+      - if: 'feature("psram_octal_spi")'
         type:
           validator: enumeration
           value:
             - "quad"
             - "octal"
-      - if: '!feature("octal_psram")'
+      - if: '!feature("psram_octal_spi")'
         type:
           validator: enumeration
           value:
             - "quad"
-    active: 'feature("psram")'
+    active: 'feature("soc_has_psram")'
 
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
@@ -92,14 +92,22 @@ options:
   - name: instruction-cache-size
     description: Instruction cache size to be set on application startup.
     default:
+      - value: '"8KB"'
+        if: 'chip == "esp32s2"'
       - value: '"32KB"'
     constraints:
+      - if: 'chip == "esp32s2"'
+        type:
+          validator: enumeration
+          value:
+            - "8KB"
+            - "16KB"
       - type:
           validator: enumeration
           value:
             - "16KB"
             - "32KB"
-    active: 'chip == "esp32s3"'
+    active: 'chip == "esp32s2" || chip == "esp32s3"'
 
   - name: instruction-cache-line-size
     description: Instruction cache line size to be set on application startup.
@@ -111,7 +119,7 @@ options:
           value:
             - "16B"
             - "32B"
-    active: 'chip == "esp32s3"'
+    active: 'chip == "esp32s2" || chip == "esp32s3"'
 
   - name: icache-associated-ways
     description: Instruction cache associated ways to be set on application startup.
@@ -128,28 +136,43 @@ options:
   - name: data-cache-size
     description: Data cache size to be set on application startup.
     default:
+      - value: '"8KB"'
+        if: 'chip == "esp32s2"'
       - value: '"32KB"'
     constraints:
+      - if: 'chip == "esp32s2"'
+        type:
+          validator: enumeration
+          value:
+            - "0KB"
+            - "8KB"
+            - "16KB"
       - type:
           validator: enumeration
           value:
             - "16KB"
             - "32KB"
             - "64KB"
-    active: 'chip == "esp32s3"'
+    active: 'chip == "esp32s2" || chip == "esp32s3"'
 
   - name: data-cache-line-size
     description: Data cache line size to be set on application startup.
     default:
       - value: '"32B"'
     constraints:
+      - if: 'chip == "esp32s2"'
+        type:
+          validator: enumeration
+          value:
+            - "16B"
+            - "32B"
       - type:
           validator: enumeration
           value:
             - "16B"
             - "32B"
             - "64B"
-    active: 'chip == "esp32s3"'
+    active: 'chip == "esp32s2" || chip == "esp32s3"'
 
   - name: dcache-associated-ways
     description: Data cache associated ways to be set on application startup.

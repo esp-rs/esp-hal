@@ -72,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
 - ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
 - Fix a crash after shutting down WiFi (#4761)
+- Fix IEEE 802.15.4 extended address byte order: use little-endian instead of big-endian (#5314)
 - Fix a crash when trying to handle an unknown WiFi event (#4942)
 - Align IEEE 802.15.4 driver with ESP-IDF 5.5.2 C driver: overhauled ISR event handling, added timer0-based ACK timeout, per-state stop dispatch, TX deferral with pending TX mechanism, CCA support, ACK frame return, and fixed TX power default (20 dBm) (#5006)
 - `WifiController::set_config` now stops the Wi-Fi controller on error to avoid leaving the controller in an inconsistent state. (#5100)

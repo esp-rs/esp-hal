@@ -42,6 +42,7 @@ mod raw;
 /// IEEE 802.15.4 errors
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
     /// invalid.
@@ -65,6 +66,7 @@ impl From<byte::Error> for Error {
 /// IEEE 802.15.4 driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct Config {
     pub auto_ack_tx: bool,
     pub auto_ack_rx: bool,
@@ -106,6 +108,7 @@ impl Default for Config {
 /// IEEE 802.15.4 driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
@@ -118,6 +121,7 @@ impl<'a> Ieee802154<'a> {
     ///
     /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
     /// things will break.
+    #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
         let (_phy_clock_guard, _phy_init_guard) = esp_ieee802154_enable(radio);
         Self {
@@ -129,6 +133,7 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Set the configuration for the driver
+    #[instability::unstable]
     pub fn set_config(&mut self, cfg: Config) {
         set_auto_ack_tx(cfg.auto_ack_tx);
         set_auto_ack_rx(cfg.auto_ack_rx);
@@ -151,7 +156,7 @@ impl<'a> Ieee802154<'a> {
 
         if let Some(ext_addr) = cfg.ext_addr {
             let mut address = [0u8; IEEE802154_FRAME_EXT_ADDR_SIZE];
-            address.copy_from_slice(&ext_addr.to_be_bytes()); // LE or BE?
+            address.copy_from_slice(&ext_addr.to_le_bytes());
 
             set_extended_address(0, address);
         }
@@ -160,11 +165,13 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Start receiving frames
+    #[instability::unstable]
     pub fn start_receive(&mut self) {
         ieee802154_receive();
     }
 
     /// Return the raw data of a received frame
+    #[instability::unstable]
     pub fn raw_received(&mut self) -> Option<RawReceived> {
         raw::ensure_receive_enabled();
         ieee802154_poll()
@@ -181,11 +188,13 @@ impl<'a> Ieee802154<'a> {
     /// ACK timed out, or no transmission has occurred).
     ///
     /// The ACK frame is cleared at the start of each new transmission.
+    #[instability::unstable]
     pub fn get_ack_frame(&self) -> Option<RawReceived> {
         raw::get_ack_frame()
     }
 
     /// Get a received frame, if available
+    #[instability::unstable]
     pub fn received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
         raw::ensure_receive_enabled();
         if let Some(raw) = ieee802154_poll() {
@@ -230,6 +239,7 @@ impl<'a> Ieee802154<'a> {
     ///
     /// If `cca` is true, a Clear Channel Assessment is performed before
     /// transmitting. The transmission is aborted if the channel is busy.
+    #[instability::unstable]
     pub fn transmit(&mut self, frame: &Frame, cca: bool) -> Result<(), Error> {
         let frm = mac::Frame {
             header: frame.header,
@@ -257,6 +267,7 @@ impl<'a> Ieee802154<'a> {
     ///
     /// If `cca` is true, a Clear Channel Assessment is performed before
     /// transmitting. The transmission is aborted if the channel is busy.
+    #[instability::unstable]
     pub fn transmit_raw(&mut self, frame: &[u8], cca: bool) -> Result<(), Error> {
         self.transmit_buffer[1..][..frame.len()].copy_from_slice(frame);
         self.transmit_buffer[0] = frame.len() as u8;
@@ -267,6 +278,7 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Set the transmit done callback function.
+    #[instability::unstable]
     pub fn set_tx_done_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         CALLBACKS.with(|cbs| {
             let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
@@ -275,11 +287,13 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Clear the transmit done callback function.
+    #[instability::unstable]
     pub fn clear_tx_done_callback(&mut self) {
         CALLBACKS.with(|cbs| cbs.tx_done = None);
     }
 
     /// Set the receive available callback function.
+    #[instability::unstable]
     pub fn set_rx_available_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         CALLBACKS.with(|cbs| {
             let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
@@ -288,31 +302,37 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Clear the receive available callback function.
+    #[instability::unstable]
     pub fn clear_rx_available_callback(&mut self) {
         CALLBACKS.with(|cbs| cbs.rx_available = None);
     }
 
     /// Set the transmit done callback function.
+    #[instability::unstable]
     pub fn set_tx_done_callback_fn(&mut self, callback: fn()) {
         CALLBACKS.with(|cbs| cbs.tx_done_fn = Some(callback));
     }
 
     /// Clear the transmit done callback function.
+    #[instability::unstable]
     pub fn clear_tx_done_callback_fn(&mut self) {
         CALLBACKS.with(|cbs| cbs.tx_done_fn = None);
     }
 
     /// Set the receive available callback function.
+    #[instability::unstable]
     pub fn set_rx_available_callback_fn(&mut self, callback: fn()) {
         CALLBACKS.with(|cbs| cbs.rx_available_fn = Some(callback));
     }
 
     /// Clear the receive available callback function.
+    #[instability::unstable]
     pub fn clear_rx_available_callback_fn(&mut self) {
         CALLBACKS.with(|cbs| cbs.rx_available_fn = None);
     }
 
     /// Set the transmit failed callback function.
+    #[instability::unstable]
     pub fn set_tx_failed_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
         CALLBACKS.with(|cbs| {
             let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
@@ -321,16 +341,19 @@ impl<'a> Ieee802154<'a> {
     }
 
     /// Clear the transmit failed callback function.
+    #[instability::unstable]
     pub fn clear_tx_failed_callback(&mut self) {
         CALLBACKS.with(|cbs| cbs.tx_failed = None);
     }
 
     /// Set the transmit failed callback function pointer.
+    #[instability::unstable]
     pub fn set_tx_failed_callback_fn(&mut self, callback: fn()) {
         CALLBACKS.with(|cbs| cbs.tx_failed_fn = Some(callback));
     }
 
     /// Clear the transmit failed callback function.
+    #[instability::unstable]
     pub fn clear_tx_failed_callback_fn(&mut self) {
         CALLBACKS.with(|cbs| cbs.tx_failed_fn = None);
     }
@@ -352,6 +375,7 @@ impl Drop for Ieee802154<'_> {
 ///
 /// RSSI is a measure of incoherent (raw) RF power in a channel. LQI is a
 /// cumulative value used in multi-hop networks to assess the cost of a link.
+#[instability::unstable]
 pub fn rssi_to_lqi(rssi: i8) -> u8 {
     if rssi < -80 {
         0
