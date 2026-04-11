@@ -79,7 +79,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
                 true
             };
 
-            if forever_unstable && step.bump != VersionBump::Patch {
+            if forever_unstable && step.bump != VersionBump::patch() {
                 bail!(
                     "Cannot bump perma-unstable package {} to a non-patch version",
                     step.package
