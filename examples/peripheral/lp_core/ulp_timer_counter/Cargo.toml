@@ -19,11 +19,11 @@ esp32s3 = [
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
 ]
-esp32s2 = [
-    "esp-backtrace/esp32s2",
-    "esp-bootloader-esp-idf/esp32s2",
-    "esp-hal/esp32s2",
-]
+#esp32s2 = [
+#    "esp-backtrace/esp32s2",
+#    "esp-bootloader-esp-idf/esp32s2",
+#    "esp-hal/esp32s2",
+#]
 
 [profile.release]
 debug            = true

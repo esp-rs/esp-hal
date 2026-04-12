@@ -10,7 +10,9 @@
 //! The following wiring is assumed:
 //! - BUTTON => GPIO0
 
-//% CHIPS: esp32s2 esp32s3
+//% CHIPS: esp32s3
+//! (ESP32S2 also supported, but not listed above, as the interrupt_counter example is only built
+//! for esp32s3 in CI)
 
 #![no_std]
 #![no_main]
