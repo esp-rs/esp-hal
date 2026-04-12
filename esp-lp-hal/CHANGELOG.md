@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix panic when handling buffers larger than 7 bytes in `LpI2c.write` and `LpI2c.read` (#4694)
 - ESP32-S2, ESP32-S3: Aligned `ulp_riscv_halt()` with ESP_IDF by setting the `cocpu_shut_reset_en` bit, squashing a rare bug where halting the chip would hang (#5134)
+- ESP32-S2, ESP32-S3: Prevent `Peripherals::take().unwrap()` from panicking on second ULP Timer `main()`-loop, by clearing `DEVICE_PERIPHERALS` variable on start.
 
 ### Removed
 

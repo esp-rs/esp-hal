@@ -48,7 +48,7 @@ fn startup_interrupt_handler() {
     // On entry, immediately disable any more start-up interrupts.
     // This is needed, because RISCV_START_INT is driven from the ULP Timer,
     // which may be called multiple times before main() has finished execution.
-    interrupt::disable(Interrupt::RISCV_START_INT);
+    interrupt::set_enabled(Interrupt::RISCV_START_INT, false);
 }
 
 #[handler]

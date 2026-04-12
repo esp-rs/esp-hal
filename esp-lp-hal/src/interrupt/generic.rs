@@ -1,6 +1,6 @@
 use portable_atomic::{AtomicPtr, Ordering};
 
-use super::{current_interrupts, enable};
+use super::{current_interrupts, set_enabled};
 pub use crate::pac::Interrupt;
 use crate::pac::{__EXTERNAL_INTERRUPTS, Vector};
 
@@ -41,7 +41,7 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
         ptr.write_volatile(handler.handler().address());
     }
-    enable(interrupt, handler.priority());
+    set_enabled(interrupt, true);
 }
 
 /// Trait implemented by drivers which allow the user to set an

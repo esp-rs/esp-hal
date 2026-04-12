@@ -40,8 +40,7 @@ pub use esp32s3_ulp as pac;
 
 /// Critical section implementation for ULP cores
 #[cfg(any(esp32s2, esp32s3))]
-#[doc(hidden)]
-pub mod critical_section;
+mod critical_section;
 
 /// Interrupt handling for RISCV ULP cores (ESP32-S2,ESP32-S3)
 #[cfg(any(esp32s2, esp32s3))]
