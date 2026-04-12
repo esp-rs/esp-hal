@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `set_current_app_partition` producing `ota_seq == 0` when selecting from uninitialized otadata, which the bootloader ignores (#5346)
 
 ### Removed
 
