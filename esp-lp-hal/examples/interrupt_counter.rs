@@ -19,54 +19,60 @@ use esp_lp_hal::{
     prelude::*,
 };
 
-const ADDRESS: u32 = 0x1000;
+const ADDRESS: usize = 0x1000;
 
-fn increment_counter() {
-    let ptr = ADDRESS as *mut u32;
-    let i = unsafe { ptr.read_volatile() };
-    unsafe {
-        ptr.write_volatile(i + 1);
-    }
-}
-fn reset_counter() {
-    let ptr = ADDRESS as *mut u32;
-    unsafe {
-        ptr.write_volatile(0);
-    }
-}
-
-// NOTE: Normally this would contain Option<Input<0>>,
-//       but for some reason the ULP core is crashing when
-//       .unwrap() is used on anything...
-static BUTTON: Mutex<RefCell<Input<0>>> = Mutex::new(RefCell::new(Input::<0>::new()));
+static BUTTON: Mutex<RefCell<Option<Input<0>>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main(mut button: Input<0>) {
-    let peripherals = Peripherals::take();
+    let peripherals = Peripherals::take().unwrap();
     let mut io = Io::new(peripherals.RTC_IO);
     io.set_interrupt_handler(gpio_interrupt_handler);
 
-    interrupt::bind_handler(Interrupt::RISCV_START_INT, startup_interrupt_handler);
-
     critical_section::with(|cs| {
         button.listen(Event::FallingEdge);
-        *BUTTON.borrow_ref_mut(cs) = button;
+        BUTTON.borrow_ref_mut(cs).replace(button);
     });
-}
 
-#[handler]
-fn gpio_interrupt_handler() {
-    if critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).is_interrupt_set()) {
-        // The button was the source of the interrupt
-        reset_counter();
-    }
-
-    // Clear the interrupt
-    critical_section::with(|cs| BUTTON.borrow_ref_mut(cs).clear_interrupt());
+    interrupt::bind_handler(Interrupt::RISCV_START_INT, startup_interrupt_handler);
 }
 
 #[handler]
 fn startup_interrupt_handler() {
-    increment_counter();
+    // Increment the counter every time RISCV_START_INT is triggered
+    unsafe {
+        let counter = ADDRESS as *mut u32;
+        counter.write_volatile(counter.read_volatile() + 1);
+    }
+
+    // On entry, immediately disable any more start-up interrupts.
+    // This is needed, because RISCV_START_INT is driven from the ULP Timer,
+    // which may be called multiple times before main() has finished execution.
     interrupt::disable(Interrupt::RISCV_START_INT);
+}
+
+#[handler]
+fn gpio_interrupt_handler() {
+    // Check if BUTTON has an interrupt pending
+    if critical_section::with(|cs| {
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .is_interrupt_set()
+    }) {
+        // The button was the source of the interrupt, reset the counter to 0.
+        unsafe {
+            let counter = ADDRESS as *mut u32;
+            counter.write_volatile(0);
+        }
+    }
+
+    critical_section::with(|cs| {
+        BUTTON
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .unwrap()
+            .clear_interrupt()
+    });
 }
