@@ -91,6 +91,10 @@ name              = "interrupt_counter"
 required-features = ["esp32s3"]
 
 [[example]]
+name              = "gpio_wakeup"
+required-features = ["esp32s3"]
+
+[[example]]
 name              = "i2c"
 required-features = ["esp32c6"]
 

@@ -126,3 +126,17 @@ pub fn is_interrupt_set<const N: u8>() -> bool {
     let stat = gpio_interrupt_status();
     (stat & (1 << N)) != 0
 }
+
+/// Global GPIO wakeup enable/disable
+pub fn gpio_wakeup_enable(enable: bool) {
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(enable));
+}
+
+/// Clear GPIO wakeup status
+pub fn gpio_wakeup_clear() {
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+}
