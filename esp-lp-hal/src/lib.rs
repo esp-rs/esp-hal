@@ -38,9 +38,17 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
+/// Critical section implementation for ULP cores
+#[cfg(any(esp32s2, esp32s3))]
+mod critical_section;
+
+/// Interrupt handling for RISCV ULP cores (ESP32-S2,ESP32-S3)
+#[cfg(any(esp32s2, esp32s3))]
+pub mod interrupt;
+
 /// The prelude
 pub mod prelude {
-    pub use procmacros::entry;
+    pub use procmacros::{entry, handler};
 }
 
 cfg_if::cfg_if! {
@@ -56,6 +64,12 @@ cfg_if::cfg_if! {
 }
 
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
+
+// Assembly containing the reset, trap, and startup assembly procedures..
+#[cfg(esp32c6)]
+global_asm!(include_str!("./lp_start.S"));
+#[cfg(any(esp32s2, esp32s3))]
+global_asm!(include_str!("./ulp_riscv_start.S"));
 
 /// Wake up the HP core
 pub fn wake_hp_core() {
@@ -73,80 +87,30 @@ pub fn wake_hp_core() {
         .write(|w| w.rtc_sw_cpu_int().set_bit());
 }
 
-#[cfg(esp32c6)]
-global_asm!(
-    r#"
-    .section    .init.vector, "ax"
-    /* This is the vector table. It is currently empty, but will be populated
-     * with exception and interrupt handlers when this is supported
-     */
-
-    .align  0x4, 0xff
-    .global _vector_table
-    .type _vector_table, @function
-_vector_table:
-    .option push
-    .option norvc
-
-    .rept 32
-    nop
-    .endr
-
-    .option pop
-    .size _vector_table, .-_vector_table
-
-    .section .init, "ax"
-    .global reset_vector
-
-/* The reset vector, jumps to startup code */
-reset_vector:
-    j __start
-
-__start:
-    /* setup the stack pointer */
-    la sp, __stack_top
-    call rust_main
-loop:
-    j loop
-"#
-);
-
-#[cfg(any(esp32s2, esp32s3))]
-global_asm!(
-    r#"
-	.section .text.vectors
-	.global irq_vector
-	.global reset_vector
-
-/* The reset vector, jumps to startup code */
-reset_vector:
-	j __start
-
-/* Interrupt handler */
-.balign 16
-irq_vector:
-	ret
-
-	.section .text
-
-__start:
-    /* setup the stack pointer */
-	la sp, __stack_top
-
-	call ulp_riscv_rescue_from_monitor
-	call rust_main
-loop:
-	j loop
-"#
-);
-
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
+            // This symbol will be provided by the user via `#[entry]`
             fn main();
+
+            // This variable is provided by the PAC, and used to
+            // detect multiple calls to Peripherals::take().
+            static mut DEVICE_PERIPHERALS: bool;
+        }
+
+        // The pac::DEVICE_PERIPHERALS variable is re-zero-ed on start,
+        // to prevent it from persisting between calls to main().
+        // This prevents ULP-Timer-triggered-main()-calls from panicking
+        // on their second loop.
+        DEVICE_PERIPHERALS = false;
+
+        #[cfg(any(esp32s2, esp32s3))]
+        {
+            ulp_riscv_rescue_from_monitor();
+            interrupt::setup_interrupts();
         }
 
         #[cfg(esp32c6)]

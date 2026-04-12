@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add `wake_hp_core` for ESP32-S2 and ESP32-S3 (#5133)
 - Add `OutputOpenDrain` GPIO type (#5131)
+- ESP32-S2, ESP32-S3: Added ULP interrupt support (#5206)
 
 ### Changed
 - Changed ULP entrypoint to allow `main()` to return, and halt, to the ULP Timer can be used (#5134)
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix panic when handling buffers larger than 7 bytes in `LpI2c.write` and `LpI2c.read` (#4694)
 - ESP32-S2, ESP32-S3: Aligned `ulp_riscv_halt()` with ESP_IDF by setting the `cocpu_shut_reset_en` bit, squashing a rare bug where halting the chip would hang (#5134)
+- ESP32-S2, ESP32-S3: Prevent `Peripherals::take().unwrap()` from panicking on second ULP Timer `main()`-loop, by clearing `DEVICE_PERIPHERALS` variable on start (#5206)
 
 ### Removed
 
