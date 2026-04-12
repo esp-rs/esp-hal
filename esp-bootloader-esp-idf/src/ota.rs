@@ -220,8 +220,23 @@ where
         let mut buffer2 = OtaSelectEntry::default();
         self.flash.read(SLOT0_DATA_OFFSET, buffer1.as_bytes_mut())?;
         self.flash.read(SLOT1_DATA_OFFSET, buffer2.as_bytes_mut())?;
-        let seq0 = buffer1.ota_seq;
-        let seq1 = buffer2.ota_seq;
+        // The esp-idf C writer never produces ota_seq == 0 (see
+        // `esp_rewrite_ota_data` in esp-idf's `esp_ota_ops.c`), so if it
+        // appears on flash it was written by a buggy caller.  Normalize it
+        // to UNINITALIZED_SEQUENCE so the rest of the selection logic does
+        // not misinterpret it via unsigned underflow in `(0u32 - 1)`.
+        //
+        // Ref: https://github.com/espressif/esp-idf/blob/v5.4.1/components/app_update/esp_ota_ops.c#L390-L435
+        let seq0 = if buffer1.ota_seq == 0 {
+            UNINITALIZED_SEQUENCE
+        } else {
+            buffer1.ota_seq
+        };
+        let seq1 = if buffer2.ota_seq == 0 {
+            UNINITALIZED_SEQUENCE
+        } else {
+            buffer2.ota_seq
+        };
         Ok((seq0, seq1))
     }
 
@@ -264,8 +279,20 @@ where
             // calculate the needed increment of the sequence-number to select the requested OTA-app
             // partition
             let inc = if current == AppPartitionSubType::Factory {
-                (((app.ota_app_number()) as i32 + 1) + (self.ota_partition_count as i32)) as u32
-                    % self.ota_partition_count as u32
+                // Both slots are uninitialized when current == Factory, so
+                // new_seq = inc directly (not base + inc).  The bootloader
+                // selects partition (ota_seq - 1) % count, so the minimum
+                // valid ota_seq that selects `app` is app_number + 1.
+                //
+                // This matches the esp-idf C implementation which uses
+                // `SUB_TYPE_ID(subtype) + 1` for the uninitialized case:
+                // https://github.com/espressif/esp-idf/blob/v5.4.1/components/app_update/esp_ota_ops.c#L430-L434
+                //
+                // Note: the previous formula `((app_number + 1) + count) %
+                // count` produces 0 when (app_number + 1) is a multiple of
+                // count (e.g. Ota1 with 2 partitions), and the bootloader
+                // ignores ota_seq == 0.
+                app.ota_app_number() as u32 + 1
             } else {
                 ((((app.ota_app_number()) as i32) - ((current.ota_app_number()) as i32))
                     + (self.ota_partition_count as i32)) as u32
@@ -462,6 +489,53 @@ mod tests {
 
         assert_eq!(SLOT_COUNT_1_UNDEFINED, &mock_flash.data[0x0000..][..0x20],);
         assert_eq!(SLOT_INITIAL, &mock_flash.data[0x1000..][..0x20],);
+    }
+
+    /// Regression test: selecting Ota1 from uninitialized otadata (Factory
+    /// state) must produce ota_seq >= 1.  Previously the increment formula
+    /// `((app_number + 1) + count) % count` gave 0 for Ota1 with 2
+    /// partitions, and the bootloader treats ota_seq == 0 as unused.
+    #[test]
+    fn test_factory_to_ota1_produces_valid_seq() {
+        let mut binary = PARTITION_RAW;
+
+        let mock_entry = PartitionEntry {
+            binary: &mut binary,
+        };
+
+        let mut mock_flash = MockFlash {
+            data: [0xff; 0x2000],
+        };
+
+        let mock_region = FlashRegion {
+            raw: mock_entry,
+            flash: &mut mock_flash,
+        };
+
+        let mut sut = Ota::new(mock_region, 2).unwrap();
+        assert_eq!(
+            sut.current_app_partition().unwrap(),
+            AppPartitionSubType::Factory
+        );
+
+        // Select Ota1 directly from uninitialized (Factory) state.
+        sut.set_current_app_partition(AppPartitionSubType::Ota1)
+            .unwrap();
+        assert_eq!(
+            sut.current_app_partition().unwrap(),
+            AppPartitionSubType::Ota1
+        );
+
+        // The written ota_seq must be >= 1 (bootloader ignores seq == 0).
+        let slot0_offset = SLOT0_DATA_OFFSET as usize;
+        let seq = u32::from_le_bytes(
+            mock_flash.data[slot0_offset..slot0_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
+        assert!(seq >= 1, "ota_seq must be >= 1, got {seq}");
+        // (seq - 1) % 2 must equal 1 to select Ota1.
+        assert_eq!((seq - 1) % 2, 1, "ota_seq {seq} does not select Ota1");
     }
 
     #[test]
