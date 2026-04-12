@@ -527,7 +527,9 @@ mod tests {
         );
 
         // The written ota_seq must be >= 1 (bootloader ignores seq == 0).
-        let seq = u32::from_le_bytes(mock_flash.data[0x0000..0x0004].try_into().unwrap());
+        let slot0_offset = SLOT0_DATA_OFFSET as usize;
+        let seq =
+            u32::from_le_bytes(mock_flash.data[slot0_offset..slot0_offset + 4].try_into().unwrap());
         assert!(seq >= 1, "ota_seq must be >= 1, got {seq}");
         // (seq - 1) % 2 must equal 1 to select Ota1.
         assert_eq!((seq - 1) % 2, 1, "ota_seq {seq} does not select Ota1");
