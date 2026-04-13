@@ -13,42 +13,41 @@ harness           = false
 required-features = ["esp-alloc"]
 
 [dependencies]
-allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 cfg-if             = "1"
-critical-section   = "1"
+# critical-section   = "1"
 defmt              = "1.0.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
-embassy-executor   = { version = "0.9.0", default-features = false }
-embassy-futures    = "0.1"
-embedded-storage   = "0.3.1"
-embassy-sync       = "0.7.2"
+embassy-executor   = { version = "0.10.0", default-features = false }
+# embassy-futures    = "0.1"
+# embedded-storage   = "0.3.1"
+# embassy-sync       = "0.7.0" # TODO: update after trouble-host has been released
 embassy-time       = "0.5.0"
-embedded-hal       = "1.0.0"
+# embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
 embedded-io-async  = "0.7.0"
-embedded-can       = "0.4.1"
-embedded-hal-async = "1.0.0"
+# embedded-can       = "0.4.1"
+# embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal", features = ["defmt"] }
-esp-metadata-generated = { path = "../esp-metadata-generated" }
+# esp-metadata-generated = { path = "../esp-metadata-generated" }
 esp-rtos           = { path = "../esp-rtos", features = ["defmt"], optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
-esp-sync           = { path = "../esp-sync" }
+# esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
-portable-atomic    = "1.11"
+# portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-trouble-host = { version = "0.6.0", features = [
-    "default-packet-pool-mtu-255",
-    "derive",
-    "scan",
-], optional = true }
+# trouble-host = { version = "0.6.0", features = [
+#     "default-packet-pool-mtu-255",
+#     "derive",
+#     "scan",
+# ], optional = true }
 
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.7", default-features = false, features = ["embassy", "external-executor", "semihosting", "defmt"] }
+embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting", "defmt"] }
 
 # radio HIL deps
 embassy-net = { version = "0.8.0", features = [
@@ -75,43 +74,6 @@ embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
 
 # Device support (required!):
-esp32 = [
-    "embedded-test/xtensa-semihosting",
-    "esp-hal/esp32",
-    "esp-alloc/esp32",
-    "esp-radio?/esp32",
-    "esp-storage?/esp32",
-    "esp-bootloader-esp-idf/esp32",
-    "esp-metadata-generated/esp32",
-    "esp-rtos?/esp32",
-]
-esp32c2 = [
-    "esp-hal/esp32c2",
-    "esp-alloc/esp32c2",
-    "esp-radio?/esp32c2",
-    "esp-storage?/esp32c2",
-    "esp-bootloader-esp-idf/esp32c2",
-    "esp-metadata-generated/esp32c2",
-    "esp-rtos?/esp32c2"
-]
-esp32c3 = [
-    "esp-hal/esp32c3",
-    "esp-alloc/esp32c3",
-    "esp-radio?/esp32c3",
-    "esp-storage?/esp32c3",
-    "esp-bootloader-esp-idf/esp32c3",
-    "esp-metadata-generated/esp32c3",
-    "esp-rtos?/esp32c3",
-]
-esp32c5 = [
-    "esp-hal/esp32c5",
-    "esp-alloc/esp32c5",
-    "esp-radio?/esp32c5",
-    "esp-storage?/esp32c5",
-    "esp-bootloader-esp-idf/esp32c5",
-    "esp-metadata-generated/esp32c5",
-    "esp-rtos?/esp32c5",
-]
 esp32c6 = [
     "esp-hal/esp32c6",
     "esp-alloc/esp32c6",
@@ -121,37 +83,7 @@ esp32c6 = [
     "esp-metadata-generated/esp32c6",
     "esp-rtos?/esp32c6",
 ]
-esp32h2 = [
-    "esp-hal/esp32h2",
-    "esp-alloc/esp32h2",
-    "esp-radio?/esp32h2",
-    "esp-storage?/esp32h2",
-    "esp-bootloader-esp-idf/esp32h2",
-    "esp-metadata-generated/esp32h2",
-    "esp-rtos?/esp32h2",
-]
-esp32s2 = [
-    "embedded-test/xtensa-semihosting",
-    "esp-hal/esp32s2",
-    "esp-alloc/esp32s2",
-    "esp-radio?/esp32s2",
-    "esp-storage?/esp32s2",
-    "esp-bootloader-esp-idf/esp32s2",
-    "esp-metadata-generated/esp32s2",
-    "esp-rtos?/esp32s2"
-]
-esp32s3 = [
-    "embedded-test/xtensa-semihosting",
-    "esp-hal/esp32s3",
-    "esp-alloc/esp32s3",
-    "esp-radio?/esp32s3",
-    "esp-storage?/esp32s3",
-    "esp-bootloader-esp-idf/esp32s3",
-    "esp-metadata-generated/esp32s3",
-    "esp-rtos?/esp32s3",
-]
 
-psram = ["esp-hal/psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.

@@ -26,6 +26,11 @@ inputs:
     required: false
     default: ""
 
+  package:
+    description: '"hil-test", "hil-test-radio", or "all"'
+    required: false
+    default: "all"
+
 runs:
   using: composite
   steps:
@@ -73,20 +78,45 @@ runs:
     - name: Build tests
       if: ${{ steps.chip.outputs.supported == 'true' }}
       shell: bash
+      env:
+        CARGO_TARGET_DIR: ${{ github.workspace }}/target
       run: |
-        if [ -n "${{ inputs.tests }}" ]; then
-          echo "Building selected tests for ${{ inputs.soc }}: ${{ inputs.tests }}"
-          cargo xtask build tests ${{ inputs.soc }} --tests "${{ inputs.tests }}"
+        build_package() {
+          local pkg=$1
+          if [ -n "${{ inputs.tests }}" ]; then
+            cargo xtask build tests ${{ inputs.soc }} $pkg --tests "${{ inputs.tests }}"
+          else
+            cargo xtask build tests ${{ inputs.soc }} $pkg
+          fi
+
+          # Move built files into a subdirectory named after the package
+          local src="${{ github.workspace }}/target/tests/${{ inputs.soc }}"
+          local dst="${src}/${pkg}"
+          mkdir -p "$dst"
+          find "$src" -maxdepth 1 -type f -exec mv {} "$dst/" \;
+        }
+
+        if [ "${{ inputs.package }}" = "all" ]; then
+          build_package hil-test
+          build_package hil-test-radio
         else
-          echo "Building ALL tests for ${{ inputs.soc }}"
-          cargo xtask build tests ${{ inputs.soc }}
+          build_package "${{ inputs.package }}"
         fi
 
     - uses: actions/upload-artifact@v6
       if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' }}
+        && (${{ inputs.package == 'all' || inputs.package == 'hil-test' }})
       with:
-        name: tests-${{ inputs.soc }}
-        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}
+        name: tests-${{ inputs.soc }}-hil-test
+        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test
+        if-no-files-found: error
+        overwrite: true
+
+    - uses: actions/upload-artifact@v6
+      if: ${{ inputs.package == 'all' || inputs.package == 'hil-test-radio' }}
+      with:
+        name: tests-${{ inputs.soc }}-hil-test-radio
+        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test-radio
         if-no-files-found: error
         overwrite: true
 

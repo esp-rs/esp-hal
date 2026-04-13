@@ -21,7 +21,7 @@ harness           = false
 required-features = ["embassy"]
 
 [[bin]]
-name              = "esp_radio"
+name              = "radio_basic"
 harness           = false
 required-features = ["esp-alloc"]
 

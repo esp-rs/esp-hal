@@ -3,10 +3,7 @@
 //% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
 
 //% FEATURES: unstable esp-alloc embassy
-// //% FEATURES(no_radio): rtos-radio-driver TODO: restore for P4
-//% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio/unstable
-//% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio/unstable trouble-host
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable trouble-host
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable
 //% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 
 // Even if the defaults change, keep this at a low-ish value for

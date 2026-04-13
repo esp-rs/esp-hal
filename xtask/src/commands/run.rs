@@ -13,6 +13,7 @@ use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
+    radio_hil_runner::{extract_radio_tests, get_test_pair, run_radio_test},
 };
 
 // ----------------------------------------------------------------------------
@@ -137,8 +138,6 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
 /// Run all (or filtered) ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-
-    // Pre-normalize filters: lowercase and trim
     let filters: Vec<String> = args
         .elfs
         .iter()
@@ -150,9 +149,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         .with_context(|| format!("Failed to read {}", args.path.display()))?
     {
         let entry = elf?;
-
         let elf_path = entry.path();
-
         if !elf_path.is_file() {
             continue;
         }
@@ -164,8 +161,6 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             .to_string_lossy()
             .to_string();
 
-        // If filters were provided, only run tests whose name contains
-        // at least one of the filter tokens (case-insensitive).
         if !filters.is_empty() && !filters.iter().any(|f| elf_name.to_lowercase().contains(f)) {
             log::info!(
                 "Skipping test '{}' for '{}' (does not match filters: {:?})",
@@ -176,21 +171,34 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             continue;
         }
 
+        let test_names = extract_radio_tests(&elf_path)?;
+        let (ap_test, sta_test) = get_test_pair(&test_names)?;
+
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
-        let mut command = Command::new("probe-rs");
-        command.arg("run").arg(&elf_path);
-        command.arg("--verify");
+        let is_radio_test = elf_name.contains("esp_radio");
 
-        let mut command = command.spawn().context("Failed to execute probe-rs")?;
-        let status = command
-            .wait()
-            .context("Error while waiting for probe-rs to exit")?;
+        if is_radio_test {
+            if let Err(e) = run_radio_test(&elf_path, &ap_test, &sta_test, 120, None) {
+                failed.push(elf_name.clone());
+                log::error!("Radio test '{}' failed: {}", elf_name, e);
+            } else {
+                log::info!("'{}' passed", elf_name);
+            }
+        } else {
+            // Use standard probe-rs runner for HAL tests
+            let status = Command::new("probe-rs")
+                .arg("run")
+                .arg(&elf_path)
+                .arg("--verify")
+                .status()
+                .context("Failed to execute probe-rs")?;
 
-        log::info!("'{elf_name}' done");
+            log::info!("'{}' done", elf_name);
 
-        if !status.success() {
-            failed.push(elf_name);
+            if !status.success() {
+                failed.push(elf_name);
+            }
         }
     }
 
