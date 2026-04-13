@@ -101,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C61: Add SHA and ECC support (#5354)
 - A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
 - Add I2S loopback logic to the peripheral driver. (#5349)
+- SPI master: added `min_async_transfer_size` config option to force small transfers to use blocking/CPU driven mode. (#5350)
 
 ### Changed
 

@@ -414,6 +414,11 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            return self.driver().read(words);
+        }
+
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_read(words) {
             DmaOperationKind::Copied => {
@@ -454,6 +459,12 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            self.driver().write(words)?;
+            return self.driver().flush();
+        }
+
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_write(words) {
             DmaOperationKind::Copied => {
@@ -488,6 +499,18 @@ impl<'d> SpiDma<'d, Async> {
 
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(read.len().max(write.len())) {
+            self.dma_driver().disable_dma();
+            if read.is_empty() {
+                self.driver().write(write)?;
+                return self.driver().flush();
+            } else if write.is_empty() {
+                return self.driver().read(read);
+            } else {
+                return self.driver().transfer(read, write);
+            }
+        }
 
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
@@ -556,6 +579,11 @@ impl<'d> SpiDma<'d, Async> {
 
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            return self.driver().transfer_in_place(words);
+        }
 
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
@@ -768,6 +796,15 @@ impl<'d, Dm> SpiDma<'d, Dm>
 where
     Dm: DriverMode,
 {
+    fn use_blocking_transfer(&self, transfer_size: usize) -> bool {
+        let threshold = self
+            .spi
+            .state()
+            .min_async_transfer_size
+            .load(Ordering::Relaxed);
+        threshold > 0 && transfer_size < threshold
+    }
+
     fn spi(&self) -> &SpiWrapper<'_> {
         &self.spi
     }
@@ -1222,6 +1259,11 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            return self.driver().read(words);
+        }
+
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_read(words) {
             DmaOperationKind::Copied => {
@@ -1257,6 +1299,12 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            self.driver().write(words)?;
+            return self.driver().flush();
+        }
+
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_write(words) {
             DmaOperationKind::Copied => {
@@ -1285,6 +1333,18 @@ where
     pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(read.len().max(write.len())) {
+            self.dma_driver().disable_dma();
+            if read.is_empty() {
+                self.driver().write(write)?;
+                return self.driver().flush();
+            } else if write.is_empty() {
+                return self.driver().read(read);
+            } else {
+                return self.driver().transfer(read, write);
+            }
+        }
 
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
@@ -1347,6 +1407,11 @@ where
     pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(words.len()) {
+            self.dma_driver().disable_dma();
+            return self.driver().transfer_in_place(words);
+        }
 
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
@@ -1561,6 +1626,16 @@ impl DmaDriver {
         // impolite.
         self.driver.configure_datalen(1, 1);
         self.driver.update();
+    }
+
+    fn disable_dma(&self) {
+        #[cfg(dma_kind = "gdma")]
+        self.regs().dma_conf().modify(|_, w| {
+            w.dma_tx_ena().clear_bit();
+            w.dma_rx_ena().clear_bit()
+        });
+
+        // PDMA: nothing to do
     }
 
     fn regs(&self) -> &RegisterBlock {

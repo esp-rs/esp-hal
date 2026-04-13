@@ -42,6 +42,7 @@ use core::{
     marker::PhantomData,
     mem::MaybeUninit,
     pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
 
@@ -472,6 +473,20 @@ pub struct Config {
 
     /// Bit order of the written data.
     write_bit_order: BitOrder,
+
+    /// Minimum transfer size in bytes below which CPU-driven (blocking) I/O
+    /// is used instead of async or DMA transfers.
+    ///
+    /// This can reduce overhead for small transfers where DMA setup or
+    /// async context-switch cost exceeds the benefit. For
+    /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
+    /// both blocking and async DMA modes: when met, DMA is disabled and the
+    /// transfer is performed by the CPU.
+    ///
+    /// A value of `0` (the default) disables the threshold — all transfers use
+    /// the driver's default method.
+    #[builder_lite(unstable)]
+    min_async_transfer_size: usize,
 }
 
 impl Default for Config {
@@ -483,6 +498,7 @@ impl Default for Config {
             mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
             write_bit_order: BitOrder::MsbFirst,
+            min_async_transfer_size: 0,
         };
 
         this.reg = this.recalculate();
@@ -921,6 +937,10 @@ impl<'d> Spi<'d, Async> {
         self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            return self.driver().transfer_in_place(words);
+        }
+
         self.driver().transfer_in_place_async(words).await
     }
 
@@ -932,6 +952,10 @@ impl<'d> Spi<'d, Async> {
         self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
 
+        if self.use_blocking_transfer(words.len()) {
+            return self.driver().read(words);
+        }
+
         self.driver().read_async(words).await
     }
 
@@ -940,6 +964,11 @@ impl<'d> Spi<'d, Async> {
         // transfer is still in progress.
         self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(words.len()) {
+            self.driver().write(words)?;
+            return self.driver().flush();
+        }
 
         self.driver().write_async(words).await
     }
@@ -1393,6 +1422,15 @@ where
         self.driver().flush()
     }
 
+    fn use_blocking_transfer(&self, transfer_size: usize) -> bool {
+        let threshold = self
+            .spi
+            .state()
+            .min_async_transfer_size
+            .load(Ordering::Relaxed);
+        threshold > 0 && transfer_size < threshold
+    }
+
     fn driver(&self) -> Driver {
         Driver {
             info: self.spi.info(),
@@ -1477,6 +1515,17 @@ impl SpiBusAsync for Spi<'_, Async> {
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
         self.driver().flush_async().await;
         self.driver().setup_full_duplex()?;
+
+        if self.use_blocking_transfer(read.len().max(write.len())) {
+            if read.is_empty() {
+                self.driver().write(write)?;
+                return self.driver().flush();
+            } else if write.is_empty() {
+                return self.driver().read(read);
+            } else {
+                return self.driver().transfer(read, write);
+            }
+        }
 
         if read.is_empty() {
             self.driver().write_async(write).await
@@ -1867,6 +1916,9 @@ impl Driver {
         self.ch_bus_freq(config)?;
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
+        self.state
+            .min_async_transfer_size
+            .store(config.min_async_transfer_size, Ordering::Relaxed);
 
         #[cfg(esp32)]
         self.calculate_half_duplex_values(config);
@@ -2482,6 +2534,7 @@ for_each_spi_master! {
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
                     pins: UnsafeCell::new(MaybeUninit::uninit()),
+                    min_async_transfer_size: AtomicUsize::new(0),
 
                     #[cfg(esp32)]
                     esp32_hack: Esp32Hack {
@@ -2508,6 +2561,7 @@ impl QspiInstance for AnySpi<'_> {}
 pub struct State {
     waker: AtomicWaker,
     pins: UnsafeCell<MaybeUninit<SpiPinGuard>>,
+    min_async_transfer_size: AtomicUsize,
 
     #[cfg(esp32)]
     esp32_hack: Esp32Hack,
