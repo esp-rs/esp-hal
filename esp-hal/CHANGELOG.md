@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add PSRAM support (#5317)
 - C61: Add PSRAM support (#5325)
 - A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
+- Add I2S loopback logic to the peripheral driver. (#5349)
 
 ### Changed
 
