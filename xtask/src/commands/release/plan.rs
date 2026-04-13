@@ -10,6 +10,7 @@ use toml_edit::{Item, Value};
 
 use crate::{
     Package,
+    Version,
     cargo::CargoToml,
     commands::{VersionBump, checker::min_package_update, do_version_bump},
     git::current_branch,
@@ -183,21 +184,32 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     let current_version = package_tomls[&package].package_version();
 
                     let bump = if !current_version.pre.is_empty() {
-                        VersionBump::PreRelease(
-                            current_version
-                                .pre
-                                .as_str()
-                                .split('.')
-                                .next()
-                                .unwrap()
-                                .to_string(),
-                        )
+                        // Package is already in a pre-release cycle — continue it
+                        // on the same base. Hand-edit the plan to start a new
+                        // cycle on a bumped base (e.g. `1.1.0-alpha.0` from
+                        // `1.0.0`) by also setting `base`.
+                        VersionBump {
+                            base: None,
+                            pre: Some(
+                                current_version
+                                    .pre
+                                    .as_str()
+                                    .split('.')
+                                    .next()
+                                    .unwrap()
+                                    .to_string(),
+                            ),
+                        }
                     } else {
-                        match b {
-                            ReleaseType::Major => VersionBump::Major,
-                            ReleaseType::Minor => VersionBump::Minor,
-                            ReleaseType::Patch => VersionBump::Patch,
+                        let base = match b {
+                            ReleaseType::Major => Version::Major,
+                            ReleaseType::Minor => Version::Minor,
+                            ReleaseType::Patch => Version::Patch,
                             _ => unreachable!(),
+                        };
+                        VersionBump {
+                            base: Some(base),
+                            pre: None,
                         }
                     };
 
@@ -241,11 +253,17 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // orchestrate the actual publishing process.
 //
 // For each package, this plan contains the version bump that will be applied.
-// The version bump is one of:
-// - PreRelease (`"bump": { "PreRelease": "beta" }`)
-// - Patch (`"bump": "Patch"`)
-// - Minor (`"bump": "Minor"`)
-// - Major (`"bump": "Major"`)
+// A bump has two orthogonal fields — `base` (how much to bump
+// major.minor.patch) and `pre` (the pre-release identifier):
+//
+// - Stable bump:               `"bump": { "base": "Minor", "pre": null }`
+// - Continue pre-release cycle:`"bump": { "base": null,    "pre": "beta" }`
+// - Start a new pre-release cycle on a bumped base (e.g. 1.0.0 -> 1.1.0-alpha.0):
+//                              `"bump": { "base": "Minor", "pre": "alpha" }`
+//
+// Starting a pre-release cycle from a stable version without also setting
+// `base` is an error, as it would produce a version lower than the current
+// one.
 "#,
     );
 

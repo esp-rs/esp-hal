@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use semver::Version;
 
 use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
-use crate::commands::{VersionBump, comparison_url};
+use crate::commands::comparison_url;
 
 /// Perform post-release tasks such as creating migration guides for packages that have them.
 pub fn post_release(workspace: &std::path::Path) -> Result<()> {
@@ -74,9 +74,18 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
 
         // Backport branch management: only for minor/major bumps on stable releases (**major** >=
         // 1), we do not have and do not maintain backport branches for `0.{minor}.x`
-        // versions.
-        match package_plan.bump {
-            VersionBump::Minor | VersionBump::Major => {
+        // versions. Pre-release cycles also don't get backport branches.
+        if package_plan.bump.pre.is_some() {
+            log::info!(
+                "Skipping backport branch creation for {} v{} (pre-release cycle)",
+                package,
+                version_str
+            );
+            continue;
+        }
+
+        match package_plan.bump.base {
+            Some(crate::Version::Minor) | Some(crate::Version::Major) => {
                 if version.major >= 1 {
                     let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
