@@ -50,6 +50,9 @@ on:
         description: "Optional list of test names to run (ELF basenames)"
         required: false
         default: ""
+      package:
+        description: '"hil-test", "hil-test-radio", or "all"'
+        default: "all"
 
 env:
   CARGO_TERM_COLOR: always

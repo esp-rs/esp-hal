@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 60, executor = hil_test::Executor::new())]
+#[embedded_test::tests(default_timeout = 45, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use core::{net::Ipv4Addr, str::FromStr};
 
@@ -143,15 +143,14 @@ mod tests {
             seed,
         );
 
-        spawner.spawn(connection(controller)).unwrap();
-        spawner.spawn(net_task(runner)).unwrap();
-        spawner.spawn(run_dhcp(stack, gw_ip_addr_str)).unwrap();
+        spawner.spawn(connection(controller).unwrap());
+        spawner.spawn(net_task(runner).unwrap());
+        spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
         stack.wait_config_up().await;
 
         defmt::info!("[AP] AP ready at {}:8080", gw_ip_addr_str);
 
-        // 6. TCP server loop — mirrors the working example exactly
         let mut rx_buffer = [0u8; 1536];
         let mut tx_buffer = [0u8; 1536];
         let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
@@ -165,11 +164,6 @@ mod tests {
                     port: 8080,
                 })
                 .await;
-
-            // if let Err(e) = r {
-            //     defmt::debug!("[AP] accept error");
-            //     continue;
-            // }
 
             defmt::info!("[AP] Connected...");
 
@@ -221,6 +215,8 @@ mod tests {
             socket.abort();
 
             Timer::after(Duration::from_millis(3000)).await;
+
+            defmt::info!("[AP] TEST_DONE: PASS");
         }
     }
 }

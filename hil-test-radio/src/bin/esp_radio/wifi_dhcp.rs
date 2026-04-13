@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 60, executor = hil_test::Executor::new())]
+#[embedded_test::tests(default_timeout = 45, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use embassy_net::{
         Runner,
@@ -69,6 +69,7 @@ mod tests {
     async fn wifi_dhcp_http_test(p: Peripherals) {
         defmt::info!("[STA] Starting Wi-Fi DHCP HTTP test");
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
+        // let spawner = executor_core0.start(Priority::Priority1);
 
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
@@ -108,8 +109,8 @@ mod tests {
 
         defmt::debug!("[STA] Scan complete, found {} networks", result.len());
 
-        spawner.spawn(connection(controller)).unwrap();
-        spawner.spawn(net_task(runner)).unwrap();
+        spawner.spawn(connection(controller).unwrap());
+        spawner.spawn(net_task(runner).unwrap());
         stack.wait_config_up().await;
 
         Timer::after(Duration::from_millis(100)).await;
@@ -145,7 +146,7 @@ mod tests {
 
         let response = request.send(&mut rx_buf).await.unwrap();
 
-        defmt::debug!("[STA] eceived HTTP response");
+        defmt::debug!("[STA] received HTTP response");
 
         assert_eq!(response.status, Status::from(200));
 
@@ -158,6 +159,8 @@ mod tests {
             body_str.contains("Hello Rust! Hello esp-radio!"),
             "Unexpected response body"
         );
+
+        defmt::info!("[STA] TEST_DONE: PASS");
     }
 
     // #[test]

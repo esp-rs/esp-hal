@@ -29,6 +29,7 @@ pub mod pr_changelog;
 
 /// GitHub repository used for all `gh` CLI calls.
 pub const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
+pub mod radio_hil_runner;
 
 // ---------------------------------------------------------------------------
 // MCP tool registration
