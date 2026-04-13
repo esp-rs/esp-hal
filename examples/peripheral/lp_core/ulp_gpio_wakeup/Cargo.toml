@@ -1,5 +1,5 @@
 [package]
-name    = "ulp-timer-counter"
+name    = "ulp-gpio-wakeup"
 version = "0.0.0"
 edition = "2024"
 publish = false

@@ -241,13 +241,13 @@ impl<const PIN: u8> Flex<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn listen(&mut self, event: Event) {
         self.clear_interrupt();
-        enable_pin_interrupt::<PIN>(Some(event as u8), false);
+        enable_pin_interrupt::<PIN>(event as u8);
     }
 
     /// Un-listen for interrupts.
     #[cfg(any(esp32s2, esp32s3))]
     pub fn unlisten(&mut self) {
-        enable_pin_interrupt::<PIN>(Some(0), false);
+        enable_pin_interrupt::<PIN>(0);
         self.clear_interrupt();
     }
 
@@ -261,20 +261,6 @@ impl<const PIN: u8> Flex<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn is_interrupt_set(&mut self) -> bool {
         is_interrupt_set::<PIN>()
-    }
-
-    /// Enable pin as a wake-up source.
-    /// This will change the interrupt type, when enabling.
-    /// Interrupt type will not be changed, when disabling.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.clear_interrupt();
-        if enable {
-            let int_evt = Event::from(event);
-            enable_pin_interrupt::<PIN>(Some(int_evt as u8), true);
-        } else {
-            enable_pin_interrupt::<PIN>(None, true);
-        }
     }
 }
 
@@ -313,13 +299,6 @@ impl<const PIN: u8> Input<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn is_interrupt_set(&mut self) -> bool {
         is_interrupt_set::<PIN>()
-    }
-    /// Enable pin as a wake-up source.
-    /// This will change the interrupt type, when enabling.
-    /// Interrupt type will not be changed, when disabling.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.pin.wakeup_enable(enable, event);
     }
 }
 
@@ -397,12 +376,5 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     #[cfg(any(esp32s2, esp32s3))]
     pub fn is_interrupt_set(&mut self) -> bool {
         is_interrupt_set::<PIN>()
-    }
-    /// Enable pin as a wake-up source.
-    /// This will change the interrupt type, when enabling.
-    /// Interrupt type will not be changed, when disabling.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) {
-        self.pin.wakeup_enable(enable, event);
     }
 }

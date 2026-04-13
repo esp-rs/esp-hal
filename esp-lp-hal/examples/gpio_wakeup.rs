@@ -1,29 +1,34 @@
-//! ULP GPIO-wakeup example.
-//! Increments a 32 bit counter value, while GPIO0 is pressed.
+//! ULP GPIO wakeup example.
+//! Increments a 32 bit counter value at a known point in memory, whenever the ULP program is woken
+//! up. The HP core will configure GPIO0 to wake up the ULP core, when pressed.
 
-//% CHIPS: esp32s3
+//% CHIPS: esp32s3,esp32s2
 
 #![no_std]
 #![no_main]
 
 extern crate panic_halt;
 
-use esp_lp_hal::{gpio::Input, prelude::*};
+use esp_lp_hal::{
+    prelude::*,
+    gpio::{
+      Input,gpio_wakeup_clear,gpio_wakeup_enable
+    }
+};
 
 const ADDRESS: usize = 0x1000;
 
 #[entry]
 fn main(mut _button: Input<0>) {
-    // Clear the GPIO wake-up flag
-    esp_lp_hal::gpio::gpio_wakeup_clear();
+    // Clear the global GPIO wake-up flag
+    gpio_wakeup_clear();
 
-    // Increment counter
-    let ptr = ADDRESS as *mut u32;
+    // Increment the counter
     unsafe {
-        let count = ptr.read_volatile();
-        ptr.write_volatile(count + 1);
+        let counter = ADDRESS as *mut u32;
+        counter.write_volatile(counter.read_volatile() + 1);
     }
 
-    // Re-enable the wakeup bit
-    esp_lp_hal::gpio::gpio_wakeup_enable(true);
+    // Re-enable the global GPIO wakeup flag
+    gpio_wakeup_enable(true);
 }

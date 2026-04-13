@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache configuration options for ESP32-S2 (#5306)
 - C5: Add PSRAM support (#5317)
 - C61: Add PSRAM support (#5325)
+- ESP32-S2, ESP32-S3: Add `wakeup_enable()` method to `LowPowerInput` and `LowPowerOutputOpenDrain`, allowing ULP core to be woken up from GPIO. (#5134)
 
 ### Changed
 
