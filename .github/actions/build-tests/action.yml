@@ -59,7 +59,19 @@ runs:
         default: true
         version: 1.93.0.0
 
+    - name: Check if chip is supported by this ref's xtask
+      id: chip
+      shell: bash
+      run: |
+        if cargo xtask build tests ${{ inputs.soc }} --help >/dev/null 2>&1; then
+          echo "supported=true" >> $GITHUB_OUTPUT
+        else
+          echo "supported=false" >> $GITHUB_OUTPUT
+          echo "Skipping ${{ inputs.soc }}: this ref's xtask does not support it."
+        fi
+
     - name: Build tests
+      if: ${{ steps.chip.outputs.supported == 'true' }}
       shell: bash
       run: |
         if [ -n "${{ inputs.tests }}" ]; then
@@ -71,8 +83,17 @@ runs:
         fi
 
     - uses: actions/upload-artifact@v6
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' }}
       with:
         name: tests-${{ inputs.soc }}
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}
         if-no-files-found: error
+        overwrite: true
+
+    - uses: actions/upload-artifact@v6
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests != '' }}
+      with:
+        name: tests-${{ inputs.soc }}
+        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}
+        if-no-files-found: ignore
         overwrite: true
