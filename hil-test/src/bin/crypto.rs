@@ -5,7 +5,7 @@
 // TODO: enable PSRAM for ESP32-C5, C61
 //% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
-//% FEATURES: unstable esp-alloc/nightly defmt
+//% FEATURES: unstable esp-alloc/nightly
 
 #![no_std]
 #![no_main]

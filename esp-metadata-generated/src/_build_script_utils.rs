@@ -1828,6 +1828,7 @@ impl Chip {
                     "bt_controller=\"npl\"",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_can_access_psram",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"5\"",
                     "dma_max_priority_is_set",
@@ -2073,6 +2074,7 @@ impl Chip {
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"5\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -4122,6 +4124,7 @@ impl Chip {
                     "dma_kind=\"pdma\"",
                     "dma_supports_mem2mem",
                     "dma_can_access_psram",
+                    "dma_ext_mem_configurable_block_size",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -4332,6 +4335,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_kind=\"pdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_can_access_psram",
+                    "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -4754,6 +4758,7 @@ impl Chip {
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
                     "dma_can_access_psram",
+                    "dma_ext_mem_configurable_block_size",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
@@ -5001,6 +5006,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_can_access_psram",
+                    "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -5663,6 +5669,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(ecc_separate_jacobian_point_memory)");
     println!("cargo:rustc-check-cfg=cfg(ecc_has_memory_clock_gate)");
@@ -5742,7 +5749,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
-    println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
+    println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");

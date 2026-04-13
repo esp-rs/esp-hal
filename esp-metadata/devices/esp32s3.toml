@@ -304,6 +304,7 @@ separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 9
 can_access_psram = true
+ext_mem_configurable_block_size = true
 
 [device.gpio]
 support_status = "supported"

@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for `rand_core 0.10.0` (#5280)
 - `esp_hal::efuse::ChipRevision` (#5287)
 - Cache configuration options for ESP32-S2 (#5306)
-- C5: Add PSRAM support (#5317)
+- C5: Add PSRAM support (#5317, #5353)
 - C61: Add PSRAM support (#5325)
 - A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
 

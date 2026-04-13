@@ -1236,7 +1236,7 @@ impl<'a> DescriptorSet<'a> {
 }
 
 /// Block size for transfers to/from PSRAM
-#[cfg(dma_can_access_psram)]
+#[cfg(dma_ext_mem_configurable_block_size)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DmaExtMemBKSize {
     /// External memory block size of 16 bytes.
@@ -1247,7 +1247,7 @@ pub enum DmaExtMemBKSize {
     Size64 = 2,
 }
 
-#[cfg(dma_can_access_psram)]
+#[cfg(dma_ext_mem_configurable_block_size)]
 impl From<ExternalBurstConfig> for DmaExtMemBKSize {
     fn from(size: ExternalBurstConfig) -> Self {
         match size {
@@ -1826,7 +1826,7 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_can_access_psram)]
+        #[cfg(dma_ext_mem_configurable_block_size)]
         self.rx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.rx_impl.set_burst_mode(preparation.burst_transfer);
@@ -2088,7 +2088,7 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_can_access_psram)]
+        #[cfg(dma_ext_mem_configurable_block_size)]
         self.tx_impl
             .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
         self.tx_impl.set_burst_mode(preparation.burst_transfer);
@@ -2283,7 +2283,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
 
-    #[cfg(dma_can_access_psram)]
+    #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
     #[cfg(dma_kind = "pdma")]

@@ -85,7 +85,7 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(esp32s3)]
+    #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
             .out_conf1()
@@ -330,7 +330,7 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(esp32s3)]
+    #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
         self.ch()
             .in_conf1()

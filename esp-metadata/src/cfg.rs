@@ -344,6 +344,8 @@ driver_configs![
             #[serde(default)]
             can_access_psram: bool,
             #[serde(default)]
+            ext_mem_configurable_block_size: bool,
+            #[serde(default)]
             separate_in_out_interrupts: bool,
             #[serde(default)]
             max_priority: Option<u32>,
