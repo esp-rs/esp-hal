@@ -2,8 +2,6 @@
 
 //% CHIPS: esp32s3
 //% FEATURES: unstable
-// The dev kit in the HIL-tester has octal PSRAM.
-//% ENV: ESP_HAL_CONFIG_PSRAM_MODE=octal
 
 #![no_std]
 #![no_main]
