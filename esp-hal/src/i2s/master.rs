@@ -440,7 +440,8 @@ pub struct Config {
     /// Transmitter unit config
     tx_config: UnitConfig,
 
-    /// On-chip TX-RX data loopback
+    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK.
+    /// Also sets RX to slave mode, following TX's clocks, TX stays master.
     signal_loopback: bool,
 
     /// The target sample rate
