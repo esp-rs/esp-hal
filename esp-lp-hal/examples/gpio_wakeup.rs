@@ -2,7 +2,7 @@
 //! Increments a 32 bit counter value at a known point in memory, whenever the ULP program is woken
 //! up. The HP core will configure GPIO0 to wake up the ULP core, when pressed.
 
-//% CHIPS: esp32s3,esp32s2
+//% CHIPS: esp32s3 esp32s2
 
 #![no_std]
 #![no_main]
