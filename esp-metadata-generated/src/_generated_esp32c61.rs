@@ -82,6 +82,21 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(2)
     };
+    ("ecc.zero_extend_writes") => {
+        true
+    };
+    ("ecc.separate_jacobian_point_memory") => {
+        true
+    };
+    ("ecc.has_memory_clock_gate") => {
+        true
+    };
+    ("ecc.supports_enhanced_security") => {
+        true
+    };
+    ("ecc.mem_block_size") => {
+        32
+    };
     ("gpio.has_bank_1") => {
         false
     };
@@ -193,6 +208,9 @@ macro_rules! property {
     ("rng.trng_supported") => {
         false
     };
+    ("sha.dma") => {
+        true
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };
@@ -273,6 +291,41 @@ macro_rules! property {
     };
     ("wifi.has_5g") => {
         false
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
+        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((5, AffinePointAddition));
+        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_ecc_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((8, ModularAddition));
+        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
+        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
+        _for_each_inner_ecc_working_mode!((11, ModularDivision));
+        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (5, AffinePointAddition), (6,
+        JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_curve {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
+        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((all(0,
+        P192, 192), (1, P256, 256)));
     };
 }
 #[macro_export]
@@ -431,6 +484,24 @@ macro_rules! sw_interrupt_delay {
             ::core::arch::asm!("nop");
             ::core::arch::asm!("nop");
         }
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha224, "SHA-224"(sizes : 64, 28, 8)
+        (insecure_against : "length extension"), 1));
+        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 2));
+        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0), (Sha224,
+        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
+        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
+        2)));
     };
 }
 #[macro_export]
@@ -2066,8 +2137,12 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// DMA peripheral clock signal
             Dma,
+            /// ECC peripheral clock signal
+            Ecc,
             /// I2C_EXT0 peripheral clock signal
             I2cExt0,
+            /// SHA peripheral clock signal
+            Sha,
             /// SPI2 peripheral clock signal
             Spi2,
             /// SYSTIMER peripheral clock signal
@@ -2086,7 +2161,9 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Dma,
+                Self::Ecc,
                 Self::I2cExt0,
+                Self::Sha,
                 Self::Spi2,
                 Self::Systimer,
                 Self::Timg0,
@@ -2102,10 +2179,20 @@ macro_rules! implement_peripheral_clocks {
                         .gdma_conf()
                         .modify(|_, w| w.gdma_clk_en().bit(enable));
                 }
+                Peripheral::Ecc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecc_conf()
+                        .modify(|_, w| w.ecc_clk_en().bit(enable));
+                }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .sha_conf()
+                        .modify(|_, w| w.sha_clk_en().bit(enable));
                 }
                 Peripheral::Spi2 => {
                     crate::peripherals::SYSTEM::regs()
@@ -2150,10 +2237,20 @@ macro_rules! implement_peripheral_clocks {
                         .gdma_conf()
                         .modify(|_, w| w.gdma_rst_en().bit(reset));
                 }
+                Peripheral::Ecc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecc_conf()
+                        .modify(|_, w| w.ecc_rst_en().bit(reset));
+                }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .sha_conf()
+                        .modify(|_, w| w.sha_rst_en().bit(reset));
                 }
                 Peripheral::Spi2 => {
                     crate::peripherals::SYSTEM::regs()

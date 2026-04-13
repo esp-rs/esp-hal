@@ -3,7 +3,7 @@
 //% CHIPS(quad): esp32s2 esp32s3
 // ESP32 has no AES-DMA, no point in setting up PSRAM
 // TODO: enable PSRAM for ESP32-C5, C61
-//% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
+//% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2
 
 //% FEATURES: unstable esp-alloc/nightly
 

@@ -207,6 +207,8 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
 
+    { name = "Sha" },
+    { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
 ] } }
 
@@ -368,6 +370,30 @@ max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 
+[device.ecc]
+support_status = "partial"
+working_modes = [
+    { id = 0, mode = "affine_point_multiplication" },
+    { id = 2, mode = "affine_point_verification" },
+    { id = 3, mode = "affine_point_verification_and_multiplication" },
+    { id = 4, mode = "jacobian_point_multiplication" },
+    { id = 5, mode = "affine_point_addition" },
+    { id = 6, mode = "jacobian_point_verification" },
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
+    { id = 8, mode = "modular_addition" },
+    { id = 9, mode = "modular_subtraction" },
+    { id = 10, mode = "modular_multiplication" },
+    { id = 11, mode = "modular_division" }
+]
+curves = [
+    { id = 0, curve = 192 },
+    { id = 1, curve = 256 }
+]
+separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true
+zero_extend_writes = true
+
 [device.systimer]
 
 [device.rng]
@@ -403,6 +429,11 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.psram]
+
+[device.sha]
+support_status = "partial"
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"
