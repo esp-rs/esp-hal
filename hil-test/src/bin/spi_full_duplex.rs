@@ -28,10 +28,17 @@ cfg_if::cfg_if! {
         use esp_hal::{
             gpio::{Level, NoPin},
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
-            dma_buffers,
+            dma_buffers,spi::master::SpiDma,
         };
+
+        #[cfg(all(spi_master_supports_dma, dma_can_access_psram))]
+        use allocator_api2::vec::Vec;
+
         #[cfg(pcnt_driver_supported)]
         use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
+
+        #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
+        use esp_hal::Async;
     }
 }
 
@@ -68,6 +75,85 @@ struct Context {
     pcnt_unit: Unit<'static, 0>,
 }
 
+#[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+macro_rules! set_up_pcnt {
+    ($ctx:expr, $input:ident) => {{
+        $ctx.pcnt_unit
+            .channel0
+            .set_edge_signal($ctx.$input.peripheral_input());
+        $ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        $ctx.pcnt_unit
+    }};
+}
+
+/// Helper function to run a test case with various memory regions for the buffers, including
+/// various alignments in external RAM if available.
+#[cfg(feature = "unstable")]
+fn run_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
+    mut test_fn: impl FnMut(&mut [u8], &mut [u8]),
+) {
+    // TODO: add cases that mix internal and external RAM.
+
+    // Test buffers in internal RAM
+    let mut tx_buf = [0; BUFFER_SIZE];
+    let mut rx_buf = [0; BUFFER_SIZE];
+    test_fn(&mut tx_buf, &mut rx_buf);
+
+    #[cfg(dma_can_access_psram)]
+    {
+        // Test buffers in external RAM using various alignment offsets.
+
+        const MAX_SHIFT: usize = 15;
+        let buf_len = BUFFER_SIZE + MAX_SHIFT;
+
+        let mut external_rx_memory = Vec::with_capacity_in(buf_len, esp_alloc::ExternalMemory);
+        let mut external_tx_memory = Vec::with_capacity_in(buf_len, esp_alloc::ExternalMemory);
+
+        external_rx_memory.resize(buf_len, 0);
+        external_tx_memory.resize(buf_len, 0);
+
+        for shift_rx in 0..=MAX_SHIFT {
+            for shift_tx in 0..=MAX_SHIFT {
+                let rx_buf = &mut external_rx_memory[shift_rx..][..BUFFER_SIZE];
+                let tx_buf = &mut external_tx_memory[shift_tx..][..BUFFER_SIZE];
+                test_fn(tx_buf, rx_buf);
+            }
+        }
+    }
+}
+
+/// Async version of [`run_test_in_all_memory_regions`].
+#[cfg(feature = "unstable")]
+async fn run_async_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
+    mut test_fn: impl AsyncFnMut(&mut [u8], &mut [u8]),
+) {
+    let mut tx_buf = [0; BUFFER_SIZE];
+    let mut rx_buf = [0; BUFFER_SIZE];
+    test_fn(&mut tx_buf, &mut rx_buf).await;
+
+    #[cfg(dma_can_access_psram)]
+    {
+        const MAX_SHIFT: usize = 15;
+        let buf_len = BUFFER_SIZE + MAX_SHIFT;
+
+        let mut external_rx_memory = Vec::with_capacity_in(buf_len, esp_alloc::ExternalMemory);
+        let mut external_tx_memory = Vec::with_capacity_in(buf_len, esp_alloc::ExternalMemory);
+
+        external_rx_memory.resize(buf_len, 0);
+        external_tx_memory.resize(buf_len, 0);
+
+        for shift_rx in 0..=MAX_SHIFT {
+            for shift_tx in 0..=MAX_SHIFT {
+                let rx_buf = &mut external_rx_memory[shift_rx..][..BUFFER_SIZE];
+                let tx_buf = &mut external_tx_memory[shift_tx..][..BUFFER_SIZE];
+                test_fn(tx_buf, rx_buf).await;
+            }
+        }
+    }
+}
+
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
@@ -77,6 +163,9 @@ mod tests {
         let peripherals = esp_hal::init(
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
+
+        #[cfg(all(dma_can_access_psram, feature = "unstable"))]
+        esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
         let (_, miso) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);
@@ -184,22 +273,15 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
         assert_eq!(read[1], write[1]);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -207,15 +289,8 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -224,7 +299,7 @@ mod tests {
         assert_eq!(read[3], 0x00);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -232,15 +307,8 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -250,7 +318,7 @@ mod tests {
         assert_eq!(read[1], write[1]);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -258,15 +326,8 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
-                let unit = ctx.pcnt_unit;
-                unit.channel0
-                    .set_edge_signal(ctx.sclk_input.peripheral_input());
-                unit.channel0
-                    .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            }
-        }
+        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -278,7 +339,7 @@ mod tests {
         assert_eq!(read[3], 0x00);
 
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        assert_eq!(unit.value(), 4 * 8);
+        assert_eq!(sclk_counter.value(), 4 * 8);
     }
 
     #[test]
@@ -286,18 +347,13 @@ mod tests {
     fn test_asymmetric_write(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         SpiBus::write(&mut ctx.spi, &write[..]).expect("Asymmetric write failed");
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -305,19 +361,14 @@ mod tests {
     async fn test_async_asymmetric_write(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::write(&mut spi, &write[..])
             .await
             .expect("Asymmetric write failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -325,12 +376,7 @@ mod tests {
     async fn async_write_after_sync_write_waits_for_flush(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
 
@@ -343,7 +389,7 @@ mod tests {
             .await
             .expect("Async write failed");
 
-        assert_eq!(unit.value(), 34);
+        assert_eq!(miso_pulse_counter.value(), 34);
     }
 
     #[test]
@@ -351,18 +397,13 @@ mod tests {
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         SpiBus::transfer(&mut ctx.spi, &mut [], &write[..]).expect("Asymmetric transfer failed");
         // Flush because we're not reading, so the write may happen in the background
         ctx.spi.flush().expect("Flush failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -370,19 +411,14 @@ mod tests {
     async fn test_async_asymmetric_write_transfer(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
-        let unit = ctx.pcnt_unit;
-
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut [], &write[..])
             .await
             .expect("Asymmetric transfer failed");
 
-        assert_eq!(unit.value(), 9);
+        assert_eq!(miso_pulse_counter.value(), 9);
     }
 
     #[test]
@@ -454,13 +490,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
@@ -468,18 +500,18 @@ mod tests {
         for i in 1..4 {
             dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(TRANSFER_SIZE, dma_rx_buf)
+                .read_buffer(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .write(TRANSFER_SIZE, dma_tx_buf)
+                .write_buffer(TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_tx_buf) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -492,13 +524,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
-        unit.channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        unit.channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         // Fill the buffer where each byte has 3 pos edges.
         dma_tx_buf.as_mut_slice().fill(0b0110_1010);
@@ -506,18 +534,18 @@ mod tests {
         for i in 1..4 {
             dma_rx_buf.as_mut_slice()[..TRANSFER_SIZE].copy_from_slice(&[5; TRANSFER_SIZE]);
             let transfer = spi
-                .read(TRANSFER_SIZE, dma_rx_buf)
+                .read_buffer(TRANSFER_SIZE, dma_rx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, dma_rx_buf) = transfer.wait();
             assert_eq!(&dma_rx_buf.as_slice()[..TRANSFER_SIZE], &[0; TRANSFER_SIZE]);
 
             let transfer = spi
-                .transfer(TRANSFER_SIZE, dma_rx_buf, TRANSFER_SIZE, dma_tx_buf)
+                .transfer_buffers(TRANSFER_SIZE, dma_rx_buf, TRANSFER_SIZE, dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
             (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-            assert_eq!(unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+            assert_eq!(miso_pulse_counter.value(), (i * 3 * TRANSFER_SIZE) as _);
         }
     }
 
@@ -539,7 +567,7 @@ mod tests {
             dma_tx_buf.as_mut_slice()[0] = i as u8;
             *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i as u8;
             let transfer = spi
-                .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+                .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
                 .map_err(|e| e.0)
                 .unwrap();
 
@@ -565,7 +593,7 @@ mod tests {
 
         let spi = ctx.spi.with_dma(ctx.dma_channel);
         let transfer = spi
-            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
+            .transfer_buffers(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, (dma_rx_buf, mut dma_tx_buf)) = transfer.wait();
@@ -579,7 +607,7 @@ mod tests {
         dma_tx_buf.fill(&[0xaa, 0xdd, 0xef, 0xbe]);
 
         let transfer = spi
-            .transfer(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
+            .transfer_buffers(READ_SIZE, dma_rx_buf, WRITE_SIZE, dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
@@ -592,84 +620,72 @@ mod tests {
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_read_write_pcnt(ctx: Context) {
-        const TRANSFER_SIZE: usize = 4;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        // Test logic
+        fn test_write(
+            spi: &mut SpiDma<'_, Blocking>,
+            miso_pulse_counter: &Unit<'_, 0>,
+            tx_buf: &mut [u8],
+            rx_buf: &mut [u8],
+        ) {
+            // Count the number of positive edges in the buffer for PCNT
+            fn count_edges(buf: &[u8]) -> i16 {
+                let mut count = 0;
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+                let mut prev_bit = 0;
+                for byte in buf {
+                    for i in 0..8 {
+                        let bit = (byte >> i) & 1;
+                        if bit == 1 && prev_bit == 0 {
+                            count += 1;
+                        }
+                        prev_bit = bit;
+                    }
+                }
 
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel)
-            .with_buffers(dma_rx_buf, dma_tx_buf);
+                count
+            }
 
-        // Fill the buffer where each byte has 3 pos edges.
-        let tx_buf = [0b0110_1010; TRANSFER_SIZE];
-        let mut rx_buf = [0; TRANSFER_SIZE];
+            // Fill the buffer with data where each byte has 3 pos edges.
+            tx_buf.fill(0b0110_1010);
 
-        for i in 1..4 {
-            // Preset as 5, expect 0 repeated receive
-            rx_buf.copy_from_slice(&[5; TRANSFER_SIZE]);
-            spi.read(&mut rx_buf).unwrap();
-            assert_eq!(rx_buf, [0; TRANSFER_SIZE]);
+            for _ in 1..4 {
+                miso_pulse_counter.clear();
 
-            spi.write(&tx_buf).unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+                // Preset as 5, expect 0 repeated receive
+                rx_buf.fill(5);
+                spi.read(rx_buf).unwrap();
+                assert!(rx_buf.iter().all(|&b| b == 0));
+
+                spi.write(tx_buf).unwrap();
+                assert_eq!(miso_pulse_counter.value(), count_edges(tx_buf));
+            }
         }
-    }
 
-    #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-    fn test_dma_bus_symmetric_transfer(ctx: Context) {
+        // Set up SPI
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
         let mut spi = ctx
             .spi
             .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
-        let mut rx_buf = [0; 4];
-
-        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
-
-        assert_eq!(tx_buf, rx_buf);
-    }
-
-    #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-    fn test_dma_bus_asymmetric_transfer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel)
-            .with_buffers(dma_rx_buf, dma_tx_buf);
-
-        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
-        let mut rx_buf = [0; 4];
-
-        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
-
-        assert_eq!(&tx_buf[0..1], &rx_buf[0..1]);
+        // Run test with various buffer sizes
+        run_test_in_all_memory_regions::<4>(|tx_buf, rx_buf| {
+            test_write(&mut spi, &miso_pulse_counter, tx_buf, rx_buf);
+        });
+        run_test_in_all_memory_regions::<128>(|tx_buf, rx_buf| {
+            test_write(&mut spi, &miso_pulse_counter, tx_buf, rx_buf);
+        });
     }
 
     #[test]
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_symmetric_transfer_huge_buffer(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 4096;
-
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(40);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -678,20 +694,50 @@ mod tests {
             .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        let tx_buf = core::array::from_fn(|i| i as _);
-        let mut rx_buf = [0; DMA_BUFFER_SIZE];
+        fn test(spi: &mut SpiDma<'_, Blocking>, tx_buf: &mut [u8], rx_buf: &mut [u8]) {
+            // Fill TX buffer with data
+            let mut i = 0u8;
+            tx_buf.fill_with(|| {
+                let byte = i;
+                i = i.wrapping_add(1);
+                byte
+            });
 
-        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
+            // Symmetric transfer
+            spi.transfer(rx_buf, tx_buf).unwrap();
+            assert_eq!(tx_buf, rx_buf);
 
-        assert_eq!(tx_buf, rx_buf);
+            // Asymmetric transfer - read more than write
+            let asymmetric_rx_len = rx_buf.len();
+            let asymmetric_tx_len = tx_buf.len() / 2;
+            let smaller_len = asymmetric_rx_len.min(asymmetric_tx_len);
+            spi.transfer(
+                &mut rx_buf[0..asymmetric_rx_len],
+                &tx_buf[0..asymmetric_tx_len],
+            )
+            .unwrap();
+            assert_eq!(tx_buf[0..smaller_len], rx_buf[0..smaller_len]);
+
+            // Asymmetric transfer - write more than read
+            let asymmetric_rx_len = rx_buf.len() / 2;
+            let asymmetric_tx_len = tx_buf.len();
+            let smaller_len = asymmetric_rx_len.min(asymmetric_tx_len);
+            spi.transfer(
+                &mut rx_buf[0..asymmetric_rx_len],
+                &tx_buf[0..asymmetric_tx_len],
+            )
+            .unwrap();
+            assert_eq!(tx_buf[0..smaller_len], rx_buf[0..smaller_len]);
+        }
+
+        run_test_in_all_memory_regions::<4>(|tx_buf, rx_buf| test(&mut spi, tx_buf, rx_buf));
+        run_test_in_all_memory_regions::<4096>(|tx_buf, rx_buf| test(&mut spi, tx_buf, rx_buf));
     }
 
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 8;
-        const TRANSFER_SIZE: usize = 5;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
@@ -700,34 +746,57 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
-        let mut receive = [0; TRANSFER_SIZE];
+        async fn test_write(
+            spi: &mut SpiDma<'_, Async>,
+            miso_pulse_counter: &Unit<'_, 0>,
+            tx_buf: &mut [u8],
+            rx_buf: &mut [u8],
+        ) {
+            fn count_edges(buf: &[u8]) -> i16 {
+                let mut count = 0;
+                let mut prev_bit = 0;
+                for byte in buf {
+                    for i in 0..8 {
+                        let bit = (byte >> i) & 1;
+                        if bit == 1 && prev_bit == 0 {
+                            count += 1;
+                        }
+                        prev_bit = bit;
+                    }
+                }
+                count
+            }
 
-        // Fill the buffer where each byte has 3 pos edges.
-        let transmit = [0b0110_1010; TRANSFER_SIZE];
+            tx_buf.fill(0b0110_1010);
 
-        for i in 1..4 {
-            receive.copy_from_slice(&[5; TRANSFER_SIZE]);
-            SpiBusAsync::read(&mut spi, &mut receive).await.unwrap();
-            assert_eq!(receive, [0; TRANSFER_SIZE]);
+            for _ in 1..4 {
+                miso_pulse_counter.clear();
 
-            SpiBusAsync::write(&mut spi, &transmit).await.unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
+                rx_buf.fill(5);
+                SpiBusAsync::read(spi, rx_buf).await.unwrap();
+                assert!(rx_buf.iter().all(|&b| b == 0));
+
+                SpiBusAsync::write(spi, tx_buf).await.unwrap();
+                assert_eq!(miso_pulse_counter.value(), count_edges(tx_buf));
+            }
         }
+
+        run_async_test_in_all_memory_regions::<4>(async |tx_buf, rx_buf| {
+            test_write(&mut spi, &miso_pulse_counter, tx_buf, rx_buf).await;
+        })
+        .await;
+        run_async_test_in_all_memory_regions::<128>(async |tx_buf, rx_buf| {
+            test_write(&mut spi, &miso_pulse_counter, tx_buf, rx_buf).await;
+        })
+        .await;
     }
 
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 8;
-        const TRANSFER_SIZE: usize = 5;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
         let mut spi = ctx
@@ -736,29 +805,52 @@ mod tests {
             .with_buffers(dma_rx_buf, dma_tx_buf)
             .into_async();
 
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.miso_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
-        let mut receive = [0; TRANSFER_SIZE];
+        async fn test_transfer(
+            spi: &mut SpiDma<'_, Async>,
+            miso_pulse_counter: &Unit<'_, 0>,
+            tx_buf: &mut [u8],
+            rx_buf: &mut [u8],
+        ) {
+            fn count_edges(buf: &[u8]) -> i16 {
+                let mut count = 0;
+                let mut prev_bit = 0;
+                for byte in buf {
+                    for i in 0..8 {
+                        let bit = (byte >> i) & 1;
+                        if bit == 1 && prev_bit == 0 {
+                            count += 1;
+                        }
+                        prev_bit = bit;
+                    }
+                }
+                count
+            }
 
-        // Fill the buffer where each byte has 3 pos edges.
-        let transmit = [0b0110_1010; TRANSFER_SIZE];
+            tx_buf.fill(0b0110_1010);
 
-        for i in 1..4 {
-            receive.copy_from_slice(&[5; TRANSFER_SIZE]);
-            SpiBusAsync::read(&mut spi, &mut receive).await.unwrap();
-            assert_eq!(receive, [0; TRANSFER_SIZE]);
+            for _ in 1..4 {
+                miso_pulse_counter.clear();
 
-            SpiBusAsync::transfer(&mut spi, &mut receive, &transmit)
-                .await
-                .unwrap();
-            assert_eq!(ctx.pcnt_unit.value(), (i * 3 * TRANSFER_SIZE) as _);
-            assert_eq!(receive, [0b0110_1010; TRANSFER_SIZE]);
+                rx_buf.fill(5);
+                SpiBusAsync::read(spi, rx_buf).await.unwrap();
+                assert!(rx_buf.iter().all(|&b| b == 0));
+
+                SpiBusAsync::transfer(spi, rx_buf, tx_buf).await.unwrap();
+                assert_eq!(miso_pulse_counter.value(), count_edges(tx_buf));
+                assert!(rx_buf.iter().all(|&b| b == 0b0110_1010));
+            }
         }
+
+        run_async_test_in_all_memory_regions::<4>(async |tx_buf, rx_buf| {
+            test_transfer(&mut spi, &miso_pulse_counter, tx_buf, rx_buf).await;
+        })
+        .await;
+        run_async_test_in_all_memory_regions::<128>(async |tx_buf, rx_buf| {
+            test_transfer(&mut spi, &miso_pulse_counter, tx_buf, rx_buf).await;
+        })
+        .await;
     }
 
     #[test]
@@ -777,27 +869,27 @@ mod tests {
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
         let transfer = spi
-            .write(dma_tx_buf.len(), dma_tx_buf)
+            .write_buffer(dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
         let transfer = spi
-            .read(dma_rx_buf.len(), dma_rx_buf)
+            .read_buffer(dma_rx_buf.len(), dma_rx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, mut dma_rx_buf) = transfer.wait();
 
         let transfer = spi
-            .write(dma_tx_buf.len(), dma_tx_buf)
+            .write_buffer(dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (spi, _dma_tx_buf) = transfer.wait();
 
         dma_rx_buf.as_mut_slice().fill(0);
         let transfer = spi
-            .read(dma_rx_buf.len(), dma_rx_buf)
+            .read_buffer(dma_rx_buf.len(), dma_rx_buf)
             .map_err(|e| e.0)
             .unwrap();
         let (_, dma_rx_buf) = transfer.wait();
@@ -865,7 +957,7 @@ mod tests {
         let spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -888,7 +980,7 @@ mod tests {
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -899,7 +991,7 @@ mod tests {
             .unwrap();
 
         let transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -921,7 +1013,7 @@ mod tests {
         let spi = ctx.spi.with_dma(ctx.dma_channel).into_async();
 
         let mut transfer = spi
-            .transfer(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
             .map_err(|e| e.0)
             .unwrap();
 
@@ -962,12 +1054,7 @@ mod tests {
     fn half_duplex_operation_works_after_nonblocking_write(mut ctx: Context) {
         // SpiBus::write returns before the transfer is complete. This test verifies that
         // half_duplex functions flush before they reconfigure the peripheral.
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.sclk_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
@@ -982,9 +1069,9 @@ mod tests {
             .half_duplex_write(DataMode::Dual, Command::None, Address::None, 0, &buffer)
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 480);
+        assert_eq!(sclk_counter.value(), 480);
 
-        ctx.pcnt_unit.clear();
+        sclk_counter.clear();
 
         // 320 clock cycles
         let mut buffer = [0x00; 40];
@@ -995,7 +1082,7 @@ mod tests {
             .half_duplex_read(DataMode::Dual, Command::None, Address::None, 0, &mut buffer)
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 480);
+        assert_eq!(sclk_counter.value(), 480);
     }
 
     #[test]
@@ -1003,12 +1090,7 @@ mod tests {
     fn half_duplex_operation_resets_size_before_empty_write(mut ctx: Context) {
         // SpiBus::write returns before the transfer is complete. This test verifies that
         // half_duplex functions flush before they reconfigure the peripheral.
-        ctx.pcnt_unit
-            .channel0
-            .set_edge_signal(ctx.sclk_input.peripheral_input());
-        ctx.pcnt_unit
-            .channel0
-            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        let sclk_counter = set_up_pcnt!(ctx, sclk_input);
 
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
@@ -1031,7 +1113,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(ctx.pcnt_unit.value(), 40);
+        assert_eq!(sclk_counter.value(), 40);
     }
 
     #[test]
@@ -1057,12 +1139,11 @@ mod tests {
             .with_dma(ctx.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        let tx_buf = [0xde, 0xad, 0xbe, 0xef];
-        let mut rx_buf = [0; 4];
-
-        spi.transfer(&mut rx_buf, &tx_buf).unwrap();
-
-        assert_eq!(tx_buf, rx_buf);
+        run_test_in_all_memory_regions::<4>(|tx_buf, rx_buf| {
+            tx_buf.copy_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+            spi.transfer(rx_buf, tx_buf).unwrap();
+            assert_eq!(tx_buf, rx_buf);
+        });
     }
 
     #[test]
