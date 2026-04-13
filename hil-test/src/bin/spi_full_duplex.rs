@@ -83,6 +83,8 @@ macro_rules! set_up_pcnt {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use hil_test::assert_eq;
+
     use super::*;
 
     #[init]

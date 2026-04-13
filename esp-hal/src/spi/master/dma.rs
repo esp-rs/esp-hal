@@ -623,15 +623,6 @@ impl<'a> MaybeCopyTxBuf<'a> {
                 NoBuffer(tx_buffer.prepare())
             }
             MaybeCopyTxBuf::Direct(descriptors) => {
-                #[cfg(dma_can_access_psram)]
-                if crate::psram::psram_range().contains(&data.addr().get()) {
-                    unsafe {
-                        crate::soc::cache_writeback_addr(
-                            data.addr().get() as u32,
-                            data.len() as u32,
-                        );
-                    }
-                }
                 let (buffer, _) = unsafe { unwrap!(prepare_for_tx(&mut **descriptors, data, 1)) };
                 buffer
             }
