@@ -339,62 +339,15 @@ jobs:
             './**/*.md'
             './**/*.toml'
 
-  # Dummy HIL test-build check for PRs
+  # Single dummy for PR CI, per-chip matrix jobs live in hil.yml and are aggregated there.
   #
-  # This job only exists so that the required "build-tests-full (...)" checks
-  # are green on normal PR CI. It does NOT actually build tests.
-  #
-  # The real test builds run in hil.yml on merge_group (and when dispatched
-  # via `/hil full`) using a job with the same id + matrix, so the merge
-  # queue reuses these check names.
-  #
-  # For a reference, check out this GH discussion: https://github.com/orgs/community/discussions/102764
-  build-tests-full:
+  # Real test builds run in hil.yml on merge_group (and `/hil full`). See:
+  # https://github.com/orgs/community/discussions/102764
+  build-tests-full-report:
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - soc: esp32c2
-            rust-target: riscv32imc-unknown-none-elf
-            runner: esp32c2-jtag
-            host: aarch64
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-            runner: esp32c3-usb
-            host: armv7
-          - soc: esp32c5
-            rust-target: riscv32imac-unknown-none-elf
-            runner: esp32c5-usb
-            host: aarch64
-          - soc: esp32c6
-            rust-target: riscv32imac-unknown-none-elf
-            runner: esp32c6-usb
-            host: armv7
-          - soc: esp32c61
-            rust-target: riscv32imac-unknown-none-elf
-            runner: esp32c61-usb
-            host: aarch64
-          - soc: esp32h2
-            rust-target: riscv32imac-unknown-none-elf
-            runner: esp32h2-usb
-            host: armv7
-          - soc: esp32
-            rust-target: xtensa-esp32-none-elf
-            runner: esp32-jtag
-            host: aarch64
-          - soc: esp32s2
-            rust-target: xtensa-esp32s2-none-elf
-            runner: esp32s2-jtag
-            host: armv7
-          - soc: esp32s3
-            rust-target: xtensa-esp32s3-none-elf
-            runner: esp32s3-usb
-            host: armv7
-
     steps:
-      - name: Dummy placeholder for HIL test builds
+      - name: Placeholder (full-matrix builds run in HIL workflow)
         run: |
-          echo "NOOP: Dummy build-tests-full for ${{ matrix.target.soc }}."
+          echo "NOOP: build-tests-full-report for PR CI."
           echo "Real HIL test builds run only in hil.yml (merge_group or /hil full)."

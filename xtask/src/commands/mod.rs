@@ -414,14 +414,15 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Determine the appropriate build target for the given package and chip:
     let target = Package::HilTest.target_triple(&args.chip)?;
 
-    // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = crate::firmware::load(&package_path.join("src").join("bin"))?
-        .into_iter()
+    // Load all test metadata first so we can differentiate between:
+    // - unknown test selectors (typos)
+    // - valid tests that are unsupported for the selected chip.
+    let mut all_tests = crate::firmware::load(&package_path.join("src").join("bin"))?;
+    all_tests.sort_by_key(|a| a.binary_name());
+    let tests = all_tests
+        .iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
-
-    // Sort all tests by name:
-    tests.sort_by_key(|a| a.binary_name());
 
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
@@ -441,7 +442,8 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             bail!("Empty test selector is not allowed.");
         }
 
-        let mut selected_failed: Vec<String> = Vec::new();
+        let mut unknown_selected: Vec<String> = Vec::new();
+        let mut unsupported_for_chip: Vec<String> = Vec::new();
 
         for selected in trimmed.into_iter().filter(|s| !s.is_empty()) {
             let (test_arg, filter) = match selected.split_once("::") {
@@ -454,15 +456,25 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 .flatten()
                 .unwrap_or(&[]);
 
-            let matched: Vec<_> = tests
+            let matched: Vec<_> = all_tests
                 .iter()
                 .filter(|t| t.matches(test_arg.as_deref()))
                 .collect();
 
             if matched.is_empty() {
-                selected_failed.push(selected.to_string());
+                unknown_selected.push(selected.to_string());
             } else {
-                for test in matched {
+                let matched_for_chip: Vec<_> = matched
+                    .into_iter()
+                    .filter(|t| t.supports_chip(args.chip))
+                    .collect();
+
+                if matched_for_chip.is_empty() {
+                    unsupported_for_chip.push(selected.to_string());
+                    continue;
+                }
+
+                for test in matched_for_chip {
                     let command = crate::generate_build_command(
                         &package_path,
                         args.chip,
@@ -479,11 +491,16 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             }
         }
 
-        if !selected_failed.is_empty() {
-            bail!(
-                "Test not found or unsupported for the given chip: {}",
-                selected_failed.join(", ")
-            )
+        if !unsupported_for_chip.is_empty() {
+            log::warn!(
+                "Skipping unsupported tests for '{}': {}",
+                args.chip,
+                unsupported_for_chip.join(", ")
+            );
+        }
+
+        if !unknown_selected.is_empty() {
+            bail!("Test not found: {}", unknown_selected.join(", "))
         }
     } else {
         for test in tests {
@@ -491,7 +508,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 &package_path,
                 args.chip,
                 &target,
-                &test,
+                test,
                 action.clone(),
                 false,
                 args.toolchain.as_deref(),
