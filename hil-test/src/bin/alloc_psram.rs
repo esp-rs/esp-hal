@@ -1,12 +1,9 @@
 //! Allocator and PSRAM-related tests
 
 //% CHIPS:
-//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2 esp32c5 esp32c61
-// The S3 dev kit in the HIL-tester has octal PSRAM.
-//% CHIPS(llff_octal, tlsf_octal): esp32s3
-//% ENV(llff_octal, tlsf_octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
-//% ENV(llff_octal, llff_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
-//% ENV(tlsf_octal, tlsf_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+//% CHIPS(llff, tlsf): esp32 esp32s2 esp32c5 esp32c61 esp32s3
+//% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+//% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-storage esp-alloc/nightly
 
 #![no_std]

@@ -179,3 +179,87 @@ expensive.
 -let revision = chip_revision();
 +let revision = chip_revision().combined();
 ```
+
+## PSRAM configuration changes
+
+The PSRAM configuration has been moved out of `esp_hal::Config`. Instead, PSRAM configuration is now done
+when creating the `Psram` driver. If you are using the `esp_alloc::psram_allocator!` macro, a default
+configuration is applied for you. However, sometimes you may want to customize this configuration.
+
+```rust
+let psram_config = esp_hal::psram::PsramConfig {
+    // Set custom configuration options here
+    // e.g. (ESP32-S3): `mode: esp_hal::psram::PsramMode::OctalSpi,`
+    ..Default::default()
+};
+```
+
+You have the following options to apply this configuration:
+
+### Pass a `PsramConfig` struct to the macro
+
+```rust
+let p = esp_hal::init(Default::default());
+esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram, psram_config);
+```
+
+### Initialize the driver explicitly and pass it to the macro
+
+```rust
+use esp_hal::psram::Psram;
+
+let p = esp_hal::init(Default::default());
+let psram = Psram::new(p.PSRAM, psram_config);
+esp_alloc::psram_allocator!(&psram);
+```
+
+### Initialize the driver explicitly and set up the PSRAM heap without the macro
+
+```rust
+use esp_hal::psram::Psram;
+
+let p = esp_hal::init(Default::default());
+let psram = Psram::new(p.PSRAM, psram_config);
+let (start, size) = psram.raw_parts();
+unsafe {
+    esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+        start,
+        size,
+        esp_alloc::MemoryCapability::External.into(),
+    ));
+}
+```
+
+## Build configuration changes
+
+The following options have been removed:
+
+- `ESP_HAL_CONFIG_XTAL_FREQUENCY`
+- `ESP_HAL_CONFIG_PSRAM_MODE`
+
+Instead, runtime configuration is available.
+
+### Configuring crystal frequency
+
+The crystal frequency can be configured when initializing `esp-hal`, by providing a custom clock configuration.
+
+```rust
+use esp_hal::clock::{CpuClock, ll};
+
+// Obtain a configuration preset for a given CPU clock frequency.
+let mut cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
+
+// Change the XTAL frequency in the configuration.
+cpu_clock_config.xtal_clk = Some(ll::XtalClkConfig::_40);
+
+// Initialize esp-hal with the custom clock configuration.
+let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock_config));
+```
+
+### Configuring the PSRAM interface (ESP32-S3)
+
+`esp-hal` will try to auto-detect the PSRAM mode. However, this may not work in all cases. Also, you
+may already know exactly what mode your chip's PSRAM can operate in, and want to configure it directly
+to save on time or code size.
+
+You can now specify the PSRAM mode via the `mode` field of the `PsramConfig` struct. Read the "PSRAM configuration changes" section for more information on how you need to apply this configuration.

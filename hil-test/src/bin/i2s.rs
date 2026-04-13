@@ -80,22 +80,6 @@ mod tests {
         }
     }
 
-    fn enable_loopback() {
-        let i2s = esp_hal::peripherals::I2S0::regs();
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
-                i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
-            } else {
-                i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
-
-                i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-                i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
-            }
-        }
-    }
-
     struct Context {
         dout: AnyPin<'static>,
         dma_channel: DmaChannel0<'static>,
@@ -136,6 +120,7 @@ mod tests {
             ctx.i2s,
             ctx.dma_channel,
             Config::new_tdm_philips()
+                .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -158,8 +143,6 @@ mod tests {
             .with_ws(NoPin)
             .with_din(din)
             .build(rx_descriptors);
-
-        enable_loopback();
 
         let mut rx_transfer = i2s_rx.read_dma_circular_async(rx_buffer).unwrap();
         spawner.spawn(writer(tx_buffer, i2s_tx).unwrap());
@@ -189,6 +172,7 @@ mod tests {
             ctx.i2s,
             ctx.dma_channel,
             Config::new_tdm_philips()
+                .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -210,8 +194,6 @@ mod tests {
             .with_ws(NoPin)
             .with_din(din)
             .build(rx_descriptors);
-
-        enable_loopback();
 
         let mut samples = SampleSource::new();
         for b in tx_buffer.iter_mut() {

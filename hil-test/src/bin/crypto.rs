@@ -1,15 +1,11 @@
 //! Crypto hardware tests
 
-//% CHIPS(quad): esp32s2
-// The S3 dev kit in the HIL-tester has octal PSRAM.
-//% CHIPS(octal): esp32s3
+//% CHIPS(quad): esp32s2 esp32s3
 // ESP32 has no AES-DMA, no point in setting up PSRAM
-// TODO: enable PSRAM for ESP32-C5
+// TODO: enable PSRAM for ESP32-C5, C61
 //% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
-//% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
-//% FEATURES(quad, octal):
-//% FEATURES: unstable esp-alloc/nightly
+//% FEATURES: unstable esp-alloc/nightly defmt
 
 #![no_std]
 #![no_main]

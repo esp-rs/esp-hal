@@ -35,24 +35,6 @@ options:
       - value: true
     active: 'chip == "esp32"'
 
-  - name: psram-mode
-    description: SPIRAM chip mode
-    default:
-      - value: '"quad"'
-    constraints:
-      - if: 'feature("psram_octal_spi")'
-        type:
-          validator: enumeration
-          value:
-            - "quad"
-            - "octal"
-      - if: '!feature("psram_octal_spi")'
-        type:
-          validator: enumeration
-          value:
-            - "quad"
-    active: 'feature("soc_has_psram")'
-
   - name: stack-guard-offset
     description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
     default:
