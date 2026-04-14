@@ -527,6 +527,7 @@ driver_configs![
         properties: {
             #[serde(default)]
             octal_spi: bool,
+            extmem_origin: u32,
         }
     },
     RgbProperties {

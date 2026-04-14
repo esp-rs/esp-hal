@@ -1,7 +1,5 @@
-use super::PsramSize;
+use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
-
-const EXTMEM_ORIGIN: u32 = 0x3C000000;
 
 /// PSRAM interface mode
 #[derive(Copy, Clone, Debug, Default, PartialEq)]

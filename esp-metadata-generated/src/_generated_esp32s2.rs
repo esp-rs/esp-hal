@@ -193,6 +193,12 @@ macro_rules! property {
     ("psram.octal_spi") => {
         false
     };
+    ("psram.extmem_origin") => {
+        1062207488
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1062207488)
+    };
     ("rmt.ram_start") => {
         1061250048
     };

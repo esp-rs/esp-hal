@@ -334,6 +334,7 @@ impl Chip {
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"xtensa\"",
                     "phy_combo_module",
+                    "psram_extmem_origin=\"1065353216\"",
                     "rmt_ram_start=\"1073047552\"",
                     "rmt_channel_ram_size=\"64\"",
                     "rmt_has_per_channel_clock",
@@ -531,6 +532,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"xtensa\"",
                     "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1065353216\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1073047552\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
@@ -1866,6 +1868,7 @@ impl Chip {
                     "lp_uart_ram_size=\"32\"",
                     "parl_io_version=\"2\"",
                     "phy_combo_module",
+                    "psram_extmem_origin=\"1107296256\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -2112,6 +2115,7 @@ impl Chip {
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -3080,6 +3084,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "psram_extmem_origin=\"1107296256\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
@@ -3222,6 +3227,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
@@ -4142,6 +4148,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"xtensa\"",
+                    "psram_extmem_origin=\"1062207488\"",
                     "rmt_ram_start=\"1061250048\"",
                     "rmt_channel_ram_size=\"64\"",
                     "rmt_has_tx_immediate_stop",
@@ -4353,6 +4360,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"xtensa\"",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1062207488\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1061250048\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -4787,6 +4795,7 @@ impl Chip {
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
                     "psram_octal_spi",
+                    "psram_extmem_origin=\"1006632960\"",
                     "rmt_ram_start=\"1610704896\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -5035,6 +5044,7 @@ impl Chip {
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
                     "cargo:rustc-cfg=psram_octal_spi",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1006632960\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610704896\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5793,6 +5803,10 @@ pub fn emit_check_cfg_directives() {
     println!(
         "cargo:rustc-check-cfg=cfg(interrupt_controller, \
          values(\"xtensa\",\"riscv_basic\",\"clic\",\"plic\"))"
+    );
+    println!(
+        "cargo:rustc-check-cfg=cfg(psram_extmem_origin, \
+         values(\"1065353216\",\"1107296256\",\"1062207488\",\"1006632960\"))"
     );
     println!(
         "cargo:rustc-check-cfg=cfg(rmt_ram_start, \

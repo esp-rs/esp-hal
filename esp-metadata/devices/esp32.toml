@@ -889,6 +889,7 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+extmem_origin = 0x3F800000
 [device.temp_sensor]
 [device.lp_timer]
 

@@ -1,6 +1,4 @@
-use super::PsramSize;
-
-const EXTMEM_ORIGIN: usize = 0x3F800000;
+use super::{EXTMEM_ORIGIN, PsramSize};
 
 /// Cache Speed
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]

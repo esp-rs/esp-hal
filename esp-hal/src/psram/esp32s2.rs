@@ -1,7 +1,5 @@
-use super::PsramSize;
+use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::peripherals::{EXTMEM, SPI0, SPI1};
-
-const EXTMEM_ORIGIN: usize = 0x3f500000;
 
 // Cache Speed
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default)]

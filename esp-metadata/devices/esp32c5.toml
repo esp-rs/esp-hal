@@ -703,6 +703,7 @@ support_status = { status = "not_supported", issue = 5172 }
 [device.io_mux]
 
 [device.psram]
+extmem_origin = 0x42000000
 
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5169 }

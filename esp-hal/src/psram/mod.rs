@@ -81,6 +81,8 @@ impl PsramSize {
     }
 }
 
+const EXTMEM_ORIGIN: u32 = property!("psram.extmem_origin");
+
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 

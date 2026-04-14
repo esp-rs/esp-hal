@@ -1,4 +1,4 @@
-use super::PsramSize;
+use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     peripherals::{CACHE, SPI0, SPI1},
     psram::implem::quad::MspiTimingSpeedMode,
@@ -8,8 +8,6 @@ mod quad;
 
 use procmacros::ram;
 use quad::CommandMode;
-
-const EXTMEM_ORIGIN: u32 = 0x42000000;
 
 const FUNC_SPICS1_SPICS1: u8 = 0;
 const PIN_FUNC_GPIO: u8 = 1;
