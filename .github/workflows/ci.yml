@@ -14,12 +14,6 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches-ignore:
-      - "gh-readonly-queue/**"
-      - "main"
-      - "backport-**"
-      - "release-branch-**"
   merge_group:
   workflow_dispatch:
 
