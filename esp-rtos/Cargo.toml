@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rtos"
-version       = "0.2.0"
+version       = "0.3.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "A task scheduler for Espressif devices"
@@ -31,12 +31,12 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false, features = [
+esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", default-features = false, features = [
     # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
     # and uses reexported riscv/xtensa-lx from esp-hal
     "requires-unstable", "rt"
 ] }
-esp-rom-sys = { version = "0.1.3", path = "../esp-rom-sys" }
+esp-rom-sys = { version = "0.1.4", path = "../esp-rom-sys" }
 
 cfg-if = "1"
 rtos-trace = { version = "0.2.0", optional = true }
@@ -45,11 +45,11 @@ rtos-trace = { version = "0.2.0", optional = true }
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
 document-features  = "0.2"
 embassy-sync = "0.8"
-esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true, default-features = false }
-esp-config = { version = "0.6.1", path = "../esp-config" }
-esp-sync = { version = "0.1.1", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
-macros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
+esp-config = { version = "0.7.0", path = "../esp-config" }
+esp-sync = { version = "0.2.0", path = "../esp-sync" }
+esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+macros = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
 # Optional dependencies that enable ecosystem support.
@@ -65,14 +65,14 @@ log-04           = { package = "log", version = "0.4", optional = true }
 riscv            = { version = "0.15.0" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
+xtensa-lx        = { version = "0.14.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-config             = { version = "0.6.1", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config             = { version = "0.7.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-hal = { version = "~1.0", path = "../esp-hal", features = ["unstable"] }
+esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
 default = []

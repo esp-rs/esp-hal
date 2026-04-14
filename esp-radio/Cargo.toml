@@ -43,28 +43,28 @@ test  = false
 
 [dependencies]
 cfg-if  = "1"
-esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false }
+esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", default-features = false }
 portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
-esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver" }
+esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver" }
 instability = "0.3.12"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
-esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true, default-features = false }
-esp-config = { version = "0.6.1", path = "../esp-config" }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.1.1", path = "../esp-sync" }
+esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
+esp-config = { version = "0.7.0", path = "../esp-config" }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.2.0", path = "../esp-sync" }
 esp-phy = { version = "0.1.1", path = "../esp-phy/" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-procmacros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-xtensa-lx-rt = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
+procmacros = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+xtensa-lx-rt = { version = "0.22.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
@@ -103,11 +103,11 @@ defmt = { version = "1.0.1", optional = true }
 log-04 = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config = { version = "0.7.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-rtos = { version = "0.2.0", path = "../esp-rtos" }
+esp-rtos = { version = "0.3.0", path = "../esp-rtos" }
 
 [features]
 default = ["esp-alloc"]

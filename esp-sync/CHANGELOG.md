@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.2.0] - 2026-04-14
+
+### Added
+
 - Initial ESP32-C5 support (#4859)
 - Initial ESP32-C61 support (#5187)
 - Added support for embassy-sync 0.8 (#5249)
@@ -16,12 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Added `#[inline]` attributes to ensure better codegen (#4627)
-
-### Fixed
-
-
-### Removed
-
 
 ## [v0.1.1] - 2025-10-30
 
@@ -33,4 +41,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-sync-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.1.0...esp-sync-v0.1.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.1.1...HEAD
+[v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.1.1...esp-sync-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.2.0...HEAD

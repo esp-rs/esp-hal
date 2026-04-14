@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.3.0] - 2026-04-14
+
+### Added
+
 - `usleep_until` and `Scheduler::usleep_until` to put the current task to sleep until the specified timestamp. (#4555)
 - `SemaphoreHandle::take_with_deadline` to take a semaphore with a deadline. (#4555)
 - `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
@@ -33,9 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `register_queue_implementation` no longer requires `QueuePtr` to be in scope (#4559)
 - `task_create` now saturates the priority to the maximum supported by the OS (#5074)
 
-### Removed
-
-
 ## [v0.2.0] - 2025-10-30
 
 ### Added
@@ -50,4 +61,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-radio-rtos-driver-v0.1.0
 [v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.1.0...esp-radio-rtos-driver-v0.2.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.2.0...HEAD
+[v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.2.0...esp-radio-rtos-driver-v0.3.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.3.0...HEAD

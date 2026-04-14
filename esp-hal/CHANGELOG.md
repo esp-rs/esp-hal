@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.1.0-rc.0] - 2026-04-14
+
+### Added
+
 - `AdcPin` now implements `Debug` and `defmt::Format`. (#5194)
 - RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
 - RMT: `Channel::apply_config` has been added. (#4302)
@@ -1592,4 +1606,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...HEAD
+[v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...HEAD
