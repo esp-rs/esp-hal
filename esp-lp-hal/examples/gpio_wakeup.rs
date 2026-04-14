@@ -10,10 +10,8 @@
 extern crate panic_halt;
 
 use esp_lp_hal::{
+    gpio::{Input, gpio_wakeup_clear, gpio_wakeup_enable},
     prelude::*,
-    gpio::{
-      Input,gpio_wakeup_clear,gpio_wakeup_enable
-    }
 };
 
 const ADDRESS: usize = 0x1000;

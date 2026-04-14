@@ -88,11 +88,11 @@ required-features = []
 
 [[example]]
 name              = "interrupt_counter"
-#required-features = ["esp32s3"]
+required-features = []
 
 [[example]]
 name              = "gpio_wakeup"
-required-features = ["esp32s3"]
+required-features = []
 
 [[example]]
 name              = "i2c"
