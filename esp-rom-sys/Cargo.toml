@@ -29,15 +29,15 @@ test  = false
 [dependencies]
 cfg-if              = "1"
 document-features   = "0.2"
-esp32   = { version = "0.39", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32c2 = { version = "0.28", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32c3 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32c5 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32c6 = { version = "0.22", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32c61 = { version = "0.1", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32h2 = { version = "0.18", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32s2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
-esp32s3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
+esp32   = { version = "0.40", features = ["critical-section"], optional = true }
+esp32c2 = { version = "0.29", features = ["critical-section"], optional = true }
+esp32c3 = { version = "0.32", features = ["critical-section"], optional = true }
+esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true }
+esp32c6 = { version = "0.23", features = ["critical-section"], optional = true }
+esp32c61 = { version = "0.3", features = ["critical-section"], optional = true }
+esp32h2 = { version = "0.19", features = ["critical-section"], optional = true }
+esp32s2 = { version = "0.31", features = ["critical-section"], optional = true }
+esp32s3 = { version = "0.35", features = ["critical-section"], optional = true }
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
