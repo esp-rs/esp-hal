@@ -34,8 +34,8 @@ test  = false
 [dependencies]
 cfg-if      = "1"
 defmt       = { version = "1", optional = true }
-esp-config  = { version = "0.6.1", path = "../esp-config" }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
+esp-config  = { version = "0.7.0", path = "../esp-config" }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 esp-println = { version = "0.16.1", optional = true, default-features = false, path = "../esp-println" }
 heapless    = "0.9"
 semihosting = { version = "0.1.20", optional = true }
@@ -45,11 +45,11 @@ document-features = "0.2"
 riscv            = { version = "0.15.0" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
+xtensa-lx        = { version = "0.14.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-config   = { version = "0.6.1", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.7.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["colors"]
