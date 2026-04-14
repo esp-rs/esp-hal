@@ -352,6 +352,16 @@ fn update(args: UpdateArgs) -> Result<()> {
             .status();
 
         log::info!("{:?}", res);
+
+        if !res?.success() {
+            // don't fail early if packaging fails - real problems will show up later
+            log::warn!(
+                "Failed to prepare package '{}' for local publishing  - Skipping!",
+                package
+            );
+            continue;
+        }
+
         std::fs::write(".cargo/config.toml", &original_config)?;
 
         // copy the crate to our registry
