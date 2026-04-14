@@ -223,17 +223,17 @@ where
         // The esp-idf C writer never produces ota_seq == 0 (see
         // `esp_rewrite_ota_data` in esp-idf's `esp_ota_ops.c`), so if it
         // appears on flash it was written by a buggy caller.  Normalize it
-        // to UNINITALIZED_SEQUENCE so the rest of the selection logic does
+        // to UNINITIALIZED_SEQUENCE so the rest of the selection logic does
         // not misinterpret it via unsigned underflow in `(0u32 - 1)`.
         //
         // Ref: https://github.com/espressif/esp-idf/blob/v5.4.1/components/app_update/esp_ota_ops.c#L390-L435
         let seq0 = if buffer1.ota_seq == 0 {
-            UNINITALIZED_SEQUENCE
+            UNINITIALIZED_SEQUENCE
         } else {
             buffer1.ota_seq
         };
         let seq1 = if buffer2.ota_seq == 0 {
-            UNINITALIZED_SEQUENCE
+            UNINITIALIZED_SEQUENCE
         } else {
             buffer2.ota_seq
         };
