@@ -713,7 +713,7 @@ impl DmaOperationKind {
             // FIXME: lazy workaround for ESP32 TX DMA alignment requirements.
             // `prepare_for_tx` and `prepare_for_rx` should be updated to handle ESP32.
             #[cfg(esp32)]
-            if !(buffer.as_ptr() as usize).is_multiple_of(4) {
+            if !((buffer.as_ptr() as usize).is_multiple_of(4) && buffer.len().is_multiple_of(4)) {
                 return false;
             }
 
@@ -722,10 +722,16 @@ impl DmaOperationKind {
             }
             #[cfg(dma_can_access_psram)]
             if is_slice_in_psram(buffer) {
-                if _direction == TransferDirection::In && cfg!(esp32s2) {
-                    // FIXME: S2 has various weird issues when transferring to PSRAM
-                    return false;
+                #[cfg(esp32s2)]
+                if _direction == TransferDirection::In {
+                    // For some reason, having tail bytes in internal RAM causes issues, so we
+                    // force copying if the end of the PSRAM buffer is not aligned.
+                    let tail_bytes = (buffer.as_ptr() as usize + buffer.len()).wrapping_neg() & 15;
+                    if tail_bytes > 0 {
+                        return false;
+                    }
                 }
+
                 return true;
             }
 
@@ -926,9 +932,9 @@ where
         not 4-byte aligned. This is a limitation of the current implementation."
     )]
     #[cfg_attr(
-        esp32,
-        doc = "On ESP32-S2, transferring to PSRAM requires copying the entire buffer. This is a
-        limitation of the current implementation."
+        esp32s2,
+        doc = "On ESP32-S2, transferring to PSRAM requires the buffer's _end_ to be 16-byte aligned,
+        otherwise the driver requires copying the entire buffer."
     )]
     #[doc = ""]
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will

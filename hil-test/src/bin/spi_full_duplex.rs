@@ -1,7 +1,7 @@
 //! SPI Full Duplex test suite.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
-//% FEATURES(unstable): unstable
+//% FEATURES(unstable): unstable defmt
 //% FEATURES(stable):
 
 // FIXME: add async test cases that don't rely on PCNT
@@ -116,10 +116,19 @@ fn run_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
         external_tx_memory.resize(buf_len, 0);
 
         for shift in 0..=MAX_SHIFT {
+            external_rx_memory.fill(0);
+
             defmt::info!("Testing PSRAM with shift {}", shift);
             let rx_buf = &mut external_rx_memory[shift..][..BUFFER_SIZE];
             let tx_buf = &mut external_tx_memory[shift..][..BUFFER_SIZE];
+
             test_fn(tx_buf, rx_buf);
+            assert!(external_rx_memory[..shift].iter().all(|&b| b == 0));
+            assert!(
+                external_rx_memory[shift + BUFFER_SIZE..]
+                    .iter()
+                    .all(|&b| b == 0)
+            );
         }
     }
 }
@@ -146,10 +155,19 @@ async fn run_async_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
         external_tx_memory.resize(buf_len, 0);
 
         for shift in 0..=MAX_SHIFT {
+            external_rx_memory.fill(0);
+
             defmt::info!("Testing PSRAM with shift {}", shift);
             let rx_buf = &mut external_rx_memory[shift..][..BUFFER_SIZE];
             let tx_buf = &mut external_tx_memory[shift..][..BUFFER_SIZE];
+
             test_fn(tx_buf, rx_buf).await;
+            assert!(external_rx_memory[..shift].iter().all(|&b| b == 0));
+            assert!(
+                external_rx_memory[shift + BUFFER_SIZE..]
+                    .iter()
+                    .all(|&b| b == 0)
+            );
         }
     }
 }
@@ -685,7 +703,7 @@ mod tests {
     #[test]
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
