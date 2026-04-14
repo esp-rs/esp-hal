@@ -73,7 +73,7 @@ Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-de
 
 We follow a few general guidelines regarding releases:
 
-- We don't offer a fixed release cycle.
+- Releases happen organically alongside development rather than on a fixed schedule. The table below outlines our general approach to each release type and when one might be cut.
 - During the `rc` phase of a release:
     - We aim to leave them in the wild for testing for at least one week per release.
     - If a considerable change (like a new addition) is added, we must extend the `rc` by at least another release.
