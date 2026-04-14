@@ -26,10 +26,13 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(config: PsramConfig) {
-    let mut config = config;
-    utils::psram_init(&mut config);
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    utils::psram_init(config);
+    true
+}
 
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
     unsafe extern "C" {

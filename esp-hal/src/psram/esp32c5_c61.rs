@@ -128,11 +128,13 @@ impl Default for PsramConfig {
 
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(config: PsramConfig) {
-    let mut config = config;
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    quad::psram_init(config);
+    true
+}
 
-    quad::psram_init(&mut config);
-
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 9;
 
     let start = {
@@ -174,7 +176,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
                 break;
             }
         }
-        let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
+        let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
         for i in 0..config.size.get() as u32 / MMU_PAGE_SIZE {

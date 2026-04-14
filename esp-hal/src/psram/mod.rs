@@ -81,7 +81,7 @@ impl PsramSize {
     }
 }
 
-const EXTMEM_ORIGIN: u32 = property!("psram.extmem_origin");
+const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
@@ -107,8 +107,10 @@ pub struct Psram {
 
 impl Psram {
     /// Initializes PSRAM.
-    pub fn new(peri: PSRAM<'static>, config: PsramConfig) -> Self {
-        init_psram(config);
+    pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
+        if init_psram(&mut config) {
+            map_psram(config);
+        }
         Self { _peri: peri }
     }
 

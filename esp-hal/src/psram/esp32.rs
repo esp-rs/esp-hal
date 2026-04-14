@@ -46,12 +46,15 @@ pub struct PsramConfig {
     pub psram_vaddr_mode: PsramVaddrMode,
 }
 
-/// Initializes the PSRAM memory on supported devices.
-pub(crate) fn init_psram(config: PsramConfig) {
-    let mut config = config;
+/// Initialize PSRAM to be used for data.
+#[procmacros::ram]
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    utils::psram_init(config);
+    true
+}
 
-    utils::psram_init(&config);
-
+#[procmacros::ram]
+pub(crate) fn map_psram(mut config: PsramConfig) {
     if config.size.is_auto() {
         const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
 

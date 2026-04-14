@@ -79,28 +79,32 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(mut config: PsramConfig) {
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     let success = match config.mode {
         PsramMode::Auto => {
-            let mut success = octal_spi_impl::psram_init(&mut config);
+            let mut success = octal_spi_impl::psram_init(config);
 
             if !success {
-                success = quad_spi_impl::psram_init(&mut config);
+                success = quad_spi_impl::psram_init(config);
             }
 
             success
         }
-        PsramMode::QuadSpi => quad_spi_impl::psram_init(&mut config),
-        PsramMode::OctalSpi => octal_spi_impl::psram_init(&mut config),
+        PsramMode::QuadSpi => quad_spi_impl::psram_init(config),
+        PsramMode::OctalSpi => octal_spi_impl::psram_init(config),
     };
 
     if !success {
         warn!(
             "Failed to configure PSRAM. This may indicate a missing/inoperable PSRAM chip, or an incorrect PSRAM configuration. Check if the PSRAM chip is present and the configuration is correct."
         );
-        return;
     }
 
+    success
+}
+
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 
@@ -152,7 +156,7 @@ pub(crate) fn init_psram(mut config: PsramConfig) {
                 break;
             }
         }
-        let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
+        let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
         // If we need use SPIRAM, we should use data cache.
