@@ -87,9 +87,9 @@ pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
 
         info!("Assuming {} bytes of PSRAM", guessed_size);
         config.size = PsramSize::Size(guessed_size);
-    } else {
-        utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
     }
+
+    utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
 
     EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
 }

@@ -139,60 +139,56 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 9;
 
-    let start = {
-        const MMU_PAGE_SIZE: u32 = 0x10000;
-        const FLASH_MMU_TABLE_SIZE: u32 = 512;
-        const MMU_VALID: u32 = 1 << 10;
+    const MMU_PAGE_SIZE: u32 = 0x10000;
+    const FLASH_MMU_TABLE_SIZE: u32 = 512;
+    const MMU_VALID: u32 = 1 << 10;
 
-        fn read_mmu_entry(i: u32) -> u32 {
-            SPI0::regs()
-                .mmu_item_index()
-                .write(|w| unsafe { w.mmu_item_index().bits(i) });
-            SPI0::regs()
-                .mmu_item_content()
-                .read()
-                .mmu_item_content()
-                .bits()
+    fn read_mmu_entry(i: u32) -> u32 {
+        SPI0::regs()
+            .mmu_item_index()
+            .write(|w| unsafe { w.mmu_item_index().bits(i) });
+        SPI0::regs()
+            .mmu_item_content()
+            .read()
+            .mmu_item_content()
+            .bits()
+    }
+
+    fn write_mmu_entry(i: u32, entry: u32) {
+        SPI0::regs()
+            .mmu_item_index()
+            .write(|w| unsafe { w.mmu_item_index().bits(i) });
+        SPI0::regs()
+            .mmu_item_content()
+            .write(|w| unsafe { w.mmu_item_content().bits(entry) });
+    }
+
+    // calculate the PSRAM start address to map
+    // the linker scripts can produce a gap between mapped IROM and DROM segments
+    // bigger than a flash page - i.e. we will see an unmapped memory slot
+    // start from the end and find the last mapped flash page
+    let mut mapped_pages = 0;
+
+    // the bootloader is using the last page to access flash internally
+    // (e.g. to read the app descriptor) so we just skip that
+    for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
+        if (read_mmu_entry(i) & MMU_VALID) != 0 {
+            mapped_pages = i + 1;
+            break;
         }
+    }
+    let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
+    debug!("PSRAM start address = {:x}", start);
 
-        fn write_mmu_entry(i: u32, entry: u32) {
-            SPI0::regs()
-                .mmu_item_index()
-                .write(|w| unsafe { w.mmu_item_index().bits(i) });
-            SPI0::regs()
-                .mmu_item_content()
-                .write(|w| unsafe { w.mmu_item_content().bits(entry) });
-        }
+    for i in 0..config.size.get() as u32 / MMU_PAGE_SIZE {
+        write_mmu_entry(i + mapped_pages, MMU_VALID + MMU_ACCESS_SPIRAM + i)
+    }
 
-        // calculate the PSRAM start address to map
-        // the linker scripts can produce a gap between mapped IROM and DROM segments
-        // bigger than a flash page - i.e. we will see an unmapped memory slot
-        // start from the end and find the last mapped flash page
-        let mut mapped_pages = 0;
-
-        // the bootloader is using the last page to access flash internally
-        // (e.g. to read the app descriptor) so we just skip that
-        for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
-            if (read_mmu_entry(i) & MMU_VALID) != 0 {
-                mapped_pages = i + 1;
-                break;
-            }
-        }
-        let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
-        debug!("PSRAM start address = {:x}", start);
-
-        for i in 0..config.size.get() as u32 / MMU_PAGE_SIZE {
-            write_mmu_entry(i + mapped_pages, MMU_VALID + MMU_ACCESS_SPIRAM + i)
-        }
-
-        // enable busses
-        CACHE::regs().cache_ctrl().modify(|_, w| {
-            w.cache_shut_bus0().clear_bit();
-            w.cache_shut_bus1().clear_bit()
-        });
-
-        start
-    };
+    // enable busses
+    CACHE::regs().cache_ctrl().modify(|_, w| {
+        w.cache_shut_bus0().clear_bit();
+        w.cache_shut_bus1().clear_bit()
+    });
 
     start as usize..start as usize + config.size.get()
 }

@@ -133,62 +133,58 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
         ) -> i32;
     }
 
-    let start = unsafe {
-        const MMU_PAGE_SIZE: u32 = 0x10000;
-        const ICACHE_MMU_SIZE: usize = 0x800;
-        const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
-        const MMU_INVALID: u32 = 1 << 14;
-        const DR_REG_MMU_TABLE: u32 = 0x600C5000;
+    const MMU_PAGE_SIZE: u32 = 0x10000;
+    const ICACHE_MMU_SIZE: usize = 0x800;
+    const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
+    const MMU_INVALID: u32 = 1 << 14;
+    const DR_REG_MMU_TABLE: u32 = 0x600C5000;
 
-        // calculate the PSRAM start address to map
-        // the linker scripts can produce a gap between mapped IROM and DROM segments
-        // bigger than a flash page - i.e. we will see an unmapped memory slot
-        // start from the end and find the last mapped flash page
-        //
-        // More general information about the MMU can be found here:
-        // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
-        let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
-        let mut mapped_pages = 0;
+    // calculate the PSRAM start address to map
+    // the linker scripts can produce a gap between mapped IROM and DROM segments
+    // bigger than a flash page - i.e. we will see an unmapped memory slot
+    // start from the end and find the last mapped flash page
+    //
+    // More general information about the MMU can be found here:
+    // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
+    let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
+    let mut mapped_pages = 0;
 
-        // the bootloader is using the last page to access flash internally
-        // (e.g. to read the app descriptor) so we just skip that
-        for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
-            if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
-                mapped_pages = (i + 1) as u32;
-                break;
-            }
+    // the bootloader is using the last page to access flash internally
+    // (e.g. to read the app descriptor) so we just skip that
+    for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
+        if unsafe { mmu_table_ptr.add(i).read_volatile() } != MMU_INVALID {
+            mapped_pages = (i + 1) as u32;
+            break;
         }
-        let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
-        debug!("PSRAM start address = {:x}", start);
+    }
+    let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
+    debug!("PSRAM start address = {:x}", start);
 
-        // If we need use SPIRAM, we should use data cache.
-        Cache_Suspend_DCache();
+    // If we need use SPIRAM, we should use data cache.
+    unsafe { Cache_Suspend_DCache() };
 
-        let cache_dbus_mmu_set_res = cache_dbus_mmu_set(
+    let cache_dbus_mmu_set_res = unsafe {
+        cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             start,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        );
-
-        EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
-            w.dcache_shut_core0_bus()
-                .clear_bit()
-                .dcache_shut_core1_bus()
-                .clear_bit()
-        });
-
-        Cache_Resume_DCache(0);
-
-        // panic AFTER resuming the cache
-        if cache_dbus_mmu_set_res != 0 {
-            panic!("cache_dbus_mmu_set failed");
-        }
-
-        start
+        )
     };
+
+    EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
+        w.dcache_shut_core0_bus().clear_bit();
+        w.dcache_shut_core1_bus().clear_bit()
+    });
+
+    unsafe { Cache_Resume_DCache(0) };
+
+    // panic AFTER resuming the cache
+    if cache_dbus_mmu_set_res != 0 {
+        panic!("cache_dbus_mmu_set failed");
+    }
 
     start as usize..start as usize + config.size.get()
 }

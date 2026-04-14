@@ -56,27 +56,28 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
         ) -> i32;
     }
 
-    unsafe {
-        const START_PAGE: u32 = 0;
+    const START_PAGE: u32 = 0;
 
-        if cache_dbus_mmu_set(
+    let cache_dbus_mmu_set_res = unsafe {
+        cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             EXTMEM_ORIGIN as u32,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        ) != 0
-        {
-            panic!("cache_dbus_mmu_set failed");
-        }
+        )
+    };
 
-        EXTMEM::regs().pro_dcache_ctrl1().modify(|_, w| {
-            w.pro_dcache_mask_bus0().clear_bit();
-            w.pro_dcache_mask_bus1().clear_bit();
-            w.pro_dcache_mask_bus2().clear_bit()
-        });
+    if cache_dbus_mmu_set_res != 0 {
+        panic!("cache_dbus_mmu_set failed");
     }
+
+    EXTMEM::regs().pro_dcache_ctrl1().modify(|_, w| {
+        w.pro_dcache_mask_bus0().clear_bit();
+        w.pro_dcache_mask_bus1().clear_bit();
+        w.pro_dcache_mask_bus2().clear_bit()
+    });
 
     EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
 }
