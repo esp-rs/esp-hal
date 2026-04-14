@@ -285,6 +285,7 @@ support_status = "partial"
 kind = "pdma"
 supports_mem2mem = true
 can_access_psram = true
+ext_mem_configurable_block_size = true
 
 [device.gpio]
 support_status = "supported"

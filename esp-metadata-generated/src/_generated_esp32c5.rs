@@ -86,6 +86,9 @@ macro_rules! property {
         true
     };
     ("dma.can_access_psram") => {
+        true
+    };
+    ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
