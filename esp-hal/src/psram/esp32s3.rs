@@ -1,7 +1,7 @@
-use super::PsramSize;
-use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
+use core::ops::Range;
 
-const EXTMEM_ORIGIN: u32 = 0x3C000000;
+use super::{EXTMEM_ORIGIN, PsramSize};
+use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
 
 /// PSRAM interface mode
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -81,28 +81,32 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(mut config: PsramConfig) {
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     let success = match config.mode {
         PsramMode::Auto => {
-            let mut success = octal_spi_impl::psram_init(&mut config);
+            let mut success = octal_spi_impl::psram_init(config);
 
             if !success {
-                success = quad_spi_impl::psram_init(&mut config);
+                success = quad_spi_impl::psram_init(config);
             }
 
             success
         }
-        PsramMode::QuadSpi => quad_spi_impl::psram_init(&mut config),
-        PsramMode::OctalSpi => octal_spi_impl::psram_init(&mut config),
+        PsramMode::QuadSpi => quad_spi_impl::psram_init(config),
+        PsramMode::OctalSpi => octal_spi_impl::psram_init(config),
     };
 
     if !success {
         warn!(
             "Failed to configure PSRAM. This may indicate a missing/inoperable PSRAM chip, or an incorrect PSRAM configuration. Check if the PSRAM chip is present and the configuration is correct."
         );
-        return;
     }
 
+    success
+}
+
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 
@@ -129,66 +133,60 @@ pub(crate) fn init_psram(mut config: PsramConfig) {
         ) -> i32;
     }
 
-    let start = unsafe {
-        const MMU_PAGE_SIZE: u32 = 0x10000;
-        const ICACHE_MMU_SIZE: usize = 0x800;
-        const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
-        const MMU_INVALID: u32 = 1 << 14;
-        const DR_REG_MMU_TABLE: u32 = 0x600C5000;
+    const MMU_PAGE_SIZE: u32 = 0x10000;
+    const ICACHE_MMU_SIZE: usize = 0x800;
+    const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
+    const MMU_INVALID: u32 = 1 << 14;
+    const DR_REG_MMU_TABLE: u32 = 0x600C5000;
 
-        // calculate the PSRAM start address to map
-        // the linker scripts can produce a gap between mapped IROM and DROM segments
-        // bigger than a flash page - i.e. we will see an unmapped memory slot
-        // start from the end and find the last mapped flash page
-        //
-        // More general information about the MMU can be found here:
-        // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
-        let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
-        let mut mapped_pages = 0;
+    // calculate the PSRAM start address to map
+    // the linker scripts can produce a gap between mapped IROM and DROM segments
+    // bigger than a flash page - i.e. we will see an unmapped memory slot
+    // start from the end and find the last mapped flash page
+    //
+    // More general information about the MMU can be found here:
+    // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
+    let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
+    let mut mapped_pages = 0;
 
-        // the bootloader is using the last page to access flash internally
-        // (e.g. to read the app descriptor) so we just skip that
-        for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
-            if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
-                mapped_pages = (i + 1) as u32;
-                break;
-            }
+    // the bootloader is using the last page to access flash internally
+    // (e.g. to read the app descriptor) so we just skip that
+    for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
+        if unsafe { mmu_table_ptr.add(i).read_volatile() } != MMU_INVALID {
+            mapped_pages = (i + 1) as u32;
+            break;
         }
-        let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
-        debug!("PSRAM start address = {:x}", start);
+    }
+    let start = EXTMEM_ORIGIN as u32 + (MMU_PAGE_SIZE * mapped_pages);
+    debug!("PSRAM start address = {:x}", start);
 
-        // If we need use SPIRAM, we should use data cache.
-        Cache_Suspend_DCache();
+    // If we need use SPIRAM, we should use data cache.
+    unsafe { Cache_Suspend_DCache() };
 
-        let cache_dbus_mmu_set_res = cache_dbus_mmu_set(
+    let cache_dbus_mmu_set_res = unsafe {
+        cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             start,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        );
-
-        EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
-            w.dcache_shut_core0_bus()
-                .clear_bit()
-                .dcache_shut_core1_bus()
-                .clear_bit()
-        });
-
-        Cache_Resume_DCache(0);
-
-        // panic AFTER resuming the cache
-        if cache_dbus_mmu_set_res != 0 {
-            panic!("cache_dbus_mmu_set failed");
-        }
-
-        start
+        )
     };
 
-    unsafe {
-        super::set_psram_range(start as usize..start as usize + config.size.get());
+    EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
+        w.dcache_shut_core0_bus().clear_bit();
+        w.dcache_shut_core1_bus().clear_bit()
+    });
+
+    unsafe { Cache_Resume_DCache(0) };
+
+    // panic AFTER resuming the cache
+    if cache_dbus_mmu_set_res != 0 {
+        panic!("cache_dbus_mmu_set failed");
     }
+
+    start as usize..start as usize + config.size.get()
 }
 
 pub(crate) mod quad_spi_impl {

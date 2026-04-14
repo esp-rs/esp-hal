@@ -403,6 +403,7 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.psram]
+extmem_origin = 0x42000000
 
 [device.spi_master]
 support_status = "supported"

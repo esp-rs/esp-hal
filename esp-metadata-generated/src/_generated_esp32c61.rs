@@ -184,6 +184,12 @@ macro_rules! property {
     ("psram.octal_spi") => {
         false
     };
+    ("psram.extmem_origin") => {
+        1107296256
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1107296256)
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };

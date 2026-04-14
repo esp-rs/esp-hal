@@ -1,7 +1,7 @@
-use super::PsramSize;
-use crate::peripherals::{EXTMEM, SPI0, SPI1};
+use core::ops::Range;
 
-const EXTMEM_ORIGIN: usize = 0x3f500000;
+use super::{EXTMEM_ORIGIN, PsramSize};
+use crate::peripherals::{EXTMEM, SPI0, SPI1};
 
 // Cache Speed
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Default)]
@@ -28,10 +28,13 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
-pub(crate) fn init_psram(config: PsramConfig) {
-    let mut config = config;
-    utils::psram_init(&mut config);
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    utils::psram_init(config);
+    true
+}
 
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
     unsafe extern "C" {
@@ -53,31 +56,30 @@ pub(crate) fn init_psram(config: PsramConfig) {
         ) -> i32;
     }
 
-    unsafe {
-        const START_PAGE: u32 = 0;
+    const START_PAGE: u32 = 0;
 
-        if cache_dbus_mmu_set(
+    let cache_dbus_mmu_set_res = unsafe {
+        cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             EXTMEM_ORIGIN as u32,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        ) != 0
-        {
-            panic!("cache_dbus_mmu_set failed");
-        }
+        )
+    };
 
-        EXTMEM::regs().pro_dcache_ctrl1().modify(|_, w| {
-            w.pro_dcache_mask_bus0().clear_bit();
-            w.pro_dcache_mask_bus1().clear_bit();
-            w.pro_dcache_mask_bus2().clear_bit()
-        });
+    if cache_dbus_mmu_set_res != 0 {
+        panic!("cache_dbus_mmu_set failed");
     }
 
-    unsafe {
-        super::set_psram_range(EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get());
-    }
+    EXTMEM::regs().pro_dcache_ctrl1().modify(|_, w| {
+        w.pro_dcache_mask_bus0().clear_bit();
+        w.pro_dcache_mask_bus1().clear_bit();
+        w.pro_dcache_mask_bus2().clear_bit()
+    });
+
+    EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
 }
 
 pub(crate) mod utils {

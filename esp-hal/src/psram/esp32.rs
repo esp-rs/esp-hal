@@ -1,6 +1,6 @@
-use super::PsramSize;
+use core::ops::Range;
 
-const EXTMEM_ORIGIN: usize = 0x3F800000;
+use super::{EXTMEM_ORIGIN, PsramSize};
 
 /// Cache Speed
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
@@ -48,12 +48,15 @@ pub struct PsramConfig {
     pub psram_vaddr_mode: PsramVaddrMode,
 }
 
-/// Initializes the PSRAM memory on supported devices.
-pub(crate) fn init_psram(config: PsramConfig) {
-    let mut config = config;
+/// Initialize PSRAM to be used for data.
+#[procmacros::ram]
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    utils::psram_init(config);
+    true
+}
 
-    utils::psram_init(&config);
-
+#[procmacros::ram]
+pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
     if config.size.is_auto() {
         const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
 
@@ -84,13 +87,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
 
         info!("Assuming {} bytes of PSRAM", guessed_size);
         config.size = PsramSize::Size(guessed_size);
-    } else {
-        utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
     }
 
-    unsafe {
-        super::set_psram_range(EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get());
-    }
+    utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
+
+    EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
 }
 
 pub(crate) mod utils {
