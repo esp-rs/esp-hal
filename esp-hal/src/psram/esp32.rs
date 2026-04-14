@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use super::{EXTMEM_ORIGIN, PsramSize};
 
 /// Cache Speed
@@ -54,7 +56,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 }
 
 #[procmacros::ram]
-pub(crate) fn map_psram(mut config: PsramConfig) {
+pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
     if config.size.is_auto() {
         const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
 
@@ -89,9 +91,7 @@ pub(crate) fn map_psram(mut config: PsramConfig) {
         utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
     }
 
-    unsafe {
-        super::set_psram_range(EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get());
-    }
+    EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
 }
 
 pub(crate) mod utils {

@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     peripherals::{CACHE, SPI0, SPI1},
@@ -134,7 +136,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 }
 
 #[procmacros::ram]
-pub(crate) fn map_psram(config: PsramConfig) {
+pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 9;
 
     let start = {
@@ -192,9 +194,7 @@ pub(crate) fn map_psram(config: PsramConfig) {
         start
     };
 
-    unsafe {
-        super::set_psram_range(start as usize..start as usize + config.size.get());
-    }
+    start as usize..start as usize + config.size.get()
 }
 
 fn core_clock_for_mode(_speed_mode: MspiTimingSpeedMode) -> u32 {

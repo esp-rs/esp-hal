@@ -109,7 +109,9 @@ impl Psram {
     /// Initializes PSRAM.
     pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
         if init_psram(&mut config) {
-            map_psram(config);
+            let range = map_psram(config);
+
+            unsafe { set_psram_range(range) };
         }
         Self { _peri: peri }
     }

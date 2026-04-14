@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
 
@@ -104,7 +106,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 }
 
 #[procmacros::ram]
-pub(crate) fn map_psram(config: PsramConfig) {
+pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 
@@ -188,9 +190,7 @@ pub(crate) fn map_psram(config: PsramConfig) {
         start
     };
 
-    unsafe {
-        super::set_psram_range(start as usize..start as usize + config.size.get());
-    }
+    start as usize..start as usize + config.size.get()
 }
 
 pub(crate) mod quad_spi_impl {
