@@ -69,7 +69,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DS                        |       |          | ❌       | [❌][5159] [^1] | ❌       |           | ❌       | ❌       | ❌       |
-| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
+| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ✔️      | ✔️      |
@@ -96,7 +96,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | [❌][5162] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      |
 | SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      |           |          |          |          |
-| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
+| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
