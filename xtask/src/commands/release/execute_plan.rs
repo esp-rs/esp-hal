@@ -248,7 +248,12 @@ fn open_pull_request(
     let packages_to_release = release_plan
         .packages
         .iter()
-        .map(|step| format!("- {}: {}", step.package, step.new_version))
+        .map(|step| {
+            format!(
+                "- {}: {} → {}",
+                step.package, step.current_version, step.new_version
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
