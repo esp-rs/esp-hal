@@ -132,7 +132,8 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(!args.no_dry_run, "release-branch", &commit_message(&plan))?;
+    let branch_name = format!("release-branch-{}", plan.slug);
+    let branch = make_git_changes(!args.no_dry_run, &branch_name, &commit_message(&plan))?;
 
     open_pull_request(
         &branch,
@@ -158,28 +159,25 @@ pub(crate) struct Branch {
 }
 
 pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -> Result<Branch> {
-    // Find an available branch name
-    let branch_name = format!(
-        "{branch_name}-{}",
-        jiff::Timestamp::now().strftime("%Y-%m-%d"),
-    );
-
+    let branch_name = branch_name.to_string();
     let upstream = get_remote_name_for("esp-rs/esp-hal")?;
 
-    // Switch to the new branch
+    // `git switch -C` creates the branch, or resets it to HEAD if it already
+    // exists — carrying our uncommitted version-bump edits along. This is
+    // what makes re-running `execute-plan` idempotent: the branch simply
+    // snaps back to a single fresh commit off the base.
     if dry_run {
-        println!("Dry run: would create a new branch: {branch_name}");
+        println!("Dry run: would switch to branch: {branch_name}");
     } else {
-        // Create a new branch
         let status = Command::new("git")
             .arg("switch")
-            .arg("-c")
+            .arg("-C")
             .arg(&branch_name)
             .status()
-            .context("Failed to create new branch")?;
+            .context("Failed to switch to release branch")?;
 
         if !status.success() {
-            bail!("Failed to create new branch: {branch_name}");
+            bail!("Failed to switch to release branch: {branch_name}");
         }
     }
 
@@ -200,18 +198,28 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
             .context("Failed to commit changes")?;
     }
 
-    // Push the branch
+    // Push the branch. If the remote branch already exists (e.g. this is a
+    // re-run), use --force-with-lease so we overwrite our own prior push but
+    // bail if someone else pushed in the meantime.
     let url = if dry_run {
         println!("Dry run: would push branch: {branch_name}");
         String::from("https://github.com/esp-rs/esp-hal/")
     } else {
-        // git push origin <branch_name>
-        let message = Command::new("git")
-            .arg("push")
+        let remote_exists = Command::new("git")
+            .args(["ls-remote", "--exit-code", "--heads"])
             .arg(&upstream)
             .arg(&branch_name)
-            .output()
-            .context("Failed to push branch")?;
+            .status()
+            .context("Failed to query remote branches")?
+            .success();
+
+        let mut push = Command::new("git");
+        push.arg("push").arg(&upstream).arg(&branch_name);
+        if remote_exists {
+            log::info!("Remote branch {branch_name} already exists — force-pushing with lease");
+            push.arg("--force-with-lease");
+        }
+        let message = push.output().context("Failed to push branch")?;
 
         if !message.status.success() {
             bail!(

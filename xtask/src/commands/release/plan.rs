@@ -50,8 +50,37 @@ pub struct PackagePlan {
 pub struct Plan {
     /// The branch the release is made from.
     pub base: String,
+    /// Short random slug that pins this plan to its release branch
+    /// (`release-branch-<slug>`). Generated once when the plan is created and
+    /// preserved across re-plans so re-runs of `execute-plan` target the same
+    /// branch and PR.
+    pub slug: String,
     /// The packages to be released, in order.
     pub packages: Vec<PackagePlan>,
+}
+
+/// Generate a short base36 slug. Not cryptographically random — we only need
+/// uniqueness across release attempts, and the slug is persisted in the plan
+/// file so it survives re-runs.
+fn generate_slug() -> String {
+    let mut n = jiff::Timestamp::now().as_nanosecond() as u128;
+    const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut slug = String::new();
+    for _ in 0..6 {
+        slug.push(CHARS[(n % 36) as usize] as char);
+        n /= 36;
+    }
+    slug
+}
+
+/// Read the slug from an existing plan file, tolerating the leading JSONC
+/// comment header that the freshly-generated plan carries until the user
+/// finalizes it.
+fn read_existing_slug(plan_path: &Path) -> Option<String> {
+    let source = std::fs::read_to_string(plan_path).ok()?;
+    let json_start = source.find('{')?;
+    let value: serde_json::Value = serde_json::from_str(&source[json_start..]).ok()?;
+    value.get("slug")?.as_str().map(str::to_string)
 }
 
 impl Plan {
@@ -175,8 +204,16 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Generate plan file. The plan should include, as an ordered list, the packages
     // and their version increment.
 
+    let plan_path = workspace.join("release_plan.jsonc");
+    let plan_path = crate::windows_safe_path(&plan_path);
+
+    // Preserve the slug from an existing plan file so that re-running `plan`
+    // after tweaks keeps targeting the same release branch.
+    let slug = read_existing_slug(&plan_path).unwrap_or_else(generate_slug);
+
     let plan = Plan {
         base: current_branch,
+        slug,
         packages: update_amounts
             .into_iter()
             .filter_map(|(package, bump)| {
@@ -229,8 +266,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             .collect(),
     };
 
-    let plan_path = workspace.join("release_plan.jsonc");
-    let plan_path = crate::windows_safe_path(&plan_path);
     log::debug!("Writing release plan to {}", plan_path.display());
 
     let plan_header = String::from(
