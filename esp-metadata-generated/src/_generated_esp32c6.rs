@@ -400,6 +400,9 @@ macro_rules! property {
     ("wifi.has_5g") => {
         false
     };
+    ("wifi.csi_supported") => {
+        true
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

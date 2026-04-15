@@ -742,6 +742,8 @@ driver_configs![
             mac_version: u32,
             #[serde(default)]
             has_5g: bool,
+            #[serde(default)]
+            csi_supported: bool,
         }
     },
 ];

@@ -456,6 +456,7 @@ instances = [
 support_status = "partial"
 has_wifi6 = true
 mac_version = 3
+csi_supported = true
 
 [device.bt]
 support_status = "partial"

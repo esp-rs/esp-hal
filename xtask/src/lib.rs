@@ -256,7 +256,10 @@ impl Package {
                 possible_symbols.contains_key(symbol),
                 "Unknown chip symbol: {symbol}",
             );
-            config.all().iter().any(|sym| sym == symbol)
+            config
+                .all()
+                .iter()
+                .any(|sym| sym.replace('.', "_") == symbol)
         });
         eval_context.add_variable("chip", config.name());
 

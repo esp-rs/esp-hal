@@ -772,6 +772,7 @@ version = 1
 support_status = "partial"
 has_wifi6 = true
 mac_version = 2
+csi_supported = true
 
 [device.bt]
 support_status = "partial"

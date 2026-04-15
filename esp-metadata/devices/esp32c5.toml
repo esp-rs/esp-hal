@@ -658,6 +658,7 @@ apb_cycle_wait_num = 16 # TODO
 [device.wifi]
 mac_version = 3
 has_5g = true
+csi_supported = true
 
 [device.bt]
 support_status = "partial"
@@ -677,6 +678,7 @@ combo_module = true
 [device.parl_io]
 support_status = "partial"
 version = 2
+
 # TODO: model chip select signal (active low)
 
 [device.ledc]

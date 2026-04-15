@@ -90,7 +90,7 @@ use crate::{
 pub mod ap;
 
 unstable_module!(
-    #[cfg(feature = "csi")]
+    #[cfg(all(feature = "csi", wifi_csi_supported))]
     #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
     pub mod csi;
     pub mod event;
