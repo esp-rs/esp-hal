@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial ESP32-C5 support (#4859, #4866)
-- Made `Backtrace` and `BacktraceFrame` implement `Clone` (#5089)
-- Initial ESP32-C61 support (#5187)
 
 ### Changed
 
@@ -21,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.19.0] - 2026-04-15
+
+### Added
+
+- Initial ESP32-C5 support (#4859, #4866)
+- Made `Backtrace` and `BacktraceFrame` implement `Clone` (#5089)
+- Initial ESP32-C61 support (#5187)
 
 ## [v0.18.1] - 2025-10-30
 
@@ -115,4 +120,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...esp-backtrace-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...esp-backtrace-v0.18.0
 [v0.18.1]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...esp-backtrace-v0.18.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.1...HEAD
+[v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.1...esp-backtrace-v0.19.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.19.0...HEAD

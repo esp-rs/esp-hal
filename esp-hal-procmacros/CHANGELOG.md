@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.22.0] - 2026-04-15
+
+### Added
+
 - `doc_replace` can now replace `__placeholders__` in-line (#5119)
 
 ### Changed
@@ -21,10 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed the logic for determining which sections should be loaded in `load_lp_code!` macro (#4612)
-
-
-### Removed
-
 
 ## [v0.21.0] - 2025-10-30
 
@@ -129,4 +139,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...esp-hal-procmacros-v0.19.0
 [v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...esp-hal-procmacros-v0.20.0
 [v0.21.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...esp-hal-procmacros-v0.21.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...HEAD
+[v0.22.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...esp-hal-procmacros-v0.22.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.22.0...HEAD

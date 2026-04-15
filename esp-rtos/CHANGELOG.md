@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.3.0] - 2026-04-15
+
+### Added
+
 - Provide implementation for the `_getreent` syscall when the `alloc` feature is enabled (#4473)
 - Provide implementation for the `_malloc_r` and `_free_r` syscalls when the `alloc` feature is enabled (#4484)
 - Support for ESP32-C5 (#4884)
@@ -70,4 +84,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-rtos-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.0...esp-rtos-v0.1.1
 [v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.1...esp-rtos-v0.2.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.2.0...HEAD
+[v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.2.0...esp-rtos-v0.3.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.3.0...HEAD

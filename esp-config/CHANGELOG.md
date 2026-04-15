@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.7.0] - 2026-04-15
+
 ## [v0.6.1] - 2025-10-30
 
 ## [v0.6.0] - 2025-10-13
@@ -77,4 +79,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.5.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.4.0...esp-config-v0.5.0
 [v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.5.0...esp-config-v0.6.0
 [v0.6.1]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.6.0...esp-config-v0.6.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.6.1...HEAD
+[v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.6.1...esp-config-v0.7.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.7.0...HEAD
