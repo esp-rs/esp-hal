@@ -132,11 +132,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(
-        !args.no_dry_run,
-        "release-branch",
-        "Finalize crate releases",
-    )?;
+    let branch = make_git_changes(!args.no_dry_run, "release-branch", &commit_message(&plan))?;
 
     open_pull_request(
         &branch,
@@ -234,6 +230,33 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
         name: branch_name,
         upstream: url,
     })
+}
+
+fn commit_message(plan: &Plan) -> String {
+    let subject = match plan.packages.len() {
+        1 => {
+            let step = &plan.packages[0];
+            format!(
+                "Release {}: {} → {}",
+                step.package, step.current_version, step.new_version
+            )
+        }
+        n => format!("Release {n} packages"),
+    };
+
+    let body = plan
+        .packages
+        .iter()
+        .map(|step| {
+            format!(
+                "- {}: {} → {}",
+                step.package, step.current_version, step.new_version
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!("{subject}\n\n{body}\n")
 }
 
 fn open_pull_request(
