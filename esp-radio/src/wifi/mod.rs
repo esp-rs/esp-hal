@@ -2280,8 +2280,6 @@ pub fn new<'d>(
     let mut controller = WifiController {
         _guard,
         _phantom: Default::default(),
-        beacon_timeout: 6,
-        ap_beacon_timeout: 100,
     };
 
     controller.set_country_info(&config.country_info)?;
@@ -2321,9 +2319,6 @@ pub fn new<'d>(
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,
-    // Things we have to remember due to how esp-wifi works:
-    beacon_timeout: u16,
-    ap_beacon_timeout: u16,
 }
 
 impl Drop for WifiController<'_> {
@@ -3067,8 +3062,6 @@ ignored."
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
-        self.ap_beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             ap: wifi_ap_config_t {
                 ssid: [0; 32],
@@ -3112,8 +3105,6 @@ ignored."
     }
 
     fn apply_sta_config(&mut self, config: &StationConfig) -> Result<(), WifiError> {
-        self.beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
@@ -3159,8 +3150,6 @@ ignored."
 
     #[cfg(feature = "wifi-eap")]
     fn apply_sta_eap_config(&mut self, config: &EapStationConfig) -> Result<(), WifiError> {
-        self.beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
