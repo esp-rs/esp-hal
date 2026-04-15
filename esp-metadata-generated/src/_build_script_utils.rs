@@ -1938,6 +1938,7 @@ impl Chip {
                     "uhci_combined_uart_selector_field",
                     "wifi_mac_version=\"3\"",
                     "wifi_has_5g",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c5",
@@ -2185,6 +2186,7 @@ impl Chip {
                     "cargo:rustc-cfg=uhci_combined_uart_selector_field",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
                     "cargo:rustc-cfg=wifi_has_5g",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[

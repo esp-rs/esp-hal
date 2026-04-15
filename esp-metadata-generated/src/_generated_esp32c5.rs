@@ -410,7 +410,7 @@ macro_rules! property {
         true
     };
     ("wifi.csi_supported") => {
-        false
+        true
     };
 }
 #[macro_export]
