@@ -898,6 +898,7 @@ extmem_origin = 0x3F800000
 ## Radio
 [device.wifi]
 mac_version = 1
+csi_supported = true
 
 [device.bt]
 support_status = "partial"

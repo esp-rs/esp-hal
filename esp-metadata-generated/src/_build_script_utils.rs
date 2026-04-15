@@ -387,6 +387,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32",
@@ -585,6 +586,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -1374,6 +1376,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c3",
@@ -1577,6 +1580,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -2561,6 +2565,7 @@ impl Chip {
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"2\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c6",
@@ -2835,6 +2840,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"2\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -3158,6 +3164,7 @@ impl Chip {
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"3\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c61",
@@ -3335,6 +3342,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -4273,6 +4281,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s2",
@@ -4485,6 +4494,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -4928,6 +4938,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s3",
@@ -5177,6 +5188,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -5609,6 +5621,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(spi_slave_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_timer1)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(wifi_csi_supported)");
     println!("cargo:rustc-check-cfg=cfg(esp32c2)");
     println!("cargo:rustc-check-cfg=cfg(riscv)");
     println!("cargo:rustc-check-cfg=cfg(single_core)");

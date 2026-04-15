@@ -677,6 +677,8 @@ combo_module = true
 [device.parl_io]
 support_status = "partial"
 version = 2
+csi_supported = true
+
 # TODO: model chip select signal (active low)
 
 [device.ledc]

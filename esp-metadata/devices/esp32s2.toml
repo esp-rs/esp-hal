@@ -691,5 +691,6 @@ extmem_origin = 0x3f500000
 ## Radio
 [device.wifi]
 mac_version = 1
+csi_supported = true
 
 [device.phy]

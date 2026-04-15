@@ -304,7 +304,7 @@ fn cargo_doc_without_pre_processing(
 
 /// Pre-process the Cargo.toml file
 ///
-/// This will keep the orignal as "Cargo.toml_original"
+/// This will keep the original as "Cargo.toml_original"
 ///
 /// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
 /// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.

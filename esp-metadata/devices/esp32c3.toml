@@ -549,6 +549,7 @@ deep_sleep = true
 ## Radio
 [device.wifi]
 mac_version = 1
+csi_supported = true
 
 [device.bt]
 support_status = "partial"
