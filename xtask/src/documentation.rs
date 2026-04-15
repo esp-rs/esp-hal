@@ -342,7 +342,10 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {
         if let Some(chip_cfg) = chip_cfg {
-            chip_cfg.all().iter().any(|symbol| cond == symbol)
+            chip_cfg
+                .all()
+                .iter()
+                .any(|symbol| cond == symbol.replace('.', "_"))
         } else {
             false
         }

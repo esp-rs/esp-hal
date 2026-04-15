@@ -253,10 +253,13 @@ impl Package {
         let possible_symbols = Chip::list_of_possible_symbols();
         eval_context.add_function("chip_has", move |symbol: &str| {
             assert!(
-                possible_symbols.contains_key(&symbol.replace('.', "_")),
+                possible_symbols.contains_key(symbol),
                 "Unknown chip symbol: {symbol}",
             );
-            config.all().iter().any(|sym| sym == symbol)
+            config
+                .all()
+                .iter()
+                .any(|sym| sym.replace('.', "_") == symbol)
         });
         eval_context.add_variable("chip", config.name());
 
