@@ -199,8 +199,9 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     }
 
     // Push the branch. If the remote branch already exists (e.g. this is a
-    // re-run), use --force-with-lease so we overwrite our own prior push but
-    // bail if someone else pushed in the meantime.
+    // re-run), fetch it first so the remote-tracking ref is current, then use
+    // --force-with-lease so we overwrite our own prior push but bail if
+    // someone else pushed in the meantime.
     let url = if dry_run {
         println!("Dry run: would push branch: {branch_name}");
         String::from("https://github.com/esp-rs/esp-hal/")
@@ -213,10 +214,23 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
             .context("Failed to query remote branches")?
             .success();
 
+        if remote_exists {
+            log::info!("Remote branch {branch_name} already exists — fetching before force-push");
+            let fetch_status = Command::new("git")
+                .arg("fetch")
+                .arg(&upstream)
+                .arg(&branch_name)
+                .status()
+                .context("Failed to fetch existing release branch before force-push")?;
+            if !fetch_status.success() {
+                bail!("Failed to fetch existing release branch {branch_name} from {upstream}");
+            }
+        }
+
         let mut push = Command::new("git");
         push.arg("push").arg(&upstream).arg(&branch_name);
         if remote_exists {
-            log::info!("Remote branch {branch_name} already exists — force-pushing with lease");
+            log::info!("Force-pushing {branch_name} with lease");
             push.arg("--force-with-lease");
         }
         let message = push.output().context("Failed to push branch")?;
@@ -240,8 +254,8 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     })
 }
 
-fn commit_message(plan: &Plan) -> String {
-    let subject = match plan.packages.len() {
+fn release_subject(plan: &Plan) -> String {
+    match plan.packages.len() {
         1 => {
             let step = &plan.packages[0];
             format!(
@@ -250,10 +264,11 @@ fn commit_message(plan: &Plan) -> String {
             )
         }
         n => format!("Release {n} packages"),
-    };
+    }
+}
 
-    let body = plan
-        .packages
+fn format_package_list(plan: &Plan) -> String {
+    plan.packages
         .iter()
         .map(|step| {
             format!(
@@ -262,27 +277,20 @@ fn commit_message(plan: &Plan) -> String {
             )
         })
         .collect::<Vec<_>>()
-        .join("\n");
+        .join("\n")
+}
 
+fn commit_message(plan: &Plan) -> String {
+    let subject = release_subject(plan);
+    let body = format_package_list(plan);
     format!("{subject}\n\n{body}\n")
 }
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
-const PR_TITLE: &str = "Prepare release";
-const PR_LABELS: &str = "release-pr,skip-changelog";
+const PR_LABELS: &[&str] = &["release-pr", "skip-changelog"];
 
 fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
-    let packages = plan
-        .packages
-        .iter()
-        .map(|step| {
-            format!(
-                "- {}: {} → {}",
-                step.package, step.current_version, step.new_version
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let packages = format_package_list(plan);
 
     let mut body = format!(
         r#"This pull request prepares the following packages for release:
@@ -435,17 +443,19 @@ fn find_existing_pr(branch_name: &str) -> Result<Option<u64>> {
 }
 
 fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
+    let title = release_subject(plan);
     if let Some(num) = find_existing_pr(&branch.name)? {
         log::info!("Updating existing release PR #{num}");
+        let num_str = num.to_string();
         gh_stdin(
             &[
                 "pr",
                 "edit",
-                &num.to_string(),
+                &num_str,
                 "--repo",
                 UPSTREAM_REPO,
                 "--title",
-                PR_TITLE,
+                &title,
                 "--body-file",
                 "-",
             ],
@@ -455,27 +465,32 @@ fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> 
     } else {
         let head = head_spec(&branch.upstream, &branch.name)?;
         log::info!("Creating release PR (head: {head}, base: {})", plan.base);
-        let stdout = gh_stdin(
-            &[
-                "pr",
-                "create",
-                "--repo",
-                UPSTREAM_REPO,
-                "--base",
-                &plan.base,
-                "--head",
-                &head,
-                "--title",
-                PR_TITLE,
-                "--label",
-                PR_LABELS,
-                "--body-file",
-                "-",
-            ],
-            body,
-        )?;
-        // `gh pr create` prints the PR URL on stdout.
-        let url = stdout.trim();
+        let mut args: Vec<&str> = vec![
+            "pr",
+            "create",
+            "--repo",
+            UPSTREAM_REPO,
+            "--base",
+            &plan.base,
+            "--head",
+            &head,
+            "--title",
+            &title,
+        ];
+        for l in PR_LABELS {
+            args.push("--label");
+            args.push(l);
+        }
+        args.push("--body-file");
+        args.push("-");
+        let stdout = gh_stdin(&args, body)?;
+        // `gh pr create` prints the PR URL as the last line of stdout.
+        let url = stdout
+            .lines()
+            .rev()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("");
         let num = url
             .rsplit('/')
             .next()

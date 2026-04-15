@@ -73,14 +73,17 @@ fn generate_slug() -> String {
     slug
 }
 
-/// Read the slug from an existing plan file, tolerating the leading JSONC
-/// comment header that the freshly-generated plan carries until the user
-/// finalizes it.
-fn read_existing_slug(plan_path: &Path) -> Option<String> {
-    let source = std::fs::read_to_string(plan_path).ok()?;
-    let json_start = source.find('{')?;
-    let value: serde_json::Value = serde_json::from_str(&source[json_start..]).ok()?;
-    value.get("slug")?.as_str().map(str::to_string)
+/// Read the slug from an existing (finalized) plan file, so that re-running
+/// `plan` preserves the release branch name. Returns `Ok(None)` when no plan
+/// file exists yet. Bails with the same error as `Plan::from_path` if the
+/// file is present but still carries its JSONC comment header — the user is
+/// expected to finalize the plan before re-running.
+fn read_existing_slug(plan_path: &Path) -> Result<Option<String>> {
+    if !plan_path.exists() {
+        return Ok(None);
+    }
+    let plan = Plan::from_path(plan_path)?;
+    Ok(Some(plan.slug))
 }
 
 impl Plan {
@@ -209,7 +212,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 
     // Preserve the slug from an existing plan file so that re-running `plan`
     // after tweaks keeps targeting the same release branch.
-    let slug = read_existing_slug(&plan_path).unwrap_or_else(generate_slug);
+    let slug = read_existing_slug(&plan_path)?.unwrap_or_else(generate_slug);
 
     let plan = Plan {
         base: current_branch,
