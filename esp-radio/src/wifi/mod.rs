@@ -1236,19 +1236,12 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            let can_send = match self {
-                InterfaceType::Station => {
-                    matches!(station_state(), WifiStationState::Connected)
-                }
-                InterfaceType::AccessPoint => {
-                    matches!(access_point_state(), WifiAccessPointState::Started)
-                }
-            };
-
-            can_send.then_some(WifiTxToken { mode: *self })
-        } else {
-            None
+            if self.link_state() == embassy_net_driver::LinkState::Up {
+                return Some(WifiTxToken { mode: *self });
+            }
         }
+
+        None
     }
 
     fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
