@@ -267,16 +267,12 @@ fn commit_message(plan: &Plan) -> String {
     format!("{subject}\n\n{body}\n")
 }
 
-fn open_pull_request(
-    branch: &Branch,
-    dry_run: bool,
-    manual_pull_request: bool,
-    release_plan_str: &str,
-    release_plan: &Plan,
-) -> Result<()> {
-    // Open a pull request
+const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
+const PR_TITLE: &str = "Prepare release";
+const PR_LABELS: &str = "release-pr,skip-changelog";
 
-    let packages_to_release = release_plan
+fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
+    let packages = plan
         .packages
         .iter()
         .map(|step| {
@@ -291,74 +287,216 @@ fn open_pull_request(
     let mut body = format!(
         r#"This pull request prepares the following packages for release:
 
-{packages_to_release}
+{packages}
 
-The release plan used for this release:
+<details>
+<summary>Release plan (click to expand)</summary>
 
-```json
+<pre>
 {release_plan_str}
-```
+</pre>
+</details>
 
-Please review the changes and merge them into the `{base_branch}` branch.
+Please review the changes and merge them into the `{base}` branch.
 
 After merging, please make sure you have this release plan in the repo root,
-then run the following command on the `{base_branch}` branch to tag and publish the packages:
+then run the following command on the `{base}` branch to tag and publish the packages:
 
 ```
 cargo xrelease publish-plan --no-dry-run
 ```
 "#,
-        base_branch = release_plan.base,
+        base = plan.base,
     );
 
-    if release_plan.base != "main" {
+    if plan.base != "main" {
         body = format!(
-            "⚠️ This pull request was branched off from `{current_branch}`. ⚠️\n\n{body}",
-            current_branch = release_plan.base
+            "⚠️ This pull request was branched off from `{}`. ⚠️\n\n{body}",
+            plan.base
         );
     }
 
-    // TODO: don't forget to update the PR text once we have the `publish` command
-    // updated.
+    body
+}
 
-    let pr_url_base = comparison_url(&release_plan.base, &branch.upstream, &branch.name)?;
-
-    // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
-    let mut open_pr_url = format!(
-        "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}&body={body}",
-        body = urlencoding::encode(&body),
-        labels = "release-pr,skip-changelog",
-    );
-
-    // https://stackoverflow.com/a/64565317
-    if manual_pull_request || open_pr_url.len() > 8201 {
-        println!();
-        println!("PR description begins here.");
-        println!();
-        eprintln!("{body}");
-        println!();
-
-        println!("The PR description is too long to be included in the URL.");
-        println!("Please copy the above text as the PR description.");
-        println!();
-
-        open_pr_url = format!(
-            "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}",
-            labels = "release-pr,skip-changelog",
-        );
-    }
+fn open_pull_request(
+    branch: &Branch,
+    dry_run: bool,
+    manual_pull_request: bool,
+    release_plan_str: &str,
+    release_plan: &Plan,
+) -> Result<()> {
+    let body = build_pr_body(release_plan, release_plan_str);
 
     if dry_run {
-        println!("Dry run: would open the following URL to create a pull request:");
-        println!("{open_pr_url}");
-    } else {
-        if opener::open(&open_pr_url).is_err() {
-            println!("Open the following URL to create a pull request:");
-            println!("{open_pr_url}");
-        }
+        println!("Dry run: would create/update the release PR with body:");
+        println!("----");
+        println!("{body}");
+        println!("----");
+        return Ok(());
     }
 
-    println!("Create the release PR and follow the next steps laid out there.");
+    if manual_pull_request || !gh_available() {
+        if !manual_pull_request {
+            log::warn!("`gh` CLI not available — falling back to manual PR instructions");
+        }
+        return print_manual_instructions(branch, release_plan, &body);
+    }
+
+    let pr_number = upsert_pull_request(branch, release_plan, &body)?;
+
+    println!(
+        "Release PR ready: https://github.com/{UPSTREAM_REPO}/pull/{pr_number} — review and merge to continue."
+    );
+    Ok(())
+}
+
+fn gh_available() -> bool {
+    Command::new("gh")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn head_spec(upstream_url: &str, branch_name: &str) -> Result<String> {
+    if upstream_url.starts_with("https://github.com/esp-rs/") || upstream_url.is_empty() {
+        Ok(branch_name.to_string())
+    } else {
+        let user = upstream_url
+            .split('/')
+            .nth(3)
+            .with_context(|| format!("Failed to extract user from URL: {upstream_url}"))?;
+        Ok(format!("{user}:{branch_name}"))
+    }
+}
+
+fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+    use std::io::Write;
+
+    let mut child = Command::new("gh")
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to spawn `gh {}`", args.join(" ")))?;
+
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin piped")
+        .write_all(stdin_data.as_bytes())
+        .context("Failed to write stdin to gh")?;
+
+    let out = child
+        .wait_with_output()
+        .with_context(|| format!("`gh {}` failed", args.join(" ")))?;
+    if !out.status.success() {
+        bail!(
+            "`gh {}` failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+fn find_existing_pr(branch_name: &str) -> Result<Option<u64>> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "list",
+            "--state",
+            "open",
+            "--repo",
+            UPSTREAM_REPO,
+            "--head",
+        ])
+        .arg(branch_name)
+        .args(["--json", "number"])
+        .output()
+        .context("`gh pr list` failed")?;
+    if !output.status.success() {
+        bail!(
+            "`gh pr list` failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let value: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse `gh pr list` output")?;
+    Ok(value
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.get("number"))
+        .and_then(|n| n.as_u64()))
+}
+
+fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
+    if let Some(num) = find_existing_pr(&branch.name)? {
+        log::info!("Updating existing release PR #{num}");
+        gh_stdin(
+            &[
+                "pr",
+                "edit",
+                &num.to_string(),
+                "--repo",
+                UPSTREAM_REPO,
+                "--title",
+                PR_TITLE,
+                "--body-file",
+                "-",
+            ],
+            body,
+        )?;
+        Ok(num)
+    } else {
+        let head = head_spec(&branch.upstream, &branch.name)?;
+        log::info!("Creating release PR (head: {head}, base: {})", plan.base);
+        let stdout = gh_stdin(
+            &[
+                "pr",
+                "create",
+                "--repo",
+                UPSTREAM_REPO,
+                "--base",
+                &plan.base,
+                "--head",
+                &head,
+                "--title",
+                PR_TITLE,
+                "--label",
+                PR_LABELS,
+                "--body-file",
+                "-",
+            ],
+            body,
+        )?;
+        // `gh pr create` prints the PR URL on stdout.
+        let url = stdout.trim();
+        let num = url
+            .rsplit('/')
+            .next()
+            .and_then(|s| s.parse::<u64>().ok())
+            .with_context(|| {
+                format!("Failed to parse PR number from `gh pr create` output: {url}")
+            })?;
+        Ok(num)
+    }
+}
+
+fn print_manual_instructions(branch: &Branch, plan: &Plan, body: &str) -> Result<()> {
+    let url = comparison_url(&plan.base, &branch.upstream, &branch.name)?;
+    println!();
+    println!("Open the following URL in a browser to create the PR:");
+    println!("  {url}");
+    println!();
+    println!("Paste this as the PR description:");
+    println!("----");
+    println!("{body}");
+    println!("----");
     Ok(())
 }
 
