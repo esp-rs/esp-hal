@@ -47,7 +47,7 @@ document-features  = "0.2"
 embassy-sync = "0.8"
 esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.7.0", path = "../esp-config" }
-esp-sync = { version = "0.2.0", path = "../esp-sync" }
+esp-sync = { version = "0.2.1", path = "../esp-sync" }
 esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
 macros = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
