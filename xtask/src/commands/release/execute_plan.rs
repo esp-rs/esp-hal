@@ -300,9 +300,10 @@ fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
 <details>
 <summary>Release plan (click to expand)</summary>
 
-<pre>
+```jsonc
 {release_plan_str}
-</pre>
+```
+
 </details>
 
 Please review the changes and merge them into the `{base}` branch.
