@@ -151,11 +151,6 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_done_force().set_bit());
 
-    // Disable GPIO wakeup
-    rtc_cntl
-        .ulp_cp_timer()
-        .write(|w| w.ulp_cp_gpio_wakeup_ena().clear_bit());
-
     ulp_config_wakeup_source(wakeup_src);
 
     // Select RISC-V as the ULP_TIMER trigger target

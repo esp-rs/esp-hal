@@ -30,7 +30,7 @@ fn main(mut button: Input<0>) {
     io.set_interrupt_handler(gpio_interrupt_handler);
 
     critical_section::with(|cs| {
-        button.listen(Event::FallingEdge);
+        button.listen(Event::FallingEdge, false);
         BUTTON.borrow_ref_mut(cs).replace(button);
     });
 

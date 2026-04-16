@@ -58,7 +58,8 @@ panic-halt = "0.2.0"
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
-default = ["embedded-hal"]
+default = ["embedded-hal", "interrupts"]
+interrupts = []
 
 ## Enable debug features in the HAL (used for development).
 debug = [

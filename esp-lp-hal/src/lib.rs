@@ -38,12 +38,9 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
-/// Critical section implementation for ULP cores
-#[cfg(any(esp32s2, esp32s3))]
-mod critical_section;
-
-/// Interrupt handling for RISCV ULP cores (ESP32-S2,ESP32-S3)
-#[cfg(any(esp32s2, esp32s3))]
+/// Interrupt handling APIs.
+/// Currently implemented for RISCV ULP cores (ESP32-S2,ESP32-S3)
+/// Functions are gated internally by stub functions.
 pub mod interrupt;
 
 /// The prelude
@@ -87,6 +84,30 @@ pub fn wake_hp_core() {
         .write(|w| w.rtc_sw_cpu_int().set_bit());
 }
 
+/// Global GPIO wakeup enable/disable
+pub fn gpio_wakeup_enable(enable: bool) {
+    #[cfg(esp32s2)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(enable));
+    #[cfg(esp32s3)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(enable));
+}
+
+/// Clear the Global GPIO wakeup status
+pub fn gpio_wakeup_clear() {
+    #[cfg(esp32s2)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+    #[cfg(esp32s3)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+}
+
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
@@ -101,17 +122,17 @@ unsafe extern "C" fn lp_core_startup() -> ! {
             static mut DEVICE_PERIPHERALS: bool;
         }
 
+        #[cfg(any(esp32s2, esp32s3))]
+        ulp_riscv_rescue_from_monitor();
+
+        #[cfg(feature = "interrupts")]
+        interrupt::setup_interrupts();
+
         // The pac::DEVICE_PERIPHERALS variable is re-zero-ed on start,
         // to prevent it from persisting between calls to main().
         // This prevents ULP-Timer-triggered-main()-calls from panicking
         // on their second loop.
         DEVICE_PERIPHERALS = false;
-
-        #[cfg(any(esp32s2, esp32s3))]
-        {
-            ulp_riscv_rescue_from_monitor();
-            interrupt::setup_interrupts();
-        }
 
         #[cfg(esp32c6)]
         if (*pac::LP_CLKRST::PTR)
@@ -139,7 +160,6 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 /// Stops the ULP core, called from itself.
-#[unsafe(link_section = ".init.rust")]
 fn ulp_riscv_halt() -> ! {
     #[cfg(any(esp32s2, esp32s3))]
     {
@@ -152,10 +172,9 @@ fn ulp_riscv_halt() -> ! {
             });
     }
 
-    // All chips will enter a no-op loop, when halting.
-    loop {
-        unsafe {
-            core::arch::asm!("addi x0, x0, 0"); // no-op
-        }
-    }
+    // All chips will enter an infinite, when halting.
+    // It's important that no 'nop' or 'wfi' is performed inside this loop,
+    // so that the chip silicon can properly detect a ULP halt.
+    #[allow(clippy::empty_loop)]
+    loop {}
 }

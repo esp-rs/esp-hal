@@ -9,16 +9,13 @@
 
 extern crate panic_halt;
 
-use esp_lp_hal::{
-    gpio::{Input, gpio_wakeup_clear, gpio_wakeup_enable},
-    prelude::*,
-};
+use esp_lp_hal::{gpio::Input, gpio_wakeup_clear, prelude::*};
 
 const ADDRESS: usize = 0x1000;
 
 #[entry]
 fn main(mut _button: Input<0>) {
-    // Clear the global GPIO wake-up flag
+    // Clear the global GPIO wake-up flag, to prevent repeated wake-ups
     gpio_wakeup_clear();
 
     // Increment the counter
@@ -26,7 +23,4 @@ fn main(mut _button: Input<0>) {
         let counter = ADDRESS as *mut u32;
         counter.write_volatile(counter.read_volatile() + 1);
     }
-
-    // Re-enable the global GPIO wakeup flag
-    gpio_wakeup_enable(true);
 }

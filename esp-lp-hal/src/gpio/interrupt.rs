@@ -5,7 +5,7 @@ use super::{Io, LpIo};
 use crate::interrupt;
 
 /// Convenience constant for `Option::None` pin
-pub(super) static USER_INTERRUPT_HANDLER: interrupt::CFnPtr = interrupt::CFnPtr::new();
+pub static USER_INTERRUPT_HANDLER: interrupt::CFnPtr = interrupt::CFnPtr::new();
 
 impl crate::interrupt::InterruptConfigurable for Io {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -26,47 +26,46 @@ pub fn user_gpio_interrupt_handler() {
     USER_INTERRUPT_HANDLER.call();
 }
 
-/// The default GPIO interrupt handler, when the user has not set one.
-///
-/// This handler will disable all pending interrupts and leave the interrupt
-/// status bits unchanged. This enables functions like `is_interrupt_set` to
-/// work correctly.
-#[handler]
-fn default_gpio_interrupt_handler() {
-    let status = gpio_interrupt_status();
-    gpio_interrupt_disable(status);
-}
-
-#[doc(hidden)]
-pub fn bind_default_interrupt_handler() {
-    interrupt::bind_handler(Interrupt::GPIO_INT, default_gpio_interrupt_handler);
+/// Event type used to trigger interrupts.
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum Event {
+    /// Interrupts trigger on rising pin edge.
+    RisingEdge  = 1,
+    /// Interrupts trigger on falling pin edge.
+    FallingEdge = 2,
+    /// Interrupts trigger on either rising or falling pin edges.
+    AnyEdge     = 3,
+    /// Interrupts trigger on low level
+    LowLevel    = 4,
+    /// Interrupts trigger on high level
+    HighLevel   = 5,
 }
 
 /// Read the interrupt status of all pins
 /// Bit 0 == GPIO0, in the returned value
 #[inline]
 pub fn gpio_interrupt_status() -> u32 {
-    unsafe { &*LpIo::PTR }.status().read().bits() >> 10
+    #[cfg(any(esp32s2, esp32s3))]
+    {
+        unsafe { &*LpIo::PTR }.status().read().bits() >> 10
+    }
+
+    #[cfg(esp32c6)]
+    {
+        todo!()
+    }
 }
 
 /// Clear the interrupt status for a bit mask of pins
 /// Expects pinmask bit 0 == GPIO0
 #[inline]
 pub fn gpio_interrupt_clear(pinmask: u32) {
+    #[cfg(any(esp32s2, esp32s3))]
     unsafe { &*LpIo::PTR }
         .status_w1tc()
         .write(|w| unsafe { w.bits(pinmask << 10) });
-}
-
-/// Disable interrupts for a bit mask of pins
-fn gpio_interrupt_disable(pin_mask: u32) {
-    // expects pinmask bit 0 == GPIO0
-    let pin_iter = InterruptStatus::from(pin_mask).iterator();
-    for n in pin_iter {
-        unsafe { &*LpIo::PTR }
-            .pin(n as usize)
-            .write(|w| unsafe { w.int_type().bits(0) });
-    }
+    #[cfg(esp32c6)]
+    todo!()
 }
 
 /// Set GPIO event listening.
@@ -76,15 +75,13 @@ fn gpio_interrupt_disable(pin_mask: u32) {
 ///   leave the int_type setting as-is.
 /// - `wake_up`: whether to wake up from light sleep.
 pub fn enable_pin_interrupt<const N: u8>(int_type: u8) {
-    let gpio_pin = unsafe { &*LpIo::PTR }.pin(N as usize);
-
-    // - 0: GPIO interrupt disable
-    // - 1: rising edge trigger
-    // - 2: falling edge trigger
-    // - 3: any edge trigger
-    // - 4: low level trigger
-    // - 5: high level trigger
-    gpio_pin.write(|w| unsafe { w.int_type().bits(int_type) });
+    #[cfg(any(esp32s2, esp32s3))]
+    {
+        let gpio_pin = unsafe { &*LpIo::PTR }.pin(N as usize);
+        gpio_pin.write(|w| unsafe { w.int_type().bits(int_type) });
+    }
+    #[cfg(esp32c6)]
+    todo!()
 }
 
 /// Clear pin interrupt
@@ -98,26 +95,13 @@ pub fn is_interrupt_set<const N: u8>() -> bool {
     (stat & (1 << N)) != 0
 }
 
-/// Global GPIO wakeup enable/disable
-pub fn gpio_wakeup_enable(enable: bool) {
-    #[cfg(esp32s2)]
-    unsafe { &*crate::pac::RTC_CNTL::PTR }
-        .ulp_cp_timer()
-        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(enable));
-    #[cfg(esp32s3)]
-    unsafe { &*crate::pac::RTC_CNTL::PTR }
-        .rtc_ulp_cp_timer()
-        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(enable));
-}
-
-/// Clear GPIO wakeup status
-pub fn gpio_wakeup_clear() {
-    #[cfg(esp32s2)]
-    unsafe { &*crate::pac::RTC_CNTL::PTR }
-        .ulp_cp_timer()
-        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
-    #[cfg(esp32s3)]
-    unsafe { &*crate::pac::RTC_CNTL::PTR }
-        .rtc_ulp_cp_timer()
-        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+/// Enable / disable pin wakeup
+pub fn pin_wakeup_enable<const N: u8>(en: bool) {
+    #[cfg(any(esp32s2, esp32s3))]
+    {
+        let gpio_pin = unsafe { &*LpIo::PTR }.pin(N as usize);
+        gpio_pin.write(|w| w.wakeup_enable().bit(en));
+    }
+    #[cfg(esp32c6)]
+    todo!()
 }

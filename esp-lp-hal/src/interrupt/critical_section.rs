@@ -2,10 +2,10 @@ use critical_section::RawRestoreState;
 
 use crate::interrupt;
 
-struct UlpCriticalSection;
-critical_section::set_impl!(UlpCriticalSection);
+struct CriticalSection;
+critical_section::set_impl!(CriticalSection);
 
-unsafe impl critical_section::Impl for UlpCriticalSection {
+unsafe impl critical_section::Impl for CriticalSection {
     unsafe fn acquire() -> RawRestoreState {
         interrupt::disable_cpu_interrupts()
     }

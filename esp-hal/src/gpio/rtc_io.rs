@@ -85,7 +85,6 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
         P: InputPin + RtcPin + 'd,
     {
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
-
         let this = Self {
             phantom: PhantomData,
         };
@@ -119,12 +118,13 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
 
     /// Allows this pin to wakeup the ULP core, when UlpCoreWakeupSource::Gpio is used.
     pub fn wakeup_enable(&self, event: Option<WakeEvent>) {
-        let pin_reg = GPIO::regs().pin(PIN as usize);
+        let pin_reg_rtc = RTC_IO::regs().pin(PIN as usize);
 
         if let Some(evt) = event {
-            pin_reg.write(|w| unsafe { w.int_type().bits(evt as u8).wakeup_enable().bit(true) });
+            pin_reg_rtc
+                .write(|w| unsafe { w.int_type().bits(evt as u8).wakeup_enable().bit(true) });
         } else {
-            pin_reg.write(|w| w.wakeup_enable().bit(false));
+            pin_reg_rtc.write(|w| unsafe { w.int_type().bits(0).wakeup_enable().bit(false) });
         }
     }
 }
@@ -151,7 +151,6 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
         this.pullup_enable(true);
         this.pulldown_enable(false);
         this.output_enable(true);
-        this.wakeup_enable(None);
 
         this
     }
@@ -194,16 +193,5 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
         GPIO::regs()
             .pin(PIN as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
-    }
-
-    /// Allows this pin to wakeup the ULP core, when UlpCoreWakeupSource::Gpio is used.
-    pub fn wakeup_enable(&self, event: Option<WakeEvent>) {
-        let pin_reg = GPIO::regs().pin(PIN as usize);
-
-        if let Some(evt) = event {
-            pin_reg.write(|w| unsafe { w.int_type().bits(evt as u8).wakeup_enable().bit(true) });
-        } else {
-            pin_reg.write(|w| w.wakeup_enable().bit(false));
-        }
     }
 }

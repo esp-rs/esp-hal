@@ -31,11 +31,20 @@ pub use conjure::*;
 /// Provides embedded-hal trait impls
 pub mod ehal;
 
-#[cfg(any(esp32s2, esp32s3))]
 /// Provides GPIO interrupt support
+// TODO: Implement GPIO interrupts for ESP32C6 LP core
+#[cfg(feature = "interrupts")]
 pub mod interrupt;
-#[cfg(any(esp32s2, esp32s3))]
-pub use interrupt::*;
+#[cfg(feature = "interrupts")]
+pub use interrupt::{
+    Event,
+    Interrupt,
+    InterruptHandler,
+    USER_INTERRUPT_HANDLER,
+    gpio_interrupt_clear,
+    gpio_interrupt_status,
+    user_gpio_interrupt_handler,
+};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
@@ -60,7 +69,7 @@ impl Io {
         Io { _io_peripheral }
     }
 
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(feature = "interrupts")]
     #[doc = "Registers an interrupt handler for all GPIO pins."]
     /// Note that when using interrupt handlers registered by this function, or
     /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
@@ -137,42 +146,6 @@ impl From<Level> for bool {
     }
 }
 
-/// Event used to trigger interrupts.
-#[cfg(any(esp32s2, esp32s3))]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum Event {
-    /// Interrupts trigger on rising pin edge.
-    RisingEdge  = 1,
-    /// Interrupts trigger on falling pin edge.
-    FallingEdge = 2,
-    /// Interrupts trigger on either rising or falling pin edges.
-    AnyEdge     = 3,
-    /// Interrupts trigger on low level
-    LowLevel    = 4,
-    /// Interrupts trigger on high level
-    HighLevel   = 5,
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-impl From<WakeEvent> for Event {
-    fn from(value: WakeEvent) -> Self {
-        match value {
-            WakeEvent::LowLevel => Event::LowLevel,
-            WakeEvent::HighLevel => Event::HighLevel,
-        }
-    }
-}
-
-/// Event used to wake up from light sleep.
-#[cfg(any(esp32s2, esp32s3))]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum WakeEvent {
-    /// Wake on low level
-    LowLevel  = 4,
-    /// Wake on high level
-    HighLevel = 5,
-}
-
 /// Flexible pin driver.
 /// Provides a common implementation for input and output pins.
 /// Currently hidden, as it is not intended to be used directly,
@@ -237,30 +210,44 @@ impl<const PIN: u8> Flex<PIN> {
         self.set_level(!level);
     }
 
-    /// Listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn listen(&mut self, event: Event) {
-        self.clear_interrupt();
-        enable_pin_interrupt::<PIN>(event as u8);
-    }
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                // Validate the inputs
+                if wakeup_enable {
+                    match event {
+                        Event::LowLevel | Event::HighLevel => {},
+                        _ => {
+                            panic!("GPIO wakeup is only supported with LowLevel or HighLevel event types.");
+                        }
+                    }
+                }
 
-    /// Un-listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn unlisten(&mut self) {
-        enable_pin_interrupt::<PIN>(0);
-        self.clear_interrupt();
-    }
+                self.clear_interrupt();
+                interrupt::enable_pin_interrupt::<PIN>(event as u8);
+                interrupt::pin_wakeup_enable::<PIN>(wakeup_enable);
+            }
 
-    /// Clear pin interrupts
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn clear_interrupt(&mut self) {
-        clear_pin_interrupt::<PIN>();
-    }
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                interrupt::enable_pin_interrupt::<PIN>(0);
+                interrupt::pin_wakeup_enable::<PIN>(false);
+                self.clear_interrupt();
+            }
 
-    /// Read pin interrupt
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn is_interrupt_set(&mut self) -> bool {
-        is_interrupt_set::<PIN>()
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
     }
 }
 
@@ -280,25 +267,28 @@ impl<const PIN: u8> Input<PIN> {
     pub fn level(&self) -> Level {
         self.pin.level()
     }
-    /// Listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn listen(&mut self, event: Event) {
-        self.pin.listen(event);
-    }
-    /// Un-listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn unlisten(&mut self) {
-        self.pin.unlisten();
-    }
-    /// Clear pin interrupts
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn clear_interrupt(&mut self) {
-        clear_pin_interrupt::<PIN>();
-    }
-    /// Read pin interrupt
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn is_interrupt_set(&mut self) -> bool {
-        is_interrupt_set::<PIN>()
+
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                self.pin.listen(event, wakeup_enable);
+            }
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                self.pin.unlisten();
+            }
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
     }
 }
 
@@ -357,24 +347,27 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     pub fn toggle(&mut self) {
         self.pin.toggle()
     }
-    /// Listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn listen(&mut self, event: Event) {
-        self.pin.listen(event);
-    }
-    /// Un-listen for interrupts.
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn unlisten(&mut self) {
-        self.pin.unlisten();
-    }
-    /// Clear pin interrupts
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn clear_interrupt(&mut self) {
-        clear_pin_interrupt::<PIN>();
-    }
-    /// Read pin interrupt
-    #[cfg(any(esp32s2, esp32s3))]
-    pub fn is_interrupt_set(&mut self) -> bool {
-        is_interrupt_set::<PIN>()
+
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                self.pin.listen(event, wakeup_enable);
+            }
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                self.pin.unlisten();
+            }
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
     }
 }
