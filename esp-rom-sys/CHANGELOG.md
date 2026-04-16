@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.1.4] - 2026-04-16
+
+### Added
+
 - Initial ESP32-C5 support (#4859)
 - Initial ESP32-C61 support (#5187)
 
@@ -19,9 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed `ets_update_cpu_frequency_rom` not linking on ESP32 (#4500)
-
-### Removed
-
 
 ## [v0.1.3] - 2025-10-30
 
@@ -47,4 +58,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.0...esp-rom-sys-v0.1.1
 [v0.1.2]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.1...esp-rom-sys-v0.1.2
 [v0.1.3]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.2...esp-rom-sys-v0.1.3
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.3...HEAD
+[v0.1.4]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.3...esp-rom-sys-v0.1.4
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.4...HEAD

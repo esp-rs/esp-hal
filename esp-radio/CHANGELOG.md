@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.18.0] - 2026-04-16
+
+### Added
+
 - It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
@@ -434,4 +448,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...HEAD
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...esp-radio-v0.18.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...HEAD
