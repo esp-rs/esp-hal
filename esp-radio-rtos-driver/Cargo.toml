@@ -2,7 +2,7 @@
 name          = "esp-radio-rtos-driver"
 version       = "0.2.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Task scheduler interface for esp-radio"
 documentation = "https://docs.espressif.com/projects/rust/esp-radio-rtos-driver/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
