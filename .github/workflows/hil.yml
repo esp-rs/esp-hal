@@ -48,6 +48,9 @@ on:
         description: "Optional list of test names to run (ELF basenames)"
         required: false
         default: ""
+      package:
+        description: '"hil-test", "hil-test-radio", or "all"'
+        default: "all"
 
 env:
   CARGO_TERM_COLOR: always
@@ -212,6 +215,7 @@ jobs:
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
           tests: ${{ github.event.inputs.tests || '' }}
+          package: ${{ github.event.inputs.package || 'all' }}
 
   build-tests-chips:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.chips != ''
@@ -298,18 +302,28 @@ jobs:
       fail-fast: false
       matrix:
         target:
+          # HAL runners
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
             host: armv7
+            type: hal
           - soc: esp32s3
             rust-target: xtensa-esp32s3-none-elf
             runner: esp32s3-usb
             host: armv7
+            type: hal
+
+          # RADIO runners
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-radio
+            host: aarch64
+            type: radio
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: tests-${{ matrix.target.soc }}
+          name: tests-${{ matrix.target.soc }}-${{ matrix.target.type == 'radio' && 'hil-test-radio' || 'hil-test' }}
           path: tests-${{ matrix.target.soc }}
         # In a quick run, some artifacts won't exist — job wouldn't fail because of that.
         continue-on-error: true

@@ -25,6 +25,7 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
+pub mod radio_hil_runner;
 
 // ---------------------------------------------------------------------------
 // MCP tool registration
@@ -91,6 +92,7 @@ pub enum Package {
     EspRtos,
     Examples,
     HilTest,
+    HilTestRadio,
     QaTest,
     XtensaLx,
     XtensaLxRt,
@@ -188,7 +190,7 @@ impl Package {
 
     /// Does the package have any host tests?
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
-        if *self == Package::HilTest {
+        if *self == Package::HilTest || *self == Package::HilTestRadio {
             return false;
         }
         let package_path = workspace.join(self.to_string()).join("src");
