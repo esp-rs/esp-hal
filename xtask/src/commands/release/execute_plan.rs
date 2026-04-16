@@ -132,11 +132,8 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(
-        !args.no_dry_run,
-        "release-branch",
-        "Finalize crate releases",
-    )?;
+    let branch_name = format!("release-branch-{}", plan.slug);
+    let branch = make_git_changes(!args.no_dry_run, &branch_name, &commit_message(&plan))?;
 
     open_pull_request(
         &branch,
@@ -162,28 +159,25 @@ pub(crate) struct Branch {
 }
 
 pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -> Result<Branch> {
-    // Find an available branch name
-    let branch_name = format!(
-        "{branch_name}-{}",
-        jiff::Timestamp::now().strftime("%Y-%m-%d"),
-    );
-
+    let branch_name = branch_name.to_string();
     let upstream = get_remote_name_for("esp-rs/esp-hal")?;
 
-    // Switch to the new branch
+    // `git switch -C` creates the branch, or resets it to HEAD if it already
+    // exists — carrying our uncommitted version-bump edits along. This is
+    // what makes re-running `execute-plan` idempotent: the branch simply
+    // snaps back to a single fresh commit off the base.
     if dry_run {
-        println!("Dry run: would create a new branch: {branch_name}");
+        println!("Dry run: would switch to branch: {branch_name}");
     } else {
-        // Create a new branch
         let status = Command::new("git")
             .arg("switch")
-            .arg("-c")
+            .arg("-C")
             .arg(&branch_name)
             .status()
-            .context("Failed to create new branch")?;
+            .context("Failed to switch to release branch")?;
 
         if !status.success() {
-            bail!("Failed to create new branch: {branch_name}");
+            bail!("Failed to switch to release branch: {branch_name}");
         }
     }
 
@@ -191,31 +185,62 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
-        Command::new("git")
+        let status = Command::new("git")
             .arg("add")
             .arg(".")
             .status()
             .context("Failed to stage changes")?;
-        Command::new("git")
+        if !status.success() {
+            bail!("Failed to stage changes");
+        }
+
+        let status = Command::new("git")
             .arg("commit")
             .arg("-m")
             .arg(commit)
             .status()
             .context("Failed to commit changes")?;
+        if !status.success() {
+            bail!("Failed to commit changes to branch: {branch_name}");
+        }
     }
 
-    // Push the branch
+    // Push the branch. If the remote branch already exists (e.g. this is a
+    // re-run), fetch it first so the remote-tracking ref is current, then use
+    // --force-with-lease so we overwrite our own prior push but bail if
+    // someone else pushed in the meantime.
     let url = if dry_run {
         println!("Dry run: would push branch: {branch_name}");
         String::from("https://github.com/esp-rs/esp-hal/")
     } else {
-        // git push origin <branch_name>
-        let message = Command::new("git")
-            .arg("push")
+        let remote_exists = Command::new("git")
+            .args(["ls-remote", "--exit-code", "--heads"])
             .arg(&upstream)
             .arg(&branch_name)
-            .output()
-            .context("Failed to push branch")?;
+            .status()
+            .context("Failed to query remote branches")?
+            .success();
+
+        if remote_exists {
+            log::info!("Remote branch {branch_name} already exists — fetching before force-push");
+            let fetch_status = Command::new("git")
+                .arg("fetch")
+                .arg(&upstream)
+                .arg(&branch_name)
+                .status()
+                .context("Failed to fetch existing release branch before force-push")?;
+            if !fetch_status.success() {
+                bail!("Failed to fetch existing release branch {branch_name} from {upstream}");
+            }
+        }
+
+        let mut push = Command::new("git");
+        push.arg("push").arg(&upstream).arg(&branch_name);
+        if remote_exists {
+            log::info!("Force-pushing {branch_name} with lease");
+            push.arg("--force-with-lease");
+        }
+        let message = push.output().context("Failed to push branch")?;
 
         if !message.status.success() {
             bail!(
@@ -236,6 +261,81 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     })
 }
 
+fn release_subject(plan: &Plan) -> String {
+    match plan.packages.len() {
+        1 => {
+            let step = &plan.packages[0];
+            format!(
+                "Release {}: {} → {}",
+                step.package, step.current_version, step.new_version
+            )
+        }
+        n => format!("Release {n} packages"),
+    }
+}
+
+fn format_package_list(plan: &Plan) -> String {
+    plan.packages
+        .iter()
+        .map(|step| {
+            format!(
+                "- {}: {} → {}",
+                step.package, step.current_version, step.new_version
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn commit_message(plan: &Plan) -> String {
+    let subject = release_subject(plan);
+    let body = format_package_list(plan);
+    format!("{subject}\n\n{body}\n")
+}
+
+const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
+const PR_LABELS: &[&str] = &["release-pr", "skip-changelog"];
+
+fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
+    let packages = format_package_list(plan);
+
+    let mut body = format!(
+        r#"This pull request prepares the following packages for release:
+
+{packages}
+
+<details>
+
+<summary>Release plan (click to expand)</summary>
+
+```jsonc
+{release_plan_str}
+```
+
+</details>
+
+Please review the changes and merge them into the `{base}` branch.
+
+After merging, please make sure you have this release plan in the repo root,
+then run the following command on the `{base}` branch to tag and publish the packages:
+
+```
+cargo xrelease publish-plan --no-dry-run
+```
+"#,
+        base = plan.base,
+    );
+
+    if plan.base != "main" {
+        body = format!(
+            "⚠️ This pull request was branched off from `{}`. ⚠️\n\n{body}",
+            plan.base
+        );
+    }
+
+    body
+}
+
 fn open_pull_request(
     branch: &Branch,
     dry_run: bool,
@@ -243,86 +343,184 @@ fn open_pull_request(
     release_plan_str: &str,
     release_plan: &Plan,
 ) -> Result<()> {
-    // Open a pull request
-
-    let packages_to_release = release_plan
-        .packages
-        .iter()
-        .map(|step| format!("- {}: {}", step.package, step.new_version))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let mut body = format!(
-        r#"This pull request prepares the following packages for release:
-
-{packages_to_release}
-
-The release plan used for this release:
-
-```json
-{release_plan_str}
-```
-
-Please review the changes and merge them into the `{base_branch}` branch.
-
-After merging, please make sure you have this release plan in the repo root,
-then run the following command on the `{base_branch}` branch to tag and publish the packages:
-
-```
-cargo xrelease publish-plan --no-dry-run
-```
-"#,
-        base_branch = release_plan.base,
-    );
-
-    if release_plan.base != "main" {
-        body = format!(
-            "⚠️ This pull request was branched off from `{current_branch}`. ⚠️\n\n{body}",
-            current_branch = release_plan.base
-        );
-    }
-
-    // TODO: don't forget to update the PR text once we have the `publish` command
-    // updated.
-
-    let pr_url_base = comparison_url(&release_plan.base, &branch.upstream, &branch.name)?;
-
-    // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
-    let mut open_pr_url = format!(
-        "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}&body={body}",
-        body = urlencoding::encode(&body),
-        labels = "release-pr,skip-changelog",
-    );
-
-    // https://stackoverflow.com/a/64565317
-    if manual_pull_request || open_pr_url.len() > 8201 {
-        println!();
-        println!("PR description begins here.");
-        println!();
-        eprintln!("{body}");
-        println!();
-
-        println!("The PR description is too long to be included in the URL.");
-        println!("Please copy the above text as the PR description.");
-        println!();
-
-        open_pr_url = format!(
-            "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}",
-            labels = "release-pr,skip-changelog",
-        );
-    }
+    let body = build_pr_body(release_plan, release_plan_str);
 
     if dry_run {
-        println!("Dry run: would open the following URL to create a pull request:");
-        println!("{open_pr_url}");
-    } else {
-        if opener::open(&open_pr_url).is_err() {
-            println!("Open the following URL to create a pull request:");
-            println!("{open_pr_url}");
-        }
+        println!("Dry run: would create/update the release PR with body:");
+        println!("----");
+        println!("{body}");
+        println!("----");
+        return Ok(());
     }
 
-    println!("Create the release PR and follow the next steps laid out there.");
+    if manual_pull_request || !gh_available() {
+        if !manual_pull_request {
+            log::warn!("`gh` CLI not available — falling back to manual PR instructions");
+        }
+        return print_manual_instructions(branch, release_plan, &body);
+    }
+
+    let pr_number = upsert_pull_request(branch, release_plan, &body)?;
+
+    println!(
+        "Release PR ready: https://github.com/{UPSTREAM_REPO}/pull/{pr_number} — review and merge to continue."
+    );
+    Ok(())
+}
+
+fn gh_available() -> bool {
+    Command::new("gh")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn head_spec(upstream_url: &str, branch_name: &str) -> Result<String> {
+    if upstream_url.starts_with("https://github.com/esp-rs/") || upstream_url.is_empty() {
+        Ok(branch_name.to_string())
+    } else {
+        let user = upstream_url
+            .split('/')
+            .nth(3)
+            .with_context(|| format!("Failed to extract user from URL: {upstream_url}"))?;
+        Ok(format!("{user}:{branch_name}"))
+    }
+}
+
+fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+    use std::io::Write;
+
+    let mut child = Command::new("gh")
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to spawn `gh {}`", args.join(" ")))?;
+
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin piped")
+        .write_all(stdin_data.as_bytes())
+        .context("Failed to write stdin to gh")?;
+
+    let out = child
+        .wait_with_output()
+        .with_context(|| format!("`gh {}` failed", args.join(" ")))?;
+    if !out.status.success() {
+        bail!(
+            "`gh {}` failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+fn find_existing_pr(branch_name: &str) -> Result<Option<u64>> {
+    let output = Command::new("gh")
+        .args([
+            "pr",
+            "list",
+            "--state",
+            "open",
+            "--repo",
+            UPSTREAM_REPO,
+            "--head",
+        ])
+        .arg(branch_name)
+        .args(["--json", "number"])
+        .output()
+        .context("`gh pr list` failed")?;
+    if !output.status.success() {
+        bail!(
+            "`gh pr list` failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let value: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse `gh pr list` output")?;
+    Ok(value
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|o| o.get("number"))
+        .and_then(|n| n.as_u64()))
+}
+
+fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
+    let title = release_subject(plan);
+    if let Some(num) = find_existing_pr(&branch.name)? {
+        log::info!("Updating existing release PR #{num}");
+        let num_str = num.to_string();
+        gh_stdin(
+            &[
+                "pr",
+                "edit",
+                &num_str,
+                "--repo",
+                UPSTREAM_REPO,
+                "--title",
+                &title,
+                "--body-file",
+                "-",
+            ],
+            body,
+        )?;
+        Ok(num)
+    } else {
+        let head = head_spec(&branch.upstream, &branch.name)?;
+        log::info!("Creating release PR (head: {head}, base: {})", plan.base);
+        let mut args: Vec<&str> = vec![
+            "pr",
+            "create",
+            "--repo",
+            UPSTREAM_REPO,
+            "--base",
+            &plan.base,
+            "--head",
+            &head,
+            "--title",
+            &title,
+        ];
+        for l in PR_LABELS {
+            args.push("--label");
+            args.push(l);
+        }
+        args.push("--body-file");
+        args.push("-");
+        let stdout = gh_stdin(&args, body)?;
+        // `gh pr create` prints the PR URL as the last line of stdout.
+        let url = stdout
+            .lines()
+            .rev()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("");
+        let num = url
+            .rsplit('/')
+            .next()
+            .and_then(|s| s.parse::<u64>().ok())
+            .with_context(|| {
+                format!("Failed to parse PR number from `gh pr create` output: {url}")
+            })?;
+        Ok(num)
+    }
+}
+
+fn print_manual_instructions(branch: &Branch, plan: &Plan, body: &str) -> Result<()> {
+    let url = comparison_url(&plan.base, &branch.upstream, &branch.name)?;
+    println!();
+    println!("Open the following URL in a browser to create the PR:");
+    println!("  {url}");
+    println!();
+    println!("Paste this as the PR description:");
+    println!("----");
+    println!("{body}");
+    println!("----");
     Ok(())
 }
 
