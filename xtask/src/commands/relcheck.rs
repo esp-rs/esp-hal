@@ -607,7 +607,7 @@ fn scrap_path_deps() -> Result<()> {
 
                 for key in ["dependencies", "build-dependencies", "dev-dependencies"] {
                     if toml.contains_key(key) {
-                        for dep in toml["dependencies"].as_table_mut().unwrap().iter_mut() {
+                        for dep in toml[key].as_table_mut().unwrap().iter_mut() {
                             let krate = dep.0.get();
 
                             if krate.starts_with("esp-") {
