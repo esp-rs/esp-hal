@@ -185,17 +185,24 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
-        Command::new("git")
+        let status = Command::new("git")
             .arg("add")
             .arg(".")
             .status()
             .context("Failed to stage changes")?;
-        Command::new("git")
+        if !status.success() {
+            bail!("Failed to stage changes");
+        }
+
+        let status = Command::new("git")
             .arg("commit")
             .arg("-m")
             .arg(commit)
             .status()
             .context("Failed to commit changes")?;
+        if !status.success() {
+            bail!("Failed to commit changes to branch: {branch_name}");
+        }
     }
 
     // Push the branch. If the remote branch already exists (e.g. this is a
@@ -298,6 +305,7 @@ fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
 {packages}
 
 <details>
+
 <summary>Release plan (click to expand)</summary>
 
 ```jsonc
