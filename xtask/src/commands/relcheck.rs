@@ -622,6 +622,30 @@ fn scrap_path_deps() -> Result<()> {
                     }
                 }
 
+                if toml.contains_key("build-dependencies") {
+                    for dep in toml["build-dependencies"]
+                        .as_table_mut()
+                        .unwrap()
+                        .iter_mut()
+                    {
+                        let krate = dep.0.get();
+
+                        if krate.starts_with("esp-") {
+                            let latest = latest_version_of_crate(krate)?;
+                            dep.1.as_table_like_mut().and_then(|table| {
+                                table.remove("path");
+                                table.insert(
+                                    "version",
+                                    toml_edit::Item::Value(toml_edit::Value::String(
+                                        toml_edit::Formatted::new(latest),
+                                    )),
+                                );
+                                Some(table)
+                            });
+                        }
+                    }
+                }
+
                 let processed = format!("#{}{}\n{}", "STOP", "SHIP", toml.to_string());
                 std::fs::write(manifest_path.join("Cargo.toml"), processed)?;
 
