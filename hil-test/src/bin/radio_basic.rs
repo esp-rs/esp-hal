@@ -10,7 +10,7 @@
 //% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio-unstable trouble-host
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio-unstable
 //% FEATURES(has_wifi_ble): trouble-host
-//% FEATURES(stable_wifi): esp-radio/wifi esp-radio esp-radio/defmt
+//% FEATURES(stable_wifi): esp-radio/wifi esp-radio
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test

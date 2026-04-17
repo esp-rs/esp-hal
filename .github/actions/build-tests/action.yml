@@ -104,8 +104,7 @@ runs:
         fi
 
     - uses: actions/upload-artifact@v6
-      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' }}
-        && (${{ inputs.package == 'all' || inputs.package == 'hil-test' }})
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' && (inputs.package == 'all' || inputs.package == 'hil-test') }}
       with:
         name: tests-${{ inputs.soc }}-hil-test
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test
@@ -113,7 +112,7 @@ runs:
         overwrite: true
 
     - uses: actions/upload-artifact@v6
-      if: ${{ inputs.package == 'all' || inputs.package == 'hil-test-radio' }}
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' && (inputs.package == 'all' || inputs.package == 'hil-test-radio') }}
       with:
         name: tests-${{ inputs.soc }}-hil-test-radio
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test-radio

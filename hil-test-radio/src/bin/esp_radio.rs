@@ -1,6 +1,5 @@
-//% CHIPS(no_wifi): esp32h2
-//% CHIPS(no_ble): esp32s2
-//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
+//% CHIPS(has_wifi_ble): esp32c6
+//% HARNESS_FIRMWARE(has_wifi_ble): wifi_ap_support
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable
@@ -37,7 +36,3 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 #[cfg(soc_has_wifi)]
 #[path = "esp_radio/wifi_dhcp.rs"]
 mod wifi_dhcp;
-
-#[cfg(soc_has_wifi)]
-#[path = "esp_radio/wifi_ap.rs"]
-mod wifi_ap;

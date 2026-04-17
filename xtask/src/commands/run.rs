@@ -12,8 +12,8 @@ use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
-    firmware::Metadata,
-    radio_hil_runner::{extract_radio_tests, get_test_pair, run_radio_test},
+    firmware::{self, Metadata},
+    radio_hil_runner::run_radio_test,
 };
 
 // ----------------------------------------------------------------------------
@@ -145,21 +145,30 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         .filter(|s| !s.is_empty())
         .collect();
 
-    for elf in fs::read_dir(&args.path)
+    let mut elfs = Vec::<(String, PathBuf)>::new();
+    for entry in fs::read_dir(&args.path)
         .with_context(|| format!("Failed to read {}", args.path.display()))?
     {
-        let entry = elf?;
-        let elf_path = entry.path();
-        if !elf_path.is_file() {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
             continue;
         }
 
-        let elf_name = elf_path
+        let elf_name = path
             .with_extension("")
             .file_name()
             .unwrap()
             .to_string_lossy()
             .to_string();
+        elfs.push((elf_name, path));
+    }
+
+    let radio_tests = load_radio_tests_for_chip(args.chip)?;
+
+    for (elf_name, elf_path) in &elfs {
+        let elf_name = elf_name.clone();
+        let elf_path = elf_path.clone();
 
         if !filters.is_empty() && !filters.iter().any(|f| elf_name.to_lowercase().contains(f)) {
             log::info!(
@@ -171,34 +180,49 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             continue;
         }
 
-        let test_names = extract_radio_tests(&elf_path)?;
-        let (ap_test, sta_test) = get_test_pair(&test_names)?;
-
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
-        let is_radio_test = elf_name.contains("esp_radio");
+        if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
+            if meta.is_support_firmware() {
+                log::info!("Skipping support firmware '{}'", elf_name);
+                continue;
+            }
 
-        if is_radio_test {
-            if let Err(e) = run_radio_test(&elf_path, &ap_test, &sta_test, 120, None) {
+            let harness_path = meta
+                .harness_firmware()
+                .and_then(|name| resolve_harness_binary_path(&elfs, name));
+
+            if meta.harness_firmware().is_some() && harness_path.is_none() {
+                failed.push(elf_name.clone());
+                log::error!(
+                    "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
+                    elf_name,
+                    meta.harness_firmware().unwrap_or_default(),
+                );
+                continue;
+            }
+
+            if let Err(e) = run_radio_test(&elf_path, harness_path.as_deref(), 120, None) {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {
                 log::info!("'{}' passed", elf_name);
             }
-        } else {
-            // Use standard probe-rs runner for HAL tests
-            let status = Command::new("probe-rs")
-                .arg("run")
-                .arg(&elf_path)
-                .arg("--verify")
-                .status()
-                .context("Failed to execute probe-rs")?;
+            continue;
+        }
 
-            log::info!("'{}' done", elf_name);
+        // Use standard probe-rs runner for non-radio tests.
+        let status = Command::new("probe-rs")
+            .arg("run")
+            .arg(&elf_path)
+            .arg("--verify")
+            .status()
+            .context("Failed to execute probe-rs")?;
 
-            if !status.success() {
-                failed.push(elf_name);
-            }
+        log::info!("'{}' done", elf_name);
+
+        if !status.success() {
+            failed.push(elf_name);
         }
     }
 
@@ -207,6 +231,30 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn load_radio_tests_for_chip(chip: Chip) -> Result<Vec<Metadata>> {
+    let radio_path = Path::new("hil-test-radio/src/bin");
+    if !radio_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let tests = firmware::load(radio_path)?
+        .into_iter()
+        .filter(|test| test.supports_chip(chip))
+        .collect();
+    Ok(tests)
+}
+
+fn resolve_harness_binary_path(elfs: &[(String, PathBuf)], harness_name: &str) -> Option<PathBuf> {
+    if let Some((_, path)) = elfs.iter().find(|(name, _)| name == harness_name) {
+        return Some(path.clone());
+    }
+
+    let prefix = format!("{harness_name}_");
+    elfs.iter()
+        .find(|(name, _)| name.starts_with(&prefix))
+        .map(|(_, path)| path.clone())
 }
 
 /// Run the specified examples for the given chip.

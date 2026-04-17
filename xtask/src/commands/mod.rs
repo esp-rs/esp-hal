@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
@@ -10,7 +13,8 @@ pub use self::{build::*, check_changelog::*, check_pr_changelog::*, release::*, 
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
-    radio_hil_runner::{extract_radio_tests, get_test_pair, run_radio_test},
+    firmware,
+    radio_hil_runner::run_radio_test,
 };
 mod build;
 mod check_changelog;
@@ -422,10 +426,9 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
 /// Execute the given action on the specified HIL tests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
-    // Determine which package to load (default to hil-test if not specified)
+    // Absolute path of the 'hil-test' package's root:
     let package_name = args.package.as_deref().unwrap_or("hil-test");
 
-    // Absolute path of the appropriate package's root:
     let package_path = match package_name {
         "hil-test" => crate::windows_safe_path(&workspace.join("hil-test")),
         "hil-test-radio" => crate::windows_safe_path(&workspace.join("hil-test-radio")),
@@ -443,13 +446,18 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // - valid tests that are unsupported for the selected chip.
     let mut all_tests = crate::firmware::load(&package_path.join("src").join("bin"))?;
     all_tests.sort_by_key(|a| a.binary_name());
-    let tests = all_tests
+    let tests_for_chip = all_tests
         .iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
 
-    // Determine if this package uses radio tests (requires custom orchestrator runner)
     let is_radio_package = package_name == "hil-test-radio";
+    // Radio runs are orchestrated by `run_radio_test`, so cargo is only used to build binaries.
+    let command_action = if is_radio_package && matches!(action, CargoAction::Run) {
+        CargoAction::Build(None)
+    } else {
+        action.clone()
+    };
 
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
@@ -459,6 +467,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     }
 
     let mut commands = CargoCommandBatcher::new();
+    let mut artifact_meta = HashMap::<String, firmware::Metadata>::new();
     // Execute the specified action:
     // If user sets some specific test(s)
     if let Some(test_arg) = args.test.as_deref() {
@@ -478,10 +487,14 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 None => (Some(selected), None),
             };
 
-            let run_test_extra_args = (action == CargoAction::Run)
-                .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
-                .flatten()
-                .unwrap_or(&[]);
+            let run_test_extra_args = if is_radio_package && action == CargoAction::Run {
+                &[]
+            } else {
+                (action == CargoAction::Run)
+                    .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+                    .flatten()
+                    .unwrap_or(&[])
+            };
 
             let matched: Vec<_> = all_tests
                 .iter()
@@ -489,6 +502,25 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 .collect();
 
             if matched.is_empty() {
+                if is_radio_package
+                    && let Some(radio_meta) =
+                        resolve_radio_module_alias(&package_path, &all_tests, args.chip, selected)
+                {
+                    let command = crate::generate_build_command(
+                        &package_path,
+                        args.chip,
+                        &target,
+                        &radio_meta,
+                        command_action.clone(),
+                        false,
+                        args.toolchain.as_deref(),
+                        args.timings,
+                        &[],
+                    )?;
+                    artifact_meta.insert(command.artifact_name.clone(), radio_meta);
+                    commands.push(command);
+                    continue;
+                }
                 unknown_selected.push(selected.to_string());
             } else {
                 let matched_for_chip: Vec<_> = matched
@@ -507,12 +539,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                         args.chip,
                         &target,
                         test,
-                        action.clone(),
+                        command_action.clone(),
                         false,
                         args.toolchain.as_deref(),
                         args.timings,
                         run_test_extra_args,
                     )?;
+                    artifact_meta.insert(command.artifact_name.clone(), test.clone());
                     commands.push(command);
                 }
             }
@@ -530,99 +563,190 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             bail!("Test not found: {}", unknown_selected.join(", "))
         }
     } else {
-        for test in tests {
+        for test in tests_for_chip {
             let command = crate::generate_build_command(
                 &package_path,
                 args.chip,
                 &target,
                 test,
-                action.clone(),
+                command_action.clone(),
                 false,
                 args.toolchain.as_deref(),
                 args.timings,
                 &[],
             )?;
+            artifact_meta.insert(command.artifact_name.clone(), test.clone());
+            commands.push(command);
+        }
+    }
+
+    if is_radio_package {
+        let mut selected_artifacts: HashSet<String> = artifact_meta.keys().cloned().collect();
+        let mut required_harness = Vec::<firmware::Metadata>::new();
+
+        for test in artifact_meta.values() {
+            if test.is_support_firmware() {
+                continue;
+            }
+            let Some(harness_name) = test.harness_firmware() else {
+                continue;
+            };
+
+            let Some(harness_meta) = all_tests.iter().find(|candidate| {
+                candidate.supports_chip(args.chip)
+                    && (candidate.binary_name() == harness_name
+                        || candidate.output_file_name() == harness_name)
+            }) else {
+                bail!(
+                    "Missing harness firmware '{harness_name}' required by '{}'",
+                    test.output_file_name()
+                );
+            };
+
+            required_harness.push(harness_meta.clone());
+        }
+
+        for harness in required_harness {
+            let artifact_name = harness.output_file_name();
+            if selected_artifacts.contains(&artifact_name) {
+                continue;
+            }
+
+            let command = crate::generate_build_command(
+                &package_path,
+                args.chip,
+                &target,
+                &harness,
+                command_action.clone(),
+                false,
+                args.toolchain.as_deref(),
+                args.timings,
+                &[],
+            )?;
+            selected_artifacts.insert(command.artifact_name.clone());
+            artifact_meta.insert(command.artifact_name.clone(), harness);
             commands.push(command);
         }
     }
 
     let mut failed = Vec::new();
+    // Radio run orchestration depends on per-artifact metadata, so avoid
+    // cargo-batch collapsing commands into a single synthetic "batch" artifact.
+    let no_batch = is_radio_package && matches!(action, CargoAction::Run);
+    let built_commands = commands.build(no_batch);
 
-    for c in commands.build(false) {
-        let repeat = if matches!(action, CargoAction::Run) {
-            args.repeat
-        } else {
-            1
-        };
+    if is_radio_package && matches!(action, CargoAction::Run) {
+        // Build all selected radio artifacts first to ensure support firmware is
+        // available before starting DUT runs.
+        let mut successfully_built = HashSet::<String>::new();
+        for c in &built_commands {
+            let mut build_cmd = c.clone();
+            if let Some(pos) = build_cmd.command.iter().position(|x| x == "run") {
+                build_cmd.command[pos] = "build".to_string();
+            }
+            if !build_cmd.command.iter().any(|x| x == "--release") {
+                build_cmd.command.push("--release".to_string());
+            }
 
-        println!(
-            "Command: cargo {}",
-            c.command.join(" ").replace("---", "\n    ---")
-        );
+            log::info!(
+                "Building radio artifact with command: {}",
+                build_cmd.command.join(" ")
+            );
 
-        // If this is a radio package and we're running (not just building),
-        // use the custom orchestrator runner instead of standard probe-rs
-        if is_radio_package && matches!(action, CargoAction::Run) {
-            for i in 0..repeat {
-                if repeat != 1 {
-                    log::info!("Run {}/{}", i + 1, repeat);
-                }
+            if build_cmd.run(false).is_err() {
+                failed.push(c.artifact_name.clone());
+            } else {
+                successfully_built.insert(c.artifact_name.clone());
+            }
+        }
 
-                // Build the radio test binary
-                let mut build_cmd = c.clone();
-
-                // Change "run" to "build" in the command
-                if let Some(pos) = build_cmd.command.iter().position(|x| x == "run") {
-                    build_cmd.command[pos] = "build".to_string();
-                }
-
-                // Ensure --release is set
-                if !build_cmd.command.iter().any(|x| x == "--release") {
-                    build_cmd.command.push("--release".to_string());
-                }
-
-                log::info!(
-                    "Building radio test with command: {}",
-                    build_cmd.command.join(" ")
+        for c in &built_commands {
+            if !successfully_built.contains(&c.artifact_name) {
+                log::warn!(
+                    "Skipping '{}' run phase because build failed",
+                    c.artifact_name
                 );
+                continue;
+            }
 
-                if build_cmd.run(false).is_err() {
-                    failed.push(c.artifact_name.clone());
-                    log::error!("Failed to build radio test");
-                    break;
+            let Some(meta) = artifact_meta.get(&c.artifact_name) else {
+                continue;
+            };
+
+            if meta.is_support_firmware() {
+                log::info!("Skipping support firmware '{}' as DUT", c.artifact_name);
+                continue;
+            }
+
+            let dut_binary_path = resolve_radio_binary_path(workspace, &target, &c.artifact_name);
+            if !dut_binary_path.exists() {
+                failed.push(c.artifact_name.clone());
+                log::error!(
+                    "Radio DUT binary not found for '{}': {}",
+                    c.artifact_name,
+                    dut_binary_path.display()
+                );
+                continue;
+            }
+
+            let harness_binary_path = meta.harness_firmware().map(|name| {
+                let harness_artifact = artifact_meta
+                    .iter()
+                    .find_map(|(artifact, candidate)| {
+                        if candidate.supports_chip(args.chip)
+                            && (candidate.output_file_name() == name
+                                || candidate.binary_name() == name)
+                        {
+                            Some(artifact.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(name);
+                resolve_radio_binary_path(workspace, &target, harness_artifact)
+            });
+
+            if let Some(path) = &harness_binary_path
+                && !path.exists()
+            {
+                failed.push(c.artifact_name.clone());
+                log::error!(
+                    "Harness firmware '{}' required by '{}' is missing at {}",
+                    meta.harness_firmware().unwrap_or_default(),
+                    c.artifact_name,
+                    path.display()
+                );
+                continue;
+            }
+
+            for i in 0..args.repeat {
+                if args.repeat != 1 {
+                    log::info!("Run {}/{}", i + 1, args.repeat);
                 }
 
-                let base_binary_name = c
-                    .artifact_name
-                    .split('_')
-                    .take_while(|part| *part != "has" && *part != "no") // Stop at config markers
-                    .collect::<Vec<_>>()
-                    .join("_");
-
-                let binary_path = workspace
-                    .join("target")
-                    .join(&target)
-                    .join("release")
-                    .join(&base_binary_name);
-
-                log::info!("Looking for binary at: {}", binary_path.display());
-
-                if !binary_path.exists() {
-                    bail!("Radio test binary not found: {}", binary_path.display());
-                }
-
-                let test_names = extract_radio_tests(&binary_path)?;
-                let (ap_test, sta_test) = get_test_pair(&test_names)?;
-
-                // Run with custom orchestrator
-                if let Err(e) = run_radio_test(&binary_path, &ap_test, &sta_test, 120, None) {
+                if let Err(e) =
+                    run_radio_test(&dut_binary_path, harness_binary_path.as_deref(), 120, None)
+                {
                     failed.push(c.artifact_name.clone());
-                    log::error!("Radio test failed: {}", e);
+                    log::error!("Radio test '{}' failed: {}", c.artifact_name, e);
                     break;
                 }
             }
-        } else {
-            // For HAL tests or build action, use standard probe-rs runner
+        }
+    } else {
+        for c in built_commands {
+            let repeat = if matches!(action, CargoAction::Run) {
+                args.repeat
+            } else {
+                1
+            };
+
+            println!(
+                "Command: cargo {}",
+                c.command.join(" ").replace("---", "\n    ---")
+            );
+
+            // For HAL tests or build action, use standard probe-rs runner.
             for i in 0..repeat {
                 if repeat != 1 {
                     log::info!("Run {}/{}", i + 1, repeat);
@@ -641,6 +765,56 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     }
 
     Ok(())
+}
+
+fn resolve_radio_binary_path(
+    workspace: &Path,
+    target: &str,
+    artifact_name: &str,
+) -> std::path::PathBuf {
+    let release_dir = workspace.join("target").join(target).join("release");
+    let exact = release_dir.join(artifact_name);
+    if exact.exists() {
+        return exact;
+    }
+
+    let base_name = artifact_name
+        .split('_')
+        .take_while(|part| *part != "has" && *part != "no")
+        .collect::<Vec<_>>()
+        .join("_");
+    release_dir.join(base_name)
+}
+
+fn resolve_radio_module_alias(
+    package_path: &Path,
+    all_tests: &[firmware::Metadata],
+    chip: Chip,
+    selected: &str,
+) -> Option<firmware::Metadata> {
+    let bins_root = package_path.join("src").join("bin");
+    let entries = std::fs::read_dir(bins_root).ok()?;
+
+    for entry in entries.flatten() {
+        let subdir = entry.path();
+        if !subdir.is_dir() {
+            continue;
+        }
+
+        if !subdir.join(format!("{selected}.rs")).exists() {
+            continue;
+        }
+
+        let binary_name = entry.file_name().to_string_lossy().to_string();
+        if let Some(meta) = all_tests
+            .iter()
+            .find(|test| test.supports_chip(chip) && test.binary_name() == binary_name)
+        {
+            return Some(meta.clone());
+        }
+    }
+
+    None
 }
 
 fn move_artifacts(chip: Chip, action: &CargoAction) {

@@ -21,6 +21,8 @@ pub struct Metadata {
     features: Vec<String>,
     tag: Option<String>,
     description: Option<String>,
+    harness_firmware: Option<String>,
+    support_firmware: bool,
     env_vars: HashMap<String, String>,
     cargo_config: Vec<String>,
 }
@@ -93,6 +95,16 @@ impl Metadata {
         self.description.clone()
     }
 
+    /// Optional support firmware binary to run on a second target.
+    pub fn harness_firmware(&self) -> Option<&str> {
+        self.harness_firmware.as_deref()
+    }
+
+    /// True if this artifact is support firmware and should not run as a DUT test.
+    pub fn is_support_firmware(&self) -> bool {
+        self.support_firmware
+    }
+
     /// Check if the example matches the given filter.
     pub fn matches(&self, filter: Option<&str>) -> bool {
         let Some(filter) = filter else {
@@ -117,6 +129,8 @@ pub struct Configuration {
     features: Vec<String>,
     esp_config: HashMap<String, String>,
     tag: Option<String>,
+    harness_firmware: Option<String>,
+    support_firmware: bool,
 }
 
 struct ConfigurationCollector<'a> {
@@ -276,6 +290,22 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 "TAG" => {
                     relevant_metadata.apply(|meta| meta.tag = Some(meta_line.value.to_string()));
                 }
+                // Optional support firmware binary that must run on another target.
+                "HARNESS_FIRMWARE" => {
+                    relevant_metadata
+                        .apply(|meta| meta.harness_firmware = Some(meta_line.value.to_string()));
+                }
+                // Mark this artifact as support firmware (not a DUT test).
+                "SUPPORT_FIRMWARE" => {
+                    let support = parse_bool(&meta_line.value)
+                        .with_context(|| "SUPPORT_FIRMWARE metadata must be true/false")?;
+                    relevant_metadata.apply(|meta| meta.support_firmware = support);
+                }
+                "TEST-SUPPORT-FIRMWARE" => {
+                    let support = parse_bool(&meta_line.value)
+                        .with_context(|| "TEST-SUPPORT-FIRMWARE metadata must be true/false")?;
+                    relevant_metadata.apply(|meta| meta.support_firmware = support);
+                }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
         }
@@ -290,6 +320,16 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
+            }
+
+            // Harness firmware is a selector, inherit if empty
+            if meta.harness_firmware.is_none() {
+                meta.harness_firmware = all_configuration.harness_firmware.clone();
+            }
+
+            // Support firmware marker inherits if not explicitly set.
+            if !meta.support_firmware {
+                meta.support_firmware = all_configuration.support_firmware;
             }
 
             // Other values are merged
@@ -322,6 +362,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     configuration_name: configuration.name.clone(),
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
+                    harness_firmware: configuration.harness_firmware.clone(),
+                    support_firmware: configuration.support_firmware,
                     env_vars: configuration.esp_config.clone(),
                     cargo_config: configuration.cargo_config.clone(),
                 })
@@ -375,6 +417,8 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
                 features: vec![],
                 tag: None,
                 description: description.clone(),
+                harness_firmware: None,
+                support_firmware: false,
                 env_vars: HashMap::new(),
                 cargo_config: Vec::new(),
             });
@@ -382,6 +426,23 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     }
 
     Ok(examples)
+}
+
+/// Find the metadata entry for an artifact/test name.
+pub fn find_test_by_name<'a>(tests: &'a [Metadata], name: &str) -> Option<&'a Metadata> {
+    tests.iter().find(|test| {
+        test.binary_name() == name
+            || test.output_file_name() == name
+            || test.name_with_configuration() == name
+    })
+}
+
+fn parse_bool(value: &str) -> Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "y" | "on" => Ok(true),
+        "false" | "0" | "no" | "n" | "off" => Ok(false),
+        _ => bail!("invalid boolean value: {value}"),
+    }
 }
 
 fn parse_description(text: &str) -> Option<String> {
