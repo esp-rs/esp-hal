@@ -770,23 +770,23 @@ impl ConfigChooser {
         loop {
             self.draw(&mut terminal)?;
 
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => return Ok(None),
-                        KeyCode::Esc => return Ok(None),
-                        KeyCode::Char('j') | KeyCode::Down => {
-                            self.state.select_next();
-                        }
-                        KeyCode::Char('k') | KeyCode::Up => {
-                            self.state.select_previous();
-                        }
-                        KeyCode::Enter => {
-                            let selected = self.state.selected().unwrap_or_default();
-                            return Ok(Some(self.config_files[selected].clone()));
-                        }
-                        _ => {}
+            if let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Char('q') => return Ok(None),
+                    KeyCode::Esc => return Ok(None),
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        self.state.select_next();
                     }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        self.state.select_previous();
+                    }
+                    KeyCode::Enter => {
+                        let selected = self.state.selected().unwrap_or_default();
+                        return Ok(Some(self.config_files[selected].clone()));
+                    }
+                    _ => {}
                 }
             }
         }
