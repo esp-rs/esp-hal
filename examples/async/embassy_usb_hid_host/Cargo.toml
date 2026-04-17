@@ -1,0 +1,50 @@
+[package]
+name    = "embassy-usb-hid_host"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = "0.10.0"
+embassy-futures = "0.1"
+embassy-usb-host = { version = "0.1.0", default-features = false }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+log = "0.4"
+
+[features]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-rtos/esp32s2",
+    "esp-hal/esp32s2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-rtos/esp32s3",
+    "esp-hal/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
+
+[patch.crates-io]
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-time-queue-utils = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-executor-macros = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-executor-timer-queue = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-usb-host = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-usb-driver = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
+embassy-usb-synopsys-otg = { git = "https://github.com/embassy-rs/embassy", rev = "798f995ba60b3fd0552f327189e0d1fa7791b93b" }
