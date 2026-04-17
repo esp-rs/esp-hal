@@ -19,7 +19,7 @@ impl FlashStorage<'_> {
     #[inline(always)]
     fn is_word_aligned(bytes: &[u8]) -> bool {
         // TODO: Use is_aligned_to when stabilized (see `pointer_is_aligned`)
-        (bytes.as_ptr() as usize) % (Self::WORD_SIZE as usize) == 0
+        (bytes.as_ptr() as usize).is_multiple_of(Self::WORD_SIZE as usize)
     }
 }
 
@@ -182,7 +182,7 @@ impl NorFlash for FlashStorage<'_> {
 
         // First erase by sector up to the block boundary.
         let mut address = from;
-        while address < to && (address % Self::BLOCK_SIZE) != 0 {
+        while address < to && !address.is_multiple_of(Self::BLOCK_SIZE) {
             self.internal_erase_sector(address / Self::SECTOR_SIZE)?;
             address += Self::SECTOR_SIZE;
         }
