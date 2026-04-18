@@ -3,16 +3,20 @@ cfg_if::cfg_if! {
     {
         // RISCV ULP specific interrupt handlers, critical section
         #[cfg(any(esp32s2, esp32s3))]
-        pub mod riscv_ulp;
+        pub mod ulp_core;
         #[cfg(any(esp32s2, esp32s3))]
-        pub use riscv_ulp::*;
+        pub use ulp_core::*;
+        // ULP-core critical section implementation
         #[cfg(any(esp32s2, esp32s3))]
         mod critical_section;
 
+        #[cfg(esp32c6)]
+        pub mod lp_core;
+        #[cfg(esp32c6)]
+        pub use lp_core::*;
+
         /// Portable interrupt binding and handling code
-        #[cfg(any(esp32s2, esp32s3))]
         pub mod generic;
-        #[cfg(any(esp32s2, esp32s3))]
         pub use generic::*;
     } else {
         /// If interrupt handling is not enabled, need to provide a stubs functions for

@@ -88,7 +88,15 @@ impl Io {
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
-        crate::interrupt::bind_handler(Interrupt::GPIO_INT, user_gpio_interrupt_handler);
+        #[cfg(any(esp32s2, esp32s3))]
+        {
+            crate::interrupt::bind_handler(Interrupt::GPIO_INT, user_gpio_interrupt_handler);
+        }
+
+        #[cfg(esp32c6)]
+        {
+            todo!()
+        }
     }
 }
 

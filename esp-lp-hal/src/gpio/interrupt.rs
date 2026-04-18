@@ -1,6 +1,7 @@
 pub use interrupt::{Interrupt, InterruptHandler, InterruptStatus};
 pub use procmacros::handler;
 
+#[allow(unused_imports)]
 use super::{Io, LpIo};
 use crate::interrupt;
 
@@ -58,6 +59,7 @@ pub fn gpio_interrupt_status() -> u32 {
 
 /// Clear the interrupt status for a bit mask of pins
 /// Expects pinmask bit 0 == GPIO0
+#[allow(unused_variables)]
 #[inline]
 pub fn gpio_interrupt_clear(pinmask: u32) {
     #[cfg(any(esp32s2, esp32s3))]
@@ -74,6 +76,7 @@ pub fn gpio_interrupt_clear(pinmask: u32) {
 /// - `int_type`: interrupt type code, value from [Event], 0 to disable interrupts. If None, will
 ///   leave the int_type setting as-is.
 /// - `wake_up`: whether to wake up from light sleep.
+#[allow(unused_variables)]
 pub fn enable_pin_interrupt<const N: u8>(int_type: u8) {
     #[cfg(any(esp32s2, esp32s3))]
     {
@@ -96,6 +99,7 @@ pub fn is_interrupt_set<const N: u8>() -> bool {
 }
 
 /// Enable / disable pin wakeup
+#[allow(unused_variables)]
 pub fn pin_wakeup_enable<const N: u8>(en: bool) {
     #[cfg(any(esp32s2, esp32s3))]
     {
