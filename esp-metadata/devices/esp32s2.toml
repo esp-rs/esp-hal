@@ -285,6 +285,7 @@ support_status = "partial"
 kind = "pdma"
 supports_mem2mem = true
 can_access_psram = true
+ext_mem_configurable_block_size = true
 
 [device.gpio]
 support_status = "supported"
@@ -678,6 +679,7 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+extmem_origin = 0x3f500000
 # octal_spi = true
 
 [device.systimer]
@@ -689,5 +691,6 @@ deep_sleep = true
 ## Radio
 [device.wifi]
 mac_version = 1
+csi_supported = true
 
 [device.phy]

@@ -304,7 +304,7 @@ fn cargo_doc_without_pre_processing(
 
 /// Pre-process the Cargo.toml file
 ///
-/// This will keep the orignal as "Cargo.toml_original"
+/// This will keep the original as "Cargo.toml_original"
 ///
 /// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
 /// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.
@@ -342,7 +342,10 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {
         if let Some(chip_cfg) = chip_cfg {
-            chip_cfg.all().iter().any(|symbol| cond == symbol)
+            chip_cfg
+                .all()
+                .iter()
+                .any(|symbol| cond == symbol.replace('.', "_"))
         } else {
             false
         }

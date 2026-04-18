@@ -86,6 +86,9 @@ macro_rules! property {
         true
     };
     ("dma.can_access_psram") => {
+        true
+    };
+    ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
@@ -240,6 +243,12 @@ macro_rules! property {
     };
     ("psram.octal_spi") => {
         false
+    };
+    ("psram.extmem_origin") => {
+        1107296256
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1107296256)
     };
     ("rmt.ram_start") => {
         1610638336
@@ -398,6 +407,9 @@ macro_rules! property {
         stringify!(3)
     };
     ("wifi.has_5g") => {
+        true
+    };
+    ("wifi.csi_supported") => {
         true
     };
 }

@@ -334,6 +334,7 @@ impl Chip {
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"xtensa\"",
                     "phy_combo_module",
+                    "psram_extmem_origin=\"1065353216\"",
                     "rmt_ram_start=\"1073047552\"",
                     "rmt_channel_ram_size=\"64\"",
                     "rmt_has_per_channel_clock",
@@ -386,6 +387,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32",
@@ -531,6 +533,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"xtensa\"",
                     "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1065353216\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1073047552\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
@@ -583,6 +586,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -1372,6 +1376,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c3",
@@ -1575,6 +1580,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -1828,6 +1834,7 @@ impl Chip {
                     "bt_controller=\"npl\"",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_can_access_psram",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"5\"",
                     "dma_max_priority_is_set",
@@ -1865,6 +1872,7 @@ impl Chip {
                     "lp_uart_ram_size=\"32\"",
                     "parl_io_version=\"2\"",
                     "phy_combo_module",
+                    "psram_extmem_origin=\"1107296256\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -1930,6 +1938,7 @@ impl Chip {
                     "uhci_combined_uart_selector_field",
                     "wifi_mac_version=\"3\"",
                     "wifi_has_5g",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c5",
@@ -2073,6 +2082,7 @@ impl Chip {
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"5\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -2110,6 +2120,7 @@ impl Chip {
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -2175,6 +2186,7 @@ impl Chip {
                     "cargo:rustc-cfg=uhci_combined_uart_selector_field",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
                     "cargo:rustc-cfg=wifi_has_5g",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -2555,6 +2567,7 @@ impl Chip {
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"2\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c6",
@@ -2829,6 +2842,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"2\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -3027,22 +3041,39 @@ impl Chip {
                     "soc_has_uart0",
                     "soc_has_uart1",
                     "soc_has_usb_device",
+                    "soc_has_dma_ch0",
+                    "soc_has_dma_ch1",
                     "soc_has_bt",
                     "soc_has_flash",
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
+                    "soc_has_mem2mem0",
+                    "soc_has_mem2mem1",
+                    "soc_has_mem2mem2",
+                    "soc_has_mem2mem3",
+                    "soc_has_mem2mem4",
+                    "soc_has_mem2mem5",
+                    "soc_has_mem2mem6",
+                    "soc_has_mem2mem7",
+                    "soc_has_mem2mem8",
+                    "soc_has_mem2mem9",
+                    "soc_has_mem2mem10",
+                    "soc_has_mem2mem11",
                     "soc_has_psram",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "bt_driver_supported",
+                    "dma_driver_supported",
+                    "ecc_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
                     "psram_driver_supported",
                     "rng_driver_supported",
+                    "sha_driver_supported",
                     "soc_driver_supported",
                     "spi_master_driver_supported",
                     "spi_slave_driver_supported",
@@ -3058,6 +3089,21 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "bt_controller=\"npl\"",
+                    "dma_kind=\"gdma\"",
+                    "dma_supports_mem2mem",
+                    "dma_separate_in_out_interrupts",
+                    "dma_max_priority=\"5\"",
+                    "dma_max_priority_is_set",
+                    "dma_gdma_version=\"2\"",
+                    "dma_gdma_version_is_set",
+                    "ecc_zero_extend_writes",
+                    "ecc_separate_jacobian_point_memory",
+                    "ecc_has_memory_clock_gate",
+                    "ecc_supports_enhanced_security",
+                    "ecc_has_modular_arithmetic",
+                    "ecc_has_point_addition",
+                    "ecc_has_curve_p192",
+                    "ecc_has_curve_p256",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"96\"",
                     "gpio_constant_1_input=\"64\"",
@@ -3078,7 +3124,9 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "psram_extmem_origin=\"1107296256\"",
                     "rng_apb_cycle_wait_num=\"16\"",
+                    "sha_dma",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
@@ -3108,6 +3156,7 @@ impl Chip {
                     "soc_has_clock_node_timg_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "spi_master_supports_dma",
                     "spi_master_has_app_interrupts",
                     "spi_master_has_dma_segmented_transfer",
                     "spi_master_has_clk_pre_div",
@@ -3117,6 +3166,7 @@ impl Chip {
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"3\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c61",
@@ -3169,22 +3219,39 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_uart0",
                     "cargo:rustc-cfg=soc_has_uart1",
                     "cargo:rustc-cfg=soc_has_usb_device",
+                    "cargo:rustc-cfg=soc_has_dma_ch0",
+                    "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
+                    "cargo:rustc-cfg=soc_has_mem2mem0",
+                    "cargo:rustc-cfg=soc_has_mem2mem1",
+                    "cargo:rustc-cfg=soc_has_mem2mem2",
+                    "cargo:rustc-cfg=soc_has_mem2mem3",
+                    "cargo:rustc-cfg=soc_has_mem2mem4",
+                    "cargo:rustc-cfg=soc_has_mem2mem5",
+                    "cargo:rustc-cfg=soc_has_mem2mem6",
+                    "cargo:rustc-cfg=soc_has_mem2mem7",
+                    "cargo:rustc-cfg=soc_has_mem2mem8",
+                    "cargo:rustc-cfg=soc_has_mem2mem9",
+                    "cargo:rustc-cfg=soc_has_mem2mem10",
+                    "cargo:rustc-cfg=soc_has_mem2mem11",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=bt_driver_supported",
+                    "cargo:rustc-cfg=dma_driver_supported",
+                    "cargo:rustc-cfg=ecc_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
+                    "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
                     "cargo:rustc-cfg=spi_slave_driver_supported",
@@ -3200,6 +3267,21 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
+                    "cargo:rustc-cfg=dma_kind=\"gdma\"",
+                    "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_separate_in_out_interrupts",
+                    "cargo:rustc-cfg=dma_max_priority=\"5\"",
+                    "cargo:rustc-cfg=dma_max_priority_is_set",
+                    "cargo:rustc-cfg=dma_gdma_version=\"2\"",
+                    "cargo:rustc-cfg=dma_gdma_version_is_set",
+                    "cargo:rustc-cfg=ecc_zero_extend_writes",
+                    "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
+                    "cargo:rustc-cfg=ecc_has_memory_clock_gate",
+                    "cargo:rustc-cfg=ecc_supports_enhanced_security",
+                    "cargo:rustc-cfg=ecc_has_modular_arithmetic",
+                    "cargo:rustc-cfg=ecc_has_point_addition",
+                    "cargo:rustc-cfg=ecc_has_curve_p192",
+                    "cargo:rustc-cfg=ecc_has_curve_p256",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
@@ -3220,7 +3302,9 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
@@ -3250,6 +3334,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
                     "cargo:rustc-cfg=spi_master_has_dma_segmented_transfer",
                     "cargo:rustc-cfg=spi_master_has_clk_pre_div",
@@ -3259,6 +3344,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -4122,6 +4208,7 @@ impl Chip {
                     "dma_kind=\"pdma\"",
                     "dma_supports_mem2mem",
                     "dma_can_access_psram",
+                    "dma_ext_mem_configurable_block_size",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -4139,6 +4226,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"xtensa\"",
+                    "psram_extmem_origin=\"1062207488\"",
                     "rmt_ram_start=\"1061250048\"",
                     "rmt_channel_ram_size=\"64\"",
                     "rmt_has_tx_immediate_stop",
@@ -4195,6 +4283,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s2",
@@ -4332,6 +4421,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_kind=\"pdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_can_access_psram",
+                    "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -4349,6 +4439,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"xtensa\"",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1062207488\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1061250048\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -4405,6 +4496,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -4754,6 +4846,7 @@ impl Chip {
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
                     "dma_can_access_psram",
+                    "dma_ext_mem_configurable_block_size",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
@@ -4782,6 +4875,7 @@ impl Chip {
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
                     "psram_octal_spi",
+                    "psram_extmem_origin=\"1006632960\"",
                     "rmt_ram_start=\"1610704896\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -4846,6 +4940,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
+                    "wifi_csi_supported",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s3",
@@ -5001,6 +5096,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_can_access_psram",
+                    "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -5029,6 +5125,7 @@ impl Chip {
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
                     "cargo:rustc-cfg=psram_octal_spi",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1006632960\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610704896\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5093,6 +5190,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
+                    "cargo:rustc-cfg=wifi_csi_supported",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -5525,6 +5623,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(spi_slave_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_timer1)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(wifi_csi_supported)");
     println!("cargo:rustc-check-cfg=cfg(esp32c2)");
     println!("cargo:rustc-check-cfg=cfg(riscv)");
     println!("cargo:rustc-check-cfg=cfg(single_core)");
@@ -5663,6 +5762,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(ecc_separate_jacobian_point_memory)");
     println!("cargo:rustc-check-cfg=cfg(ecc_has_memory_clock_gate)");
@@ -5722,6 +5822,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32c61)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem9)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem10)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem11)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f96m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");
@@ -5742,7 +5845,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
-    println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
+    println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");
@@ -5786,6 +5889,10 @@ pub fn emit_check_cfg_directives() {
     println!(
         "cargo:rustc-check-cfg=cfg(interrupt_controller, \
          values(\"xtensa\",\"riscv_basic\",\"clic\",\"plic\"))"
+    );
+    println!(
+        "cargo:rustc-check-cfg=cfg(psram_extmem_origin, \
+         values(\"1065353216\",\"1107296256\",\"1062207488\",\"1006632960\"))"
     );
     println!(
         "cargo:rustc-check-cfg=cfg(rmt_ram_start, \

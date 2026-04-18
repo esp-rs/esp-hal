@@ -1,8 +1,8 @@
 [package]
 name          = "esp-config"
-version       = "0.6.1"
+version       = "0.7.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Configure projects using esp-hal and related packages"
 documentation = "https://docs.espressif.com/projects/rust/esp-config/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
@@ -33,7 +33,7 @@ document-features = "0.2"
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 serde_yaml = { version =  "0.9", optional = true }
 somni-expr = { version = "0.2.0", optional = true }
-esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"], optional = true }
+esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"], optional = true }
 
 # used by the `tui` feature
 clap            = { version = "4.5", features = ["derive"], optional = true }

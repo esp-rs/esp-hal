@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.2.0] - 2026-04-16
+
+### Added
+
 - `last_calibration_result` to get the result of the last calibration (#4479)
 - Support for ESP32-C5 (#5003)
 - Support for ESP32-C61 (#5255)
@@ -16,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Use drivers from ESP-IDF v5.5.3 (#5226)
-
 
 ### Fixed
 
@@ -36,4 +49,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-phy-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-phy-v0.1.0...esp-phy-v0.1.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-phy-v0.1.1...HEAD
+[v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-phy-v0.1.1...esp-phy-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-phy-v0.2.0...HEAD

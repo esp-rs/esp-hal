@@ -304,6 +304,7 @@ separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 9
 can_access_psram = true
+ext_mem_configurable_block_size = true
 
 [device.gpio]
 support_status = "supported"
@@ -877,6 +878,7 @@ deep_sleep = true
 ## Miscellaneous
 [device.io_mux]
 [device.psram]
+extmem_origin = 0x3C000000
 octal_spi = true
 
 [device.systimer]
@@ -888,6 +890,7 @@ octal_spi = true
 ## Radio
 [device.wifi]
 mac_version = 1
+csi_supported = true
 
 [device.bt]
 support_status = "partial"

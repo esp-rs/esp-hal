@@ -108,7 +108,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(dma_can_access_psram)]
+    #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
         // not supported
     }
@@ -280,7 +280,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         self.0.is_compatible_with(peripheral)
     }
 
-    #[cfg(dma_can_access_psram)]
+    #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
         // not supported
     }

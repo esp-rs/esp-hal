@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.10.1] - 2026-04-16
+
+### Added
+
 - Clock tree modeling (#4501)
 - Encode pin restrictions in the generated data (#4790)
 - Initial ESP32-C5 support (#4859, #4866)
@@ -18,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Symbols generated from driver names are now suffixed by `_driver_supported` (#4929)
-
-### Fixed
-
 
 ### Removed
 
@@ -95,4 +106,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.7.0...esp-metadata-v0.8.0
 [v0.9.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.8.0...esp-metadata-v0.9.0
 [v0.10.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.9.0...esp-metadata-v0.10.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.10.0...HEAD
+[v0.10.1]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.10.0...esp-metadata-v0.10.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.10.1...HEAD

@@ -1,8 +1,8 @@
 [package]
 name          = "esp-radio-rtos-driver"
-version       = "0.2.0"
+version       = "0.3.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Task scheduler interface for esp-radio"
 documentation = "https://docs.espressif.com/projects/rust/esp-radio-rtos-driver/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
@@ -23,7 +23,7 @@ portable-atomic = "1"
 portable-atomic = { version = "1", features = ["unsafe-assume-single-core"] }
 
 [dependencies]
-esp-sync = { version = "0.1.1", path = "../esp-sync", optional = true }
+esp-sync = { version = "0.2.1", path = "../esp-sync", optional = true }
 cfg-if = "1"
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
