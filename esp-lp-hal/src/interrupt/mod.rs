@@ -10,7 +10,9 @@ cfg_if::cfg_if! {
         mod critical_section;
 
         /// Portable interrupt binding and handling code
+        #[cfg(any(esp32s2, esp32s3))]
         pub mod generic;
+        #[cfg(any(esp32s2, esp32s3))]
         pub use generic::*;
     } else {
         /// If interrupt handling is not enabled, need to provide a stubs functions for
