@@ -10,7 +10,7 @@
 //! The following wiring is assumed:
 //! - BUTTON => GPIO0
 
-//% CHIPS: esp32s3,esp32s2
+//% CHIPS: esp32s3 esp32s2
 
 #![no_std]
 #![no_main]
