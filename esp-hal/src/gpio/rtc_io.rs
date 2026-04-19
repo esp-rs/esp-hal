@@ -33,7 +33,7 @@ use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
 use crate::{
-    gpio::RtcFunction,
+    gpio::{RtcFunction, WakeEvent},
     peripherals::{GPIO, RTC_IO},
 };
 
@@ -85,13 +85,13 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
         P: InputPin + RtcPin + 'd,
     {
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
-
         let this = Self {
             phantom: PhantomData,
         };
         this.input_enable(true);
         this.pullup_enable(false);
         this.pulldown_enable(false);
+        this.wakeup_enable(None);
 
         this
     }
@@ -114,6 +114,23 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
         RTC_IO::regs()
             .touch_pad(PIN as usize)
             .modify(|_, w| w.rde().bit(enable));
+    }
+
+    /// Allows this pin to wakeup the ULP core, when UlpCoreWakeupSource::Gpio is used.
+    pub fn wakeup_enable(&self, event: Option<WakeEvent>) {
+        let pin_reg_rtc = RTC_IO::regs().pin(PIN as usize);
+        let wake_en = event.is_some();
+        let int_type = event.map_or(0, |e| e as u8);
+
+        #[cfg(esp32s3)]
+        pin_reg_rtc.write(|w| unsafe { w.int_type().bits(int_type).wakeup_enable().bit(wake_en) });
+        #[cfg(esp32s2)]
+        pin_reg_rtc.write(|w| unsafe {
+            w.gpio_pin_int_type()
+                .bits(int_type)
+                .gpio_pin_wakeup_enable()
+                .bit(wake_en)
+        });
     }
 }
 

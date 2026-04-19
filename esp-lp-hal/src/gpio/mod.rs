@@ -23,13 +23,80 @@
 //! }
 //! ```
 
+/// Used by the `entry` procmacro
+pub mod conjure;
+pub use conjure::*;
+
+#[cfg(feature = "embedded-hal")]
+/// Provides embedded-hal trait impls
+pub mod ehal;
+
+/// Provides GPIO interrupt support
+// TODO: Implement GPIO interrupts for ESP32C6 LP core
+#[cfg(feature = "interrupts")]
+pub mod interrupt;
+#[cfg(feature = "interrupts")]
+pub use interrupt::{
+    Event,
+    Interrupt,
+    InterruptHandler,
+    USER_INTERRUPT_HANDLER,
+    gpio_interrupt_clear,
+    gpio_interrupt_status,
+    user_gpio_interrupt_handler,
+};
+
 cfg_if::cfg_if! {
     if #[cfg(esp32c6)] {
         type LpIo = crate::pac::LP_IO;
-        const MAX_GPIO_PIN: u8 = 7;
+        /// Maximum GPIO pin number.
+        pub const MAX_GPIO_PIN: u8 = 7;
     } else {
         type LpIo = crate::pac::RTC_IO;
-        const MAX_GPIO_PIN: u8 = 21;
+        /// Maximum GPIO pin number.
+        pub const MAX_GPIO_PIN: u8 = 21;
+    }
+}
+
+/// General Purpose Input/Output driver
+pub struct Io {
+    _io_peripheral: LpIo,
+}
+
+impl Io {
+    /// Initialize the I/O driver.
+    pub fn new(_io_peripheral: LpIo) -> Self {
+        Io { _io_peripheral }
+    }
+
+    #[cfg(feature = "interrupts")]
+    #[doc = "Registers an interrupt handler for all GPIO pins."]
+    /// Note that when using interrupt handlers registered by this function, or
+    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
+    /// **not** clear the interrupt status register or the interrupt enable
+    /// setting for you. Based on your use case, you need to do one of this
+    /// yourself:
+    ///
+    /// - Disabling the interrupt enable setting for the GPIO pin allows you to handle an event once
+    ///   per call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method will return
+    ///   `true` if the interrupt is set even after your handler has finished running.
+    /// - Clearing the interrupt status register allows you to handle an event repeatedly after
+    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] will return `false`
+    ///   after your handler has finished running.
+    ///
+    /// [`listen()`]: Input::listen
+    /// [`is_interrupt_set()`]: Input::is_interrupt_set
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        USER_INTERRUPT_HANDLER.store(handler.handler().callback());
+        #[cfg(any(esp32s2, esp32s3))]
+        {
+            crate::interrupt::bind_handler(Interrupt::GPIO_INT, user_gpio_interrupt_handler);
+        }
+
+        #[cfg(esp32c6)]
+        {
+            todo!()
+        }
     }
 }
 
@@ -89,6 +156,9 @@ impl From<Level> for bool {
 
 /// Flexible pin driver.
 /// Provides a common implementation for input and output pins.
+/// Currently hidden, as it is not intended to be used directly,
+/// because it does not handle changing the pin modes.
+#[doc(hidden)]
 pub struct Flex<const PIN: u8> {}
 
 #[allow(clippy::new_without_default)]
@@ -147,6 +217,46 @@ impl<const PIN: u8> Flex<PIN> {
         let level = self.output_level();
         self.set_level(!level);
     }
+
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                // Validate the inputs
+                if wakeup_enable {
+                    match event {
+                        Event::LowLevel | Event::HighLevel => {},
+                        _ => {
+                            panic!("GPIO wakeup is only supported with LowLevel or HighLevel event types.");
+                        }
+                    }
+                }
+
+                self.clear_interrupt();
+                interrupt::enable_pin_interrupt::<PIN>(event as u8);
+                interrupt::pin_wakeup_enable::<PIN>(wakeup_enable);
+            }
+
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                interrupt::enable_pin_interrupt::<PIN>(0);
+                interrupt::pin_wakeup_enable::<PIN>(false);
+                self.clear_interrupt();
+            }
+
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
+    }
 }
 
 /// Digital input.
@@ -161,10 +271,32 @@ impl<const PIN: u8> Input<PIN> {
         let pin = Flex::<PIN>::new();
         Self { pin }
     }
-
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         self.pin.level()
+    }
+
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                self.pin.listen(event, wakeup_enable);
+            }
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                self.pin.unlisten();
+            }
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
     }
 }
 
@@ -180,7 +312,6 @@ impl<const PIN: u8> Output<PIN> {
         let pin = Flex::<PIN>::new();
         Self { pin }
     }
-
     /// Set the output level.
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_level(level);
@@ -224,120 +355,27 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
     pub fn toggle(&mut self) {
         self.pin.toggle()
     }
-}
 
-// Used by the `entry` procmacro:
-#[doc(hidden)]
-pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
-    if PIN > MAX_GPIO_PIN {
-        None
-    } else {
-        Some(Output::<PIN>::new())
-    }
-}
-
-// Used by the `entry` procmacro:
-#[doc(hidden)]
-pub unsafe fn conjure_output_open_drain<const PIN: u8>() -> Option<OutputOpenDrain<PIN>> {
-    if PIN > MAX_GPIO_PIN {
-        None
-    } else {
-        Some(OutputOpenDrain::<PIN>::new())
-    }
-}
-
-// Used by the `entry` procmacro:
-#[doc(hidden)]
-pub unsafe fn conjure_input<const PIN: u8>() -> Option<Input<PIN>> {
-    if PIN > MAX_GPIO_PIN {
-        None
-    } else {
-        Some(Input::<PIN>::new())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::ErrorType for Input<PIN> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::ErrorType for Output<PIN> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::ErrorType for OutputOpenDrain<PIN> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::InputPin for Input<PIN> {
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.level() == Level::High)
-    }
-
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.level() == Level::Low)
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::OutputPin for Output<PIN> {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.set_level(Level::Low);
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.set_level(Level::High);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for Output<PIN> {
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_level() == Level::High)
-    }
-
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_level() == Level::Low)
-    }
-}
-
-// OutputOpenDrain
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::InputPin for OutputOpenDrain<PIN> {
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.level() == Level::High)
-    }
-
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.level() == Level::Low)
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::OutputPin for OutputOpenDrain<PIN> {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.set_level(Level::Low);
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.set_level(Level::High);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for OutputOpenDrain<PIN> {
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_level() == Level::High)
-    }
-
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_level() == Level::Low)
+    // Interrupt-related APIs
+    cfg_if::cfg_if! {
+        if #[cfg(feature="interrupts")]
+        {
+            /// Listen for interrupts.
+            pub fn listen(&mut self, event : Event, wakeup_enable : bool) {
+                self.pin.listen(event, wakeup_enable);
+            }
+            /// Un-listen for interrupts.
+            pub fn unlisten(&mut self) {
+                self.pin.unlisten();
+            }
+            /// Clear pin interrupts
+            pub fn clear_interrupt(&mut self) {
+                interrupt::clear_pin_interrupt::<PIN>();
+            }
+            /// Read pin interrupt
+            pub fn is_interrupt_set(&mut self) -> bool {
+                interrupt::is_interrupt_set::<PIN>()
+            }
+        }
     }
 }

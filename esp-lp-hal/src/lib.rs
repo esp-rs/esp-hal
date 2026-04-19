@@ -38,9 +38,14 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
+/// Interrupt handling APIs.
+/// Currently implemented for RISCV ULP cores (ESP32-S2,ESP32-S3)
+/// Functions are gated internally by stub functions.
+pub mod interrupt;
+
 /// The prelude
 pub mod prelude {
-    pub use procmacros::entry;
+    pub use procmacros::{entry, handler};
 }
 
 cfg_if::cfg_if! {
@@ -56,6 +61,12 @@ cfg_if::cfg_if! {
 }
 
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
+
+// Assembly containing the reset, trap, and startup assembly procedures..
+#[cfg(esp32c6)]
+global_asm!(include_str!("./lp_start.S"));
+#[cfg(any(esp32s2, esp32s3))]
+global_asm!(include_str!("./ulp_riscv_start.S"));
 
 /// Wake up the HP core
 pub fn wake_hp_core() {
@@ -73,72 +84,33 @@ pub fn wake_hp_core() {
         .write(|w| w.rtc_sw_cpu_int().set_bit());
 }
 
-#[cfg(esp32c6)]
-global_asm!(
-    r#"
-    .section    .init.vector, "ax"
-    /* This is the vector table. It is currently empty, but will be populated
-     * with exception and interrupt handlers when this is supported
-     */
+/// Global GPIO wakeup enable/disable
+pub fn gpio_wakeup_enable() {
+    #[cfg(esp32s2)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(true));
+    #[cfg(esp32s3)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(true));
+}
 
-    .align  0x4, 0xff
-    .global _vector_table
-    .type _vector_table, @function
-_vector_table:
-    .option push
-    .option norvc
-
-    .rept 32
-    nop
-    .endr
-
-    .option pop
-    .size _vector_table, .-_vector_table
-
-    .section .init, "ax"
-    .global reset_vector
-
-/* The reset vector, jumps to startup code */
-reset_vector:
-    j __start
-
-__start:
-    /* setup the stack pointer */
-    la sp, __stack_top
-    call rust_main
-loop:
-    j loop
-"#
-);
-
-#[cfg(any(esp32s2, esp32s3))]
-global_asm!(
-    r#"
-	.section .text.vectors
-	.global irq_vector
-	.global reset_vector
-
-/* The reset vector, jumps to startup code */
-reset_vector:
-	j __start
-
-/* Interrupt handler */
-.balign 16
-irq_vector:
-	ret
-
-	.section .text
-
-__start:
-    /* setup the stack pointer */
-	la sp, __stack_top
-
-	call ulp_riscv_rescue_from_monitor
-	call rust_main
-loop:
-	j loop
-"#
-);
+/// Clear the Global GPIO wakeup status
+pub fn gpio_wakeup_clear() {
+    #[cfg(esp32s2)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+    #[cfg(esp32s3)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+    #[cfg(esp32c6)]
+    unsafe { &*crate::pac::LP_IO::PTR }
+        .status_w1tc()
+        .write(|w| unsafe { w.status_w1tc().bits(0xff) });
+}
 
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
@@ -146,8 +118,25 @@ loop:
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
+            // This symbol will be provided by the user via `#[entry]`
             fn main();
+
+            // This variable is provided by the PAC, and used to
+            // detect multiple calls to Peripherals::take().
+            static mut DEVICE_PERIPHERALS: bool;
         }
+
+        #[cfg(any(esp32s2, esp32s3))]
+        ulp_riscv_rescue_from_monitor();
+
+        #[cfg(feature = "interrupts")]
+        interrupt::setup_interrupts();
+
+        // The pac::DEVICE_PERIPHERALS variable is re-zero-ed on start,
+        // to prevent it from persisting between calls to main().
+        // This prevents ULP-Timer-triggered-main()-calls from panicking
+        // on their second loop.
+        DEVICE_PERIPHERALS = false;
 
         #[cfg(esp32c6)]
         if (*pac::LP_CLKRST::PTR)
@@ -175,7 +164,6 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 /// Stops the ULP core, called from itself.
-#[unsafe(link_section = ".init.rust")]
 fn ulp_riscv_halt() -> ! {
     #[cfg(any(esp32s2, esp32s3))]
     {
@@ -188,10 +176,9 @@ fn ulp_riscv_halt() -> ! {
             });
     }
 
-    // All chips will enter a no-op loop, when halting.
-    loop {
-        unsafe {
-            core::arch::asm!("addi x0, x0, 0"); // no-op
-        }
-    }
+    // All chips will enter an infinite, when halting.
+    // It's important that no 'nop' or 'wfi' is performed inside this loop,
+    // so that the chip silicon can properly detect a ULP halt.
+    #[allow(clippy::empty_loop)]
+    loop {}
 }

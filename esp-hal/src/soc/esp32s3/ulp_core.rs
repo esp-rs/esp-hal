@@ -51,6 +51,8 @@ pub enum UlpCoreWakeupSource {
     /// Wakeup after the ULP Timer has elapsed.
     /// The actual period between wake-ups is affected by the runtime duration of the ULP program.
     Timer(UlpCoreTimerCycles),
+    /// Wakeup on GPIO state
+    Gpio,
 }
 
 /// ULP Timer cycles are clocked at a rate of approximately 17.5MHz / 32768  = ~534 Hz.
@@ -219,6 +221,11 @@ fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
             LPWR::regs()
                 .ulp_cp_timer()
                 .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
+        }
+        UlpCoreWakeupSource::Gpio => {
+            LPWR::regs()
+                .ulp_cp_timer()
+                .write(|w| w.ulp_cp_gpio_wakeup_ena().set_bit());
         }
     }
 }
