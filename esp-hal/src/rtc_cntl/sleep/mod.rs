@@ -375,15 +375,15 @@ impl Default for WakeFromLpCoreWakeupSource {
 ///
 /// This wakeup source can be used to wake up from both light and deep sleep.
 #[cfg(any(esp32s2, esp32s3))]
-pub struct UlpWakeupSource {
+pub struct WakeFromUlpCoreWakeupSource {
     wake_on_interrupt: bool,
     wake_on_trap: bool,
     clear_interrupts_on_sleep: bool,
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-impl UlpWakeupSource {
-    /// Create a new instance of `WakeFromUlpWakeupSource`
+impl WakeFromUlpCoreWakeupSource {
+    /// Create a new instance of `WakeFromUlpCoreWakeupSource`
     pub const fn new() -> Self {
         Self {
             wake_on_interrupt: true,
@@ -421,7 +421,7 @@ impl UlpWakeupSource {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
-impl Default for UlpWakeupSource {
+impl Default for WakeFromUlpCoreWakeupSource {
     fn default() -> Self {
         Self::new()
     }

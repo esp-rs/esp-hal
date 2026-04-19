@@ -117,32 +117,20 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     }
 
     /// Allows this pin to wakeup the ULP core, when UlpCoreWakeupSource::Gpio is used.
-    #[cfg(any(esp32s2, esp32s3))]
     pub fn wakeup_enable(&self, event: Option<WakeEvent>) {
         let pin_reg_rtc = RTC_IO::regs().pin(PIN as usize);
+        let wake_en = event.is_some();
+        let int_type = event.map_or(0, |e| e as u8);
 
-        if let Some(evt) = event {
-            #[cfg(esp32s3)]
-            pin_reg_rtc
-                .write(|w| unsafe { w.int_type().bits(evt as u8).wakeup_enable().bit(true) });
-            #[cfg(esp32s2)]
-            pin_reg_rtc.write(|w| unsafe {
-                w.gpio_pin_int_type()
-                    .bits(evt as u8)
-                    .gpio_pin_wakeup_enable()
-                    .bit(true)
-            });
-        } else {
-            #[cfg(esp32s3)]
-            pin_reg_rtc.write(|w| unsafe { w.int_type().bits(0).wakeup_enable().bit(false) });
-            #[cfg(esp32s2)]
-            pin_reg_rtc.write(|w| unsafe {
-                w.gpio_pin_int_type()
-                    .bits(0)
-                    .gpio_pin_wakeup_enable()
-                    .bit(false)
-            });
-        }
+        #[cfg(esp32s3)]
+        pin_reg_rtc.write(|w| unsafe { w.int_type().bits(int_type).wakeup_enable().bit(wake_en) });
+        #[cfg(esp32s2)]
+        pin_reg_rtc.write(|w| unsafe {
+            w.gpio_pin_int_type()
+                .bits(int_type)
+                .gpio_pin_wakeup_enable()
+                .bit(wake_en)
+        });
     }
 }
 

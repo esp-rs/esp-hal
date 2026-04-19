@@ -2399,6 +2399,7 @@ impl Chip {
                     "gpio_support_deepsleep_wakeup",
                     "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
+                    "riscv_coproc_supported",
                     "adc_driver_supported",
                     "aes_driver_supported",
                     "assist_debug_driver_supported",
@@ -2674,6 +2675,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
+                    "cargo:rustc-cfg=riscv_coproc_supported",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=aes_driver_supported",
                     "cargo:rustc-cfg=assist_debug_driver_supported",
@@ -5807,6 +5809,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
     println!("cargo:rustc-check-cfg=cfg(lp_core)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
+    println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
@@ -5841,7 +5844,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
-    println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");

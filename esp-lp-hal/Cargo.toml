@@ -47,9 +47,9 @@ riscv             = { version = "0.15" }
 portable-atomic = { version = "1", default-features = false }
 critical-section = { version = "1.2.0", features = ["restore-state-u32"], optional = true }
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
-esp32c6-lp        = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "86d386a" }
-esp32s2-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "86d386a" }
-esp32s3-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "86d386a" }
+esp32c6-lp        = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f0a1b2c" }
+esp32s2-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f0a1b2c" }
+esp32s3-ulp       = { version = "0.3.0", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f0a1b2c" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"

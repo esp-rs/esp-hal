@@ -106,6 +106,10 @@ pub fn gpio_wakeup_clear() {
     unsafe { &*crate::pac::RTC_CNTL::PTR }
         .rtc_ulp_cp_timer()
         .write(|w| w.ulp_cp_gpio_wakeup_clr().set_bit());
+    #[cfg(esp32c6)]
+    unsafe { &*crate::pac::LP_IO::PTR }
+        .status_w1tc()
+        .write(|w| unsafe { w.status_w1tc().bits(0xff) });
 }
 
 /// Entry point to the ULP program
