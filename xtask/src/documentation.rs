@@ -470,6 +470,38 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
+/// Returns the highest stable (non-prerelease) version directories under `package_docs_path`.
+/// Used to avoid defaulting to pre-releases when a stable version exists alongside a pre-release.
+fn latest_stable_docs_version(package_docs_path: &Path) -> Option<semver::Version> {
+    let mut best: Option<semver::Version> = None;
+    let entries = fs::read_dir(package_docs_path).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        // Skip non-directory entries
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path.file_name()?.to_string_lossy();
+        if name == "latest" {
+            continue;
+        }
+        // Parse the version from the directory name
+        let Ok(ver) = name.parse::<semver::Version>() else {
+            continue;
+        };
+        // Skip pre-release versions
+        if !ver.pre.is_empty() {
+            continue;
+        }
+        // If multiple stable versions exist, return the highest one
+        best = Some(match best {
+            None => ver,
+            Some(b) => ver.max(b),
+        });
+    }
+    best
+}
+
 /// Build the documentation index for all packages.
 pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
     let docs_path = workspace.join("docs");
@@ -545,13 +577,28 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
             chips.sort();
 
+            let current_version: semver::Version = version_path
+                .file_name()
+                .with_context(|| format!("invalid version path: {}", version_path.display()))?
+                .to_string_lossy()
+                .parse()
+                .with_context(|| {
+                    format!("directory name is not semver: {}", version_path.display())
+                })?;
+
+            let version_prefix = latest_stable_docs_version(&package_docs_path)
+                .and_then(|latest_stable| {
+                    (latest_stable != current_version).then(|| format!("../{latest_stable}/"))
+                })
+                .unwrap_or_default();
+
             let meta = generate_documentation_meta_for_package(workspace, *package, &chips)?;
 
             // Render the template to HTML and write it out to the desired path:
             let html = render_template(
                 &resources_path,
                 "package_index.html.jinja",
-                minijinja::context! { metadata => meta },
+                minijinja::context! { metadata => meta, version_prefix => version_prefix },
             )?;
             let path = version_path.join("index.html");
             fs::write(&path, html).context("Failed to write index.html")?;
@@ -625,6 +672,7 @@ fn generate_documentation_meta_for_package(
 
 fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>> {
     let mut metadata = Vec::new();
+    let docs_path = workspace.join("docs");
 
     for package in Package::iter() {
         // Not all packages have documentation built:
@@ -632,7 +680,9 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
             continue;
         }
 
-        let version = crate::package_version(workspace, package)?;
+        let cargo_version = crate::package_version(workspace, package)?;
+        let package_docs_path = docs_path.join(package.as_ref());
+        let version = latest_stable_docs_version(&package_docs_path).unwrap_or(cargo_version);
 
         let url = if package.chip_features_matter() {
             format!("{package}/{version}/index.html")
