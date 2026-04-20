@@ -119,7 +119,7 @@ fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
         let mut error_message = String::new();
         for (dep_kind, errors) in errors {
             if !error_message.is_empty() {
-                error_message.push_str("\n");
+                error_message.push('\n');
             }
             writeln!(&mut error_message, "In [{dep_kind}]:").unwrap();
             for (krate, error) in errors {
@@ -219,7 +219,7 @@ fn bump_crate_version(
             let content = fs::read_to_string(&p)
                 .with_context(|| format!("Could not read {}", p.display()))?;
             CargoToml::from_str(&bumped_package.workspace, Package::Examples, &content)
-                .with_context(|| format!("Could not parse Cargo.toml"))
+                .with_context(|| "Could not parse Cargo.toml".to_string())
         }));
 
     for dependent in tomls {
@@ -273,7 +273,7 @@ pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Resul
                 version.pre = Prerelease::EMPTY;
             } else {
                 // If the version is not a pre-release, we need to bump the version
-                bump_version_number(&mut version, &amount);
+                bump_version_number(&mut version, amount);
             }
         }
         VersionBump::PreRelease(pre) => {

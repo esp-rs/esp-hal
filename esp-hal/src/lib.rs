@@ -721,13 +721,9 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(soc_cpu_has_branch_predictor)]
     {
-        // Enable branch predictor
-        // Note that the branch predictor will start cache requests and needs to be disabled when
-        // the cache is disabled.
-        // MHCR: CSR 0x7c1
-        const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-        const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-        const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+        const MHCR_RS: u32 = 1 << 4;
+        const MHCR_BFE: u32 = 1 << 5;
+        const MHCR_BTB: u32 = 1 << 12;
         unsafe {
             core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
         }
@@ -743,35 +739,45 @@ pub fn init(config: Config) -> Peripherals {
 
     Clocks::init(config.clock_config());
 
-    // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
     #[cfg(sleep_driver_supported)]
-    crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
+    {
+        crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
+    }
 
-    // Disable watchdog timers
     #[cfg(swd)]
-    rtc.swd.disable();
+    {
+        rtc.swd.disable();
+    }
 
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]
-    crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
+    {
+        crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
+    }
 
     #[cfg(timergroup_timg1)]
-    crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
+    {
+        crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
+    }
 
     crate::time::implem::time_init();
 
     #[cfg(gpio_driver_supported)]
-    crate::gpio::interrupt::bind_default_interrupt_handler();
+    {
+        crate::gpio::interrupt::bind_default_interrupt_handler();
+    }
 
     unsafe {
         esp_rom_sys::init_syscall_table();
     }
 
     #[cfg(all(riscv, write_vec_table_monitoring))]
-    crate::soc::setup_trap_section_protection();
+    {
+        crate::soc::setup_trap_section_protection();
+    }
 
     peripherals
 }

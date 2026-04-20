@@ -3366,6 +3366,15 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
             unsafe {
                 fifo_ptr.write_volatile(data as u32);
             }
+        } else if #[cfg(esp32p4)] {
+            // P4: data register is read-only (RX FIFO only). TX uses txfifo_start_addr.
+            // PAC txfifo_start_addr is also read-only in SVD, use direct MMIO.
+            // Ref: esp-idf i2c_ll.h -- i2c_ll_write_txfifo() uses HAL_FORCE_MODIFY
+            //      TRM v0.5 Ch 48 -- I2C_TXFIFO_START_ADDR (offset 0x100)
+            let base = register_block as *const _ as usize;
+            unsafe {
+                ((base + 0x100) as *mut u32).write_volatile(data as u32);
+            }
         } else {
             register_block
                 .data()

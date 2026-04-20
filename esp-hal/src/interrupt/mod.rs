@@ -198,19 +198,45 @@ impl InterruptStatus {
         match Cpu::current() {
             Cpu::ProCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_status(idx)
-                        .read()
-                        .bits()
+                    // P4: Status registers at base + 0x200 (4 x 32-bit = 128 sources)
+                    // Ref: esp-idf interrupt_core0_reg.h
+                    //   INTERRUPT_CORE0_INTR_STATUS_REG_0_REG = base + 0x200
+                    //   INTERRUPT_CORE0_INTR_STATUS_REG_1_REG = base + 0x204
+                    //   INTERRUPT_CORE0_INTR_STATUS_REG_2_REG = base + 0x208
+                    //   INTERRUPT_CORE0_INTR_STATUS_REG_3_REG = base + 0x20c
+                    // TRM v0.5 Ch 14
+                    #[cfg(esp32p4)]
+                    {
+                        let base = crate::soc::registers::INTERRUPT_MAP_BASE + 0x200;
+                        unsafe { ((base as *const u32).add(idx)).read_volatile() }
+                    }
+                    #[cfg(not(esp32p4))]
+                    {
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(idx)
+                            .read()
+                            .bits()
+                    }
                 }),
             },
             #[cfg(multi_core)]
             Cpu::AppCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_status(idx)
-                        .read()
-                        .bits()
+                    // P4 Core1: base + 0x800 + 0x200
+                    // Ref: esp-idf interrupt_core1_reg.h
+                    //   INTERRUPT_CORE1 = INTERRUPT_CORE0 + 0x800
+                    #[cfg(esp32p4)]
+                    {
+                        let base = crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU + 0x200;
+                        unsafe { ((base as *const u32).add(idx)).read_volatile() }
+                    }
+                    #[cfg(not(esp32p4))]
+                    {
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(idx)
+                            .read()
+                            .bits()
+                    }
                 }),
             },
         }
@@ -352,6 +378,25 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
 }
 
 pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
+    // P4: 120 individual INT_MAP registers at sequential 4-byte offsets from base.
+    // Each register has 6-bit field [5:0] for CPU interrupt line (0-63).
+    // Core0: base = 0x500D_6000, Core1: base = 0x500D_6800
+    // Ref: esp-idf interrupt_core0_reg.h -- LP_RTC_INT_MAP_REG at offset 0x0,
+    //      LP_WDT_INT_MAP_REG at offset 0x4, etc.
+    // TRM v0.5 Ch 14
+    #[cfg(esp32p4)]
+    {
+        let base = match core {
+            Cpu::ProCpu => crate::soc::registers::INTERRUPT_MAP_BASE,
+            #[cfg(multi_core)]
+            Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
+        };
+        unsafe {
+            let reg = (base as *mut u32).add(interrupt as usize);
+            reg.write_volatile(cpu_interrupt);
+        }
+    }
+    #[cfg(not(esp32p4))]
     match core {
         Cpu::ProCpu => {
             INTERRUPT_CORE0::regs()
@@ -373,6 +418,21 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 }
 
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
+    // P4: read INT_MAP register directly. 6-bit field [5:0] = CPU interrupt line.
+    // Ref: esp-idf interrupt_core0_reg.h, TRM v0.5 Ch 14
+    #[cfg(esp32p4)]
+    let cpu_intr = {
+        let base = match cpu {
+            Cpu::ProCpu => crate::soc::registers::INTERRUPT_MAP_BASE,
+            #[cfg(multi_core)]
+            Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
+        };
+        unsafe {
+            let reg = (base as *const u32).add(interrupt as usize);
+            reg.read_volatile() & 0x3F // 6-bit field
+        }
+    };
+    #[cfg(not(esp32p4))]
     let cpu_intr = match cpu {
         Cpu::ProCpu => INTERRUPT_CORE0::regs()
             .core_0_intr_map(interrupt as usize)

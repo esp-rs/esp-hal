@@ -45,6 +45,7 @@
 //! ```
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
+use clocks::ClockTree;
 #[cfg(soc_has_clock_node_lp_slow_clk)]
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
@@ -100,6 +101,11 @@ impl CpuClock {
                 Self::_160MHz
             } else if #[cfg(esp32h2)] {
                 Self::_96MHz
+            } else if #[cfg(esp32p4)] {
+                // ESP32-P4 v3.x (eco5): max 400 MHz via CPLL
+                // Ref: TRM v0.5 Ch 2 -- HP CPU max frequency 400 MHz for v3.x
+                //      esp-idf clk_tree_defs.h -- SOC_CPU_CLK_SRC_CPLL
+                Self::_400MHz
             } else {
                 Self::_240MHz
             }
@@ -200,6 +206,9 @@ static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 impl Clocks {
     pub(crate) fn init(cpu_clock_config: ClockConfig) {
         ESP_HAL_LOCK.lock(|| {
+            // P4: init() disables all WDTs and resets PMU power domain force flags.
+            // Full PLL/clock tree config is NOT yet implemented -- relies on ROM bootloader.
+            // Ref: esp-idf pmu_init.c, bootloader_esp32p4.c, TRM v0.5 Ch 16
             crate::rtc_cntl::rtc::init();
 
             let config = Self::configure(cpu_clock_config);
@@ -521,12 +530,24 @@ impl Clocks {
 
 /// The CPU clock frequency.
 pub fn cpu_clock() -> Rate {
-    Clocks::get().cpu_clock
+    // P4: ClockConfig is empty (no clock node framework yet).
+    // Return the actual configured frequency from CPLL init.
+    // Ref: esp-idf rtc_clk.c -- default is 400 MHz for eco5 (v3.x)
+    //      TRM v0.5 Ch 12
+    #[cfg(esp32p4)]
+    { Rate::from_mhz(400) }
+    #[cfg(not(esp32p4))]
+    { Clocks::get().cpu_clock }
 }
 
 /// The XTAL clock frequency.
 pub fn xtal_clock() -> Rate {
-    Clocks::get().xtal_clock
+    // P4: 40 MHz external crystal (SOC_XTAL_FREQ_40M)
+    // Ref: esp-idf clk_tree_defs.h -- SOC_XTAL_FREQ_40M = 40
+    #[cfg(esp32p4)]
+    { Rate::from_mhz(40) }
+    #[cfg(not(esp32p4))]
+    { Clocks::get().xtal_clock }
 }
 
 /// Read the calibrated RTC slow clock period from the STORE1 register.
@@ -545,7 +566,14 @@ fn rtc_slow_cal_period() -> u64 {
         }
     }
 
-    LP_AON::regs().store1().read().bits() as u64
+    // P4: store registers are in LP_SYS (mapped as LP_AON in esp-hal).
+    // LP_SYS has lp_store0..lp_store14 registers.
+    // Ref: esp-idf lp_system_reg.h -- LP_SYSTEM_REG_LP_STORE1_REG = RTC_SLOW_CLK_CAL_REG
+    //      esp-idf esp_time_impl.c -- uses store2/store3 for boot time
+    #[cfg(esp32p4)]
+    { LP_AON::regs().lp_store1().read().bits() as u64 }
+    #[cfg(not(esp32p4))]
+    { LP_AON::regs().store1().read().bits() as u64 }
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.

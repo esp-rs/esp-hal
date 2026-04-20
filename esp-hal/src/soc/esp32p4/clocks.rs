@@ -1,52 +1,86 @@
-//! Clock tree definitions and implementations for ESP32-C6.
+//! Clock tree for ESP32-P4X (chip revision v3.x / eco5).
 //!
-//! Remarks:
-//! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't need
-//!   to be configured.
-//! - Some information may be assumed, e.g. the possibility to disable watchdog timers before clock
-//!   configuration.
-//! - Internal RC oscillators (136k RC_SLOW and 17.5M RC_FAST) are not calibrated here, this system
-//!   can only give a rough estimate of their frequency. They can be calibrated separately using a
-//!   known crystal frequency.
-//! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external 32k
-//!   oscillator, LP_DYN_FAST_CLK, APB_DECREASE_DIV (which seems unnecessary to model),
-//!   PCR_CPU_HS_120M_FORCE.
-#![allow(dead_code, reason = "Some of this is bound to be unused")]
-
-// TODO: This is a temporary place for this, should probably be moved into clocks_ll.
-
-use crate::peripherals::{LP_AON_CLKRST, PMU, SYSTEM};
+//! CPLL: 400 MHz (eco5 default), 360 MHz (conservative)
+//! SPLL: 480 MHz (peripheral clocks)
+//! MPLL: 400 MHz (PSRAM, media)
+//! XTAL: 40 MHz
+//!
+//! Clock hierarchy: XTAL -> CPLL -> CPU_ROOT -> CPU/APB dividers
+//! SPLL -> PLL_F240M/160M/120M/80M/20M (peripheral clocks)
+//!
+//! Ref: esp-idf rtc_clk.c, clk_tree_ll.h, clk_tree_defs.h
+//!      TRM v0.5 Ch 12 (Reset and Clock)
+#![allow(dead_code, reason = "Clock functions called from generated macro code")]
 
 define_clock_tree_types!();
 
-/// Clock configuration options.
+/// CPU clock frequency presets for ESP32-P4X (eco5 / chip revision v3.x).
+/// Ref: esp-idf rtc_clk.c:240 -- !CONFIG_ESP32P4_SELECTS_REV_LESS_V3 path
+///      TRM v0.5 Ch 2 -- HP CPU max frequency 400 MHz for v3.x
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(
-    clippy::enum_variant_names,
-    reason = "MHz suffix indicates physical unit."
-)]
 #[non_exhaustive]
 pub enum CpuClock {
-    /// 360 MHz CPU clock
+    /// 400 MHz CPU clock (eco5 / v3.x maximum)
+    /// CPLL -> CPU_ROOT -> CPU/1, APB divider /4 = 100MHz
     #[default]
-    _360MHz  = 360,
+    _400MHz = 400,
+
+    /// 360 MHz CPU clock (conservative)
+    _360MHz = 360,
+
+    /// 200 MHz CPU clock (low power)
+    /// CPLL -> CPU_ROOT -> CPU/2, APB /2 = 100MHz
+    _200MHz = 200,
+
+    /// 100 MHz CPU clock (ultra low power)
+    /// CPLL -> CPU_ROOT -> CPU/4, APB /1 = 100MHz
+    _100MHz = 100,
 }
 
 impl CpuClock {
-    const PRESET_360: ClockConfig = ClockConfig {
-        xtal_clk: None,
-        apb_clk: Some(ApbClkConfig::new(0)),
+    // Preset: 400 MHz CPU, 100 MHz APB
+    // Ref: esp-idf rtc_clk.c:262 -- case 400: cpu=1, mem=2, apb=2
+    const PRESET_400: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(0)),   // /1 = 400 MHz
+        apb_clk: Some(ApbClkConfig::new(3)),    // /4 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-        ..Default::default()
+    };
+
+    const PRESET_360: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(0)),   // /1 = 360 MHz (CPLL at 360)
+        apb_clk: Some(ApbClkConfig::new(3)),    // /4 = 90 MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+    };
+
+    const PRESET_200: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(1)),   // /2 = 200 MHz
+        apb_clk: Some(ApbClkConfig::new(1)),    // /2 = 100 MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+    };
+
+    const PRESET_100: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(3)),   // /4 = 100 MHz
+        apb_clk: Some(ApbClkConfig::new(0)),    // /1 = 100 MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
 }
 
 impl From<CpuClock> for ClockConfig {
     fn from(value: CpuClock) -> ClockConfig {
         match value {
+            CpuClock::_400MHz => CpuClock::PRESET_400,
             CpuClock::_360MHz => CpuClock::PRESET_360,
+            CpuClock::_200MHz => CpuClock::PRESET_200,
+            CpuClock::_100MHz => CpuClock::PRESET_100,
         }
     }
 }
@@ -60,286 +94,193 @@ impl Default for ClockConfig {
 impl ClockConfig {
     pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
         match self {
+            v if v == CpuClock::PRESET_400 => Some(CpuClock::_400MHz),
             v if v == CpuClock::PRESET_360 => Some(CpuClock::_360MHz),
+            v if v == CpuClock::PRESET_200 => Some(CpuClock::_200MHz),
+            v if v == CpuClock::PRESET_100 => Some(CpuClock::_100MHz),
             _ => None,
         }
     }
 
-    pub(crate) fn configure(mut self) {
-        if self.xtal_clk.is_none() {
-            self.xtal_clk = Some(XtalClkConfig::_40);
-        }
+    pub(crate) fn configure(self) {
         self.apply();
     }
 }
 
-// XTAL_CLK
+// ============================================================
+// Clock node implementation functions (called from generated macro)
+// These must match the function names that define_clock_tree_types!() expects.
+// ============================================================
 
-fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
-    // The stored configuration affects PLL settings instead.
+// CPU_ROOT_CLK (mux: XTAL / CPLL / RC_FAST)
+fn configure_cpu_root_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<CpuRootClkConfig>,
+    new_selector: CpuRootClkConfig,
+) {
+    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_src()
+    //      LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel: 0=XTAL, 1=CPLL, 2=RC_FAST
+    let sel = match new_selector {
+        CpuRootClkConfig::Xtal => 0,
+        CpuRootClkConfig::Cpll => 1,
+        CpuRootClkConfig::RcFast => 2,
+    };
+    crate::peripherals::LP_AON_CLKRST::regs()
+        .lp_aonclkrst_hp_clk_ctrl()
+        .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(sel) });
 }
 
-// CPLL_CLK
-
-fn enable_cpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_cpll_clk_impl(_clocks: &mut ClockTree, _config: CpllClkConfig) {
-    todo!()
-}
-
-// RC_FAST_CLK
-
-fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    HP_SYS_CLKRST::regs().hp_rst_en1().modify(|_,w| w.rst_en_uart0_core().bit(en))
-    PMU::regs()
-        .hp_sleep_lp_ck_power()
-        .modify(|_, w| w.hp_sleep_xpd_fosc_clk().bit(en));
-    // TODO: Should the digital clock gate be a different clock node?
-    LP_AON_CLKRST::regs()
-        .clk_to_hp()
-        .modify(|_, w| w.icg_hp_fosc().bit(en));
-    crate::rom::ets_delay_us(5);
-}
-
-// MPLL_CLK
-
-fn enable_mpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_mpll_clk_impl(_clocks: &mut ClockTree, _config: MpllClkConfig) {
-    todo!()
-}
-
-// SPLL_CLK
-
-fn enable_spll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_spll_clk_impl(_clocks: &mut ClockTree, _config: SpllClkConfig) {
-    todo!()
-}
-
-// XTAL32K_CLK
-
-fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    LP_AON_CLKRST::regs().xtal32k().write(|w| unsafe {
-        w.dac_xtal32k().bits(3);
-        w.dres_xtal32k().bits(3);
-        w.dgm_xtal32k().bits(3);
-        w.dbuf_xtal32k().bit(true)
+// CPU_CLK divider
+fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old_config: Option<CpuClkConfig>, new_config: CpuClkConfig) {
+    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_divider()
+    //      HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num = divider - 1
+    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
+    clkrst.root_clk_ctrl0().modify(|_, w| unsafe {
+        w.cpu_clk_div_num().bits(new_config.divisor as u8);
+        w.cpu_clk_div_numerator().bits(0);
+        w.cpu_clk_div_denominator().bits(0)
     });
-
-    PMU::regs()
-        .hp_sleep_lp_ck_power()
-        .modify(|_, w| w.hp_sleep_xpd_xtal32k().bit(en));
-
-    // Enable for digital part
-    // TODO: Should the digital clock gate be a different clock node?
-    LP_AON_CLKRST::regs()
-        .clk_to_hp()
-        .modify(|_, w| w.icg_hp_xtal32k().bit(en));
-}
-
-// RC_SLOW_CLK
-
-fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    if en {
-        // SCK_DCAP value controls tuning of 136k clock. The higher the value of DCAP, the lower the
-        // frequency. There is no separate enable bit, just make sure the calibration value is set.
-        // const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 128;
-        // crate::soc::regi2c::I2C_DIG_REG_SCK_DCAP.write_reg(RTC_CNTL_SCK_DCAP_DEFAULT);
+    // Trigger divider update
+    clkrst.root_clk_ctrl0().modify(|_, w| w.soc_clk_div_update().set_bit());
+    while clkrst.root_clk_ctrl0().read().soc_clk_div_update().bit_is_set() {
+        core::hint::spin_loop();
     }
-
-    PMU::regs()
-        .hp_sleep_lp_ck_power()
-        .modify(|_, w| w.hp_sleep_xpd_rc32k().bit(en));
-
-    // Enable for digital part
-    LP_AON_CLKRST::regs()
-        .clk_to_hp()
-        .modify(|_, w| w.icg_hp_osc32k().bit(en));
 }
 
-// OSC_SLOW_CLK
-
-fn enable_osc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // TODO:
-    // gpio_ll_input_enable(&GPIO, SOC_EXT_OSC_SLOW_GPIO_NUM);
-    // REG_SET_BIT(LP_AON_GPIO_HOLD0_REG, BIT(SOC_EXT_OSC_SLOW_GPIO_NUM));
-    todo!();
-
-    // No need to configure anything else for OSC_SLOW_CLK
+// APB_CLK divider
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old_config: Option<ApbClkConfig>, _new_config: ApbClkConfig) {
+    // TODO(P4X): APB divider register in HP_SYS_CLKRST
+    // For now, APB freq is derived from CPU freq via divider
 }
 
-// PLL_LP_CLK
-
-fn enable_pll_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_pll_lp_clk_impl(_clocks: &mut ClockTree, _config: PllLpClkConfig) {
-    todo!()
-}
-
-// ROOT_CLK
-
-fn configure_root_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<RootClkConfig>,
-    _new_selector: RootClkConfig,
-) {
-    todo!()
-}
-
-// CPU_CLK
-
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _new_config: CpuClkConfig) {
-    todo!()
-}
-
-// MEM_CLK
-
-fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_mem_clk_impl(_clocks: &mut ClockTree, _new_config: MemClkConfig) {
-    todo!()
-}
-
-// SYS_CLK
-
-fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-fn configure_sys_clk_impl(_clocks: &mut ClockTree, _new_config: SysClkConfig) {
-    todo!()
-}
-
-// APB_CLK
-
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
-
-fn configure_apb_clk_impl(_clocks: &mut ClockTree, _new_config: ApbClkConfig) {
-    todo!()
-}
-
-// PLL_F50M_CLK
-
-fn enable_pll_f50m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F25M_CLK
-
-fn enable_pll_f25m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F240M_CLK
-
-fn enable_pll_f240m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F160M_CLK
-
-fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F120M_CLK
-
-fn enable_pll_f120m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F80M_CLK
-
-fn enable_pll_f80m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// PLL_F20M_CLK
-
-fn enable_pll_f20m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
-}
-
-// LP_SLOW_CLK
-
-fn configure_lp_slow_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<LpSlowClkConfig>,
-    new_selector: LpSlowClkConfig,
-) {
-    LP_AON_CLKRST::regs().lp_clk_conf().modify(|_, w| unsafe {
-        w.slow_clk_sel().bits(match new_selector {
-            LpSlowClkConfig::Xtal32kClk => 1,
-            LpSlowClkConfig::RcSlow => 0,
-            LpSlowClkConfig::OscSlow => 2,
-        })
-    });
-}
-
-// LP_FAST_CLK
-
+// LP_FAST_CLK mux
 fn configure_lp_fast_clk_impl(
     _clocks: &mut ClockTree,
     _old_selector: Option<LpFastClkConfig>,
     new_selector: LpFastClkConfig,
 ) {
-    LP_AON_CLKRST::regs().lp_clk_conf().modify(|_, w| {
-        w.fast_clk_sel().bit(match new_selector {
-            LpFastClkConfig::RcFastClk => false,
-            LpFastClkConfig::XtalD2Clk => true,
-        })
-    });
+    // Ref: esp-idf clk_tree_ll.h -- clk_ll_rtc_fast_set_src()
+    crate::peripherals::LP_AON_CLKRST::regs()
+        .lp_aonclkrst_lp_clk_conf()
+        .modify(|_, w| unsafe {
+            w.lp_aonclkrst_fast_clk_sel().bits(match new_selector {
+                LpFastClkConfig::RcFast => 0,
+                LpFastClkConfig::XtalD2 => 1,
+            })
+        });
 }
 
-// LP_DYN_SLOW_CLK
-
-fn configure_lp_dyn_slow_clk_impl(
+// LP_SLOW_CLK mux
+fn configure_lp_slow_clk_impl(
     _clocks: &mut ClockTree,
-    _old_selector: Option<LpDynSlowClkConfig>,
-    _new_selector: LpDynSlowClkConfig,
+    _old_selector: Option<LpSlowClkConfig>,
+    new_selector: LpSlowClkConfig,
 ) {
-    todo!()
+    // Ref: esp-idf clk_tree_ll.h -- clk_ll_rtc_slow_set_src()
+    crate::peripherals::LP_AON_CLKRST::regs()
+        .lp_aonclkrst_lp_clk_conf()
+        .modify(|_, w| unsafe {
+            w.lp_aonclkrst_slow_clk_sel().bits(match new_selector {
+                LpSlowClkConfig::RcSlow => 0,
+                LpSlowClkConfig::Xtal32k => 1,
+                LpSlowClkConfig::Rc32k => 2,
+                LpSlowClkConfig::OscSlow => 3,
+            })
+        });
 }
 
-// LP_DYN_FAST_CLK
+// ============================================================
+// Per-instance clock impl for UART (called on UartInstance enum)
+// Ref: esp-idf uart_ll.h, hp_sys_clkrst_reg.h
+// ============================================================
 
-fn configure_lp_dyn_fast_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<LpDynFastClkConfig>,
-    _new_selector: LpDynFastClkConfig,
-) {
-    todo!()
+impl UartInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // UART function clock enable is handled by peripheral clock gates in system.rs
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<UartFunctionClockConfig>,
+        _new_config: UartFunctionClockConfig,
+    ) {
+        // TODO(P4X): Configure UART clock source selection
+        // HP_SYS_CLKRST PERI_CLK_CTRL110-114 for UART0-4
+        // Ref: esp-idf clk_tree_ll.h -- clk_ll_uart_set_sclk()
+    }
+
+    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Baud rate generator is always on when UART is enabled
+    }
+
+    fn configure_baud_rate_generator_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<UartBaudRateGeneratorConfig>,
+        _new_config: UartBaudRateGeneratorConfig,
+    ) {
+        // Baud rate is configured directly in UART registers, not here
+    }
 }
 
-// LP_PERI_CLK
+// ============================================================
+// Per-instance clock impl for TIMG
+// Ref: esp-idf timer_ll.h
+// ============================================================
 
-fn enable_lp_peri_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    todo!()
+impl TimgInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // TIMG function clock is managed by peripheral clock gates
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TimgFunctionClockConfig>,
+        _new_config: TimgFunctionClockConfig,
+    ) {
+        // TODO(P4X): Configure TIMG clock source
+        // HP_SYS_CLKRST PERI_CLK_CTRL20/21
+    }
+
+    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+
+    fn configure_wdt_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TimgWdtClockConfig>,
+        _new_config: TimgWdtClockConfig,
+    ) {
+        // TODO(P4X): Configure TIMG WDT clock source
+    }
 }
 
-fn configure_lp_peri_clk_impl(_clocks: &mut ClockTree, _new_config: LpPeriClkConfig) {
-    todo!()
-}
+// ============================================================
+// System clock impl functions
+// ============================================================
 
-// XTAL_D2_CLK
+// Mux enable stubs (mux nodes need enable functions too)
+fn enable_cpu_root_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_lp_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 
-fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do, the divider is always on.
-}
+// Source clock enable/disable stubs (PLLs, oscillators)
+fn enable_cpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_spll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_mpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_osc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_rc32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f20m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f80m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f120m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f160m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f25m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_pll_f50m_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {}

@@ -371,7 +371,7 @@ pub trait RtcPin: Pin {
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
-    #[cfg(any(xtensa, esp32c6))]
+    #[cfg(any(xtensa, esp32c6, esp32p4))]
     #[doc(hidden)]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -383,7 +383,7 @@ pub trait RtcPin: Pin {
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c3, esp32c2, esp32c6))]
+    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32p4))]
     #[doc(hidden)]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
@@ -1671,6 +1671,9 @@ impl<'lt> AnyPin<'lt> {
         {
             /// Workaround to make D+ and D- work when the pin is assigned to
             /// the `USB_SERIAL_JTAG` peripheral by default.
+            // P4 uses dedicated pins (GPIO49/50) for USB, so USB_DM/USB_DP are
+            // not in the analog function table -> this inner fn is unused on P4.
+            #[allow(dead_code)]
             fn disable_usb_pads(_gpionum: u8) {
                 crate::peripherals::USB_DEVICE::regs()
                     .conf0()
@@ -2266,7 +2269,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(xtensa, esp32c6))]
+    #[cfg(any(xtensa, esp32c6, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
@@ -2279,7 +2282,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32p4))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
         for_each_rtcio_pin! {
             (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };

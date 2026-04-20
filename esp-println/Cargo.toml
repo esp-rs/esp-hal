@@ -62,6 +62,7 @@ esp32c5 = ["esp-metadata-generated/esp32c5", "esp-sync?/esp32c5"]
 esp32c6  = ["esp-metadata-generated/esp32c6", "esp-sync?/esp32c6"]
 esp32c61 = ["esp-metadata-generated/esp32c61", "esp-sync?/esp32c61"]
 esp32h2 = ["esp-metadata-generated/esp32h2", "esp-sync?/esp32h2"]
+esp32p4 = ["esp-metadata-generated/esp32p4", "esp-sync?/esp32p4"]
 esp32s2 = ["esp-metadata-generated/esp32s2", "esp-sync?/esp32s2"]
 esp32s3 = ["esp-metadata-generated/esp32s3", "esp-sync?/esp32s3"]
 

@@ -77,7 +77,7 @@ pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
 #[unsafe(no_mangle)]
 extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
     cfg_if::cfg_if! {
-        if #[cfg(any(esp32c6, esp32h2))] {
+        if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
             unsafe extern "C" {
                 fn ets_clk_get_xtal_freq() -> i32;
             }

@@ -31,6 +31,7 @@ use crate::rtc_cntl::Rtc;
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "esp32p4.rs")]
 mod sleep_impl;
 
 pub use sleep_impl::*;

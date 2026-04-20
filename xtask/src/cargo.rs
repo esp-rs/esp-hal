@@ -365,6 +365,12 @@ impl BuiltCommand {
     }
 }
 
+impl Default for CargoCommandBatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CargoCommandBatcher {
     pub fn new() -> Self {
         Self {
@@ -544,7 +550,7 @@ pub struct CargoToml {
     pub manifest: toml_edit::DocumentMut,
 }
 
-const DEPENDENCY_KINDS: [&'static str; 3] =
+const DEPENDENCY_KINDS: [&str; 3] =
     ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl CargoToml {
@@ -575,7 +581,7 @@ impl CargoToml {
         let Some(espressif) = metadata.get("espressif") else {
             return None;
         };
-        Some(espressif.as_table()?)
+        espressif.as_table()
     }
 
     /// Create a `CargoToml` instance from a manifest string.
@@ -713,11 +719,10 @@ impl CargoToml {
                     name
                 };
 
-                if let Ok(package) = Package::from_str(name, true) {
-                    if !dependencies.contains(&package) {
+                if let Ok(package) = Package::from_str(name, true)
+                    && !dependencies.contains(&package) {
                         dependencies.push(package);
                     }
-                }
             }
         });
         dependencies
@@ -732,7 +737,7 @@ impl CargoToml {
 
         self.visit_dependencies(|_, _, table| {
             // Update dependencies which specify a version:
-            match &mut table[&package_name] {
+            match &mut table[package_name] {
                 Item::Value(Value::String(table)) => {
                     // package = "version"
                     *table = Formatted::new(format_dependency_version(table.value(), version));
@@ -754,16 +759,14 @@ impl CargoToml {
                 Item::None => {
                     // alias = { package = "foo", version = "version" }
                     let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
-                        if let Value::InlineTable(table) = p {
-                            if let Some(Value::String(name)) = &table.get("package") {
-                                if name.value() == &package_name {
+                        if let Value::InlineTable(table) = p
+                            && let Some(Value::String(name)) = &table.get("package")
+                                && name.value() == package_name {
                                     // Return the actual key of this dependency, e.g.:
                                     // `procmacros = { package = "esp-hal-procmacros" }`
                                     //  ^^^^^^^^^^
                                     return Some(k.last().unwrap().get().to_string());
                                 }
-                            }
-                        }
 
                         None
                     });

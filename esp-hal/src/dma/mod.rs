@@ -61,7 +61,7 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::buffers::*;
 #[cfg(dma_kind = "gdma")]
 pub use self::gdma::*;
-#[cfg(any(dma_kind = "gdma", esp32s2))] // TODO
+#[cfg(all(any(dma_kind = "gdma", esp32s2), dma_supports_mem2mem))]
 pub use self::m2m::*;
 #[cfg(dma_kind = "pdma")]
 pub use self::pdma::*;

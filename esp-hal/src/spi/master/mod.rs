@@ -2396,7 +2396,15 @@ impl Driver {
 
     fn update(&self) {
         cfg_if::cfg_if! {
-            if #[cfg(not(any(esp32, esp32s2)))] {
+            if #[cfg(esp32p4)] {
+                // P4 PAC: cmd.update() is write-only (no read method).
+                // Write update bit and wait a short time instead of polling.
+                // Ref: esp-idf spi_ll.h -- spi_ll_update_conf()
+                let reg_block = self.regs();
+                reg_block.cmd().modify(|_, w| w.update().set_bit());
+                // Small delay for SPI register sync
+                for _ in 0..10 { core::hint::spin_loop(); }
+            } else if #[cfg(not(any(esp32, esp32s2)))] {
                 let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());

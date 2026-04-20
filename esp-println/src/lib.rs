@@ -229,6 +229,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32p4",
         feature = "esp32s3"
     )
 ))]
@@ -262,6 +263,13 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x6003_8000;
     #[cfg(feature = "esp32s3")]
     const SERIAL_JTAG_CONF_REG: usize = 0x6003_8004;
+
+    // ESP32-P4: USB_DEVICE peripheral at 0x500D_2000 per PAC.
+    // FIFO/CONF layout matches C6/H2 (same Synopsys USB Serial/JTAG IP).
+    #[cfg(feature = "esp32p4")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x500D_2000;
+    #[cfg(feature = "esp32p4")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x500D_2004;
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
@@ -409,6 +417,17 @@ mod uart_printer {
     }
 
     struct Device;
+
+    // ESP32-P4: ROM uart_tx_one_char at 0x4fc00054
+    // Ref: esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.ld
+    #[cfg(feature = "esp32p4")]
+    impl Functions for Device {
+        const TX_ONE_CHAR: usize = 0x4fc0_0054;
+
+        fn flush() {
+            // tx_one_char waits for TX FIFO space
+        }
+    }
 
     #[cfg(feature = "esp32c2")]
     impl Functions for Device {

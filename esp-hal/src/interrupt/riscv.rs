@@ -312,6 +312,16 @@ pub fn enable_direct(
             let clic = unsafe { crate::soc::pac::CLIC::steal() };
 
             // Enable hardware vectoring
+            #[cfg(esp32p4)]
+            clic.int_ctrl(cpu_interrupt as usize).modify(|_, w| unsafe {
+                // P4: CLIC uses consolidated int_ctrl register (not separate int_attr).
+                // int_ctrl contains: int_ip[0], int_ie[8], int_attr_shv[16],
+                //   int_attr_trig[17:18], int_attr_mode[22:23], int_ctl[24:31]
+                // Ref: esp-idf clic_reg.h, TRM v0.5 Ch 2/14
+                w.int_attr_shv().set_bit();
+                w.int_attr_trig().bits(0) // positive level
+            });
+            #[cfg(not(esp32p4))]
             clic.int_attr(cpu_interrupt as usize).modify(|_, w| {
                 w.shv().hardware();
                 w.trig().positive_level()
@@ -409,6 +419,14 @@ fn cpu_wait_mode_on() -> bool {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_pcr)] {
             crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
+        } else if #[cfg(esp32p4)] {
+            // P4: CPU_WAITI_CTRL0_REG in HP_SYS_CLKRST (offset 0xf4) controls
+            // whether WFI gates the clock. Default: core0_waiti_icg_en=1 (enabled).
+            // This register is only in hw_ver3 (eco5+), not in current PAC.
+            // Ref: esp-idf hp_sys_clkrst_reg.h -- HP_SYS_CLKRST_CPU_WAITI_CTRL0_REG
+            //      TRM v0.5 Ch 22 (v3.x addition)
+            // Return true (WFI clock gating active) -- matches default hardware state.
+            true
         } else {
             crate::peripherals::SYSTEM::regs()
                 .cpu_per_conf()

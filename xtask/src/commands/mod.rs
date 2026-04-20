@@ -400,7 +400,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             args,
             filtered,
             &package_path,
-            out_path.as_ref().map(|p| p.as_path()),
+            out_path.as_deref(),
         ),
         CargoAction::Run => run_examples(args, filtered, &package_path),
     }
@@ -450,13 +450,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             };
 
             let run_test_extra_args = (action == CargoAction::Run)
-                .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+                .then(|| filter.as_ref().map(std::slice::from_ref))
                 .flatten()
                 .unwrap_or(&[]);
 
             let matched: Vec<_> = tests
                 .iter()
-                .filter(|t| t.matches(test_arg.as_deref()))
+                .filter(|t| t.matches(test_arg))
                 .collect();
 
             if matched.is_empty() {

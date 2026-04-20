@@ -88,7 +88,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     }
 
     // Packages that have doc features are documented. We run doc-tests for these, and only these.
-    let Some(mut features) = package.doc_feature_rules(&esp_metadata::Config::for_chip(&chip))
+    let Some(mut features) = package.doc_feature_rules(esp_metadata::Config::for_chip(&chip))
     else {
         log::info!("Skipping undocumented package {package}.");
         return Ok(true);

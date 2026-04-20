@@ -1,29 +1,34 @@
 //! # Reading of eFuses (ESP32-P4)
-pub use self::fields::*;
-use crate::peripherals::pac::EFUSE;
 
+use crate::peripherals::EFUSE;
+
+#[cfg_attr(not(feature = "unstable"), allow(dead_code))]
 mod fields;
+#[instability::unstable]
+pub use fields::*;
 
-impl super::Efuse {
-    /// Get status of SPI boot encryption.
-    pub fn get_flash_encryption() -> bool {
-        (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
-    }
+/// Get status of SPI boot encryption.
+#[instability::unstable]
+pub fn flash_encryption() -> bool {
+    !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
+        .count_ones()
+        .is_multiple_of(2)
+}
 
-    /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    pub fn get_rwdt_multiplier() -> u8 {
-        Self::read_field_le::<u8>(WDT_DELAY_SEL)
-    }
+/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+#[instability::unstable]
+pub fn rwdt_multiplier() -> u8 {
+    super::read_field_le::<u8>(WDT_DELAY_SEL)
+}
 
-    /// Returns the major hardware revision
-    pub fn major_chip_version() -> u8 {
-        Self::read_field_le(WAFER_VERSION_MAJOR)
-    }
+/// Returns the major hardware revision
+pub(crate) fn major_chip_version() -> u8 {
+    super::read_field_le(WAFER_VERSION_MAJOR)
+}
 
-    /// Returns the minor hardware revision
-    pub fn minor_chip_version() -> u8 {
-        Self::read_field_le(WAFER_VERSION_MINOR)
-    }
+/// Returns the minor hardware revision
+pub(crate) fn minor_chip_version() -> u8 {
+    super::read_field_le(WAFER_VERSION_MINOR)
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]
@@ -45,7 +50,7 @@ pub(crate) enum EfuseBlock {
 impl EfuseBlock {
     pub(crate) fn address(self) -> *const u32 {
         use EfuseBlock::*;
-        let efuse = unsafe { &*EFUSE::PTR };
+        let efuse = EFUSE::regs();
         match self {
             Block0 => efuse.rd_wr_dis().as_ptr(),
             Block1 => efuse.rd_mac_sys_0().as_ptr(),

@@ -1100,7 +1100,7 @@ impl<'d> UartRx<'d, Async> {
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                     let reg_en = self.regs().tout_conf();
                 } else {
                     let reg_en = self.regs().conf1();
@@ -2042,7 +2042,8 @@ where
     /// Configures the AT-CMD detection settings
     #[instability::unstable]
     pub fn set_at_cmd(&mut self, config: AtCmdConfig) {
-        #[cfg(not(any(esp32, esp32s2)))]
+        // P4: sclk_en is controlled by HP_SYS_CLKRST, not UART clk_conf register
+        #[cfg(not(any(esp32, esp32s2, esp32p4)))]
         self.regs()
             .clk_conf()
             .modify(|_, w| w.sclk_en().clear_bit());
@@ -2070,7 +2071,7 @@ where
                 .write(|w| unsafe { w.rx_gap_tout().bits(gap_timeout as _) });
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(any(esp32, esp32s2, esp32p4)))]
         self.regs().clk_conf().modify(|_, w| w.sclk_en().set_bit());
 
         sync_regs(self.regs());
@@ -3306,7 +3307,7 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     let reg_thrhd = register_block.conf1();
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                     let reg_thrhd = register_block.tout_conf();
                 } else {
                     let reg_thrhd = register_block.mem_conf();
@@ -3316,7 +3317,7 @@ impl Info {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                 let reg_en = register_block.tout_conf();
             } else {
                 let reg_en = register_block.conf1();
@@ -3339,7 +3340,7 @@ impl Info {
 
             let source_config = ClockConfig::new(
                 config.clock_source,
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
+                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
                 0,
             );
             let clk = clock.function_clock_config_frequency(clocks, source_config);
@@ -3357,7 +3358,7 @@ impl Info {
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
             cfg_if::cfg_if! {
-                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr))] {
+                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))] {
                     const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
@@ -3459,7 +3460,7 @@ impl Info {
                 xoff_threshold,
             } => {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                         self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
@@ -3478,7 +3479,7 @@ impl Info {
             }
             SwFlowControl::Disabled => {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                         let reg = self.regs().swfc_conf0();
                     } else {
                         let reg = self.regs().flow_conf();
@@ -3508,7 +3509,7 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     self.regs().conf1().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                     self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
                 } else {
                     self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
@@ -3517,7 +3518,7 @@ impl Info {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                 self.regs().hwfc_conf().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });
@@ -3749,6 +3750,10 @@ crate::any_peripheral! {
         Uart1(crate::peripherals::UART1<'d>),
         #[cfg(soc_has_uart2)]
         Uart2(crate::peripherals::UART2<'d>),
+        #[cfg(soc_has_uart3)]
+        Uart3(crate::peripherals::UART3<'d>),
+        #[cfg(soc_has_uart4)]
+        Uart4(crate::peripherals::UART4<'d>),
     }
 }
 
@@ -3790,7 +3795,7 @@ impl<'t> UartClockGuard<'t> {
             // Apply default SCLK configuration
             let sclk_config = ClockConfig::new(
                 Default::default(),
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr))]
+                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
                 0,
             );
             clock.configure_function_clock(clocks, sclk_config);
