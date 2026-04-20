@@ -112,14 +112,15 @@ impl Package {
         // This is intended to opt-out in case there are features that look like chip names, but
         // aren't supposed to be handled like them.
         if let Some(metadata) = toml.espressif_metadata()
-            && let Some(Item::Value(ov)) = metadata.get("has_chip_features") {
-                let Value::Boolean(ov) = ov else {
-                    log::warn!("Invalid value for 'has_chip_features' in metadata");
-                    return false;
-                };
+            && let Some(Item::Value(ov)) = metadata.get("has_chip_features")
+        {
+            let Value::Boolean(ov) = ov else {
+                log::warn!("Invalid value for 'has_chip_features' in metadata");
+                return false;
+            };
 
-                return *ov.value();
-            }
+            return *ov.value();
+        }
 
         features
             .iter()
@@ -176,9 +177,11 @@ impl Package {
         // Look for files matching the pattern "MIGRATING-*.md"
         for entry in entries.flatten() {
             if let Some(file_name) = entry.file_name().to_str()
-                && file_name.starts_with("MIGRATING-") && file_name.ends_with(".md") {
-                    return true;
-                }
+                && file_name.starts_with("MIGRATING-")
+                && file_name.ends_with(".md")
+            {
+                return true;
+            }
         }
 
         false
@@ -796,27 +799,23 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     let cmd = CargoArgsBuilder::default();
 
     match package {
-        Package::EspConfig => {
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["build".into(), "tui".into()])
-                    .build(),
-                &package_path,
-            )
-        }
+        Package::EspConfig => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .features(&["build".into(), "tui".into()])
+                .build(),
+            &package_path,
+        ),
 
-        Package::EspBootloaderEspIdf => {
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .arg("--lib")
-                    .arg("--tests")
-                    .features(&["std".into()])
-                    .build(),
-                &package_path,
-            )
-        }
+        Package::EspBootloaderEspIdf => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .arg("--lib")
+                .arg("--tests")
+                .features(&["std".into()])
+                .build(),
+            &package_path,
+        ),
 
         Package::EspStorage => {
             cargo::run(
@@ -865,18 +864,18 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                 &package_path,
             )
         }
-        Package::EspHalProcmacros => {
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["has-lp-core".into(),
-                        "is-lp-core".into(),
-                        "rtc-slow".into(),
-                        "rtc-fast".into()])
-                    .build(),
-                &package_path,
-            )
-        }
+        Package::EspHalProcmacros => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .features(&[
+                    "has-lp-core".into(),
+                    "is-lp-core".into(),
+                    "rtc-slow".into(),
+                    "rtc-fast".into(),
+                ])
+                .build(),
+            &package_path,
+        ),
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",
             package,

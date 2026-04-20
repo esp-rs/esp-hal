@@ -194,7 +194,7 @@ pub(crate) fn init() {
     // Set CPU divider: cpu_clk_div_num = divider - 1 = 0
     // Ref: HP_SYS_CLKRST.root_clk_ctrl0.reg_cpu_clk_div_num
     clkrst.root_clk_ctrl0().modify(|_, w| unsafe {
-        w.cpu_clk_div_num().bits(0);      // CPU: /1 = 400 MHz
+        w.cpu_clk_div_num().bits(0); // CPU: /1 = 400 MHz
         w.cpu_clk_div_numerator().bits(0);
         w.cpu_clk_div_denominator().bits(0)
     });
@@ -284,12 +284,7 @@ fn cpll_configure(freq_mhz: u32) {
         .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
 
     // Wait for calibration to complete
-    while !clkrst
-        .ana_pll_ctrl0()
-        .read()
-        .cpu_pll_cal_end()
-        .bit_is_set()
-    {
+    while !clkrst.ana_pll_ctrl0().read().cpu_pll_cal_end().bit_is_set() {
         core::hint::spin_loop();
     }
 
@@ -347,12 +342,7 @@ fn spll_configure(freq_mhz: u32) {
         .ana_pll_ctrl0()
         .modify(|_, w| w.sys_pll_cal_stop().clear_bit());
 
-    while !clkrst
-        .ana_pll_ctrl0()
-        .read()
-        .sys_pll_cal_end()
-        .bit_is_set()
-    {
+    while !clkrst.ana_pll_ctrl0().read().sys_pll_cal_end().bit_is_set() {
         core::hint::spin_loop();
     }
 
@@ -362,4 +352,3 @@ fn spll_configure(freq_mhz: u32) {
 
     crate::rom::ets_delay_us(10);
 }
-

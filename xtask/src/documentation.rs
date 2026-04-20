@@ -107,10 +107,11 @@ fn build_documentation_for_package(
 
     // Ensure that the package/chip combination provided are valid:
     if let Some(chip) = chip
-        && let Err(err) = package.validate_package_chip(&chip) {
-            log::warn!("{err}");
-            return Ok(());
-        }
+        && let Err(err) = package.validate_package_chip(&chip)
+    {
+        log::warn!("{err}");
+        return Ok(());
+    }
 
     // Build the documentation for the specified package, targeting the
     // specified chip:

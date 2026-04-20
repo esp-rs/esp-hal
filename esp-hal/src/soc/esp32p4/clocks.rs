@@ -43,32 +43,32 @@ impl CpuClock {
     // Ref: esp-idf rtc_clk.c:262 -- case 400: cpu=1, mem=2, apb=2
     const PRESET_400: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(0)),   // /1 = 400 MHz
-        apb_clk: Some(ApbClkConfig::new(3)),    // /4 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 400 MHz
+        apb_clk: Some(ApbClkConfig::new(3)), // /4 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
 
     const PRESET_360: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(0)),   // /1 = 360 MHz (CPLL at 360)
-        apb_clk: Some(ApbClkConfig::new(3)),    // /4 = 90 MHz
+        cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 360 MHz (CPLL at 360)
+        apb_clk: Some(ApbClkConfig::new(3)), // /4 = 90 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
 
     const PRESET_200: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(1)),   // /2 = 200 MHz
-        apb_clk: Some(ApbClkConfig::new(1)),    // /2 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(1)), // /2 = 200 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
 
     const PRESET_100: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(3)),   // /4 = 100 MHz
-        apb_clk: Some(ApbClkConfig::new(0)),    // /1 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(3)), // /4 = 100 MHz
+        apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
@@ -132,7 +132,11 @@ fn configure_cpu_root_clk_impl(
 
 // CPU_CLK divider
 fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
-fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old_config: Option<CpuClkConfig>, new_config: CpuClkConfig) {
+fn configure_cpu_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<CpuClkConfig>,
+    new_config: CpuClkConfig,
+) {
     // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_divider()
     //      HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num = divider - 1
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
@@ -142,15 +146,26 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old_config: Option<CpuClkCon
         w.cpu_clk_div_denominator().bits(0)
     });
     // Trigger divider update
-    clkrst.root_clk_ctrl0().modify(|_, w| w.soc_clk_div_update().set_bit());
-    while clkrst.root_clk_ctrl0().read().soc_clk_div_update().bit_is_set() {
+    clkrst
+        .root_clk_ctrl0()
+        .modify(|_, w| w.soc_clk_div_update().set_bit());
+    while clkrst
+        .root_clk_ctrl0()
+        .read()
+        .soc_clk_div_update()
+        .bit_is_set()
+    {
         core::hint::spin_loop();
     }
 }
 
 // APB_CLK divider
 fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
-fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old_config: Option<ApbClkConfig>, _new_config: ApbClkConfig) {
+fn configure_apb_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<ApbClkConfig>,
+    _new_config: ApbClkConfig,
+) {
     // TODO(P4X): APB divider register in HP_SYS_CLKRST
     // For now, APB freq is derived from CPU freq via divider
 }

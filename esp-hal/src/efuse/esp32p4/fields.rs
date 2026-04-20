@@ -343,19 +343,25 @@ pub const RD_DIS_TEMPERATURE_SENSOR: EfuseField = EfuseField::new(0, 1, 38, 1);
 pub const RD_DIS_USB_DEVICE_EXCHG_PINS: EfuseField = EfuseField::new(0, 1, 38, 1);
 /// `[]` rd_dis of USB_OTG11_EXCHG_PINS
 pub const RD_DIS_USB_OTG11_EXCHG_PINS: EfuseField = EfuseField::new(0, 1, 38, 1);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_0_1: EfuseField = EfuseField::new(0, 1, 39, 2);
 /// `[]` Set this bit to disable function of usb switch to jtag in module of usb device
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 41, 1);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_2_2: EfuseField = EfuseField::new(0, 1, 42, 1);
 /// `[]` Set this bit to disable the function that forces chip into download mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 44, 1);
-/// `[]` Set this bit to disable accessing MSPI flash/MSPI ram by SYS AXI matrix during boot_mode_download
+/// `[]` Set this bit to disable accessing MSPI flash/MSPI ram by SYS AXI matrix during
+/// boot_mode_download
 pub const SPI_DOWNLOAD_MSPI_DIS: EfuseField = EfuseField::new(0, 1, 45, 1);
 /// `[]` Set this bit to disable TWAI function
 pub const DIS_TWAI: EfuseField = EfuseField::new(0, 1, 46, 1);
-/// `[]` Set this bit to enable selection between usb_to_jtag and pad_to_jtag through strapping gpio25 when both EFUSE_DIS_PAD_JTAG and EFUSE_DIS_USB_JTAG are equal to 0
+/// `[]` Set this bit to enable selection between usb_to_jtag and pad_to_jtag through strapping
+/// gpio25 when both EFUSE_DIS_PAD_JTAG and EFUSE_DIS_USB_JTAG are equal to 0
 pub const JTAG_SEL_ENABLE: EfuseField = EfuseField::new(0, 1, 47, 1);
 /// `[]` Set odd bits to disable JTAG in the soft way. JTAG can be enabled in HMAC module
 pub const SOFT_DIS_JTAG: EfuseField = EfuseField::new(0, 1, 48, 3);
@@ -363,33 +369,53 @@ pub const SOFT_DIS_JTAG: EfuseField = EfuseField::new(0, 1, 48, 3);
 pub const DIS_PAD_JTAG: EfuseField = EfuseField::new(0, 1, 51, 1);
 /// `[]` Set this bit to disable flash manual encrypt function (except in SPI boot mode)
 pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(0, 1, 52, 1);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_3_6: EfuseField = EfuseField::new(0, 1, 53, 4);
-/// `[]` 0: intphy(gpio24/25) <---> usb_device 1: intphy(26/27) <---> usb_otg11.1: intphy(gpio26/27) <---> usb_device 1: intphy(24/25) <---> usb_otg11
+/// `[]` 0: intphy(gpio24/25) <---> usb_device 1: intphy(26/27) <---> usb_otg11.1: intphy(gpio26/27)
+/// <---> usb_device 1: intphy(24/25) <---> usb_otg11
 pub const USB_PHY_SEL: EfuseField = EfuseField::new(0, 1, 57, 1);
-/// `[]` Set the bits to control validation of HUK generate mode. Odd of 1 is invalid; even of 1 is valid
+/// `[]` Set the bits to control validation of HUK generate mode. Odd of 1 is invalid; even of 1 is
+/// valid
 pub const HUK_GEN_STATE: EfuseField = EfuseField::new(0, 1, 58, 5);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_7_7: EfuseField = EfuseField::new(0, 1, 63, 1);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_8_10: EfuseField = EfuseField::new(0, 2, 64, 3);
-/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this feature is disabled
+/// `[]` Represents the starting flash sector (flash sector size is 0x1000) of the recovery
+/// bootloader used by the ROM bootloader If the primary bootloader fails. 0 and 0xFFF - this
+/// feature is disabled
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR_11_11: EfuseField = EfuseField::new(0, 2, 67, 1);
-/// `[]` Set the bits to control key manager random number switch cycle. 0: control by register. 1: 8 km clk cycles. 2: 16 km cycles. 3: 32 km cycles
+/// `[]` Set the bits to control key manager random number switch cycle. 0: control by register. 1:
+/// 8 km clk cycles. 2: 16 km cycles. 3: 32 km cycles
 pub const KM_RND_SWITCH_CYCLE: EfuseField = EfuseField::new(0, 2, 68, 1);
-/// `[]` EFUSE_KM_DEPLOY_ONLY_ONCE and EFUSE_KM_DEPLOY_ONLY_ONCE_H together form one field: {EFUSE_KM_DEPLOY_ONLY_ONCE_H; EFUSE_KM_DEPLOY_ONLY_ONCE`[3:0]`}. Set each bit to control whether corresponding key can only be deployed once. 1 is true; 0 is false. bit 0: ecsda; bit 1: xts; bit2: hmac; bit3: ds; bit4:psram
+/// `[]` EFUSE_KM_DEPLOY_ONLY_ONCE and EFUSE_KM_DEPLOY_ONLY_ONCE_H together form one field:
+/// {EFUSE_KM_DEPLOY_ONLY_ONCE_H; EFUSE_KM_DEPLOY_ONLY_ONCE`[3:0]`}. Set each bit to control whether
+/// corresponding key can only be deployed once. 1 is true; 0 is false. bit 0: ecsda; bit 1: xts;
+/// bit2: hmac; bit3: ds; bit4:psram
 pub const KM_DEPLOY_ONLY_ONCE: EfuseField = EfuseField::new(0, 3, 118, 5);
-/// `[]` EFUSE_FORCE_USE_KEY_MANAGER_KEY and EFUSE_FORCE_USE_KEY_MANAGER_KEY_H together form one field: {EFUSE_FORCE_USE_KEY_MANAGER_KEY_H; EFUSE_FORCE_USE_KEY_MANAGER_KEY`[3:0]`}. Set each bit to control whether corresponding key must come from key manager. 1 is true; 0 is false. bit 0: ecsda; bit 1: xts; bit2: hmac; bit3: ds; bit4:psram
+/// `[]` EFUSE_FORCE_USE_KEY_MANAGER_KEY and EFUSE_FORCE_USE_KEY_MANAGER_KEY_H together form one
+/// field: {EFUSE_FORCE_USE_KEY_MANAGER_KEY_H; EFUSE_FORCE_USE_KEY_MANAGER_KEY`[3:0]`}. Set each bit
+/// to control whether corresponding key must come from key manager. 1 is true; 0 is false. bit 0:
+/// ecsda; bit 1: xts; bit2: hmac; bit3: ds; bit4:psram
 pub const FORCE_USE_KEY_MANAGER_KEY: EfuseField = EfuseField::new(0, 3, 119, 5);
 /// `[]` Set this bit to disable software written init key; and force use efuse_init_key
 pub const FORCE_DISABLE_SW_INIT_KEY: EfuseField = EfuseField::new(0, 2, 77, 1);
-/// `[]` Set this bit to config flash encryption xts-512 key; else use xts-256 key when using the key manager
+/// `[]` Set this bit to config flash encryption xts-512 key; else use xts-256 key when using the
+/// key manager
 pub const KM_XTS_KEY_LENGTH_256: EfuseField = EfuseField::new(0, 2, 78, 1);
 /// `[]` Set this bit to permanently turn on ECC const-time mode
 pub const ECC_FORCE_CONST_TIME: EfuseField = EfuseField::new(0, 2, 79, 1);
-/// `[]` Select lp wdt timeout threshold at startup = initial timeout value * (2 ^ (EFUSE_WDT_DELAY_SEL + 1))
+/// `[]` Select lp wdt timeout threshold at startup = initial timeout value * (2 ^
+/// (EFUSE_WDT_DELAY_SEL + 1))
 pub const WDT_DELAY_SEL: EfuseField = EfuseField::new(0, 2, 81, 1);
-/// `[]` Set this bit to enable SPI boot encrypt/decrypt. Odd number of 1: enable. even number of 1: disable {0: "Disable"; 1: "Enable"; 3: "Disable"; 7: "Enable"}
+/// `[]` Set this bit to enable SPI boot encrypt/decrypt. Odd number of 1: enable. even number of 1:
+/// disable {0: "Disable"; 1: "Enable"; 3: "Disable"; 7: "Enable"}
 pub const SPI_BOOT_CRYPT_CNT: EfuseField = EfuseField::new(0, 2, 82, 3);
 /// `[]` Revoke 1st secure boot key
 pub const SECURE_BOOT_KEY_REVOKE0: EfuseField = EfuseField::new(0, 2, 85, 1);
@@ -421,7 +447,8 @@ pub const SECURE_BOOT_AGGRESSIVE_REVOKE: EfuseField = EfuseField::new(0, 3, 117,
 pub const FLASH_ECC_EN: EfuseField = EfuseField::new(0, 3, 122, 1);
 /// `[]` Set this bit to disable download via USB-OTG
 pub const DIS_USB_OTG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 3, 123, 1);
-/// `[]` Configures flash waiting time after power-up; in unit of ms. When the value less than 15; the waiting time is the configurable value. Otherwise; the waiting time is 30
+/// `[]` Configures flash waiting time after power-up; in unit of ms. When the value less than 15;
+/// the waiting time is the configurable value. Otherwise; the waiting time is 30
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 3, 124, 4);
 /// `[]` Set this bit to disable download mode (boot_mode`[3:0]` = 0; 1; 2; 4; 5; 6; 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
@@ -435,13 +462,16 @@ pub const LOCK_KM_KEY: EfuseField = EfuseField::new(0, 4, 131, 1);
 pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 132, 1);
 /// `[]` Set this bit to enable security download mode
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// `[]` Set the type of UART printing; 00: force enable printing; 01: enable printing when GPIO8 is reset at low level; 10: enable printing when GPIO8 is reset at high level; 11: force disable printing
+/// `[]` Set the type of UART printing; 00: force enable printing; 01: enable printing when GPIO8 is
+/// reset at low level; 10: enable printing when GPIO8 is reset at high level; 11: force disable
+/// printing
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// `[]` Set this bit to force ROM code to send a resume command during SPI boot
 pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 4, 136, 1);
 /// `[]` Secure version used by ESP-IDF anti-rollback feature
 pub const SECURE_VERSION: EfuseField = EfuseField::new(0, 4, 137, 16);
-/// `[]` Represents whether secure boot do fast verification on wake is disabled. 0: enabled 1: disabled
+/// `[]` Represents whether secure boot do fast verification on wake is disabled. 0: enabled 1:
+/// disabled
 pub const SECURE_BOOT_DISABLE_FAST_WAKE: EfuseField = EfuseField::new(0, 4, 153, 1);
 /// `[]` Set bits to enable hysteresis function of PAD0~27
 pub const HYS_EN_PAD: EfuseField = EfuseField::new(0, 4, 154, 1);
@@ -449,9 +479,14 @@ pub const HYS_EN_PAD: EfuseField = EfuseField::new(0, 4, 154, 1);
 pub const PXA0_TIEH_SEL_0: EfuseField = EfuseField::new(0, 5, 160, 2);
 /// `[]` Represents whether to enable PVT power glitch monitor function.1:Enable. 0:Disable
 pub const PVT_GLITCH_EN: EfuseField = EfuseField::new(0, 5, 162, 1);
-/// `[]` EFUSE_KM_DISABLE_DEPLOY_MODE and EFUSE_KM_DISABLE_DEPLOY_MODE_H together form one field: {EFUSE_KM_DISABLE_DEPLOY_MODE_H; EFUSE_KM_DISABLE_DEPLOY_MODE`[3:0]`}. Set each bit to control whether corresponding key's deploy mode of new value deployment is disabled. 1 is true; 0 is false. bit 0: ecsda; bit 1: xts; bit2: hmac; bit3: ds; bit4:psram
+/// `[]` EFUSE_KM_DISABLE_DEPLOY_MODE and EFUSE_KM_DISABLE_DEPLOY_MODE_H together form one field:
+/// {EFUSE_KM_DISABLE_DEPLOY_MODE_H; EFUSE_KM_DISABLE_DEPLOY_MODE`[3:0]`}. Set each bit to control
+/// whether corresponding key's deploy mode of new value deployment is disabled. 1 is true; 0 is
+/// false. bit 0: ecsda; bit 1: xts; bit2: hmac; bit3: ds; bit4:psram
 pub const KM_DISABLE_DEPLOY_MODE: EfuseField = EfuseField::new(0, 5, 167, 5);
-/// `[]` Sets this bit to control the xts pseudo-round anti-dpa attack function. 0: controlled by register. 1-3: the higher the value is; the more pseudo-rounds are inserted to the xts-aes calculation
+/// `[]` Sets this bit to control the xts pseudo-round anti-dpa attack function. 0: controlled by
+/// register. 1-3: the higher the value is; the more pseudo-rounds are inserted to the xts-aes
+/// calculation
 pub const XTS_DPA_PSEUDO_LEVEL: EfuseField = EfuseField::new(0, 5, 176, 2);
 /// `[]` HP system power source select. 0:LDO  1: DCDC
 pub const HP_PWR_SRC_SEL: EfuseField = EfuseField::new(0, 5, 178, 1);

@@ -30,7 +30,6 @@ pub(crate) mod constants {
     pub const SOC_DRAM_HIGH: u32 = 0x4FFC_0000;
 }
 
-
 pub(crate) fn pre_init() {
     // TODO: Check if anything needs to be done here
 }

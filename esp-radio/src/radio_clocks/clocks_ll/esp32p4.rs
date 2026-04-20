@@ -40,7 +40,6 @@ pub(super) fn init_clocks() {
         PMU::regs()
             .imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
-
     }
 }
 

@@ -29,22 +29,23 @@ struct ArgInfo {
     value_delimiter: Option<char>,
 }
 
-
 /// Parse a string literal from an expression.
 fn expr_lit_str(expr: &Expr) -> Option<String> {
     if let Expr::Lit(el) = expr
-        && let Lit::Str(s) = &el.lit {
-            return Some(s.value());
-        }
+        && let Lit::Str(s) = &el.lit
+    {
+        return Some(s.value());
+    }
     None
 }
 
 /// Parse a char literal from an expression.
 fn expr_lit_char(expr: &Expr) -> Option<char> {
     if let Expr::Lit(el) = expr
-        && let Lit::Char(c) = &el.lit {
-            return Some(c.value());
-        }
+        && let Lit::Char(c) = &el.lit
+    {
+        return Some(c.value());
+    }
     None
 }
 
@@ -58,9 +59,10 @@ fn extract_doc(attrs: &[Attribute]) -> String {
             }
             if let Meta::NameValue(nv) = &attr.meta
                 && let Expr::Lit(el) = &nv.value
-                    && let Lit::Str(s) = &el.lit {
-                        return Some(s.value().trim().to_string());
-                    }
+                && let Lit::Str(s) = &el.lit
+            {
+                return Some(s.value().trim().to_string());
+            }
             None
         })
         .filter(|s| !s.is_empty())

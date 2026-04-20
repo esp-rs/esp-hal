@@ -535,9 +535,13 @@ pub fn cpu_clock() -> Rate {
     // Ref: esp-idf rtc_clk.c -- default is 400 MHz for eco5 (v3.x)
     //      TRM v0.5 Ch 12
     #[cfg(esp32p4)]
-    { Rate::from_mhz(400) }
+    {
+        Rate::from_mhz(400)
+    }
     #[cfg(not(esp32p4))]
-    { Clocks::get().cpu_clock }
+    {
+        Clocks::get().cpu_clock
+    }
 }
 
 /// The XTAL clock frequency.
@@ -545,9 +549,13 @@ pub fn xtal_clock() -> Rate {
     // P4: 40 MHz external crystal (SOC_XTAL_FREQ_40M)
     // Ref: esp-idf clk_tree_defs.h -- SOC_XTAL_FREQ_40M = 40
     #[cfg(esp32p4)]
-    { Rate::from_mhz(40) }
+    {
+        Rate::from_mhz(40)
+    }
     #[cfg(not(esp32p4))]
-    { Clocks::get().xtal_clock }
+    {
+        Clocks::get().xtal_clock
+    }
 }
 
 /// Read the calibrated RTC slow clock period from the STORE1 register.
@@ -571,9 +579,13 @@ fn rtc_slow_cal_period() -> u64 {
     // Ref: esp-idf lp_system_reg.h -- LP_SYSTEM_REG_LP_STORE1_REG = RTC_SLOW_CLK_CAL_REG
     //      esp-idf esp_time_impl.c -- uses store2/store3 for boot time
     #[cfg(esp32p4)]
-    { LP_AON::regs().lp_store1().read().bits() as u64 }
+    {
+        LP_AON::regs().lp_store1().read().bits() as u64
+    }
     #[cfg(not(esp32p4))]
-    { LP_AON::regs().store1().read().bits() as u64 }
+    {
+        LP_AON::regs().store1().read().bits() as u64
+    }
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.

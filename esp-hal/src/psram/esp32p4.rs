@@ -207,10 +207,10 @@ fn psram_detect_size(mspi_base: u32) -> usize {
 
         // Decode density field [2:0]
         match mr2 & 0x7 {
-            0x1 => 4 * 1024 * 1024,   // 32 Mbit = 4 MB
-            0x3 => 8 * 1024 * 1024,   // 64 Mbit = 8 MB
-            0x5 => 16 * 1024 * 1024,  // 128 Mbit = 16 MB
-            0x7 => 32 * 1024 * 1024,  // 256 Mbit = 32 MB
+            0x1 => 4 * 1024 * 1024,  // 32 Mbit = 4 MB
+            0x3 => 8 * 1024 * 1024,  // 64 Mbit = 8 MB
+            0x5 => 16 * 1024 * 1024, // 128 Mbit = 16 MB
+            0x7 => 32 * 1024 * 1024, // 256 Mbit = 32 MB
             _ => {
                 // Unknown/invalid response -> fall back to EV Board default
                 32 * 1024 * 1024
@@ -321,12 +321,8 @@ fn cache_resume() {
 pub(crate) fn cache_invalidate(addr: u32, size: u32) {
     let cache = unsafe { &*crate::pac::CACHE::PTR };
 
-    cache
-        .sync_addr()
-        .write(|w| unsafe { w.bits(addr) });
-    cache
-        .sync_size()
-        .write(|w| unsafe { w.bits(size) });
+    cache.sync_addr().write(|w| unsafe { w.bits(addr) });
+    cache.sync_size().write(|w| unsafe { w.bits(size) });
 
     // Trigger invalidate: sync_ctrl.invalidate_ena
     cache
@@ -334,12 +330,7 @@ pub(crate) fn cache_invalidate(addr: u32, size: u32) {
         .modify(|_, w| w.invalidate_ena().set_bit());
 
     // Wait for completion
-    while !cache
-        .sync_ctrl()
-        .read()
-        .sync_done()
-        .bit_is_set()
-    {
+    while !cache.sync_ctrl().read().sync_done().bit_is_set() {
         core::hint::spin_loop();
     }
 }
@@ -353,24 +344,13 @@ pub(crate) fn cache_invalidate(addr: u32, size: u32) {
 pub(crate) fn cache_writeback(addr: u32, size: u32) {
     let cache = unsafe { &*crate::pac::CACHE::PTR };
 
-    cache
-        .sync_addr()
-        .write(|w| unsafe { w.bits(addr) });
-    cache
-        .sync_size()
-        .write(|w| unsafe { w.bits(size) });
+    cache.sync_addr().write(|w| unsafe { w.bits(addr) });
+    cache.sync_size().write(|w| unsafe { w.bits(size) });
 
     // Trigger writeback: sync_ctrl.writeback_ena
-    cache
-        .sync_ctrl()
-        .modify(|_, w| w.writeback_ena().set_bit());
+    cache.sync_ctrl().modify(|_, w| w.writeback_ena().set_bit());
 
-    while !cache
-        .sync_ctrl()
-        .read()
-        .sync_done()
-        .bit_is_set()
-    {
+    while !cache.sync_ctrl().read().sync_done().bit_is_set() {
         core::hint::spin_loop();
     }
 }
@@ -453,7 +433,7 @@ fn configure_psram_mspi(base: u32) {
         let sctrl = (base + CACHE_SCTRL) as *mut u32;
         let val = sctrl.read_volatile();
         let val = val | (1 << 20); // cache_sram_usr_rcmd = 1
-        let val = val | (1 << 5);  // cache_sram_usr_wcmd = 1
+        let val = val | (1 << 5); // cache_sram_usr_wcmd = 1
         // sram_addr_bitlen = 31 (32-bit address)
         let val = (val & !(0x3F << 14)) | (31 << 14);
         // usr_rd_sram_dummy = 1, sram_rdummy_cyclelen = 13 (14-1 for 200MHz)

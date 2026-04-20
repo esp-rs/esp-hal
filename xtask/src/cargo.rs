@@ -550,8 +550,7 @@ pub struct CargoToml {
     pub manifest: toml_edit::DocumentMut,
 }
 
-const DEPENDENCY_KINDS: [&str; 3] =
-    ["dependencies", "dev-dependencies", "build-dependencies"];
+const DEPENDENCY_KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
@@ -720,9 +719,10 @@ impl CargoToml {
                 };
 
                 if let Ok(package) = Package::from_str(name, true)
-                    && !dependencies.contains(&package) {
-                        dependencies.push(package);
-                    }
+                    && !dependencies.contains(&package)
+                {
+                    dependencies.push(package);
+                }
             }
         });
         dependencies
@@ -761,12 +761,13 @@ impl CargoToml {
                     let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
                         if let Value::InlineTable(table) = p
                             && let Some(Value::String(name)) = &table.get("package")
-                                && name.value() == package_name {
-                                    // Return the actual key of this dependency, e.g.:
-                                    // `procmacros = { package = "esp-hal-procmacros" }`
-                                    //  ^^^^^^^^^^
-                                    return Some(k.last().unwrap().get().to_string());
-                                }
+                            && name.value() == package_name
+                        {
+                            // Return the actual key of this dependency, e.g.:
+                            // `procmacros = { package = "esp-hal-procmacros" }`
+                            //  ^^^^^^^^^^
+                            return Some(k.last().unwrap().get().to_string());
+                        }
 
                         None
                     });

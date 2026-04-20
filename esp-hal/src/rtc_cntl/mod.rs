@@ -716,9 +716,7 @@ impl Rwdt {
     fn set_write_protection(&mut self, enable: bool) {
         // Ref: esp-idf lpwdt_ll.h -- LP_WDT_WKEY_VALUE = 0x50D83AA1
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
-        LP_WDT::regs()
-            .wprotect()
-            .write(|w| unsafe { w.bits(wkey) });
+        LP_WDT::regs().wprotect().write(|w| unsafe { w.bits(wkey) });
     }
 
     fn set_enabled(&mut self, enable: bool) {
@@ -759,10 +757,18 @@ impl Rwdt {
         // Ref: esp-idf lp_wdt_struct.h
         let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
         match stage {
-            RwdtStage::Stage0 => rtc_cntl.config1().modify(|_, w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) }),
-            RwdtStage::Stage1 => rtc_cntl.config2().modify(|_, w| unsafe { w.bits(timeout_raw) }),
-            RwdtStage::Stage2 => rtc_cntl.config3().modify(|_, w| unsafe { w.bits(timeout_raw) }),
-            RwdtStage::Stage3 => rtc_cntl.config4().modify(|_, w| unsafe { w.bits(timeout_raw) }),
+            RwdtStage::Stage0 => rtc_cntl
+                .config1()
+                .modify(|_, w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) }),
+            RwdtStage::Stage1 => rtc_cntl
+                .config2()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+            RwdtStage::Stage2 => rtc_cntl
+                .config3()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+            RwdtStage::Stage3 => rtc_cntl
+                .config4()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
         };
         self.set_write_protection(true);
     }
