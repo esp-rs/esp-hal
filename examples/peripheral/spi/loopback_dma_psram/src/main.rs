@@ -12,9 +12,6 @@
 //! This example transfers data via SPI.
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
-//!
-//! If your module is octal PSRAM then you need to set
-//! `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
 #![no_std]
 #![no_main]

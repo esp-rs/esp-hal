@@ -10,6 +10,7 @@ use toml_edit::{Item, Value};
 
 use crate::{
     Package,
+    Version,
     cargo::CargoToml,
     commands::{VersionBump, checker::min_package_update, do_version_bump},
     git::current_branch,
@@ -49,8 +50,40 @@ pub struct PackagePlan {
 pub struct Plan {
     /// The branch the release is made from.
     pub base: String,
+    /// Short random slug that pins this plan to its release branch
+    /// (`release-branch-<slug>`). Generated once when the plan is created and
+    /// preserved across re-plans so re-runs of `execute-plan` target the same
+    /// branch and PR.
+    pub slug: String,
     /// The packages to be released, in order.
     pub packages: Vec<PackagePlan>,
+}
+
+/// Generate a short base36 slug. Not cryptographically random — we only need
+/// uniqueness across release attempts, and the slug is persisted in the plan
+/// file so it survives re-runs.
+fn generate_slug() -> String {
+    let mut n = jiff::Timestamp::now().as_nanosecond() as u128;
+    const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut slug = String::new();
+    for _ in 0..6 {
+        slug.push(CHARS[(n % 36) as usize] as char);
+        n /= 36;
+    }
+    slug
+}
+
+/// Read the slug from an existing (finalized) plan file, so that re-running
+/// `plan` preserves the release branch name. Returns `Ok(None)` when no plan
+/// file exists yet. Bails with the same error as `Plan::from_path` if the
+/// file is present but still carries its JSONC comment header — the user is
+/// expected to finalize the plan before re-running.
+fn read_existing_slug(plan_path: &Path) -> Result<Option<String>> {
+    if !plan_path.exists() {
+        return Ok(None);
+    }
+    let plan = Plan::from_path(plan_path)?;
+    Ok(Some(plan.slug))
 }
 
 impl Plan {
@@ -174,8 +207,16 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Generate plan file. The plan should include, as an ordered list, the packages
     // and their version increment.
 
+    let plan_path = workspace.join("release_plan.jsonc");
+    let plan_path = crate::windows_safe_path(&plan_path);
+
+    // Preserve the slug from an existing plan file so that re-running `plan`
+    // after tweaks keeps targeting the same release branch.
+    let slug = read_existing_slug(&plan_path)?.unwrap_or_else(generate_slug);
+
     let plan = Plan {
         base: current_branch,
+        slug,
         packages: update_amounts
             .into_iter()
             .filter_map(|(package, bump)| {
@@ -183,21 +224,32 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     let current_version = package_tomls[&package].package_version();
 
                     let bump = if !current_version.pre.is_empty() {
-                        VersionBump::PreRelease(
-                            current_version
-                                .pre
-                                .as_str()
-                                .split('.')
-                                .next()
-                                .unwrap()
-                                .to_string(),
-                        )
+                        // Package is already in a pre-release cycle — continue it
+                        // on the same base. Hand-edit the plan to start a new
+                        // cycle on a bumped base (e.g. `1.1.0-alpha.0` from
+                        // `1.0.0`) by also setting `base`.
+                        VersionBump {
+                            base: None,
+                            pre: Some(
+                                current_version
+                                    .pre
+                                    .as_str()
+                                    .split('.')
+                                    .next()
+                                    .unwrap()
+                                    .to_string(),
+                            ),
+                        }
                     } else {
-                        match b {
-                            ReleaseType::Major => VersionBump::Major,
-                            ReleaseType::Minor => VersionBump::Minor,
-                            ReleaseType::Patch => VersionBump::Patch,
+                        let base = match b {
+                            ReleaseType::Major => Version::Major,
+                            ReleaseType::Minor => Version::Minor,
+                            ReleaseType::Patch => Version::Patch,
                             _ => unreachable!(),
+                        };
+                        VersionBump {
+                            base: Some(base),
+                            pre: None,
                         }
                     };
 
@@ -217,8 +269,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             .collect(),
     };
 
-    let plan_path = workspace.join("release_plan.jsonc");
-    let plan_path = crate::windows_safe_path(&plan_path);
     log::debug!("Writing release plan to {}", plan_path.display());
 
     let plan_header = String::from(
@@ -241,11 +291,17 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // orchestrate the actual publishing process.
 //
 // For each package, this plan contains the version bump that will be applied.
-// The version bump is one of:
-// - PreRelease (`"bump": { "PreRelease": "beta" }`)
-// - Patch (`"bump": "Patch"`)
-// - Minor (`"bump": "Minor"`)
-// - Major (`"bump": "Major"`)
+// A bump has two orthogonal fields — `base` (how much to bump
+// major.minor.patch) and `pre` (the pre-release identifier):
+//
+// - Stable bump:               `"bump": { "base": "Minor", "pre": null }`
+// - Continue pre-release cycle:`"bump": { "base": null,    "pre": "beta" }`
+// - Start a new pre-release cycle on a bumped base (e.g. 1.0.0 -> 1.1.0-alpha.0):
+//                              `"bump": { "base": "Minor", "pre": "alpha" }`
+//
+// Starting a pre-release cycle from a stable version without also setting
+// `base` is an error, as it would produce a version lower than the current
+// one.
 "#,
     );
 

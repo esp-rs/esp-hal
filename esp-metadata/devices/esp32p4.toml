@@ -290,6 +290,11 @@ support_status = "partial"
 dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
+# PSRAM: cache-mapped external RAM (HEX mode)
+# Ref: esp-idf esp_psram_impl_ap_hex.c, TRM v0.5 Ch 9
+[device.psram]
+extmem_origin = 0x48000000
+
 # RSA: hardware accelerator
 # Ref: esp-idf mpi_ll.h, TRM v0.5 Ch 33
 [device.rsa]

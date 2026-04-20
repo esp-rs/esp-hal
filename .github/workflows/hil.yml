@@ -104,12 +104,10 @@ jobs:
           path: target/aarch64-unknown-linux-gnu/release/xtask
 
   # NOTE:
-  # There is also a dummy job named 'build-tests-full' in `ci.yml` which runs
-  # only on non-merge-group events to satisfy branch protection required
-  # checks on PRs.
-  #
-  # This job is the *real* HIL test-build job, used on merge_group and when
-  # triggered via `/hil full`.
+  # `ci.yml` defines a single `build-tests-full-report` job on non-merge-group
+  # events as a PR placeholder. This matrix job performs the real compiles on
+  # merge_group and `/hil full`. `build-tests-full-report` waits for every
+  # matrix leg.
   build-tests-full:
     needs: get-labels
     if: >
@@ -178,6 +176,13 @@ jobs:
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
           tests: ${{ github.event.inputs.tests || '' }}
+
+  build-tests-full-report:
+    needs: [build-tests-full]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All full-matrix HIL test builds succeeded
+        run: echo "OK"
 
   build-tests-quick:
     if: >
@@ -356,7 +361,7 @@ jobs:
         github.event.inputs.matrix == 'full' &&
         github.event.inputs.chips == '')
        )
-    needs: [build-tests-full, build-xtasks, get-labels]
+    needs: [build-tests-full-report, build-xtasks, get-labels]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:

@@ -9,12 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for ESP32-C5 (#4998)
-- Support for ESP32-C61 (#5240)
 
 ### Changed
-
-- Speed up erase by erasing entire blocks when possible (#5079)
 
 
 ### Fixed
@@ -22,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.9.0] - 2026-04-16
+
+### Added
+
+- Support for ESP32-C5 (#4998)
+- Support for ESP32-C61 (#5240)
+
+### Changed
+
+- Speed up erase by erasing entire blocks when possible (#5079)
 
 ## [v0.8.1] - 2025-10-30
 
@@ -87,4 +94,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.6.0...esp-storage-v0.7.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.7.0...esp-storage-v0.8.0
 [v0.8.1]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.0...esp-storage-v0.8.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.1...HEAD
+[v0.9.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.1...esp-storage-v0.9.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.9.0...HEAD

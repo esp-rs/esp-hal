@@ -69,6 +69,21 @@ esp-hal = { version = "~1.1" }
 
 Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements) will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possibility of breaking your project.
 
+## Release policy
+
+We follow a few general guidelines regarding releases:
+
+- Releases happen organically alongside development rather than on a fixed schedule. The table below outlines our general approach to each release type and when one might be cut.
+- During the `rc` phase of a release:
+    - We aim to leave them in the wild for testing for at least one week per release.
+    - If a considerable change (like a new addition) is added, we must extend the `rc` by at least another release.
+
+| Release Type | Cadence    | Pre-release Requirement                         |
+| ------------ | ---------- | ----------------------------------------------- |
+| Patch        | Frequent   | None                                            |
+| Minor        | Periodic   | `rc` release required                           |
+| Major        | Infrequent | Full pre-release cycle (`alpha` may be skipped) |
+
 ## AI Contribution Policy
 
 We follow the same policy as the official Rust Embedded working group, please review [the policy](https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy) before contributing with AI tools.

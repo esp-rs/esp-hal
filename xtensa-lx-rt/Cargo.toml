@@ -1,6 +1,6 @@
 [package]
 name          = "xtensa-lx-rt"
-version       = "0.21.0"
+version       = "0.22.0"
 edition       = "2024"
 rust-version  = "1.88.0"
 description   = "Minimal startup/runtime for Xtensa LX CPUs"

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.18.0] - 2026-04-16
+
+### Added
+
 - It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
@@ -76,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix a crash when trying to handle an unknown WiFi event (#4942)
 - Align IEEE 802.15.4 driver with ESP-IDF 5.5.2 C driver: overhauled ISR event handling, added timer0-based ACK timeout, per-state stop dispatch, TX deferral with pending TX mechanism, CCA support, ACK frame return, and fixed TX power default (20 dBm) (#5006)
 - `WifiController::set_config` now stops the Wi-Fi controller on error to avoid leaving the controller in an inconsistent state. (#5100)
+- Don't offer CSI functionality for unsupported targets - i.e. ESP32-C2 (#5370)
 
 ### Removed
 
@@ -433,4 +448,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...HEAD
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...esp-radio-v0.18.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...HEAD

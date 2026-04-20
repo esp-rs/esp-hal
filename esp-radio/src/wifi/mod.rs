@@ -90,7 +90,7 @@ use crate::{
 pub mod ap;
 
 unstable_module!(
-    #[cfg(feature = "csi")]
+    #[cfg(all(feature = "csi", wifi_csi_supported))]
     #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
     pub mod csi;
     pub mod event;
@@ -1236,19 +1236,12 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            let can_send = match self {
-                InterfaceType::Station => {
-                    matches!(station_state(), WifiStationState::Connected)
-                }
-                InterfaceType::AccessPoint => {
-                    matches!(access_point_state(), WifiAccessPointState::Started)
-                }
-            };
-
-            can_send.then_some(WifiTxToken { mode: *self })
-        } else {
-            None
+            if self.link_state() == embassy_net_driver::LinkState::Up {
+                return Some(WifiTxToken { mode: *self });
+            }
         }
+
+        None
     }
 
     fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
@@ -2280,8 +2273,6 @@ pub fn new<'d>(
     let mut controller = WifiController {
         _guard,
         _phantom: Default::default(),
-        beacon_timeout: 6,
-        ap_beacon_timeout: 100,
     };
 
     controller.set_country_info(&config.country_info)?;
@@ -2321,9 +2312,6 @@ pub fn new<'d>(
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,
-    // Things we have to remember due to how esp-wifi works:
-    beacon_timeout: u16,
-    ap_beacon_timeout: u16,
 }
 
 impl Drop for WifiController<'_> {
@@ -3067,8 +3055,6 @@ ignored."
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
-        self.ap_beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             ap: wifi_ap_config_t {
                 ssid: [0; 32],
@@ -3112,8 +3098,6 @@ ignored."
     }
 
     fn apply_sta_config(&mut self, config: &StationConfig) -> Result<(), WifiError> {
-        self.beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
@@ -3159,8 +3143,6 @@ ignored."
 
     #[cfg(feature = "wifi-eap")]
     fn apply_sta_eap_config(&mut self, config: &EapStationConfig) -> Result<(), WifiError> {
-        self.beacon_timeout = config.beacon_timeout;
-
         let mut cfg = wifi_config_t {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],

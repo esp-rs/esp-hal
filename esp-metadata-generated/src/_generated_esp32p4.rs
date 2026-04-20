@@ -199,6 +199,12 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("psram.extmem_origin") => {
+        1207959552
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1207959552)
+    };
     ("rsa.size_increment") => {
         32
     };

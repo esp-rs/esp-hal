@@ -254,7 +254,10 @@ impl Package {
                 possible_symbols.contains_key(symbol),
                 "Unknown chip symbol: {symbol}",
             );
-            config.all().iter().any(|sym| sym == symbol)
+            config
+                .all()
+                .iter()
+                .any(|sym| sym.replace('.', "_") == symbol)
         });
         eval_context.add_variable("chip", config.name());
 
@@ -543,7 +546,9 @@ impl Package {
     }
 }
 
-#[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::Display, clap::ValueEnum, Serialize, Deserialize,
+)]
 #[strum(serialize_all = "lowercase")]
 /// Represents the versioning scheme for a package.
 pub enum Version {

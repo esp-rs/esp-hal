@@ -303,6 +303,7 @@ gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 5
+can_access_psram = true
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 
@@ -657,6 +658,7 @@ apb_cycle_wait_num = 16 # TODO
 [device.wifi]
 mac_version = 3
 has_5g = true
+csi_supported = true
 
 [device.bt]
 support_status = "partial"
@@ -676,6 +678,7 @@ combo_module = true
 [device.parl_io]
 support_status = "partial"
 version = 2
+
 # TODO: model chip select signal (active low)
 
 [device.ledc]
@@ -702,6 +705,7 @@ support_status = { status = "not_supported", issue = 5172 }
 [device.io_mux]
 
 [device.psram]
+extmem_origin = 0x42000000
 
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5169 }

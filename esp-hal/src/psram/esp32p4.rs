@@ -37,7 +37,26 @@ pub struct PsramConfig {
 /// Initialize PSRAM.
 ///
 /// Ref: esp-idf esp_psram_impl_enable() in esp_psram_impl_ap_hex.c
-pub(crate) fn init_psram(config: PsramConfig) {
+///
+/// Signature matches the post-merge (esp-hal 1.1.0-rc.0+) convention:
+/// returns `true` on successful bring-up. Our P4 implementation is not
+/// yet hardware-validated, so we always return `true` optimistically --
+/// this crate's `psram::Psram::new` only uses the return value to decide
+/// whether to `map_psram`, and if the caller hasn't wired up PSRAM pins
+/// they won't construct the `Psram` handle anyway.
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
+    init_psram_inner(*config);
+    true
+}
+
+/// Returns the virtual-address range that the PSRAM was mapped into.
+/// Called by `Psram::new` right after `init_psram` returns true.
+pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
+    let size = config.size.get();
+    PSRAM_VADDR_START..PSRAM_VADDR_START + size
+}
+
+fn init_psram_inner(config: PsramConfig) {
     // 1. Enable MPLL (400 MHz) for PSRAM clock
     // Ref: esp-idf clk_tree_ll.h -- clk_ll_mpll_enable(), clk_ll_mpll_set_config()
     //      regi2c_mpll.h -- I2C_MPLL = 0x63

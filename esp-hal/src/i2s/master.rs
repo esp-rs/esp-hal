@@ -440,6 +440,10 @@ pub struct Config {
     /// Transmitter unit config
     tx_config: UnitConfig,
 
+    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK.
+    /// Also sets RX to slave mode, following TX's clocks, TX stays master.
+    signal_loopback: bool,
+
     /// The target sample rate
     #[cfg(any(esp32, esp32s2))]
     sample_rate: Rate,
@@ -573,6 +577,7 @@ impl Default for Config {
         Self {
             rx_config: UnitConfig::new_tdm_philips(),
             tx_config: UnitConfig::new_tdm_philips(),
+            signal_loopback: false,
             #[cfg(any(esp32, esp32s2))]
             sample_rate: Rate::from_hz(44100),
             #[cfg(any(esp32, esp32s2))]
@@ -1523,7 +1528,7 @@ mod private {
 
             self.regs().conf().modify(|_, w| {
                 w.tx_slave_mod().clear_bit();
-                w.rx_slave_mod().clear_bit();
+                w.rx_slave_mod().bit(config.signal_loopback);
                 // Send MSB to the right channel to be consistent with ESP32-S3 et al.
                 w.tx_msb_right().set_bit();
                 w.rx_msb_right().set_bit();
@@ -1535,7 +1540,7 @@ mod private {
                 w.rx_right_first().set_bit();
                 w.tx_mono().clear_bit();
                 w.rx_mono().clear_bit();
-                w.sig_loopback().clear_bit()
+                w.sig_loopback().bit(config.signal_loopback)
             });
 
             self.regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
@@ -1938,6 +1943,13 @@ mod private {
 
             self.configure_tx(&config.tx_config)?;
             self.configure_rx(&config.rx_config)?;
+
+            self.regs()
+                .tx_conf()
+                .modify(|_, w| w.sig_loopback().bit(config.signal_loopback));
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_slave_mod().bit(config.signal_loopback));
 
             Ok(())
         }

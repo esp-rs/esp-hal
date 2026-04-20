@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.1.0-rc.0] - 2026-04-16
+
+### Added
+
 - `AdcPin` now implements `Debug` and `defmt::Format`. (#5194)
 - RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
 - RMT: `Channel::apply_config` has been added. (#4302)
@@ -58,8 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for `rand_core 0.10.0` (#5280)
 - `esp_hal::efuse::ChipRevision` (#5287)
 - Cache configuration options for ESP32-S2 (#5306)
-- C5: Add PSRAM support (#5317)
+- C5: Add PSRAM support (#5317, #5353)
 - C61: Add PSRAM support (#5325)
+- C61: Add DMA support (#5356)
+- C61: Add SHA and ECC support (#5354)
+- A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
+- Add I2S loopback logic to the peripheral driver. (#5349)
 
 ### Changed
 
@@ -139,6 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Efuse` struct has been removed. Use free-standing functions in the `efuse` module instead. (#5104)
 - The `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration option has been removed (#4517)
+- The `ESP_HAL_CONFIG_PSRAM_MODE` configuration option has been removed (#5334)
 - `Clocks::{i2c_clock, pwm_clock, crypto_clock}` fields (#4636, #4647)
 - `RtcClock::xtal_freq()` and the `XtalClock` enum (#4724)
 - `Rtc::estimate_xtal_frequency()` (#4851)
@@ -1588,4 +1607,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...HEAD
+[v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...HEAD

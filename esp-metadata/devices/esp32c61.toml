@@ -32,6 +32,7 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
+    # { name = "APB_SARADC", dma_peripheral = 8 },
     { name = "ASSIST_DEBUG"},
     { name = "CLINT" },
     { name = "CACHE" },
@@ -48,7 +49,7 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
     # { name = "IEEE802154" }, # TODO: add PAC manually later
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -74,7 +75,7 @@ peripherals = [
     { name = "PCR" },
     { name = "PMU" },
     { name = "RNG" },
-    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "SLC" },
     # { name = "SLCHOST" }, TODO: add PAC manually later
     { name = "SPI0" },
@@ -90,12 +91,28 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
+    { name = "DMA_CH0", virtual = true },
+    { name = "DMA_CH1", virtual = true },
+
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     # { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
+    { name = "MEM2MEM0", virtual = true, dma_peripheral = 0 },
+    { name = "MEM2MEM1", virtual = true, dma_peripheral = 2 },
+    { name = "MEM2MEM2", virtual = true, dma_peripheral = 4 },
+    { name = "MEM2MEM3", virtual = true, dma_peripheral = 5 },
+    { name = "MEM2MEM4", virtual = true, dma_peripheral = 6 },
+    { name = "MEM2MEM5", virtual = true, dma_peripheral = 9 },
+    { name = "MEM2MEM6", virtual = true, dma_peripheral = 10 },
+    { name = "MEM2MEM7", virtual = true, dma_peripheral = 11 },
+    { name = "MEM2MEM8", virtual = true, dma_peripheral = 12 },
+    { name = "MEM2MEM9", virtual = true, dma_peripheral = 13 },
+    { name = "MEM2MEM10", virtual = true, dma_peripheral = 14 },
+    { name = "MEM2MEM11", virtual = true, dma_peripheral = 15 },
+
     { name = "PSRAM", virtual = true },
 ]
 
@@ -187,8 +204,11 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" }},
+    { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
 
+    { name = "Sha" },
+    { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
 ] } }
 
@@ -340,6 +360,40 @@ output_signals = [
     { name = "GPIO",                  id = 256 },
 ]
 
+[device.dma]
+support_status = "partial"
+kind = "gdma"
+gdma_version = 2
+separate_in_out_interrupts = true
+supports_mem2mem = true
+max_priority = 5
+# TODO: DMA can access flash
+# TODO: weight-based arbitration
+
+[device.ecc]
+support_status = "partial"
+working_modes = [
+    { id = 0, mode = "affine_point_multiplication" },
+    { id = 2, mode = "affine_point_verification" },
+    { id = 3, mode = "affine_point_verification_and_multiplication" },
+    { id = 4, mode = "jacobian_point_multiplication" },
+    { id = 5, mode = "affine_point_addition" },
+    { id = 6, mode = "jacobian_point_verification" },
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
+    { id = 8, mode = "modular_addition" },
+    { id = 9, mode = "modular_subtraction" },
+    { id = 10, mode = "modular_multiplication" },
+    { id = 11, mode = "modular_division" }
+]
+curves = [
+    { id = 0, curve = 192 },
+    { id = 1, curve = 256 }
+]
+separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true
+zero_extend_writes = true
+
 [device.systimer]
 
 [device.rng]
@@ -375,10 +429,16 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.psram]
+extmem_origin = 0x42000000
+
+[device.sha]
+support_status = "partial"
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"
-supports_dma = false
+supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 has_clk_pre_div = true
@@ -396,6 +456,7 @@ instances = [
 support_status = "partial"
 has_wifi6 = true
 mac_version = 3
+csi_supported = true
 
 [device.bt]
 support_status = "partial"

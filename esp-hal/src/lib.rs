@@ -419,7 +419,6 @@ mod soc;
 // Some PAC-related utility
 use crate::pac::generic::{Readable, Reg, Resettable, W, Writable};
 
-#[cfg_attr(esp32c61, expect(dead_code))]
 trait RegisterToggle {
     type Reg: Readable + Resettable + Writable;
 

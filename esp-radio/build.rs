@@ -56,6 +56,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
     }
 
+    if cfg!(feature = "csi") && !chip.contains("wifi_csi_supported") {
+        panic!("\n\nCSI is not supported on this target.\n\n");
+    }
+
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
     // implementation detail.

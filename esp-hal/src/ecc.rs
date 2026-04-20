@@ -1173,7 +1173,7 @@ fn ecc_work_queue_handler() {
         // The queue may indicate that it needs to be polled again. In this case, we do not clear
         // the interrupt bit, which causes the interrupt to be re-handled.
         cfg_if::cfg_if! {
-            if #[cfg(esp32c5)] {
+            if #[cfg(any(esp32c5, esp32c61))] {
                 let reg = ECC::regs().int_clr();
             } else {
                 let reg = ECC::regs().mult_int_clr();

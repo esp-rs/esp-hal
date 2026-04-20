@@ -10,7 +10,7 @@
 #![cfg_attr(
     psram_octal_spi,
     doc = concat!("The ", chip_pretty!(), " can use either Quad SPI or Octal SPI to interface with PSRAM.
-        You need to configure the correct interface type using `ESP_HAL_CONFIG_PSRAM_MODE`.")
+        `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
 #![doc = ""]
 //! ## Examples
@@ -82,6 +82,8 @@ impl PsramSize {
     }
 }
 
+const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
+
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
 
@@ -106,8 +108,12 @@ pub struct Psram {
 
 impl Psram {
     /// Initializes PSRAM.
-    pub fn new(peri: PSRAM<'static>, config: PsramConfig) -> Self {
-        init_psram(config);
+    pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
+        if init_psram(&mut config) {
+            let range = map_psram(config);
+
+            unsafe { set_psram_range(range) };
+        }
         Self { _peri: peri }
     }
 

@@ -937,15 +937,6 @@ pub mod dma {
                         }
                         *buffer = None;
                     }
-                    #[cfg(dma_can_access_psram)]
-                    if crate::psram::psram_range().contains(&item.buffers.output.addr().get()) {
-                        unsafe {
-                            crate::soc::cache_writeback_addr(
-                                item.buffers.output.addr().get() as u32,
-                                item.buffers.output.len() as u32,
-                            );
-                        }
-                    }
 
                     // Now process the remainder:
                     if remaining_bytes > 0 {

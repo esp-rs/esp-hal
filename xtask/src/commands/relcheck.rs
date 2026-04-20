@@ -352,6 +352,16 @@ fn update(args: UpdateArgs) -> Result<()> {
             .status();
 
         log::info!("{:?}", res);
+
+        if !res?.success() {
+            // don't fail early if packaging fails - real problems will show up later
+            log::warn!(
+                "Failed to prepare package '{}' for local publishing  - Skipping!",
+                package
+            );
+            continue;
+        }
+
         std::fs::write(".cargo/config.toml", &original_config)?;
 
         // copy the crate to our registry
@@ -594,21 +604,26 @@ fn scrap_path_deps() -> Result<()> {
                 // scrap the path dependencies, use version from local registry
                 let contents = std::fs::read_to_string(manifest_path.join("Cargo.toml$"))?;
                 let mut toml = contents.parse::<toml_edit::DocumentMut>()?;
-                for dep in toml["dependencies"].as_table_mut().unwrap().iter_mut() {
-                    let krate = dep.0.get();
 
-                    if krate.starts_with("esp-") {
-                        let latest = latest_version_of_crate(krate)?;
-                        dep.1.as_table_like_mut().and_then(|table| {
-                            table.remove("path");
-                            table.insert(
-                                "version",
-                                toml_edit::Item::Value(toml_edit::Value::String(
-                                    toml_edit::Formatted::new(latest),
-                                )),
-                            );
-                            Some(table)
-                        });
+                for key in ["dependencies", "build-dependencies", "dev-dependencies"] {
+                    if toml.contains_key(key) {
+                        for dep in toml[key].as_table_mut().unwrap().iter_mut() {
+                            let krate = dep.0.get();
+
+                            if krate.starts_with("esp-") {
+                                let latest = latest_version_of_crate(krate)?;
+                                dep.1.as_table_like_mut().and_then(|table| {
+                                    table.remove("path");
+                                    table.insert(
+                                        "version",
+                                        toml_edit::Item::Value(toml_edit::Value::String(
+                                            toml_edit::Formatted::new(latest),
+                                        )),
+                                    );
+                                    Some(table)
+                                });
+                            }
+                        }
                     }
                 }
 

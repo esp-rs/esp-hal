@@ -1,4 +1,4 @@
-# Migration Guide from 0.17.0 to {{currentVersion}}
+# Migration Guide from 0.17.0 to 0.18.0
 
 ## The `serde` feature has been removed
 
