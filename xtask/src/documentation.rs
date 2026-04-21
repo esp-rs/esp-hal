@@ -592,7 +592,8 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 })
                 .unwrap_or_default();
 
-            let meta = generate_documentation_meta_for_package(workspace, *package, &chips)?;
+            let meta =
+                generate_documentation_meta_for_package(*package, &chips, current_version)?;
 
             // Render the template to HTML and write it out to the desired path:
             let html = render_template(
@@ -639,12 +640,10 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 }
 
 fn generate_documentation_meta_for_package(
-    workspace: &Path,
     package: Package,
     chips: &[Chip],
+    doc_tree_version: semver::Version,
 ) -> Result<Vec<Value>> {
-    let version = crate::package_version(workspace, package)?;
-
     let mut metadata = Vec::new();
 
     for chip in chips {
@@ -658,7 +657,7 @@ fn generate_documentation_meta_for_package(
         // information on the documentation index:
         metadata.push(minijinja::context! {
             name => package,
-            version => version,
+            version => doc_tree_version,
             chip => chip.to_string(),
             chip_pretty => chip.pretty_name(),
             package => package.to_string().replace('-', "_"),
