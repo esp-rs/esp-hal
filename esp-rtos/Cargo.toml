@@ -36,7 +36,7 @@ esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", default-features = fal
     # and uses reexported riscv/xtensa-lx from esp-hal
     "requires-unstable", "rt"
 ] }
-esp-rom-sys = { version = "0.1.4", path = "../esp-rom-sys" }
+esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys" }
 
 cfg-if = "1"
 rtos-trace = { version = "0.2.0", optional = true }

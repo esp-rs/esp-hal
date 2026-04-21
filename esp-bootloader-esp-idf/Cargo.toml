@@ -35,7 +35,7 @@ document-features = "0.2"
 esp-config = { version = "0.7.0", path = "../esp-config" }
 esp-hal-procmacros = { version = "0.22.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
-esp-rom-sys = { version = "0.1.4", path = "../esp-rom-sys", optional = true }
+esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
