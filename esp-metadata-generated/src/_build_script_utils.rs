@@ -2266,6 +2266,38 @@ impl Chip {
                         limitations: &["usb_jtag"],
                     },
                     PinInfo {
+                        pin: 15,
+                        limitations: &["spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 22,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
                         pin: 23,
                         limitations: &[],
                     },
@@ -3421,7 +3453,7 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 14,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_psram"],
                     },
                     PinInfo {
                         pin: 15,
@@ -3429,27 +3461,27 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 16,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 17,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 18,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 21,
-                        limitations: &["spi_flash"],
+                        limitations: &["spi_flash", "spi_psram"],
                     },
                     PinInfo {
                         pin: 22,
@@ -5311,7 +5343,7 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 29,
-                        limitations: &["spi_flash", "spi_psram"],
+                        limitations: &["spi_flash"],
                     },
                     PinInfo {
                         pin: 30,
