@@ -14,15 +14,6 @@ Note that this crate currently requires you to enable the `unstable` feature on 
 
 [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 
-## `esp-rom-sys` compatibility
-
-`esp-radio` depends directly on `esp-rom-sys` with an exact version pin (`=0.1.x`).
-This is intentional: radio blob compatibility is tied to a validated `esp-rom-sys`
-patch level, and Cargo must not silently float this dependency when `esp-radio` is
-in the graph.
-
-Only one exact `esp-rom-sys` pin is allowed in the dependency graph.
-
 ## Current support
 
 If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists.
