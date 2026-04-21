@@ -90,12 +90,9 @@ mod _p4_peripheral_clocks {
         Hmac      = 35,
         Ds        = 36,
         // -- DMA -- SOC_CLK_CTRL1 sys + HP_RST_EN0/1
-        // P4 has 3 DMA controllers:
-        //   AHB_DMA (AHB PDMA): GDMA v2 compatible, used by esp-hal as "Dma"
-        //   DW_GDMA (DesignWare GDMA): different register layout, not used by esp-hal
-        //   AXI_DMA (AXI PDMA): AXI bus DMA
-        Dma       = 37, // maps to AHB_DMA (GDMA v2 compatible)
-        Gdma      = 38, // DW_GDMA (DesignWare GDMA) -- NOT esp-hal compatible
+        // P4 has several DMA controllers (IDF public naming: see async_memcpy docs):
+        Dma       = 37, // GDMA-AHB
+        Gdma      = 38, // DMA block at 0x50081000 (SOC_DW_GDMA_SUPPORTED), unused
         AhbPdma   = 39, // alias for Dma (legacy)
         AxiPdma   = 40,
         // -- ADC -- SOC_CLK_CTRL2 apb + HP_RST_EN2
@@ -335,12 +332,14 @@ mod _p4_peripheral_clocks {
                     .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
             }
             // -- DMA --
-            // Dma = AHB_DMA (GDMA v2 compatible, used by esp-hal)
+            // GDMA-AHB (GDMA v2 compatible, used by esp-hal)
             Peripheral::Dma => {
                 c.soc_clk_ctrl1()
                     .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
             }
-            // Gdma = DW_GDMA (DesignWare, NOT used by esp-hal DMA driver)
+            // the DMA block at 0x50081000 (SOC_DW_GDMA_SUPPORTED in Kconfig),
+            // may not used by esp-hal's DMA driver.
+            // TODO: Investigate more on 0x50081000 DMA block.
             Peripheral::Gdma => {
                 c.soc_clk_ctrl1()
                     .modify(|_, w| w.gdma_sys_clk_en().bit(enable));

@@ -10,9 +10,9 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
-// P4 DMA module alias: pac::dma is DW_GDMA, but esp-hal GDMA driver expects AHB_DMA layout.
-// Provide `pac::dma` alias pointing to `pac::ahb_dma` module for GDMA driver compatibility.
-// This is necessary because ahb_v2.rs uses `pac::dma::ch::CH` type directly.
+// P4 DMA module alias: the esp-hal GDMA driver expects the GDMA-AHB (`ahb_dma`)
+// register layout. The PAC's `dma` module maps to a different block (see
+// SOC_DW_GDMA_SUPPORTED), so alias `ahb_dma` to keep ahb_v2.rs type paths working.
 #[allow(unused)]
 pub(crate) mod dma_compat {
     pub use super::pac::ahb_dma::*;

@@ -1,9 +1,11 @@
 use super::*;
 use crate::RegisterToggle;
 
-// P4: PAC "dma" module is DW_GDMA (DesignWare), "ahb_dma" is GDMA v2 (what we need).
-// Other chips: PAC "dma" module IS the GDMA v2 module.
-// Ref: esp-idf ahb_dma_ll.h vs dw_gdma_ll.h
+// P4 has two DMA controllers: `ahb_dma` (GDMA-AHB, GDMA v2 layout, used here) and
+// `axi_dma` (GDMA-AXI, different register layout). The PAC's `dma` module maps to
+// a separate block that is not GDMA-AHB, so alias `ahb_dma` as `gdma_pac` on P4.
+// Other chips: PAC `dma` module is the GDMA v2 module directly.
+// Ref: esp-idf async_memcpy docs -- only `gdma_ahb` / `gdma_axi` are public names.
 cfg_if::cfg_if! {
     if #[cfg(esp32p4)] {
         use pac::ahb_dma as gdma_pac;

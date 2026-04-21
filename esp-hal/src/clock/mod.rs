@@ -530,32 +530,12 @@ impl Clocks {
 
 /// The CPU clock frequency.
 pub fn cpu_clock() -> Rate {
-    // P4: ClockConfig is empty (no clock node framework yet).
-    // Return the actual configured frequency from CPLL init.
-    // Ref: esp-idf rtc_clk.c -- default is 400 MHz for eco5 (v3.x)
-    //      TRM v0.5 Ch 12
-    #[cfg(esp32p4)]
-    {
-        Rate::from_mhz(400)
-    }
-    #[cfg(not(esp32p4))]
-    {
-        Clocks::get().cpu_clock
-    }
+    Clocks::get().cpu_clock
 }
 
 /// The XTAL clock frequency.
 pub fn xtal_clock() -> Rate {
-    // P4: 40 MHz external crystal (SOC_XTAL_FREQ_40M)
-    // Ref: esp-idf clk_tree_defs.h -- SOC_XTAL_FREQ_40M = 40
-    #[cfg(esp32p4)]
-    {
-        Rate::from_mhz(40)
-    }
-    #[cfg(not(esp32p4))]
-    {
-        Clocks::get().xtal_clock
-    }
+    Clocks::get().xtal_clock
 }
 
 /// Read the calibrated RTC slow clock period from the STORE1 register.

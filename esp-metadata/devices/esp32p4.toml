@@ -155,8 +155,8 @@ peripherals = [
     { name = "TWAI1", interrupts = { peri = "TWAI1" } },
     { name = "TWAI2", interrupts = { peri = "TWAI2" } },
     { name = "PSRAM", virtual = true },
-    # DMA: PAC "DMA" is DW_GDMA (DesignWare), "AHB_DMA" is GDMA v2 compatible
-    # Using pac="AHB_DMA" maps DMA singleton to AHB_DMA RegisterBlock
+    # DMA: P4 has three DMA blocks; see [device.dma] below for the table.
+    # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
     { name = "DMA_CH0", virtual = true },
     { name = "DMA_CH1", virtual = true },
@@ -236,13 +236,15 @@ fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0x1F
 
-# DMA: deferred -- P4 PAC "DMA" is DW_GDMA (DesignWare), not AHB_DMA
-# P4 has: AHB_DMA (GDMA v2 at 0x50085000) + AXI_DMA (0x5008A000) + DW_GDMA (0x50086000)
-# esp-hal expects DMA singleton to be GDMA v2 compatible (in_conf0/out_conf0/in_link/out_link)
-# But P4 PAC's "DMA" type is DW_GDMA (sar0/dar0/ctl0 pattern), NOT compatible
-# Need: either PAC fix (rename AHB_DMA -> DMA) or esp-hal adapter layer
-# Ref: esp-idf ahb_dma_ll.h for AHB_DMA register layout
-# Ref: esp-idf dw_gdma_ll.h for DW_GDMA (different, DesignWare IP)
+# DMA: P4 exposes three DMA controllers. IDF public docs
+# (https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/system/async_memcpy.html)
+# refer to them as GDMA-AHB and GDMA-AXI:
+#   AHB_DMA / GDMA-AHB (0x50085000): GDMA v2 layout -- used by esp-hal as `Dma`
+#   AXI_DMA / GDMA-AXI (0x5008A000): AXI-bus DMA, different layout
+#   DMA (separate block at 0x50081000, SOC_DW_GDMA_SUPPORTED):
+#     another register layout, not used by esp-hal
+# esp-hal's `Dma` singleton must be GDMA v2 compatible, hence PAC alias AHB_DMA above.
+# Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
 support_status = "partial"
 kind = "gdma"
