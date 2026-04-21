@@ -106,11 +106,11 @@ fn build_documentation_for_package(
     let version = crate::package_version(workspace, *package)?;
 
     // Ensure that the package/chip combination provided are valid:
-    if let Some(chip) = chip
-        && let Err(err) = package.validate_package_chip(&chip)
-    {
-        log::warn!("{err}");
-        return Ok(());
+    if let Some(chip) = chip {
+        if let Err(err) = package.validate_package_chip(&chip) {
+            log::warn!("{err}");
+            return Ok(());
+        }
     }
 
     // Build the documentation for the specified package, targeting the
@@ -333,7 +333,11 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
 
     let cargo_toml = cargo_toml.lines();
 
-    let chip_cfg = chip.as_ref().map(Config::for_chip);
+    let chip_cfg = if let Some(chip) = &chip {
+        Some(Config::for_chip(chip))
+    } else {
+        None
+    };
     let mut processed_cargo_toml = Vec::new();
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {

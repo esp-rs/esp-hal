@@ -19,7 +19,6 @@ use syn::{
 // Attribute parsing helpers
 
 /// Parsed information from a `#[arg(...)]` attribute.
-#[derive(Default)]
 struct ArgInfo {
     /// True if `long` (or `long = "name"`) was present.
     has_long: bool,
@@ -29,22 +28,32 @@ struct ArgInfo {
     value_delimiter: Option<char>,
 }
 
+impl Default for ArgInfo {
+    fn default() -> Self {
+        Self {
+            has_long: false,
+            long_name: String::new(),
+            value_delimiter: None,
+        }
+    }
+}
+
 /// Parse a string literal from an expression.
 fn expr_lit_str(expr: &Expr) -> Option<String> {
-    if let Expr::Lit(el) = expr
-        && let Lit::Str(s) = &el.lit
-    {
-        return Some(s.value());
+    if let Expr::Lit(el) = expr {
+        if let Lit::Str(s) = &el.lit {
+            return Some(s.value());
+        }
     }
     None
 }
 
 /// Parse a char literal from an expression.
 fn expr_lit_char(expr: &Expr) -> Option<char> {
-    if let Expr::Lit(el) = expr
-        && let Lit::Char(c) = &el.lit
-    {
-        return Some(c.value());
+    if let Expr::Lit(el) = expr {
+        if let Lit::Char(c) = &el.lit {
+            return Some(c.value());
+        }
     }
     None
 }
@@ -57,11 +66,12 @@ fn extract_doc(attrs: &[Attribute]) -> String {
             if !attr.path().is_ident("doc") {
                 return None;
             }
-            if let Meta::NameValue(nv) = &attr.meta
-                && let Expr::Lit(el) = &nv.value
-                && let Lit::Str(s) = &el.lit
-            {
-                return Some(s.value().trim().to_string());
+            if let Meta::NameValue(nv) = &attr.meta {
+                if let Expr::Lit(el) = &nv.value {
+                    if let Lit::Str(s) = &el.lit {
+                        return Some(s.value().trim().to_string());
+                    }
+                }
             }
             None
         })
@@ -423,7 +433,7 @@ fn expand_mcp_tool(attrs: McpToolAttrs, item: &ItemStruct) -> syn::Result<TokenS
     let input_type_name = format_ident!("{}McpInput", struct_name);
 
     // Derive the tool name from the command string: spaces/hyphens → underscores.
-    let tool_name = attrs.command.replace([' ', '-'], "_");
+    let tool_name = attrs.command.replace(' ', "_").replace('-', "_");
 
     // Split the command string into individual CLI tokens.
     let command_parts: Vec<String> = attrs
