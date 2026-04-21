@@ -740,3 +740,59 @@ where
 
     Ok(html)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use tempfile::TempDir;
+
+    use super::latest_stable_docs_version;
+
+    fn mkdir(root: &Path, name: &str) {
+        fs::create_dir_all(root.join(name)).unwrap();
+    }
+
+    #[test]
+    fn picks_highest_stable_and_ignores_prerelease_and_nonsemver_names() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        mkdir(root, "0.9.0");
+        mkdir(root, "1.0.0");
+        mkdir(root, "1.1.0-rc.0");
+        mkdir(root, "2.0.0");
+        mkdir(root, "latest");
+        mkdir(root, "main");
+        assert_eq!(
+            latest_stable_docs_version(root),
+            Some("2.0.0".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn returns_none_when_only_prereleases() {
+        let tmp = TempDir::new().unwrap();
+        mkdir(tmp.path(), "1.0.0-beta.0");
+        mkdir(tmp.path(), "1.1.0-rc.0");
+        assert_eq!(latest_stable_docs_version(tmp.path()), None);
+    }
+
+    #[test]
+    fn returns_none_for_empty_dir() {
+        let tmp = TempDir::new().unwrap();
+        assert_eq!(latest_stable_docs_version(tmp.path()), None);
+    }
+
+    #[test]
+    fn skips_files_and_unparseable_dir_names() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        mkdir(root, "1.0.0");
+        fs::write(root.join("not-a-dir"), b"x").unwrap();
+        mkdir(root, "not-a-version");
+        assert_eq!(
+            latest_stable_docs_version(root),
+            Some("1.0.0".parse().unwrap())
+        );
+    }
+}
