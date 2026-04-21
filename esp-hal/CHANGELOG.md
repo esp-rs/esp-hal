@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The `Trng::default()` which is insecure (#5403)
 
 ## [v1.1.0-rc.0] - 2026-04-16
 
