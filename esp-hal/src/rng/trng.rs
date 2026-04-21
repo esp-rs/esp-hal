@@ -181,7 +181,7 @@ pub enum TrngError {
 /// let pin_value: u16 = adc1.read_oneshot(&mut adc1_pin)?;
 /// # {after_snippet}
 /// ```
-#[derive(Default, Debug)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[instability::unstable]
