@@ -152,6 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug in `Spi::half_duplex_{read, write}` where calling these functions aborted previously running writes (#5247)
 - LP I2C: prevent spurious I2C start during the initialization of LpI2c (#5311)
 - Fixed a bug in `TWAI` that may cause the driver to hang (#5318)
+- ESP32-C6: Fixed an issue where the chip failed to enable a required clock signal before trying to use it (#5405)
 
 ### Removed
 

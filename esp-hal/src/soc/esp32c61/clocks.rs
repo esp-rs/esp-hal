@@ -14,7 +14,7 @@
 #![allow(missing_docs, reason = "Experimental")]
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, UART0, UART1},
     soc::regi2c,
 };
 
@@ -129,12 +129,6 @@ fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // Digital part - The target SPLL is fixed to 480MHz, do nothing.
 
     // Analog part
-    let old_clk_conf = MODEM_LPCON::regs().clk_conf().read();
-    MODEM_LPCON::regs().clk_conf().write(|w| {
-        unsafe { w.bits(old_clk_conf.bits()) };
-        w.clk_i2c_mst_en().set_bit()
-    });
-
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
         w.bbpll_stop_force_high().clear_bit();
         w.bbpll_stop_force_low().set_bit()
@@ -173,10 +167,6 @@ fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         w.bbpll_stop_force_high().set_bit();
         w.bbpll_stop_force_low().clear_bit()
     });
-
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .write(|w| unsafe { w.bits(old_clk_conf.bits()) });
 }
 
 // RC_FAST_CLK

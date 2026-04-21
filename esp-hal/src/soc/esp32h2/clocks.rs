@@ -15,7 +15,7 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0, UART0, UART1},
     soc::regi2c,
 };
 
@@ -126,17 +126,6 @@ fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
         return;
     }
-
-    // Enable I2C master clock
-    MODEM_LPCON::regs()
-        .clk_conf_force_on()
-        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
-
-    // Set I2C clock to 96MHz
-    const MODEM_LPCON_CLK_I2C_SEL_96M: u32 = 1 << 0; // FIXME add to PAC
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .modify(|r, w| unsafe { w.bits(r.bits() | MODEM_LPCON_CLK_I2C_SEL_96M) });
 
     // BPPLL calibration start
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
