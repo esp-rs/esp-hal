@@ -6,7 +6,9 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::{Args, Subcommand};
+use semver::{Comparator, Op, Version, VersionReq};
 use strum::IntoEnumIterator;
+use toml_edit::Table;
 
 use crate::{Package, cargo::CargoToml, windows_safe_path};
 
@@ -24,6 +26,8 @@ pub enum RelCheckCmds {
     /// Remove the path-dependencies from examples and make sure the dependencies are available in
     /// the local registry.
     ReplacePathDeps,
+    /// Validate workspace esp-rom-sys dependency version policy.
+    CheckRomSysPolicy,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -40,6 +44,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
         RelCheckCmds::Deinit => deinit_rel_check()?,
         RelCheckCmds::Update(args) => update(args)?,
         RelCheckCmds::ReplacePathDeps => scrap_path_deps()?,
+        RelCheckCmds::CheckRomSysPolicy => check_rom_sys_policy(Path::new("."))?,
     }
 
     Ok(())
@@ -750,4 +755,89 @@ fn related_crates_cb(
     }
 
     packages
+}
+
+const EXPECTED: (u64, u64) = (0, 1);
+const EXACT_ALLOWLIST: [Package; 1] = [Package::EspRadio];
+
+/// Checks that the esp-rom-sys dependency policy is followed across the workspace.
+fn check_rom_sys_policy(workspace: &Path) -> Result<()> {
+    let mut errs = Vec::new();
+    let mut global_exact: Option<Version> = None;
+    let mut count = 0;
+
+    for pkg in Package::iter().filter(|&p| p != Package::Examples) {
+        let Ok(mut toml) = CargoToml::new(workspace, pkg) else {
+            continue;
+        };
+        let mut found = false;
+
+        toml.visit_dependencies(|path, _, table| {
+            let Some(raw) = get_ver(table, "esp-rom-sys") else {
+                return;
+            };
+            let Ok(req) = VersionReq::parse(&raw) else {
+                return errs.push(format!("Bad semver: {raw}"));
+            };
+
+            let exact = extract_exact(&req.comparators);
+            let is_allowed = EXACT_ALLOWLIST.contains(&pkg);
+            found = true;
+            count += 1;
+
+            if is_allowed != exact.is_some() {
+                errs.push(format!("{pkg}: pin policy mismatch for '{raw}'"));
+            }
+
+            if let Some(v) = exact {
+                if global_exact.get_or_insert(v.clone()) != &v {
+                    errs.push(format!("Conflicting pins: {raw}"));
+                }
+            }
+
+            let in_line = req
+                .comparators
+                .iter()
+                .all(|c| c.major == EXPECTED.0 && c.minor == Some(EXPECTED.1));
+            if !in_line || req.matches(&Version::new(EXPECTED.0, EXPECTED.1 + 1, 0)) {
+                errs.push(format!(
+                    "{path}: must stay on {}.{}.*",
+                    EXPECTED.0, EXPECTED.1
+                ));
+            }
+        });
+
+        if EXACT_ALLOWLIST.contains(&pkg) && !found {
+            errs.push(format!("Missing required pin for {pkg:?}"));
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(log::info!("Checked {count} deps, all good."))
+    } else {
+        bail!("Policy failed:\n- {}", errs.join("\n- "))
+    }
+}
+
+fn get_ver(table: &Table, target: &str) -> Option<String> {
+    table.iter().find_map(|(name, item)| {
+        let pkg = item.get("package").and_then(|i| i.as_str()).unwrap_or(name);
+        if pkg != target {
+            return None;
+        }
+        item.as_str()
+            .or_else(|| item.get("version").and_then(|v| v.as_str()))
+            .map(Into::into)
+    })
+}
+
+fn extract_exact(comps: &[Comparator]) -> Option<Version> {
+    let c = comps.first()?;
+    (comps.len() == 1 && c.op == Op::Exact).then(|| Version {
+        major: c.major,
+        minor: c.minor.unwrap_or(0),
+        patch: c.patch.unwrap_or(0),
+        pre: c.pre.clone(),
+        build: Default::default(),
+    })
 }

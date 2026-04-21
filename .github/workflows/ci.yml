@@ -278,6 +278,9 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
+      # Enforce esp-rom-sys dependency requirement policy:
+      - run: cargo xrel-check check-rom-sys-policy
+
       # Run host tests for all applicable packages:
       - run: cargo xtask host-tests
 
