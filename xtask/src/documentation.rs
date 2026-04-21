@@ -470,8 +470,9 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
-/// Returns the highest stable (non-prerelease) version directories under `package_docs_path`.
-/// Used to avoid defaulting to pre-releases when a stable version exists alongside a pre-release.
+/// Returns the highest stable (non-prerelease) `semver::Version` found among the version-named
+/// directories under `package_docs_path`. Used to avoid defaulting to pre-releases when a stable
+/// version exists alongside a pre-release.
 fn latest_stable_docs_version(package_docs_path: &Path) -> Option<semver::Version> {
     let mut best: Option<semver::Version> = None;
     let entries = fs::read_dir(package_docs_path).ok()?;
@@ -482,9 +483,6 @@ fn latest_stable_docs_version(package_docs_path: &Path) -> Option<semver::Versio
             continue;
         }
         let name = path.file_name()?.to_string_lossy();
-        if name == "latest" {
-            continue;
-        }
         // Parse the version from the directory name
         let Ok(ver) = name.parse::<semver::Version>() else {
             continue;
@@ -528,7 +526,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         let package_docs_path = docs_path.join(package.as_ref());
 
         // Each path we iterate over should be the directory for a given version of
-        // the package's documentation: (except latest)
+        // the package's documentation (non-semver names, e.g. `latest`, are skipped).
         if !package_docs_path.exists() {
             log::warn!(
                 "Package documentation path does not exist: '{}', skipping",
@@ -545,10 +543,6 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                     "Path is not a directory, skipping: '{}'",
                     version_path.display()
                 );
-                continue;
-            }
-
-            if version_path.file_name().unwrap() == "latest" {
                 continue;
             }
 
@@ -577,29 +571,28 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
             chips.sort();
 
-            let current_version: semver::Version = version_path
+            let channel = version_path
                 .file_name()
-                .with_context(|| format!("invalid version path: {}", version_path.display()))?
-                .to_string_lossy()
-                .parse()
-                .with_context(|| {
-                    format!("directory name is not semver: {}", version_path.display())
-                })?;
-
-            let version_prefix = latest_stable_docs_version(&package_docs_path)
-                .and_then(|latest_stable| {
-                    (latest_stable != current_version).then(|| format!("../{latest_stable}/"))
-                })
+                .map(|n| n.to_string_lossy())
                 .unwrap_or_default();
+            let current_version = match channel.parse::<semver::Version>() {
+                Ok(v) => v,
+                Err(_) => {
+                    log::debug!(
+                        "Skipping package doc directory (not semver): {}",
+                        version_path.display()
+                    );
+                    continue;
+                }
+            };
 
-            let meta =
-                generate_documentation_meta_for_package(*package, &chips, current_version)?;
+            let meta = generate_documentation_meta_for_package(*package, &chips, current_version)?;
 
             // Render the template to HTML and write it out to the desired path:
             let html = render_template(
                 &resources_path,
                 "package_index.html.jinja",
-                minijinja::context! { metadata => meta, version_prefix => version_prefix },
+                minijinja::context! { metadata => meta },
             )?;
             let path = version_path.join("index.html");
             fs::write(&path, html).context("Failed to write index.html")?;
