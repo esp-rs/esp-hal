@@ -419,14 +419,18 @@ fn cpu_wait_mode_on() -> bool {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_pcr)] {
             crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        } else if #[cfg(esp32p4)] {
-            // P4: CPU_WAITI_CTRL0_REG in HP_SYS_CLKRST (offset 0xf4) controls
-            // whether WFI gates the clock. Default: core0_waiti_icg_en=1 (enabled).
-            // This register is only in hw_ver3 (eco5+), not in current PAC.
-            // Ref: esp-idf hp_sys_clkrst_reg.h -- HP_SYS_CLKRST_CPU_WAITI_CTRL0_REG
-            //      TRM v0.5 Ch 22 (v3.x addition)
-            // Return true (WFI clock gating active) -- matches default hardware state.
-            true
+        } else if #[cfg(all(multi_core, soc_has_hp_sys_clkrst))] {
+            // AMP-aware: read this core's CORE{N}_WAITI_ICG_EN bit in
+            // HP_SYS_CLKRST.CPU_WAITI_CTRL0 (hw_ver3). Each core answers
+            // locally, so AMP setups where cores run different firmware get
+            // the right per-core result.
+            //   ICG_EN = 1 -> this core's WFI may gate clock -> NOT safe
+            //   ICG_EN = 0 -> WFI will not gate             -> safe
+            // TODO: add HP_SYS_CLKRST.CPU_WAITI_CTRL0 (offset 0xF4) to the
+            // esp32p4 PAC and replace this raw MMIO with the PAC accessor.
+            const HP_SYS_CLKRST_CPU_WAITI_CTRL0: *const u32 = 0x500E_60F4 as *const u32;
+            let reg = unsafe { core::ptr::read_volatile(HP_SYS_CLKRST_CPU_WAITI_CTRL0) };
+            (reg & (1 << Cpu::current() as u32)) == 0
         } else {
             crate::peripherals::SYSTEM::regs()
                 .cpu_per_conf()
