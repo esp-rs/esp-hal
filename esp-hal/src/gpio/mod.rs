@@ -1671,8 +1671,9 @@ impl<'lt> AnyPin<'lt> {
         {
             /// Workaround to make D+ and D- work when the pin is assigned to
             /// the `USB_SERIAL_JTAG` peripheral by default.
-            // P4 uses dedicated pins (GPIO49/50) for USB, so USB_DM/USB_DP are
-            // not in the analog function table -> this inner fn is unused on P4.
+            // TODO: considering USB1P1_N0/1 USB1P1_P0/1 on P4
+            // On P4 the analog table uses USB_PHY{0,1}_DM/DP instead of
+            // USB_DM/DP, so neither arm below matches and this fn is unused.
             #[allow(dead_code)]
             fn disable_usb_pads(_gpionum: u8) {
                 crate::peripherals::USB_DEVICE::regs()

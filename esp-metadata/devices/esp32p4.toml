@@ -26,6 +26,14 @@ software_interrupt_count = 4
 software_interrupt_delay = 24
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
+# TODO: Tyding new TRM after 0.5 document
+# Currently following section is not fully written.
+# - Bus Architecture
+# - Processor Instruction Extensions
+# - AXI Performance Monitor
+# - MIPI DSI (CAM)
+# - I3C
+
 [device.soc]
 cpu_has_csr_pc = true
 # ESP32-P4 v3.x: 20 MHz RC_FAST default (TRM v0.5, Ch 12)
@@ -33,7 +41,7 @@ rc_fast_clk_default = 20_000_000
 
 # Clock tree for ESP32-P4X (eco5 / chip revision v3.x)
 # 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)
-# Ref: esp-idf clk_tree_defs.h, clk_tree_ll.h, TRM v0.5 Ch 12
+# Ref: esp-idf clk_tree_defs.h, clk_tree_ll.h, DS, TRM v0.5 Ch 12
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
@@ -126,8 +134,6 @@ peripherals = [
     { name = "HP_SYS_CLKRST" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
-    # CLIC is the per-core interrupt controller (TRM Ch 14), used by user code
-    # to enable/disable/prioritize interrupts.
     { name = "CLIC" },
     { name = "IO_MUX" },
     { name = "LP_AON", pac = "LP_SYS" },
@@ -144,10 +150,9 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART" },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART" },
     { name = "UART4", interrupts = { peri = "UART4" }, clock_group = "UART" },
-    # Phase 2 peripherals
+    # Map to SPI2 RegisterBlock for esp-hal driver compatibility.
     { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1 },
     # SPI3: same RegisterBlock layout as SPI2 but different PAC type.
-    # Map to SPI2 RegisterBlock for esp-hal driver compatibility.
     { name = "SPI3", pac = "SPI2", interrupts = { peri = "SPI3" }, dma_peripheral = 2 },
     { name = "I2C0", interrupts = { peri = "I2C0" } },
     { name = "I2C1", interrupts = { peri = "I2C1" } },
@@ -161,13 +166,12 @@ peripherals = [
     { name = "DMA_CH0", virtual = true },
     { name = "DMA_CH1", virtual = true },
     { name = "DMA_CH2", virtual = true },
-    # Phase 3 peripherals
+
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
-    # EMAC: PAC에 없음. MMIO 0x5009_8000. esp-hal에도 EMAC driver 없음 (ESP32만).
-    # 새 driver 필요: components/esp_hal_emac/esp32p4/include/hal/emac_ll.h 참고
+    # TODO: clear about EMAC and PAC relationship
+    # But ESP-IDF have: components/esp_hal_emac/esp32p4/include/hal/emac_ll.h
     # { name = "EMAC" },
-    # Phase 4 peripherals
     { name = "LEDC", interrupts = { peri = "LEDC" } },
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
     { name = "MCPWM1", interrupts = { peri = "PWM1" } },
@@ -739,7 +743,7 @@ output_signals = [
 # 55 GPIO pins (0-54), IO MUX functions from esp-idf io_mux_reg.h
 # ADC channels from esp-idf adc_channel.h
 # LP pins: GPIO0-5, GPIO12-23 (RTCIO capable)
-# Ref: TRM v0.5 Ch 11, esp-idf gpio_periph.c, rtc_io_channel.h
+# Ref: DS, TRM v0.5 Ch 11, esp-idf gpio_periph.c, rtc_io_channel.h
 pins = [
     { pin =  0, lp = { 0 = "LP_GPIO0" } },
     { pin =  1, lp = { 0 = "LP_GPIO1" } },
