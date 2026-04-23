@@ -98,41 +98,13 @@ impl<'d> FlashStorage<'d> {
     ///
     /// Panics if called more than once.
     pub fn new(flash: Flash<'d>) -> Self {
-        // get the flash size from the bootloader
-        // we might want to find a better way for this (e.g. read the chip ID)
-        // since this assumed the ESP-IDF bootloader
-        const ADDR: u32 = if cfg!(feature = "esp32c5") {
-            0x2000
-        } else if cfg!(any(feature = "esp32", feature = "esp32s2")) {
-            0x1000
-        } else {
-            0x0000
-        };
-
-        let mut storage = Self {
-            capacity: 0,
+        Self {
+            capacity: chip_specific::get_flash_size() as usize,
             unlocked: false,
             #[cfg(multi_core)]
             multi_core_strategy: MultiCoreStrategy::Error,
             _flash: flash,
-        };
-
-        let mut buffer = crate::buffer::FlashWordBuffer::uninit();
-        storage.internal_read(ADDR, buffer.as_bytes_mut()).unwrap();
-
-        let buffer = unsafe { buffer.assume_init_bytes() };
-        let mb = match buffer[3] & 0xf0 {
-            0x00 => 1,
-            0x10 => 2,
-            0x20 => 4,
-            0x30 => 8,
-            0x40 => 16,
-            0x50 => 32,
-            _ => 0,
-        };
-        storage.capacity = mb * 1024 * 1024;
-
-        storage
+        }
     }
 
     #[inline(always)]

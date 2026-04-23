@@ -8,8 +8,6 @@ pub fn uninit_slice_mut(bytes: &mut [u8]) -> &mut [MaybeUninit<u8>] {
     unsafe { core::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut _, bytes.len()) }
 }
 
-pub type FlashWordBuffer = FlashBuffer<4>;
-
 pub type FlashSectorBuffer = FlashBuffer<4096>;
 
 #[repr(C, align(4))]

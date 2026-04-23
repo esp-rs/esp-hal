@@ -121,3 +121,7 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
         ERROR_CODE
     }
 }
+
+pub(crate) fn get_flash_size() -> u32 {
+    FLASH_SIZE
+}
