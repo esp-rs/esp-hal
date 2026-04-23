@@ -33,8 +33,7 @@ impl Manifest {
     fn normalize_versions(&mut self) {
         self.versions.sort_by_key(|v| {
             let trimmed = v.trim();
-            let semver_str = trimmed.strip_prefix('v').unwrap_or(trimmed);
-            let semver = semver::Version::parse(semver_str).ok();
+            let semver = semver::Version::parse(trimmed).ok();
             let rank = match trimmed.to_lowercase().as_str() {
                 "main" => 0,
                 "git" => 1,
@@ -735,7 +734,7 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
     manifest_url.push_str(&format!("/{package}/manifest.json"));
 
     #[cfg(feature = "deploy-docs")]
-    let mut manifest = match reqwest::blocking::get(manifest_url) {
+    let manifest = match reqwest::blocking::get(manifest_url) {
         Ok(resp) if resp.status().is_success() => resp.json::<Manifest>()?,
         Ok(resp) => {
             log::warn!("Unable to fetch package manifest: {}", resp.status());
@@ -748,9 +747,7 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
     };
 
     #[cfg(not(feature = "deploy-docs"))]
-    let mut manifest = Manifest::default();
-
-    manifest.normalize_versions();
+    let manifest = Manifest::default();
 
     Ok(manifest)
 }
@@ -830,7 +827,19 @@ mod tests {
     fn test_manifest_sorting_and_dedup() {
         let mut manifest = Manifest::default();
         let input = vec![
-            "main", "0.9.0", "v1.2.0", "1.1.0", "git", "1.0.0", "nightly",
+            "main",
+            "1.0.0-beta.1",
+            "0.9.0",
+            "1.2.0",
+            "1.1.1",
+            "1.1.0",
+            "1.1.0-rc.1",
+            "1.1.0-rc.0",
+            "1.1.0-beta.0",
+            "git",
+            "1.0.0",
+            "nightly",
+            "1.0.0-beta.0",
             "main", // Duplicated main
         ];
 
@@ -841,7 +850,16 @@ mod tests {
         assert_eq!(
             manifest.versions,
             vec![
-                "v1.2.0", "1.1.0", "1.0.0", "0.9.0",   // Semver descending
+                "1.2.0",
+                "1.1.1",
+                "1.1.0",
+                "1.1.0-rc.1",
+                "1.1.0-rc.0",
+                "1.1.0-beta.0",
+                "1.0.0",
+                "1.0.0-beta.1",
+                "1.0.0-beta.0",
+                "0.9.0",   // Semver descending
                 "main",    // Rank 0
                 "git",     // Rank 1
                 "nightly"  // Rank 2 + alphabetical
