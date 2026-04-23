@@ -43,7 +43,7 @@ peripherals = [
     { name = "EFUSE" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
-    # { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "GPIO_SD", pac = "GPIO_EXT" },
     # { name = "HINF" }, # TODO: add PAC manually later
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -96,7 +96,7 @@ peripherals = [
 
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
-    # { name = "GPIO_DEDICATED", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
@@ -360,6 +360,10 @@ output_signals = [
     { name = "SDIO_TOHOST_INT",       id = 124 },
     { name = "GPIO",                  id = 256 },
 ]
+
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 [device.dma]
 support_status = "partial"

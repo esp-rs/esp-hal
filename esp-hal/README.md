@@ -66,7 +66,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      |
 | Camera interface          | ❌    |          |          |          |          |           |          | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |           |          | ⚒️      |          |
-| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
+| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DS                        |       |          | ❌       | [❌][5159] [^1] | ❌       |           | ❌       | ❌       | ❌       |
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          |
