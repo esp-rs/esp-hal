@@ -453,6 +453,11 @@ instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
 ]
 
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
+has_region_monitor = true
+
 ## Radio
 [device.wifi]
 support_status = "partial"
