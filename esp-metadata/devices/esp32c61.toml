@@ -210,6 +210,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Sha" },
     { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = true },
 ] } }
 
 
@@ -395,6 +396,7 @@ supports_enhanced_security = true
 zero_extend_writes = true
 
 [device.systimer]
+[device.usb_serial_jtag]
 
 [device.rng]
 support_status = "partial"

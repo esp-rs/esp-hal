@@ -2164,9 +2164,12 @@ macro_rules! implement_peripheral_clocks {
             Uart0,
             /// UART1 peripheral clock signal
             Uart1,
+            /// USB_DEVICE peripheral clock signal
+            UsbDevice,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Dma,
@@ -2179,6 +2182,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Timg1,
                 Self::Uart0,
                 Self::Uart1,
+                Self::UsbDevice,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -2237,6 +2241,11 @@ macro_rules! implement_peripheral_clocks {
                         .conf()
                         .modify(|_, w| w.clk_en().bit(enable));
                 }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_clk_en().bit(enable));
+                }
             }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
@@ -2294,6 +2303,11 @@ macro_rules! implement_peripheral_clocks {
                         .uart(1)
                         .conf()
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_rst_en().bit(reset));
                 }
             }
         }
