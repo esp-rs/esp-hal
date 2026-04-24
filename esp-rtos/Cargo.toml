@@ -31,7 +31,7 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", default-features = false, features = [
+esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, features = [
     # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
     # and uses reexported riscv/xtensa-lx from esp-hal
     "requires-unstable", "rt"
@@ -72,7 +72,7 @@ esp-config             = { version = "0.7.0", path = "../esp-config", features =
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", features = ["unstable"] }
+esp-hal = { version = "~1.1.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
 default = []

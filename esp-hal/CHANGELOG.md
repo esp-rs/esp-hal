@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v1.1.0] - 2026-04-24
+
+### Removed
+
 - The `Trng::default()` which is insecure (#5403)
 
 ## [v1.1.0-rc.0] - 2026-04-16
@@ -1610,4 +1615,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
 [v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...HEAD
+[v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...esp-hal-v1.1.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...HEAD
