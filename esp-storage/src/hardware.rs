@@ -43,7 +43,7 @@ pub(crate) fn get_flash_size() -> u32 {
         unsafe extern "C" {
             static g_rom_flashchip: RomSpiflashChip;
         }
-        return unsafe { g_rom_flashchip.chip_size };
+        unsafe { g_rom_flashchip.chip_size }
     }
 
     #[cfg(not(esp32))]
