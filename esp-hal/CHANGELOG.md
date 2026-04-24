@@ -21,12 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.1.0] - 2026-04-24
 
-### Removed
-
-- The `Trng::default()` which is insecure (#5403)
-
-## [v1.1.0-rc.0] - 2026-04-16
-
 ### Added
 
 - `AdcPin` now implements `Debug` and `defmt::Format`. (#5194)
@@ -176,6 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::Priority::None` (#4996)
 - The `psram` feature has been replaced by a `Psram` driver object. esp-alloc has been updated so that no user code changes should be necessary when using `esp_alloc::psram_allocator!` (#5310)
 - The `esp_hal::psram::psram_raw_parts` function has been removed. Use `esp_alloc::psram_allocator`, or `Psram::raw_parts`. (#5310)
+- The `Trng::default()` which is insecure (#5403)
 
 ## [v1.0.0] - 2025-10-30
 
