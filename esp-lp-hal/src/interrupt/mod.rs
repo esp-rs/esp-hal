@@ -6,18 +6,18 @@ cfg_if::cfg_if! {
         pub mod ulp_core;
         #[cfg(any(esp32s2, esp32s3))]
         pub use ulp_core::*;
-        // ULP-core critical section implementation
-        #[cfg(any(esp32s2, esp32s3))]
-        mod critical_section;
 
         #[cfg(esp32c6)]
         pub mod lp_core;
         #[cfg(esp32c6)]
         pub use lp_core::*;
 
+        // Machine-mode critical section implementation.
+        mod critical_section;
+
         /// Portable interrupt binding and handling code
-        pub mod generic;
-        pub use generic::*;
+        pub mod shared;
+        pub use shared::*;
     } else {
         /// If interrupt handling is not enabled, need to provide a stubs functions for
         /// start_trap_rust and DefaultHandler.

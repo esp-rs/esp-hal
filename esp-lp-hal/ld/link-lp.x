@@ -39,6 +39,8 @@ SECTIONS
         
         KEEP(*(.init));
         KEEP(*(.init.rust));        
+        KEEP(*(.trap));        
+        KEEP(*(.trap.rust));        
         *(.text)
         *(.text*)
     } > ram

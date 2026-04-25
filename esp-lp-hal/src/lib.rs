@@ -38,9 +38,7 @@ pub use esp32s2_ulp as pac;
 #[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
-/// Interrupt handling APIs.
-/// Currently implemented for RISCV ULP cores (ESP32-S2,ESP32-S3)
-/// Functions are gated internally by stub functions.
+/// Interrupt handling APIs
 pub mod interrupt;
 
 /// The prelude

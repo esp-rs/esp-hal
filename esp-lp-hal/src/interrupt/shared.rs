@@ -1,6 +1,8 @@
+use core::ptr::NonNull;
+
 use portable_atomic::{AtomicPtr, Ordering};
 
-use super::{current_interrupts, set_enabled};
+use super::{set_enabled, status, trap_cause};
 pub use crate::pac::Interrupt;
 use crate::pac::{__EXTERNAL_INTERRUPTS, Vector};
 
@@ -203,9 +205,7 @@ impl InterruptStatus {
     /// Get status of interrupts
     /// This bitmask should match the Interrupt enum.
     pub fn current() -> Self {
-        Self {
-            status: [current_interrupts()],
-        }
+        Self { status: [status()] }
     }
 
     /// Is the given interrupt bit set
@@ -228,4 +228,96 @@ impl From<u32> for InterruptStatus {
     fn from(value: u32) -> Self {
         Self { status: [value] }
     }
+}
+
+/// Trap entry point rust (_start_trap_rust)
+#[doc(hidden)]
+#[unsafe(link_section = ".trap.rust")]
+#[unsafe(export_name = "_start_trap_rust")]
+pub extern "C" fn start_trap_rust(trap_frame: *const u32) {
+    unsafe {
+        match trap_cause() {
+            riscv::interrupt::Trap::Interrupt(code) => {
+                dispatch_interrupt(code);
+            }
+            riscv::interrupt::Trap::Exception(code) => {
+                dispatch_exception(
+                    NonNull::new_unchecked(trap_frame as *mut TrapFrame).as_ref(),
+                    code,
+                );
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+// #[unsafe(link_section = ".trap.rust")]
+pub fn dispatch_exception(_trap_frame: &TrapFrame, _code: usize) {
+    // loop {}
+}
+
+/// Called by _start_trap_rust, this trap handler will call other interrupt handling
+/// functions depending on the bits set in pending_irqs.
+#[doc(hidden)]
+// #[unsafe(link_section = ".trap.rust")]
+pub fn dispatch_interrupt(_code: usize) {
+    // Dispatch peripheral interrupt
+    let status = InterruptStatus::current();
+
+    // Iterate the active interrupts, fetch their handler, and call it if set.
+    for interrupt_nr in status.iterator() {
+        if let Ok(i) = Interrupt::try_from(interrupt_nr) {
+            if let Some(handler) = bound_handler(i) {
+                handler.callback()();
+            }
+        }
+    }
+}
+
+/// Default interrupt handler, does nothing.
+#[allow(dead_code)]
+#[doc(hidden)]
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub fn DefaultHandler() {}
+
+/// TODO: Write store_trap / load_trap functions, to generate the context saving assembly code,
+//        which is currently hand-written in ulp_riscv_vectors.S
+/// Registers saved in trap handler
+#[doc(hidden)]
+#[repr(C)]
+#[derive(Debug)]
+pub struct TrapFrame {
+    /// `x1`: return address, stores the address to return to after a function call or interrupt.
+    pub ra: usize,
+    /// `x5`: temporary register `t0`, used for intermediate values.
+    pub t0: usize,
+    /// `x6`: temporary register `t1`, used for intermediate values.
+    pub t1: usize,
+    /// `x7`: temporary register `t2`, used for intermediate values.
+    pub t2: usize,
+    /// `x28`: temporary register `t3`, used for intermediate values.
+    pub t3: usize,
+    /// `x29`: temporary register `t4`, used for intermediate values.
+    pub t4: usize,
+    /// `x30`: temporary register `t5`, used for intermediate values.
+    pub t5: usize,
+    /// `x31`: temporary register `t6`, used for intermediate values.
+    pub t6: usize,
+    /// `x10`: argument register `a0`. Used to pass the first argument to a function.
+    pub a0: usize,
+    /// `x11`: argument register `a1`. Used to pass the second argument to a function.
+    pub a1: usize,
+    /// `x12`: argument register `a2`. Used to pass the third argument to a function.
+    pub a2: usize,
+    /// `x13`: argument register `a3`. Used to pass the fourth argument to a function.
+    pub a3: usize,
+    /// `x14`: argument register `a4`. Used to pass the fifth argument to a function.
+    pub a4: usize,
+    /// `x15`: argument register `a5`. Used to pass the sixth argument to a function.
+    pub a5: usize,
+    /// `x16`: argument register `a6`. Used to pass the seventh argument to a function.
+    pub a6: usize,
+    /// `x17`: argument register `a7`. Used to pass the eighth argument to a function.
+    pub a7: usize,
 }

@@ -17,7 +17,7 @@ use panic_halt as _;
 
 #[entry]
 fn main(mut i2c: LpI2c) -> ! {
-    let _peripherals = esp32c6_lp::Peripherals::take().unwrap();
+    let _peripherals = esp_lp_hal::pac::Peripherals::take().unwrap();
 
     loop {
         let mut data = [0u8; 22];

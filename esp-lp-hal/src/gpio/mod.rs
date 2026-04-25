@@ -234,7 +234,7 @@ impl<const PIN: u8> Flex<PIN> {
                     }
                 }
 
-                self.clear_interrupt();
+                // self.clear_interrupt();
                 interrupt::enable_pin_interrupt::<PIN>(event as u8);
                 interrupt::pin_wakeup_enable::<PIN>(wakeup_enable);
             }
