@@ -142,7 +142,7 @@ impl<'d> FlashStorage<'d> {
         length: usize,
     ) -> Result<(), FlashStorageError> {
         let offset = offset as usize;
-        if offset % ALIGN as usize != 0 || length % ALIGN as usize != 0 {
+        if !offset.is_multiple_of(ALIGN as usize) || !length.is_multiple_of(ALIGN as usize) {
             return Err(FlashStorageError::NotAligned);
         }
         Ok(())

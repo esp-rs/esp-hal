@@ -190,8 +190,8 @@ fn parse_configs(
 
     // check if we find multiple potential config files - if yes and if the base `config.toml`
     // contains an [env] section let the user know this is not ideal
-    if let Some(config_toml_dir) = config_toml_path.parent() {
-        if config_toml_dir
+    if let Some(config_toml_dir) = config_toml_path.parent()
+        && config_toml_dir
             .read_dir()?
             .filter(|entry| {
                 if let Ok(entry) = entry {
@@ -202,14 +202,13 @@ fn parse_configs(
             })
             .count()
             > 1
-        {
-            let base_toml = config_toml_dir.join("config.toml");
-            if base_toml.exists() {
-                let base_toml_content = std::fs::read_to_string(base_toml)?;
-                let base_toml = base_toml_content.as_str().parse::<DocumentMut>()?;
-                if base_toml.contains_key("env") {
-                    hint_about_configs = true;
-                }
+    {
+        let base_toml = config_toml_dir.join("config.toml");
+        if base_toml.exists() {
+            let base_toml_content = std::fs::read_to_string(base_toml)?;
+            let base_toml = base_toml_content.as_str().parse::<DocumentMut>()?;
+            if base_toml.contains_key("env") {
+                hint_about_configs = true;
             }
         }
     }

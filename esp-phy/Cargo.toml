@@ -29,7 +29,7 @@ bench = false
 cfg-if = "1"
 
 document-features = "0.2"
-esp-hal = { version = "~1.1.0-rc.0", path = "../esp-hal", default-features = false }
+esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false }
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.2.1", path = "../esp-sync" }
 

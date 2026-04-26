@@ -16,7 +16,7 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, UART0, UART1},
     soc::regi2c,
 };
 
@@ -155,12 +155,6 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     // Digital part - nothing to do here, PLL always runs at 480MHz
 
     // Analog part
-    // TODO: reference count I2C_ANA_MST clock (also applies to other chips)
-    let old_clk_conf = MODEM_LPCON::regs().clk_conf().read();
-    MODEM_LPCON::regs().clk_conf().write(|w| {
-        unsafe { w.bits(old_clk_conf.bits()) };
-        w.clk_i2c_mst_en().set_bit()
-    });
 
     // BBPLL CALIBRATION START
     I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
@@ -218,10 +212,6 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         w.bbpll_stop_force_high().set_bit();
         w.bbpll_stop_force_low().clear_bit()
     });
-
-    MODEM_LPCON::regs()
-        .clk_conf()
-        .write(|w| unsafe { w.bits(old_clk_conf.bits()) });
 }
 
 // RC_FAST_CLK

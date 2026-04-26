@@ -43,7 +43,7 @@ peripherals = [
     { name = "EFUSE" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
-    # { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "GPIO_SD", pac = "GPIO_EXT" },
     # { name = "HINF" }, # TODO: add PAC manually later
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -96,7 +96,7 @@ peripherals = [
 
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
-    # { name = "GPIO_DEDICATED", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
@@ -210,6 +210,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Sha" },
     { name = "Ecc" },
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true },
+    { name = "UsbDevice", keep_enabled = true },
 ] } }
 
 
@@ -245,14 +246,14 @@ pins = [
     { pin =  11, functions = { 0 = "U0TXD" } },
     { pin =  12,                                                                                    analog = { 0 = "USB_DM" } },
     { pin =  13,                                                                                    analog = { 0 = "USB_DP" } },
-    { pin =  14, functions = { 0 = "FSPICS1" },                     limitations = ["spi_flash"] },
+    { pin =  14, functions = { 0 = "FSPICS1" },                     limitations = ["spi_psram"] },
     { pin =  15, functions = { 0 = "FSPICS0" },                     limitations = ["spi_flash"] },
-    { pin =  16, functions = { 0 = "FSPIQ" },                       limitations = ["spi_flash"] },
-    { pin =  17, functions = { 0 = "FSPIWP" },                      limitations = ["spi_flash"] },
-    { pin =  18,                                                    limitations = ["spi_flash"] },
-    { pin =  19, functions = { 0 = "FSPIHD" },                      limitations = ["spi_flash"] },
-    { pin =  20, functions = { 0 = "FSPICLK" },                     limitations = ["spi_flash"] },
-    { pin =  21, functions = { 0 = "FSPID" },                       limitations = ["spi_flash"] },
+    { pin =  16, functions = { 0 = "FSPIQ" },                       limitations = ["spi_flash", "spi_psram"] },
+    { pin =  17, functions = { 0 = "FSPIWP" },                      limitations = ["spi_flash", "spi_psram"] },
+    { pin =  18,                                                    limitations = ["spi_flash", "spi_psram"] },
+    { pin =  19, functions = { 0 = "FSPIHD" },                      limitations = ["spi_flash", "spi_psram"] },
+    { pin =  20, functions = { 0 = "FSPICLK" },                     limitations = ["spi_flash", "spi_psram"] },
+    { pin =  21, functions = { 0 = "FSPID" },                       limitations = ["spi_flash", "spi_psram"] },
     { pin =  22, functions = { 0 = "SDIO_DATA2" } },
     { pin =  23, functions = { 0 = "SDIO_DATA3" } },
     { pin =  24 },
@@ -360,6 +361,10 @@ output_signals = [
     { name = "GPIO",                  id = 256 },
 ]
 
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
+
 [device.dma]
 support_status = "partial"
 kind = "gdma"
@@ -395,6 +400,7 @@ supports_enhanced_security = true
 zero_extend_writes = true
 
 [device.systimer]
+[device.usb_serial_jtag]
 
 [device.rng]
 support_status = "partial"
@@ -450,6 +456,11 @@ instances = [
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
 ]
+
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
+has_region_monitor = true
 
 ## Radio
 [device.wifi]

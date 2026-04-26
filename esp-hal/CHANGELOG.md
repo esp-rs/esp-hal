@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- C61: usb-serial-jtag and debug-assist (#5427)
+- C6: dedicated gpio (#5426)
 
 ### Changed
 
@@ -19,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
-## [v1.1.0-rc.0] - 2026-04-16
+## [v1.1.0] - 2026-04-24
 
 ### Added
 
@@ -152,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug in `Spi::half_duplex_{read, write}` where calling these functions aborted previously running writes (#5247)
 - LP I2C: prevent spurious I2C start during the initialization of LpI2c (#5311)
 - Fixed a bug in `TWAI` that may cause the driver to hang (#5318)
+- ESP32-C6: Fixed an issue where the chip failed to enable a required clock signal before trying to use it (#5405)
 
 ### Removed
 
@@ -169,6 +172,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::Priority::None` (#4996)
 - The `psram` feature has been replaced by a `Psram` driver object. esp-alloc has been updated so that no user code changes should be necessary when using `esp_alloc::psram_allocator!` (#5310)
 - The `esp_hal::psram::psram_raw_parts` function has been removed. Use `esp_alloc::psram_allocator`, or `Psram::raw_parts`. (#5310)
+- The `Trng::default()` which is insecure (#5403)
+
+This release was made possible via the following pre-releases:
+
+- [v1.1.0-rc.0] - 2026-04-16
 
 ## [v1.0.0] - 2025-10-30
 
@@ -1608,4 +1616,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
 [v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...HEAD
+[v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...esp-hal-v1.1.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...HEAD

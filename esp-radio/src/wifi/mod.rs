@@ -55,6 +55,7 @@ use core::{
 };
 
 use docsplay::Display;
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, waitqueue::GenericAtomicWaker};
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
 use esp_hal::system::Cpu;
@@ -865,14 +866,72 @@ pub enum AccessPointStationEventInfo {
     Disconnected(AccessPointStationDisconnectedInfo),
 }
 
-static RX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
-    NonReentrantMutex::new(VecDeque::new());
+/// A receive packet queue.
+///
+/// This struct is to encapsulate the queue AND the waker, so waking the waker
+/// upon receiving a packet does not require another critical section.
+///
+/// The struct also uses VecDeque's capacity to avoid storing a copy of the maximum queue length.
+struct PacketQueue {
+    queue: VecDeque<PacketBuffer>,
 
-pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
-    NonReentrantMutex::new(VecDeque::new());
+    // NoopRawMutex is safe here because we only access the waker in the queue's critical section.
+    waker: GenericAtomicWaker<NoopRawMutex>,
+}
+
+impl PacketQueue {
+    const fn new() -> Self {
+        Self {
+            queue: VecDeque::new(),
+            waker: GenericAtomicWaker::new(NoopRawMutex::new()),
+        }
+    }
+
+    fn change_capacity(&mut self, new_capacity: usize) -> Result<(), WifiError> {
+        // If we've allocated more memory already than configured, use that instead of shrinking the
+        // queue. We do not trim the queue if it's over capacity.
+        let new_capacity = new_capacity.max(self.queue.capacity());
+        let additional = new_capacity.saturating_sub(self.queue.capacity());
+        self.queue
+            .try_reserve_exact(additional)
+            .map_err(|_| WifiError::OutOfMemory)
+    }
+
+    fn push_back(&mut self, packet: PacketBuffer) -> Result<(), PacketBuffer> {
+        if self.len() >= self.queue.capacity() {
+            return Err(packet);
+        }
+
+        self.queue.push_back(packet);
+        self.waker.wake();
+
+        Ok(())
+    }
+
+    fn pop_front(&mut self) -> Option<PacketBuffer> {
+        self.queue.pop_front()
+    }
+
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    fn register_waker(&mut self, waker: &core::task::Waker) {
+        self.waker.register(waker);
+    }
+}
+
+static DATA_QUEUE_RX_AP: NonReentrantMutex<PacketQueue> =
+    NonReentrantMutex::new(PacketQueue::new());
+
+static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
+    NonReentrantMutex::new(PacketQueue::new());
 
 /// Common errors.
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1013,18 +1072,8 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    match DATA_QUEUE_RX_STA.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
-            queue.push_back(packet);
-            Ok(())
-        } else {
-            Err(packet)
-        }
-    }) {
-        Ok(()) => {
-            embassy::STA_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
-        }
+    match DATA_QUEUE_RX_STA.with(|queue| queue.push_back(packet)) {
+        Ok(()) => include::ESP_OK as esp_err_t,
         _ => {
             debug!("RX QUEUE FULL");
             include::ESP_ERR_NO_MEM as esp_err_t
@@ -1044,18 +1093,8 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    match DATA_QUEUE_RX_AP.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
-            queue.push_back(packet);
-            Ok(())
-        } else {
-            Err(packet)
-        }
-    }) {
-        Ok(()) => {
-            embassy::AP_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
-        }
+    match DATA_QUEUE_RX_AP.with(|queue| queue.push_back(packet)) {
+        Ok(()) => include::ESP_OK as esp_err_t,
         _ => {
             debug!("RX QUEUE FULL");
             include::ESP_ERR_NO_MEM as esp_err_t
@@ -1213,7 +1252,7 @@ impl InterfaceType {
         out
     }
 
-    fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
+    fn data_queue_rx(&self) -> &'static NonReentrantMutex<PacketQueue> {
         match self {
             InterfaceType::Station => &DATA_QUEUE_RX_STA,
             InterfaceType::AccessPoint => &DATA_QUEUE_RX_AP,
@@ -1272,10 +1311,7 @@ impl InterfaceType {
     }
 
     fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
-        match self {
-            InterfaceType::Station => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
-            InterfaceType::AccessPoint => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
-        }
+        self.data_queue_rx().with(|q| q.register_waker(cx.waker()));
     }
 
     fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
@@ -1794,10 +1830,7 @@ pub(crate) mod embassy {
     // between interfaces.
     pub(crate) static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
 
-    pub(crate) static AP_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
     pub(crate) static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static STA_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
     pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
     impl RxToken for WifiRxToken {
@@ -2255,10 +2288,12 @@ pub fn new<'d>(
 
             magic: WIFI_INIT_CONFIG_MAGIC as i32,
         };
+    }
 
-        RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
-        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-    };
+    DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+    DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+    TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
     crate::wifi::wifi_init(device)?;
 

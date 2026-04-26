@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fs::{self, create_dir_all},
     io::Write,
     path::{Path, PathBuf},
@@ -19,7 +18,35 @@ use crate::{Chip, Package, cargo::CargoArgsBuilder, windows_safe_path};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
 struct Manifest {
-    versions: HashSet<semver::Version>,
+    versions: Vec<String>,
+}
+
+impl Manifest {
+    fn insert_version(&mut self, version: impl Into<String>) {
+        let version = version.into();
+        if !self.versions.contains(&version) {
+            self.versions.push(version);
+            self.normalize_versions();
+        }
+    }
+
+    fn normalize_versions(&mut self) {
+        self.versions.sort_by_key(|v| {
+            let trimmed = v.trim();
+            let semver = semver::Version::parse(trimmed).ok();
+            let rank = match trimmed.to_lowercase().as_str() {
+                "main" => 0,
+                "git" => 1,
+                _ => 2,
+            };
+            (
+                semver.is_none(),
+                std::cmp::Reverse(semver),
+                rank,
+                trimmed.to_lowercase(),
+            )
+        });
+    }
 }
 
 /// Build the documentation for the specified packages and chips.
@@ -65,7 +92,7 @@ pub fn build_documentation(
 
         // Update the package manifest to include the latest version:
         let version = crate::package_version(workspace, *package)?;
-        manifest.versions.insert(version.clone());
+        manifest.insert_version(version.to_string());
 
         // Build the documentation for the package:
         if chips.is_empty() {
@@ -470,6 +497,36 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
+/// Returns the highest stable (non-prerelease) `semver::Version` found among the version-named
+/// directories under `package_docs_path`. Used to avoid defaulting to pre-releases when a stable
+/// version exists alongside a pre-release.
+fn latest_stable_docs_version(package_docs_path: &Path) -> Option<semver::Version> {
+    let mut best: Option<semver::Version> = None;
+    let entries = fs::read_dir(package_docs_path).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        // Skip non-directory entries
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path.file_name()?.to_string_lossy();
+        // Parse the version from the directory name
+        let Ok(ver) = name.parse::<semver::Version>() else {
+            continue;
+        };
+        // Skip pre-release versions
+        if !ver.pre.is_empty() {
+            continue;
+        }
+        // If multiple stable versions exist, return the highest one
+        best = Some(match best {
+            None => ver,
+            Some(b) => ver.max(b),
+        });
+    }
+    best
+}
+
 /// Build the documentation index for all packages.
 pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
     let docs_path = workspace.join("docs");
@@ -496,7 +553,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         let package_docs_path = docs_path.join(package.as_ref());
 
         // Each path we iterate over should be the directory for a given version of
-        // the package's documentation: (except latest)
+        // the package's documentation (non-semver names, e.g. `latest`, are skipped).
         if !package_docs_path.exists() {
             log::warn!(
                 "Package documentation path does not exist: '{}', skipping",
@@ -513,10 +570,6 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                     "Path is not a directory, skipping: '{}'",
                     version_path.display()
                 );
-                continue;
-            }
-
-            if version_path.file_name().unwrap() == "latest" {
                 continue;
             }
 
@@ -545,7 +598,22 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
             chips.sort();
 
-            let meta = generate_documentation_meta_for_package(workspace, *package, &chips)?;
+            let channel = version_path
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default();
+            let current_version = match channel.parse::<semver::Version>() {
+                Ok(v) => v,
+                Err(_) => {
+                    log::debug!(
+                        "Skipping package doc directory (not semver): {}",
+                        version_path.display()
+                    );
+                    continue;
+                }
+            };
+
+            let meta = generate_documentation_meta_for_package(*package, &chips, current_version)?;
 
             // Render the template to HTML and write it out to the desired path:
             let html = render_template(
@@ -592,12 +660,10 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 }
 
 fn generate_documentation_meta_for_package(
-    workspace: &Path,
     package: Package,
     chips: &[Chip],
+    doc_tree_version: semver::Version,
 ) -> Result<Vec<Value>> {
-    let version = crate::package_version(workspace, package)?;
-
     let mut metadata = Vec::new();
 
     for chip in chips {
@@ -611,7 +677,7 @@ fn generate_documentation_meta_for_package(
         // information on the documentation index:
         metadata.push(minijinja::context! {
             name => package,
-            version => version,
+            version => doc_tree_version,
             chip => chip.to_string(),
             chip_pretty => chip.pretty_name(),
             package => package.to_string().replace('-', "_"),
@@ -625,6 +691,7 @@ fn generate_documentation_meta_for_package(
 
 fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>> {
     let mut metadata = Vec::new();
+    let docs_path = workspace.join("docs");
 
     for package in Package::iter() {
         // Not all packages have documentation built:
@@ -632,7 +699,9 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
             continue;
         }
 
-        let version = crate::package_version(workspace, package)?;
+        let cargo_version = crate::package_version(workspace, package)?;
+        let package_docs_path = docs_path.join(package.as_ref());
+        let version = latest_stable_docs_version(&package_docs_path).unwrap_or(cargo_version);
 
         let url = if package.chip_features_matter() {
             format!("{package}/{version}/index.html")
@@ -697,4 +766,104 @@ where
     let html = tmpl.render(ctx)?;
 
     Ok(html)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use tempfile::TempDir;
+
+    use super::{Manifest, latest_stable_docs_version};
+
+    fn mkdir(root: &Path, name: &str) {
+        fs::create_dir_all(root.join(name)).unwrap();
+    }
+
+    #[test]
+    fn picks_highest_stable_and_ignores_prerelease_and_nonsemver_names() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        mkdir(root, "0.9.0");
+        mkdir(root, "1.0.0");
+        mkdir(root, "1.1.0-rc.0");
+        mkdir(root, "2.0.0");
+        mkdir(root, "latest");
+        mkdir(root, "main");
+        assert_eq!(
+            latest_stable_docs_version(root),
+            Some("2.0.0".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn returns_none_when_only_prereleases() {
+        let tmp = TempDir::new().unwrap();
+        mkdir(tmp.path(), "1.0.0-beta.0");
+        mkdir(tmp.path(), "1.1.0-rc.0");
+        assert_eq!(latest_stable_docs_version(tmp.path()), None);
+    }
+
+    #[test]
+    fn returns_none_for_empty_dir() {
+        let tmp = TempDir::new().unwrap();
+        assert_eq!(latest_stable_docs_version(tmp.path()), None);
+    }
+
+    #[test]
+    fn skips_files_and_unparseable_dir_names() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        mkdir(root, "1.0.0");
+        fs::write(root.join("not-a-dir"), b"x").unwrap();
+        mkdir(root, "not-a-version");
+        assert_eq!(
+            latest_stable_docs_version(root),
+            Some("1.0.0".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn test_manifest_sorting_and_dedup() {
+        let mut manifest = Manifest::default();
+        let input = vec![
+            "main",
+            "1.0.0-beta.1",
+            "0.9.0",
+            "1.2.0",
+            "1.1.1",
+            "1.1.0",
+            "1.1.0-rc.1",
+            "1.1.0-rc.0",
+            "1.1.0-beta.0",
+            "git",
+            "1.0.0",
+            "nightly",
+            "1.0.0-beta.0",
+            "main", // Duplicated main
+        ];
+
+        for v in input {
+            manifest.insert_version(v);
+        }
+
+        assert_eq!(
+            manifest.versions,
+            vec![
+                "1.2.0",
+                "1.1.1",
+                "1.1.0",
+                "1.1.0-rc.1",
+                "1.1.0-rc.0",
+                "1.1.0-beta.0",
+                "1.0.0",
+                "1.0.0-beta.1",
+                "1.0.0-beta.0",
+                "0.9.0",   // Semver descending
+                "main",    // Rank 0
+                "git",     // Rank 1
+                "nightly"  // Rank 2 + alphabetical
+            ]
+        );
+    }
 }

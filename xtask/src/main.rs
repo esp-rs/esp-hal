@@ -652,6 +652,15 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
                     let dst = dir.join(without_fingerprint);
 
+                    if dst.exists() {
+                        std::fs::remove_file(&dst).with_context(|| {
+                            format!(
+                                "Failed to remove destination file {} before copying",
+                                dst.display()
+                            )
+                        })?;
+                    }
+
                     log::debug!("Copying {} to {}", example_path.display(), dst.display());
 
                     // Copy so we don't trigger a rebuild unnecessarily by deleting the original

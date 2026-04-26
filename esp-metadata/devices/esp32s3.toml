@@ -339,7 +339,7 @@ pins = [
     { pin = 26, functions = { 0 = "SPICS1" },                                              limitations = ["spi_psram"] },
     { pin = 27, functions = { 0 = "SPIHD"  },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 28, functions = { 0 = "SPIWP"  },                                              limitations = ["spi_flash", "spi_psram"] },
-    { pin = 29, functions = { 0 = "SPICS0" },                                              limitations = ["spi_flash", "spi_psram"] },
+    { pin = 29, functions = { 0 = "SPICS0" },                                              limitations = ["spi_flash"] },
     { pin = 30, functions = { 0 = "SPICLK" },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 31, functions = { 0 = "SPIQ"   },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 32, functions = { 0 = "SPID"   },                                              limitations = ["spi_flash"] },

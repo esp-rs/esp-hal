@@ -89,7 +89,7 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
             (unsafe { ets_get_xtal_freq() }) / 1_000_000
         } else if #[cfg(any(esp32, esp32c2))] {
             // just rely on RTC_CNTL_STORE4
-            regs!(RTC_CNTL).store4().read().bits() as i32
+            (regs!(RTC_CNTL).store4().read().bits() & 0xff) as i32
         } else if #[cfg(any(esp32c5, esp32c61))]  {
             // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
             regs!(PCR).sysclk_conf().read().clk_xtal_freq().bits() as i32

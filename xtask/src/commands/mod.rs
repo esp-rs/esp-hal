@@ -216,6 +216,7 @@ pub enum ExamplesPackage {
     Examples,
     QaTest,
     EspLpHal,
+    CompileTests,
 }
 
 impl From<ExamplesPackage> for Package {
@@ -224,6 +225,7 @@ impl From<ExamplesPackage> for Package {
             ExamplesPackage::Examples => Package::Examples,
             ExamplesPackage::QaTest => Package::QaTest,
             ExamplesPackage::EspLpHal => Package::EspLpHal,
+            ExamplesPackage::CompileTests => Package::CompileTests,
         }
     }
 }
@@ -232,6 +234,13 @@ impl ExamplesPackage {
     /// Get the underlying Package
     pub fn as_package(self) -> Package {
         Package::from(self)
+    }
+
+    fn single_project_examples(&self) -> bool {
+        match self {
+            ExamplesPackage::Examples | ExamplesPackage::CompileTests => true,
+            _ => false,
+        }
     }
 }
 
@@ -324,10 +333,10 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     // Load all examples which support the specified chip and parse their metadata.
     //
-    // The `examples` directory contains a number of individual projects, and does not rely on
+    // Directories might contain a number of individual projects, and don't not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if args.package.as_package() == Package::Examples {
+    let examples = if args.package.single_project_examples() {
         crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",

@@ -250,8 +250,10 @@ fn bump_crate_version(
         .into_iter()
         .map(|p| p.join("Cargo.toml"));
 
+    // skip compile tests, these represent real world projects and therefore serve as a good test
+    // when we try and build them when the new versions are available in our local test registry.
     let tomls = Package::iter()
-        .filter(|&p| p != Package::Examples)
+        .filter(|&p| p != Package::Examples && p != Package::CompileTests)
         .map(|p| {
             CargoToml::new(&bumped_package.workspace, p)
                 .with_context(|| format!("Could not load Cargo.toml of {p}"))

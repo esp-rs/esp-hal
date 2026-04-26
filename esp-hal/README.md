@@ -60,16 +60,16 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|
 | ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          |          | ⚒️      |
+| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          |           |          |          |          |          |
 | Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |           |          |          |          |          |
 | Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          | ⚒️      |
 | Camera interface          | ❌    |          |          |          |          |           |          |          | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          |
-| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
-| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
+| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                        |       |          | ❌       | [❌][5159] [^1] | ❌       |           | ❌       |          | ❌       | ❌       |
-| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      |          |          |
+| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |          |
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ⚒️      | ✔️      | ✔️      |
@@ -88,7 +88,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |           |          |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
@@ -96,7 +96,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | [❌][5162] [^1] | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
 | SDIO host                 | ⚒️   |          |          |          |          |           |          |          |          | ⚒️      |
 | SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      |           |          |          |          |          |
-| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
@@ -110,7 +110,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ULP (FSM)                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          |          | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
-| USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      |          | ⚒️      |
+| USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      |
 
  * Empty cell: Not available

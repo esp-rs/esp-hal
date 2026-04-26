@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `rtc_clk_xtal_freq_get` (#5407)
 
 ### Removed
 

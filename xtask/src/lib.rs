@@ -95,6 +95,8 @@ pub enum Package {
     XtensaLx,
     XtensaLxRt,
     XtensaLxRtProcMacros,
+
+    CompileTests,
 }
 
 impl Package {
@@ -230,7 +232,7 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self) -> bool {
-        if *self == Package::Examples {
+        if *self == Package::Examples || *self == Package::CompileTests {
             // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
             // did nothing in this directory will be published.
             false
@@ -435,7 +437,7 @@ impl Package {
     }
 
     fn targets_lp_core(&self) -> bool {
-        if *self == Package::Examples {
+        if *self == Package::Examples || *self == Package::CompileTests {
             return false;
         }
 
@@ -464,7 +466,7 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        if *self == Package::Examples {
+        if *self == Package::Examples || *self == Package::CompileTests {
             return Ok(());
         }
 
@@ -622,7 +624,7 @@ pub fn generate_build_command(
     }
     features.push(chip.to_string());
 
-    let cwd = if package_path.ends_with("examples") {
+    let cwd = if package_path.ends_with("examples") || package_path.ends_with("compile-tests") {
         package_path.join(package).to_path_buf()
     } else {
         package_path.to_path_buf()
@@ -643,7 +645,7 @@ pub fn generate_build_command(
 
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if !package_path.ends_with("examples") {
+    } else if !package_path.ends_with("examples") && !package_path.ends_with("compile-tests") {
         Some(format!("--example={}", app.binary_name()))
     } else {
         None
@@ -776,7 +778,7 @@ pub fn format_package(
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
 
-    let paths = if package == Package::Examples {
+    let paths = if package == Package::Examples || package == Package::CompileTests {
         crate::find_packages(&package_path)?
     } else {
         vec![package_path]

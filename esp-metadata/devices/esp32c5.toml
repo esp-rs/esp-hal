@@ -352,6 +352,14 @@ pins = [
     { pin =  12, functions = { 0 = "U0RXD" } },
     { pin =  13, functions = { 0 = "SDIO_DATA3" },                                           analog = { 0 = "USB_DM" } },
     { pin =  14, functions = { 0 = "SDIO_DATA2" },                                           analog = { 0 = "USB_DP" } },
+    { pin =  15,                                                limitations = ["spi_psram"] }, # CS1
+    { pin =  16,                                                limitations = ["spi_flash"] }, # CS0
+    { pin =  17,                                                limitations = ["spi_flash", "spi_psram"] }, # SPIQ
+    { pin =  18,                                                limitations = ["spi_flash", "spi_psram"] }, # SPIWP
+    { pin =  19,                                                limitations = ["spi_flash", "spi_psram"] }, # VDD_SPI
+    { pin =  20,                                                limitations = ["spi_flash", "spi_psram"] }, # SPIHD
+    { pin =  21,                                                limitations = ["spi_flash", "spi_psram"] }, # SPICLK
+    { pin =  22,                                                limitations = ["spi_flash", "spi_psram"] }, # SPID
     { pin =  23 },
     { pin =  24 },
     { pin =  25, limitations = ["strapping"] },
