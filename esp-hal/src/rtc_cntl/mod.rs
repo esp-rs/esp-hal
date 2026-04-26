@@ -416,7 +416,6 @@ impl<'d> Rtc<'d> {
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
         // P4: store registers are in LP_SYS (mapped as LP_AON).
-        // Ref: esp-idf rom/rtc.h -- RTC_XTAL_FREQ_REG = LP_SYSTEM_REG_LP_STORE4_REG
         //      RTC_DISABLE_ROM_LOG = (1<<0)|(1<<16)
         //      esp-idf rtc_suppress_rom_log() uses LP_STORE4
         #[cfg(esp32p4)]
@@ -671,7 +670,6 @@ impl Rwdt {
     pub fn listen(&mut self) {
         let rtc_cntl = LP_WDT::regs();
         self.set_write_protection(false);
-        // Ref: esp-idf lpwdt_ll.h -- lpwdt_ll_set_wdt_config0()
         rtc_cntl
             .config0()
             .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
@@ -714,7 +712,6 @@ impl Rwdt {
     }
 
     fn set_write_protection(&mut self, enable: bool) {
-        // Ref: esp-idf lpwdt_ll.h -- LP_WDT_WKEY_VALUE = 0x50D83AA1
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
         LP_WDT::regs().wprotect().write(|w| unsafe { w.bits(wkey) });
     }
@@ -754,7 +751,6 @@ impl Rwdt {
         self.set_write_protection(false);
 
         // P4 PAC: config1().wdt_stg0_hold(), config2().wdt_stg1_hold(), etc.
-        // Ref: esp-idf lp_wdt_struct.h
         let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
         match stage {
             RwdtStage::Stage0 => rtc_cntl
@@ -844,16 +840,8 @@ pub fn wakeup_cause() -> SleepSource {
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(soc_has_intpri)] {
-            let wakeup_cause_bits = crate::peripherals::PMU::regs()
-                .slp_wakeup_status0()
-                .read()
-                .wakeup_cause()
-                .bits();
-        } else if #[cfg(esp32p4)] {
-            // P4: PMU_SLP_WAKEUP_STATUS0_REG (offset 0x144), field wakeup_cause [30:0]
-            // Ref: esp-idf pmu_reg.h -- PMU_SLP_WAKEUP_STATUS0_REG
-            //      TRM v0.5 Ch 16
+        } else if #[cfg(soc_has_pmu)] {
+            // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()

@@ -56,18 +56,15 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     PSRAM_VADDR_START..PSRAM_VADDR_START + size
 }
 
+// TODO: Test and debug with several PSRAM size
 fn init_psram_inner(config: PsramConfig) {
     // 1. Enable MPLL (400 MHz) for PSRAM clock
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_mpll_enable(), clk_ll_mpll_set_config()
-    //      regi2c_mpll.h -- I2C_MPLL = 0x63
     configure_mpll(400);
 
     // 2. Enable PSRAM controller clock and select MPLL source
-    // Ref: esp-idf psram_ctrlr_ll.h -- psram_ctrlr_ll_enable_module_clock()
     //      HP_SYS_CLKRST.peri_clk_ctrl00.reg_psram_clk_en = 1
     //      HP_SYS_CLKRST.peri_clk_ctrl00.reg_psram_clk_src_sel = 1 (MPLL)
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-    // Ref: esp-idf clk_gate_ll.h -- psram_ctrlr_ll_enable_module_clock()
     clkrst.peri_clk_ctrl00().modify(|_, w| unsafe {
         w.psram_pll_clk_en().set_bit();
         w.psram_core_clk_en().set_bit();
@@ -75,22 +72,19 @@ fn init_psram_inner(config: PsramConfig) {
     });
 
     // 3. Set bus clock divider: MPLL(400MHz) / 2 = 200MHz PSRAM bus
-    // Ref: esp-idf psram_ctrlr_ll.h -- psram_ctrlr_ll_set_bus_clock()
     //      SPI_MEM_S_SRAM_CLK_REG: SCLKCNT_N=1, SCLKCNT_H=0, SCLKCNT_L=1
-    // TODO(P4X): These registers are in SPIMEM2 which may not be in PAC.
+    // TODO(esp32p4): These registers are in SPIMEM2 which may not be in PAC.
     // Using direct MMIO for now.
     // PSRAM MSPI controller base
-    // Ref: esp-idf reg_base.h -- DR_REG_PSRAM_MSPI0_BASE = 0x5008_E000
     const PSRAM_MSPI_BASE: u32 = 0x5008_E000;
 
     // 3a. Set PSRAM bus clock divider: MPLL(400MHz) / 2 = 200MHz
     // Ref: SPI_MEM_S_SRAM_CLK_REG offset from PSRAM_MSPI_BASE
     //      sclkcnt_n=1, sclkcnt_h=0, sclkcnt_l=1
-    // TODO(P4X): verify exact register offset for SRAM_CLK_REG
+    // TODO(esp32p4): verify exact register offset for SRAM_CLK_REG
     // const SRAM_CLK_OFFSET: u32 = ...; // need to find from spi_mem_s_reg.h
 
     // 3b. Configure PSRAM read/write commands for HEX sync mode
-    // Ref: esp-idf psram_ctrlr_ll.h -- psram_ctrlr_ll_set_rd_cmd/wr_cmd()
     //      SPI_MEM_S_CACHE_SCTRL_REG: cache_sram_usr_rcmd, cache_sram_usr_wcmd
     //      SPI_MEM_S_SRAM_DRD_CMD_REG: cmd_bitlen=15, cmd_value=0x0000 (sync read)
     //      SPI_MEM_S_SRAM_DWR_CMD_REG: cmd_bitlen=15, cmd_value=0x8080 (sync write)
@@ -109,12 +103,10 @@ fn init_psram_inner(config: PsramConfig) {
     //      SPI_MEM_S_CACHE_FCTRL_REG: axi_req_en=1
 
     // 4. Configure PSRAM MSPI controller
-    // Ref: esp-idf psram_ctrlr_ll.h, spi_mem_s_reg.h
     //      PSRAM_MSPI_BASE = 0x5008_E000
     configure_psram_mspi(PSRAM_MSPI_BASE);
 
     // 5. Map PSRAM via MMU (0x48000000 virtual -> physical)
-    // Ref: esp-idf mmu_ll.h -- mmu_ll_write_entry()
     mmu_map_psram(PSRAM_MSPI_BASE, config);
 
     // Determine PSRAM size
@@ -130,7 +122,7 @@ fn init_psram_inner(config: PsramConfig) {
         unsafe { super::set_psram_range(start..end) };
     }
 
-    // TODO(P4X): Full PSRAM init needs:
+    // TODO(esp32p4): Full PSRAM init needs:
     // - SPIMEM2 read/write command configuration (HEX sync mode)
     // - Address bitlen (32-bit), dummy cycles (14 read, 7 write at 200MHz)
     // - CS timing, DDR mode enable
@@ -250,14 +242,12 @@ fn mmu_map_psram(mspi_base: u32, config: PsramConfig) {
     // PSRAM virtual starts at 0x4800_0000. The MMU entry index depends on
     // the overall virtual address map layout. For P4, PSRAM region starts
     // at a fixed offset in the MMU table.
-    // Ref: esp-idf mmu_ll.h -- mmu_ll_get_entry_id()
     //      The formula: entry_id = (vaddr - SOC_MMU_VADDR_BASE) / MMU_PAGE_SIZE
     //      SOC_MMU_VADDR_BASE = 0x4000_0000 (flash mapping start)
     //      PSRAM at 0x4800_0000: entry_id = (0x4800_0000 - 0x4000_0000) / 0x10000 = 0x800
     const PSRAM_MMU_START_ENTRY: u32 = 0x800;
 
     // Disable data cache before modifying MMU
-    // Ref: esp-idf cache_ll.h -- cache_ll_l1_disable_cache()
     cache_suspend();
 
     unsafe {
@@ -363,20 +353,17 @@ fn configure_mpll(freq_mhz: u32) {
     use crate::soc::regi2c;
 
     const I2C_MPLL: u8 = 0x63;
-    // Ref: esp-idf soc/esp32p4/include/soc/regi2c_mpll.h
     const I2C_MPLL_DIV_REG_ADDR: u8 = 2;
     const I2C_MPLL_DHREF: u8 = 3;
     const I2C_MPLL_IR_CAL_RSTB: u8 = 5;
 
     // Enable MPLL power
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_mpll_enable()
     //      PMU.rf_pwc: mspi_phy_xpd
     //      LP_AON_CLKRST: hp_mpll_500m_clk_en
-    // TODO(P4X): PMU rf_pwc register access for MPLL power
+    // TODO(esp32p4): PMU rf_pwc register access for MPLL power
 
     // Calculate divider: MPLL_freq = XTAL(40MHz) * (div+1) / (ref_div+1)
     // For 400MHz: ref_div=1, div=19 -> 40*20/2 = 400MHz
-    // Ref: esp-idf clk_tree_ll.h:508
     let div_val: u8 = match freq_mhz {
         400 => (9 << 3) | 1,  // div=9, ref_div=1 -> 40*10/2 = 200... needs recalc
         500 => (12 << 3) | 1, // div=12, ref_div=1
@@ -384,7 +371,6 @@ fn configure_mpll(freq_mhz: u32) {
     };
 
     // MPLL calibration sequence
-    // Ref: esp-idf clk_tree_ll.h:484-498
     // 1. Set DHREF bits [5:4] = 3
     let dhref = regi2c::regi2c_read(I2C_MPLL, 0, I2C_MPLL_DHREF);
     regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_DHREF, dhref | (3 << 4));
@@ -460,7 +446,6 @@ fn configure_psram_mspi(base: u32) {
         let sram_cmd = (base + SRAM_CMD) as *mut u32;
         let val = sram_cmd.read_volatile();
         // sdin_hex (bit 4) and sdout_hex (bit 5) -- exact bit positions need verification
-        // Ref: esp-idf psram_ctrlr_ll.h -- psram_ctrlr_ll_set_line_mode()
         let val = val | (1 << 4) | (1 << 5); // HEX mode data lines
         sram_cmd.write_volatile(val);
 

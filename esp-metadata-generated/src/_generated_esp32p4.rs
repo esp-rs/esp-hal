@@ -70,6 +70,9 @@ macro_rules! property {
     ("dma.can_access_psram") => {
         false
     };
+    ("dma.ext_mem_configurable_block_size") => {
+        false
+    };
     ("dma.separate_in_out_interrupts") => {
         true
     };
@@ -198,6 +201,9 @@ macro_rules! property {
     };
     ("interrupts.disabled_interrupt") => {
         0
+    };
+    ("psram.octal_spi") => {
+        false
     };
     ("psram.extmem_origin") => {
         1207959552
@@ -3083,8 +3089,8 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC1_CH5, GPIO21));
         _for_each_inner_analog_function!((ADC1_CH6, GPIO22));
         _for_each_inner_analog_function!((ADC1_CH7, GPIO23));
-        _for_each_inner_analog_function!((USB_PHY0_DM, GPIO24));
-        _for_each_inner_analog_function!((USB_PHY0_DP, GPIO25));
+        _for_each_inner_analog_function!((USB_DM, GPIO24));
+        _for_each_inner_analog_function!((USB_DP, GPIO25));
         _for_each_inner_analog_function!((USB_PHY1_DM, GPIO26));
         _for_each_inner_analog_function!((USB_PHY1_DP, GPIO27));
         _for_each_inner_analog_function!((ADC2_CH0, GPIO49));
@@ -3101,8 +3107,6 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO21));
         _for_each_inner_analog_function!(((ADC1_CH6, ADCn_CHm, 1, 6), GPIO22));
         _for_each_inner_analog_function!(((ADC1_CH7, ADCn_CHm, 1, 7), GPIO23));
-        _for_each_inner_analog_function!(((USB_PHY0_DM, USB_PHYn_DM, 0), GPIO24));
-        _for_each_inner_analog_function!(((USB_PHY0_DP, USB_PHYn_DP, 0), GPIO25));
         _for_each_inner_analog_function!(((USB_PHY1_DM, USB_PHYn_DM, 1), GPIO26));
         _for_each_inner_analog_function!(((USB_PHY1_DP, USB_PHYn_DP, 1), GPIO27));
         _for_each_inner_analog_function!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO49));
@@ -3113,19 +3117,18 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO54));
         _for_each_inner_analog_function!((all(ADC1_CH0, GPIO16), (ADC1_CH1, GPIO17),
         (ADC1_CH2, GPIO18), (ADC1_CH3, GPIO19), (ADC1_CH4, GPIO20), (ADC1_CH5, GPIO21),
-        (ADC1_CH6, GPIO22), (ADC1_CH7, GPIO23), (USB_PHY0_DM, GPIO24), (USB_PHY0_DP,
-        GPIO25), (USB_PHY1_DM, GPIO26), (USB_PHY1_DP, GPIO27), (ADC2_CH0, GPIO49),
-        (ADC2_CH1, GPIO50), (ADC2_CH2, GPIO51), (ADC2_CH3, GPIO52), (ADC2_CH4, GPIO53),
-        (ADC2_CH5, GPIO54))); _for_each_inner_analog_function!((all_expanded((ADC1_CH0,
-        ADCn_CHm, 1, 0), GPIO16), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO17), ((ADC1_CH2,
-        ADCn_CHm, 1, 2), GPIO18), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO19), ((ADC1_CH4,
-        ADCn_CHm, 1, 4), GPIO20), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO21), ((ADC1_CH6,
-        ADCn_CHm, 1, 6), GPIO22), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO23), ((USB_PHY0_DM,
-        USB_PHYn_DM, 0), GPIO24), ((USB_PHY0_DP, USB_PHYn_DP, 0), GPIO25), ((USB_PHY1_DM,
-        USB_PHYn_DM, 1), GPIO26), ((USB_PHY1_DP, USB_PHYn_DP, 1), GPIO27), ((ADC2_CH0,
-        ADCn_CHm, 2, 0), GPIO49), ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO50), ((ADC2_CH2,
-        ADCn_CHm, 2, 2), GPIO51), ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO52), ((ADC2_CH4,
-        ADCn_CHm, 2, 4), GPIO53), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO54)));
+        (ADC1_CH6, GPIO22), (ADC1_CH7, GPIO23), (USB_DM, GPIO24), (USB_DP, GPIO25),
+        (USB_PHY1_DM, GPIO26), (USB_PHY1_DP, GPIO27), (ADC2_CH0, GPIO49), (ADC2_CH1,
+        GPIO50), (ADC2_CH2, GPIO51), (ADC2_CH3, GPIO52), (ADC2_CH4, GPIO53), (ADC2_CH5,
+        GPIO54))); _for_each_inner_analog_function!((all_expanded((ADC1_CH0, ADCn_CHm, 1,
+        0), GPIO16), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO17), ((ADC1_CH2, ADCn_CHm, 1, 2),
+        GPIO18), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO19), ((ADC1_CH4, ADCn_CHm, 1, 4),
+        GPIO20), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO21), ((ADC1_CH6, ADCn_CHm, 1, 6),
+        GPIO22), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO23), ((USB_PHY1_DM, USB_PHYn_DM, 1),
+        GPIO26), ((USB_PHY1_DP, USB_PHYn_DP, 1), GPIO27), ((ADC2_CH0, ADCn_CHm, 2, 0),
+        GPIO49), ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO50), ((ADC2_CH2, ADCn_CHm, 2, 2),
+        GPIO51), ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO52), ((ADC2_CH4, ADCn_CHm, 2, 4),
+        GPIO53), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO54)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.

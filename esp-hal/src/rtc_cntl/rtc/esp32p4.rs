@@ -77,7 +77,6 @@ fn pmu_power_domain_force_default() {
     let pmu = PMU::regs();
 
     // PMU_HP_PD_TOP
-    // Ref: esp-idf pmu_init.c, pmu_ll.h -- pmu_ll_hp_set_power_force_*
     pmu.power_pd_top_cntl().modify(|_, w| {
         w.force_top_reset().bit(false);
         w.force_top_iso().bit(false);
@@ -88,7 +87,6 @@ fn pmu_power_domain_force_default() {
     });
 
     // PMU_HP_PD_CNNT (eco5: replaces hpaon + hpcpu + hpwifi from eco4)
-    // Ref: esp-idf pmu_reg.h -- PMU_POWER_PD_CNNT_CNTL_REG
     pmu.power_pd_cnnt_cntl().modify(|_, w| {
         w.force_cnnt_reset().bit(false);
         w.force_cnnt_iso().bit(false);
@@ -99,7 +97,6 @@ fn pmu_power_domain_force_default() {
     });
 
     // PMU_HP_PD_HPMEM
-    // Ref: esp-idf pmu_reg.h -- PMU_POWER_PD_HPMEM_CNTL_REG
     pmu.power_pd_hpmem_cntl().modify(|_, w| {
         w.force_hp_mem_reset().bit(false);
         w.force_hp_mem_iso().bit(false);
@@ -110,7 +107,6 @@ fn pmu_power_domain_force_default() {
     });
 
     // PMU_LP_PD_LPPERI (eco5 new)
-    // Ref: esp-idf pmu_reg.h -- PMU_POWER_PD_LPPERI_CNTL_REG
     pmu.power_pd_lpperi_cntl().modify(|_, w| {
         w.force_lp_peri_reset().bit(false);
         w.force_lp_peri_iso().bit(false);
@@ -134,9 +130,7 @@ pub(crate) fn init() {
     pmu_power_domain_force_default();
 
     // 2. Disable TIMG0 watchdog
-    // Ref: esp-idf wdt_hal.c -- wdt_hal_init(), wdt_hal_disable()
     //      TIMG WDT write protect key: 0x50D8_3AA1
-    //      TRM v0.5 Ch 19 -- TIMG0_WDTWPROTECT_REG, TIMG0_WDTCONFIG0_REG
     let tg0 = TIMG0::regs();
     tg0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     tg0.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
@@ -149,18 +143,14 @@ pub(crate) fn init() {
     tg1.wdtwprotect().write(|w| unsafe { w.bits(0) });
 
     // 4. Disable LP_WDT (Low-Power Watchdog)
-    // Ref: esp-idf lpwdt_ll.h -- LP_WDT write protect key: 0x50D8_3AA1
     //      P4 PAC: config0() (not wdtconfig0()), wprotect() (not wdtwprotect())
-    //      TRM v0.5 Ch 19 -- LP_WDT_CONFIG0_REG
     let lp_wdt = LP_WDT::regs();
     lp_wdt.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     lp_wdt.config0().modify(|_, w| unsafe { w.bits(0) });
     lp_wdt.wprotect().write(|w| unsafe { w.bits(0) });
 
     // 5. Disable SWD (Super Watchdog) by enabling auto-feed
-    // Ref: esp-idf bootloader_esp32p4.c -- bootloader_super_wdt_auto_feed()
     //      LP_WDT SWD write protect key: 0x50D8_3AA1 (same key)
-    //      TRM v0.5 Ch 19 -- LP_WDT_SWD_CONFIG_REG
     lp_wdt
         .swd_wprotect()
         .write(|w| unsafe { w.bits(0x50D8_3AA1) });
@@ -170,7 +160,6 @@ pub(crate) fn init() {
     lp_wdt.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
     // 6. Clear DCDC switch force flags
-    // Ref: esp-idf pmu_init.c -- pmu_ll_set_dcdc_switch_force_power_up/down
     //      PMU_POWER_DCDC_SWITCH_REG (offset 0x10c)
     let pmu = PMU::regs();
     pmu.power_dcdc_switch().modify(|_, w| {
@@ -179,16 +168,10 @@ pub(crate) fn init() {
     });
 
     // 7. Enable CPLL (400 MHz) and SPLL (480 MHz)
-    // Ref: esp-idf rtc_clk.c:401 -- rtc_clk_cpu_freq_set_config()
-    //      esp-idf clk_tree_ll.h:375 -- clk_ll_cpll_set_config()
-    //      esp-idf clk_tree_ll.h:430 -- clk_ll_spll_set_config()
-    //      TRM v0.5 Ch 12 (Reset and Clock)
     cpll_configure(400);
     spll_configure(480);
 
     // 8. Set CPU divider to 1 (400 MHz CPU), MEM divider 2, APB divider 2
-    // Ref: esp-idf rtc_clk.c:262 -- case 400: mem_divider=2, apb_divider=2
-    //      esp-idf clk_tree_ll.h -- clk_ll_cpu_set_divider()
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
 
     // Set CPU divider: cpu_clk_div_num = divider - 1 = 0
@@ -212,7 +195,6 @@ pub(crate) fn init() {
     }
 
     // 9. Switch CPU clock source from XTAL to CPLL
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_src(SOC_CPU_CLK_SRC_CPLL)
     //      LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel: 0=XTAL, 1=CPLL, 2=RC_FAST
     crate::peripherals::LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
@@ -229,20 +211,17 @@ fn cpll_configure(freq_mhz: u32) {
     use crate::soc::regi2c;
 
     // I2C CPLL register addresses
-    // Ref: esp-idf soc/esp32p4/include/soc/regi2c_cpll.h
     const I2C_CPLL: u8 = 0x67; // CPLL slave address
     const I2C_CPLL_OC_REF_DIV: u8 = 2;
     const I2C_CPLL_OC_DIV_7_0: u8 = 3;
     const I2C_CPLL_OC_DCUR: u8 = 6;
 
     // 1. Enable CPLL power
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpll_enable()
     //      PMU.imm_hp_ck_power: tie_high_xpd_pll, tie_high_xpd_pll_i2c
     //      Note: PAC uses "pll" not "cpll" (eco4 PAC, single PLL)
     let pmu = PMU::regs();
     // PAC: tie_high_xpd_pll is 4-bit field (one bit per PLL: CPLL/SPLL/MPLL/PLLA).
     // Set all bits to enable all PLLs. Same for pll_i2c.
-    // Ref: esp-idf pmu_reg.h -- PMU_TIE_HIGH_XPD_CPLL (BIT27) etc.
     pmu.imm_hp_ck_power().write(|w| unsafe {
         w.tie_high_xpd_pll().bits(0xF);
         w.tie_high_xpd_pll_i2c().bits(0xF)
@@ -254,7 +233,6 @@ fn cpll_configure(freq_mhz: u32) {
 
     // 2. Configure CPLL via I2C analog registers
     // eco5 values (v3.x): div7_0 = 10 (400MHz), 9 (360MHz) with 40MHz XTAL
-    // Ref: esp-idf clk_tree_ll.h:400-410 -- !CONFIG_ESP32P4_SELECTS_REV_LESS_V3 path
     let div7_0: u8 = match freq_mhz {
         400 => 10, // eco5: 400 MHz
         360 => 9,  // eco5: 360 MHz
@@ -262,11 +240,9 @@ fn cpll_configure(freq_mhz: u32) {
     };
 
     // OC_REF_DIV + DCHGP: (oc_enb_fcal << 7) | (dchgp << 4) | div_ref = 0x50
-    // Ref: esp-idf clk_tree_ll.h:414
     let lref: u8 = 0x50; // dchgp=5, div_ref=0, oc_enb_fcal=0
 
     // OC_DCUR: (dlref_sel << 6) | (dhref_sel << 4) | dcur = 0x73
-    // Ref: esp-idf clk_tree_ll.h:421
     let dcur: u8 = 0x73; // dlref_sel=1, dhref_sel=3, dcur=3
 
     regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_REF_DIV, lref);
@@ -274,7 +250,6 @@ fn cpll_configure(freq_mhz: u32) {
     regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_DCUR, dcur);
 
     // 3. Run CPLL calibration
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpll_calibration_start/stop/is_done
     //      HP_SYS_CLKRST.ana_pll_ctrl0.cpu_pll_cal_stop
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
 
@@ -307,7 +282,6 @@ fn spll_configure(freq_mhz: u32) {
     use crate::soc::regi2c;
 
     // I2C SPLL register addresses
-    // Ref: esp-idf soc/esp32p4/include/soc/regi2c_syspll.h
     const I2C_SPLL: u8 = regi2c::REGI2C_SYS_PLL;
     const I2C_SPLL_OC_REF_DIV: u8 = 2;
     const I2C_SPLL_OC_DIV_7_0: u8 = 3;
@@ -317,7 +291,6 @@ fn spll_configure(freq_mhz: u32) {
 
     // Configure SPLL via I2C analog registers
     // eco5 values: div7_0 = (freq_mhz / 40) - 1, same formula as CPLL
-    // Ref: esp-idf clk_tree_ll.h:460 -- !CONFIG_ESP32P4_SELECTS_REV_LESS_V3 path
     let div7_0: u8 = match freq_mhz {
         480 => 11, // 480 MHz: (480/40) - 1 = 11
         240 => 5,  // 240 MHz: (240/40) - 1 = 5
@@ -325,7 +298,6 @@ fn spll_configure(freq_mhz: u32) {
     };
 
     // Same OC_REF_DIV and OC_DCUR values as CPLL
-    // Ref: esp-idf clk_tree_ll.h:468-475
     let lref: u8 = 0x50; // dchgp=5, div_ref=0, oc_enb_fcal=0
     let dcur: u8 = 0x73; // dlref_sel=1, dhref_sel=3, dcur=3
 
@@ -334,7 +306,6 @@ fn spll_configure(freq_mhz: u32) {
     regi2c::regi2c_write(I2C_SPLL, 0, I2C_SPLL_OC_DCUR, dcur);
 
     // Run SPLL calibration
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_spll_calibration_start/stop/is_done
     //      HP_SYS_CLKRST.ana_pll_ctrl0.sys_pll_cal_stop
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
 

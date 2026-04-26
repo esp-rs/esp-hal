@@ -7,7 +7,6 @@ pub(super) fn init() {
 
     // Set 3 level bits = 8 priority levels
     // P4 PAC: int_config_nlbits() (not mnlbits())
-    // Ref: esp-idf clic_reg.h -- CLIC_INT_CONFIG_REG, nlbits field
     cfg_if::cfg_if! {
         if #[cfg(esp32p4)] {
             clic.int_config()
@@ -205,7 +204,7 @@ core::arch::global_asm!(
         * If an interrupt occurs and is configured as (hardware) vectored, the CPU will jump to
         * MTVT[31:0] + 4 * interrupt_id
         *
-        * In the case of the ESP32P4/ESP32C5, the interrupt matrix, between the CPU interrupt lines
+        * In the case of the ESP32-P4/ESP32-C5, the interrupt matrix, between the CPU interrupt lines
         * and the peripherals, offers 32 lines, and the lower 16 interrupts are used for CLINT.
         */
     .balign 0x40

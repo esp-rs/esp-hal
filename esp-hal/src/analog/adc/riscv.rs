@@ -184,7 +184,6 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 
     // ESP32-P4 uses DREF value 4 (same as S2/S3) not 1.
-    // Ref: esp-idf esp32p4/adc_ll.h -- adc_ll_calibration_init()
     //      REGI2C_SAR_I2C (0x69) reg 2, bits [6:4] = DREF
     #[cfg(esp32p4)]
     fn calibration_init() {

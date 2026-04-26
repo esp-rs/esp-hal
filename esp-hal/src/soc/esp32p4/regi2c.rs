@@ -8,7 +8,6 @@
 //!      TRM v0.5 Ch 49 (Analog I2C Controller)
 
 // I2C slave addresses for analog blocks
-// Ref: esp-idf regi2c_impl.c lines 57-81
 #[allow(dead_code)]
 pub(crate) const REGI2C_DIG_REG: u8 = 0x6d;
 #[allow(dead_code)]
@@ -27,7 +26,6 @@ pub(crate) const REGI2C_PLLA: u8 = 0x6f;
 pub(crate) const REGI2C_SAR_I2C: u8 = 0x69;
 
 // Master select bits in ANA_CONF2 register
-// Ref: esp-idf regi2c_impl.c lines 21-28
 const REGI2C_DIG_REG_MST_SEL: u16 = 1 << 10;
 const REGI2C_PLL_CPU_MST_SEL: u16 = 1 << 11;
 #[allow(dead_code)]
@@ -65,7 +63,6 @@ const LP_I2C_ANA_MST_ANA_CONF2_REG: u32 = LP_I2C_ANA_MST_BASE + 0x08;
 /// Ref: esp-idf regi2c_impl.c:83-117 -- regi2c_enable_block()
 fn regi2c_enable_block(block: u8) {
     // Clear both conf registers first
-    // Ref: esp-idf regi2c_impl.c:86-87
     unsafe {
         (LP_I2C_ANA_MST_ANA_CONF2_REG as *mut u32).write_volatile(0);
         (LP_I2C_ANA_MST_ANA_CONF1_REG as *mut u32).write_volatile(0);

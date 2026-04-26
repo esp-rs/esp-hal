@@ -51,8 +51,8 @@ macro_rules! p4_rtc_pin {
                 fn rtcio_pad_hold(&self, enable: bool) {
                     // LP_AON (LP_SYS) doesn't have gpio_hold for P4.
                     // P4 uses LP_IO_MUX pad hold instead.
-                    // Ref: esp-idf rtc_io_ll.h -- rtcio_ll_force_hold_enable()
-                    // For now, no-op. TODO(P4X): implement LP pad hold
+                    // TODO: implement LP pad hold
+                    // For now, no-op. 
                     let _ = enable;
                 }
 

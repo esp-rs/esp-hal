@@ -4137,6 +4137,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
+                    "psram_driver_supported",
                     "rsa_driver_supported",
                     "sha_driver_supported",
                     "soc_driver_supported",
@@ -4183,6 +4184,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "psram_extmem_origin=\"1207959552\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
                     "sha_dma",
@@ -4279,6 +4281,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
+                    "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -4325,6 +4328,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=psram_extmem_origin=\"1207959552\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sha_dma",
@@ -6447,7 +6451,7 @@ pub fn emit_check_cfg_directives() {
     );
     println!(
         "cargo:rustc-check-cfg=cfg(psram_extmem_origin, \
-         values(\"1065353216\",\"1107296256\",\"1062207488\",\"1006632960\"))"
+         values(\"1065353216\",\"1107296256\",\"1207959552\",\"1062207488\",\"1006632960\"))"
     );
     println!(
         "cargo:rustc-check-cfg=cfg(rmt_ram_start, \

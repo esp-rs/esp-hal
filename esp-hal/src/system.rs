@@ -12,9 +12,8 @@ cfg_if::cfg_if! {
 
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
 // ESP32-P4: manual Peripheral enum with HP_SYS_CLKRST clock gate registers.
-// The generated macro produces an empty #[repr(u8)] enum (no clock nodes in metadata).
-// This manual definition covers all 43 peripherals with their enable/reset registers.
-// Ref: esp-idf clk_gate_ll.h, hp_sys_clkrst_reg.h, TRM v0.5 Ch 12/22.
+// The generated macro produces an empty #[repr(u8)] enum (no clock nodes in metadata),
+// so this manual definition covers all 43 peripherals with their enable/reset registers.
 #[cfg(not(esp32p4))]
 implement_peripheral_clocks!();
 
@@ -259,9 +258,8 @@ mod _p4_peripheral_clocks {
             }
             // -- PWM/Counter --
             Peripheral::Ledc => {
-                // Note: LEDC uses SOC_CLK_CTRL3 in esp-idf, but PAC may differ
-                // Ref: esp-idf clk_gate_ll.h -- _ledc_ll_enable_bus_clock
-                // For now just reset control
+                // TODO(esp32p4): LEDC uses SOC_CLK_CTRL3 in IDF, but PAC may differ.
+                //                Only reset wiring is handled here for now.
             }
             Peripheral::Pcnt => {
                 c.soc_clk_ctrl2()
@@ -366,8 +364,7 @@ mod _p4_peripheral_clocks {
             }
             // -- LCD/Camera --
             Peripheral::LcdCam => {
-                // LCD_CAM uses SOC_CLK_CTRL3 which may not be in PAC
-                // Ref: esp-idf clk_gate_ll.h -- _lcdcam_ll_enable_bus_clock
+                // TODO(esp32p4): LCD_CAM uses SOC_CLK_CTRL3 which may not be in PAC.
             }
         }
     }

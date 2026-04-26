@@ -9,7 +9,7 @@
 //!   - crate::clock::Clock, crate::efuse::Efuse (old API pattern)
 //!   - PMU hp_active/hp_modem/hp_sleep register groups
 //!
-//! TODO(P4X): Implement sleep mode once PMU eco5 registers are validated.
+//! TODO(esp32p4): Implement sleep mode once PMU eco5 registers are validated.
 //! Ref: esp-idf pmu_sleep.c, pmu_eco5_struct.h
 //!      TRM v0.5 Ch 16 (Low-Power Management)
 //!      .investigation/ESP32P4_ECO5_PERIPHERAL_AUDIT.md

@@ -233,8 +233,6 @@ impl InterruptStatusRegisterAccess {
                 }
             } else if #[cfg(esp32p4)] {
                 // P4 PAC: intr_0() (Core0 GPIO interrupt status)
-                // Ref: esp-idf gpio_ll.h -- gpio_ll_get_intr_status()
-                //      TRM v0.5 Ch 11 -- GPIO_STATUS_INT_REG
                 match self {
                     Self::Bank0 => GPIO::regs().intr_0().read().bits(),
                     #[cfg(gpio_has_bank_1)]

@@ -317,7 +317,6 @@ pub fn enable_direct(
                 // P4: CLIC uses consolidated int_ctrl register (not separate int_attr).
                 // int_ctrl contains: int_ip[0], int_ie[8], int_attr_shv[16],
                 //   int_attr_trig[17:18], int_attr_mode[22:23], int_ctl[24:31]
-                // Ref: esp-idf clic_reg.h, TRM v0.5 Ch 2/14
                 w.int_attr_shv().set_bit();
                 w.int_attr_trig().bits(0) // positive level
             });
@@ -429,6 +428,8 @@ fn cpu_wait_mode_on() -> bool {
             // TODO: add HP_SYS_CLKRST.CPU_WAITI_CTRL0 (offset 0xF4) to the
             // esp32p4 PAC and replace this raw MMIO with the PAC accessor.
             const HP_SYS_CLKRST_CPU_WAITI_CTRL0: *const u32 = 0x500E_60F4 as *const u32;
+            // SAFETY: fixed MMIO address of a read-only status register. The
+            // volatile read has no side effects.
             let reg = unsafe { core::ptr::read_volatile(HP_SYS_CLKRST_CPU_WAITI_CTRL0) };
             (reg & (1 << Cpu::current() as u32)) == 0
         } else {

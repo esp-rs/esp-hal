@@ -52,6 +52,9 @@ cfg_if::cfg_if! {
         use crate::peripherals::DPORT as INTERRUPT_CORE0;
         use crate::peripherals::DPORT as INTERRUPT_CORE1;
     } else {
+        // P4 reads these registers via raw MMIO, not through the PAC singletons,
+        // so the INTERRUPT_CORE0/1 imports aren't needed there.
+        #[cfg(not(esp32p4))]
         use crate::peripherals::INTERRUPT_CORE0;
         #[cfg(esp32s3)]
         use crate::peripherals::INTERRUPT_CORE1;
@@ -199,15 +202,16 @@ impl InterruptStatus {
             Cpu::ProCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
                     // P4: Status registers at base + 0x200 (4 x 32-bit = 128 sources)
-                    // Ref: esp-idf interrupt_core0_reg.h
                     //   INTERRUPT_CORE0_INTR_STATUS_REG_0_REG = base + 0x200
                     //   INTERRUPT_CORE0_INTR_STATUS_REG_1_REG = base + 0x204
                     //   INTERRUPT_CORE0_INTR_STATUS_REG_2_REG = base + 0x208
                     //   INTERRUPT_CORE0_INTR_STATUS_REG_3_REG = base + 0x20c
-                    // TRM v0.5 Ch 14
                     #[cfg(esp32p4)]
                     {
                         let base = crate::soc::registers::INTERRUPT_MAP_BASE + 0x200;
+                        // SAFETY: fixed MMIO address of a read-only interrupt-status
+                        // register; `idx` is bounded by STATUS_WORDS (4) which stays
+                        // inside the 0x200..0x210 status-register window.
                         unsafe { ((base as *const u32).add(idx)).read_volatile() }
                     }
                     #[cfg(not(esp32p4))]
@@ -223,11 +227,11 @@ impl InterruptStatus {
             Cpu::AppCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
                     // P4 Core1: base + 0x800 + 0x200
-                    // Ref: esp-idf interrupt_core1_reg.h
                     //   INTERRUPT_CORE1 = INTERRUPT_CORE0 + 0x800
                     #[cfg(esp32p4)]
                     {
                         let base = crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU + 0x200;
+                        // SAFETY: same as Core0 path above, against the Core1 block.
                         unsafe { ((base as *const u32).add(idx)).read_volatile() }
                     }
                     #[cfg(not(esp32p4))]
@@ -381,9 +385,7 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
     // P4: 120 individual INT_MAP registers at sequential 4-byte offsets from base.
     // Each register has 6-bit field [5:0] for CPU interrupt line (0-63).
     // Core0: base = 0x500D_6000, Core1: base = 0x500D_6800
-    // Ref: esp-idf interrupt_core0_reg.h -- LP_RTC_INT_MAP_REG at offset 0x0,
     //      LP_WDT_INT_MAP_REG at offset 0x4, etc.
-    // TRM v0.5 Ch 14
     #[cfg(esp32p4)]
     {
         let base = match core {
@@ -391,6 +393,9 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
             #[cfg(multi_core)]
             Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
         };
+        // SAFETY: `base` points at the per-core INT_MAP register array; `interrupt`
+        // is a peripheral-interrupt index which is bounded by the PAC's enum and
+        // always maps to a valid register slot inside the 120-entry array.
         unsafe {
             let reg = (base as *mut u32).add(interrupt as usize);
             reg.write_volatile(cpu_interrupt);
@@ -419,7 +424,6 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     // P4: read INT_MAP register directly. 6-bit field [5:0] = CPU interrupt line.
-    // Ref: esp-idf interrupt_core0_reg.h, TRM v0.5 Ch 14
     #[cfg(esp32p4)]
     let cpu_intr = {
         let base = match cpu {
@@ -427,6 +431,7 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
             #[cfg(multi_core)]
             Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
         };
+        // SAFETY: matches map_raw -- same bounded INT_MAP array, read-only volatile.
         unsafe {
             let reg = (base as *const u32).add(interrupt as usize);
             reg.read_volatile() & 0x3F // 6-bit field

@@ -40,7 +40,6 @@ pub enum CpuClock {
 
 impl CpuClock {
     // Preset: 400 MHz CPU, 100 MHz APB
-    // Ref: esp-idf rtc_clk.c:262 -- case 400: cpu=1, mem=2, apb=2
     const PRESET_400: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 400 MHz
@@ -118,7 +117,6 @@ fn configure_cpu_root_clk_impl(
     _old_selector: Option<CpuRootClkConfig>,
     new_selector: CpuRootClkConfig,
 ) {
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_src()
     //      LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel: 0=XTAL, 1=CPLL, 2=RC_FAST
     let sel = match new_selector {
         CpuRootClkConfig::Xtal => 0,
@@ -137,7 +135,6 @@ fn configure_cpu_clk_impl(
     _old_config: Option<CpuClkConfig>,
     new_config: CpuClkConfig,
 ) {
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_cpu_set_divider()
     //      HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num = divider - 1
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
     clkrst.root_clk_ctrl0().modify(|_, w| unsafe {
@@ -166,7 +163,7 @@ fn configure_apb_clk_impl(
     _old_config: Option<ApbClkConfig>,
     _new_config: ApbClkConfig,
 ) {
-    // TODO(P4X): APB divider register in HP_SYS_CLKRST
+    // TODO(esp32p4): APB divider register in HP_SYS_CLKRST
     // For now, APB freq is derived from CPU freq via divider
 }
 
@@ -176,7 +173,6 @@ fn configure_lp_fast_clk_impl(
     _old_selector: Option<LpFastClkConfig>,
     new_selector: LpFastClkConfig,
 ) {
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_rtc_fast_set_src()
     crate::peripherals::LP_AON_CLKRST::regs()
         .lp_aonclkrst_lp_clk_conf()
         .modify(|_, w| unsafe {
@@ -193,7 +189,6 @@ fn configure_lp_slow_clk_impl(
     _old_selector: Option<LpSlowClkConfig>,
     new_selector: LpSlowClkConfig,
 ) {
-    // Ref: esp-idf clk_tree_ll.h -- clk_ll_rtc_slow_set_src()
     crate::peripherals::LP_AON_CLKRST::regs()
         .lp_aonclkrst_lp_clk_conf()
         .modify(|_, w| unsafe {
@@ -208,7 +203,6 @@ fn configure_lp_slow_clk_impl(
 
 // ============================================================
 // Per-instance clock impl for UART (called on UartInstance enum)
-// Ref: esp-idf uart_ll.h, hp_sys_clkrst_reg.h
 // ============================================================
 
 impl UartInstance {
@@ -222,9 +216,8 @@ impl UartInstance {
         _old_config: Option<UartFunctionClockConfig>,
         _new_config: UartFunctionClockConfig,
     ) {
-        // TODO(P4X): Configure UART clock source selection
+        // TODO(esp32p4): Configure UART clock source selection
         // HP_SYS_CLKRST PERI_CLK_CTRL110-114 for UART0-4
-        // Ref: esp-idf clk_tree_ll.h -- clk_ll_uart_set_sclk()
     }
 
     fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
@@ -243,7 +236,6 @@ impl UartInstance {
 
 // ============================================================
 // Per-instance clock impl for TIMG
-// Ref: esp-idf timer_ll.h
 // ============================================================
 
 impl TimgInstance {
@@ -257,7 +249,7 @@ impl TimgInstance {
         _old_config: Option<TimgFunctionClockConfig>,
         _new_config: TimgFunctionClockConfig,
     ) {
-        // TODO(P4X): Configure TIMG clock source
+        // TODO(esp32p4): Configure TIMG clock source
         // HP_SYS_CLKRST PERI_CLK_CTRL20/21
     }
 
@@ -269,7 +261,7 @@ impl TimgInstance {
         _old_config: Option<TimgWdtClockConfig>,
         _new_config: TimgWdtClockConfig,
     ) {
-        // TODO(P4X): Configure TIMG WDT clock source
+        // TODO(esp32p4): Configure TIMG WDT clock source
     }
 }
 

@@ -46,11 +46,16 @@
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
 use clocks::ClockTree;
-#[cfg(soc_has_clock_node_lp_slow_clk)]
+// Only used inside the calibrate_rtc_slow_clock() path, which is itself
+// gated by soc_has_clock_node_timg_calibration_clock.
+#[cfg(all(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_timg_calibration_clock))]
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
-#[cfg(soc_has_clock_node_timg_function_clock)]
+#[cfg(all(
+    soc_has_clock_node_timg_function_clock,
+    soc_has_clock_node_timg_calibration_clock
+))]
 use clocks::TimgFunctionClockConfig;
 
 /// # Low-level clock control
@@ -208,7 +213,6 @@ impl Clocks {
         ESP_HAL_LOCK.lock(|| {
             // P4: init() disables all WDTs and resets PMU power domain force flags.
             // Full PLL/clock tree config is NOT yet implemented -- relies on ROM bootloader.
-            // Ref: esp-idf pmu_init.c, bootloader_esp32p4.c, TRM v0.5 Ch 16
             crate::rtc_cntl::rtc::init();
 
             let config = Self::configure(cpu_clock_config);
@@ -556,8 +560,6 @@ fn rtc_slow_cal_period() -> u64 {
 
     // P4: store registers are in LP_SYS (mapped as LP_AON in esp-hal).
     // LP_SYS has lp_store0..lp_store14 registers.
-    // Ref: esp-idf lp_system_reg.h -- LP_SYSTEM_REG_LP_STORE1_REG = RTC_SLOW_CLK_CAL_REG
-    //      esp-idf esp_time_impl.c -- uses store2/store3 for boot time
     #[cfg(esp32p4)]
     {
         LP_AON::regs().lp_store1().read().bits() as u64

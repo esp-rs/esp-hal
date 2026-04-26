@@ -26,8 +26,8 @@ software_interrupt_count = 4
 software_interrupt_delay = 24
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
-# TODO: Tyding new TRM after 0.5 document
-# Currently following section is not fully written.
+# TODO: align with newer TRM revisions after v0.5. The v0.5 TRM still has
+# the following sections incomplete:
 # - Bus Architecture
 # - Processor Instruction Extensions
 # - AXI Performance Monitor
@@ -136,6 +136,10 @@ peripherals = [
     { name = "INTERRUPT_CORE1" },
     { name = "CLIC" },
     { name = "IO_MUX" },
+    # LP_AON / LPWR: compatibility aliases -- other chips expose an `LP_AON`
+    # (and the `LPWR` alias) register block; on P4 the same registers live in
+    # `LP_SYS` in the PAC, so we point the esp-hal `LP_AON` / `LPWR` singletons
+    # at the `LP_SYS` PAC type.
     { name = "LP_AON", pac = "LP_SYS" },
     { name = "LP_AON_CLKRST" },
     { name = "LP_SYS" },
@@ -150,9 +154,11 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART" },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART" },
     { name = "UART4", interrupts = { peri = "UART4" }, clock_group = "UART" },
-    # Map to SPI2 RegisterBlock for esp-hal driver compatibility.
     { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1 },
-    # SPI3: same RegisterBlock layout as SPI2 but different PAC type.
+    # SPI3 has the same RegisterBlock layout as SPI2 but the PAC exposes it as
+    # a distinct type. Map to SPI2 so the SPI master driver can reuse its
+    # register accessors directly. Verified field-compatible against the
+    # upstream esp32p4 PAC at the time of this port.
     { name = "SPI3", pac = "SPI2", interrupts = { peri = "SPI3" }, dma_peripheral = 2 },
     { name = "I2C0", interrupts = { peri = "I2C0" } },
     { name = "I2C1", interrupts = { peri = "I2C1" } },
@@ -169,8 +175,9 @@ peripherals = [
 
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
-    # TODO: clear about EMAC and PAC relationship
-    # But ESP-IDF have: components/esp_hal_emac/esp32p4/include/hal/emac_ll.h
+    # TODO: clarify EMAC <-> PAC mapping before exposing it.
+    # IDF has the LL header at components/esp_hal_emac/esp32p4/include/hal/emac_ll.h
+    # but the esp32p4 PAC has not been generated with a matching peripheral yet.
     # { name = "EMAC" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
@@ -769,8 +776,15 @@ pins = [
     { pin = 21, analog = { 1 = "ADC1_CH5", lp = { 0 = "LP_GPIO21" } } },
     { pin = 22, functions = { 4 = "DBG_PSRAM_CK", lp = { 0 = "LP_GPIO22" } }, analog = { 1 = "ADC1_CH6" } },
     { pin = 23, functions = { 3 = "REF_50M_CLK", 4 = "DBG_PSRAM_CS", lp = { 0 = "LP_GPIO23" } }, analog = { 1 = "ADC1_CH7" } },
-    { pin = 24, limitations = ["usb_jtag"], analog = { 0 = "USB_PHY0_DM" } },
-    { pin = 25, limitations = ["usb_jtag"], analog = { 0 = "USB_PHY0_DP" } },
+    # Pins 24/25 are the default USB-Serial/JTAG pair (PHY0). Use the canonical
+    # `USB_DM`/`USB_DP` names so `disable_usb_pads!` (see esp-hal gpio/mod.rs)
+    # and the `UsbJtag` pin-limitation auto-derive pick them up like on every
+    # other chip. `usb_jtag` limitation is set automatically via the names.
+    { pin = 24, analog = { 0 = "USB_DM" } },
+    { pin = 25, analog = { 0 = "USB_DP" } },
+    # Pins 26/27 are the USB OTG FS (PHY1) pair. Kept under the PHY1 names
+    # until the P4 OTG FS driver lands -- at that point consider whether to
+    # rename to USB_DM/USB_DP so the same helpers fire here too.
     { pin = 26, limitations = ["usb_jtag"], analog = { 0 = "USB_PHY1_DM" } },
     { pin = 27, limitations = ["usb_jtag"], analog = { 0 = "USB_PHY1_DP" } },
     { pin = 28, functions = { 2 = "SPI2_CS", 3 = "EMAC_PHY_RXDV", 4 = "DBG_PSRAM_D" } },
