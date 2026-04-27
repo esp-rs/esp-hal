@@ -33,6 +33,7 @@ memory_map = { ranges = [
 
 peripherals = [
     # { name = "APB_SARADC", dma_peripheral = 8 },
+    # { name = "AVC" },
     { name = "ASSIST_DEBUG"},
     { name = "CLINT" },
     { name = "CACHE" },
@@ -213,6 +214,8 @@ clocks = { system_clocks = { clock_tree = [
     { name = "UsbDevice", keep_enabled = true },
 ] } }
 
+[device.adc]
+support_status = { status = "not_supported", issue = 5422 }
 
 [device.interrupts]
 support_status = "partial"
@@ -402,6 +405,18 @@ zero_extend_writes = true
 [device.systimer]
 [device.usb_serial_jtag]
 
+[device.ledc]
+support_status = { status = "not_supported", issue = 5418 }
+
+[device.etm]
+support_status = { status = "not_supported", issue = 5419 }
+
+[device.lp_timer]
+support_status = { status = "not_supported", issue = 5420 }
+
+[device.sleep]
+support_status = { status = "not_supported", issue = 5424 }
+
 [device.rng]
 support_status = "partial"
 trng_supported = false  # TODO
@@ -434,6 +449,9 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.i2c_slave]
+support_status = { status = "not_supported", issue = 5438 }
+
 [device.psram]
 extmem_origin = 0x42000000
 
@@ -462,6 +480,20 @@ support_status = "partial"
 has_sp_monitor = true
 has_region_monitor = true
 
+[device.avc]
+support_status = { status = "not_supported", issue = 5423 }
+
+[device.io_mux]
+
+[device.i2s]
+support_status = { status = "not_supported", issue = 5415 }
+
+[device.sd_slave]
+support_status = { status = "not_supported", issue = 5417 }
+
+[device.temp_sensor]
+support_status = { status = "not_supported", issue = 5421 }
+
 ## Radio
 [device.wifi]
 support_status = "partial"
@@ -472,3 +504,7 @@ csi_supported = true
 [device.bt]
 support_status = "partial"
 controller = "npl"
+
+[device.phy]
+support_status = "partial"
+combo_module = true

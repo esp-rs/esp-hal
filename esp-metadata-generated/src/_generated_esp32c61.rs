@@ -211,6 +211,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("phy.combo_module") => {
+        true
+    };
     ("psram.octal_spi") => {
         false
     };
@@ -231,6 +234,12 @@ macro_rules! property {
     };
     ("sha.dma") => {
         true
+    };
+    ("sleep.light_sleep") => {
+        false
+    };
+    ("sleep.deep_sleep") => {
+        false
     };
     ("soc.cpu_has_branch_predictor") => {
         false
