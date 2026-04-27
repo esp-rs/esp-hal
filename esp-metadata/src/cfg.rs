@@ -358,6 +358,11 @@ driver_configs![
         name: "DS",
         properties: {}
     },
+    EcdsaProperties {
+        driver: ecdsa,
+        name: "ECDSA",
+        properties: {}
+    },
     EccProperties {
         driver: ecc,
         name: "ECC",

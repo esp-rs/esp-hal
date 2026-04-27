@@ -69,6 +69,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |
+| ECDSA                     |       |          |          | [❌][5444] [^1] |          | [❌][5444] [^1] | [❌][5444] [^1] |          |          |
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      | [❌][5419] [^1] | ⚒️      |          |          |
@@ -149,6 +150,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5424]: https://github.com/esp-rs/esp-hal/issues/5424
 [5438]: https://github.com/esp-rs/esp-hal/issues/5438
+[5444]: https://github.com/esp-rs/esp-hal/issues/5444
 <!-- end chip support table -->
 
 ## `unstable` feature
