@@ -174,10 +174,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `esp_hal::psram::psram_raw_parts` function has been removed. Use `esp_alloc::psram_allocator`, or `Psram::raw_parts`. (#5310)
 - The `Trng::default()` which is insecure (#5403)
 
-This release was made possible via the following pre-releases:
-
-- [v1.1.0-rc.0] - 2026-04-16
-
 ## [v1.0.0] - 2025-10-30
 
 ### Added
@@ -1615,6 +1611,5 @@ This release was made possible via the following pre-releases:
 [v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
-[v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
-[v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...esp-hal-v1.1.0
+[v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.1.0
 [Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...HEAD
