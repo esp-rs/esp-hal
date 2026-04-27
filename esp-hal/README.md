@@ -76,7 +76,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ✔️      | ✔️      |
 | HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      |
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      |
-| I2C slave                 | ❌    |          | ❌       | [❌][5156] [^1] | ❌       | [❌][5438] [^1] | ❌       | ❌       | ❌       |
+| I2C slave                 | [❌][1909] [^1] |          | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] |
 | I2S                       | ⚒️   |          | ⚒️      | [❌][5172] [^1] | ⚒️      | [❌][5415] [^1] | ⚒️      | ⚒️      | ⚒️      |
 | IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |
 | Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
@@ -123,10 +123,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 [884]: https://github.com/esp-rs/esp-hal/issues/884
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
+[1909]: https://github.com/esp-rs/esp-hal/issues/1909
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155
-[5156]: https://github.com/esp-rs/esp-hal/issues/5156
 [5160]: https://github.com/esp-rs/esp-hal/issues/5160
 [5161]: https://github.com/esp-rs/esp-hal/issues/5161
 [5162]: https://github.com/esp-rs/esp-hal/issues/5162
@@ -149,7 +149,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5424]: https://github.com/esp-rs/esp-hal/issues/5424
-[5438]: https://github.com/esp-rs/esp-hal/issues/5438
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 <!-- end chip support table -->
 
