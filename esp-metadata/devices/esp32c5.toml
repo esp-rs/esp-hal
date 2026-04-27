@@ -647,7 +647,7 @@ support_status = { status = "not_supported", issue = 5171 }
 support_status = { status = "not_supported", issue = 5164 }
 
 [device.ds]
-support_status = { status = "not_supported", issue = 5159 }
+support_status = { status = "not_supported", issue = 884 }
 
 [device.lp_uart]
 support_status = { status = "not_supported", issue = 5155 }

@@ -68,7 +68,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | DAC                       | ⚒️   |          |          |          |          |           |          | ⚒️      |          |
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |
-| DS                        |       |          | ❌       | [❌][5159] [^1] | ❌       |           | ❌       | ❌       | ❌       |
+| DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |           |          |          |          |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      |           | ⚒️      |          |          |
@@ -120,12 +120,12 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
+[884]: https://github.com/esp-rs/esp-hal/issues/884
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155
 [5156]: https://github.com/esp-rs/esp-hal/issues/5156
-[5159]: https://github.com/esp-rs/esp-hal/issues/5159
 [5160]: https://github.com/esp-rs/esp-hal/issues/5160
 [5161]: https://github.com/esp-rs/esp-hal/issues/5161
 [5162]: https://github.com/esp-rs/esp-hal/issues/5162

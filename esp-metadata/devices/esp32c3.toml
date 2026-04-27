@@ -517,7 +517,7 @@ has_sclk_divider = true
 support_status = "partial"
 
 [device.ds]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
 support_status = "partial"
