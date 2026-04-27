@@ -412,7 +412,6 @@ support_status = { status = "not_supported", issue = 5418 }
 support_status = { status = "not_supported", issue = 5419 }
 
 [device.lp_timer]
-support_status = { status = "not_supported", issue = 5420 }
 
 [device.sleep]
 support_status = { status = "not_supported", issue = 5424 }
