@@ -3228,10 +3228,10 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedRxFifoThreshold] if the provided value exceeds
-    /// [`Info::RX_FIFO_MAX_THRHD`].
+    /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
+    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
-        if threshold > Self::RX_FIFO_MAX_THRHD {
+        if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
         }
 
