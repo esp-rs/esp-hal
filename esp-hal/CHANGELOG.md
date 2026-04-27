@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- C5 and C61: Enable RTC timekeeping (#5449)
 - C61: usb-serial-jtag and debug-assist (#5427)
 - C61: dedicated gpio (#5426)
 
