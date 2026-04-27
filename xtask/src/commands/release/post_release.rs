@@ -76,17 +76,21 @@ pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Resul
         let migration_file_path = package_path.join(&migration_file_name);
 
         // Create the migration guide file if it doesn't exist
-        if !migration_file_path.exists() {
-            // Create the title content
-            let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
-            fs::write(&migration_file_path, title)
-                .with_context(|| format!("Failed to write to {migration_file_path:?}"))?;
-            log::info!("Created migration guide: {}", migration_file_path.display());
-        } else {
+        if migration_file_path.exists() {
             log::info!(
                 "Migration guide already exists: {}",
                 migration_file_path.display()
             );
+        } else if dry_run {
+            log::info!(
+                "Dry run: would create migration guide: {}",
+                migration_file_path.display()
+            );
+        } else {
+            let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
+            fs::write(&migration_file_path, title)
+                .with_context(|| format!("Failed to write to {migration_file_path:?}"))?;
+            log::info!("Created migration guide: {}", migration_file_path.display());
         }
 
         // Backport branch management: only for minor/major bumps on stable releases (**major** >=
@@ -107,13 +111,7 @@ pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Resul
                     let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
                     let branch_exists = Command::new("git")
-                        .args([
-                            "ls-remote",
-                            "--exit-code",
-                            "--heads",
-                            &remote,
-                            &branch_name,
-                        ])
+                        .args(["ls-remote", "--exit-code", "--heads", &remote, &branch_name])
                         .current_dir(workspace)
                         .status()
                         .map(|status| status.success())
