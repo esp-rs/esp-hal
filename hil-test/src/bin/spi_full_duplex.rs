@@ -999,6 +999,57 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    fn dma_transfer_works_with_nothing_to_read(ctx: Context) {
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
+
+        let tx_buf = [0x02, 0x02, 0x02, 0x02];
+        spi.transfer(&mut [], &tx_buf).unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 4);
+    }
+
+    #[test]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    async fn async_dma_transfer_works_with_nothing_to_read(ctx: Context) {
+        ctx.pcnt_unit
+            .channel0
+            .set_edge_signal(ctx.miso_input.peripheral_input());
+        ctx.pcnt_unit
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf)
+            .into_async();
+
+        let tx_buf = [0x02, 0x02, 0x02, 0x02];
+        spi.transfer_async(&mut [], &tx_buf).await.unwrap();
+
+        assert_eq!(ctx.pcnt_unit.value(), 4);
+    }
+
+    #[test]
     #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn half_duplex_operation_resets_size_before_empty_write(mut ctx: Context) {
         // SpiBus::write returns before the transfer is complete. This test verifies that
