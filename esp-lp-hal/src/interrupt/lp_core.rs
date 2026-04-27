@@ -20,6 +20,11 @@ pub fn set_enabled(_interrupt: Interrupt, _enable: bool) {
     // todo!()
 }
 
+/// Clears a peripheral interrupt.
+pub fn clear(interrupt: Interrupt) {
+    todo!()
+}
+
 /// Returns a bitmask of active peripheral interrupts
 pub fn status() -> u32 {
     todo!()

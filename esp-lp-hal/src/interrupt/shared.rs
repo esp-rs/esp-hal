@@ -251,15 +251,15 @@ pub extern "C" fn start_trap_rust(trap_frame: *const u32) {
 }
 
 #[doc(hidden)]
-// #[unsafe(link_section = ".trap.rust")]
+#[unsafe(link_section = ".trap.rust")]
 pub fn dispatch_exception(_trap_frame: &TrapFrame, _code: usize) {
-    // loop {}
+    loop {}
 }
 
 /// Called by _start_trap_rust, this trap handler will call other interrupt handling
 /// functions depending on the bits set in pending_irqs.
 #[doc(hidden)]
-// #[unsafe(link_section = ".trap.rust")]
+#[unsafe(link_section = ".trap.rust")]
 pub fn dispatch_interrupt(_code: usize) {
     // Dispatch peripheral interrupt
     let status = InterruptStatus::current();

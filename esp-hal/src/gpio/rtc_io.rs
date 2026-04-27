@@ -91,7 +91,7 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
         this.input_enable(true);
         this.pullup_enable(false);
         this.pulldown_enable(false);
-        this.wakeup_enable(None);
+        // this.wakeup_enable(None);
 
         this
     }

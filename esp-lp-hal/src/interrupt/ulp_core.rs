@@ -3,7 +3,6 @@
 use super::Interrupt;
 
 /// Setup interrupt handlers, including any default ones
-#[inline(always)]
 pub fn setup_interrupts() {
     machine_interrupt_enable(true);
 }
@@ -14,7 +13,6 @@ pub fn setup_interrupts() {
 /// to be serviced.
 ///
 /// Internally, this function maps the interrupt to the appropriate CPU interrupt.
-#[inline]
 pub fn set_enabled(interrupt: Interrupt, enable: bool) {
     // Enable/disable SENS interrupts
     unsafe { &*crate::pac::SENS::PTR }
@@ -57,6 +55,24 @@ pub fn set_enabled(interrupt: Interrupt, enable: bool) {
 
     // GPIO interrupt requires no enable/disable handling here,
     // as it is handled by the gpio module on a per-pin basis.
+}
+
+/// Clears a peripheral interrupt.
+/// For GPIO_INT, clears all interrupts.
+pub fn clear(interrupt: Interrupt) {
+    // Enable/disable SENS interrupts
+    match interrupt {
+        Interrupt::GPIO_INT => {
+            crate::gpio::interrupt::gpio_interrupt_clear(
+                crate::gpio::interrupt::gpio_interrupt_status(),
+            );
+        }
+        _ => {
+            unsafe { &*crate::pac::SENS::PTR }
+                .sar_cocpu_int_clr()
+                .write(|w| unsafe { w.bits(interrupt as u32) });
+        }
+    }
 }
 
 /// Returns a bitmask of active interrupts
