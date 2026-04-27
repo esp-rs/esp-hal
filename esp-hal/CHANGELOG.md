@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - C61: usb-serial-jtag and debug-assist (#5427)
-- C6: dedicated gpio (#5426)
+- C61: dedicated gpio (#5426)
 
 ### Changed
 
