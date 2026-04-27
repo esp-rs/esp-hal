@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
 
 ### Removed
 
