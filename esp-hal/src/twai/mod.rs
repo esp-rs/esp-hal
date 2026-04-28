@@ -773,7 +773,7 @@ where
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(any(esp32h2, esp32c6)))]
         {
-            assert!(crate::soc::clocks::apb_clk_frequency() / 1_000_000 == 80);
+            assert!(crate::soc::clocks::apb_clk_frequency() == 80_000_000);
         }
 
         // Unpack the baud rate timings and convert them to the values needed for the

@@ -293,22 +293,20 @@ impl ClockTreeNodeInstance {
         self.prefix_function("configure")
     }
 
-    pub(super) fn freq_cache_static_name(&self) -> Ident {
-        let name = if self.group_template.is_empty() {
+    fn node_ident_base(&self) -> String {
+        if self.group_template.is_empty() {
             self.name.clone()
         } else {
             format!("{}_{}", self.group_template, self.node.name())
-        };
-        format_ident!("{}_FREQ_CACHE", name)
+        }
+    }
+
+    pub(super) fn freq_cache_static_name(&self) -> Ident {
+        format_ident!("{}_FREQ_CACHE", self.node_ident_base())
     }
 
     pub(super) fn refresh_downstream_function_name(&self) -> Ident {
-        let name = if self.group_template.is_empty() {
-            self.name.clone()
-        } else {
-            format!("{}_{}", self.group_template, self.node.name())
-        };
-        format_ident!("refresh_{}_downstream", name.to_lowercase())
+        format_ident!("refresh_{}_downstream", self.node_ident_base().to_lowercase())
     }
 
     fn current_config_function_name(&self) -> Ident {
@@ -787,11 +785,7 @@ impl SystemClocks {
                 continue;
             }
 
-            let template_key = if node.group_template.is_empty() {
-                node_name.clone()
-            } else {
-                format!("{}_{}", node.group_template, node.node.name())
-            };
+            let template_key = node.node_ident_base();
 
             if !seen_cache_templates.insert(template_key.clone()) {
                 continue;
@@ -836,6 +830,29 @@ impl SystemClocks {
             }
         }
 
+        // Helper: generates a `for child_instance in [...] { child_fn(clocks, child_instance); }`
+        // call for a template-group child node.
+        let template_child_call =
+            |tree: &ProcessedClockData, child: &ClockTreeNodeInstance, child_fn: &Ident| {
+                let instances = tree.group_instances.get(&child.group_template).unwrap();
+                let child_enum = format_ident!(
+                    "{}Instance",
+                    child
+                        .group_template
+                        .from_case(Case::Constant)
+                        .to_case(Case::Pascal)
+                );
+                let variants: Vec<_> = instances
+                    .iter()
+                    .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal)))
+                    .collect();
+                quote! {
+                    for child_instance in [#(#child_enum::#variants,)*] {
+                        #child_fn(clocks, child_instance);
+                    }
+                }
+            };
+
         // For each configurable node, emit a targeted downstream refresh function.
         // Each function refreshes itself and delegates to its direct configurable children's
         // refresh functions, forming a call chain instead of inlining everything.
@@ -850,11 +867,7 @@ impl SystemClocks {
                 continue;
             }
 
-            let template_key = if node.group_template.is_empty() {
-                node_name.clone()
-            } else {
-                format!("{}_{}", node.group_template, node.node.name())
-            };
+            let template_key = node.node_ident_base();
 
             if !seen_refresh_fns.insert(template_key.clone()) {
                 continue;
@@ -868,52 +881,15 @@ impl SystemClocks {
                 .dependency_graph
                 .configurable_children_of(&node_name, tree);
 
-            let child_calls: Vec<TokenStream> = children
-                .iter()
-                .filter_map(|child_name| {
-                    let child = tree.try_get_node(child_name)?;
-                    let child_fn = child.refresh_downstream_function_name();
-
-                    if child.properties.receiver.is_some() {
-                        // Template child — call for each instance.
-                        let instances =
-                            tree.group_instances.get(&child.group_template).unwrap();
-                        let child_enum = format_ident!(
-                            "{}Instance",
-                            child
-                                .group_template
-                                .from_case(Case::Constant)
-                                .to_case(Case::Pascal)
-                        );
-                        let variants: Vec<_> = instances
-                            .iter()
-                            .map(|v| {
-                                format_ident!(
-                                    "{}",
-                                    v.from_case(Case::Constant).to_case(Case::Pascal)
-                                )
-                            })
-                            .collect();
-                        Some(quote! {
-                            for child_instance in [#(#child_enum::#variants,)*] {
-                                #child_fn(clocks, child_instance);
-                            }
-                        })
-                    } else {
-                        Some(quote! { #child_fn(clocks); })
-                    }
-                })
-                .collect();
-
             if node.properties.receiver.is_some() {
                 // Template node: function takes a typed instance parameter.
+                // Same-template children receive the current instance; others loop over instances.
                 let enum_name = format_ident!(
                     "{}Instance",
                     node.group_template
                         .from_case(Case::Constant)
                         .to_case(Case::Pascal)
                 );
-                // For same-template children, pass the current instance instead of looping.
                 let child_calls: Vec<TokenStream> = children
                     .iter()
                     .filter_map(|child_name| {
@@ -922,29 +898,7 @@ impl SystemClocks {
                         if child.group_template == node.group_template {
                             Some(quote! { #child_fn(clocks, instance); })
                         } else if child.properties.receiver.is_some() {
-                            let instances =
-                                tree.group_instances.get(&child.group_template).unwrap();
-                            let child_enum = format_ident!(
-                                "{}Instance",
-                                child
-                                    .group_template
-                                    .from_case(Case::Constant)
-                                    .to_case(Case::Pascal)
-                            );
-                            let variants: Vec<_> = instances
-                                .iter()
-                                .map(|v| {
-                                    format_ident!(
-                                        "{}",
-                                        v.from_case(Case::Constant).to_case(Case::Pascal)
-                                    )
-                                })
-                                .collect();
-                            Some(quote! {
-                                for child_instance in [#(#child_enum::#variants,)*] {
-                                    #child_fn(clocks, child_instance);
-                                }
-                            })
+                            Some(template_child_call(tree, child, &child_fn))
                         } else {
                             Some(quote! { #child_fn(clocks); })
                         }
@@ -957,6 +911,19 @@ impl SystemClocks {
                     }
                 });
             } else {
+                // System (scalar) node: no instance parameter.
+                let child_calls: Vec<TokenStream> = children
+                    .iter()
+                    .filter_map(|child_name| {
+                        let child = tree.try_get_node(child_name)?;
+                        let child_fn = child.refresh_downstream_function_name();
+                        if child.properties.receiver.is_some() {
+                            Some(template_child_call(tree, child, &child_fn))
+                        } else {
+                            Some(quote! { #child_fn(clocks); })
+                        }
+                    })
+                    .collect();
                 downstream_refresh_fns.push(quote! {
                     fn #fn_name(clocks: &mut ClockTree) {
                         #self_stmt

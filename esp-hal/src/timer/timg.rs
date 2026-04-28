@@ -422,7 +422,6 @@ impl Timer<'_> {
     }
 
     fn source_frequency(&self) -> Rate {
-        let hz;
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_timg_function_clock)] {
                 let timg = match self.timer_group() {
@@ -431,9 +430,9 @@ impl Timer<'_> {
                     1 => crate::soc::clocks::TimgInstance::Timg1,
                     _ => unreachable!()
                 };
-                hz = timg.function_clock_frequency();
+                let hz = timg.function_clock_frequency();
             } else {
-                hz = crate::soc::clocks::apb_clk_frequency();
+                let hz = crate::soc::clocks::apb_clk_frequency();
             }
         }
         Rate::from_hz(hz)
@@ -688,12 +687,11 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        let clk_src;
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_timg_wdt_clock)] {
-                clk_src = Rate::from_hz(TG::clock_instance().wdt_clock_frequency());
+                let clk_src = Rate::from_hz(TG::clock_instance().wdt_clock_frequency());
             } else {
-                clk_src = Rate::from_hz(clocks::apb_clk_frequency());
+                let clk_src = Rate::from_hz(clocks::apb_clk_frequency());
             }
         }
 
