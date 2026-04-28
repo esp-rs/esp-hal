@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The clock frequency accessor functions no longer need to lock the clock tree (#5461)
 
 ### Fixed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: attenuation is now correctly set for ADC2 (#5463)
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
 - UART: prevent returning 0 from `read_async` (#5451)
+- The `Clocks` struct has been removed (#5461)
 
 ### Removed
 
