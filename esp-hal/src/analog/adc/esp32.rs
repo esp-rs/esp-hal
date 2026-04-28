@@ -5,8 +5,8 @@ use core::{
 
 use super::{AdcConfig, Attenuation};
 use crate::{
-    peripherals::{ADC1, ADC2, RTC_IO, SENS},
-    private::{self},
+    peripherals::{ADC1, ADC2, SENS},
+    private,
 };
 
 pub(super) const NUM_ATTENS: usize = 10;
