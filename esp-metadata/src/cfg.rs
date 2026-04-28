@@ -703,6 +703,7 @@ driver_configs![
         name: "UART",
         properties: {
             ram_size: u32,
+            register_map_version: UartRegisterMapVersion,
             #[serde(default)]
             peripheral_controls_mem_clk: bool,
             // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.

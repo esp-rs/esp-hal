@@ -388,6 +388,14 @@ impl Config {
             );
         }
 
+        if let Some(uart) = &self.device.peri_config.uart {
+            ensure!(
+                matches!(uart.register_map_version.0, 1 | 2),
+                "uart.register_map_version must be 1 or 2 for device '{}'",
+                self.device.name
+            );
+        }
+
         Ok(())
     }
 
