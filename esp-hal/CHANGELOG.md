@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
+- ESP32: attenuation is now correctly set for ADC2 (#5463)
 
 ### Removed
 
+- ESP32: removed unsupported Hall-effect sensor API (#5463)
 
 ## [v1.1.0] - 2026-04-24
 

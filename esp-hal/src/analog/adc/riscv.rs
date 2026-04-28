@@ -87,7 +87,7 @@ where
             // Trigger ADC sampling
             ADCI::start_onetime_sample();
 
-            // Wait until ADC1 sampling is done
+            // Wait until ADC sampling is done
             while !ADCI::is_done() {}
 
             let adc = ADCI::read_data() & ADC_VAL_MASK;

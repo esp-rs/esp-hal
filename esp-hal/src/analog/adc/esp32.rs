@@ -267,7 +267,7 @@ where
 
         for (channel, attentuation) in attenuations.iter().enumerate() {
             if let Some(attenuation) = attentuation {
-                ADC1::set_attenuation(channel, *attenuation as u8);
+                ADCI::set_attenuation(channel, *attenuation as u8);
             }
         }
 
@@ -362,22 +362,6 @@ where
         self.active_channel = None;
 
         Ok(converted_value)
-    }
-}
-
-impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
-    /// Enable the Hall sensor
-    pub fn enable_hall_sensor() {
-        RTC_IO::regs()
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().set_bit());
-    }
-
-    /// Disable the Hall sensor
-    pub fn disable_hall_sensor() {
-        RTC_IO::regs()
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().clear_bit());
     }
 }
 
