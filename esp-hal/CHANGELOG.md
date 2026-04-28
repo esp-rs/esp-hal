@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The clock frequency accessor functions no longer need to lock the clock tree (#5461)
+- SPI: `SpiDmaBus` has been merged into `SpiDma`. `with_buffers` now returns `SpiDma` directly, and the buffer-taking transfer methods have been renamed to `read_buffer`, `write_buffer`, `transfer_buffers`, `half_duplex_read_buffer` and `half_duplex_write_buffer` to avoid conflicts with the `SpiBus` trait methods. (#5272)
 
 ### Fixed
 
