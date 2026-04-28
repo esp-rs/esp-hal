@@ -267,7 +267,15 @@ where
 
         for (channel, attentuation) in attenuations.iter().enumerate() {
             if let Some(attenuation) = attentuation {
-                ADC1::set_attenuation(channel, *attenuation as u8);
+                // Use the generic type parameter `ADCI` instead of the
+                // hard-coded `ADC1` so per-channel attenuation lands on
+                // the actual peripheral the caller passed to
+                // `Adc::new`. With the previous `ADC1::set_attenuation`,
+                // an `Adc::<ADC2>::new(...)` invocation silently wrote
+                // to the matching channel of ADC1 and the ADC2 reading
+                // stayed at the 11 dB hardware default. See
+                // https://github.com/esp-rs/esp-hal/issues/5459.
+                ADCI::set_attenuation(channel, *attenuation as u8);
             }
         }
 
