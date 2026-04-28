@@ -620,7 +620,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
-register_map_version = 2
+version = 2
 peripheral_controls_mem_clk = true
 
 [device.uhci]

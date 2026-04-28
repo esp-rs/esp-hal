@@ -852,7 +852,7 @@ instances = [
     { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
 ]
 ram_size = 128
-register_map_version = 1
+version = 1
 
 [device.uhci]
 support_status = "not_supported"

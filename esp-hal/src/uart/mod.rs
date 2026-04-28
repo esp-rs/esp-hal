@@ -1101,9 +1101,9 @@ impl<'d> UartRx<'d, Async> {
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(uart_v2)] {
+                if #[cfg(uart_version = "2")] {
                     let reg_en = self.regs().tout_conf();
-                } else if #[cfg(uart_v1)] {
+                } else if #[cfg(uart_version = "1")] {
                     let reg_en = self.regs().conf1();
                 }
             };
@@ -3307,9 +3307,9 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     let reg_thrhd = register_block.conf1();
-                } else if #[cfg(uart_v2)] {
+                } else if #[cfg(uart_version = "2")] {
                     let reg_thrhd = register_block.tout_conf();
-                } else if #[cfg(uart_v1)] {
+                } else if #[cfg(uart_version = "1")] {
                     let reg_thrhd = register_block.mem_conf();
                 }
             }
@@ -3317,9 +3317,9 @@ impl Info {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(uart_v2)] {
+            if #[cfg(uart_version = "2")] {
                 let reg_en = register_block.tout_conf();
-            } else if #[cfg(uart_v1)] {
+            } else if #[cfg(uart_version = "1")] {
                 let reg_en = register_block.conf1();
             }
         }
@@ -3460,7 +3460,7 @@ impl Info {
                 xoff_threshold,
             } => {
                 cfg_if::cfg_if! {
-                    if #[cfg(uart_v2)] {
+                    if #[cfg(uart_version = "2")] {
                         self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
@@ -3468,7 +3468,7 @@ impl Info {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
-                    } else if #[cfg(uart_v1)] {
+                    } else if #[cfg(uart_version = "1")] {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
@@ -3479,9 +3479,9 @@ impl Info {
             }
             SwFlowControl::Disabled => {
                 cfg_if::cfg_if! {
-                    if #[cfg(uart_v2)] {
+                    if #[cfg(uart_version = "2")] {
                         let reg = self.regs().swfc_conf0();
-                    } else if #[cfg(uart_v1)] {
+                    } else if #[cfg(uart_version = "1")] {
                         let reg = self.regs().flow_conf();
                     }
                 }
@@ -3509,20 +3509,20 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     self.regs().conf1().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else if #[cfg(uart_v2)] {
+                } else if #[cfg(uart_version = "2")] {
                     self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else if #[cfg(uart_v1)] {
+                } else if #[cfg(uart_version = "1")] {
                     self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
                 }
             }
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(uart_v2)] {
+            if #[cfg(uart_version = "2")] {
                 self.regs().hwfc_conf().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });
-            } else if #[cfg(uart_v1)] {
+            } else if #[cfg(uart_version = "1")] {
                 self.regs().conf1().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });

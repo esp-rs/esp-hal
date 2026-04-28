@@ -386,7 +386,7 @@ impl Chip {
                     "timergroup_timg_has_timer1",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v1",
+                    "uart_version=\"1\"",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -586,7 +586,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v1",
+                    "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -908,7 +908,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v1",
+                    "uart_version=\"1\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                 ],
@@ -1068,7 +1068,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v1",
+                    "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                 ],
@@ -1378,7 +1378,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v1",
+                    "uart_version=\"1\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
@@ -1583,7 +1583,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v1",
+                    "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
@@ -1941,7 +1941,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v2",
+                    "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
                     "uhci_combined_uart_selector_field",
                     "wifi_mac_version=\"3\"",
@@ -2191,7 +2191,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v2",
+                    "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=uhci_combined_uart_selector_field",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
@@ -2606,7 +2606,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_divider",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v2",
+                    "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"2\"",
@@ -2882,7 +2882,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v2",
+                    "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"2\"",
@@ -3218,7 +3218,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v2",
+                    "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"3\"",
@@ -3408,7 +3408,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v2",
+                    "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
@@ -3793,7 +3793,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_tick_enable",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v2",
+                    "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
                 ],
                 cfgs: &[
@@ -4033,7 +4033,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_tick_enable",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v2",
+                    "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                 ],
                 memory_layout: &MemoryLayout {
@@ -4352,7 +4352,7 @@ impl Chip {
                     "timergroup_timg_has_timer1",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v1",
+                    "uart_version=\"1\"",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -4566,7 +4566,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v1",
+                    "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -5010,7 +5010,7 @@ impl Chip {
                     "timergroup_timg_has_timer1",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
-                    "uart_v1",
+                    "uart_version=\"1\"",
                     "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
@@ -5261,7 +5261,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=uart_v1",
+                    "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
@@ -5697,7 +5697,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(spi_slave_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_timer1)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_is_set)");
-    println!("cargo:rustc-check-cfg=cfg(uart_v1)");
     println!("cargo:rustc-check-cfg=cfg(wifi_csi_supported)");
     println!("cargo:rustc-check-cfg=cfg(esp32c2)");
     println!("cargo:rustc-check-cfg=cfg(riscv)");
@@ -5868,7 +5867,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parl_io_rx_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parl_io_tx_clock)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
-    println!("cargo:rustc-check-cfg=cfg(uart_v2)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_5g)");
@@ -5983,6 +5981,7 @@ pub fn emit_check_cfg_directives() {
         "cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default, values(\"8500000\",\"17500000\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
+    println!("cargo:rustc-check-cfg=cfg(uart_version, values(\"1\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(wifi_mac_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");

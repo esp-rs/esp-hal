@@ -349,10 +349,10 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
-    ("uart.register_map_version") => {
+    ("uart.version") => {
         1
     };
-    ("uart.register_map_version", str) => {
+    ("uart.version", str) => {
         stringify!(1)
     };
     ("uart.peripheral_controls_mem_clk") => {

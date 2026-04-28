@@ -1,38 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{
-    cfg::{GenericProperty, UartProperties},
-    generate_for_each_macro,
-    number,
-};
-
-/// UART register map version (HAL `cfg(uart_v1)` / `cfg(uart_v2)`).
-///
-/// Version 2 matches peripherals that expose `HWFC_CONF`, split software flow
-/// control registers, and RX timeout fields in `TOUT_CONF` as used in esp-hal.
-/// Usually uart_v1 is used on older chips, and uart_v2 is used on newer ones.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[repr(transparent)]
-pub(crate) struct UartRegisterMapVersion(pub u32);
-
-impl GenericProperty for UartRegisterMapVersion {
-    fn cfgs(&self) -> Option<Vec<String>> {
-        match self.0 {
-            1 => Some(vec!["uart_v1".to_string()]),
-            2 => Some(vec!["uart_v2".to_string()]),
-            _ => None,
-        }
-    }
-
-    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
-        let v = number(self.0);
-        quote! {
-            ("uart.register_map_version") => { #v };
-            ("uart.register_map_version", str) => { stringify!(#v) };
-        }
-    }
-}
+use crate::{cfg::UartProperties, generate_for_each_macro};
 
 /// Instance configuration, used in [device.uart.instances]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
