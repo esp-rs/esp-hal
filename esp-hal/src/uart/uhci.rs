@@ -314,8 +314,8 @@ where
         for_each_uart! {
             (all $( ($id:literal, $peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
                 reg.conf0().modify(|_, w| {
-                    cfg_if::cfg_if! {
-                        if #[cfg(uhci_combined_uart_selector_field)] {
+                    cfg_select! {
+                        uhci_combined_uart_selector_field => {
                             unsafe {
                                 w.uart_sel().bits(
                                     match &self.uart.tx.uart.0 {
@@ -326,7 +326,8 @@ where
                                     }
                                 )
                             }
-                        } else {
+                        }
+                        _ => {
                             paste::paste! {
                                 // Clear any previous selection
                                 $(

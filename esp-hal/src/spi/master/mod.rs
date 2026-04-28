@@ -514,22 +514,25 @@ impl Config {
         let clocks = Clocks::get();
 
         // FIXME: take clock source into account
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
+        cfg_select! {
+            esp32h2 => {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 let _clocks = clocks;
                 Rate::from_mhz(48)
-            } else if #[cfg(any(esp32c5, esp32c61))] {
+            }
+            any(esp32c5, esp32c61) => {
                 // We select the 160MHz PLL as the clock source in the driver. There is a by-2 divider
                 // configured between the PLL and the SPI clock (spi2_clkm_div_num).
                 let _clocks = clocks;
                 Rate::from_mhz(80) // clk_spi2_mst must be <= 80MHz
-            } else if #[cfg(esp32c6)] {
+            }
+            esp32c6 => {
                 // We select the 80MHz PLL as the clock source in the driver
                 // FIXME we state that the default clock source is APB, which just isn't true
                 let _clocks = clocks;
                 Rate::from_mhz(80)
-            } else {
+            }
+            _ => {
                 clocks.apb_clock
             }
         }
@@ -1353,8 +1356,8 @@ where
 
         self.flush()?;
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(esp32, spi_address_workaround))] {
+        cfg_select! {
+            all(esp32, spi_address_workaround) => {
                 let mut buffer = buffer;
                 let mut data_mode = data_mode;
                 let mut address = address;
@@ -1377,6 +1380,8 @@ where
                     return Err(Error::Unsupported);
                 }
             }
+
+            _ => {}
         }
 
         self.driver().setup_half_duplex(
@@ -1593,10 +1598,11 @@ impl Driver {
         // function works for DMA so I have left it unchanged, but does not work
         // for CPU-controlled transfers on the ESP32. Toggling slave mode works on
         // ESP32, but not on later chips.
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().slave().toggle(|w, en| w.mode().bit(en));
-            } else {
+            }
+            _ => {
                 self.configure_datalen(1, 1);
             }
         }
@@ -1637,10 +1643,11 @@ impl Driver {
                 });
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().ctrl().modify(|_, w| w.wp().clear_bit());
-            } else {
+            }
+            _ => {
                 self.regs().ctrl().modify(|_, w| {
                     w.q_pol().clear_bit();
                     w.d_pol().clear_bit();
@@ -1744,8 +1751,8 @@ impl Driver {
     /// Enable or disable listening for the given interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
@@ -1754,7 +1761,8 @@ impl Driver {
                     }
                     w
                 });
-            } else if #[cfg(esp32s2)] {
+            }
+            esp32s2 => {
                 self.regs().slave().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
@@ -1764,7 +1772,8 @@ impl Driver {
                     }
                     w
                 });
-            } else {
+            }
+            _ => {
                 self.regs().dma_int_ena().modify(|_, w| {
                     for interrupt in interrupts {
                         match interrupt {
@@ -1788,19 +1797,21 @@ impl Driver {
     fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         let mut res = EnumSet::new();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
                 }
-            } else if #[cfg(esp32s2)] {
+            }
+            esp32s2 => {
                 if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
                 }
                 if self.regs().hold().read().dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegmentedTransferDone);
                 }
-            } else {
+            }
+            _ => {
                 let ints = self.regs().dma_int_raw().read();
 
                 if ints.trans_done().bit() {
@@ -1826,8 +1837,8 @@ impl Driver {
 
     /// Resets asserted interrupts
     fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 for interrupt in interrupts {
                     match interrupt {
                         SpiInterrupt::TransferDone => {
@@ -1835,7 +1846,8 @@ impl Driver {
                         }
                     }
                 }
-            } else if #[cfg(esp32s2)] {
+            }
+            esp32s2 => {
                 for interrupt in interrupts {
                     match interrupt {
                         SpiInterrupt::TransferDone => {
@@ -1849,7 +1861,8 @@ impl Driver {
                         }
                     }
                 }
-            } else {
+            }
+            _ => {
                 self.regs().dma_int_clr().write(|w| {
                     for interrupt in interrupts {
                         match interrupt {
@@ -1928,10 +1941,11 @@ impl Driver {
     }
 
     fn set_data_mode(&self, data_mode: Mode) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let pin_reg = self.regs().pin();
-            } else {
+            }
+            _ => {
                 let pin_reg = self.regs().misc();
             }
         };
@@ -2394,8 +2408,8 @@ impl Driver {
     }
 
     fn update(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(not(any(esp32, esp32s2)))] {
+        cfg_select! {
+            not(any(esp32, esp32s2)) => {
                 let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
@@ -2403,7 +2417,8 @@ impl Driver {
                 while reg_block.cmd().read().update().bit_is_set() {
                     // wait
                 }
-            } else {
+            }
+            _ => {
                 // Doesn't seem to be needed for ESP32 and ESP32-S2
             }
         }
@@ -2418,8 +2433,8 @@ impl Driver {
         let rx_len = rx_len.saturating_sub(1);
         let tx_len = tx_len.saturating_sub(1);
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let len = rx_len.max(tx_len);
                 reg_block
                     .mosi_dlen()
@@ -2428,7 +2443,8 @@ impl Driver {
                 reg_block
                     .miso_dlen()
                     .write(|w| unsafe { w.usr_miso_dbitlen().bits(len) });
-            } else if #[cfg(esp32s2)] {
+            }
+            esp32s2 => {
                 reg_block
                     .mosi_dlen()
                     .write(|w| unsafe { w.usr_mosi_dbitlen().bits(tx_len) });
@@ -2436,7 +2452,8 @@ impl Driver {
                 reg_block
                     .miso_dlen()
                     .write(|w| unsafe { w.usr_miso_dbitlen().bits(rx_len) });
-            } else {
+            }
+            _ => {
                 reg_block
                     .ms_dlen()
                     .write(|w| unsafe { w.ms_data_bitlen().bits(rx_len.max(tx_len)) });

@@ -474,8 +474,8 @@ impl EspHeapInner {
             }
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "internal-heap-stats")] {
+        cfg_select! {
+            feature = "internal-heap-stats" => {
                 HeapStats {
                     region_stats,
                     size: free + used,
@@ -484,7 +484,8 @@ impl EspHeapInner {
                     total_allocated: self.internal_heap_stats.total_allocated,
                     total_freed: self.internal_heap_stats.total_freed,
                 }
-            } else {
+            }
+            _ => {
                 HeapStats {
                     region_stats,
                     size: free + used,

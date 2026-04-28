@@ -2,7 +2,7 @@
 name          = "esp-sync"
 version       = "0.2.1"
 edition       = "2024"
-rust-version  = "1.88.0"
+rust-version  = "1.95.0"
 description   = "Synchronization primitives for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-sync/latest/"
 categories    = ["no-std", "embedded", "concurrency"]
@@ -19,7 +19,6 @@ check-configs = [
 clippy-configs = [{ features = ["defmt"] }]
 
 [dependencies]
-cfg-if = "1"
 document-features = "0.2"
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }

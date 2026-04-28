@@ -23,13 +23,14 @@ mod tests {
         time::Rate,
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+    any(esp32, esp32s2) => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-        } else {
+        }
+    _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-    }
+}
 
     const BUFFER_SIZE: usize = 2000;
 
@@ -92,13 +93,14 @@ mod tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_I2S0;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let (_, dout) = hil_test::common_test_pins!(peripherals);
 

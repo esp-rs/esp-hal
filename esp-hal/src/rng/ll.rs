@@ -11,10 +11,11 @@ fn tee_enabled() -> bool {
 
 #[inline]
 fn current_cpu_cycles() -> usize {
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
+    cfg_select! {
+        xtensa => {
             xtensa_lx::timer::get_cycle_count() as usize
-        } else if #[cfg(soc_cpu_has_csr_pc)] {
+        }
+        soc_cpu_has_csr_pc => {
             const PRV_M: usize = 3;
             macro_rules! read_csr_fn {
                 ($fnname:ident, $csr:expr) => {
@@ -49,7 +50,8 @@ fn current_cpu_cycles() -> usize {
             } else {
                 read_pccr_user()
             }
-        } else {
+        }
+        _ => {
             riscv::register::mcycle::read()
         }
     }

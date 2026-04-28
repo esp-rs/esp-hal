@@ -125,13 +125,14 @@ pub(crate) fn bind_default_interrupt_handler() {
     );
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
+cfg_select! {
+    esp32 => {
         // On ESP32, the interrupt fires on the core that started listening for a pin event.
         fn cores() -> impl Iterator<Item = crate::system::Cpu> {
             crate::system::Cpu::all()
         }
-    } else {
+    }
+    _ => {
         fn cores() -> [crate::system::Cpu; 1] {
             [crate::system::Cpu::current()]
         }
@@ -225,13 +226,14 @@ pub(crate) enum InterruptStatusRegisterAccess {
 
 impl InterruptStatusRegisterAccess {
     pub(crate) fn interrupt_status_read(self) -> u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 match self {
                     Self::Bank0 => GPIO::regs().status().read().bits(),
                     Self::Bank1 => GPIO::regs().status1().read().bits(),
                 }
-            } else {
+            }
+            _ => {
                 match self {
                     Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
                     #[cfg(gpio_has_bank_1)]

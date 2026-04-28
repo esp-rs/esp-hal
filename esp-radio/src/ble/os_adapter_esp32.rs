@@ -513,14 +513,15 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
 ) -> i32 {
     trace!("coex_schm_register_btdm_callback {:?}", callback);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe extern "C" {
                 fn coex_schm_register_callback(kind: u32, callback: unsafe extern "C" fn()) -> i32;
             }
             const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
             unsafe { coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, callback) }
-        } else {
+        }
+        _ => {
             0
         }
     }
@@ -533,13 +534,14 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(
 ) -> i32 {
     trace!("coex_wifi_channel_get");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe extern "C" {
                 fn coex_wifi_channel_get(_primary: *mut u8, _secondary: *mut u8) -> i32;
             }
             unsafe { coex_wifi_channel_get(_primary, _secondary) }
-        } else {
+        }
+        _ => {
             -1
         }
     }

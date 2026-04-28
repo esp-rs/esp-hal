@@ -419,13 +419,14 @@ mod tests {
         }
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
+        cfg_select! {
+    esp32s2 => {
                 let dma_channel = peripherals.DMA_CRYPTO;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let aes = Aes::new(peripherals.AES).with_dma(dma_channel);
 
@@ -467,13 +468,14 @@ mod tests {
 
         esp_alloc::heap_allocator!(size: 32 * 1024);
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
+        cfg_select! {
+    esp32s2 => {
                 let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
-            } else {
+            }
+    _ => {
                 let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
             }
-        }
+}
         let _backend = aes.start();
 
         const MAX_SHIFT: usize = 15;
@@ -494,13 +496,14 @@ mod tests {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
+        cfg_select! {
+    esp32s2 => {
                 let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
-            } else {
+            }
+    _ => {
                 let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
             }
-        }
+}
         let _backend = aes.start();
 
         let mut plaintext = [0; PLAINTEXT_BUF_SIZE];

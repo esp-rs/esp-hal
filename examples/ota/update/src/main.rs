@@ -88,15 +88,17 @@ fn main() -> ! {
         }
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+    cfg_select! {
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
             let button = peripherals.GPIO0;
-        } else if #[cfg(any(feature = "esp32c5"))] {
+        }
+    any(feature = "esp32c5") => {
             let button = peripherals.GPIO28;
-        }else {
+        }
+    _ => {
             let button = peripherals.GPIO9;
         }
-    }
+}
 
     let boot_button = Input::new(button, InputConfig::default().with_pull(Pull::Up));
 

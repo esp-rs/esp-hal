@@ -62,8 +62,8 @@ mod tests {
 
         let parl_io = peripherals.PARL_IO;
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c5)] {
+        cfg_select! {
+    esp32c5 => {
                 // 27 is RGB, 9 and 10 are connected, 13 and 14 is USB
                 let valid_pin = peripherals.GPIO0.degrade();
                 let clock_pin = peripherals.GPIO1.degrade();
@@ -77,7 +77,8 @@ mod tests {
                     peripherals.GPIO8.degrade(),
                     peripherals.GPIO9.degrade(),
                 ];
-            } else if #[cfg(esp32c6)] {
+            }
+    esp32c6 => {
                 // 8 is RGB, 2 and 3 are connected, 12 and 13 is USB
                 let valid_pin = peripherals.GPIO0.degrade();
                 let clock_pin = peripherals.GPIO1.degrade();
@@ -91,7 +92,8 @@ mod tests {
                     peripherals.GPIO9.degrade(),
                     peripherals.GPIO10.degrade(),
                 ];
-            } else if #[cfg(esp32h2)] {
+            }
+    esp32h2 => {
                 // 8 is RGB, 2 and 3 are connected, 26 and 27 is USB
                 let valid_pin = peripherals.GPIO0.degrade();
                 let clock_pin = peripherals.GPIO1.degrade();
@@ -106,7 +108,9 @@ mod tests {
                     peripherals.GPIO23.degrade(),
                 ];
             }
-        }
+
+    _ => {}
+}
 
         Context {
             parl_io,

@@ -19,8 +19,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
+cfg_select! {
+    feature = "unstable" => {
         use esp_hal::peripherals::SPI2;
         use esp_hal::spi::master::{Address, Command, DataMode};
 
@@ -33,13 +33,16 @@ cfg_if::cfg_if! {
         #[cfg(pcnt_driver_supported)]
         use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
     }
+
+    _ => {}
 }
 
 #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
+cfg_select! {
+    any(esp32, esp32s2) => {
         type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-    } else {
+    }
+    _ => {
         type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
     }
 }
@@ -94,25 +97,27 @@ mod tests {
         let sclk_input = Input::new(sclk_input, Default::default());
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_supports_dma, feature = "unstable"))] {
+        cfg_select! {
+    all(spi_master_supports_dma, feature = "unstable") => {
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-            } else {
+            }
+    _ => {
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
                 static mut RX_BUFFER: [u8; 4096] = [0; 4096];
 
                 let tx_buffer = unsafe { (&raw mut TX_BUFFER).as_mut().unwrap() };
                 let rx_buffer = unsafe { (&raw mut RX_BUFFER).as_mut().unwrap() };
             }
-        }
+}
 
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
@@ -125,8 +130,8 @@ mod tests {
         .with_miso(miso)
         .with_mosi(mosi);
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "unstable")] {
+        cfg_select! {
+    feature = "unstable" => {
                 #[cfg(pcnt_driver_supported)]
                 let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -146,7 +151,8 @@ mod tests {
                     #[cfg(pcnt_driver_supported)]
                     pcnt_unit: pcnt.unit0,
                 }
-            } else {
+            }
+    _ => {
                 Context {
                     spi,
                     rx_buffer,
@@ -154,7 +160,7 @@ mod tests {
                     miso_input,
                 }
             }
-        }
+}
     }
 
     #[test]
@@ -184,15 +190,17 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+        cfg_select! {
+    all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
                 unit.channel0
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
-        }
+
+    _ => {}
+}
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -207,15 +215,17 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+        cfg_select! {
+    all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
                 unit.channel0
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
-        }
+
+    _ => {}
+}
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -232,15 +242,17 @@ mod tests {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read = [0x00; 2];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+        cfg_select! {
+    all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
                 unit.channel0
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
-        }
+
+    _ => {}
+}
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -258,15 +270,17 @@ mod tests {
         let write = [0xde, 0xad];
         let mut read = [0x00; 4];
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(pcnt_driver_supported, feature = "unstable"))] {
+        cfg_select! {
+    all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
                 unit.channel0
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
-        }
+
+    _ => {}
+}
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)

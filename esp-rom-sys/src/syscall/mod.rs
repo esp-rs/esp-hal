@@ -176,8 +176,8 @@ unsafe extern "C" fn abort_wrapper() {
 /// Should only get called once.
 #[allow(clippy::missing_transmute_annotations)]
 pub unsafe fn init_syscall_table() {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
                 static mut syscall_table_ptr_app: *const chip_specific::syscall_stub_table;
@@ -186,12 +186,14 @@ pub unsafe fn init_syscall_table() {
                 syscall_table_ptr_pro = &raw const SYSCALL_TABLE;
                 syscall_table_ptr_app = &raw const SYSCALL_TABLE;
             }
-        } else if #[cfg(esp32s2)] {
+        }
+        esp32s2 => {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
             }
             unsafe { syscall_table_ptr_pro = &raw const SYSCALL_TABLE; }
-        } else {
+        }
+        _ => {
             unsafe extern "C" {
                 static mut syscall_table_ptr: *const chip_specific::syscall_stub_table;
             }

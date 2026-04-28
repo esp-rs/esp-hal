@@ -505,15 +505,16 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+        cfg_select! {
+    any(feature = "esp32", feature = "esp32s2") => {
                 let dma_channel1 = peripherals.DMA_SPI2;
                 let dma_channel2 = peripherals.DMA_SPI3;
-            } else {
+            }
+    _ => {
                 let dma_channel1 = peripherals.DMA_CH0;
                 let dma_channel2 = peripherals.DMA_CH1;
             }
-        }
+}
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -597,13 +598,14 @@ mod interrupt_spi_dma {
             system::{Cpu, CpuControl, Stack},
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
-            } else {
+            }
+    _ => {
                 type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
             }
-        }
+}
 
         const BUFFER_SIZE: usize = 256;
 
@@ -648,13 +650,14 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 

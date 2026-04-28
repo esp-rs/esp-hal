@@ -32,12 +32,13 @@ use crate::{
     peripherals::DMA_COPY,
 };
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32s2)] {
+cfg_select! {
+    esp32s2 => {
         type Mem2MemChannel<'d> = DMA_COPY<'d>;
         type Mem2MemRxChannel<'d> = CopyDmaRxChannel<'d>;
         type Mem2MemTxChannel<'d> = CopyDmaTxChannel<'d>;
-    } else {
+    }
+    _ => {
         type Mem2MemChannel<'d> = AnyGdmaChannel<'d>;
         type Mem2MemRxChannel<'d> = AnyGdmaRxChannel<'d>;
         type Mem2MemTxChannel<'d> = AnyGdmaTxChannel<'d>;
@@ -86,11 +87,12 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ) -> Self {
         let channel = Channel::new(channel.degrade());
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "gdma")] {
+        cfg_select! {
+            dma_kind = "gdma" => {
                 let mut channel = channel;
                 channel.rx.set_mem2mem_mode(true);
-            } else {
+            }
+            _ => {
                 // The S2's COPY DMA channel doesn't care about this. Once support for other
                 // channels are added, this will need updating.
                 let peripheral = DmaPeripheral::Spi2;

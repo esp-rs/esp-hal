@@ -100,10 +100,11 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
 
 impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
+        cfg_select! {
+            esp32s3 => {
                  self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
-            } else {
+            }
+            _ => {
                  self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
             }
         }
@@ -230,20 +231,23 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 TX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 true
             }
         }
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 TX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
             }
+
+            _ => {}
         }
     }
 }
@@ -465,20 +469,23 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 RX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 true
             }
         }
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 RX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
             }
+
+            _ => {}
         }
     }
 }

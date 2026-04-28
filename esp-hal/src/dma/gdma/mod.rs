@@ -91,12 +91,14 @@ use crate::asynch::AtomicWaker;
 static TX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 static RX_WAKERS: [AtomicWaker; CHANNEL_COUNT] = [const { AtomicWaker::new() }; CHANNEL_COUNT];
 
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32c2, esp32c3))] {
+cfg_select! {
+    any(esp32c2, esp32c3) => {
         use portable_atomic::AtomicBool;
         static TX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
         static RX_IS_ASYNC: [AtomicBool; CHANNEL_COUNT] = [const { AtomicBool::new(false) }; CHANNEL_COUNT];
     }
+
+    _ => {}
 }
 
 impl crate::private::Sealed for AnyGdmaTxChannel<'_> {}
@@ -232,8 +234,8 @@ const CHANNEL_COUNT: usize = cfg!(soc_has_dma_ch0) as usize
     + cfg!(soc_has_dma_ch3) as usize
     + cfg!(soc_has_dma_ch4) as usize;
 
-cfg_if::cfg_if! {
-    if #[cfg(dma_separate_in_out_interrupts)] {
+cfg_select! {
+    dma_separate_in_out_interrupts => {
         #[cfg(soc_has_dma_ch0)]
         impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
         #[cfg(soc_has_dma_ch1)]
@@ -244,7 +246,8 @@ cfg_if::cfg_if! {
         impl_channel!(3, DMA_IN_CH3, DMA_OUT_CH3);
         #[cfg(soc_has_dma_ch4)]
         impl_channel!(4, DMA_IN_CH4, DMA_OUT_CH4);
-    } else {
+    }
+    _ => {
         #[cfg(soc_has_dma_ch0)]
         impl_channel!(0, DMA_CH0);
         #[cfg(soc_has_dma_ch1)]

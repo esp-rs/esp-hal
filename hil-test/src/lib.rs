@@ -53,38 +53,46 @@ macro_rules! assert_eq {
 macro_rules! i2c_pins {
     ($peripherals:expr) => {{
         // Order: (SDA, SCL)
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32s2, esp32s3))] {
+        cfg_select! {
+    any(esp32s2, esp32s3) => {
                 ($peripherals.GPIO3, $peripherals.GPIO2)
-            } else if #[cfg(esp32)] {
+            }
+    esp32 => {
                 ($peripherals.GPIO32, $peripherals.GPIO33)
-            } else if #[cfg(any(esp32c6, esp32c61))] {
+            }
+    any(esp32c6, esp32c61) => {
                 ($peripherals.GPIO6, $peripherals.GPIO7)
-            } else if #[cfg(esp32h2)] {
+            }
+    esp32h2 => {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
-            } else if #[cfg(esp32c2)] {
+            }
+    esp32c2 => {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
-            } else if #[cfg(esp32c5)] {
+            }
+    esp32c5 => {
                 ($peripherals.GPIO2, $peripherals.GPIO3)
-            } else { // esp32c3
+            }
+    _ => { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
             }
-        }
+}
     }};
 }
 
 #[macro_export]
 macro_rules! common_test_pins {
     ($peripherals:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32s2, esp32s3, esp32c5))] {
+        cfg_select! {
+    any(esp32s2, esp32s3, esp32c5) => {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
-            } else if #[cfg(esp32)] {
+            }
+    esp32 => {
                 ($peripherals.GPIO2, $peripherals.GPIO4)
-            } else { // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
+            }
+    _ => { // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
-        }
+}
     }};
 }
 
@@ -93,17 +101,20 @@ macro_rules! common_test_pins {
 #[macro_export]
 macro_rules! unconnected_pin {
     ($peripherals:expr) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+        cfg_select! {
+    any(esp32, esp32s2, esp32s3) => {
                 $peripherals.GPIO0
-            } else if #[cfg(esp32c2)] {
+            }
+    esp32c2 => {
                 $peripherals.GPIO8
-            } else if #[cfg(esp32c5)] {
+            }
+    esp32c5 => {
                 $peripherals.GPIO28
-            } else { // esp32c3, esp32c6, esp32c61, esp32h2
+            }
+    _ => { // esp32c3, esp32c6, esp32c61, esp32h2
                 $peripherals.GPIO9
             }
-        }
+}
     }};
 }
 

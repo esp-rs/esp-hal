@@ -47,28 +47,31 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32h2")] {
+    cfg_select! {
+    feature = "esp32h2" => {
             let freq = Rate::from_mhz(32);
-        } else {
+        }
+    _ => {
             let freq = Rate::from_mhz(80);
         }
-    };
+}
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
     let rx_config = RxChannelConfig::default()
         .with_clk_divider(255)
         .with_idle_threshold(10000);
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+    cfg_select! {
+    any(feature = "esp32", feature = "esp32s2") => {
             let channel = rmt.channel0.configure_rx(&rx_config).unwrap();
-        } else if #[cfg(feature = "esp32s3")] {
+        }
+    feature = "esp32s3" => {
             let channel = rmt.channel7.configure_rx(&rx_config).unwrap();
-        } else {
+        }
+    _ => {
             let channel = rmt.channel2.configure_rx(&rx_config).unwrap();
         }
-    }
+}
 
     let mut channel = channel.with_pin(peripherals.GPIO4);
 

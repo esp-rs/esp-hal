@@ -2376,13 +2376,14 @@ mod chip_specific {
 
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
                 #[cfg(not(soc_has_clock_node_rmt_sclk))]
-                cfg_if::cfg_if!(
-                    if #[cfg(any(esp32c5, esp32c6))] {
+                cfg_select! {
+                    any(esp32c5, esp32c6) => {
                         w.sclk_sel().bits(source.bits());
-                    } else {
+                    }
+                    _ => {
                         w.sclk_sel().bit(source.bit());
                     }
-                );
+                }
 
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);

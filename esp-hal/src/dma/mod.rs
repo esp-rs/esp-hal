@@ -377,12 +377,14 @@ impl DmaDescriptor {
 unsafe impl Send for DmaDescriptor {}
 
 mod buffers;
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "gdma")] {
+cfg_select! {
+    dma_kind = "gdma" => {
         mod gdma;
-    } else if #[cfg(dma_kind = "pdma")] {
+    }
+    dma_kind = "pdma" => {
         mod pdma;
-    } else {
+    }
+    _ => {
         compile_error!("Unsupported DMA kind");
     }
 }
@@ -1697,19 +1699,21 @@ where
 
 // NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
 // `GenericPeripheralGuard`.
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "pdma")] {
+cfg_select! {
+    dma_kind = "pdma" => {
         type PeripheralGuard = Option<system::PeripheralGuard>;
-    } else {
+    }
+    _ => {
         type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
     }
 }
 
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
+    cfg_select! {
+        dma_kind = "pdma" => {
             _ch.peripheral_clock().map(|peri_clock| system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
-        } else {
+        }
+        _ => {
             // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
             system::GenericPeripheralGuard::new_with(init_dma_racey)
         }
@@ -1869,8 +1873,8 @@ where
         // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
         // not. TRM section 3.4.9
         // Note that DmaBuffer implementations are required to do this for us.
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+        cfg_select! {
+            dma_can_access_psram => {
                 let mut uses_psram = false;
                 let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
@@ -1890,6 +1894,8 @@ where
                     }
                 }
             }
+
+            _ => {}
         }
 
         let preparation = Preparation {
@@ -2134,8 +2140,8 @@ where
         // alignment and writeback the cache for that buffer.
         // Note that DmaBuffer implementations are required to do this for us.
         #[cfg(dma_can_access_psram)]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+        cfg_select! {
+            dma_can_access_psram => {
                 let mut uses_psram = false;
                 let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
@@ -2155,6 +2161,8 @@ where
                     }
                 }
             }
+
+            _ => {}
         }
 
         let preparation = Preparation {

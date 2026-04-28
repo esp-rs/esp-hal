@@ -163,12 +163,13 @@ impl<'d> SpiDma<'d, Blocking> {
 
         let empty_rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(esp32, spi_address_workaround))] {
+        cfg_select! {
+            all(esp32, spi_address_workaround) => {
                 static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
                 let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
                 let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
-            } else {
+            }
+            _ => {
                 let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
             }
         }

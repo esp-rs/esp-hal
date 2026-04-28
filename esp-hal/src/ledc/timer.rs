@@ -359,10 +359,11 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
 
     /// Update the timer in HW
     fn update_hw(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let tmr = self.ledc.lstimer(self.number as usize);
-            } else {
+            }
+            _ => {
                 let tmr = self.ledc.timer(self.number as usize);
             }
         }

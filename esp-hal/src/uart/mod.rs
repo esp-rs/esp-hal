@@ -942,10 +942,11 @@ where
 fn sync_regs(_register_block: &RegisterBlock) {
     #[cfg(not(any(esp32, esp32s2)))]
     {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3, esp32s3) => {
                 let update_reg = _register_block.id();
-            } else {
+            }
+            _ => {
                 let update_reg = _register_block.reg_update();
             }
         }
@@ -1099,10 +1100,11 @@ impl<'d> UartRx<'d, Async> {
                 events |= RxEvent::CmdCharDetected;
             }
 
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            cfg_select! {
+                any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                     let reg_en = self.regs().tout_conf();
-                } else {
+                }
+                _ => {
                     let reg_en = self.regs().conf1();
                 }
             };
@@ -3281,10 +3283,11 @@ impl Info {
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The value you pass times
     ///   the symbol size must be <= **0x3FF**
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 const MAX_THRHD: u8 = 0x7F; // 7 bits
-            } else {
+            }
+            _ => {
                 const MAX_THRHD: u16 = 0x3FF; // 10 bits
             }
         }
@@ -3303,22 +3306,25 @@ impl Info {
                 return Err(ConfigError::TimeoutTooLong);
             }
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     let reg_thrhd = register_block.conf1();
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                }
+                any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                     let reg_thrhd = register_block.tout_conf();
-                } else {
+                }
+                _ => {
                     let reg_thrhd = register_block.mem_conf();
                 }
             }
             reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+        cfg_select! {
+            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 let reg_en = register_block.tout_conf();
-            } else {
+            }
+            _ => {
                 let reg_en = register_block.conf1();
             }
         }
@@ -3356,15 +3362,16 @@ impl Info {
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
-            cfg_if::cfg_if! {
-                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr))] {
+            cfg_select! {
+                any(uart_has_sclk_divider, soc_has_pcr) => {
                     const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 
                     let conf = ClockConfig::new(config.clock_source, clk_div - 1);
                     let divider = (clk << FRAC_BITS) / (config.baudrate * clk_div);
-                } else {
+                }
+                _ => {
                     debug!("SCLK: {}", clk);
                     let conf = ClockConfig::new(config.clock_source);
                     let divider = (clk << FRAC_BITS) / config.baudrate;
@@ -3458,16 +3465,18 @@ impl Info {
                 xon_threshold,
                 xoff_threshold,
             } => {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                cfg_select! {
+                    any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                         self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
-                    } else if #[cfg(esp32)]{
+                    }
+                    esp32 => {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
-                    } else {
+                    }
+                    _ => {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
@@ -3477,10 +3486,11 @@ impl Info {
                 }
             }
             SwFlowControl::Disabled => {
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                cfg_select! {
+                    any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                         let reg = self.regs().swfc_conf0();
-                    } else {
+                    }
+                    _ => {
                         let reg = self.regs().flow_conf();
                     }
                 }
@@ -3505,23 +3515,26 @@ impl Info {
 
     fn configure_rts_flow_ctrl(&self, enable: bool, threshold: Option<u8>) {
         if let Some(threshold) = threshold {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     self.regs().conf1().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                }
+                any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                     self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else {
+                }
+                _ => {
                     self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
                 }
             }
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+        cfg_select! {
+            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 self.regs().hwfc_conf().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });
-            } else {
+            }
+            _ => {
                 self.regs().conf1().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });
@@ -3576,23 +3589,26 @@ impl Info {
     fn read_next_from_fifo(&self) -> u8 {
         fn access_fifo_register<R>(f: impl Fn() -> R) -> R {
             // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     crate::interrupt::free(f)
-                } else {
+                }
+                _ => {
                     f()
                 }
             }
         }
 
         let fifo_reg = self.regs().fifo();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
+        cfg_select! {
+            esp32s2 => {
                 // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
                 let fifo_reg = unsafe {
                     &*fifo_reg.as_ptr().cast::<u8>().add(0x20C00000).cast::<crate::pac::uart0::FIFO>()
                 };
             }
+
+            _ => {}
         }
 
         access_fifo_register(|| fifo_reg.read().rxfifo_rd_byte().bits())

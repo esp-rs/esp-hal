@@ -138,12 +138,13 @@ impl<'a> WifiCsiInfo<'_> {
     /// [`SecondaryChannel`] on which this packet is received.
     #[instability::unstable]
     pub fn secondary_channel(&self) -> SecondaryChannel {
-        cfg_if::cfg_if! {
-            if #[cfg(wifi_mac_version = "1")] {
+        cfg_select! {
+            wifi_mac_version = "1" => {
                 SecondaryChannel::from_raw(unsafe {
                     (*self.inner).rx_ctrl.secondary_channel()
                 })
-            } else {
+            }
+            _ => {
                 SecondaryChannel::from_raw(unsafe {
                     (*self.inner).rx_ctrl.second()
                 })

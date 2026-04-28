@@ -26,13 +26,14 @@ mod read {
     };
 
     #[cfg(spi_master_supports_dma)]
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
+    cfg_select! {
+    dma_kind = "pdma" => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-        } else {
+        }
+    _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-    }
+}
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -51,13 +52,14 @@ mod read {
         let miso_mirror = Output::new(miso_mirror, Level::High, OutputConfig::default());
 
         #[cfg(spi_master_supports_dma)]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let spi = Spi::new(
             peripherals.SPI2,
@@ -286,13 +288,14 @@ mod write {
     };
 
     #[cfg(spi_master_supports_dma)]
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
+    cfg_select! {
+    dma_kind = "pdma" => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-        } else {
+        }
+    _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-    }
+}
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -313,13 +316,14 @@ mod write {
         let pcnt = Pcnt::new(peripherals.PCNT);
 
         #[cfg(spi_master_supports_dma)]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let mut mosi = Flex::new(mosi);
 
@@ -521,13 +525,14 @@ mod spi_slave {
     };
 
     #[cfg(spi_slave_supports_dma)]
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+    any(esp32, esp32s2) => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-        } else {
+        }
+    _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-    }
+}
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -607,13 +612,14 @@ mod spi_slave {
         let cs_pin = hil_test::unconnected_pin!(peripherals);
 
         #[cfg(spi_slave_supports_dma)]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let mut mosi_gpio = Flex::new(mosi_pin);
         mosi_gpio.apply_output_config(&OutputConfig::default());
@@ -707,21 +713,23 @@ mod qspi_dma {
         peripherals::PCNT,
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
+    cfg_select! {
+    dma_kind = "pdma" => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-        } else {
+        }
+    _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-    }
+}
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+    esp32 => {
             const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
-        } else {
+        }
+    _ => {
             const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
         }
-    }
+}
 
     type SpiUnderTest<'a> = SpiDma<'a, Blocking>;
 
@@ -951,13 +959,14 @@ mod qspi_dma {
         let _ = Input::new(pin_mirror.reborrow(), config);
         let _ = Input::new(unconnected_pin.reborrow(), config);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
+        cfg_select! {
+    dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
-            } else {
+            }
+    _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-        }
+}
 
         let spi = Spi::new(
             peripherals.SPI2,

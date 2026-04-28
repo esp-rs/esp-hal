@@ -2,7 +2,7 @@
 name          = "esp-alloc"
 version       = "0.10.0"
 edition       = "2024"
-rust-version  = "1.88.0"
+rust-version  = "1.95.0"
 description   = "A heap allocator for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-alloc/latest/"
 keywords      = ["allocator", "embedded", "esp32", "espressif", "memory"]
@@ -34,7 +34,6 @@ test = false
 [dependencies]
 allocator-api2        = { version = "0.3.0", default-features = false }
 defmt                 = { version = "1.0.1", optional = true }
-cfg-if                = "1"
 enumset               = "1"
 esp-sync              = { version = "0.2.1", path = "../esp-sync" }
 document-features     = "0.2"

@@ -34,17 +34,19 @@ const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
 impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
-        cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+        cfg_select! {
+            riscv => {
                 let mut mstatus = 0u32;
                 unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
                 let token = mstatus & 0b1000;
-            } else if #[cfg(xtensa)] {
+            }
+            xtensa => {
                 let token: u32;
                 unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
                 #[cfg(debug_assertions)]
                 let token = token & !RESERVED_MASK;
-            } else {
+            }
+            _ => {
                 compile_error!("Unsupported architecture")
             }
         };
@@ -64,14 +66,15 @@ impl RawLock for SingleCoreInterruptLock {
 
         let token = token.inner();
 
-        cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+        cfg_select! {
+            riscv => {
                 if token != 0 {
                     unsafe {
                         riscv::interrupt::enable();
                     }
                 }
-            } else if #[cfg(xtensa)] {
+            }
+            xtensa => {
                 #[cfg(debug_assertions)]
                 if token & RESERVED_MASK != 0 {
                     // We could do this transformation in fmt.rs automatically, but experiments
@@ -90,7 +93,8 @@ impl RawLock for SingleCoreInterruptLock {
                         "wsr.ps {0}",
                         "rsync", in(reg) token)
                 }
-            } else {
+            }
+            _ => {
                 compile_error!("Unsupported architecture")
             }
         }

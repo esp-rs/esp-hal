@@ -1444,8 +1444,8 @@ fn set_filter(
     sda_threshold: Option<u8>,
     scl_threshold: Option<u8>,
 ) {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_separate_filter_config_registers)] {
+    cfg_select! {
+        i2c_master_separate_filter_config_registers => {
             register_block.sda_filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -1458,7 +1458,8 @@ fn set_filter(
                 }
                 w.scl_filter_en().bit(scl_threshold.is_some())
             });
-        } else {
+        }
+        _ => {
             register_block.filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -1491,25 +1492,29 @@ fn configure_clock(
     timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
-        cfg_if::cfg_if! {
-            if #[cfg(all(soc_has_pcr, soc_has_i2c1))] {
+        cfg_select! {
+            all(soc_has_pcr, soc_has_i2c1) => {
                 crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
                     w.i2c_sclk_sel().clear_bit();
                     w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
                     w.i2c_sclk_en().set_bit()
                 });
-            } else if #[cfg(soc_has_pcr)] {
+            }
+            soc_has_pcr => {
                 crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
                     w.i2c_sclk_sel().clear_bit();
                     w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
                     w.i2c_sclk_en().set_bit()
                 });
-            } else if #[cfg(not(any(esp32, esp32s2)))] { // TODO have a better cfg for this
+            }
+            not(any(esp32, esp32s2)) => { // TODO have a better cfg for this
                 info.regs().clk_conf().modify(|_, w| {
                     w.sclk_sel().clear_bit();
                     w.sclk_div_num().bits((sclk_div - 1) as u8)
                 });
             }
+
+            _ => {}
         }
 
         // scl period
@@ -1552,13 +1557,14 @@ fn configure_clock(
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_bus_timeout_enable)] {
+        cfg_select! {
+            i2c_master_has_bus_timeout_enable => {
                 info.regs().to().write(|w| {
                     w.time_out_en().bit(timeout.is_some());
                     w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
-            } else {
+            }
+            _ => {
                 info.regs()
                     .to()
                     .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
@@ -1773,11 +1779,12 @@ impl Driver<'_> {
     }
 
     fn do_fsm_reset(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_reliable_fsm_reset)] {
+        cfg_select! {
+            i2c_master_has_reliable_fsm_reset => {
                 // Device has a working FSM reset mechanism
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-            } else {
+            }
+            _ => {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
                 // define I2C_LL_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
@@ -3345,28 +3352,30 @@ where
 }
 
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
+    cfg_select! {
+        esp32s2 => {
             // Apparently the ESO can read just fine using DPORT,
             // so use this workaround on S2 only.
             let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
             let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
             unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
-        } else {
+        }
+        _ => {
             register_block.data().read().fifo_rdata().bits()
         }
     }
 }
 
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+        any(esp32, esp32s2) => {
             let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
             let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
             unsafe {
                 fifo_ptr.write_volatile(data as u32);
             }
-        } else {
+        }
+        _ => {
             register_block
                 .data()
                 .write(|w| unsafe { w.fifo_rdata().bits(data) });
@@ -3377,15 +3386,16 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 // Estimate the reason for an acknowledge check failure on a best effort basis.
 // When in doubt it's better to return `Unknown` than to return a wrong reason.
 fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_can_estimate_nack_reason)] {
+    cfg_select! {
+        i2c_master_can_estimate_nack_reason => {
             // this is based on observations rather than documented behavior
             if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
                 AcknowledgeCheckFailedReason::Address
             } else {
                 AcknowledgeCheckFailedReason::Data
             }
-        } else {
+        }
+        _ => {
             AcknowledgeCheckFailedReason::Unknown
         }
     }

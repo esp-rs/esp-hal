@@ -352,15 +352,16 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         phy_init_guard = esp_phy::enable_phy();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 unsafe extern "C" {
                     fn btdm_rf_bb_init_phase2();
                 }
 
                 btdm_rf_bb_init_phase2();
                 coex_bt_high_prio();
-            } else {
+            }
+            _ => {
                 coex_pti_v2();
             }
         }

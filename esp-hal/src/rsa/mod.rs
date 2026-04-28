@@ -168,11 +168,12 @@ impl<'d> Rsa<'d, Async> {
 
 impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     fn internal_enable_disable_interrupt(&self, enable: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 // Can't seem to actually disable the interrupt, but esp-idf still writes the register
                 self.regs().interrupt().write(|w| w.interrupt().bit(enable));
-            } else {
+            }
+            _ => {
                 self.regs().int_ena().write(|w| w.int_ena().bit(enable));
             }
         }
@@ -187,10 +188,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// This function would return without an error if the memory is
     /// initialized.
     fn ready(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3) => {
                 self.regs().clean().read().clean().bit_is_set()
-            } else {
+            }
+            _ => {
                 self.regs().query_clean().read().query_clean().bit_is_set()
             }
         }
@@ -198,12 +200,13 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular exponentiation operation.
     fn start_modexp(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3) => {
                 self.regs()
                     .modexp_start()
                     .write(|w| w.modexp_start().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs()
                     .set_start_modexp()
                     .write(|w| w.set_start_modexp().set_bit());
@@ -213,10 +216,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the multiplication operation.
     fn start_multi(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3))] {
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3) => {
                 self.regs().mult_start().write(|w| w.mult_start().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs()
                     .set_start_mult()
                     .write(|w| w.set_start_mult().set_bit());
@@ -226,15 +230,17 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Starts the modular multiplication operation.
     fn start_modmulti(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 // modular-ness is encoded in the multi_mode register value
                 self.start_multi();
-            } else if #[cfg(any(esp32s2, esp32s3))] {
+            }
+            any(esp32s2, esp32s3) => {
                 self.regs()
                     .modmult_start()
                     .write(|w| w.modmult_start().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs()
                     .set_start_modmult()
                     .write(|w| w.set_start_modmult().set_bit());
@@ -244,10 +250,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Clears the RSA interrupt flag.
     fn clear_interrupt(&mut self) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().interrupt().write(|w| w.interrupt().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs().int_clr().write(|w| w.int_clr().set_bit());
             }
         }
@@ -255,12 +262,14 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Checks if the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().interrupt().read().interrupt().bit_is_set()
-            } else if #[cfg(any(esp32s2, esp32s3))] {
+            }
+            any(esp32s2, esp32s3) => {
                 self.regs().idle().read().idle().bit_is_set()
-            } else {
+            }
+            _ => {
                 self.regs().query_idle().read().query_idle().bit_is_set()
             }
         }
@@ -280,10 +289,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
             mode
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().mult_mode().write(|w| unsafe { w.bits(mode) });
-            } else {
+            }
+            _ => {
                 self.regs().mode().write(|w| unsafe { w.bits(mode) });
             }
         }
@@ -291,10 +301,11 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Writes the result size of the modular exponentiation.
     fn write_modexp_mode(&mut self, mode: u32) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().modexp_mode().write(|w| unsafe { w.bits(mode) });
-            } else {
+            }
+            _ => {
                 self.regs().mode().write(|w| unsafe { w.bits(mode) });
             }
         }
@@ -771,10 +782,11 @@ where
 pub(super) fn rsa_interrupt_handler() {
     let rsa = RSA::regs();
     SIGNALED.store(true, Ordering::Release);
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             rsa.interrupt().write(|w| w.interrupt().set_bit());
-        } else  {
+        }
+        _ => {
             rsa.int_clr().write(|w| w.int_clr().set_bit());
         }
     }
@@ -1121,10 +1133,11 @@ fn rsa_work_queue_handler() {
     if !RSA_WORK_QUEUE.process() {
         // The queue may indicate that it needs to be polled again. In this case, we do not clear
         // the interrupt bit, which causes the interrupt to be re-handled.
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 RSA::regs().interrupt().write(|w| w.interrupt().set_bit());
-            } else {
+            }
+            _ => {
                 RSA::regs().int_clr().write(|w| w.int_clr().set_bit());
             }
         }

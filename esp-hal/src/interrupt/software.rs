@@ -108,10 +108,11 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
 
     /// Trigger this software-interrupt
     pub fn raise(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_intpri)] {
+        cfg_select! {
+            soc_has_intpri => {
                 let regs = crate::peripherals::INTPRI::regs();
-            } else {
+            }
+            _ => {
                 let regs = crate::peripherals::SYSTEM::regs();
             }
         }
@@ -135,10 +136,11 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
 
     /// Resets this software-interrupt
     pub fn reset(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_intpri)] {
+        cfg_select! {
+            soc_has_intpri => {
                 let regs = crate::peripherals::INTPRI::regs();
-            } else {
+            }
+            _ => {
                 let regs = crate::peripherals::SYSTEM::regs();
             }
         }
