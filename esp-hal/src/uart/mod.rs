@@ -3267,6 +3267,19 @@ impl Info {
         Ok(())
     }
 
+    #[procmacros::doc_replace(
+        "rx_timeout_limit" => {
+            cfg(esp32) => "- `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.",
+            cfg(esp32c2) => "- `esp32c2`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32c3) => "- `esp32c3`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32c5) => "- `esp32c5`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32c6) => "- `esp32c6`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32c61) => "- `esp32c61`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32h2) => "- `esp32h2`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32s2) => "- `esp32s2`: The value you pass times the symbol size must be <= **0x3FF**.",
+            cfg(esp32s3) => "- `esp32s3`: The value you pass times the symbol size must be <= **0x3FF**.",
+        }
+    )]
     /// Configures the Receive Timeout detection setting
     ///
     /// ## Arguments
@@ -3278,9 +3291,7 @@ impl Info {
     ///
     /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
-    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c5`, `esp32c6`, `esp32c61`, `esp32h2`, `esp32s2`, `esp32s3`:
-    ///   The value you pass times the symbol size must be <= **0x3FF**
+    /// {rx_timeout_limit}
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
