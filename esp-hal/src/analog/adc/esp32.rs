@@ -265,8 +265,8 @@ where
         // Set attenuation for pins
         let attenuations = config.attenuations;
 
-        for (channel, attentuation) in attenuations.iter().enumerate() {
-            if let Some(attenuation) = attentuation {
+        for (channel, attenuation) in attenuations.iter().enumerate() {
+            if let Some(attenuation) = attenuation {
                 ADCI::set_attenuation(channel, *attenuation as u8);
             }
         }
