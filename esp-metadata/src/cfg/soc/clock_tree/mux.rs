@@ -321,6 +321,8 @@ impl Multiplexer {
                 #configures
 
                 #apply_impl
+
+                refresh_all_frequency_caches(clocks);
             }
         }
     }

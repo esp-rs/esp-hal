@@ -115,6 +115,7 @@ impl ClockTreeNodeType for Source {
                 #reject_exprs
                 let old_config = #config_field.replace(config);
                 #hal_impl(clocks, old_config, config);
+                refresh_all_frequency_caches(clocks);
             }
         }
     }

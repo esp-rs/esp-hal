@@ -293,6 +293,15 @@ impl ClockTreeNodeInstance {
         self.prefix_function("configure")
     }
 
+    pub(super) fn freq_cache_static_name(&self) -> Ident {
+        let name = if self.group_template.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}_{}", self.group_template, self.node.name())
+        };
+        format_ident!("{}_FREQ_CACHE", name)
+    }
+
     fn current_config_function_name(&self) -> Ident {
         self.suffix_function("config")
     }
@@ -455,18 +464,19 @@ impl ClockTreeNodeInstance {
             frequency: Function {
                 _name: frequency_function_name.to_string(),
                 implementation: if self.is_configurable() {
-                    let config_field = self.properties.indexed_config_accessor();
+                    let cache_name = self.freq_cache_static_name();
+                    let cache_load = if self.properties.receiver.is_some() {
+                        quote! { #cache_name[self as usize].load(::core::sync::atomic::Ordering::Acquire) }
+                    } else {
+                        quote! { #cache_name.load(::core::sync::atomic::Ordering::Acquire) }
+                    };
                     quote! {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(#(#receiver,)* clocks: &mut ClockTree, config: #ty_name) -> u32 {
                             #frequency_function_impl
                         }
-                        pub fn #frequency_function_name(#(#receiver,)* clocks: &mut ClockTree) -> u32 {
-                            if let Some(config) = #config_field {
-                                #(#receiver.)* #config_frequency_function_name(clocks, config)
-                            } else {
-                                0
-                            }
+                        pub fn #frequency_function_name(#(#receiver,)* _clocks: &mut ClockTree) -> u32 {
+                            #cache_load
                         }
                     }
                 } else {
@@ -752,6 +762,81 @@ impl SystemClocks {
             })
             .collect::<Vec<_>>();
 
+        // Build AtomicU32 cache statics and the refresh function body in topological order.
+        let mut freq_cache_statics: Vec<TokenStream> = vec![];
+        let mut refresh_cache_stmts: Vec<TokenStream> = vec![];
+        let mut seen_cache_templates: HashSet<String> = HashSet::new();
+
+        for node_name in tree.dependency_graph.iter() {
+            let Some(node) = tree.try_get_node(&node_name) else {
+                continue;
+            };
+            if !node.is_configurable() {
+                continue;
+            }
+
+            let template_key = if node.group_template.is_empty() {
+                node_name.clone()
+            } else {
+                format!("{}_{}", node.group_template, node.node.name())
+            };
+
+            if !seen_cache_templates.insert(template_key) {
+                continue;
+            }
+
+            let cache_name = node.freq_cache_static_name();
+            let config_freq_fn = node.config_frequency_function_name();
+
+            if node.properties.receiver.is_some() {
+                let instances = tree.group_instances.get(&node.group_template).unwrap();
+                let instance_count = number(instances.len());
+                let enum_name = format_ident!(
+                    "{}Instance",
+                    node.group_template
+                        .from_case(Case::Constant)
+                        .to_case(Case::Pascal)
+                );
+                let variants: Vec<_> = instances
+                    .iter()
+                    .map(|v| {
+                        format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal))
+                    })
+                    .collect();
+                let field_name = node.properties.field_name();
+
+                freq_cache_statics.push(quote! {
+                    static #cache_name: [::core::sync::atomic::AtomicU32; #instance_count] =
+                        [const { ::core::sync::atomic::AtomicU32::new(0) }; #instance_count];
+                });
+                refresh_cache_stmts.push(quote! {
+                    for instance in [#(#enum_name::#variants,)*] {
+                        if let Some(config) = clocks.#field_name[instance as usize] {
+                            #cache_name[instance as usize].store(
+                                instance.#config_freq_fn(clocks, config),
+                                ::core::sync::atomic::Ordering::Release,
+                            );
+                        }
+                    }
+                });
+            } else {
+                let config_field = node.properties.indexed_config_accessor();
+
+                freq_cache_statics.push(quote! {
+                    static #cache_name: ::core::sync::atomic::AtomicU32 =
+                        ::core::sync::atomic::AtomicU32::new(0);
+                });
+                refresh_cache_stmts.push(quote! {
+                    if let Some(config) = #config_field {
+                        #cache_name.store(
+                            #config_freq_fn(clocks, config),
+                            ::core::sync::atomic::Ordering::Release,
+                        );
+                    }
+                });
+            }
+        }
+
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
@@ -787,6 +872,8 @@ impl SystemClocks {
                             #(#clock_tree_state_field_names: #clock_tree_state_field_initializers,)*
                             #(#clock_tree_refcount_field_inits,)*
                         });
+
+                    #(#freq_cache_statics)*
 
                     #(#clock_tree_node_impls)*
 
@@ -824,6 +911,9 @@ impl SystemClocks {
                         let last = *refcount == 0;
                         // CLOCK_BITMAP.fetch_and(!clock_id, Ordering::Relaxed);
                         last
+                    }
+                    fn refresh_all_frequency_caches(clocks: &mut ClockTree) {
+                        #(#refresh_cache_stmts)*
                     }
                 };
             }

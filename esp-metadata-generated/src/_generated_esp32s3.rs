@@ -1600,9 +1600,48 @@ macro_rules! define_clock_tree_types {
                 uart_baud_rate_generator_refcount: [0; 3],
                 uart_mem_clock_refcount: [0; 3],
             });
+        static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static PLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static SYSTEM_PRE_DIV_IN_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static SYSTEM_PRE_DIV_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static CPU_PLL_DIV_OUT_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static CPU_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static RC_FAST_CLK_DIV_N_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static RTC_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static RTC_FAST_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static LOW_POWER_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
+        static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static CRYPTO_PWM_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static MCPWM_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
+        static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             configure_xtal_clk_impl(clocks, old_config, config);
+            refresh_all_frequency_caches(clocks);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
@@ -1613,12 +1652,8 @@ macro_rules! define_clock_tree_types {
         pub fn xtal_clk_config_frequency(clocks: &mut ClockTree, config: XtalClkConfig) -> u32 {
             config.value()
         }
-        pub fn xtal_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.xtal_clk {
-                xtal_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn xtal_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            XTAL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
             if clocks.cpu_pll_div_out.is_some() {
@@ -1629,6 +1664,7 @@ macro_rules! define_clock_tree_types {
             }
             let old_config = clocks.pll_clk.replace(config);
             configure_pll_clk_impl(clocks, old_config, config);
+            refresh_all_frequency_caches(clocks);
         }
         pub fn pll_clk_config(clocks: &mut ClockTree) -> Option<PllClkConfig> {
             clocks.pll_clk
@@ -1653,12 +1689,8 @@ macro_rules! define_clock_tree_types {
         pub fn pll_clk_config_frequency(clocks: &mut ClockTree, config: PllClkConfig) -> u32 {
             config.value()
         }
-        pub fn pll_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.pll_clk {
-                pll_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn pll_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            PLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_CLK");
@@ -1746,6 +1778,7 @@ macro_rules! define_clock_tree_types {
                     SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks),
                 }
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn system_pre_div_in_config(clocks: &mut ClockTree) -> Option<SystemPreDivInConfig> {
             clocks.system_pre_div_in
@@ -1778,16 +1811,13 @@ macro_rules! define_clock_tree_types {
                 SystemPreDivInConfig::RcFast => rc_fast_clk_frequency(clocks),
             }
         }
-        pub fn system_pre_div_in_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.system_pre_div_in {
-                system_pre_div_in_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn system_pre_div_in_frequency(_clocks: &mut ClockTree) -> u32 {
+            SYSTEM_PRE_DIV_IN_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_system_pre_div(clocks: &mut ClockTree, config: SystemPreDivConfig) {
             let old_config = clocks.system_pre_div.replace(config);
             configure_system_pre_div_impl(clocks, old_config, config);
+            refresh_all_frequency_caches(clocks);
         }
         pub fn system_pre_div_config(clocks: &mut ClockTree) -> Option<SystemPreDivConfig> {
             clocks.system_pre_div
@@ -1811,12 +1841,8 @@ macro_rules! define_clock_tree_types {
         ) -> u32 {
             (system_pre_div_in_frequency(clocks) / (config.divisor() + 1))
         }
-        pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.system_pre_div {
-                system_pre_div_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn system_pre_div_frequency(_clocks: &mut ClockTree) -> u32 {
+            SYSTEM_PRE_DIV_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_cpu_pll_div_out(clocks: &mut ClockTree, config: CpuPllDivOutConfig) {
             if clocks.pll_clk.is_some() {
@@ -1826,6 +1852,7 @@ macro_rules! define_clock_tree_types {
             }
             let old_config = clocks.cpu_pll_div_out.replace(config);
             configure_cpu_pll_div_out_impl(clocks, old_config, config);
+            refresh_all_frequency_caches(clocks);
         }
         pub fn cpu_pll_div_out_config(clocks: &mut ClockTree) -> Option<CpuPllDivOutConfig> {
             clocks.cpu_pll_div_out
@@ -1849,12 +1876,8 @@ macro_rules! define_clock_tree_types {
         ) -> u32 {
             config.value()
         }
-        pub fn cpu_pll_div_out_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.cpu_pll_div_out {
-                cpu_pll_div_out_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn cpu_pll_div_out_frequency(_clocks: &mut ClockTree) -> u32 {
+            CPU_PLL_DIV_OUT_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
@@ -1873,6 +1896,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_apb_clk_impl(clocks, old_selector, new_selector);
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk
@@ -1906,12 +1930,8 @@ macro_rules! define_clock_tree_types {
                 ApbClkConfig::Cpu => cpu_clk_frequency(clocks),
             }
         }
-        pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.apb_clk {
-                apb_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn apb_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            APB_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_crypto_pwm_clk(clocks: &mut ClockTree, new_selector: CryptoPwmClkConfig) {
             let old_selector = clocks.crypto_pwm_clk.replace(new_selector);
@@ -1930,6 +1950,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_crypto_pwm_clk_impl(clocks, old_selector, new_selector);
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn crypto_pwm_clk_config(clocks: &mut ClockTree) -> Option<CryptoPwmClkConfig> {
             clocks.crypto_pwm_clk
@@ -1966,12 +1987,8 @@ macro_rules! define_clock_tree_types {
                 CryptoPwmClkConfig::Cpu => cpu_clk_frequency(clocks),
             }
         }
-        pub fn crypto_pwm_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.crypto_pwm_clk {
-                crypto_pwm_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn crypto_pwm_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            CRYPTO_PWM_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
@@ -2004,6 +2021,7 @@ macro_rules! define_clock_tree_types {
                     CpuClkConfig::Pll => release_cpu_pll_div_out(clocks),
                 }
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
@@ -2018,12 +2036,8 @@ macro_rules! define_clock_tree_types {
                 CpuClkConfig::Pll => cpu_pll_div_out_frequency(clocks),
             }
         }
-        pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.cpu_clk {
-                cpu_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn cpu_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            CPU_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_pll_d2(clocks: &mut ClockTree) {
             trace!("Requesting PLL_D2");
@@ -2077,6 +2091,7 @@ macro_rules! define_clock_tree_types {
         pub fn configure_rc_fast_clk_div_n(clocks: &mut ClockTree, config: RcFastClkDivNConfig) {
             let old_config = clocks.rc_fast_clk_div_n.replace(config);
             configure_rc_fast_clk_div_n_impl(clocks, old_config, config);
+            refresh_all_frequency_caches(clocks);
         }
         pub fn rc_fast_clk_div_n_config(clocks: &mut ClockTree) -> Option<RcFastClkDivNConfig> {
             clocks.rc_fast_clk_div_n
@@ -2100,12 +2115,8 @@ macro_rules! define_clock_tree_types {
         ) -> u32 {
             (rc_fast_clk_frequency(clocks) / (config.divisor() + 1))
         }
-        pub fn rc_fast_clk_div_n_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.rc_fast_clk_div_n {
-                rc_fast_clk_div_n_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn rc_fast_clk_div_n_frequency(_clocks: &mut ClockTree) -> u32 {
+            RC_FAST_CLK_DIV_N_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_xtal_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_DIV_CLK");
@@ -2137,6 +2148,7 @@ macro_rules! define_clock_tree_types {
                     RtcSlowClkConfig::RcFast => release_rc_fast_div_clk(clocks),
                 }
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn rtc_slow_clk_config(clocks: &mut ClockTree) -> Option<RtcSlowClkConfig> {
             clocks.rtc_slow_clk
@@ -2172,12 +2184,8 @@ macro_rules! define_clock_tree_types {
                 RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(clocks),
             }
         }
-        pub fn rtc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.rtc_slow_clk {
-                rtc_slow_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn rtc_slow_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            RTC_SLOW_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
             let old_selector = clocks.rtc_fast_clk.replace(new_selector);
@@ -2196,6 +2204,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_rtc_fast_clk_impl(clocks, old_selector, new_selector);
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn rtc_fast_clk_config(clocks: &mut ClockTree) -> Option<RtcFastClkConfig> {
             clocks.rtc_fast_clk
@@ -2232,12 +2241,8 @@ macro_rules! define_clock_tree_types {
                 RtcFastClkConfig::Rc => rc_fast_clk_div_n_frequency(clocks),
             }
         }
-        pub fn rtc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.rtc_fast_clk {
-                rtc_fast_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn rtc_fast_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            RTC_FAST_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_low_power_clk(clocks: &mut ClockTree, new_selector: LowPowerClkConfig) {
             let old_selector = clocks.low_power_clk.replace(new_selector);
@@ -2260,6 +2265,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_low_power_clk_impl(clocks, old_selector, new_selector);
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn low_power_clk_config(clocks: &mut ClockTree) -> Option<LowPowerClkConfig> {
             clocks.low_power_clk
@@ -2302,12 +2308,8 @@ macro_rules! define_clock_tree_types {
                 LowPowerClkConfig::RtcSlow => rtc_slow_clk_frequency(clocks),
             }
         }
-        pub fn low_power_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.low_power_clk {
-                low_power_clk_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn low_power_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+            LOW_POWER_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_uart_mem_clk(clocks: &mut ClockTree) {
             trace!("Requesting UART_MEM_CLK");
@@ -2350,6 +2352,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
             }
+            refresh_all_frequency_caches(clocks);
         }
         pub fn timg_calibration_clock_config(
             clocks: &mut ClockTree,
@@ -2391,12 +2394,8 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
             }
         }
-        pub fn timg_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_calibration_clock {
-                timg_calibration_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
+        pub fn timg_calibration_clock_frequency(_clocks: &mut ClockTree) -> u32 {
+            TIMG_CALIBRATION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         impl McpwmInstance {
             pub fn configure_function_clock(
@@ -2414,6 +2413,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
+                refresh_all_frequency_caches(clocks);
             }
             pub fn function_clock_config(
                 self,
@@ -2449,12 +2449,9 @@ macro_rules! define_clock_tree_types {
             ) -> u32 {
                 crypto_pwm_clk_frequency(clocks)
             }
-            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.mcpwm_function_clock[self as usize] {
-                    self.function_clock_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                MCPWM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
         impl RmtInstance {
@@ -2477,6 +2474,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_sclk_impl(clocks, old_selector, new_selector);
                 }
+                refresh_all_frequency_caches(clocks);
             }
             pub fn sclk_config(self, clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
                 clocks.rmt_sclk[self as usize]
@@ -2517,12 +2515,8 @@ macro_rules! define_clock_tree_types {
                     RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
                 }
             }
-            pub fn sclk_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.rmt_sclk[self as usize] {
-                    self.sclk_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn sclk_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                RMT_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
             }
         }
         impl TimgInstance {
@@ -2547,6 +2541,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
+                refresh_all_frequency_caches(clocks);
             }
             pub fn function_clock_config(
                 self,
@@ -2591,12 +2586,9 @@ macro_rules! define_clock_tree_types {
                     TimgFunctionClockConfig::ApbClk => apb_clk_frequency(clocks),
                 }
             }
-            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.timg_function_clock[self as usize] {
-                    self.function_clock_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                TIMG_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
         impl UartInstance {
@@ -2623,6 +2615,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_config, config);
                 }
+                refresh_all_frequency_caches(clocks);
             }
             pub fn function_clock_config(
                 self,
@@ -2670,12 +2663,9 @@ macro_rules! define_clock_tree_types {
                     UartFunctionClockSclk::Xtal => xtal_clk_frequency(clocks),
                 } / (config.div_num() + 1))
             }
-            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.uart_function_clock[self as usize] {
-                    self.function_clock_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                UART_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
             pub fn configure_baud_rate_generator(
                 self,
@@ -2684,6 +2674,7 @@ macro_rules! define_clock_tree_types {
             ) {
                 let old_config = clocks.uart_baud_rate_generator[self as usize].replace(config);
                 self.configure_baud_rate_generator_impl(clocks, old_config, config);
+                refresh_all_frequency_caches(clocks);
             }
             pub fn baud_rate_generator_config(
                 self,
@@ -2720,16 +2711,14 @@ macro_rules! define_clock_tree_types {
                 ((self.function_clock_frequency(clocks) * 16)
                     / ((config.integral() * 16) + config.fractional()))
             }
-            pub fn baud_rate_generator_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.uart_baud_rate_generator[self as usize] {
-                    self.baud_rate_generator_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn baud_rate_generator_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                UART_BAUD_RATE_GENERATOR_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
             pub fn configure_mem_clock(self, clocks: &mut ClockTree, config: UartMemClockConfig) {
                 let old_config = clocks.uart_mem_clock[self as usize].replace(config);
                 self.configure_mem_clock_impl(clocks, old_config, config);
+                refresh_all_frequency_caches(clocks);
             }
             pub fn mem_clock_config(self, clocks: &mut ClockTree) -> Option<UartMemClockConfig> {
                 clocks.uart_mem_clock[self as usize]
@@ -2758,12 +2747,9 @@ macro_rules! define_clock_tree_types {
             ) -> u32 {
                 uart_mem_clk_frequency(clocks)
             }
-            pub fn mem_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
-                if let Some(config) = clocks.uart_mem_clock[self as usize] {
-                    self.mem_clock_config_frequency(clocks, config)
-                } else {
-                    0
-                }
+            pub fn mem_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
         /// Clock tree configuration.
@@ -2843,6 +2829,146 @@ macro_rules! define_clock_tree_types {
             *refcount = refcount.saturating_sub(1);
             let last = *refcount == 0;
             last
+        }
+        fn refresh_all_frequency_caches(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.xtal_clk {
+                XTAL_CLK_FREQ_CACHE.store(
+                    xtal_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.pll_clk {
+                PLL_CLK_FREQ_CACHE.store(
+                    pll_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.system_pre_div_in {
+                SYSTEM_PRE_DIV_IN_FREQ_CACHE.store(
+                    system_pre_div_in_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.system_pre_div {
+                SYSTEM_PRE_DIV_FREQ_CACHE.store(
+                    system_pre_div_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.cpu_pll_div_out {
+                CPU_PLL_DIV_OUT_FREQ_CACHE.store(
+                    cpu_pll_div_out_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.cpu_clk {
+                CPU_CLK_FREQ_CACHE.store(
+                    cpu_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.rc_fast_clk_div_n {
+                RC_FAST_CLK_DIV_N_FREQ_CACHE.store(
+                    rc_fast_clk_div_n_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.rtc_slow_clk {
+                RTC_SLOW_CLK_FREQ_CACHE.store(
+                    rtc_slow_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.rtc_fast_clk {
+                RTC_FAST_CLK_FREQ_CACHE.store(
+                    rtc_fast_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.low_power_clk {
+                LOW_POWER_CLK_FREQ_CACHE.store(
+                    low_power_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.timg_calibration_clock {
+                TIMG_CALIBRATION_CLOCK_FREQ_CACHE.store(
+                    timg_calibration_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            for instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
+                if let Some(config) = clocks.uart_mem_clock[instance as usize] {
+                    UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
+                        instance.mem_clock_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
+            if let Some(config) = clocks.apb_clk {
+                APB_CLK_FREQ_CACHE.store(
+                    apb_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            if let Some(config) = clocks.crypto_pwm_clk {
+                CRYPTO_PWM_CLK_FREQ_CACHE.store(
+                    crypto_pwm_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            for instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
+                if let Some(config) = clocks.mcpwm_function_clock[instance as usize] {
+                    MCPWM_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                        instance.function_clock_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
+            for instance in [RmtInstance::Rmt] {
+                if let Some(config) = clocks.rmt_sclk[instance as usize] {
+                    RMT_SCLK_FREQ_CACHE[instance as usize].store(
+                        instance.sclk_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
+            for instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                if let Some(config) = clocks.timg_function_clock[instance as usize] {
+                    TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                        instance.function_clock_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
+            for instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
+                if let Some(config) = clocks.uart_function_clock[instance as usize] {
+                    UART_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                        instance.function_clock_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
+            for instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
+                if let Some(config) = clocks.uart_baud_rate_generator[instance as usize] {
+                    UART_BAUD_RATE_GENERATOR_FREQ_CACHE[instance as usize].store(
+                        instance.baud_rate_generator_config_frequency(clocks, config),
+                        ::core::sync::atomic::Ordering::Release,
+                    );
+                }
+            }
         }
     };
 }

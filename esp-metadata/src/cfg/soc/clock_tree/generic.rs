@@ -308,6 +308,8 @@ impl ClockTreeNodeType for Generic {
                 let old_config = #config_field.replace(config);
 
                 #func_body
+
+                refresh_all_frequency_caches(clocks);
             }
         }
     }
