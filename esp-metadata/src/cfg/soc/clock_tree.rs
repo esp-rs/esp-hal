@@ -196,11 +196,7 @@ impl DependencyGraph {
 
     /// Returns the nearest configurable nodes directly downstream of `node`, in topological order.
     /// The search stops at each configurable node found (does not look through them).
-    pub fn configurable_children_of(
-        &self,
-        node: &str,
-        tree: &ProcessedClockData,
-    ) -> Vec<String> {
+    pub fn configurable_children_of(&self, node: &str, tree: &ProcessedClockData) -> Vec<String> {
         let mut found: IndexSet<String> = IndexSet::new();
         let mut visited: IndexSet<String> = IndexSet::new();
         let mut queue: Vec<String> = self.users(node).to_vec();
@@ -221,7 +217,6 @@ impl DependencyGraph {
         }
         self.iter().filter(|n| found.contains(n.as_str())).collect()
     }
-
 }
 
 fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<Item = String> {

@@ -306,7 +306,10 @@ impl ClockTreeNodeInstance {
     }
 
     pub(super) fn refresh_downstream_function_name(&self) -> Ident {
-        format_ident!("refresh_{}_downstream", self.node_ident_base().to_lowercase())
+        format_ident!(
+            "refresh_{}_downstream",
+            self.node_ident_base().to_lowercase()
+        )
     }
 
     fn current_config_function_name(&self) -> Ident {
@@ -804,14 +807,17 @@ impl SystemClocks {
                         [const { ::core::sync::atomic::AtomicU32::new(0) }; #instance_count];
                 });
                 // Refresh stmt for template nodes uses an `instance` variable (passed by caller).
-                refresh_stmt_by_key.insert(template_key.clone(), quote! {
-                    if let Some(config) = clocks.#field_name[instance as usize] {
-                        #cache_name[instance as usize].store(
-                            instance.#config_freq_fn(clocks, config),
-                            ::core::sync::atomic::Ordering::Release,
-                        );
-                    }
-                });
+                refresh_stmt_by_key.insert(
+                    template_key.clone(),
+                    quote! {
+                        if let Some(config) = clocks.#field_name[instance as usize] {
+                            #cache_name[instance as usize].store(
+                                instance.#config_freq_fn(clocks, config),
+                                ::core::sync::atomic::Ordering::Release,
+                            );
+                        }
+                    },
+                );
             } else {
                 let config_field = node.properties.indexed_config_accessor();
 
@@ -819,14 +825,17 @@ impl SystemClocks {
                     static #cache_name: ::core::sync::atomic::AtomicU32 =
                         ::core::sync::atomic::AtomicU32::new(0);
                 });
-                refresh_stmt_by_key.insert(template_key, quote! {
-                    if let Some(config) = #config_field {
-                        #cache_name.store(
-                            #config_freq_fn(clocks, config),
-                            ::core::sync::atomic::Ordering::Release,
-                        );
-                    }
-                });
+                refresh_stmt_by_key.insert(
+                    template_key,
+                    quote! {
+                        if let Some(config) = #config_field {
+                            #cache_name.store(
+                                #config_freq_fn(clocks, config),
+                                ::core::sync::atomic::Ordering::Release,
+                            );
+                        }
+                    },
+                );
             }
         }
 
