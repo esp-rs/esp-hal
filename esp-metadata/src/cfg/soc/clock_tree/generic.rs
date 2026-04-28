@@ -380,7 +380,7 @@ impl ClockTreeNodeType for Generic {
                     for clock in tree.clock_tree.values() {
                         let clock_name = clock.name_str().as_str();
                         let frequency_fn = clock.frequency_function_name();
-                        variables.insert(clock_name, quote! { #frequency_fn(clocks) });
+                        variables.insert(clock_name, quote! { #frequency_fn() });
                     }
 
                     let cfg_expr_code = ExprCompiler::new(&variables)
@@ -453,13 +453,13 @@ impl ClockTreeNodeType for Generic {
                 let source_node = instance.resolve_node(tree, &input);
                 let source_receiver = source_node.properties.receiver();
                 let freq_fn = source_node.frequency_function_name();
-                quote! { #(#source_receiver.)* #freq_fn(clocks) }
+                quote! { #(#source_receiver.)* #freq_fn() }
             }
             ClockSource::Mux(input) if input.len() == 1 => {
                 let source_node = instance.resolve_node(tree, &input[0].outputs);
                 let source_receiver = source_node.properties.receiver();
                 let freq_fn = source_node.frequency_function_name();
-                quote! { #(#source_receiver.)* #freq_fn(clocks) }
+                quote! { #(#source_receiver.)* #freq_fn() }
             }
             ClockSource::Mux(inputs) => {
                 let ty_name = self.param_type_name(instance, source_param_name);
@@ -475,7 +475,7 @@ impl ClockTreeNodeType for Generic {
 
                         (
                             quote! { #ty_name::#name },
-                            quote! { #(#source_receiver.)* #frequency_fn(clocks) },
+                            quote! { #(#source_receiver.)* #frequency_fn() },
                         )
                     })
                     .unzip::<_, _, Vec<_>, Vec<_>>();

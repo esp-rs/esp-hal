@@ -664,7 +664,7 @@ impl RejectExpression {
                 // Referring to a node by name resolves to its output frequency.
                 let node = instance.resolve_node(tree, var);
                 let freq_fn = node.frequency_function_name();
-                variables.insert(var, quote! { #freq_fn(clocks) });
+                variables.insert(var, quote! { #freq_fn() });
 
                 // Only run the assert if the referenced nodes have been configured
                 let config_field = node.properties.indexed_config_accessor();

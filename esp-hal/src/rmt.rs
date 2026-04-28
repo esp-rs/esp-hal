@@ -2257,9 +2257,7 @@ for_each_rmt_clock_source!(
 
                     #[cfg(rmt_supports_rcfast_clock)]
                     ClockSource::RcFast => {
-                        Rate::from_hz(clocks::ClockTree::with(
-                            clocks::rc_fast_clk_frequency,
-                        ))
+                        Rate::from_hz(clocks::rc_fast_clk_frequency())
                     }
 
                     #[cfg(rmt_supports_xtal_clock)]

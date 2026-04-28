@@ -160,7 +160,7 @@ impl ClockTreeNodeType for Multiplexer {
                 let frequency_fn = upstream_node.frequency_function_name();
                 let receiver = upstream_node.properties.receiver();
 
-                quote! { #(#receiver.)* #frequency_fn(clocks) }
+                quote! { #(#receiver.)* #frequency_fn() }
             })
             .collect::<Vec<_>>();
 

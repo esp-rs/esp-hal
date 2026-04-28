@@ -68,7 +68,6 @@ use crate::{
     },
     pac,
     peripherals::LCD_CAM,
-    soc::clocks::ClockTree,
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -127,16 +126,14 @@ where
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
-        let (i, divider) = ClockTree::with(|clocks| {
-            calculate_clkm(
-                (config.frequency.as_hz() * 2) as _,
-                &[
-                    crate::soc::clocks::xtal_clk_frequency(clocks) as usize,
-                    crate::soc::clocks::pll_d2_frequency(clocks) as usize,
-                    crate::soc::clocks::crypto_pwm_clk_frequency(clocks) as usize,
-                ],
-            )
-        })
+        let (i, divider) = calculate_clkm(
+            (config.frequency.as_hz() * 2) as _,
+            &[
+                crate::soc::clocks::xtal_clk_frequency() as usize,
+                crate::soc::clocks::pll_d2_frequency() as usize,
+                crate::soc::clocks::crypto_pwm_clk_frequency() as usize,
+            ],
+        )
         .map_err(ConfigError::Clock)?;
 
         self.regs().lcd_clock().write(|w| unsafe {

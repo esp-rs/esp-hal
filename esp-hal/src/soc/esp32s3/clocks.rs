@@ -451,7 +451,7 @@ fn configure_cpu_clk_impl(
         w.soc_clk_sel().bits(clock_source_sel0_bit)
     });
 
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 
     ensure_voltage_minimal(clocks);
@@ -561,8 +561,8 @@ fn pvt_supported() -> bool {
     (blk_major == 0 && blk_minor == 1) || (blk_major == 1 && blk_minor >= 2) || blk_major > 1
 }
 
-fn ensure_voltage_raised(clocks: &mut ClockTree) {
-    let cpu_freq = cpu_clk_frequency(clocks);
+fn ensure_voltage_raised(_clocks: &mut ClockTree) {
+    let cpu_freq = cpu_clk_frequency();
     let pd_slave = cpu_freq / 80_000_000;
 
     if cpu_freq == 240_000_000 {
@@ -590,8 +590,8 @@ fn ensure_voltage_raised(clocks: &mut ClockTree) {
         .modify(|_, w| unsafe { w.ldo_slave().bits(0x7 >> pd_slave) });
 }
 
-fn ensure_voltage_minimal(clocks: &mut ClockTree) {
-    let cpu_freq = cpu_clk_frequency(clocks);
+fn ensure_voltage_minimal(_clocks: &mut ClockTree) {
+    let cpu_freq = cpu_clk_frequency();
     let pd_slave = cpu_freq / 80_000_000;
 
     if cpu_freq < 240_000_000 {

@@ -2154,7 +2154,7 @@ macro_rules! define_clock_tree_types {
         pub fn xtal_clk_config_frequency(clocks: &mut ClockTree, config: XtalClkConfig) -> u32 {
             config.value()
         }
-        pub fn xtal_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn xtal_clk_frequency() -> u32 {
             XTAL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_pll_clk(clocks: &mut ClockTree) {
@@ -2173,7 +2173,7 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
-        pub fn pll_clk_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn pll_clk_frequency() -> u32 {
             480000000
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
@@ -2190,7 +2190,7 @@ macro_rules! define_clock_tree_types {
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
-        pub fn rc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn rc_fast_clk_frequency() -> u32 {
             17500000
         }
         pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
@@ -2207,7 +2207,7 @@ macro_rules! define_clock_tree_types {
                 enable_xtal32k_clk_impl(clocks, false);
             }
         }
-        pub fn xtal32k_clk_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn xtal32k_clk_frequency() -> u32 {
             32768
         }
         pub fn request_osc_slow_clk(clocks: &mut ClockTree) {
@@ -2220,7 +2220,7 @@ macro_rules! define_clock_tree_types {
             trace!("Disabling OSC_SLOW_CLK");
             enable_osc_slow_clk_impl(clocks, false);
         }
-        pub fn osc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn osc_slow_clk_frequency() -> u32 {
             32768
         }
         pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
@@ -2233,7 +2233,7 @@ macro_rules! define_clock_tree_types {
             trace!("Disabling RC_SLOW_CLK");
             enable_rc_slow_clk_impl(clocks, false);
         }
-        pub fn rc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn rc_slow_clk_frequency() -> u32 {
             136000
         }
         pub fn configure_hp_root_clk(clocks: &mut ClockTree, config: HpRootClkConfig) {
@@ -2265,9 +2265,9 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             config: HpRootClkConfig,
         ) -> u32 {
-            (soc_root_clk_frequency(clocks) / config.divisor())
+            (soc_root_clk_frequency() / config.divisor())
         }
-        pub fn hp_root_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn hp_root_clk_frequency() -> u32 {
             HP_ROOT_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
@@ -2293,11 +2293,11 @@ macro_rules! define_clock_tree_types {
         #[allow(unused_variables)]
         pub fn cpu_clk_config_frequency(clocks: &mut ClockTree, config: CpuClkConfig) -> u32 {
             match config {
-                CpuClkConfig::Hs => cpu_hs_div_frequency(clocks),
-                CpuClkConfig::Ls => cpu_ls_div_frequency(clocks),
+                CpuClkConfig::Hs => cpu_hs_div_frequency(),
+                CpuClkConfig::Ls => cpu_ls_div_frequency(),
             }
         }
-        pub fn cpu_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn cpu_clk_frequency() -> u32 {
             CPU_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_ahb_clk(clocks: &mut ClockTree, new_selector: AhbClkConfig) {
@@ -2323,11 +2323,11 @@ macro_rules! define_clock_tree_types {
         #[allow(unused_variables)]
         pub fn ahb_clk_config_frequency(clocks: &mut ClockTree, config: AhbClkConfig) -> u32 {
             match config {
-                AhbClkConfig::Hs => ahb_hs_div_frequency(clocks),
-                AhbClkConfig::Ls => ahb_ls_div_frequency(clocks),
+                AhbClkConfig::Hs => ahb_hs_div_frequency(),
+                AhbClkConfig::Ls => ahb_ls_div_frequency(),
             }
         }
-        pub fn ahb_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn ahb_clk_frequency() -> u32 {
             AHB_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_mspi_fast_clk(clocks: &mut ClockTree, new_selector: MspiFastClkConfig) {
@@ -2380,11 +2380,11 @@ macro_rules! define_clock_tree_types {
             config: MspiFastClkConfig,
         ) -> u32 {
             match config {
-                MspiFastClkConfig::Hs => mspi_fast_hs_clk_frequency(clocks),
-                MspiFastClkConfig::Ls => mspi_fast_ls_clk_frequency(clocks),
+                MspiFastClkConfig::Hs => mspi_fast_hs_clk_frequency(),
+                MspiFastClkConfig::Ls => mspi_fast_ls_clk_frequency(),
             }
         }
-        pub fn mspi_fast_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn mspi_fast_clk_frequency() -> u32 {
             MSPI_FAST_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_soc_root_clk(clocks: &mut ClockTree, new_selector: SocRootClkConfig) {
@@ -2456,12 +2456,12 @@ macro_rules! define_clock_tree_types {
             config: SocRootClkConfig,
         ) -> u32 {
             match config {
-                SocRootClkConfig::Xtal => xtal_clk_frequency(clocks),
-                SocRootClkConfig::RcFast => rc_fast_clk_frequency(clocks),
-                SocRootClkConfig::Pll => pll_clk_frequency(clocks),
+                SocRootClkConfig::Xtal => xtal_clk_frequency(),
+                SocRootClkConfig::RcFast => rc_fast_clk_frequency(),
+                SocRootClkConfig::Pll => pll_clk_frequency(),
             }
         }
-        pub fn soc_root_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn soc_root_clk_frequency() -> u32 {
             SOC_ROOT_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_cpu_hs_div(clocks: &mut ClockTree, config: CpuHsDivConfig) {
@@ -2486,9 +2486,9 @@ macro_rules! define_clock_tree_types {
         }
         #[allow(unused_variables)]
         pub fn cpu_hs_div_config_frequency(clocks: &mut ClockTree, config: CpuHsDivConfig) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn cpu_hs_div_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn cpu_hs_div_frequency() -> u32 {
             CPU_HS_DIV_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_cpu_ls_div(clocks: &mut ClockTree, config: CpuLsDivConfig) {
@@ -2513,9 +2513,9 @@ macro_rules! define_clock_tree_types {
         }
         #[allow(unused_variables)]
         pub fn cpu_ls_div_config_frequency(clocks: &mut ClockTree, config: CpuLsDivConfig) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn cpu_ls_div_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn cpu_ls_div_frequency() -> u32 {
             CPU_LS_DIV_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_ahb_hs_div(clocks: &mut ClockTree, config: AhbHsDivConfig) {
@@ -2540,9 +2540,9 @@ macro_rules! define_clock_tree_types {
         }
         #[allow(unused_variables)]
         pub fn ahb_hs_div_config_frequency(clocks: &mut ClockTree, config: AhbHsDivConfig) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn ahb_hs_div_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn ahb_hs_div_frequency() -> u32 {
             AHB_HS_DIV_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_ahb_ls_div(clocks: &mut ClockTree, config: AhbLsDivConfig) {
@@ -2567,9 +2567,9 @@ macro_rules! define_clock_tree_types {
         }
         #[allow(unused_variables)]
         pub fn ahb_ls_div_config_frequency(clocks: &mut ClockTree, config: AhbLsDivConfig) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn ahb_ls_div_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn ahb_ls_div_frequency() -> u32 {
             AHB_LS_DIV_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
@@ -2598,9 +2598,9 @@ macro_rules! define_clock_tree_types {
         }
         #[allow(unused_variables)]
         pub fn apb_clk_config_frequency(clocks: &mut ClockTree, config: ApbClkConfig) -> u32 {
-            (ahb_clk_frequency(clocks) / (config.divisor() + 1))
+            (ahb_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn apb_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn apb_clk_frequency() -> u32 {
             APB_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_mspi_fast_hs_clk(clocks: &mut ClockTree, config: MspiFastHsClkConfig) {
@@ -2628,9 +2628,9 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             config: MspiFastHsClkConfig,
         ) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn mspi_fast_hs_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn mspi_fast_hs_clk_frequency() -> u32 {
             MSPI_FAST_HS_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_mspi_fast_ls_clk(clocks: &mut ClockTree, config: MspiFastLsClkConfig) {
@@ -2658,9 +2658,9 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             config: MspiFastLsClkConfig,
         ) -> u32 {
-            (hp_root_clk_frequency(clocks) / (config.divisor() + 1))
+            (hp_root_clk_frequency() / (config.divisor() + 1))
         }
-        pub fn mspi_fast_ls_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn mspi_fast_ls_clk_frequency() -> u32 {
             MSPI_FAST_LS_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_pll_f48m(clocks: &mut ClockTree) {
@@ -2679,7 +2679,7 @@ macro_rules! define_clock_tree_types {
                 release_pll_clk(clocks);
             }
         }
-        pub fn pll_f48m_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn pll_f48m_frequency() -> u32 {
             48000000
         }
         pub fn request_pll_f80m(clocks: &mut ClockTree) {
@@ -2698,7 +2698,7 @@ macro_rules! define_clock_tree_types {
                 release_pll_clk(clocks);
             }
         }
-        pub fn pll_f80m_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn pll_f80m_frequency() -> u32 {
             80000000
         }
         pub fn request_pll_f160m(clocks: &mut ClockTree) {
@@ -2713,7 +2713,7 @@ macro_rules! define_clock_tree_types {
             enable_pll_f160m_impl(clocks, false);
             release_pll_clk(clocks);
         }
-        pub fn pll_f160m_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn pll_f160m_frequency() -> u32 {
             160000000
         }
         pub fn request_pll_f240m(clocks: &mut ClockTree) {
@@ -2732,7 +2732,7 @@ macro_rules! define_clock_tree_types {
                 release_pll_clk(clocks);
             }
         }
-        pub fn pll_f240m_frequency(clocks: &mut ClockTree) -> u32 {
+        pub fn pll_f240m_frequency() -> u32 {
             240000000
         }
         pub fn configure_ledc_sclk(clocks: &mut ClockTree, new_selector: LedcSclkConfig) {
@@ -2786,12 +2786,12 @@ macro_rules! define_clock_tree_types {
         #[allow(unused_variables)]
         pub fn ledc_sclk_config_frequency(clocks: &mut ClockTree, config: LedcSclkConfig) -> u32 {
             match config {
-                LedcSclkConfig::PllF80m => pll_f80m_frequency(clocks),
-                LedcSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                LedcSclkConfig::XtalClk => xtal_clk_frequency(clocks),
+                LedcSclkConfig::PllF80m => pll_f80m_frequency(),
+                LedcSclkConfig::RcFastClk => rc_fast_clk_frequency(),
+                LedcSclkConfig::XtalClk => xtal_clk_frequency(),
             }
         }
-        pub fn ledc_sclk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn ledc_sclk_frequency() -> u32 {
             LEDC_SCLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn request_xtal_d2_clk(clocks: &mut ClockTree) {
@@ -2806,8 +2806,8 @@ macro_rules! define_clock_tree_types {
             enable_xtal_d2_clk_impl(clocks, false);
             release_xtal_clk(clocks);
         }
-        pub fn xtal_d2_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (xtal_clk_frequency(clocks) / 2)
+        pub fn xtal_d2_clk_frequency() -> u32 {
+            (xtal_clk_frequency() / 2)
         }
         pub fn configure_lp_fast_clk(clocks: &mut ClockTree, new_selector: LpFastClkConfig) {
             let old_selector = clocks.lp_fast_clk.replace(new_selector);
@@ -2859,11 +2859,11 @@ macro_rules! define_clock_tree_types {
             config: LpFastClkConfig,
         ) -> u32 {
             match config {
-                LpFastClkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                LpFastClkConfig::XtalD2Clk => xtal_d2_clk_frequency(clocks),
+                LpFastClkConfig::RcFastClk => rc_fast_clk_frequency(),
+                LpFastClkConfig::XtalD2Clk => xtal_d2_clk_frequency(),
             }
         }
-        pub fn lp_fast_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn lp_fast_clk_frequency() -> u32 {
             LP_FAST_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_lp_slow_clk(clocks: &mut ClockTree, new_selector: LpSlowClkConfig) {
@@ -2912,12 +2912,12 @@ macro_rules! define_clock_tree_types {
             config: LpSlowClkConfig,
         ) -> u32 {
             match config {
-                LpSlowClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
-                LpSlowClkConfig::RcSlow => rc_slow_clk_frequency(clocks),
-                LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(clocks),
+                LpSlowClkConfig::Xtal32k => xtal32k_clk_frequency(),
+                LpSlowClkConfig::RcSlow => rc_slow_clk_frequency(),
+                LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
             }
         }
-        pub fn lp_slow_clk_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn lp_slow_clk_frequency() -> u32 {
             LP_SLOW_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn configure_timg_calibration_clock(
@@ -2979,12 +2979,12 @@ macro_rules! define_clock_tree_types {
             config: TimgCalibrationClockConfig,
         ) -> u32 {
             match config {
-                TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(clocks),
-                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(clocks),
-                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+                TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
+                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
         }
-        pub fn timg_calibration_clock_frequency(_clocks: &mut ClockTree) -> u32 {
+        pub fn timg_calibration_clock_frequency() -> u32 {
             TIMG_CALIBRATION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         impl McpwmInstance {
@@ -3054,12 +3054,12 @@ macro_rules! define_clock_tree_types {
                 config: McpwmFunctionClockConfig,
             ) -> u32 {
                 match config {
-                    McpwmFunctionClockConfig::PllF160m => pll_f160m_frequency(clocks),
-                    McpwmFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                    McpwmFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                    McpwmFunctionClockConfig::PllF160m => pll_f160m_frequency(),
+                    McpwmFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                    McpwmFunctionClockConfig::XtalClk => xtal_clk_frequency(),
                 }
             }
-            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn function_clock_frequency(self) -> u32 {
                 MCPWM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3124,12 +3124,12 @@ macro_rules! define_clock_tree_types {
                 config: ParlIoRxClockConfig,
             ) -> u32 {
                 match config {
-                    ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                    ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                    ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(clocks),
+                    ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
-            pub fn rx_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn rx_clock_frequency(self) -> u32 {
                 PARL_IO_RX_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3192,12 +3192,12 @@ macro_rules! define_clock_tree_types {
                 config: ParlIoTxClockConfig,
             ) -> u32 {
                 match config {
-                    ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                    ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                    ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(clocks),
+                    ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
-            pub fn tx_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn tx_clock_frequency(self) -> u32 {
                 PARL_IO_TX_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3258,12 +3258,12 @@ macro_rules! define_clock_tree_types {
                 config: RmtSclkConfig,
             ) -> u32 {
                 match config {
-                    RmtSclkConfig::PllF80m => pll_f80m_frequency(clocks),
-                    RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                    RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
+                    RmtSclkConfig::PllF80m => pll_f80m_frequency(),
+                    RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    RmtSclkConfig::XtalClk => xtal_clk_frequency(),
                 }
             }
-            pub fn sclk_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn sclk_frequency(self) -> u32 {
                 RMT_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
             }
         }
@@ -3334,12 +3334,12 @@ macro_rules! define_clock_tree_types {
                 config: TimgFunctionClockConfig,
             ) -> u32 {
                 match config {
-                    TimgFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                    TimgFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                    TimgFunctionClockConfig::PllF80m => pll_f80m_frequency(clocks),
+                    TimgFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+                    TimgFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                    TimgFunctionClockConfig::PllF80m => pll_f80m_frequency(),
                 }
             }
-            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn function_clock_frequency(self) -> u32 {
                 TIMG_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3402,12 +3402,12 @@ macro_rules! define_clock_tree_types {
                 config: TimgWdtClockConfig,
             ) -> u32 {
                 match config {
-                    TimgWdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                    TimgWdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
-                    TimgWdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    TimgWdtClockConfig::XtalClk => xtal_clk_frequency(),
+                    TimgWdtClockConfig::PllF80m => pll_f80m_frequency(),
+                    TimgWdtClockConfig::RcFastClk => rc_fast_clk_frequency(),
                 }
             }
-            pub fn wdt_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn wdt_clock_frequency(self) -> u32 {
                 TIMG_WDT_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3479,12 +3479,12 @@ macro_rules! define_clock_tree_types {
                 config: UartFunctionClockConfig,
             ) -> u32 {
                 (match config.sclk {
-                    UartFunctionClockSclk::PllF80m => pll_f80m_frequency(clocks),
-                    UartFunctionClockSclk::RcFast => rc_fast_clk_frequency(clocks),
-                    UartFunctionClockSclk::Xtal => xtal_clk_frequency(clocks),
+                    UartFunctionClockSclk::PllF80m => pll_f80m_frequency(),
+                    UartFunctionClockSclk::RcFast => rc_fast_clk_frequency(),
+                    UartFunctionClockSclk::Xtal => xtal_clk_frequency(),
                 } / (config.div_num() + 1))
             }
-            pub fn function_clock_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn function_clock_frequency(self) -> u32 {
                 UART_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
@@ -3529,10 +3529,10 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: UartBaudRateGeneratorConfig,
             ) -> u32 {
-                ((self.function_clock_frequency(clocks) * 16)
+                ((self.function_clock_frequency() * 16)
                     / ((config.integral() * 16) + config.fractional()))
             }
-            pub fn baud_rate_generator_frequency(self, _clocks: &mut ClockTree) -> u32 {
+            pub fn baud_rate_generator_frequency(self) -> u32 {
                 UART_BAUD_RATE_GENERATOR_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }

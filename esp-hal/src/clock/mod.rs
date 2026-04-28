@@ -129,7 +129,7 @@ impl RtcClock {
                 let getter = clocks::lp_slow_clk_frequency;
             }
         }
-        Rate::from_hz(ClockTree::with(getter))
+        Rate::from_hz(getter())
     }
 
     /// Measure the frequency of one of the TIMG0 calibration clocks,
@@ -143,7 +143,7 @@ impl RtcClock {
     #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
-            let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
+            let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency());
 
             let (xtal_cycles, _) = Clocks::measure_rtc_clock(
                 clocks,
@@ -259,11 +259,11 @@ impl Clocks {
             // code
             Self {
                 #[cfg(soc_has_clock_node_cpu_clk)]
-                cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency(clocks)),
+                cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency()),
                 #[cfg(soc_has_clock_node_apb_clk)]
-                apb_clock: Rate::from_hz(clocks::apb_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(clocks::apb_clk_frequency()),
                 #[cfg(soc_has_clock_node_xtal_clk)]
-                xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency()),
             }
         })
     }
@@ -371,7 +371,7 @@ impl Clocks {
                 .modify(|_, w| w.tick_enable().set_bit());
         }
 
-        let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
+        let calibration_clock_frequency = clocks::timg_calibration_clock_frequency();
 
         let effective_calibration_clock_frequency =
             calibration_clock_frequency / calibration_divider;
@@ -381,7 +381,7 @@ impl Clocks {
         #[cfg(not(esp32))]
         {
             let function_clk_freq =
-                clocks::TimgInstance::Timg0.function_clock_frequency(clocks) as u64;
+                clocks::TimgInstance::Timg0.function_clock_frequency() as u64;
             let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
                 / effective_calibration_clock_frequency as u64)
                 as u32;

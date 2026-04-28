@@ -475,13 +475,13 @@ impl ClockTreeNodeInstance {
                         pub fn #config_frequency_function_name(#(#receiver,)* clocks: &mut ClockTree, config: #ty_name) -> u32 {
                             #frequency_function_impl
                         }
-                        pub fn #frequency_function_name(#(#receiver,)* _clocks: &mut ClockTree) -> u32 {
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
                             #cache_load
                         }
                     }
                 } else {
                     quote! {
-                        pub fn #frequency_function_name(#(#receiver,)* clocks: &mut ClockTree) -> u32 {
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
                             #frequency_function_impl
                         }
                     }
