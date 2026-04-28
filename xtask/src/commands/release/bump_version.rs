@@ -440,7 +440,21 @@ fn finalize_placeholders(
         }
     }
 
+    let is_prerelease = !new_version.pre.is_empty();
+
     walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
+        if is_prerelease {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with("MIGRATING-") && name.ends_with(".md") {
+                    log::info!(
+                        "  Skipping migration guide {} (pre-release)",
+                        path.display()
+                    );
+                    return;
+                }
+            }
+        }
+
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
