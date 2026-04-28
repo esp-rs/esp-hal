@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
+- ESP32: attenuation is now correctly set for ADC2 (#5463)
+- UART: disallow 0 as the RX FIFO full threshold (#5451)
+- UART: prevent returning 0 from `read_async` (#5451)
 
 ### Removed
 
