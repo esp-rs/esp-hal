@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5 and C61: Enable RTC timekeeping (#5449)
 - C61: usb-serial-jtag and debug-assist (#5427)
 - C61: dedicated gpio (#5426)
-- UART: unstably add and return RX timeout error (#5451)
 
 ### Changed
 
@@ -22,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
 - ESP32: attenuation is now correctly set for ADC2 (#5463)
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
-- UART: disable default RX timeout (#5451)
+- UART: prevent returning 0 from `read_async` (#5451)
 
 ### Removed
 

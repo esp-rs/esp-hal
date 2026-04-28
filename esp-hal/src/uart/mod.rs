@@ -1078,7 +1078,8 @@ impl<'d> UartRx<'d, Async> {
         // of returnable bytes.
         let minimum = minimum.min(max_threshold);
 
-        if self.uart.info().rx_fifo_count() < minimum {
+        // loop to prevent returning 0 bytes
+        while self.uart.info().rx_fifo_count() < minimum {
             // We're ignoring the user configuration here to ensure that this is not waiting
             // for more data than the buffer. We'll restore the original value after the
             // future resolved.
