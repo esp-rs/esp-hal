@@ -61,18 +61,18 @@ cfg_select! {
 
             /// 64 bytes
             Size64 = 64,
-        }
+    }
 
         impl ExternalBurstConfig {
             /// The default external memory burst length.
             pub const DEFAULT: Self = Self::Size16;
-        }
+    }
 
         impl Default for ExternalBurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
-        }
+    }
 
         /// Internal memory access burst mode.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -83,18 +83,18 @@ cfg_select! {
 
             /// Burst mode is enabled.
             Enabled,
-        }
+    }
 
         impl InternalBurstConfig {
             /// The default internal burst mode configuration.
             pub const DEFAULT: Self = Self::Disabled;
-        }
+    }
 
         impl Default for InternalBurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
-        }
+    }
 
         /// Burst transfer configuration.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -109,7 +109,7 @@ cfg_select! {
             ///
             /// The burst size is not configurable.
             pub internal_memory: InternalBurstConfig,
-        }
+    }
 
         impl BurstConfig {
             /// The default burst mode configuration.
@@ -117,13 +117,13 @@ cfg_select! {
                 external_memory: ExternalBurstConfig::DEFAULT,
                 internal_memory: InternalBurstConfig::DEFAULT,
             };
-        }
+    }
 
         impl Default for BurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
-        }
+    }
 
         impl From<InternalBurstConfig> for BurstConfig {
             fn from(internal_memory: InternalBurstConfig) -> Self {
@@ -132,7 +132,7 @@ cfg_select! {
                     internal_memory,
                 }
             }
-        }
+    }
 
         impl From<ExternalBurstConfig> for BurstConfig {
             fn from(external_memory: ExternalBurstConfig) -> Self {
@@ -141,7 +141,7 @@ cfg_select! {
                     internal_memory: InternalBurstConfig::DEFAULT,
                 }
             }
-        }
+    }
     }
     _ => {
         /// Burst transfer configuration.
@@ -153,18 +153,18 @@ cfg_select! {
 
             /// Burst mode is enabled.
             Enabled,
-        }
+    }
 
         impl BurstConfig {
             /// The default burst mode configuration.
             pub const DEFAULT: Self = Self::Disabled;
-        }
+    }
 
         impl Default for BurstConfig {
             fn default() -> Self {
                 Self::DEFAULT
             }
-        }
+    }
 
         type InternalBurstConfig = BurstConfig;
     }
@@ -284,7 +284,7 @@ impl BurstConfig {
                 let mut alignment = alignment;
                 if is_valid_psram_address(_buffer.as_ptr() as usize) {
                     alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
-                }
+            }
             }
 
             _ => {}
@@ -655,7 +655,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
                             self.buffer.len() as u32,
                         )
                     };
-                }
+            }
             }
 
             _ => {}
@@ -869,7 +869,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
                             self.buffer.len() as u32,
                         )
                     };
-                }
+            }
             }
 
             _ => {}
@@ -1054,7 +1054,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
                             self.buffer.len() as u32,
                         )
                     };
-                }
+            }
             }
 
             _ => {}
@@ -1100,7 +1100,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
                             self.buffer.len() as u32,
                         )
                     };
-                }
+            }
             }
 
             _ => {}
@@ -1684,7 +1684,7 @@ pub(crate) unsafe fn prepare_for_tx(
             // Make sure input data is in PSRAM instead of cache
             if data_in_psram {
                 unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
-            }
+        }
         }
 
         _ => {}
@@ -1761,7 +1761,7 @@ pub(crate) unsafe fn prepare_for_rx(
                 unsafe {
                     crate::soc::cache_writeback_addr(data_addr as u32, consumed_bytes as u32);
                     crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
-                }
+            }
 
                 consumed_bytes
             }

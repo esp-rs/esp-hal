@@ -127,10 +127,10 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
                 println!(
                     "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
                 );
-            }
+        }
             for frame in backtrace.frames() {
                 println!("0x{:x}", frame.program_counter());
-            }
+        }
         }
         _ => {
             arch::dump_stack();
@@ -214,7 +214,7 @@ fn abort() -> ! {
             // call custom code
             unsafe extern "Rust" {
                 fn custom_halt() -> !;
-            }
+        }
             unsafe { custom_halt() }
         }
 

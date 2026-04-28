@@ -78,13 +78,13 @@ mod tests {
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         cfg_select! {
-    any(feature = "esp32c6", feature = "esp32h2") => {
+            any(feature = "esp32c6", feature = "esp32h2") => {
                 let cpu_intr = &peripherals.INTPRI;
             }
-    _ => {
+            _ => {
                 let cpu_intr = &peripherals.SYSTEM;
             }
-}
+        }
 
         let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu(0) as *const _ as u32;
         unsafe {
@@ -141,12 +141,12 @@ mod tests {
 
         // TODO c3/c2 values should be adjusted to catch smaller regressions
         cfg_select! {
-    any(feature = "esp32c3", feature = "esp32c2") => {
+            any(feature = "esp32c3", feature = "esp32c2") => {
             assert!(perf_counter < 400);
-        }
-    _ => {
+            }
+            _ => {
             assert!(perf_counter < 155);
+            }
         }
-}
     }
 }

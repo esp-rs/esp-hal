@@ -1372,13 +1372,13 @@ where
                     buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
                     data_mode = address.mode();
                     address = Address::None;
-                }
+            }
 
                 if dummy > 0 {
                     // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
                     error!("Dummy bits are not supported without data");
                     return Err(Error::Unsupported);
-                }
+            }
             }
 
             _ => {}
@@ -1801,34 +1801,34 @@ impl Driver {
             esp32 => {
                 if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
-                }
+            }
             }
             esp32s2 => {
                 if self.regs().slave().read().trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
-                }
+            }
                 if self.regs().hold().read().dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegmentedTransferDone);
-                }
+            }
             }
             _ => {
                 let ints = self.regs().dma_int_raw().read();
 
                 if ints.trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
-                }
+            }
                 #[cfg(spi_master_has_dma_segmented_transfer)]
                 if ints.dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegmentedTransferDone);
-                }
+            }
                 #[cfg(spi_master_has_app_interrupts)]
                 if ints.app2().bit() {
                     res.insert(SpiInterrupt::App2);
-                }
+            }
                 #[cfg(spi_master_has_app_interrupts)]
                 if ints.app1().bit() {
                     res.insert(SpiInterrupt::App1);
-                }
+            }
             }
         }
 
@@ -1845,7 +1845,7 @@ impl Driver {
                             self.regs().slave().modify(|_, w| w.trans_done().clear_bit());
                         }
                     }
-                }
+            }
             }
             esp32s2 => {
                 for interrupt in interrupts {
@@ -1860,7 +1860,7 @@ impl Driver {
                                 .modify(|_, w| w.dma_seg_trans_done().clear_bit());
                         }
                     }
-                }
+            }
             }
             _ => {
                 self.regs().dma_int_clr().write(|w| {
@@ -2416,7 +2416,7 @@ impl Driver {
 
                 while reg_block.cmd().read().update().bit_is_set() {
                     // wait
-                }
+            }
             }
             _ => {
                 // Doesn't seem to be needed for ESP32 and ESP32-S2

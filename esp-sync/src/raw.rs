@@ -72,7 +72,7 @@ impl RawLock for SingleCoreInterruptLock {
                     unsafe {
                         riscv::interrupt::enable();
                     }
-                }
+            }
             }
             xtensa => {
                 #[cfg(debug_assertions)]
@@ -86,13 +86,13 @@ impl RawLock for SingleCoreInterruptLock {
                     }
 
                     __assert_failed();
-                }
+            }
 
                 unsafe {
                     core::arch::asm!(
                         "wsr.ps {0}",
                         "rsync", in(reg) token)
-                }
+            }
             }
             _ => {
                 compile_error!("Unsupported architecture")

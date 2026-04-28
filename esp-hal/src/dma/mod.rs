@@ -1892,7 +1892,7 @@ where
                         }
                         unsafe {crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32); }
                     }
-                }
+            }
             }
 
             _ => {}
@@ -2159,7 +2159,7 @@ where
                         }
                         unsafe { crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32); }
                     }
-                }
+            }
             }
 
             _ => {}

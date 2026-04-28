@@ -98,26 +98,26 @@ mod tests {
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         cfg_select! {
-    all(spi_master_supports_dma, feature = "unstable") => {
+            all(spi_master_supports_dma, feature = "unstable") => {
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
             }
-    _ => {
+            _ => {
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
                 static mut RX_BUFFER: [u8; 4096] = [0; 4096];
 
                 let tx_buffer = unsafe { (&raw mut TX_BUFFER).as_mut().unwrap() };
                 let rx_buffer = unsafe { (&raw mut RX_BUFFER).as_mut().unwrap() };
             }
-}
+        }
 
         // Need to set miso first so that mosi can overwrite the
         // output connection (because we are using the same pin to loop back)
@@ -131,7 +131,7 @@ mod tests {
         .with_mosi(mosi);
 
         cfg_select! {
-    feature = "unstable" => {
+            feature = "unstable" => {
                 #[cfg(pcnt_driver_supported)]
                 let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -150,17 +150,17 @@ mod tests {
                     tx_descriptors,
                     #[cfg(pcnt_driver_supported)]
                     pcnt_unit: pcnt.unit0,
-                }
             }
-    _ => {
+            }
+            _ => {
                 Context {
                     spi,
                     rx_buffer,
                     tx_buffer,
                     miso_input,
-                }
             }
-}
+            }
+        }
     }
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
         let mut read = [0x00; 2];
 
         cfg_select! {
-    all(pcnt_driver_supported, feature = "unstable") => {
+            all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
@@ -199,8 +199,8 @@ mod tests {
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
 
-    _ => {}
-}
+            _ => {}
+        }
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -216,7 +216,7 @@ mod tests {
         let mut read = [0x00; 4];
 
         cfg_select! {
-    all(pcnt_driver_supported, feature = "unstable") => {
+            all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
@@ -224,8 +224,8 @@ mod tests {
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
 
-    _ => {}
-}
+            _ => {}
+        }
 
         SpiBus::transfer(&mut ctx.spi, &mut read, &write).expect("Asymmetric transfer failed");
         assert_eq!(read[0], write[0]);
@@ -243,7 +243,7 @@ mod tests {
         let mut read = [0x00; 2];
 
         cfg_select! {
-    all(pcnt_driver_supported, feature = "unstable") => {
+            all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
@@ -251,8 +251,8 @@ mod tests {
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
 
-    _ => {}
-}
+            _ => {}
+        }
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)
@@ -271,7 +271,7 @@ mod tests {
         let mut read = [0x00; 4];
 
         cfg_select! {
-    all(pcnt_driver_supported, feature = "unstable") => {
+            all(pcnt_driver_supported, feature = "unstable") => {
                 let unit = ctx.pcnt_unit;
                 unit.channel0
                     .set_edge_signal(ctx.sclk_input.peripheral_input());
@@ -279,8 +279,8 @@ mod tests {
                     .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
             }
 
-    _ => {}
-}
+            _ => {}
+        }
 
         let mut spi = ctx.spi.into_async();
         SpiBusAsync::transfer(&mut spi, &mut read, &write)

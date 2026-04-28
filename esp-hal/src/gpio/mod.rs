@@ -1905,7 +1905,7 @@ impl<'lt> AnyPin<'lt> {
                     match crate::system::Cpu::current() {
                         crate::system::Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
                         crate::system::Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
-                    }
+                }
                 }
                 _ => {
                     // ESP32 and ESP32-C3 have separate bits for maskable and NMI interrupts.

@@ -49,7 +49,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     cfg_select! {
-    feature = "esp32" => {
+        feature = "esp32" => {
             let sclk = peripherals.GPIO12;
             let miso = peripherals.GPIO2;
             let mosi = peripherals.GPIO4;
@@ -57,7 +57,7 @@ fn main() -> ! {
             let sio3 = peripherals.GPIO13;
             let cs = peripherals.GPIO14;
         }
-    _ => {
+        _ => {
             let sclk = peripherals.GPIO0;
             let miso = peripherals.GPIO1;
             let mosi = peripherals.GPIO2;
@@ -65,16 +65,16 @@ fn main() -> ! {
             let sio3 = peripherals.GPIO4;
             let cs = peripherals.GPIO5;
         }
-}
+    }
 
     cfg_select! {
-    any(feature = "esp32", feature = "esp32s2") => {
+        any(feature = "esp32", feature = "esp32s2") => {
             let dma_channel = peripherals.DMA_SPI2;
         }
-    _ => {
+        _ => {
             let dma_channel = peripherals.DMA_CH0;
         }
-}
+    }
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(320, 256);
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();

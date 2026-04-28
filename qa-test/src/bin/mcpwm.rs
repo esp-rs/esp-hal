@@ -26,17 +26,17 @@ fn main() -> ! {
     let pin = peripherals.GPIO0;
 
     cfg_select! {
-    feature = "esp32h2" => {
+        feature = "esp32h2" => {
             let clock_cfg =
                 PeripheralClockConfig::with_frequency(Rate::from_mhz(40)).unwrap();
         }
-    not(feature = "esp32h2") => {
+        not(feature = "esp32h2") => {
             let clock_cfg =
                 PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
         }
 
-    _ => {}
-}
+        _ => {}
+    }
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
     mcpwm.operator0.set_timer(&mcpwm.timer0);

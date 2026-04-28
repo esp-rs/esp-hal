@@ -80,13 +80,13 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
         any(esp32c6, esp32h2) => {
             unsafe extern "C" {
                 fn ets_clk_get_xtal_freq() -> i32;
-            }
+        }
             (unsafe { ets_clk_get_xtal_freq() }) / 1_000_000
         }
         any(esp32s2, esp32s3, esp32c3) => {
             unsafe extern "C" {
                 fn ets_get_xtal_freq() -> i32;
-            }
+        }
             (unsafe { ets_get_xtal_freq() }) / 1_000_000
         }
         any(esp32, esp32c2) => {

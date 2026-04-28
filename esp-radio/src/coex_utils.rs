@@ -38,7 +38,7 @@ macro_rules! extern_coex_fns {
                     feature = "coex" => {
                         unsafe extern "C" {
                             fn $name($($arg: $arg_ty),*) $(-> $ret)?;
-                        }
+                    }
                         unsafe { $name ($($arg),*) }
                     }
                     _ => {

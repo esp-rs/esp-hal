@@ -169,19 +169,19 @@ mod tests {
         // while we're at it.
 
         cfg_select! {
-    esp32c2 => {
+            esp32c2 => {
                 let fastest_clock_source = ClockSource::PllF40m;
             }
-    any(esp32c5, esp32c6, esp32c61) => {
+            any(esp32c5, esp32c6, esp32c61) => {
                 let fastest_clock_source = ClockSource::PllF80m;
             }
-    esp32h2 => {
+            esp32h2 => {
                 let fastest_clock_source = ClockSource::PllF48m;
             }
-    _ => {
+            _ => {
                 let fastest_clock_source = ClockSource::Apb;
             }
-}
+        }
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]

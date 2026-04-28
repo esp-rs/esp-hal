@@ -3373,7 +3373,7 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
             let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
             unsafe {
                 fifo_ptr.write_volatile(data as u32);
-            }
+        }
         }
         _ => {
             register_block
@@ -3393,7 +3393,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
                 AcknowledgeCheckFailedReason::Address
             } else {
                 AcknowledgeCheckFailedReason::Data
-            }
+        }
         }
         _ => {
             AcknowledgeCheckFailedReason::Unknown

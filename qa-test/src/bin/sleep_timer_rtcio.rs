@@ -51,7 +51,7 @@ fn main() -> ! {
 
     let config = InputConfig::default().with_pull(Pull::None);
     cfg_select! {
-    any(feature = "esp32c3", feature = "esp32c2") => {
+        any(feature = "esp32c3", feature = "esp32c2") => {
             let mut pin2 = peripherals.GPIO2;
             let mut pin3 = peripherals.GPIO3;
             let _pin2_input = Input::new(pin2.reborrow(), config);
@@ -61,7 +61,7 @@ fn main() -> ! {
                 (&mut pin3, WakeupLevel::High),
             ];
         }
-    any(feature = "esp32s2", feature = "esp32s3") => {
+        any(feature = "esp32s2", feature = "esp32s3") => {
             let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
             let _pin17_input = Input::new(pin17.reborrow(), config);
@@ -72,8 +72,8 @@ fn main() -> ! {
             ];
         }
 
-    _ => {}
-}
+        _ => {}
+    }
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);
     println!("sleeping!");

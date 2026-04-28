@@ -717,7 +717,7 @@ pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
                         yield_task()
                     } else {
                         schedule_other_core()
-                    }
+                }
                 }
                 _ => {
                     yield_task()

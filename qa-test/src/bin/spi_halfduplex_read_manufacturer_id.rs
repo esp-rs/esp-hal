@@ -48,7 +48,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     cfg_select! {
-    feature = "esp32" => {
+        feature = "esp32" => {
             let sclk = peripherals.GPIO12;
             let miso = peripherals.GPIO2;
             let mosi = peripherals.GPIO4;
@@ -56,7 +56,7 @@ fn main() -> ! {
             let sio3 = peripherals.GPIO13;
             let cs = peripherals.GPIO14;
         }
-    _ => {
+        _ => {
             let sclk = peripherals.GPIO0;
             let miso = peripherals.GPIO1;
             let mosi = peripherals.GPIO2;
@@ -64,7 +64,7 @@ fn main() -> ! {
             let sio3 = peripherals.GPIO4;
             let cs = peripherals.GPIO5;
         }
-}
+    }
 
     let mut spi = Spi::new(
         peripherals.SPI2,

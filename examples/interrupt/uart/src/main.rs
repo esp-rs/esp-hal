@@ -40,27 +40,27 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     cfg_select! {
-    feature = "esp32" => {
+        feature = "esp32" => {
             let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
         }
-    feature = "esp32c2" => {
+        feature = "esp32c2" => {
             let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         }
-    feature = "esp32c3" => {
+        feature = "esp32c3" => {
             let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
         }
-    feature = "esp32c6" => {
+        feature = "esp32c6" => {
             let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
         }
-    feature = "esp32h2" => {
+        feature = "esp32h2" => {
             let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
         }
-    any(feature = "esp32s2", feature = "esp32s3") => {
+        any(feature = "esp32s2", feature = "esp32s3") => {
             let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
 
-    _ => {}
-}
+        _ => {}
+    }
 
     let uart_config = UartConfig::default()
         .with_baudrate(19200)

@@ -24,13 +24,13 @@ mod tests {
     };
 
     cfg_select! {
-    any(esp32, esp32s2) => {
+        any(esp32, esp32s2) => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
         }
-    _ => {
+        _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-}
+    }
 
     const BUFFER_SIZE: usize = 2000;
 
@@ -94,13 +94,13 @@ mod tests {
         );
 
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_I2S0;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         let (_, dout) = hil_test::common_test_pins!(peripherals);
 

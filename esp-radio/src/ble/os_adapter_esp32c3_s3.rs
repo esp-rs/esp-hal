@@ -183,7 +183,7 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
             unsafe {
                 const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
                 coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
-            }
+        }
         }
         _ => {
             0

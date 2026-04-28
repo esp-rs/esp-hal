@@ -38,7 +38,7 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     cfg_select! {
-    feature = "esp32c6" => {
+        feature = "esp32c6" => {
             use esp_hal::gpio::{Input, InputConfig, Pull};
 
             let mut pin_low = peripherals.GPIO2;
@@ -49,13 +49,13 @@ fn main() -> ! {
             );
             core::mem::drop(input);
         }
-    feature = "esp32h2" => {
+        feature = "esp32h2" => {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
             let mut pin_high = peripherals.GPIO10;
         }
 
-    _ => {}
-}
+        _ => {}
+    }
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

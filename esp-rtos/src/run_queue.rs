@@ -282,7 +282,7 @@ impl RunQueue {
                     }
 
                     break;
-                }
+            }
 
             }
             _ => {

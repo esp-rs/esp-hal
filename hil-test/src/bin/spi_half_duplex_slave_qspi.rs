@@ -27,13 +27,13 @@ mod read {
 
     #[cfg(spi_master_supports_dma)]
     cfg_select! {
-    dma_kind = "pdma" => {
+        dma_kind = "pdma" => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         }
-    _ => {
+        _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-}
+    }
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -53,13 +53,13 @@ mod read {
 
         #[cfg(spi_master_supports_dma)]
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         let spi = Spi::new(
             peripherals.SPI2,
@@ -289,13 +289,13 @@ mod write {
 
     #[cfg(spi_master_supports_dma)]
     cfg_select! {
-    dma_kind = "pdma" => {
+        dma_kind = "pdma" => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         }
-    _ => {
+        _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-}
+    }
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -317,13 +317,13 @@ mod write {
 
         #[cfg(spi_master_supports_dma)]
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         let mut mosi = Flex::new(mosi);
 
@@ -526,13 +526,13 @@ mod spi_slave {
 
     #[cfg(spi_slave_supports_dma)]
     cfg_select! {
-    any(esp32, esp32s2) => {
+        any(esp32, esp32s2) => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         }
-    _ => {
+        _ => {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-}
+    }
 
     struct Context {
         spi: Spi<'static, Blocking>,
@@ -613,13 +613,13 @@ mod spi_slave {
 
         #[cfg(spi_slave_supports_dma)]
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         let mut mosi_gpio = Flex::new(mosi_pin);
         mosi_gpio.apply_output_config(&OutputConfig::default());
@@ -714,22 +714,22 @@ mod qspi_dma {
     };
 
     cfg_select! {
-    dma_kind = "pdma" => {
+        dma_kind = "pdma" => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         }
-    _ => {
+        _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
-}
+    }
 
     cfg_select! {
-    esp32 => {
+        esp32 => {
             const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
         }
-    _ => {
+        _ => {
             const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
         }
-}
+    }
 
     type SpiUnderTest<'a> = SpiDma<'a, Blocking>;
 
@@ -960,13 +960,13 @@ mod qspi_dma {
         let _ = Input::new(unconnected_pin.reborrow(), config);
 
         cfg_select! {
-    dma_kind = "pdma" => {
+            dma_kind = "pdma" => {
                 let dma_channel = peripherals.DMA_SPI2;
             }
-    _ => {
+            _ => {
                 let dma_channel = peripherals.DMA_CH0;
             }
-}
+        }
 
         let spi = Spi::new(
             peripherals.SPI2,

@@ -48,7 +48,7 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
                         addr = in(reg) addr,
                         dbreakc = in(reg) dbreakc,
                     );
-                }
+            }
             }
             _ => {
                 unsafe { set_watchpoint(0, addr, 4); }

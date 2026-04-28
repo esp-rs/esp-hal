@@ -25,7 +25,7 @@ fn main() -> ! {
     da.set_interrupt_handler(interrupt_handler);
 
     cfg_select! {
-    not(feature = "esp32s3") => {
+        not(feature = "esp32s3") => {
             use core::ptr::addr_of_mut;
 
             unsafe extern "C" {
@@ -33,7 +33,7 @@ fn main() -> ! {
                 static mut _stack_start: u32;
                 // bottom of stack
                 static mut _stack_end: u32;
-            }
+        }
 
             #[allow(unused_unsafe)]
             let stack_top = unsafe { addr_of_mut!(_stack_start) } as *mut _ as u32;
@@ -42,12 +42,12 @@ fn main() -> ! {
 
             let size = 4096;
         }
-    _ => {
+        _ => {
             let stack_bottom = 0x3fcce000;
 
             let size = 256;
         }
-}
+    }
 
     // Monitor the SP so as to prevent stack overflow or erroneous push/pop.
     // When the SP exceeds the minimum or maximum threshold, the module will

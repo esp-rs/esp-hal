@@ -54,28 +54,28 @@ macro_rules! i2c_pins {
     ($peripherals:expr) => {{
         // Order: (SDA, SCL)
         cfg_select! {
-    any(esp32s2, esp32s3) => {
+            any(esp32s2, esp32s3) => {
                 ($peripherals.GPIO3, $peripherals.GPIO2)
             }
-    esp32 => {
+            esp32 => {
                 ($peripherals.GPIO32, $peripherals.GPIO33)
             }
-    any(esp32c6, esp32c61) => {
+            any(esp32c6, esp32c61) => {
                 ($peripherals.GPIO6, $peripherals.GPIO7)
             }
-    esp32h2 => {
+            esp32h2 => {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
             }
-    esp32c2 => {
+            esp32c2 => {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
             }
-    esp32c5 => {
+            esp32c5 => {
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
-    _ => { // esp32c3
+            _ => { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
             }
-}
+        }
     }};
 }
 
@@ -83,16 +83,16 @@ macro_rules! i2c_pins {
 macro_rules! common_test_pins {
     ($peripherals:expr) => {{
         cfg_select! {
-    any(esp32s2, esp32s3, esp32c5) => {
+            any(esp32s2, esp32s3, esp32c5) => {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
             }
-    esp32 => {
+            esp32 => {
                 ($peripherals.GPIO2, $peripherals.GPIO4)
             }
-    _ => { // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
+            _ => { // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
-}
+        }
     }};
 }
 
@@ -102,19 +102,19 @@ macro_rules! common_test_pins {
 macro_rules! unconnected_pin {
     ($peripherals:expr) => {{
         cfg_select! {
-    any(esp32, esp32s2, esp32s3) => {
+            any(esp32, esp32s2, esp32s3) => {
                 $peripherals.GPIO0
             }
-    esp32c2 => {
+            esp32c2 => {
                 $peripherals.GPIO8
             }
-    esp32c5 => {
+            esp32c5 => {
                 $peripherals.GPIO28
             }
-    _ => { // esp32c3, esp32c6, esp32c61, esp32h2
+            _ => { // esp32c3, esp32c6, esp32c61, esp32h2
                 $peripherals.GPIO9
             }
-}
+        }
     }};
 }
 

@@ -130,12 +130,12 @@ cfg_select! {
         // On ESP32, the interrupt fires on the core that started listening for a pin event.
         fn cores() -> impl Iterator<Item = crate::system::Cpu> {
             crate::system::Cpu::all()
-        }
+    }
     }
     _ => {
         fn cores() -> [crate::system::Cpu; 1] {
             [crate::system::Cpu::current()]
-        }
+    }
     }
 }
 
@@ -231,14 +231,14 @@ impl InterruptStatusRegisterAccess {
                 match self {
                     Self::Bank0 => GPIO::regs().status().read().bits(),
                     Self::Bank1 => GPIO::regs().status1().read().bits(),
-                }
+            }
             }
             _ => {
                 match self {
                     Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
                     #[cfg(gpio_has_bank_1)]
                     Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
-                }
+            }
             }
         }
     }

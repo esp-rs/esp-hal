@@ -16,16 +16,16 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         cfg_select! {
-    esp32s2 => {
+            esp32s2 => {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
             }
-    soc_has_mem2mem1 => {
+            soc_has_mem2mem1 => {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
             }
-    _ => {
+            _ => {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
             }
-}
+        }
 
         Context { mem2mem }
     }

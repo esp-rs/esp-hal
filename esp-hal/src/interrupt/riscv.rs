@@ -611,7 +611,7 @@ pub(crate) mod rt {
                 // `mintstatus` CSR
                 unsafe {
                     core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
-                }
+            }
             }
             _ => {
                 unsafe { change_current_runlevel(level) };

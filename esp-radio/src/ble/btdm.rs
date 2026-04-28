@@ -356,7 +356,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             esp32 => {
                 unsafe extern "C" {
                     fn btdm_rf_bb_init_phase2();
-                }
+            }
 
                 btdm_rf_bb_init_phase2();
                 coex_bt_high_prio();

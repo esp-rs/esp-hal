@@ -86,7 +86,7 @@ pub(super) fn dump_stack() {
 
             unsafe extern "C" {
                 static _stack_start: u32;
-            }
+        }
 
             let end = u32::min(
                 core::ptr::addr_of!(_stack_start) as u32,
@@ -97,7 +97,7 @@ pub(super) fn dump_stack() {
             for address in sp..end {
                 let byte = unsafe { (address as *const u8).read_volatile() };
                 esp_println::print!("{:02x}", byte);
-            }
+        }
             esp_println::println!();
         }
         _ => {

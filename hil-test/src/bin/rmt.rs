@@ -447,14 +447,14 @@ cfg_select! {
             ($rmt:expr) => {
                 $rmt.channel4
             };
-        }
+    }
     }
     _ => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel2
             };
-        }
+    }
     }
 }
 

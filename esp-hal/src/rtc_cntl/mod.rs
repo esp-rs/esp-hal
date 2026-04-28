@@ -229,7 +229,7 @@ impl<'d> Rtc<'d> {
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
-                }
+            }
 
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();

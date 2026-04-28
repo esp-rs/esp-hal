@@ -28,16 +28,16 @@ fn main() -> ! {
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
     cfg_select! {
-    feature = "esp32s2" => {
+        feature = "esp32s2" => {
             let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
         }
-    any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3") => {
+        any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3") => {
             let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
         }
-    _ => {
+        _ => {
             let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
         }
-}
+    }
 
     let mut mem2mem = mem2mem
         .with_descriptors(rx_descriptors, tx_descriptors, BurstConfig::default())

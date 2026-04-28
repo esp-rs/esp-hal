@@ -34,13 +34,13 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     cfg_select! {
-    feature = "esp32h2" => {
+        feature = "esp32h2" => {
             let freq = Rate::from_mhz(32);
         }
-    _ => {
+        _ => {
             let freq = Rate::from_mhz(80);
         }
-}
+    }
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
 

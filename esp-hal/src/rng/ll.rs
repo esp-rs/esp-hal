@@ -30,7 +30,7 @@ fn current_cpu_cycles() -> usize {
                         return r;
                     }
                 }
-            }
+        }
 
             read_csr_fn!(read_pccr_machine, "0x7e2");
             read_csr_fn!(read_pccr_user, "0x802");
@@ -43,13 +43,13 @@ fn current_cpu_cycles() -> usize {
                 }
 
                 PRV_M
-            }
+        }
 
             if read_prv_mode() == PRV_M {
                 read_pccr_machine()
             } else {
                 read_pccr_user()
-            }
+        }
         }
         _ => {
             riscv::register::mcycle::read()

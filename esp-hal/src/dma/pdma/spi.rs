@@ -63,7 +63,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
                 match self.0 {
                     AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
                     AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
-                }
+            }
             }
         }
     }
@@ -261,7 +261,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
                 match self.0 {
                     AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
                     AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
-                }
+            }
             }
         }
     }

@@ -181,22 +181,22 @@ pub unsafe fn init_syscall_table() {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
                 static mut syscall_table_ptr_app: *const chip_specific::syscall_stub_table;
-            }
+        }
             unsafe {
                 syscall_table_ptr_pro = &raw const SYSCALL_TABLE;
                 syscall_table_ptr_app = &raw const SYSCALL_TABLE;
-            }
+        }
         }
         esp32s2 => {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
-            }
+        }
             unsafe { syscall_table_ptr_pro = &raw const SYSCALL_TABLE; }
         }
         _ => {
             unsafe extern "C" {
                 static mut syscall_table_ptr: *const chip_specific::syscall_stub_table;
-            }
+        }
             unsafe { syscall_table_ptr = &raw const SYSCALL_TABLE; }
         }
     };

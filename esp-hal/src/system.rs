@@ -275,7 +275,7 @@ impl Cpu {
                 match Self::current() {
                     Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
                     Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
-                }
+            }
             }
             _ => {
                 [].into_iter()

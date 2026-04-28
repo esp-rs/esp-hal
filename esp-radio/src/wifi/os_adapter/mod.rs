@@ -1460,7 +1460,7 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
                     arg1 as u32,
                     unwrap!(cb) as *mut c_void,
                 )
-            }
+        }
         }
         _ => {
             0

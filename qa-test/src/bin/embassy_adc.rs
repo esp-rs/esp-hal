@@ -39,15 +39,15 @@ async fn main(_spawner: Spawner) {
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
 
     cfg_select! {
-    feature = "esp32c3" => {
+        feature = "esp32c3" => {
             let mut adc2_config = AdcConfig::new();
             let analog_pin2 = peripherals.GPIO5;
             let mut pin2 = adc2_config.enable_pin(analog_pin2, Attenuation::_11dB);
             let mut adc2 = Adc::new(peripherals.ADC2, adc2_config).into_async();
         }
 
-    _ => {}
-}
+        _ => {}
+    }
 
     let delay = Delay::new();
 
@@ -55,13 +55,13 @@ async fn main(_spawner: Spawner) {
         let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await;
         println!("ADC1 value: {}", adc1_value);
         cfg_select! {
-    feature = "esp32c3" => {
+            feature = "esp32c3" => {
                 let adc2_value: u16 = adc2.read_oneshot(&mut pin2).await;
                 println!("ADC2 value: {}", adc2_value);
             }
 
-    _ => {}
-}
+            _ => {}
+        }
         delay.delay_millis(1000);
     }
 }

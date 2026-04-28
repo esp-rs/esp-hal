@@ -325,7 +325,7 @@ where
                                         })*
                                     }
                                 )
-                            }
+                        }
                         }
                         _ => {
                             paste::paste! {
@@ -341,7 +341,7 @@ where
                                         w.[< $peri:lower _ce >]().set_bit()
                                     })*
                                 }
-                            }
+                        }
                         }
                     }
                 });
