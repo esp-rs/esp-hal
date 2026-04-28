@@ -1,6 +1,6 @@
 use esp_sync::NonReentrantMutex;
 
-use crate::{clock::Clocks, peripherals::RNG};
+use crate::{peripherals::RNG, soc::clocks};
 
 // TODO: find a better place for these
 #[inline]
@@ -76,8 +76,7 @@ fn read_one(wait_cycles: usize) -> u32 {
 }
 
 pub(super) fn fill_ptr_range(data: *mut u8, len: usize) {
-    let clocks = Clocks::get();
-    let cpu_to_apb_freq_ratio = clocks.cpu_clock / clocks.apb_clock;
+    let cpu_to_apb_freq_ratio = clocks::cpu_clk_frequency() / clocks::apb_clk_frequency();
     let wait_cycles = cpu_to_apb_freq_ratio as usize * property!("rng.apb_cycle_wait_num");
 
     let mut remaining = len;

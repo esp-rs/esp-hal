@@ -521,12 +521,12 @@ impl Clocks {
 
 /// The CPU clock frequency.
 pub fn cpu_clock() -> Rate {
-    Clocks::get().cpu_clock
+    Rate::from_hz(crate::soc::clocks::cpu_clk_frequency())
 }
 
 /// The XTAL clock frequency.
 pub fn xtal_clock() -> Rate {
-    Clocks::get().xtal_clock
+    Rate::from_hz(crate::soc::clocks::xtal_clk_frequency())
 }
 
 /// Read the calibrated RTC slow clock period from the STORE1 register.

@@ -63,7 +63,6 @@ use crate::{
     DriverMode,
     RegisterToggle,
     asynch::AtomicWaker,
-    clock::Clocks,
     gpio::{
         InputConfig,
         InputSignal,
@@ -511,26 +510,21 @@ impl Config {
     }
 
     fn clock_source_freq_hz(&self) -> Rate {
-        let clocks = Clocks::get();
-
         // FIXME: take clock source into account
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let _clocks = clocks;
                 Rate::from_mhz(48)
             } else if #[cfg(any(esp32c5, esp32c61))] {
                 // We select the 160MHz PLL as the clock source in the driver. There is a by-2 divider
                 // configured between the PLL and the SPI clock (spi2_clkm_div_num).
-                let _clocks = clocks;
                 Rate::from_mhz(80) // clk_spi2_mst must be <= 80MHz
             } else if #[cfg(esp32c6)] {
                 // We select the 80MHz PLL as the clock source in the driver
                 // FIXME we state that the default clock source is APB, which just isn't true
-                let _clocks = clocks;
                 Rate::from_mhz(80)
             } else {
-                clocks.apb_clock
+                Rate::from_hz(crate::soc::clocks::apb_clk_frequency())
             }
         }
     }
