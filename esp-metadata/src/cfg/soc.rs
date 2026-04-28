@@ -799,9 +799,7 @@ impl SystemClocks {
                 );
                 let variants: Vec<_> = instances
                     .iter()
-                    .map(|v| {
-                        format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal))
-                    })
+                    .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal)))
                     .collect();
                 let field_name = node.properties.field_name();
 

@@ -213,7 +213,6 @@ use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
-use crate::soc::clocks;
 use crate::{
     Async,
     Blocking,
@@ -227,6 +226,7 @@ use crate::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
+    soc::clocks,
     system::GenericPeripheralGuard,
     time::Rate,
 };
