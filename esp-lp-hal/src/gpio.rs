@@ -114,8 +114,6 @@ impl<const PIN: u8> Flex<PIN> {
             esp32s3 => {
                 ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into()
             }
-
-            _ => {}
         }
     }
 
@@ -146,8 +144,6 @@ impl<const PIN: u8> Flex<PIN> {
             esp32s3 => {
                 ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into()
             }
-
-            _ => {}
         }
     }
 
