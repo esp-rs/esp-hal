@@ -3252,7 +3252,7 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTxFifoThreshold] if the provided value exceeds
+    /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
     fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
@@ -3275,7 +3275,7 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The value you pass times
