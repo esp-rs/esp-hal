@@ -93,21 +93,21 @@ jobs:
         shell: bash
         run: |
           # lints and docs are checked separately
-          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32c2 --toolchain $MSRV --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32 --toolchain esp --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32c2 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32c3 --toolchain $MSRV --no-lint --no-docs
 
       - name: Build and Check RISC-V
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
-          cargo xcheck ci esp32c5 --toolchain $MSRV --no-lint --no-docs
-          cargo xcheck ci esp32c6 --toolchain $MSRV --no-lint --no-docs
-          cargo xcheck ci esp32c61 --toolchain $MSRV --no-lint --no-docs
-          cargo xcheck ci esp32h2 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32c5 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32c6 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32c61 --toolchain $MSRV --no-lint --no-docs
+          cargo +$MSRV xcheck ci esp32h2 --toolchain $MSRV --no-lint --no-docs
 
   detect-extras-runner:
     needs: get-labels
