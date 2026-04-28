@@ -82,7 +82,7 @@ pub fn wake_hp_core() {
         .write(|w| w.rtc_sw_cpu_int().set_bit());
 }
 
-/// Global GPIO wakeup enable/disable
+/// Global GPIO wakeup enable
 pub fn gpio_wakeup_enable() {
     #[cfg(esp32s2)]
     unsafe { &*crate::pac::RTC_CNTL::PTR }
@@ -92,6 +92,18 @@ pub fn gpio_wakeup_enable() {
     unsafe { &*crate::pac::RTC_CNTL::PTR }
         .rtc_ulp_cp_timer()
         .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(true));
+}
+
+/// Global GPIO wakeup disable
+pub fn gpio_wakeup_disable() {
+    #[cfg(esp32s2)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(false));
+    #[cfg(esp32s3)]
+    unsafe { &*crate::pac::RTC_CNTL::PTR }
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_gpio_wakeup_ena().bit(false));
 }
 
 /// Clear the Global GPIO wakeup status
