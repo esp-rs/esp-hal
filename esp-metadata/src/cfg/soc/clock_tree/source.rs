@@ -103,6 +103,7 @@ impl ClockTreeNodeType for Source {
         let config_field = instance.properties.indexed_config_accessor();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
+        let refresh_fn = instance.refresh_downstream_function_name();
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
@@ -115,7 +116,7 @@ impl ClockTreeNodeType for Source {
                 #reject_exprs
                 let old_config = #config_field.replace(config);
                 #hal_impl(clocks, old_config, config);
-                refresh_all_frequency_caches(clocks);
+                #refresh_fn(clocks);
             }
         }
     }

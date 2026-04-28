@@ -302,6 +302,15 @@ impl ClockTreeNodeInstance {
         format_ident!("{}_FREQ_CACHE", name)
     }
 
+    pub(super) fn refresh_downstream_function_name(&self) -> Ident {
+        let name = if self.group_template.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}_{}", self.group_template, self.node.name())
+        };
+        format_ident!("refresh_{}_downstream", name.to_lowercase())
+    }
+
     fn current_config_function_name(&self) -> Ident {
         self.suffix_function("config")
     }
@@ -762,9 +771,12 @@ impl SystemClocks {
             })
             .collect::<Vec<_>>();
 
-        // Build AtomicU32 cache statics and the refresh function body in topological order.
+        // Build AtomicU32 cache statics and per-node downstream refresh functions.
+        // refresh_stmt_by_key holds the token stream that refreshes one configurable node:
+        //   - scalar nodes: refreshes that single node
+        //   - template nodes: refreshes `instance` (a local variable) of that template
         let mut freq_cache_statics: Vec<TokenStream> = vec![];
-        let mut refresh_cache_stmts: Vec<TokenStream> = vec![];
+        let mut refresh_stmt_by_key: IndexMap<String, TokenStream> = IndexMap::new();
         let mut seen_cache_templates: HashSet<String> = HashSet::new();
 
         for node_name in tree.dependency_graph.iter() {
@@ -781,7 +793,7 @@ impl SystemClocks {
                 format!("{}_{}", node.group_template, node.node.name())
             };
 
-            if !seen_cache_templates.insert(template_key) {
+            if !seen_cache_templates.insert(template_key.clone()) {
                 continue;
             }
 
@@ -791,30 +803,19 @@ impl SystemClocks {
             if node.properties.receiver.is_some() {
                 let instances = tree.group_instances.get(&node.group_template).unwrap();
                 let instance_count = number(instances.len());
-                let enum_name = format_ident!(
-                    "{}Instance",
-                    node.group_template
-                        .from_case(Case::Constant)
-                        .to_case(Case::Pascal)
-                );
-                let variants: Vec<_> = instances
-                    .iter()
-                    .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal)))
-                    .collect();
                 let field_name = node.properties.field_name();
 
                 freq_cache_statics.push(quote! {
                     static #cache_name: [::core::sync::atomic::AtomicU32; #instance_count] =
                         [const { ::core::sync::atomic::AtomicU32::new(0) }; #instance_count];
                 });
-                refresh_cache_stmts.push(quote! {
-                    for instance in [#(#enum_name::#variants,)*] {
-                        if let Some(config) = clocks.#field_name[instance as usize] {
-                            #cache_name[instance as usize].store(
-                                instance.#config_freq_fn(clocks, config),
-                                ::core::sync::atomic::Ordering::Release,
-                            );
-                        }
+                // Refresh stmt for template nodes uses an `instance` variable (passed by caller).
+                refresh_stmt_by_key.insert(template_key.clone(), quote! {
+                    if let Some(config) = clocks.#field_name[instance as usize] {
+                        #cache_name[instance as usize].store(
+                            instance.#config_freq_fn(clocks, config),
+                            ::core::sync::atomic::Ordering::Release,
+                        );
                     }
                 });
             } else {
@@ -824,12 +825,142 @@ impl SystemClocks {
                     static #cache_name: ::core::sync::atomic::AtomicU32 =
                         ::core::sync::atomic::AtomicU32::new(0);
                 });
-                refresh_cache_stmts.push(quote! {
+                refresh_stmt_by_key.insert(template_key, quote! {
                     if let Some(config) = #config_field {
                         #cache_name.store(
                             #config_freq_fn(clocks, config),
                             ::core::sync::atomic::Ordering::Release,
                         );
+                    }
+                });
+            }
+        }
+
+        // For each configurable node, emit a targeted downstream refresh function.
+        // Each function refreshes itself and delegates to its direct configurable children's
+        // refresh functions, forming a call chain instead of inlining everything.
+        let mut downstream_refresh_fns: Vec<TokenStream> = vec![];
+        let mut seen_refresh_fns: HashSet<String> = HashSet::new();
+
+        for node_name in tree.dependency_graph.iter() {
+            let Some(node) = tree.try_get_node(&node_name) else {
+                continue;
+            };
+            if !node.is_configurable() {
+                continue;
+            }
+
+            let template_key = if node.group_template.is_empty() {
+                node_name.clone()
+            } else {
+                format!("{}_{}", node.group_template, node.node.name())
+            };
+
+            if !seen_refresh_fns.insert(template_key.clone()) {
+                continue;
+            }
+
+            let fn_name = node.refresh_downstream_function_name();
+            let self_stmt = refresh_stmt_by_key.get(&template_key).cloned();
+
+            // Build calls to direct configurable children's refresh functions.
+            let children = tree
+                .dependency_graph
+                .configurable_children_of(&node_name, tree);
+
+            let child_calls: Vec<TokenStream> = children
+                .iter()
+                .filter_map(|child_name| {
+                    let child = tree.try_get_node(child_name)?;
+                    let child_fn = child.refresh_downstream_function_name();
+
+                    if child.properties.receiver.is_some() {
+                        // Template child — call for each instance.
+                        let instances =
+                            tree.group_instances.get(&child.group_template).unwrap();
+                        let child_enum = format_ident!(
+                            "{}Instance",
+                            child
+                                .group_template
+                                .from_case(Case::Constant)
+                                .to_case(Case::Pascal)
+                        );
+                        let variants: Vec<_> = instances
+                            .iter()
+                            .map(|v| {
+                                format_ident!(
+                                    "{}",
+                                    v.from_case(Case::Constant).to_case(Case::Pascal)
+                                )
+                            })
+                            .collect();
+                        Some(quote! {
+                            for child_instance in [#(#child_enum::#variants,)*] {
+                                #child_fn(clocks, child_instance);
+                            }
+                        })
+                    } else {
+                        Some(quote! { #child_fn(clocks); })
+                    }
+                })
+                .collect();
+
+            if node.properties.receiver.is_some() {
+                // Template node: function takes a typed instance parameter.
+                let enum_name = format_ident!(
+                    "{}Instance",
+                    node.group_template
+                        .from_case(Case::Constant)
+                        .to_case(Case::Pascal)
+                );
+                // For same-template children, pass the current instance instead of looping.
+                let child_calls: Vec<TokenStream> = children
+                    .iter()
+                    .filter_map(|child_name| {
+                        let child = tree.try_get_node(child_name)?;
+                        let child_fn = child.refresh_downstream_function_name();
+                        if child.group_template == node.group_template {
+                            Some(quote! { #child_fn(clocks, instance); })
+                        } else if child.properties.receiver.is_some() {
+                            let instances =
+                                tree.group_instances.get(&child.group_template).unwrap();
+                            let child_enum = format_ident!(
+                                "{}Instance",
+                                child
+                                    .group_template
+                                    .from_case(Case::Constant)
+                                    .to_case(Case::Pascal)
+                            );
+                            let variants: Vec<_> = instances
+                                .iter()
+                                .map(|v| {
+                                    format_ident!(
+                                        "{}",
+                                        v.from_case(Case::Constant).to_case(Case::Pascal)
+                                    )
+                                })
+                                .collect();
+                            Some(quote! {
+                                for child_instance in [#(#child_enum::#variants,)*] {
+                                    #child_fn(clocks, child_instance);
+                                }
+                            })
+                        } else {
+                            Some(quote! { #child_fn(clocks); })
+                        }
+                    })
+                    .collect();
+                downstream_refresh_fns.push(quote! {
+                    fn #fn_name(clocks: &mut ClockTree, instance: #enum_name) {
+                        #self_stmt
+                        #(#child_calls)*
+                    }
+                });
+            } else {
+                downstream_refresh_fns.push(quote! {
+                    fn #fn_name(clocks: &mut ClockTree) {
+                        #self_stmt
+                        #(#child_calls)*
                     }
                 });
             }
@@ -910,9 +1041,7 @@ impl SystemClocks {
                         // CLOCK_BITMAP.fetch_and(!clock_id, Ordering::Relaxed);
                         last
                     }
-                    fn refresh_all_frequency_caches(clocks: &mut ClockTree) {
-                        #(#refresh_cache_stmts)*
-                    }
+                    #(#downstream_refresh_fns)*
                 };
             }
         })

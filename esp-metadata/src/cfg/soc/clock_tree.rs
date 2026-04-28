@@ -40,7 +40,7 @@
 use std::{any::Any, collections::HashMap, str::FromStr};
 
 use anyhow::{Context, Result};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use serde::{
@@ -192,6 +192,61 @@ impl DependencyGraph {
     /// Returns the names of nodes in a topological order.
     pub fn iter(&self) -> impl Iterator<Item = String> {
         topological_sort(&self.reverse_graph)
+    }
+
+    /// Returns the nearest configurable nodes directly downstream of `node`, in topological order.
+    /// The search stops at each configurable node found (does not look through them).
+    pub fn configurable_children_of(
+        &self,
+        node: &str,
+        tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        let mut result = Vec::new();
+        let mut visited = IndexSet::new();
+        let mut queue: Vec<String> = self.users(node).to_vec();
+        while let Some(n) = queue.pop() {
+            if !visited.insert(n.clone()) {
+                continue;
+            }
+            match tree.try_get_node(&n) {
+                Some(inst) if inst.is_configurable() => result.push(n),
+                _ => {
+                    for user in self.users(&n) {
+                        queue.push(user.clone());
+                    }
+                }
+            }
+        }
+        self.iter().filter(|n| result.contains(n)).collect()
+    }
+
+    /// Returns all configurable nodes that are transitively downstream of `node`
+    /// (including `node` itself), in topological order.
+    pub fn downstream_configurable_of(
+        &self,
+        node: &str,
+        tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        // BFS forward through the graph (upstream → downstream direction).
+        let mut reachable = IndexSet::new();
+        let mut queue = vec![node.to_string()];
+        while let Some(n) = queue.pop() {
+            if !reachable.insert(n.clone()) {
+                continue;
+            }
+            for user in self.users(&n) {
+                queue.push(user.clone());
+            }
+        }
+        // Preserve topological order, keeping only configurable nodes.
+        self.iter()
+            .filter(|n| {
+                reachable.contains(n.as_str())
+                    && tree
+                        .try_get_node(n)
+                        .is_some_and(|inst| inst.is_configurable())
+            })
+            .collect()
     }
 }
 

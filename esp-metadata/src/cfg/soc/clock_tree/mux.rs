@@ -249,6 +249,12 @@ impl Multiplexer {
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let config_field = instance.properties.indexed_config_accessor();
         let receiver = instance.properties.receiver();
+        let refresh_fn = instance.refresh_downstream_function_name();
+        let refresh_call = if instance.properties.receiver.is_some() {
+            quote! { #refresh_fn(clocks, self); }
+        } else {
+            quote! { #refresh_fn(clocks); }
+        };
 
         let hal_impl = quote! { #(#receiver.)*#hal_impl };
 
@@ -322,7 +328,7 @@ impl Multiplexer {
 
                 #apply_impl
 
-                refresh_all_frequency_caches(clocks);
+                #refresh_call
             }
         }
     }

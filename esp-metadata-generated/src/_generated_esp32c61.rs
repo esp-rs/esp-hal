@@ -1239,7 +1239,7 @@ macro_rules! define_clock_tree_types {
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             configure_xtal_clk_impl(clocks, old_config, config);
-            refresh_all_frequency_caches(clocks);
+            refresh_xtal_clk_downstream(clocks);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
@@ -1488,7 +1488,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_hp_root_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_all_frequency_caches(clocks);
+            refresh_hp_root_clk_downstream(clocks);
         }
         pub fn hp_root_clk_config(clocks: &mut ClockTree) -> Option<HpRootClkConfig> {
             clocks.hp_root_clk
@@ -1534,7 +1534,7 @@ macro_rules! define_clock_tree_types {
         pub fn configure_cpu_clk(clocks: &mut ClockTree, config: CpuClkConfig) {
             let old_config = clocks.cpu_clk.replace(config);
             configure_cpu_clk_impl(clocks, old_config, config);
-            refresh_all_frequency_caches(clocks);
+            refresh_cpu_clk_downstream(clocks);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
@@ -1565,7 +1565,7 @@ macro_rules! define_clock_tree_types {
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
             let old_config = clocks.ahb_clk.replace(config);
             configure_ahb_clk_impl(clocks, old_config, config);
-            refresh_all_frequency_caches(clocks);
+            refresh_ahb_clk_downstream(clocks);
         }
         pub fn ahb_clk_config(clocks: &mut ClockTree) -> Option<AhbClkConfig> {
             clocks.ahb_clk
@@ -1592,7 +1592,7 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             configure_apb_clk_impl(clocks, old_config, config);
-            refresh_all_frequency_caches(clocks);
+            refresh_apb_clk_downstream(clocks);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk
@@ -1654,7 +1654,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_lp_fast_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_all_frequency_caches(clocks);
+            refresh_lp_fast_clk_downstream(clocks);
         }
         pub fn lp_fast_clk_config(clocks: &mut ClockTree) -> Option<LpFastClkConfig> {
             clocks.lp_fast_clk
@@ -1716,7 +1716,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_lp_slow_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_all_frequency_caches(clocks);
+            refresh_lp_slow_clk_downstream(clocks);
         }
         pub fn lp_slow_clk_config(clocks: &mut ClockTree) -> Option<LpSlowClkConfig> {
             clocks.lp_slow_clk
@@ -1783,7 +1783,7 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
             }
-            refresh_all_frequency_caches(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
         }
         pub fn timg_calibration_clock_config(
             clocks: &mut ClockTree,
@@ -1855,7 +1855,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
-                refresh_all_frequency_caches(clocks);
+                refresh_timg_function_clock_downstream(clocks, self);
             }
             pub fn function_clock_config(
                 self,
@@ -1930,7 +1930,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_wdt_clock_impl(clocks, old_selector, new_selector);
                 }
-                refresh_all_frequency_caches(clocks);
+                refresh_timg_wdt_clock_downstream(clocks, self);
             }
             pub fn wdt_clock_config(self, clocks: &mut ClockTree) -> Option<TimgWdtClockConfig> {
                 clocks.timg_wdt_clock[self as usize]
@@ -2000,7 +2000,7 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_config, config);
                 }
-                refresh_all_frequency_caches(clocks);
+                refresh_uart_function_clock_downstream(clocks, self);
             }
             pub fn function_clock_config(
                 self,
@@ -2059,7 +2059,7 @@ macro_rules! define_clock_tree_types {
             ) {
                 let old_config = clocks.uart_baud_rate_generator[self as usize].replace(config);
                 self.configure_baud_rate_generator_impl(clocks, old_config, config);
-                refresh_all_frequency_caches(clocks);
+                refresh_uart_baud_rate_generator_downstream(clocks, self);
             }
             pub fn baud_rate_generator_config(
                 self,
@@ -2169,86 +2169,127 @@ macro_rules! define_clock_tree_types {
             let last = *refcount == 0;
             last
         }
-        fn refresh_all_frequency_caches(clocks: &mut ClockTree) {
+        fn refresh_xtal_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.xtal_clk {
                 XTAL_CLK_FREQ_CACHE.store(
                     xtal_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_hp_root_clk_downstream(clocks);
+            refresh_lp_fast_clk_downstream(clocks);
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_wdt_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_wdt_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_hp_root_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.hp_root_clk {
                 HP_ROOT_CLK_FREQ_CACHE.store(
                     hp_root_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_cpu_clk_downstream(clocks);
+            refresh_ahb_clk_downstream(clocks);
+        }
+        fn refresh_cpu_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.cpu_clk {
                 CPU_CLK_FREQ_CACHE.store(
                     cpu_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+        }
+        fn refresh_ahb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.ahb_clk {
                 AHB_CLK_FREQ_CACHE.store(
                     ahb_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_apb_clk_downstream(clocks);
+        }
+        fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
                     apb_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+        }
+        fn refresh_lp_fast_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.lp_fast_clk {
                 LP_FAST_CLK_FREQ_CACHE.store(
                     lp_fast_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+        }
+        fn refresh_lp_slow_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.lp_slow_clk {
                 LP_SLOW_CLK_FREQ_CACHE.store(
                     lp_slow_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+        }
+        fn refresh_timg_calibration_clock_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.timg_calibration_clock {
                 TIMG_CALIBRATION_CLOCK_FREQ_CACHE.store(
                     timg_calibration_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
-            for instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                if let Some(config) = clocks.timg_function_clock[instance as usize] {
-                    TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                        instance.function_clock_config_frequency(clocks, config),
-                        ::core::sync::atomic::Ordering::Release,
-                    );
-                }
+        }
+        fn refresh_timg_function_clock_downstream(clocks: &mut ClockTree, instance: TimgInstance) {
+            if let Some(config) = clocks.timg_function_clock[instance as usize] {
+                TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
             }
-            for instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                if let Some(config) = clocks.timg_wdt_clock[instance as usize] {
-                    TIMG_WDT_CLOCK_FREQ_CACHE[instance as usize].store(
-                        instance.wdt_clock_config_frequency(clocks, config),
-                        ::core::sync::atomic::Ordering::Release,
-                    );
-                }
+        }
+        fn refresh_timg_wdt_clock_downstream(clocks: &mut ClockTree, instance: TimgInstance) {
+            if let Some(config) = clocks.timg_wdt_clock[instance as usize] {
+                TIMG_WDT_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.wdt_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
             }
-            for instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                if let Some(config) = clocks.uart_function_clock[instance as usize] {
-                    UART_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                        instance.function_clock_config_frequency(clocks, config),
-                        ::core::sync::atomic::Ordering::Release,
-                    );
-                }
+        }
+        fn refresh_uart_function_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
+            if let Some(config) = clocks.uart_function_clock[instance as usize] {
+                UART_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
             }
-            for instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                if let Some(config) = clocks.uart_baud_rate_generator[instance as usize] {
-                    UART_BAUD_RATE_GENERATOR_FREQ_CACHE[instance as usize].store(
-                        instance.baud_rate_generator_config_frequency(clocks, config),
-                        ::core::sync::atomic::Ordering::Release,
-                    );
-                }
+            refresh_uart_baud_rate_generator_downstream(clocks, instance);
+        }
+        fn refresh_uart_baud_rate_generator_downstream(
+            clocks: &mut ClockTree,
+            instance: UartInstance,
+        ) {
+            if let Some(config) = clocks.uart_baud_rate_generator[instance as usize] {
+                UART_BAUD_RATE_GENERATOR_FREQ_CACHE[instance as usize].store(
+                    instance.baud_rate_generator_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
             }
         }
     };

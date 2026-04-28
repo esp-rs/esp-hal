@@ -219,6 +219,12 @@ impl ClockTreeNodeType for Generic {
         let hal_impl = format_ident!("{apply_fn_name}_impl");
         let receiver = instance.properties.receiver();
         let hal_impl = quote! { #(#receiver.)* #hal_impl };
+        let refresh_fn = instance.refresh_downstream_function_name();
+        let refresh_call = if instance.properties.receiver.is_some() {
+            quote! { #refresh_fn(clocks, self); }
+        } else {
+            quote! { #refresh_fn(clocks); }
+        };
 
         // TODO: support reject exprs - implement `value(node, property)` in expressions
 
@@ -309,7 +315,7 @@ impl ClockTreeNodeType for Generic {
 
                 #func_body
 
-                refresh_all_frequency_caches(clocks);
+                #refresh_call
             }
         }
     }
