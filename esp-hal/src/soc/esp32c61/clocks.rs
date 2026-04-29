@@ -84,12 +84,12 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         if self.xtal_clk.is_none() {
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 

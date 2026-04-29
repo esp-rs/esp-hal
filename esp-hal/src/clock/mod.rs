@@ -72,12 +72,15 @@ use crate::efuse::ChipRevision;
     timergroup_rc_fast_calibration_tick_enable
 ))]
 use crate::peripherals::PCR;
+#[cfg(soc_has_clock_node_timg_calibration_clock)]
+use crate::peripherals::TIMG0;
 #[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
-use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
-#[cfg(soc_has_clock_node_timg_calibration_clock)]
-use crate::{peripherals::TIMG0, soc::clocks::ClockTree};
+use crate::{
+    soc::{clocks, clocks::ClockTree},
+    time::Rate,
+};
 
 impl CpuClock {
     #[procmacros::doc_replace]
@@ -124,12 +127,12 @@ impl RtcClock {
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
-                let getter = clocks::rtc_slow_clk_frequency;
+                let freq = clocks::rtc_slow_clk_frequency();
             } else {
-                let getter = clocks::lp_slow_clk_frequency;
+                let freq = clocks::lp_slow_clk_frequency();
             }
         }
-        Rate::from_hz(getter())
+        Rate::from_hz(freq)
     }
 
     /// Measure the frequency of one of the TIMG0 calibration clocks,
@@ -176,20 +179,11 @@ impl RtcClock {
 }
 
 pub(crate) fn init(cpu_clock_config: ClockConfig) {
-    ESP_HAL_LOCK.lock(|| {
-        crate::rtc_cntl::rtc::init();
-        configure(cpu_clock_config);
-    });
-
-    calibrate_rtc_slow_clock();
-}
-
-fn configure(clock_config: ClockConfig) {
-    use crate::soc::clocks::ClockTree;
-
-    clock_config.configure();
-
     ClockTree::with(|clocks| {
+        crate::rtc_cntl::rtc::init();
+
+        cpu_clock_config.configure(clocks);
+
         // FIXME: MCPWM clock configuration needs to know about the active clock source
         // frequency. In the future, we should turn the MCPWM config structs into
         // plain old data structures and remove this pre-configuration, otherwise we will not be
@@ -214,6 +208,8 @@ fn configure(clock_config: ClockConfig) {
         #[cfg(soc_has_clock_node_rc_fast_div_clk)]
         clocks::request_rc_fast_div_clk(clocks);
     });
+
+    calibrate_rtc_slow_clock();
 }
 
 impl RtcClock {
