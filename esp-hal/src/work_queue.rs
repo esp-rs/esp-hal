@@ -149,6 +149,7 @@ impl<T: Sync + Send> Inner<T> {
     fn dequeue_and_post(&mut self, notify_on_empty: bool) -> bool {
         let Some(mut ptr) = self.dequeue() else {
             if notify_on_empty {
+                debug!("Stop driver - no more work items");
                 // There are no more work items. Notify the driver that it can stop.
                 (self.vtable.stop)(self.data);
             }
@@ -157,6 +158,7 @@ impl<T: Sync + Send> Inner<T> {
 
         // Start processing a new work item.
 
+        debug!("Post new work item to driver");
         if let Some(poll_status) = (self.vtable.post)(self.data, &mut unsafe { ptr.as_mut() }.data)
         {
             match poll_status {

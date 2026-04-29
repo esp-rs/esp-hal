@@ -358,6 +358,11 @@ driver_configs![
         name: "DS",
         properties: {}
     },
+    EcdsaProperties {
+        driver: ecdsa,
+        name: "ECDSA",
+        properties: {}
+    },
     EccProperties {
         driver: ecc,
         name: "ECC",
@@ -698,6 +703,7 @@ driver_configs![
         name: "UART",
         properties: {
             ram_size: u32,
+            version: u32,
             #[serde(default)]
             peripheral_controls_mem_clk: bool,
             // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.

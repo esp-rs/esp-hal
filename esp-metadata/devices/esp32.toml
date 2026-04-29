@@ -794,7 +794,7 @@ separate_filter_config_registers = true
 i2c0_data_register_ahb_address = 0x6001301c
 
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 1909 }
 
 [device.interrupts]
 support_status = "partial"
@@ -852,6 +852,7 @@ instances = [
     { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
 ]
 ram_size = 128
+version = 1
 
 [device.uhci]
 support_status = "not_supported"

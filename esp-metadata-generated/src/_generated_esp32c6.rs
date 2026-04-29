@@ -379,6 +379,12 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
+    ("uart.version") => {
+        2
+    };
+    ("uart.version", str) => {
+        stringify!(2)
+    };
     ("uart.peripheral_controls_mem_clk") => {
         true
     };

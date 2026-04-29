@@ -232,7 +232,7 @@ impl<'d> Rtc<'d> {
 
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
-            } else if #[cfg(any(esp32c6, esp32h2))] {
+            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
                 rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
 
                 let h = rtc_cntl
@@ -427,7 +427,7 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
                 let interrupt = Interrupt::LP_WDT;
             } else {
                 let interrupt = Interrupt::RTC_CORE;

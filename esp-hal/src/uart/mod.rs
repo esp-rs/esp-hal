@@ -1078,7 +1078,8 @@ impl<'d> UartRx<'d, Async> {
         // of returnable bytes.
         let minimum = minimum.min(max_threshold);
 
-        if self.uart.info().rx_fifo_count() < minimum {
+        // loop to prevent returning 0 bytes
+        while self.uart.info().rx_fifo_count() < minimum {
             // We're ignoring the user configuration here to ensure that this is not waiting
             // for more data than the buffer. We'll restore the original value after the
             // future resolved.
@@ -1100,9 +1101,9 @@ impl<'d> UartRx<'d, Async> {
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                if #[cfg(uart_version = "2")] {
                     let reg_en = self.regs().tout_conf();
-                } else {
+                } else if #[cfg(uart_version = "1")] {
                     let reg_en = self.regs().conf1();
                 }
             };
@@ -3228,10 +3229,10 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedRxFifoThreshold] if the provided value exceeds
-    /// [`Info::RX_FIFO_MAX_THRHD`].
+    /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
+    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
-        if threshold > Self::RX_FIFO_MAX_THRHD {
+        if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
         }
 
@@ -3252,7 +3253,7 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTxFifoThreshold] if the provided value exceeds
+    /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
     fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
@@ -3266,6 +3267,12 @@ impl Info {
         Ok(())
     }
 
+    #[procmacros::doc_replace(
+        "rx_timeout_limit" => {
+            cfg(esp32) => "- Symbol size is fixed to 8, do not pass a value > **0x7F**.",
+            _ => "- The value you pass times the symbol size must be <= **0x3FF**.",
+        }
+    )]
     /// Configures the Receive Timeout detection setting
     ///
     /// ## Arguments
@@ -3275,11 +3282,9 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
-    /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The value you pass times
-    ///   the symbol size must be <= **0x3FF**
+    /// {rx_timeout_limit}
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -3306,9 +3311,9 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     let reg_thrhd = register_block.conf1();
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                } else if #[cfg(uart_version = "2")] {
                     let reg_thrhd = register_block.tout_conf();
-                } else {
+                } else if #[cfg(uart_version = "1")] {
                     let reg_thrhd = register_block.mem_conf();
                 }
             }
@@ -3316,9 +3321,9 @@ impl Info {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            if #[cfg(uart_version = "2")] {
                 let reg_en = register_block.tout_conf();
-            } else {
+            } else if #[cfg(uart_version = "1")] {
                 let reg_en = register_block.conf1();
             }
         }
@@ -3459,7 +3464,7 @@ impl Info {
                 xoff_threshold,
             } => {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                    if #[cfg(uart_version = "2")] {
                         self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
@@ -3467,7 +3472,7 @@ impl Info {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
-                    } else {
+                    } else if #[cfg(uart_version = "1")] {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
@@ -3478,9 +3483,9 @@ impl Info {
             }
             SwFlowControl::Disabled => {
                 cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                    if #[cfg(uart_version = "2")] {
                         let reg = self.regs().swfc_conf0();
-                    } else {
+                    } else if #[cfg(uart_version = "1")] {
                         let reg = self.regs().flow_conf();
                     }
                 }
@@ -3508,20 +3513,20 @@ impl Info {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
                     self.regs().conf1().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+                } else if #[cfg(uart_version = "2")] {
                     self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-                } else {
+                } else if #[cfg(uart_version = "1")] {
                     self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
                 }
             }
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            if #[cfg(uart_version = "2")] {
                 self.regs().hwfc_conf().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });
-            } else {
+            } else if #[cfg(uart_version = "1")] {
                 self.regs().conf1().modify(|_, w| {
                     w.rx_flow_en().bit(enable)
                 });

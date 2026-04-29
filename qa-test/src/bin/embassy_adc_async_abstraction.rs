@@ -43,24 +43,24 @@ trait Converter {
     fn raw_to_metering(raw_value: u16) -> u16;
 }
 
-pub struct AdcSensor<'d, ADCI, PIN, CS, MC> {
-    adc: Adc<'d, ADCI, Async>,
-    pin: AdcPin<PIN, ADCI, CS>,
+pub struct AdcSensor<'d, ADCX, PIN, CS, MC> {
+    adc: Adc<'d, ADCX, Async>,
+    pin: AdcPin<PIN, ADCX, CS>,
     _phantom: PhantomData<MC>,
 }
 
-impl<'d, ADCI, PIN, CS, MC> AdcSensor<'d, ADCI, PIN, CS, MC> {
-    pub fn new(adc: Adc<'d, ADCI, Async>, pin: AdcPin<PIN, ADCI, CS>) -> Self {
+impl<'d, ADCX, PIN, CS, MC> AdcSensor<'d, ADCX, PIN, CS, MC> {
+    pub fn new(adc: Adc<'d, ADCX, Async>, pin: AdcPin<PIN, ADCX, CS>) -> Self {
         let _phantom = PhantomData::<MC> {};
         Self { adc, pin, _phantom }
     }
 }
 
-impl<'d, ADCI, PIN, CS, MC> Sensor for AdcSensor<'d, ADCI, PIN, CS, MC>
+impl<'d, ADCX, PIN, CS, MC> Sensor for AdcSensor<'d, ADCX, PIN, CS, MC>
 where
-    ADCI: RegisterAccess + Instance + 'd,
+    ADCX: RegisterAccess + Instance + 'd,
     PIN: AdcChannel,
-    CS: AdcCalScheme<ADCI>,
+    CS: AdcCalScheme<ADCX>,
     MC: Converter,
 {
     async fn measure(&mut self) -> u16 {

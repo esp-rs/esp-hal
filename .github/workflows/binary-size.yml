@@ -115,6 +115,10 @@ jobs:
           cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
+          MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
+          if [ -n "$MANIFEST" ]; then
+            EXAMPLE_NAME=$(sed -n '/^\[package\]$/,/^\[/{s/^[[:space:]]*name[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p}' "$MANIFEST" | head -n 1)
+          fi
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
           BIN=$(find target qa-test/target examples -type f \
@@ -154,6 +158,10 @@ jobs:
           cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
+          MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
+          if [ -n "$MANIFEST" ]; then
+            EXAMPLE_NAME=$(sed -n '/^\[package\]$/,/^\[/{s/^[[:space:]]*name[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p}' "$MANIFEST" | head -n 1)
+          fi
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
           BIN=$(find target qa-test/target examples -type f \

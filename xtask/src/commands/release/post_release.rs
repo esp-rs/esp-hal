@@ -1,13 +1,23 @@
 use std::{fs, process::Command};
 
 use anyhow::{Context, Result};
+use clap::Args;
 use semver::Version;
 
 use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
-use crate::commands::comparison_url;
+use crate::{commands::comparison_url, git::get_remote_name_for};
+
+/// Arguments for performing post-release tasks.
+#[derive(Debug, Args)]
+pub struct PostReleaseArgs {
+    /// Actually make git changes and push. Without this flag, the command will
+    /// only show what would be done.
+    #[arg(long)]
+    no_dry_run: bool,
+}
 
 /// Perform post-release tasks such as creating migration guides for packages that have them.
-pub fn post_release(workspace: &std::path::Path) -> Result<()> {
+pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Result<()> {
     // Read the release plan
     let plan_path = workspace.join("release_plan.jsonc");
     let plan_path = crate::windows_safe_path(&plan_path);
@@ -15,7 +25,14 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
     let plan = Plan::from_path(&plan_path)
         .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
 
-    run_baseline_workflow(&plan)?;
+    let dry_run = !args.no_dry_run;
+    let remote = get_remote_name_for("esp-rs/esp-hal")?;
+
+    if dry_run {
+        log::info!("Dry run: would trigger baseline workflow");
+    } else {
+        run_baseline_workflow(&plan)?;
+    }
 
     // Process packages from the plan that have migration guides
     for package_plan in plan.packages.iter() {
@@ -59,17 +76,21 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         let migration_file_path = package_path.join(&migration_file_name);
 
         // Create the migration guide file if it doesn't exist
-        if !migration_file_path.exists() {
-            // Create the title content
-            let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
-            fs::write(&migration_file_path, title)
-                .with_context(|| format!("Failed to write to {migration_file_path:?}"))?;
-            log::info!("Created migration guide: {}", migration_file_path.display());
-        } else {
+        if migration_file_path.exists() {
             log::info!(
                 "Migration guide already exists: {}",
                 migration_file_path.display()
             );
+        } else if dry_run {
+            log::info!(
+                "Dry run: would create migration guide: {}",
+                migration_file_path.display()
+            );
+        } else {
+            let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
+            fs::write(&migration_file_path, title)
+                .with_context(|| format!("Failed to write to {migration_file_path:?}"))?;
+            log::info!("Created migration guide: {}", migration_file_path.display());
         }
 
         // Backport branch management: only for minor/major bumps on stable releases (**major** >=
@@ -89,15 +110,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                 if version.major >= 1 {
                     let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
-                    // Check if branch already exists on origin
                     let branch_exists = Command::new("git")
-                        .args([
-                            "ls-remote",
-                            "--exit-code",
-                            "--heads",
-                            "origin",
-                            &branch_name,
-                        ])
+                        .args(["ls-remote", "--exit-code", "--heads", &remote, &branch_name])
                         .current_dir(workspace)
                         .status()
                         .map(|status| status.success())
@@ -105,7 +119,11 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
 
                     if branch_exists {
                         log::info!(
-                            "Backport branch already exists on origin: {branch_name}, skipping creation"
+                            "Backport branch already exists on {remote}: {branch_name}, skipping creation"
+                        );
+                    } else if dry_run {
+                        log::info!(
+                            "Dry run: would create and push backport branch {branch_name} to {remote}"
                         );
                     } else {
                         // We want the backport branch to start at the released tag for this
@@ -120,7 +138,6 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                             .unwrap_or(false);
 
                         let create_status = if tag_exists {
-                            // Create branch from the release tag (preferred).
                             Command::new("git")
                                 .arg("branch")
                                 .arg(&branch_name)
@@ -128,7 +145,6 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                                 .current_dir(workspace)
                                 .status()
                         } else {
-                            // Fallback: create branch from current HEAD if tag is missing for some reason.
                             log::warn!(
                                 "Tag {tag_name} not found; creating backport branch {branch_name} from current HEAD"
                             );
@@ -146,7 +162,7 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
 
                         let push_status = Command::new("git")
                             .arg("push")
-                            .arg("origin")
+                            .arg(&remote)
                             .arg(&branch_name)
                             .current_dir(workspace)
                             .status()
@@ -156,7 +172,7 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
 
                         if !push_status.success() {
                             return Err(anyhow::anyhow!(
-                                "`git push origin {}` failed",
+                                "`git push {remote} {}` failed",
                                 branch_name
                             ));
                         }
@@ -179,7 +195,7 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                                 "ls-remote",
                                 "--exit-code",
                                 "--heads",
-                                "origin",
+                                &remote,
                                 &prev_branch_name,
                             ])
                             .current_dir(workspace)
@@ -188,26 +204,32 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                             .unwrap_or(false);
 
                         if prev_exists {
-                            let delete_status = Command::new("git")
-                                .arg("push")
-                                .arg("origin")
-                                .arg(format!(":{}", prev_branch_name))
-                                .current_dir(workspace)
-                                .status()
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to delete previous backport branch {prev_branch_name}"
-                                    )
-                                })?;
-
-                            if delete_status.success() {
+                            if dry_run {
                                 log::info!(
-                                    "Deleted previous backport branch {prev_branch_name} on origin"
+                                    "Dry run: would delete previous backport branch {prev_branch_name} on {remote}"
                                 );
                             } else {
-                                log::warn!(
-                                    "Failed to delete previous backport branch {prev_branch_name} on origin"
-                                );
+                                let delete_status = Command::new("git")
+                                    .arg("push")
+                                    .arg(&remote)
+                                    .arg(format!(":{}", prev_branch_name))
+                                    .current_dir(workspace)
+                                    .status()
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to delete previous backport branch {prev_branch_name}"
+                                        )
+                                    })?;
+
+                                if delete_status.success() {
+                                    log::info!(
+                                        "Deleted previous backport branch {prev_branch_name} on {remote}"
+                                    );
+                                } else {
+                                    log::warn!(
+                                        "Failed to delete previous backport branch {prev_branch_name} on {remote}"
+                                    );
+                                }
                             }
                         }
                     }
@@ -229,20 +251,27 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         }
     }
 
-    let branch = make_git_changes(false, "post-release-branch", "Post release rollover")?;
+    let branch_name = format!("post-release-branch-{}", plan.slug);
+    let branch = make_git_changes(dry_run, &branch_name, "Post release rollover")?;
 
-    println!("Post-release migration guides created successfully.");
+    if dry_run {
+        println!(
+            "Dry run completed. To make changes, run `cargo xrelease post-release --no-dry-run`."
+        );
+    } else {
+        println!("Post-release migration guides created successfully.");
 
-    let pr_url_base = comparison_url(&plan.base, &branch.upstream, &branch.name)?;
+        let pr_url_base = comparison_url(&plan.base, &branch.upstream, &branch.name)?;
 
-    let open_pr_url = format!(
-        "{pr_url_base}?quick_pull=1&title=Post+release+rollover&labels={labels}",
-        labels = "skip-changelog",
-    );
+        let open_pr_url = format!(
+            "{pr_url_base}?quick_pull=1&title=Post+release+rollover&labels={labels}",
+            labels = "skip-changelog",
+        );
 
-    if opener::open(&open_pr_url).is_err() {
-        println!("Open the following URL to create a pull request:");
-        println!("{open_pr_url}");
+        if opener::open(&open_pr_url).is_err() {
+            println!("Open the following URL to create a pull request:");
+            println!("{open_pr_url}");
+        }
     }
 
     Ok(())
