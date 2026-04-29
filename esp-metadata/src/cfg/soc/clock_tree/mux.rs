@@ -147,7 +147,6 @@ impl ClockTreeNodeType for Multiplexer {
             .iter()
             .map(|variant| {
                 let name = variant.config_enum_variant_name();
-
                 quote! { #ty_name::#name }
             })
             .collect::<Vec<_>>();
@@ -159,7 +158,6 @@ impl ClockTreeNodeType for Multiplexer {
                 let upstream_node = instance.resolve_node(tree, &variant.outputs);
                 let frequency_fn = upstream_node.frequency_function_name();
                 let receiver = upstream_node.properties.receiver();
-
                 quote! { #(#receiver.)* #frequency_fn() }
             })
             .collect::<Vec<_>>();
@@ -172,9 +170,7 @@ impl ClockTreeNodeType for Multiplexer {
             }
         } else {
             let variant_frequency = variant_frequencies.first().unwrap();
-            quote! {
-                #variant_frequency
-            }
+            quote! { #variant_frequency }
         }
     }
 
@@ -324,11 +320,11 @@ impl Multiplexer {
             pub fn #apply_fn_name(#(#receiver,)* clocks: &mut ClockTree, new_selector: #ty_name) {
                 let old_selector = #config_field.replace(new_selector);
 
+                #refresh_call
+
                 #configures
 
                 #apply_impl
-
-                #refresh_call
             }
         }
     }

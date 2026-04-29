@@ -313,9 +313,9 @@ impl ClockTreeNodeType for Generic {
                 #reject_exprs
                 let old_config = #config_field.replace(config);
 
-                #func_body
-
                 #refresh_call
+
+                #func_body
             }
         }
     }

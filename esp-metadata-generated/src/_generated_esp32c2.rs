@@ -1381,8 +1381,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
-            configure_xtal_clk_impl(clocks, old_config, config);
             refresh_xtal_clk_downstream(clocks);
+            configure_xtal_clk_impl(clocks, old_config, config);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
@@ -1486,6 +1486,7 @@ macro_rules! define_clock_tree_types {
             new_selector: SystemPreDivInConfig,
         ) {
             let old_selector = clocks.system_pre_div_in.replace(new_selector);
+            refresh_system_pre_div_in_downstream(clocks);
             match new_selector {
                 SystemPreDivInConfig::Xtal => request_xtal_clk(clocks),
                 SystemPreDivInConfig::RcFast => request_rc_fast_clk(clocks),
@@ -1497,7 +1498,6 @@ macro_rules! define_clock_tree_types {
                     SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks),
                 }
             }
-            refresh_system_pre_div_in_downstream(clocks);
         }
         pub fn system_pre_div_in_config(clocks: &mut ClockTree) -> Option<SystemPreDivInConfig> {
             clocks.system_pre_div_in
@@ -1535,8 +1535,8 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_system_pre_div(clocks: &mut ClockTree, config: SystemPreDivConfig) {
             let old_config = clocks.system_pre_div.replace(config);
-            configure_system_pre_div_impl(clocks, old_config, config);
             refresh_system_pre_div_downstream(clocks);
+            configure_system_pre_div_impl(clocks, old_config, config);
         }
         pub fn system_pre_div_config(clocks: &mut ClockTree) -> Option<SystemPreDivConfig> {
             clocks.system_pre_div
@@ -1565,8 +1565,8 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_cpu_pll_div(clocks: &mut ClockTree, config: CpuPllDivConfig) {
             let old_config = clocks.cpu_pll_div.replace(config);
-            configure_cpu_pll_div_impl(clocks, old_config, config);
             refresh_cpu_pll_div_downstream(clocks);
+            configure_cpu_pll_div_impl(clocks, old_config, config);
         }
         pub fn cpu_pll_div_config(clocks: &mut ClockTree) -> Option<CpuPllDivConfig> {
             clocks.cpu_pll_div
@@ -1595,6 +1595,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
+            refresh_apb_clk_downstream(clocks);
             if clocks.apb_clk_refcount > 0 {
                 match new_selector {
                     ApbClkConfig::Pll40m => request_pll_40m(clocks),
@@ -1610,7 +1611,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_apb_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_apb_clk_downstream(clocks);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk
@@ -1649,6 +1649,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_crypto_clk(clocks: &mut ClockTree, new_selector: CryptoClkConfig) {
             let old_selector = clocks.crypto_clk.replace(new_selector);
+            refresh_crypto_clk_downstream(clocks);
             if clocks.crypto_clk_refcount > 0 {
                 match new_selector {
                     CryptoClkConfig::Pll80m => request_pll_80m(clocks),
@@ -1664,7 +1665,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_crypto_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_crypto_clk_downstream(clocks);
         }
         pub fn crypto_clk_config(clocks: &mut ClockTree) -> Option<CryptoClkConfig> {
             clocks.crypto_clk
@@ -1703,6 +1703,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_mspi_clk(clocks: &mut ClockTree, new_selector: MspiClkConfig) {
             let old_selector = clocks.mspi_clk.replace(new_selector);
+            refresh_mspi_clk_downstream(clocks);
             if clocks.mspi_clk_refcount > 0 {
                 match new_selector {
                     MspiClkConfig::CpuDiv2 => request_cpu_div2(clocks),
@@ -1718,7 +1719,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_mspi_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_mspi_clk_downstream(clocks);
         }
         pub fn mspi_clk_config(clocks: &mut ClockTree) -> Option<MspiClkConfig> {
             clocks.mspi_clk
@@ -1757,6 +1757,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
+            refresh_cpu_clk_downstream(clocks);
             match new_selector {
                 CpuClkConfig::Xtal => {
                     configure_apb_clk(clocks, ApbClkConfig::Cpu);
@@ -1789,7 +1790,6 @@ macro_rules! define_clock_tree_types {
                     CpuClkConfig::Pll => release_cpu_pll_div(clocks),
                 }
             }
-            refresh_cpu_clk_downstream(clocks);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
@@ -1877,8 +1877,8 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_rc_fast_clk_div_n(clocks: &mut ClockTree, config: RcFastClkDivNConfig) {
             let old_config = clocks.rc_fast_clk_div_n.replace(config);
-            configure_rc_fast_clk_div_n_impl(clocks, old_config, config);
             refresh_rc_fast_clk_div_n_downstream(clocks);
+            configure_rc_fast_clk_div_n_impl(clocks, old_config, config);
         }
         pub fn rc_fast_clk_div_n_config(clocks: &mut ClockTree) -> Option<RcFastClkDivNConfig> {
             clocks.rc_fast_clk_div_n
@@ -1922,6 +1922,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_rtc_slow_clk(clocks: &mut ClockTree, new_selector: RtcSlowClkConfig) {
             let old_selector = clocks.rtc_slow_clk.replace(new_selector);
+            refresh_rtc_slow_clk_downstream(clocks);
             match new_selector {
                 RtcSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
                 RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
@@ -1935,7 +1936,6 @@ macro_rules! define_clock_tree_types {
                     RtcSlowClkConfig::RcFast => release_rc_fast_div_clk(clocks),
                 }
             }
-            refresh_rtc_slow_clk_downstream(clocks);
         }
         pub fn rtc_slow_clk_config(clocks: &mut ClockTree) -> Option<RtcSlowClkConfig> {
             clocks.rtc_slow_clk
@@ -1976,6 +1976,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
             let old_selector = clocks.rtc_fast_clk.replace(new_selector);
+            refresh_rtc_fast_clk_downstream(clocks);
             if clocks.rtc_fast_clk_refcount > 0 {
                 match new_selector {
                     RtcFastClkConfig::Xtal => request_xtal_div_clk(clocks),
@@ -1991,7 +1992,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_rtc_fast_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_rtc_fast_clk_downstream(clocks);
         }
         pub fn rtc_fast_clk_config(clocks: &mut ClockTree) -> Option<RtcFastClkConfig> {
             clocks.rtc_fast_clk
@@ -2033,6 +2033,7 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_low_power_clk(clocks: &mut ClockTree, new_selector: LowPowerClkConfig) {
             let old_selector = clocks.low_power_clk.replace(new_selector);
+            refresh_low_power_clk_downstream(clocks);
             if clocks.low_power_clk_refcount > 0 {
                 match new_selector {
                     LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
@@ -2052,7 +2053,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_low_power_clk_impl(clocks, old_selector, new_selector);
             }
-            refresh_low_power_clk_downstream(clocks);
         }
         pub fn low_power_clk_config(clocks: &mut ClockTree) -> Option<LowPowerClkConfig> {
             clocks.low_power_clk
@@ -2122,6 +2122,7 @@ macro_rules! define_clock_tree_types {
             new_selector: TimgCalibrationClockConfig,
         ) {
             let old_selector = clocks.timg_calibration_clock.replace(new_selector);
+            refresh_timg_calibration_clock_downstream(clocks);
             if clocks.timg_calibration_clock_refcount > 0 {
                 match new_selector {
                     TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
@@ -2139,7 +2140,6 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
             }
-            refresh_timg_calibration_clock_downstream(clocks);
         }
         pub fn timg_calibration_clock_config(
             clocks: &mut ClockTree,
@@ -2191,6 +2191,7 @@ macro_rules! define_clock_tree_types {
                 new_selector: TimgFunctionClockConfig,
             ) {
                 let old_selector = clocks.timg_function_clock[self as usize].replace(new_selector);
+                refresh_timg_function_clock_downstream(clocks, self);
                 if clocks.timg_function_clock_refcount[self as usize] > 0 {
                     match new_selector {
                         TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
@@ -2206,7 +2207,6 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
-                refresh_timg_function_clock_downstream(clocks, self);
             }
             pub fn function_clock_config(
                 self,
@@ -2261,6 +2261,7 @@ macro_rules! define_clock_tree_types {
                 new_selector: TimgWdtClockConfig,
             ) {
                 let old_selector = clocks.timg_wdt_clock[self as usize].replace(new_selector);
+                refresh_timg_wdt_clock_downstream(clocks, self);
                 if clocks.timg_wdt_clock_refcount[self as usize] > 0 {
                     match new_selector {
                         TimgWdtClockConfig::Pll40m => request_pll_40m(clocks),
@@ -2276,7 +2277,6 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_wdt_clock_impl(clocks, old_selector, new_selector);
                 }
-                refresh_timg_wdt_clock_downstream(clocks, self);
             }
             pub fn wdt_clock_config(self, clocks: &mut ClockTree) -> Option<TimgWdtClockConfig> {
                 clocks.timg_wdt_clock[self as usize]
@@ -2326,6 +2326,7 @@ macro_rules! define_clock_tree_types {
                 config: UartFunctionClockConfig,
             ) {
                 let old_config = clocks.uart_function_clock[self as usize].replace(config);
+                refresh_uart_function_clock_downstream(clocks, self);
                 if clocks.uart_function_clock_refcount[self as usize] > 0 {
                     match config.sclk {
                         UartFunctionClockSclk::PllF40m => request_pll_40m(clocks),
@@ -2343,7 +2344,6 @@ macro_rules! define_clock_tree_types {
                 } else {
                     self.configure_function_clock_impl(clocks, old_config, config);
                 }
-                refresh_uart_function_clock_downstream(clocks, self);
             }
             pub fn function_clock_config(
                 self,
@@ -2397,8 +2397,8 @@ macro_rules! define_clock_tree_types {
             }
             pub fn configure_mem_clock(self, clocks: &mut ClockTree, config: UartMemClockConfig) {
                 let old_config = clocks.uart_mem_clock[self as usize].replace(config);
-                self.configure_mem_clock_impl(clocks, old_config, config);
                 refresh_uart_mem_clock_downstream(clocks, self);
+                self.configure_mem_clock_impl(clocks, old_config, config);
             }
             pub fn mem_clock_config(self, clocks: &mut ClockTree) -> Option<UartMemClockConfig> {
                 clocks.uart_mem_clock[self as usize]
@@ -2437,8 +2437,8 @@ macro_rules! define_clock_tree_types {
                 config: UartBaudRateGeneratorConfig,
             ) {
                 let old_config = clocks.uart_baud_rate_generator[self as usize].replace(config);
-                self.configure_baud_rate_generator_impl(clocks, old_config, config);
                 refresh_uart_baud_rate_generator_downstream(clocks, self);
+                self.configure_baud_rate_generator_impl(clocks, old_config, config);
             }
             pub fn baud_rate_generator_config(
                 self,

@@ -115,8 +115,8 @@ impl ClockTreeNodeType for Source {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
                 let old_config = #config_field.replace(config);
-                #hal_impl(clocks, old_config, config);
                 #refresh_fn(clocks);
+                #hal_impl(clocks, old_config, config);
             }
         }
     }
