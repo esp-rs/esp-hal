@@ -33,7 +33,7 @@ pub(crate) mod constants {
 pub(crate) unsafe fn configure_cpu_caches() {
     // this is just the bare minimum we need to run code from flash
     // consider implementing more advanced configurations
-    // see https://github.com/apache/incubator-nuttx/blob/master/arch/xtensa/src/esp32s3/esp32s3_start.c
+    // see https://github.com/apache/nuttx/blob/f25db331136351dbf8ebe6925a98d3b77e1ca983/arch/xtensa/src/esp32s3/esp32s3_start.c#L213
 
     unsafe extern "C" {
         fn Cache_Suspend_DCache();
