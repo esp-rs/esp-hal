@@ -583,8 +583,16 @@ jobs:
         run: |
           # Expected format: /test-size example_name chip(s)
           COMMENT="${{ github.event.comment.body }}"
+          # Use only the line that holds the command (let users add free-form
+          # text in the rest of the comment) and strip any CR characters that
+          # GitHub may include on CRLF line endings.
+          COMMAND_LINE=$(printf '%s' "$COMMENT" | tr -d '\r' | grep -m1 -E '^/test-size' || true)
+          if [ -z "$COMMAND_LINE" ]; then
+            echo "Error: Could not find /test-size command line in comment."
+            exit 1
+          fi
           # Strip the /test-size prefix
-          ARGS=$(echo "$COMMENT" | sed 's|/test-size[[:space:]]*||')
+          ARGS=$(printf '%s' "$COMMAND_LINE" | sed 's|/test-size[[:space:]]*||')
 
           # Extract --package value if present
           PACKAGE=""
