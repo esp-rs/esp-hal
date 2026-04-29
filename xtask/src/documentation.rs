@@ -180,8 +180,6 @@ fn build_documentation_for_package(
     // create "/latest" redirect - assuming that the current version is the latest.
     //
     // Hosted docs rely on nginx to rewrite `/latest/...` deep links to `/latest/?path=...`.
-    // Client-side logic resolves `path` against the baked-in semver folder after redirect:
-    // https://github.com/esp-rs/esp-hal/issues/4411
     let latest_path = if package.chip_features_matter() {
         output_path
             .parent()
@@ -195,7 +193,8 @@ fn build_documentation_for_package(
     log::info!("Creating latest version redirect at {:?}", latest_path);
     create_dir_all(latest_path.clone())
         .with_context(|| format!("Failed to create dir in {}", latest_path.display()))?;
-    let latest_html = latest_redirect_html(package, &version);
+    let latest_html = latest_redirect_html(workspace, package, &version)
+        .with_context(|| format!("Failed to render latest redirect for {}", package))?;
     std::fs::File::create(latest_path.clone().join("index.html"))?
         .write_all(latest_html.as_bytes())
         .with_context(|| format!("Failed to create or write to {}", latest_path.display()))?;
@@ -203,8 +202,7 @@ fn build_documentation_for_package(
     Ok(())
 }
 
-/// Relative URL prefix under `latest/` pointing at this build's versioned docs root (trailing
-/// slash).
+/// Relative URL from `latest/index.html` to this package's versioned docs root.
 fn latest_redirect_base(package: &Package, version: &semver::Version) -> String {
     if package.chip_features_matter() {
         format!("../{}/", version)
@@ -213,73 +211,18 @@ fn latest_redirect_base(package: &Package, version: &semver::Version) -> String 
     }
 }
 
-/// `path` query value from nginx, decoded once by the browser (`path=chip/crate/...`).
-/// Rules must stay in sync with the inline script in [`latest_redirect_html`].
-#[cfg_attr(not(test), allow(dead_code))] // Exercised by unit tests; runtime logic lives in the script.
-fn redirect_path_suffix_is_safe(path: &str) -> bool {
-    if path.is_empty() {
-        return false;
-    }
-    if path.starts_with('/') || path.starts_with('\\') {
-        return false;
-    }
-    if path.contains("..") || path.contains(':') || path.contains("//") {
-        return false;
-    }
-    path.chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '/'))
-}
-
-fn latest_redirect_html(package: &Package, version: &semver::Version) -> String {
+/// Renders `latest/index.html`, which redirects into the semver docs.
+fn latest_redirect_html(
+    workspace: &Path,
+    package: &Package,
+    version: &semver::Version,
+) -> Result<String> {
     let base = latest_redirect_base(package, version);
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Redirecting...</title>
-<script>
-(function () {{
-  var base = "{base}";
-  var params = new URLSearchParams(location.search);
-  var path = params.get("path");
-  if (path && safe(path)) {{
-    location.replace(base + path);
-  }} else {{
-    location.replace(base);
-  }}
-  function safe(p) {{
-    if (!p.length) return false;
-    var c0 = p.charCodeAt(0);
-    if (c0 === 47 || c0 === 92) return false;
-    if (p.indexOf("..") !== -1) return false;
-    if (p.indexOf(":") !== -1) return false;
-    if (p.indexOf("//") !== -1) return false;
-    for (var i = 0; i < p.length; i++) {{
-      var c = p.charCodeAt(i);
-      if (c < 32 || c === 127) return false;
-    }}
-    for (var j = 0; j < p.length; j++) {{
-      var ch = p.charAt(j);
-      var ok =
-        (ch >= "a" && ch <= "z") ||
-        (ch >= "A" && ch <= "Z") ||
-        (ch >= "0" && ch <= "9") ||
-        ch === "_" ||
-        ch === "-" ||
-        ch === "." ||
-        ch === "/";
-      if (!ok) return false;
-    }}
-    return true;
-  }}
-}})();
-</script>
-<noscript><meta http-equiv="refresh" content="0; url={base}" /></noscript>
-</head>
-<body></body>
-</html>
-"#
+    let resources_path = workspace.join("resources");
+    render_template(
+        &resources_path,
+        "latest_redirect.html.jinja",
+        minijinja::context! { base => base },
     )
 }
 
@@ -849,12 +792,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::{
-        Manifest,
-        latest_redirect_base,
-        latest_stable_docs_version,
-        redirect_path_suffix_is_safe,
-    };
+    use super::{Manifest, latest_stable_docs_version};
 
     fn mkdir(root: &Path, name: &str) {
         fs::create_dir_all(root.join(name)).unwrap();
@@ -900,39 +838,6 @@ mod tests {
         assert_eq!(
             latest_stable_docs_version(root),
             Some("1.0.0".parse().unwrap())
-        );
-    }
-
-    #[test]
-    fn redirect_path_suffix_accepts_typical_doc_paths() {
-        assert!(redirect_path_suffix_is_safe(
-            "esp32c6/esp_hal/gpio/index.html"
-        ));
-        assert!(redirect_path_suffix_is_safe("esp32c5/esp_hal/index.html"));
-    }
-
-    #[test]
-    fn redirect_path_suffix_rejects_traversal_and_absolute() {
-        assert!(!redirect_path_suffix_is_safe(""));
-        assert!(!redirect_path_suffix_is_safe("../etc/passwd"));
-        assert!(!redirect_path_suffix_is_safe("safe/../evil"));
-        assert!(!redirect_path_suffix_is_safe("/esp32/esp_hal/index.html"));
-        assert!(!redirect_path_suffix_is_safe("\\evil"));
-        assert!(!redirect_path_suffix_is_safe("//evil"));
-        assert!(!redirect_path_suffix_is_safe("http:evil"));
-        assert!(!redirect_path_suffix_is_safe("a:b"));
-    }
-
-    #[test]
-    fn latest_redirect_base_matches_chip_and_non_chip_layout() {
-        let v = semver::Version::parse("1.2.3").unwrap();
-        assert_eq!(
-            latest_redirect_base(&crate::Package::EspHal, &v),
-            "../1.2.3/"
-        );
-        assert_eq!(
-            latest_redirect_base(&crate::Package::EspAlloc, &v),
-            "../1.2.3/esp_alloc/"
         );
     }
 
