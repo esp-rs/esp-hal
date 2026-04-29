@@ -59,40 +59,40 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<ADCI> AdcConfig<ADCI>
+impl<ADCX> AdcConfig<ADCX>
 where
-    ADCI: RegisterAccess,
+    ADCX: RegisterAccess,
 {
     /// Calibrate ADC with specified attenuation and voltage source
     pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
     where
-        ADCI: super::CalibrationAccess,
+        ADCX: super::CalibrationAccess,
     {
         let mut adc_max: u16 = 0;
         let mut adc_min: u16 = u16::MAX;
         let mut adc_sum: u32 = 0;
 
-        ADCI::enable_vdef(true);
+        ADCX::enable_vdef(true);
 
         // Start sampling
-        ADCI::config_onetime_sample(ADC_CAL_CHANNEL as u8, atten as u8);
+        ADCX::config_onetime_sample(ADC_CAL_CHANNEL as u8, atten as u8);
 
         // Connect calibration source
-        ADCI::connect_cal(source, true);
+        ADCX::connect_cal(source, true);
 
-        ADCI::calibration_init();
+        ADCX::calibration_init();
         for _ in 0..ADC_CAL_CNT_MAX {
-            ADCI::set_init_code(0);
+            ADCX::set_init_code(0);
 
             // Trigger ADC sampling
-            ADCI::start_onetime_sample();
+            ADCX::start_onetime_sample();
 
-            // Wait until ADC1 sampling is done
-            while !ADCI::is_done() {}
+            // Wait until ADC sampling is done
+            while !ADCX::is_done() {}
 
-            let adc = ADCI::read_data() & ADC_VAL_MASK;
+            let adc = ADCX::read_data() & ADC_VAL_MASK;
 
-            ADCI::reset();
+            ADCX::reset();
 
             adc_sum += adc as u32;
             adc_max = adc.max(adc_max);
@@ -102,7 +102,7 @@ where
         let cal_val = (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (ADC_CAL_CNT_MAX - 2);
 
         // Disconnect calibration source
-        ADCI::connect_cal(source, false);
+        ADCX::connect_cal(source, false);
 
         cal_val
     }
@@ -287,21 +287,21 @@ impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
 }
 
 /// Analog-to-Digital Converter peripheral driver.
-pub struct Adc<'d, ADCI, Dm: crate::DriverMode> {
-    _adc: ADCI,
+pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
+    _adc: ADCX,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
-impl<'d, ADCI> Adc<'d, ADCI, Blocking>
+impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
-    ADCI: RegisterAccess + 'd,
+    ADCX: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
@@ -321,14 +321,14 @@ where
     }
 
     /// Reconfigures the ADC driver to operate in asynchronous mode.
-    pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
+    pub fn into_async(mut self) -> Adc<'d, ADCX, Async> {
         acquire_async_adc();
         self.set_interrupt_handler(adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
         // entering async mode, otherwise there can be '0' readings, happening initially
         // using ADC2
-        ADCI::reset();
+        ADCX::reset();
 
         Adc {
             _adc: self._adc,
@@ -346,11 +346,11 @@ where
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(
         &mut self,
-        pin: &mut super::AdcPin<PIN, ADCI, CS>,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
     ) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
-        CS: super::AdcCalScheme<ADCI>,
+        CS: super::AdcCalScheme<ADCX>,
     {
         if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
             panic!(
@@ -371,32 +371,32 @@ where
             self.active_channel = Some(pin.pin.adc_channel());
 
             // Set ADC unit calibration according used scheme for pin
-            ADCI::calibration_init();
-            ADCI::set_init_code(pin.cal_scheme.adc_cal());
+            ADCX::calibration_init();
+            ADCX::set_init_code(pin.cal_scheme.adc_cal());
 
             let channel = self.active_channel.unwrap();
             let attenuation = self.attenuations[channel as usize].unwrap() as u8;
-            ADCI::config_onetime_sample(channel, attenuation);
-            ADCI::start_onetime_sample();
+            ADCX::config_onetime_sample(channel, attenuation);
+            ADCX::start_onetime_sample();
 
             // see https://github.com/espressif/esp-idf/blob/b4268c874a4cf8fcf7c0c4153cffb76ad2ddda4e/components/hal/adc_oneshot_hal.c#L105-L107
             // the delay might be a bit generous but longer delay seem to not cause problems
             #[cfg(esp32c6)]
             {
                 crate::rom::ets_delay_us(40);
-                ADCI::start_onetime_sample();
+                ADCX::start_onetime_sample();
             }
         }
 
         // Wait for ADC to finish conversion
-        let conversion_finished = ADCI::is_done();
+        let conversion_finished = ADCX::is_done();
         if !conversion_finished {
             return Err(nb::Error::WouldBlock);
         }
 
         // Get converted value
-        let converted_value = ADCI::read_data();
-        ADCI::reset();
+        let converted_value = ADCX::read_data();
+        ADCX::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
         let converted_value = pin.cal_scheme.adc_val(converted_value);
@@ -418,9 +418,9 @@ where
     }
 }
 
-impl<ADCI> crate::private::Sealed for Adc<'_, ADCI, Blocking> {}
+impl<ADCX> crate::private::Sealed for Adc<'_, ADCX, Blocking> {}
 
-impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
+impl<ADCX> InterruptConfigurable for Adc<'_, ADCX, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, InterruptSource);
@@ -464,12 +464,12 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     }
 }
 
-impl<'d, ADCI> Adc<'d, ADCI, Async>
+impl<'d, ADCX> Adc<'d, ADCX, Async>
 where
-    ADCI: RegisterAccess + 'd,
+    ADCX: RegisterAccess + 'd,
 {
     /// Create a new instance in [crate::Blocking] mode.
-    pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
+    pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
         if release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
             for cpu in crate::system::Cpu::all() {
@@ -490,11 +490,11 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> u16
+    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
     where
-        ADCI: Instance,
+        ADCX: Instance,
         PIN: super::AdcChannel,
-        CS: super::AdcCalScheme<ADCI>,
+        CS: super::AdcCalScheme<ADCX>,
     {
         let channel = pin.pin.adc_channel();
         if self.attenuations[channel as usize].is_none() {
@@ -502,17 +502,17 @@ where
         }
 
         // Set ADC unit calibration according used scheme for pin
-        ADCI::calibration_init();
-        ADCI::set_init_code(pin.cal_scheme.adc_cal());
+        ADCX::calibration_init();
+        ADCX::set_init_code(pin.cal_scheme.adc_cal());
 
         let attenuation = self.attenuations[channel as usize].unwrap() as u8;
-        ADCI::config_onetime_sample(channel, attenuation);
-        ADCI::start_onetime_sample();
+        ADCX::config_onetime_sample(channel, attenuation);
+        ADCX::start_onetime_sample();
 
         // Wait for ADC to finish conversion and get value
         let adc_ready_future = AdcFuture::new(self);
         adc_ready_future.await;
-        let converted_value = ADCI::read_data();
+        let converted_value = ADCX::read_data();
 
         // There is a hardware limitation. If the APB clock frequency is high, the step
         // of this reg signal: ``onetime_start`` may not be captured by the
@@ -524,7 +524,7 @@ where
         // We reset ``onetime_start`` in `reset` and assume enough time has passed until
         // the next sample is requested.
 
-        ADCI::reset();
+        ADCX::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
         pin.cal_scheme.adc_val(converted_value)
@@ -565,9 +565,9 @@ pub(crate) fn adc_interrupt_handler() {
     }
 }
 
-fn handle_async<ADCI: Instance>(_instance: ADCI) {
-    ADCI::waker().wake();
-    ADCI::unlisten();
+fn handle_async<ADCX: Instance>(_instance: ADCX) {
+    ADCX::waker().wake();
+    ADCX::unlisten();
 }
 
 /// Enable asynchronous access.
@@ -640,35 +640,35 @@ impl Instance for crate::peripherals::ADC2<'_> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct AdcFuture<ADCI: Instance> {
-    phantom: PhantomData<ADCI>,
+pub(crate) struct AdcFuture<ADCX: Instance> {
+    phantom: PhantomData<ADCX>,
 }
 
-impl<ADCI: Instance> AdcFuture<ADCI> {
-    pub fn new(_self: &super::Adc<'_, ADCI, Async>) -> Self {
+impl<ADCX: Instance> AdcFuture<ADCX> {
+    pub fn new(_self: &super::Adc<'_, ADCX, Async>) -> Self {
         Self {
             phantom: PhantomData,
         }
     }
 }
 
-impl<ADCI: Instance + super::RegisterAccess> core::future::Future for AdcFuture<ADCI> {
+impl<ADCX: Instance + super::RegisterAccess> core::future::Future for AdcFuture<ADCX> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if ADCI::is_done() {
-            ADCI::clear_interrupt();
+        if ADCX::is_done() {
+            ADCX::clear_interrupt();
             Poll::Ready(())
         } else {
-            ADCI::waker().register(cx.waker());
-            ADCI::listen();
+            ADCX::waker().register(cx.waker());
+            ADCX::listen();
             Poll::Pending
         }
     }
 }
 
-impl<ADCI: Instance> Drop for AdcFuture<ADCI> {
+impl<ADCX: Instance> Drop for AdcFuture<ADCX> {
     fn drop(&mut self) {
-        ADCI::unlisten();
+        ADCX::unlisten();
     }
 }

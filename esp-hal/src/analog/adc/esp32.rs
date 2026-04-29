@@ -5,8 +5,8 @@ use core::{
 
 use super::{AdcConfig, Attenuation};
 use crate::{
-    peripherals::{ADC1, ADC2, RTC_IO, SENS},
-    private::{self},
+    peripherals::{ADC1, ADC2, SENS},
+    private,
 };
 
 pub(super) const NUM_ATTENS: usize = 10;
@@ -239,9 +239,9 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
-impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
+impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
 where
-    ADCI: RegisterAccess + 'd,
+    ADCX: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
@@ -250,8 +250,8 @@ where
     ///
     /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
     /// will panic.
-    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
-        if ADCI::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
+        if ADCX::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
             panic!(
                 "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
             );
@@ -260,21 +260,21 @@ where
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
-        ADCI::set_resolution(config.resolution as u8);
+        ADCX::set_resolution(config.resolution as u8);
 
         // Set attenuation for pins
         let attenuations = config.attenuations;
 
-        for (channel, attentuation) in attenuations.iter().enumerate() {
-            if let Some(attenuation) = attentuation {
-                ADC1::set_attenuation(channel, *attenuation as u8);
+        for (channel, attenuation) in attenuations.iter().enumerate() {
+            if let Some(attenuation) = attenuation {
+                ADCX::set_attenuation(channel, *attenuation as u8);
             }
         }
 
         // Set controller to RTC
-        ADCI::clear_dig_force();
-        ADCI::set_start_force();
-        ADCI::set_en_pad_force();
+        ADCX::clear_dig_force();
+        ADCX::set_start_force();
+        ADCX::set_en_pad_force();
         sensors.sar_touch_ctrl1().modify(|_, w| {
             w.xpd_hall_force().set_bit();
             w.hall_phase_force().set_bit()
@@ -321,7 +321,7 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
+    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCX>) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
     {
@@ -343,41 +343,25 @@ where
             // If no conversions are in progress, start a new one for given channel
             self.active_channel = Some(pin.pin.adc_channel());
 
-            ADCI::set_en_pad(pin.pin.adc_channel());
+            ADCX::set_en_pad(pin.pin.adc_channel());
 
-            ADCI::clear_start_sar();
-            ADCI::set_start_sar();
+            ADCX::clear_start_sar();
+            ADCX::set_start_sar();
         }
 
         // Wait for ADC to finish conversion
-        let conversion_finished = ADCI::read_done_sar();
+        let conversion_finished = ADCX::read_done_sar();
         if !conversion_finished {
             return Err(nb::Error::WouldBlock);
         }
 
         // Get converted value
-        let converted_value = ADCI::read_data_sar();
+        let converted_value = ADCX::read_data_sar();
 
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
         Ok(converted_value)
-    }
-}
-
-impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
-    /// Enable the Hall sensor
-    pub fn enable_hall_sensor() {
-        RTC_IO::regs()
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().set_bit());
-    }
-
-    /// Disable the Hall sensor
-    pub fn disable_hall_sensor() {
-        RTC_IO::regs()
-            .hall_sens()
-            .modify(|_, w| w.xpd_hall().clear_bit());
     }
 }
 

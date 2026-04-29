@@ -20,32 +20,32 @@ use crate::analog::adc::{
 /// range because bias correction is done *before* the ADC's output is truncated
 /// to 12 bits.
 #[derive(Clone, Copy)]
-pub struct AdcCalBasic<ADCI> {
+pub struct AdcCalBasic<ADCX> {
     /// Calibration value to set to ADC unit
     cal_val: u16,
 
     #[cfg(esp32c5)]
     chan_compens: i32,
 
-    _phantom: PhantomData<ADCI>,
+    _phantom: PhantomData<ADCX>,
 }
 
-impl<ADCI> crate::private::Sealed for AdcCalBasic<ADCI> {}
+impl<ADCX> crate::private::Sealed for AdcCalBasic<ADCX> {}
 
-impl<ADCI> AdcCalScheme<ADCI> for AdcCalBasic<ADCI>
+impl<ADCX> AdcCalScheme<ADCX> for AdcCalBasic<ADCX>
 where
-    ADCI: AdcCalEfuse + CalibrationAccess,
+    ADCX: AdcCalEfuse + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
         // Try to get init code (Dout0) from efuse
         // Dout0 means mean raw ADC value when zero voltage applied to input.
-        let cal_val = ADCI::init_code(atten).unwrap_or_else(|| {
+        let cal_val = ADCX::init_code(atten).unwrap_or_else(|| {
             // As a fallback try to calibrate via connecting input to ground internally.
-            AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Gnd)
+            AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Gnd)
         });
 
         #[cfg(esp32c5)]
-        let chan_compens = ADCI::cal_chan_compens(atten, ADCI::ADC_CAL_CHANNEL).unwrap_or(0);
+        let chan_compens = ADCX::cal_chan_compens(atten, ADCX::ADC_CAL_CHANNEL).unwrap_or(0);
 
         Self {
             cal_val,
@@ -63,6 +63,6 @@ where
     #[cfg(esp32c5)]
     fn adc_val(&self, val: u16) -> u16 {
         val.saturating_sub(self.chan_compens as u16)
-            .clamp(0, ADCI::ADC_VAL_MASK)
+            .clamp(0, ADCX::ADC_VAL_MASK)
     }
 }
