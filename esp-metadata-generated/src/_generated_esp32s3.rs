@@ -2844,50 +2844,13 @@ macro_rules! define_clock_tree_types {
                 UartInstance::Uart2,
             ] {
                 refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
+                refresh_uart_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [RmtInstance::Rmt] {
                 refresh_rmt_sclk_downstream(clocks, child_instance);
             }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
             }
         }
         fn refresh_pll_clk_downstream(clocks: &mut ClockTree) {
@@ -2999,23 +2962,6 @@ macro_rules! define_clock_tree_types {
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
             for child_instance in [
                 UartInstance::Uart0,
                 UartInstance::Uart1,
@@ -3030,9 +2976,6 @@ macro_rules! define_clock_tree_types {
                     crypto_pwm_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
-            }
-            for child_instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
-                refresh_mcpwm_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
                 refresh_mcpwm_function_clock_downstream(clocks, child_instance);

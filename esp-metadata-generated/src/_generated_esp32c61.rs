@@ -2180,18 +2180,7 @@ macro_rules! define_clock_tree_types {
             refresh_lp_fast_clk_downstream(clocks);
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);

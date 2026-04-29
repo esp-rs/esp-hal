@@ -2694,20 +2694,6 @@ macro_rules! define_clock_tree_types {
             ] {
                 refresh_uart_mem_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
         }
         fn refresh_pll_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.pll_clk {
@@ -2718,9 +2704,6 @@ macro_rules! define_clock_tree_types {
             }
             refresh_apll_clk_downstream(clocks);
             refresh_cpu_pll_div_in_downstream(clocks);
-            for child_instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
-                refresh_mcpwm_function_clock_downstream(clocks, child_instance);
-            }
             for child_instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
                 refresh_mcpwm_function_clock_downstream(clocks, child_instance);
             }
@@ -2840,20 +2823,6 @@ macro_rules! define_clock_tree_types {
             ] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
         }
         fn refresh_ref_tick_xtal_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.ref_tick_xtal {
@@ -2897,20 +2866,6 @@ macro_rules! define_clock_tree_types {
                     ref_tick_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [
                 UartInstance::Uart0,

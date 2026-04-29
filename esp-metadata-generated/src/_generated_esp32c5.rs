@@ -3034,8 +3034,6 @@ macro_rules! define_clock_tree_types {
             refresh_crypto_clk_downstream(clocks);
             for child_instance in [ParlIoInstance::ParlIo] {
                 refresh_parl_io_rx_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [ParlIoInstance::ParlIo] {
                 refresh_parl_io_tx_clock_downstream(clocks, child_instance);
             }
             for child_instance in [RmtInstance::Rmt] {
@@ -3043,18 +3041,7 @@ macro_rules! define_clock_tree_types {
             }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);

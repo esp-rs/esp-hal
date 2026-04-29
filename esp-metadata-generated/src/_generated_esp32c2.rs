@@ -2566,20 +2566,10 @@ macro_rules! define_clock_tree_types {
             refresh_low_power_clk_downstream(clocks);
             for child_instance in [TimgInstance::Timg0] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0] {
                 refresh_timg_wdt_clock_downstream(clocks, child_instance);
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_mem_clock_downstream(clocks, child_instance);
             }
         }
@@ -2617,21 +2607,16 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_apb_clk_downstream(clocks);
+            refresh_crypto_clk_downstream(clocks);
+            refresh_mspi_clk_downstream(clocks);
             for child_instance in [TimgInstance::Timg0] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [TimgInstance::Timg0] {
                 refresh_timg_wdt_clock_downstream(clocks, child_instance);
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            refresh_apb_clk_downstream(clocks);
-            refresh_crypto_clk_downstream(clocks);
-            refresh_mspi_clk_downstream(clocks);
         }
         fn refresh_rc_fast_clk_div_n_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.rc_fast_clk_div_n {
