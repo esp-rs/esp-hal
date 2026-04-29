@@ -16,8 +16,8 @@
   function isAllowedDocPath(path) {
     if (!path.length) return false;
 
-    /* '/' (47) or '\\' (92) at the start turns `base + path` into an absolute-style URL. */
-    if (path.charCodeAt(0) === 47 || path.charCodeAt(0) === 92) return false;
+    /* Leading slash or backslash at the start turns `base + path` into an absolute-style URL. */
+    if (path.startsWith("/") || path.startsWith("\\")) return false;
     if (path.indexOf("..") !== -1) return false;
     if (path.indexOf(":") !== -1) return false;
     if (path.indexOf("//") !== -1) return false;
