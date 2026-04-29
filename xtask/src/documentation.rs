@@ -792,7 +792,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::{Manifest, latest_stable_docs_version};
+    use super::{Manifest, latest_redirect_base, latest_redirect_html, latest_stable_docs_version};
 
     fn mkdir(root: &Path, name: &str) {
         fs::create_dir_all(root.join(name)).unwrap();
@@ -839,6 +839,33 @@ mod tests {
             latest_stable_docs_version(root),
             Some("1.0.0".parse().unwrap())
         );
+    }
+
+    #[test]
+    fn latest_redirect_base_paths() {
+        let v = semver::Version::parse("2.1.0").unwrap();
+        assert_eq!(
+            latest_redirect_base(&crate::Package::EspHal, &v),
+            "../2.1.0/"
+        );
+        assert_eq!(
+            latest_redirect_base(&crate::Package::EspAlloc, &v),
+            "../2.1.0/esp_alloc/"
+        );
+    }
+
+    /// Small integration check for jinja template.
+    #[test]
+    fn latest_redirect_html_matches_latest_redirect_base() {
+        let ws = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let ver = semver::Version::parse("1.0.0").unwrap();
+        let pkg = crate::Package::EspHal;
+
+        let html = latest_redirect_html(ws, &pkg, &ver).unwrap();
+        let base = latest_redirect_base(&pkg, &ver);
+
+        assert!(html.contains(&format!("var base = \"{base}\"")));
+        assert!(html.contains(&format!("content=\"0; url={base}\"")));
     }
 
     #[test]

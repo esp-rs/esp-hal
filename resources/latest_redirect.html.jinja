@@ -4,39 +4,32 @@
 <meta charset="utf-8">
 <title>Redirecting...</title>
 <script>
+{#-
+  nginx sends users here as …/latest/?path=<decoded remainder>. We merge `path` onto `base`
+  (../<semver>/…) only when it looks like a rustdoc-relative path.
+-#}
 (function () {
   var base = "{{ base }}";
-  var params = new URLSearchParams(location.search);
-  var path = params.get("path");
-  if (path && safe(path)) {
-    location.replace(base + path);
+  var pathFromQuery = new URLSearchParams(location.search).get("path");
+
+  /* Reject junk `?path=` values, otherwise we only open `base`. */
+  function isAllowedDocPath(path) {
+    if (!path.length) return false;
+
+    /* '/' (47) or '\\' (92) at the start turns `base + path` into an absolute-style URL. */
+    if (path.charCodeAt(0) === 47 || path.charCodeAt(0) === 92) return false;
+    if (path.indexOf("..") !== -1) return false;
+    if (path.indexOf(":") !== -1) return false;
+    if (path.indexOf("//") !== -1) return false;
+
+    return /^[0-9A-Za-z./_-]+$/.test(path);
+  }
+
+  /* Deep page under `base`, or semver root only if `path` is missing / invalid. */
+  if (pathFromQuery && isAllowedDocPath(pathFromQuery)) {
+    location.replace(base + pathFromQuery);
   } else {
     location.replace(base);
-  }
-  function safe(p) {
-    if (!p.length) return false;
-    var c0 = p.charCodeAt(0);
-    if (c0 === 47 || c0 === 92) return false;
-    if (p.indexOf("..") !== -1) return false;
-    if (p.indexOf(":") !== -1) return false;
-    if (p.indexOf("//") !== -1) return false;
-    for (var i = 0; i < p.length; i++) {
-      var c = p.charCodeAt(i);
-      if (c < 32 || c === 127) return false;
-    }
-    for (var j = 0; j < p.length; j++) {
-      var ch = p.charAt(j);
-      var ok =
-        (ch >= "a" && ch <= "z") ||
-        (ch >= "A" && ch <= "Z") ||
-        (ch >= "0" && ch <= "9") ||
-        ch === "_" ||
-        ch === "-" ||
-        ch === "." ||
-        ch === "/";
-      if (!ok) return false;
-    }
-    return true;
   }
 })();
 </script>
