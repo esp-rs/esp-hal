@@ -50,10 +50,9 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     // We must initialize some kind of interface and start it and start the controller in station
     // mode.
-    let (_controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut sniffer = interfaces.sniffer;
+    let mut sniffer = controller.sniffer();
 
     // Create a buffer, which can hold the enitre serialized beacon frame.
     let mut beacon = [0u8; 300];

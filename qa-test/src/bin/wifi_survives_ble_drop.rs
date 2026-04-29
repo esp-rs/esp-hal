@@ -84,14 +84,13 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     println!("Starting wifi");
-    let (mut controller, interfaces) = esp_radio::wifi::new(
+    let wifi_interface = esp_radio::wifi::Interface::station();
+    let mut controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
     println!("Wifi configured and started!");
-
-    let wifi_interface = interfaces.station;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -195,6 +194,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }

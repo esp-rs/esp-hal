@@ -46,7 +46,7 @@ async fn main(_spawner: Spawner) {
 
     println!("Creating wifi controller with print-logs-from-driver enabled");
 
-    let (mut controller, _interfaces) = esp_radio::wifi::new(
+    let mut controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )

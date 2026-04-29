@@ -50,10 +50,12 @@ async fn main(spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let wifi = peripherals.WIFI;
-    // start the controller in station mode
-    let (_controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
+    let controller = mk_static!(
+        esp_radio::wifi::WifiController<'static>,
+        esp_radio::wifi::new(wifi, Default::default()).unwrap()
+    );
 
-    let esp_now = interfaces.esp_now;
+    let esp_now = controller.esp_now();
     esp_now.set_channel(11).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());

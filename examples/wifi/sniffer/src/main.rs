@@ -40,10 +40,9 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // We must initialize some kind of interface and start it.
-    let (_controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut sniffer = interfaces.sniffer;
+    let mut sniffer = controller.sniffer();
     sniffer.set_promiscuous_mode(true).unwrap();
     sniffer.set_receive_cb(|packet| {
         let _ = match_frames! {

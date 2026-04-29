@@ -95,15 +95,14 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     println!("Starting wifi");
-    let (controller, interfaces) = esp_radio::wifi::new(
+    let wifi_ap_device = esp_radio::wifi::Interface::access_point();
+    let wifi_sta_device = esp_radio::wifi::Interface::station();
+    let controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(access_point_station_config),
     )
     .unwrap();
     println!("Wifi started!");
-
-    let wifi_ap_device = interfaces.access_point;
-    let wifi_sta_device = interfaces.station;
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
@@ -378,6 +377,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task(pool_size = 2)]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }

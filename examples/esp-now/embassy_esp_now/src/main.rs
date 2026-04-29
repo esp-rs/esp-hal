@@ -33,11 +33,9 @@ async fn main(_spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let wifi = peripherals.WIFI;
-    // We don't need the controller but using `_` instead of `_controller` causes the
-    // `WifiContoller` to be dropped immediately.
-    let (_controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
+    let controller = esp_radio::wifi::new(wifi, Default::default()).unwrap();
 
-    let mut esp_now = interfaces.esp_now;
+    let mut esp_now = controller.esp_now();
     esp_now.set_channel(11).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());

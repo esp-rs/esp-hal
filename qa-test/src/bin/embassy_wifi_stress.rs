@@ -60,7 +60,7 @@ async fn main(_spawner: Spawner) {
         );
 
         println!("Wifi stack setup (STA)");
-        let (mut controller, _interfaces) =
+        let mut controller =
             esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
 
         {

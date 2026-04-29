@@ -45,13 +45,12 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
 
-        let (mut controller, interfaces) = esp_radio::wifi::new(
+        let mut wifi_interface = esp_radio::wifi::Interface::station();
+        let mut controller = esp_radio::wifi::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )
         .unwrap();
-
-        let mut wifi_interface = interfaces.station;
 
         let token = wifi_interface.transmit();
         assert!(matches!(token, None));
@@ -82,14 +81,13 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
 
-        let (mut controller, interfaces) = esp_radio::wifi::new(
+        let mut wifi_interface = esp_radio::wifi::Interface::station();
+        let mut controller = esp_radio::wifi::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )
         .unwrap();
         controller.connect_async().await.unwrap();
-
-        let mut wifi_interface = interfaces.station;
 
         let token = wifi_interface.transmit();
 
