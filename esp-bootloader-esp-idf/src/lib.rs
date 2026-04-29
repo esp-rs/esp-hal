@@ -101,21 +101,16 @@
 // MUST be the first module
 mod fmt;
 
-// P4 ROM does not have md5/crc functions (rom_crc_le/rom_md5_bsd flags not set).
-// Use software crypto for P4, ROM crypto for other chips.
-// Ref: esp-rom-sys rom/mod.rs -- pub mod crc gated on rom_crc_le
-// P4 ROM does not have md5/crc functions (rom_crc_le/rom_md5_bsd flags not set).
-// Use software crypto (non_rom module) for P4 and std builds.
-#[cfg(all(not(feature = "std"), not(feature = "esp32p4")))]
+#[cfg(not(feature = "std"))]
 mod rom;
-#[cfg(all(not(feature = "std"), not(feature = "esp32p4")))]
+#[cfg(not(feature = "std"))]
 pub(crate) use rom as crypto;
 
-#[cfg(any(feature = "std", feature = "esp32p4"))]
+#[cfg(feature = "std")]
 mod non_rom;
 #[cfg(embedded_test)]
 pub use crypto::Crc32 as Crc32ForTesting;
-#[cfg(any(feature = "std", feature = "esp32p4"))]
+#[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
 pub mod partitions;

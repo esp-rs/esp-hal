@@ -13,8 +13,24 @@ cores  = 2
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
 symbols = [
+    # Additional peripherals defined by us (the developers):
     "very_large_intr_status",
     "spi_octal",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_ext1_wakeup",
+    "pm_support_touch_sensor_wakeup",
+
+    # TODO: add the following symbols when investigation and getting ready
+    #   - "lp_core"
+    #   - "swd"
+    #   - "gpio_support_deepsleep_wakeup"
+    #   - "uart_support_wakeup_int"
 ]
 
 [device.interrupts]
