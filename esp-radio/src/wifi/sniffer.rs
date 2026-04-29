@@ -130,3 +130,13 @@ impl Sniffer<'_> {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
     }
 }
+
+impl Drop for Sniffer<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            esp_wifi_set_promiscuous(false);
+            esp_wifi_set_promiscuous_rx_cb(None);
+        }
+        SNIFFER_CB.with(|callback| *callback = None);
+    }
+}
