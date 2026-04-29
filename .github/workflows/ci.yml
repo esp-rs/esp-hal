@@ -314,9 +314,6 @@ jobs:
   # Check links in .rs, .md, and .toml files
 
   link-check:
-    needs: get-labels
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
