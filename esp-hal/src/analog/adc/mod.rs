@@ -97,15 +97,15 @@ pub enum AdcCalSource {
 }
 
 /// An I/O pin which can be read using the ADC.
-pub struct AdcPin<PIN, ADCI, CS = ()> {
+pub struct AdcPin<PIN, ADCX, CS = ()> {
     /// The underlying GPIO pin
     pub pin: PIN,
     /// Calibration scheme used for the configured ADC pin
     pub cal_scheme: CS,
-    _phantom: PhantomData<ADCI>,
+    _phantom: PhantomData<ADCX>,
 }
 
-impl<PIN: core::fmt::Debug, ADCI, CS: core::fmt::Debug> core::fmt::Debug for AdcPin<PIN, ADCI, CS> {
+impl<PIN: core::fmt::Debug, ADCX, CS: core::fmt::Debug> core::fmt::Debug for AdcPin<PIN, ADCX, CS> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AdcPin")
             .field("pin", &self.pin)
@@ -115,7 +115,7 @@ impl<PIN: core::fmt::Debug, ADCI, CS: core::fmt::Debug> core::fmt::Debug for Adc
 }
 
 #[cfg(feature = "defmt")]
-impl<PIN: defmt::Format, ADCI, CS: defmt::Format> defmt::Format for AdcPin<PIN, ADCI, CS> {
+impl<PIN: defmt::Format, ADCX, CS: defmt::Format> defmt::Format for AdcPin<PIN, ADCX, CS> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
@@ -128,22 +128,22 @@ impl<PIN: defmt::Format, ADCI, CS: defmt::Format> defmt::Format for AdcPin<PIN, 
 
 /// Configuration for the ADC.
 #[cfg(feature = "unstable")]
-pub struct AdcConfig<ADCI> {
+pub struct AdcConfig<ADCX> {
     #[cfg(esp32)]
     resolution: Resolution,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
-    _phantom: PhantomData<ADCI>,
+    _phantom: PhantomData<ADCX>,
 }
 
 #[cfg(feature = "unstable")]
-impl<ADCI> AdcConfig<ADCI> {
+impl<ADCX> AdcConfig<ADCX> {
     /// Create a new configuration struct with its default values
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Enable the specified pin with the given attenuation
-    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCI>
+    pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCX>
     where
         PIN: AdcChannel + AnalogPin,
     {
@@ -166,11 +166,11 @@ impl<ADCI> AdcConfig<ADCI> {
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCI, CS>
+    ) -> AdcPin<PIN, ADCX, CS>
     where
-        ADCI: CalibrationAccess,
+        ADCX: CalibrationAccess,
         PIN: AdcChannel + AnalogPin,
-        CS: AdcCalScheme<ADCI>,
+        CS: AdcCalScheme<ADCX>,
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
@@ -185,7 +185,7 @@ impl<ADCI> AdcConfig<ADCI> {
 }
 
 #[cfg(feature = "unstable")]
-impl<ADCI> Default for AdcConfig<ADCI> {
+impl<ADCX> Default for AdcConfig<ADCX> {
     fn default() -> Self {
         Self {
             #[cfg(esp32)]
@@ -221,7 +221,7 @@ pub trait AdcChannel {
 /// The methods in this trait are mostly for internal use. To get
 /// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
 /// and specify some implementor of this trait.
-pub trait AdcCalScheme<ADCI>: Sized + crate::private::Sealed {
+pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
     /// Create a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
@@ -238,7 +238,7 @@ pub trait AdcCalScheme<ADCI>: Sized + crate::private::Sealed {
 
 impl crate::private::Sealed for () {}
 
-impl<ADCI> AdcCalScheme<ADCI> for () {
+impl<ADCX> AdcCalScheme<ADCX> for () {
     fn new_cal(_atten: Attenuation) -> Self {}
 }
 

@@ -43,8 +43,8 @@ pub trait AdcHasCurveCal {
 /// This scheme also includes basic calibration ([`super::AdcCalBasic`]) and
 /// line fitting ([`AdcCalLine`]).
 #[derive(Clone, Copy)]
-pub struct AdcCalCurve<ADCI> {
-    line: AdcCalLine<ADCI>,
+pub struct AdcCalCurve<ADCX> {
+    line: AdcCalLine<ADCX>,
 
     /// Coefficients of the error estimation polynomial.
     ///
@@ -57,19 +57,19 @@ pub struct AdcCalCurve<ADCI> {
     /// subtracted from linear calibration's output to get the final reading.
     coeff: &'static [CurveCoeff],
 
-    _phantom: PhantomData<ADCI>,
+    _phantom: PhantomData<ADCX>,
 }
 
-impl<ADCI> crate::private::Sealed for AdcCalCurve<ADCI> {}
+impl<ADCX> crate::private::Sealed for AdcCalCurve<ADCX> {}
 
-impl<ADCI> AdcCalScheme<ADCI> for AdcCalCurve<ADCI>
+impl<ADCX> AdcCalScheme<ADCX> for AdcCalCurve<ADCX>
 where
-    ADCI: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
+    ADCX: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
-        let line = AdcCalLine::<ADCI>::new_cal(atten);
+        let line = AdcCalLine::<ADCX>::new_cal(atten);
 
-        let coeff = ADCI::CURVES_COEFFS
+        let coeff = ADCX::CURVES_COEFFS
             .iter()
             .find(|item| item.atten == atten)
             .expect("No curve coefficients for given attenuation")
