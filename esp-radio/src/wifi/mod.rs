@@ -2400,7 +2400,6 @@ pub fn new<'d>(
 /// deinitialized and Wi-Fi is stopped.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,

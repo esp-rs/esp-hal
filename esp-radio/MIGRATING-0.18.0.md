@@ -18,7 +18,8 @@ let wifi_interface = esp_radio::wifi::Interface::station();
 let mut controller = esp_radio::wifi::new(peripherals.WIFI, config)?;
 ```
 
-For ESP-NOW and Sniffer, use the controller's getter methods:
+For ESP-NOW and Sniffer, use the controller methods. The returned instances borrow the
+controller, so the controller must outlive them:
 
 ```rust
 // Before
@@ -32,5 +33,6 @@ let mut sniffer = controller.sniffer();
 let esp_now = controller.esp_now();
 ```
 
-Note: `Interface` is no longer `Clone` or `Copy`. Each mode (station / access point) is a
-singleton — only one instance can exist at a time. Dropping it releases the slot.
+`Interface` is no longer `Clone` or `Copy`. Each mode (station / access point) is a
+singleton — only one instance can exist at a time. Dropping it releases the slot so it
+can be created again.
