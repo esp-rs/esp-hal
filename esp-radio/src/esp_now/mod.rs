@@ -644,7 +644,10 @@ impl defmt::Format for EspNowRc<'_> {
 impl EspNowRc<'_> {
     fn new() -> Self {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
-        assert!(ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0);
+        assert!(
+            ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0,
+            "ESP-NOW already in use"
+        );
 
         Self {
             rc: &ESP_NOW_RC,

@@ -1067,6 +1067,13 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
 
 fn wifi_deinit() -> Result<(), crate::WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+
+    // Drain RX queues before deinit so that any stale PacketBuffers are freed
+    // while the driver is still alive. Without this, an Interface that outlives
+    // the controller could hold PacketBuffers with dangling `eb` pointers.
+    DATA_QUEUE_RX_STA.with(|q| while q.pop_front().is_some() {});
+    DATA_QUEUE_RX_AP.with(|q| while q.pop_front().is_some() {});
+
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
     Ok(())
@@ -2425,6 +2432,10 @@ impl Drop for WifiController<'_> {
 
 impl WifiController<'_> {
     /// Returns an ESP-NOW instance tied to this controller's lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an ESP-NOW instance already exists.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[instability::unstable]
     pub fn esp_now(&self) -> crate::esp_now::EspNow<'_> {
@@ -2432,6 +2443,10 @@ impl WifiController<'_> {
     }
 
     /// Returns a sniffer instance tied to this controller's lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a sniffer instance already exists.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[instability::unstable]
     pub fn sniffer(&self) -> Sniffer<'_> {
