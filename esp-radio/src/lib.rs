@@ -46,7 +46,7 @@
     wifi_driver_supported,
     doc = r#"
 
-if let Ok((controller, interfaces)) = esp_radio::wifi::new(
+if let Ok(controller) = esp_radio::wifi::new(
     peripherals.WIFI,
     Default::default(),
 ) {}
