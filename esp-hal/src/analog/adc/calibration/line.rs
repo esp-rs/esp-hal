@@ -35,8 +35,8 @@ const GAIN_SCALE: u32 = 1 << 16;
 ///
 /// This scheme also includes basic calibration ([`AdcCalBasic`]).
 #[derive(Clone, Copy)]
-pub struct AdcCalLine<ADCI> {
-    basic: AdcCalBasic<ADCI>,
+pub struct AdcCalLine<ADCX> {
+    basic: AdcCalBasic<ADCX>,
 
     /// ADC gain.
     ///
@@ -45,28 +45,28 @@ pub struct AdcCalLine<ADCI> {
     /// number with 16 fractional bits.
     gain: u32,
 
-    _phantom: PhantomData<ADCI>,
+    _phantom: PhantomData<ADCX>,
 }
 
-impl<ADCI> crate::private::Sealed for AdcCalLine<ADCI> {}
+impl<ADCX> crate::private::Sealed for AdcCalLine<ADCX> {}
 
-impl<ADCI> AdcCalScheme<ADCI> for AdcCalLine<ADCI>
+impl<ADCX> AdcCalScheme<ADCX> for AdcCalLine<ADCX>
 where
-    ADCI: AdcCalEfuse + AdcHasLineCal + CalibrationAccess,
+    ADCX: AdcCalEfuse + AdcHasLineCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
-        let basic = AdcCalBasic::<ADCI>::new_cal(atten);
+        let basic = AdcCalBasic::<ADCX>::new_cal(atten);
 
         // Try get the reference point (Dout, Vin) from efuse
         // Dout means mean raw ADC value when specified Vin applied to input.
-        let (code, mv) = ADCI::cal_code(atten)
-            .map(|code| (code, ADCI::cal_mv(atten)))
+        let (code, mv) = ADCX::cal_code(atten)
+            .map(|code| (code, ADCX::cal_mv(atten)))
             .unwrap_or_else(|| {
                 // As a fallback try to calibrate using reference voltage source.
                 // This method is not too good because actual reference voltage may varies
                 // in range 1000..=1200 mV and this value currently cannot be read from efuse.
                 (
-                    AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Ref),
+                    AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Ref),
                     1100, // use 1100 mV as a middle of typical reference voltage range
                 )
             });

@@ -211,6 +211,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("phy.combo_module") => {
+        true
+    };
     ("psram.octal_spi") => {
         false
     };
@@ -231,6 +234,12 @@ macro_rules! property {
     };
     ("sha.dma") => {
         true
+    };
+    ("sleep.light_sleep") => {
+        false
+    };
+    ("sleep.deep_sleep") => {
+        false
     };
     ("soc.cpu_has_branch_predictor") => {
         false
@@ -294,6 +303,12 @@ macro_rules! property {
     };
     ("uart.ram_size", str) => {
         stringify!(128)
+    };
+    ("uart.version") => {
+        2
+    };
+    ("uart.version", str) => {
+        stringify!(2)
     };
     ("uart.peripheral_controls_mem_clk") => {
         true

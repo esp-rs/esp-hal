@@ -219,6 +219,7 @@ instances = [
     { name = "uart4", sys_instance = "Uart4", tx = "UART4_TXD", rx = "UART4_RXD", cts = "UART4_CTS", rts = "UART4_RTS" },
 ]
 ram_size = 128
+version = 2
 
 # SYSTIMER: 2 counter units, 3 alarm comparators, 16 MHz (XTAL/2.5)
 # Ref: esp-idf systimer_ll.h, TRM v0.5 Ch 17

@@ -59,7 +59,7 @@ pub enum Release {
     /// Rollover migrations steps post release.
     /// - Create new migration guides for packages that have a migration guide
     #[cfg(feature = "release")]
-    PostRelease,
+    PostRelease(PostReleaseArgs),
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:

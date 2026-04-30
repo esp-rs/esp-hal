@@ -142,7 +142,7 @@ fn main() -> Result<()> {
             #[cfg(feature = "release")]
             Release::PublishPlan(args) => publish_plan(&workspace, args),
             #[cfg(feature = "release")]
-            Release::PostRelease => post_release(&workspace),
+            Release::PostRelease(args) => post_release(&workspace, args),
             #[cfg(feature = "release")]
             Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, args),
         },
