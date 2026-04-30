@@ -1078,7 +1078,8 @@ impl<'d> UartRx<'d, Async> {
         // of returnable bytes.
         let minimum = minimum.min(max_threshold);
 
-        if self.uart.info().rx_fifo_count() < minimum {
+        // loop to prevent returning 0 bytes
+        while self.uart.info().rx_fifo_count() < minimum {
             // We're ignoring the user configuration here to ensure that this is not waiting
             // for more data than the buffer. We'll restore the original value after the
             // future resolved.
@@ -3228,10 +3229,10 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedRxFifoThreshold] if the provided value exceeds
-    /// [`Info::RX_FIFO_MAX_THRHD`].
+    /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
+    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
-        if threshold > Self::RX_FIFO_MAX_THRHD {
+        if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
         }
 
@@ -3252,7 +3253,7 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTxFifoThreshold] if the provided value exceeds
+    /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
     fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
@@ -3275,7 +3276,7 @@ impl Info {
     ///
     /// ## Errors
     ///
-    /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
+    /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
     /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The value you pass times
