@@ -119,10 +119,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // backport branch serves a single package; dependencies have their own
     // branches and are released independently.
     let packages_to_release = if let Some(ref ctx) = backport {
-        println!(
-            "Backport branch detected: releasing only {}.",
-            ctx.package
-        );
+        println!("Backport branch detected: releasing only {}.", ctx.package);
         vec![ctx.package]
     } else {
         // Recursively collect dependencies. A bit inefficient, but we don't

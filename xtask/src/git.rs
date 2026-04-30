@@ -33,7 +33,9 @@ pub fn parse_backport_branch(branch: &str) -> Option<BackportInfo> {
         let prefix = format!("{}-", pkg);
         if let Some(suffix) = branch.strip_prefix(&prefix) {
             if let Some((major, minor)) = parse_version_suffix(suffix) {
-                let dominated = best.as_ref().map_or(true, |&(_, _, _, len)| prefix.len() > len);
+                let dominated = best
+                    .as_ref()
+                    .map_or(true, |&(_, _, _, len)| prefix.len() > len);
                 if dominated {
                     best = Some((pkg, major, minor, prefix.len()));
                 }
