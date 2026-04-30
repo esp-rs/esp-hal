@@ -175,6 +175,33 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("i2s.version") => {
+        1
+    };
+    ("i2s.version", str) => {
+        stringify!(1)
+    };
+    ("i2s.mclk_divider_bit_width") => {
+        6
+    };
+    ("i2s.mclk_divider_bit_width", str) => {
+        stringify!(6)
+    };
+    ("i2s.max_ws_width") => {
+        128
+    };
+    ("i2s.max_ws_width", str) => {
+        stringify!(128)
+    };
+    ("i2s.clock_configured_by_pcr") => {
+        false
+    };
+    ("i2s.bck_divider_in_conf") => {
+        false
+    };
+    ("i2s.msb_shift_in_conf") => {
+        false
+    };
     ("interrupts.status_registers") => {
         3
     };

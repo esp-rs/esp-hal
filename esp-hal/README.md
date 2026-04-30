@@ -141,8 +141,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5169]: https://github.com/esp-rs/esp-hal/issues/5169
 [5170]: https://github.com/esp-rs/esp-hal/issues/5170
 [5171]: https://github.com/esp-rs/esp-hal/issues/5171
-[5172]: https://github.com/esp-rs/esp-hal/issues/5172
-[5415]: https://github.com/esp-rs/esp-hal/issues/5415
 [5417]: https://github.com/esp-rs/esp-hal/issues/5417
 [5418]: https://github.com/esp-rs/esp-hal/issues/5418
 [5419]: https://github.com/esp-rs/esp-hal/issues/5419

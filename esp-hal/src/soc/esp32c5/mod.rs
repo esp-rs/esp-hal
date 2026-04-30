@@ -16,7 +16,12 @@ pub(crate) mod regi2c;
 pub(crate) use esp32c5 as pac;
 
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) mod constants {}
+pub(crate) mod constants {
+    /// The clock frequency for the I2S peripheral in Hertz.
+    pub const I2S_SCLK: u32 = 160_000_000;
+    /// The default clock source for the I2S peripheral.
+    pub const I2S_DEFAULT_CLK_SRC: u8 = 2;
+}
 
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.
@@ -58,7 +63,7 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_get_dcache_line_size() -> u32 {
     unsafe extern "C" {
-        fn Cache_Get_DCache_Line_Size() -> u32;
+        fn Cache_Get_Line_Size() -> u32;
     }
-    unsafe { Cache_Get_DCache_Line_Size() }
+    unsafe { Cache_Get_Line_Size() }
 }

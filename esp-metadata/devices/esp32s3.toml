@@ -866,6 +866,10 @@ deep_sleep = true
 
 ## Interfaces
 [device.i2s]
+version = 2
+mclk_divider_bit_width = 6
+max_ws_width = 128
+
 [device.camera]
 [device.rgb_display]
 [device.ledc]

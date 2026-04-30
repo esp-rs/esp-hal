@@ -211,6 +211,33 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("i2s.version") => {
+        2
+    };
+    ("i2s.version", str) => {
+        stringify!(2)
+    };
+    ("i2s.mclk_divider_bit_width") => {
+        9
+    };
+    ("i2s.mclk_divider_bit_width", str) => {
+        stringify!(9)
+    };
+    ("i2s.max_ws_width") => {
+        512
+    };
+    ("i2s.max_ws_width", str) => {
+        stringify!(512)
+    };
+    ("i2s.clock_configured_by_pcr") => {
+        true
+    };
+    ("i2s.bck_divider_in_conf") => {
+        true
+    };
+    ("i2s.msb_shift_in_conf") => {
+        true
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -3202,6 +3229,8 @@ macro_rules! implement_peripheral_clocks {
             Ecc,
             /// I2C_EXT0 peripheral clock signal
             I2cExt0,
+            /// I2S0 peripheral clock signal
+            I2s0,
             /// PARL_IO peripheral clock signal
             ParlIo,
             /// PCNT peripheral clock signal
@@ -3244,6 +3273,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Dma,
                 Self::Ecc,
                 Self::I2cExt0,
+                Self::I2s0,
                 Self::ParlIo,
                 Self::Pcnt,
                 Self::Rmt,
@@ -3285,6 +3315,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2s_conf()
+                        .modify(|_, w| w.i2s_clk_en().bit(enable));
                 }
                 Peripheral::ParlIo => {
                     crate::peripherals::SYSTEM::regs()
@@ -3383,6 +3418,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2s_conf()
+                        .modify(|_, w| w.i2s_rst_en().bit(reset));
                 }
                 Peripheral::ParlIo => {
                     crate::peripherals::SYSTEM::regs()

@@ -452,7 +452,17 @@ driver_configs![
     I2sProperties {
         driver: i2s,
         name: "I2S",
-        properties: {}
+        properties: {
+            version: u32,
+            mclk_divider_bit_width: u32,
+            max_ws_width: u32,
+            #[serde(default)]
+            clock_configured_by_pcr: bool,
+            #[serde(default)]
+            bck_divider_in_conf: bool,
+            #[serde(default)]
+            msb_shift_in_conf: bool,
+        }
     },
     IeeeProperties {
         driver: ieee802154,

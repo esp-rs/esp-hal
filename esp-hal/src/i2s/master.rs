@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "DMA_I2S0",
-        cfg(not(any(esp32, esp32s2))) => "DMA_CH0"
+        cfg(i2s_version = "1") => "DMA_I2S0",
+        cfg(not(i2s_version = "1")) => "DMA_CH0"
     },
     "mclk" => {
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
@@ -153,19 +153,16 @@ pub enum I2sInterrupt {
     RxHung,
     /// Transmit buffer hung, indicating a stall in data transmission.
     TxHung,
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     /// Reception of data is complete.
     RxDone,
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     /// Transmission of data is complete.
     TxDone,
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
-pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
-
-#[cfg(any(esp32c3, esp32c6, esp32h2))]
-pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
+pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize =
+    property!("i2s.mclk_divider_bit_width");
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
@@ -200,7 +197,7 @@ impl From<DmaError> for Error {
 /// Supported data formats
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(i2s_version = "1"))]
 pub enum DataFormat {
     /// 32-bit data width and 32-bit channel width.
     Data32Channel32,
@@ -244,7 +241,7 @@ pub enum DataFormat {
     Data16Channel16,
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(i2s_version = "1"))]
 impl DataFormat {
     /// Returns the number of data bits for the selected data format.
     pub fn data_bits(&self) -> u8 {
@@ -346,12 +343,12 @@ pub enum WsWidth {
     HalfFrame,
     /// Word select signal will be kept active for the length of the first channel (PCM long frame
     /// standard)
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     OneChannel,
     /// Word select signal will be kept active for a single BCLK cycle (PCM short frame standard)
     Bit,
     /// Word select signal will be kept active for the specified amount of bits(BCLK cycles)
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     Bits(u16),
 }
 
@@ -412,7 +409,7 @@ impl Channels {
     /// let channels = Channels::new(6, 0b_001_001, None);
     /// # {after_snippet}
     /// ```
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     pub const fn new(count: u8, mask: u16, fill: Option<u32>) -> Self {
         Self::new_impl(count, mask, fill)
     }
@@ -423,7 +420,7 @@ impl Channels {
         Self { count, mask, fill }
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     fn active_count(&self) -> u8 {
         self.mask.count_ones() as u8
     }
@@ -445,11 +442,11 @@ pub struct Config {
     signal_loopback: bool,
 
     /// The target sample rate
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     sample_rate: Rate,
 
     /// Format of the data
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
 
@@ -482,7 +479,7 @@ impl Config {
     }
 
     /// TDM PCM long frame standard configuration with two 16-bit active channels
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     pub fn new_tdm_pcm_long() -> Self {
         Self {
             rx_config: UnitConfig::new_tdm_pcm_long(),
@@ -493,7 +490,7 @@ impl Config {
 
     /// Assign the given value to the `sample_rate` field in both units.
     #[must_use]
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     pub fn with_sample_rate(mut self, sample_rate: Rate) -> Self {
         self.rx_config.sample_rate = sample_rate;
         self.tx_config.sample_rate = sample_rate;
@@ -510,7 +507,7 @@ impl Config {
 
     /// Assign the given value to the `data_format` field in both units.
     #[must_use]
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     pub fn with_data_format(mut self, data_format: DataFormat) -> Self {
         self.rx_config.data_format = data_format;
         self.tx_config.data_format = data_format;
@@ -551,7 +548,7 @@ impl Config {
     }
 
     /// Assign the given value to the `bit_order` field in both units.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     #[must_use]
     pub fn with_bit_order(mut self, bit_order: BitOrder) -> Self {
         self.rx_config.bit_order = bit_order;
@@ -559,7 +556,7 @@ impl Config {
         self
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     fn calculate_clock(&self) -> I2sClockDividers {
         I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits())
     }
@@ -578,9 +575,9 @@ impl Default for Config {
             rx_config: UnitConfig::new_tdm_philips(),
             tx_config: UnitConfig::new_tdm_philips(),
             signal_loopback: false,
-            #[cfg(any(esp32, esp32s2))]
+            #[cfg(i2s_version = "1")]
             sample_rate: Rate::from_hz(44100),
-            #[cfg(any(esp32, esp32s2))]
+            #[cfg(i2s_version = "1")]
             data_format: DataFormat::Data16Channel16,
         }
     }
@@ -592,14 +589,14 @@ impl Default for Config {
 #[non_exhaustive]
 pub struct UnitConfig {
     /// The target sample rate
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     sample_rate: Rate,
 
     /// I2S channels configuration
     channels: Channels,
 
     /// Format of the data
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     data_format: DataFormat,
 
     /// Duration for which WS signal is kept active
@@ -616,7 +613,7 @@ pub struct UnitConfig {
     endianness: Endianness,
 
     /// Bit order of the data
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     bit_order: BitOrder,
 }
 
@@ -624,17 +621,17 @@ impl UnitConfig {
     /// TDM Philips standard configuration with two 16-bit active channels
     pub fn new_tdm_philips() -> Self {
         Self {
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(i2s_version = "1"))]
             sample_rate: Rate::from_hz(44100),
             channels: Channels::STEREO,
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(i2s_version = "1"))]
             data_format: DataFormat::Data16Channel16,
             ws_width: WsWidth::HalfFrame,
             ws_polarity: Polarity::ActiveLow,
             msb_shift: true,
             #[cfg(not(esp32))]
             endianness: Endianness::LittleEndian,
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(i2s_version = "1"))]
             bit_order: BitOrder::MsbFirst,
         }
     }
@@ -652,7 +649,7 @@ impl UnitConfig {
     }
 
     /// TDM PCM long frame standard configuration with two 16-bit active channels
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     pub fn new_tdm_pcm_long() -> Self {
         Self::new_tdm_philips()
             .with_ws_width(WsWidth::OneChannel)
@@ -660,7 +657,7 @@ impl UnitConfig {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(not(i2s_version = "1"))]
         if self.channels.active_count() == 0 || self.channels.count > 16 {
             return Err(ConfigError::ChannelsOutOfRange);
         }
@@ -668,7 +665,7 @@ impl UnitConfig {
         Ok(())
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     fn calculate_ws_width(&self) -> Result<u16, ConfigError> {
         let ws_width = match self.ws_width {
             WsWidth::HalfFrame => {
@@ -679,10 +676,7 @@ impl UnitConfig {
             WsWidth::Bits(bits) => bits,
         };
 
-        #[cfg(not(esp32h2))]
-        const MAX_WS_WIDTH: u16 = 128;
-        #[cfg(esp32h2)]
-        const MAX_WS_WIDTH: u16 = 512;
+        const MAX_WS_WIDTH: u16 = property!("i2s.max_ws_width") as u16;
 
         if !(1..=MAX_WS_WIDTH).contains(&ws_width)
             || ws_width > self.data_format.data_bits() as u16 * self.channels.count as u16
@@ -693,7 +687,7 @@ impl UnitConfig {
         Ok(ws_width)
     }
 
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     fn calculate_clock(&self) -> I2sClockDividers {
         I2sClockDividers::new(
             self.sample_rate,
@@ -715,10 +709,10 @@ impl Default for UnitConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {
     /// Provided [Channels] configuration has no active channels or has over 16 total channels
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     ChannelsOutOfRange,
     /// Requested WS signal width is out of range
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(i2s_version = "1"))]
     WsWidthOutOfRange,
 }
 
@@ -728,14 +722,14 @@ impl core::fmt::Display for ConfigError {
     #[allow(unused_variables)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match *self {
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(i2s_version = "1"))]
             ConfigError::ChannelsOutOfRange => {
                 write!(
                     f,
                     "Provided channels configuration has no active channels or has over 16 total channels"
                 )
             }
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(i2s_version = "1"))]
             ConfigError::WsWidthOutOfRange => {
                 write!(
                     f,
@@ -852,14 +846,14 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 guard: rx_guard,
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: config.data_format,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 guard: tx_guard,
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: config.data_format,
             },
         })
@@ -872,14 +866,14 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: self.i2s_rx.i2s,
                 rx_channel: self.i2s_rx.rx_channel.into_async(),
                 guard: self.i2s_rx.guard,
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: self.i2s_rx.data_format,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
                 tx_channel: self.i2s_tx.tx_channel.into_async(),
                 guard: self.i2s_tx.guard,
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: self.i2s_tx.data_format,
             },
         }
@@ -988,7 +982,7 @@ where
     tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
 
@@ -1079,7 +1073,7 @@ where
     /// Change the I2S Tx unit configuration.
     pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
+            if #[cfg(i2s_version = "1")] {
                 self.i2s.configure_tx(tx_config, self.data_format)
             } else {
                 self.i2s.configure_tx(tx_config)
@@ -1131,7 +1125,7 @@ where
     rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
 
@@ -1223,7 +1217,7 @@ where
     /// Change the I2S Rx unit configuration.
     pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
+            if #[cfg(i2s_version = "1")] {
                 self.i2s.configure_rx(rx_config, self.data_format)
             } else {
                 self.i2s.configure_rx(rx_config)
@@ -1315,7 +1309,7 @@ mod private {
         pub i2s: AnyI2s<'d>,
         pub tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
     }
 
@@ -1330,7 +1324,7 @@ mod private {
                 tx_channel: self.tx_channel,
                 tx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
             }
         }
@@ -1376,7 +1370,7 @@ mod private {
         pub i2s: AnyI2s<'d>,
         pub rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
-        #[cfg(any(esp32, esp32s2))]
+        #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
     }
 
@@ -1391,7 +1385,7 @@ mod private {
                 rx_channel: self.rx_channel,
                 rx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
-                #[cfg(any(esp32, esp32s2))]
+                #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
             }
         }
@@ -1447,7 +1441,7 @@ mod private {
         fn din_signal(&self) -> InputSignal;
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(i2s_version = "1")]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
@@ -1758,7 +1752,7 @@ mod private {
         }
     }
 
-    #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+    #[cfg(i2s_version = "2")]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
@@ -1816,7 +1810,7 @@ mod private {
             });
         }
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(not(i2s_clock_configured_by_pcr))]
         fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
             let clkm_div = clock_settings.mclk_dividers();
 
@@ -1836,13 +1830,19 @@ mod private {
                 w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
+            #[cfg(not(i2s_bck_divider_in_conf))]
             self.regs().tx_conf1().modify(|_, w| unsafe {
+                w.tx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(i2s_bck_divider_in_conf)]
+            self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
-        #[cfg(any(esp32c3, esp32s3))]
+        #[cfg(not(i2s_clock_configured_by_pcr))]
         fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
             let clkm_div = clock_settings.mclk_dividers();
 
@@ -1862,13 +1862,19 @@ mod private {
                 w.mclk_sel().bit(true)
             });
 
+            #[cfg(not(i2s_bck_divider_in_conf))]
             self.regs().rx_conf1().modify(|_, w| unsafe {
+                w.rx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+            #[cfg(i2s_bck_divider_in_conf)]
+            self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(i2s_clock_configured_by_pcr)]
         fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
             // I2S clocks are configured via PCR
             use crate::peripherals::PCR;
@@ -1891,19 +1897,20 @@ mod private {
                     .bits(clock_settings.mclk_divider as u8)
             });
 
-            #[cfg(not(esp32h2))]
+            #[cfg(not(i2s_bck_divider_in_conf))]
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(esp32h2)]
+
+            #[cfg(i2s_bck_divider_in_conf)]
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
         }
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(i2s_clock_configured_by_pcr)]
         fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
             // I2S clocks are configured via PCR
             use crate::peripherals::PCR;
@@ -1926,12 +1933,14 @@ mod private {
                     .bits(clock_settings.mclk_divider as u8);
                 w.i2s_mclk_sel().bit(true)
             });
-            #[cfg(not(esp32h2))]
+
+            #[cfg(not(i2s_bck_divider_in_conf))]
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(esp32h2)]
+
+            #[cfg(i2s_bck_divider_in_conf)]
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1963,7 +1972,7 @@ mod private {
             self.set_tx_clock(config.calculate_clock());
 
             self.regs().tx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(esp32h2))]
+                #[cfg(not(i2s_msb_shift_in_conf))]
                 w.tx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.tx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -1982,7 +1991,7 @@ mod private {
                 w.tx_tdm_en().set_bit();
                 w.tx_pdm_en().clear_bit();
                 w.tx_pcm_bypass().set_bit();
-                #[cfg(esp32h2)]
+                #[cfg(i2s_msb_shift_in_conf)]
                 w.tx_msb_shift().bit(config.msb_shift);
                 w.tx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
@@ -2029,7 +2038,7 @@ mod private {
             self.set_rx_clock(config.calculate_clock());
 
             self.regs().rx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(esp32h2))]
+                #[cfg(not(i2s_msb_shift_in_conf))]
                 w.rx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.rx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -2047,7 +2056,7 @@ mod private {
                 w.rx_tdm_en().set_bit();
                 w.rx_pdm_en().clear_bit();
                 w.rx_pcm_bypass().set_bit();
-                #[cfg(esp32h2)]
+                #[cfg(i2s_msb_shift_in_conf)]
                 w.rx_msb_shift().bit(config.msb_shift);
                 w.rx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
@@ -2193,7 +2202,7 @@ mod private {
 
         fn bclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                if #[cfg(any(i2s_version = "1", esp32s3))] {
                     OutputSignal::I2S0O_BCK
                 } else {
                     OutputSignal::I2SO_BCK
@@ -2203,7 +2212,7 @@ mod private {
 
         fn ws_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                if #[cfg(any(i2s_version = "1", esp32s3))] {
                     OutputSignal::I2S0O_WS
                 } else {
                     OutputSignal::I2SO_WS
@@ -2227,7 +2236,7 @@ mod private {
 
         fn bclk_rx_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                if #[cfg(any(i2s_version = "1", esp32s3))] {
                     OutputSignal::I2S0I_BCK
                 } else {
                     OutputSignal::I2SI_BCK
@@ -2237,7 +2246,7 @@ mod private {
 
         fn ws_rx_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2, esp32s3))] {
+                if #[cfg(any(i2s_version = "1", esp32s3))] {
                     OutputSignal::I2S0I_WS
                 } else {
                     OutputSignal::I2SI_WS
@@ -2388,7 +2397,7 @@ mod private {
         numerator: u32,
     }
 
-    #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+    #[cfg(i2s_version = "2")]
     pub struct I2sMclkDividers {
         x: u32,
         y: u32,
@@ -2460,7 +2469,7 @@ mod private {
             }
         }
 
-        #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+        #[cfg(i2s_version = "2")]
         fn mclk_dividers(&self) -> I2sMclkDividers {
             let x;
             let y;

@@ -265,6 +265,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "Pcnt" },
     { name = "Rmt" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
@@ -709,7 +710,12 @@ support_status = { status = "not_supported", issue = 5166 }
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.i2s]
-support_status = { status = "not_supported", issue = 5172 }
+version = 2
+mclk_divider_bit_width = 9
+max_ws_width = 512
+clock_configured_by_pcr = true
+bck_divider_in_conf = true
+msb_shift_in_conf = true
 
 [device.io_mux]
 
