@@ -27,23 +27,21 @@ pub struct BackportInfo {
 /// `esp-hal-procmacros`), the longest matching package name wins.
 #[cfg(feature = "release")]
 pub fn parse_backport_branch(branch: &str) -> Option<BackportInfo> {
-    let mut best: Option<(Package, u64, u64)> = None;
+    let mut best: Option<(Package, u64, u64, usize)> = None;
 
     for pkg in Package::iter() {
         let prefix = format!("{}-", pkg);
         if let Some(suffix) = branch.strip_prefix(&prefix) {
             if let Some((major, minor)) = parse_version_suffix(suffix) {
-                let dominated = best
-                    .as_ref()
-                    .map_or(true, |(prev, _, _)| prefix.len() > format!("{}-", prev).len());
+                let dominated = best.as_ref().map_or(true, |&(_, _, _, len)| prefix.len() > len);
                 if dominated {
-                    best = Some((pkg, major, minor));
+                    best = Some((pkg, major, minor, prefix.len()));
                 }
             }
         }
     }
 
-    best.map(|(package, major, minor)| BackportInfo {
+    best.map(|(package, major, minor, _)| BackportInfo {
         package,
         major,
         minor,

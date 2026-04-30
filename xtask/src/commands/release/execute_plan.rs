@@ -46,14 +46,12 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     if let Some(ref bp) = plan.backport {
         ensure!(
             plan.packages.len() == 1 && plan.packages[0].package == bp.package,
-            "Patch release plan must contain exactly one package ({}) matching \
-            the backport branch.",
+            "Patch release plan must contain exactly one package ({}) matching the backport branch.",
             bp.package
         );
         ensure!(
             plan.packages[0].bump == VersionBump::patch(),
-            "Patch release plan contains a non-patch bump for {}: {:?}. \
-            Releases from backport branches must only use Patch bumps.",
+            "Backport release for {} has a non-patch bump ({:?}); only Patch bumps are allowed.",
             plan.packages[0].package,
             plan.packages[0].bump
         );
