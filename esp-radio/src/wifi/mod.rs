@@ -2409,12 +2409,12 @@ pub struct WifiController<'d> {
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
         state::locked(|| {
+            set_access_point_state(WifiAccessPointState::Uninitialized);
+            set_station_state(WifiStationState::Uninitialized);
+
             if let Err(e) = crate::wifi::wifi_deinit() {
                 warn!("Failed to cleanly deinit wifi: {:?}", e);
             }
-
-            set_access_point_state(WifiAccessPointState::Uninitialized);
-            set_station_state(WifiStationState::Uninitialized);
 
             #[cfg(all(rng_trng_supported, feature = "unstable"))]
             esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
