@@ -453,14 +453,22 @@ driver_configs![
         driver: i2s,
         name: "I2S",
         properties: {
+            /// Register-layout generation derived from the chip SVD.
             version: u32,
+            /// Width of the MCLK divider field in the I2S clock register.
             mclk_divider_bit_width: u32,
+            /// Largest WS divider value supported by the peripheral.
             max_ws_width: u32,
             #[serde(default)]
+            /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,
             #[serde(default)]
+            /// Whether BCK divider fields live in the main TX/RX_CONF registers.
+            /// Another option is CONF1 registers.
             bck_divider_in_conf: bool,
             #[serde(default)]
+            /// Whether MSB shift fields live in the main TX/RX_CONF registers.
+            /// Another option is CONF1 registers.
             msb_shift_in_conf: bool,
         }
     },
