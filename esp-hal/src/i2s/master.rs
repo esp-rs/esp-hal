@@ -675,7 +675,7 @@ impl UnitConfig {
             WsWidth::Bits(bits) => bits,
         };
 
-        const MAX_WS_WIDTH: u16 = property!("i2s.max_ws_width") as u16;
+        const MAX_WS_WIDTH: u16 = property!("i2s.max_ws_width");
 
         if !(1..=MAX_WS_WIDTH).contains(&ws_width)
             || ws_width > self.data_format.data_bits() as u16 * self.channels.count as u16
