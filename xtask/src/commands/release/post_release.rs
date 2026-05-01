@@ -17,6 +17,13 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
 
     run_baseline_workflow(&plan)?;
 
+    if plan.backport.is_some() {
+        println!(
+            "Patch release: skipping migration guide creation and backport branch management."
+        );
+        return Ok(());
+    }
+
     // Process packages from the plan that have migration guides
     for package_plan in plan.packages.iter() {
         let package = package_plan.package;
