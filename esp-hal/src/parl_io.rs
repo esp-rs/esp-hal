@@ -1222,7 +1222,7 @@ where
             return Err(ConfigError::UnreachableClockRate);
         }
 
-        let frequency = ClockTree::with(|clocks| ParlIoInstance::ParlIo.tx_clock_frequency(clocks));
+        let frequency = ParlIoInstance::ParlIo.tx_clock_frequency();
         let divider = frequency / config.frequency.as_hz();
         if divider > 0xFFFF {
             return Err(ConfigError::UnreachableClockRate);
@@ -1385,7 +1385,7 @@ where
             return Err(ConfigError::UnreachableClockRate);
         }
 
-        let frequency = ClockTree::with(|clocks| ParlIoInstance::ParlIo.rx_clock_frequency(clocks));
+        let frequency = ParlIoInstance::ParlIo.rx_clock_frequency();
         let divider = frequency / config.frequency.as_hz();
         if divider > 0xffff {
             return Err(ConfigError::UnreachableClockRate);

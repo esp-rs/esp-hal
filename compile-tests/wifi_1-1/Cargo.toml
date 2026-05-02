@@ -1,0 +1,96 @@
+[package]
+name    = "wifi_1-1"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = "0.10.0"
+embassy-net = { version = "0.9.1", features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "dns",
+] }
+embassy-time = "0.5.0"
+embedded-io-async = "0.7.0"
+enumset = { version = "1.0.0", optional = true }
+esp-alloc = { version = "0.10.0" }
+esp-backtrace = { version = "0.19.0", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { version = "0.5.0" }
+esp-hal = { version = "1.1.0" , features = ["log-04", "unstable"] }
+esp-println = { version = "0.17.0", features = ["log-04"] }
+esp-rtos = { version = "0.3.0", features = ["esp-radio", "embassy", "log-04"] }
+esp-radio = { version = "0.18.0", features = [
+    "log-04",
+    "wifi",
+] }
+reqwless = { version = "0.14.0", default-features = false }
+static_cell = "2.1.0"
+
+[features]
+esp32 = [
+    "esp-backtrace/esp32",
+    "esp-bootloader-esp-idf/esp32",
+    "esp-hal/esp32",
+    "esp-rtos/esp32",
+    "esp-radio/esp32",
+]
+esp32c2 = [
+    "esp-backtrace/esp32c2",
+    "esp-bootloader-esp-idf/esp32c2",
+    "esp-hal/esp32c2",
+    "esp-rtos/esp32c2",
+    "esp-radio/esp32c2",
+]
+esp32c3 = [
+    "esp-backtrace/esp32c3",
+    "esp-bootloader-esp-idf/esp32c3",
+    "esp-hal/esp32c3",
+    "esp-rtos/esp32c3",
+    "esp-radio/esp32c3",
+]
+esp32c5 = [
+    "esp-backtrace/esp32c5",
+    "esp-bootloader-esp-idf/esp32c5",
+    "esp-hal/esp32c5",
+    "esp-rtos/esp32c5",
+    "esp-radio/esp32c5",
+]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal/esp32c6",
+    "esp-rtos/esp32c6",
+    "esp-radio/esp32c6",
+]
+esp32c61 = [
+    "esp-backtrace/esp32c61",
+    "esp-bootloader-esp-idf/esp32c61",
+    "esp-hal/esp32c61",
+    "esp-rtos/esp32c61",
+    "esp-radio/esp32c61",
+]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-hal/esp32s2",
+    "esp-rtos/esp32s2",
+    "esp-radio/esp32s2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal/esp32s3",
+    "esp-rtos/esp32s3",
+    "esp-radio/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1

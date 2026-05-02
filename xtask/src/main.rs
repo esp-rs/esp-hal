@@ -142,7 +142,7 @@ fn main() -> Result<()> {
             #[cfg(feature = "release")]
             Release::PublishPlan(args) => publish_plan(&workspace, args),
             #[cfg(feature = "release")]
-            Release::PostRelease => post_release(&workspace),
+            Release::PostRelease(args) => post_release(&workspace, args),
             #[cfg(feature = "release")]
             Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, args),
         },
@@ -651,6 +651,15 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     }
 
                     let dst = dir.join(without_fingerprint);
+
+                    if dst.exists() {
+                        std::fs::remove_file(&dst).with_context(|| {
+                            format!(
+                                "Failed to remove destination file {} before copying",
+                                dst.display()
+                            )
+                        })?;
+                    }
 
                     log::debug!("Copying {} to {}", example_path.display(), dst.display());
 

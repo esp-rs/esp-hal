@@ -14,7 +14,7 @@
 #[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, pac, time::Rate};
+use crate::{pac, soc::clocks, time::Rate};
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -314,10 +314,7 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     /// Get the current source timer frequency from the HW
     fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(|source| match source {
-            LSClockSource::APBClk => {
-                let clocks = Clocks::get();
-                clocks.apb_clock
-            }
+            LSClockSource::APBClk => Rate::from_hz(clocks::apb_clk_frequency()),
         })
     }
 
@@ -377,10 +374,7 @@ impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
     /// Get the current source timer frequency from the HW
     fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(|source| match source {
-            HSClockSource::APBClk => {
-                let clocks = Clocks::get();
-                clocks.apb_clock
-            }
+            HSClockSource::APBClk => Rate::from_hz(clocks::apb_clk_frequency()),
         })
     }
 

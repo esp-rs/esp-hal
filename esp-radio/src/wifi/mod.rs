@@ -55,6 +55,7 @@ use core::{
 };
 
 use docsplay::Display;
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, waitqueue::GenericAtomicWaker};
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
 use esp_hal::system::Cpu;
@@ -80,6 +81,7 @@ use self::{
 };
 use crate::{
     RadioRefGuard,
+    asynch::AtomicWaker,
     hal::ram,
     sys::{
         c_types,
@@ -108,6 +110,17 @@ pub(crate) mod state;
 mod internal;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
+
+/// The link state of a network device.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+enum LinkState {
+    /// The link is down.
+    #[default]
+    Down,
+    /// The link is up.
+    Up,
+}
 
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
@@ -865,14 +878,72 @@ pub enum AccessPointStationEventInfo {
     Disconnected(AccessPointStationDisconnectedInfo),
 }
 
-static RX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
-    NonReentrantMutex::new(VecDeque::new());
+/// A receive packet queue.
+///
+/// This struct is to encapsulate the queue AND the waker, so waking the waker
+/// upon receiving a packet does not require another critical section.
+///
+/// The struct also uses VecDeque's capacity to avoid storing a copy of the maximum queue length.
+struct PacketQueue {
+    queue: VecDeque<PacketBuffer>,
 
-pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
-    NonReentrantMutex::new(VecDeque::new());
+    // NoopRawMutex is safe here because we only access the waker in the queue's critical section.
+    waker: GenericAtomicWaker<NoopRawMutex>,
+}
+
+impl PacketQueue {
+    const fn new() -> Self {
+        Self {
+            queue: VecDeque::new(),
+            waker: GenericAtomicWaker::new(NoopRawMutex::new()),
+        }
+    }
+
+    fn change_capacity(&mut self, new_capacity: usize) -> Result<(), WifiError> {
+        // If we've allocated more memory already than configured, use that instead of shrinking the
+        // queue. We do not trim the queue if it's over capacity.
+        let new_capacity = new_capacity.max(self.queue.capacity());
+        let additional = new_capacity.saturating_sub(self.queue.capacity());
+        self.queue
+            .try_reserve_exact(additional)
+            .map_err(|_| WifiError::OutOfMemory)
+    }
+
+    fn push_back(&mut self, packet: PacketBuffer) -> Result<(), PacketBuffer> {
+        if self.len() >= self.queue.capacity() {
+            return Err(packet);
+        }
+
+        self.queue.push_back(packet);
+        self.waker.wake();
+
+        Ok(())
+    }
+
+    fn pop_front(&mut self) -> Option<PacketBuffer> {
+        self.queue.pop_front()
+    }
+
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    fn register_waker(&mut self, waker: &core::task::Waker) {
+        self.waker.register(waker);
+    }
+}
+
+static DATA_QUEUE_RX_AP: NonReentrantMutex<PacketQueue> =
+    NonReentrantMutex::new(PacketQueue::new());
+
+static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
+    NonReentrantMutex::new(PacketQueue::new());
 
 /// Common errors.
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1013,18 +1084,8 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    match DATA_QUEUE_RX_STA.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
-            queue.push_back(packet);
-            Ok(())
-        } else {
-            Err(packet)
-        }
-    }) {
-        Ok(()) => {
-            embassy::STA_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
-        }
+    match DATA_QUEUE_RX_STA.with(|queue| queue.push_back(packet)) {
+        Ok(()) => include::ESP_OK as esp_err_t,
         _ => {
             debug!("RX QUEUE FULL");
             include::ESP_ERR_NO_MEM as esp_err_t
@@ -1044,18 +1105,8 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    match DATA_QUEUE_RX_AP.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
-            queue.push_back(packet);
-            Ok(())
-        } else {
-            Err(packet)
-        }
-    }) {
-        Ok(()) => {
-            embassy::AP_RECEIVE_WAKER.wake();
-            include::ESP_OK as esp_err_t
-        }
+    match DATA_QUEUE_RX_AP.with(|queue| queue.push_back(packet)) {
+        Ok(()) => include::ESP_OK as esp_err_t,
         _ => {
             debug!("RX QUEUE FULL");
             include::ESP_ERR_NO_MEM as esp_err_t
@@ -1084,7 +1135,7 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
 
     decrement_inflight_counter();
 
-    embassy::TRANSMIT_WAKER.wake();
+    TRANSMIT_WAKER.wake();
 }
 
 pub(crate) fn wifi_start_scan(
@@ -1213,7 +1264,7 @@ impl InterfaceType {
         out
     }
 
-    fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
+    fn data_queue_rx(&self) -> &'static NonReentrantMutex<PacketQueue> {
         match self {
             InterfaceType::Station => &DATA_QUEUE_RX_STA,
             InterfaceType::AccessPoint => &DATA_QUEUE_RX_AP,
@@ -1236,7 +1287,7 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            if self.link_state() == embassy_net_driver::LinkState::Up {
+            if self.link_state() == LinkState::Up {
                 return Some(WifiTxToken { mode: *self });
             }
         }
@@ -1268,24 +1319,21 @@ impl InterfaceType {
     }
 
     fn register_transmit_waker(&self, cx: &mut core::task::Context<'_>) {
-        embassy::TRANSMIT_WAKER.register(cx.waker())
+        TRANSMIT_WAKER.register(cx.waker())
     }
 
     fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
-        match self {
-            InterfaceType::Station => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
-            InterfaceType::AccessPoint => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
-        }
+        self.data_queue_rx().with(|q| q.register_waker(cx.waker()));
     }
 
     fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            InterfaceType::Station => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
-            InterfaceType::AccessPoint => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::Station => STA_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::AccessPoint => AP_LINK_STATE_WAKER.register(cx.waker()),
         }
     }
 
-    fn link_state(&self) -> embassy_net_driver::LinkState {
+    fn link_state(&self) -> LinkState {
         let is_up = match self {
             InterfaceType::Station => {
                 matches!(station_state(), WifiStationState::Connected)
@@ -1296,14 +1344,18 @@ impl InterfaceType {
         };
 
         if is_up {
-            embassy_net_driver::LinkState::Up
+            LinkState::Up
         } else {
-            embassy_net_driver::LinkState::Down
+            LinkState::Down
         }
     }
 }
 
 /// Wi-Fi interface.
+///
+/// This implements the `embassy-net-driver` trait for up to three latest versions of that crate.
+/// While that crate isn't stable we make an exception here from the [API Guidelines](https://rust-lang.github.io/api-guidelines/necessities.html#c-stable)
+/// in exposing unstable dependencies.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -1784,21 +1836,26 @@ macro_rules! esp_wifi_result {
 }
 pub(crate) use esp_wifi_result;
 
-pub(crate) mod embassy {
-    use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
+// We can get away with a single tx waker because the transmit queue is shared
+// between interfaces.
+static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
+
+static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
+static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
+
+// we implement up to three latest versions of the embassy-net-driver
+// (but 0.1 clashes with embassy-time-driver)
+pub(crate) mod embassy_02 {
+    use embassy_net_driver_02::{
+        Capabilities,
+        Driver,
+        HardwareAddress,
+        LinkState,
+        RxToken,
+        TxToken,
+    };
 
     use super::*;
-    use crate::asynch::AtomicWaker;
-
-    // We can get away with a single tx waker because the transmit queue is shared
-    // between interfaces.
-    pub(crate) static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static AP_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(crate) static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static STA_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 
     impl RxToken for WifiRxToken {
         fn consume<R, F>(self, f: F) -> R
@@ -1842,12 +1899,12 @@ pub(crate) mod embassy {
             self.mode.tx_token()
         }
 
-        fn link_state(
-            &mut self,
-            cx: &mut core::task::Context<'_>,
-        ) -> embassy_net_driver::LinkState {
+        fn link_state(&mut self, cx: &mut core::task::Context<'_>) -> LinkState {
             self.mode.register_link_state_waker(cx);
-            self.mode.link_state()
+            match self.mode.link_state() {
+                super::LinkState::Down => LinkState::Down,
+                super::LinkState::Up => LinkState::Up,
+            }
         }
 
         fn capabilities(&self) -> Capabilities {
@@ -2255,10 +2312,12 @@ pub fn new<'d>(
 
             magic: WIFI_INIT_CONFIG_MAGIC as i32,
         };
+    }
 
-        RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
-        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-    };
+    DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+    DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+    TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
     crate::wifi::wifi_init(device)?;
 

@@ -6,7 +6,9 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::{Args, Subcommand};
+use semver::{Comparator, Op, Version, VersionReq};
 use strum::IntoEnumIterator;
+use toml_edit::Table;
 
 use crate::{Package, cargo::CargoToml, windows_safe_path};
 
@@ -24,6 +26,8 @@ pub enum RelCheckCmds {
     /// Remove the path-dependencies from examples and make sure the dependencies are available in
     /// the local registry.
     ReplacePathDeps,
+    /// Validate workspace esp-rom-sys dependency version policy.
+    CheckRomSysPolicy,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -40,6 +44,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
         RelCheckCmds::Deinit => deinit_rel_check()?,
         RelCheckCmds::Update(args) => update(args)?,
         RelCheckCmds::ReplacePathDeps => scrap_path_deps()?,
+        RelCheckCmds::CheckRomSysPolicy => check_rom_sys_policy(Path::new("."))?,
     }
 
     Ok(())
@@ -116,50 +121,66 @@ fn deinit_rel_check() -> Result<()> {
 }
 
 fn init_rel_check() -> Result<()> {
+    fn prepare_for_directory(project: &Path) -> Result<()> {
+        log::info!("Processing {}", project.display());
+
+        let _ = std::fs::remove_file(project.join("Cargo.lock"));
+
+        // make sure we have the `Cargo.lock` file
+        let status = std::process::Command::new("cargo")
+            .arg(format!("+{}", toolchain()))
+            .arg("metadata")
+            .arg("--format-version=1")
+            .current_dir(&project)
+            .stdout(std::process::Stdio::null())
+            .status()?;
+
+        if !status.success() {
+            log::warn!("Failed");
+        }
+
+        // add all dependencies referenced by the lock file
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.arg("local-registry");
+        cmd.arg("--no-delete");
+        cmd.arg("--sync");
+        cmd.arg("Cargo.lock");
+        cmd.arg(windows_safe_path(
+            &std::path::PathBuf::from("target/local-registry")
+                .canonicalize()
+                .unwrap(),
+        ));
+        cmd.stdout(std::process::Stdio::null());
+        cmd.env_clear();
+        cmd.envs(
+            std::env::vars()
+                .into_iter()
+                .filter(|(k, _)| !k.starts_with("CARGO")),
+        );
+        cmd.current_dir(&project);
+
+        log::info!("{:?}", cmd);
+        cmd.status()?;
+        Ok(())
+    }
+
     // cleanup
     if std::fs::exists("target/local-registry")? {
         std::fs::remove_dir_all("target/local-registry")?;
     }
     std::fs::create_dir("target/local-registry")?;
 
-    // make sure we have the `Cargo.lock` file
-    let project = Path::new("init-local-registry");
-    let _ = std::fs::remove_file(project.join("Cargo.lock"));
+    // prepare latest released versions
+    prepare_for_directory(Path::new("init-local-registry"))?;
 
-    let status = std::process::Command::new("cargo")
-        .arg(format!("+{}", toolchain()))
-        .arg("metadata")
-        .arg("--format-version=1")
-        .current_dir(&project)
-        .stdout(std::process::Stdio::null())
-        .status()?;
-
-    if !status.success() {
-        log::warn!("Failed");
+    // prepare versions from compile-tests - might not be latest released
+    for dir in std::fs::read_dir("compile-tests")? {
+        if let Ok(dir) = dir {
+            if dir.file_type()?.is_dir() {
+                prepare_for_directory(&dir.path())?;
+            }
+        }
     }
-
-    // add all dependencies referenced by the lock file
-    let mut cmd = std::process::Command::new("cargo");
-    cmd.arg("local-registry");
-    cmd.arg("--no-delete");
-    cmd.arg("--sync");
-    cmd.arg("Cargo.lock");
-    cmd.arg(windows_safe_path(
-        &std::path::PathBuf::from("target/local-registry")
-            .canonicalize()
-            .unwrap(),
-    ));
-    cmd.stdout(std::process::Stdio::null());
-    cmd.env_clear();
-    cmd.envs(
-        std::env::vars()
-            .into_iter()
-            .filter(|(k, _)| !k.starts_with("CARGO")),
-    );
-    cmd.current_dir(&project);
-
-    log::info!("{:?}", cmd);
-    cmd.status()?;
 
     // install dependencies needed for build-std
     let mut cmd = std::process::Command::new("cargo");
@@ -213,6 +234,28 @@ fn init_rel_check() -> Result<()> {
         toolchain_folder("stable")?.display()
     ));
     cmd.arg("target/local-registry");
+    cmd.stdout(std::process::Stdio::null());
+    cmd.env_clear();
+    cmd.envs(
+        std::env::vars()
+            .into_iter()
+            .filter(|(k, _)| !k.starts_with("CARGO")),
+    );
+
+    log::info!("{:?}", cmd);
+    cmd.status()?;
+
+    // and lastly do it for the xtask itself
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("local-registry");
+    cmd.arg("--no-delete");
+    cmd.arg("--sync");
+    cmd.arg("Cargo.lock");
+    cmd.arg(windows_safe_path(
+        &std::path::PathBuf::from("target/local-registry")
+            .canonicalize()
+            .unwrap(),
+    ));
     cmd.stdout(std::process::Stdio::null());
     cmd.env_clear();
     cmd.envs(
@@ -712,4 +755,89 @@ fn related_crates_cb(
     }
 
     packages
+}
+
+const EXPECTED: (u64, u64) = (0, 1);
+const EXACT_ALLOWLIST: [Package; 1] = [Package::EspRadio];
+
+/// Checks that the esp-rom-sys dependency policy is followed across the workspace.
+fn check_rom_sys_policy(workspace: &Path) -> Result<()> {
+    let mut errs = Vec::new();
+    let mut global_exact: Option<Version> = None;
+    let mut count = 0;
+
+    for pkg in Package::iter().filter(|&p| p != Package::Examples) {
+        let Ok(mut toml) = CargoToml::new(workspace, pkg) else {
+            continue;
+        };
+        let mut found = false;
+
+        toml.visit_dependencies(|path, _, table| {
+            let Some(raw) = get_ver(table, "esp-rom-sys") else {
+                return;
+            };
+            let Ok(req) = VersionReq::parse(&raw) else {
+                return errs.push(format!("Bad semver: {raw}"));
+            };
+
+            let exact = extract_exact(&req.comparators);
+            let is_allowed = EXACT_ALLOWLIST.contains(&pkg);
+            found = true;
+            count += 1;
+
+            if is_allowed != exact.is_some() {
+                errs.push(format!("{pkg}: pin policy mismatch for '{raw}'"));
+            }
+
+            if let Some(v) = exact {
+                if global_exact.get_or_insert(v.clone()) != &v {
+                    errs.push(format!("Conflicting pins: {raw}"));
+                }
+            }
+
+            let in_line = req
+                .comparators
+                .iter()
+                .all(|c| c.major == EXPECTED.0 && c.minor == Some(EXPECTED.1));
+            if !in_line || req.matches(&Version::new(EXPECTED.0, EXPECTED.1 + 1, 0)) {
+                errs.push(format!(
+                    "{path}: must stay on {}.{}.*",
+                    EXPECTED.0, EXPECTED.1
+                ));
+            }
+        });
+
+        if EXACT_ALLOWLIST.contains(&pkg) && !found {
+            errs.push(format!("Missing required pin for {pkg:?}"));
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(log::info!("Checked {count} deps, all good."))
+    } else {
+        bail!("Policy failed:\n- {}", errs.join("\n- "))
+    }
+}
+
+fn get_ver(table: &Table, target: &str) -> Option<String> {
+    table.iter().find_map(|(name, item)| {
+        let pkg = item.get("package").and_then(|i| i.as_str()).unwrap_or(name);
+        if pkg != target {
+            return None;
+        }
+        item.as_str()
+            .or_else(|| item.get("version").and_then(|v| v.as_str()))
+            .map(Into::into)
+    })
+}
+
+fn extract_exact(comps: &[Comparator]) -> Option<Version> {
+    let c = comps.first()?;
+    (comps.len() == 1 && c.op == Op::Exact).then(|| Version {
+        major: c.major,
+        minor: c.minor.unwrap_or(0),
+        patch: c.patch.unwrap_or(0),
+        pre: c.pre.clone(),
+        build: Default::default(),
+    })
 }

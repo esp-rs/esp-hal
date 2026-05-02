@@ -1,7 +1,7 @@
 //! SPI Half Duplex Write Test
 
 //% CHIPS: esp32s3
-//% FEATURES: unstable
+//% FEATURES: unstable esp-alloc
 
 #![no_std]
 #![no_main]

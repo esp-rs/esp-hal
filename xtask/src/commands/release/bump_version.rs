@@ -250,8 +250,10 @@ fn bump_crate_version(
         .into_iter()
         .map(|p| p.join("Cargo.toml"));
 
+    // skip compile tests, these represent real world projects and therefore serve as a good test
+    // when we try and build them when the new versions are available in our local test registry.
     let tomls = Package::iter()
-        .filter(|&p| p != Package::Examples)
+        .filter(|&p| p != Package::Examples && p != Package::CompileTests)
         .map(|p| {
             CargoToml::new(&bumped_package.workspace, p)
                 .with_context(|| format!("Could not load Cargo.toml of {p}"))
@@ -438,7 +440,21 @@ fn finalize_placeholders(
         }
     }
 
+    let is_prerelease = !new_version.pre.is_empty();
+
     walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
+        if is_prerelease {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with("MIGRATING-") && name.ends_with(".md") {
+                    log::info!(
+                        "  Skipping migration guide {} (pre-release)",
+                        path.display()
+                    );
+                    return;
+                }
+            }
+        }
+
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {

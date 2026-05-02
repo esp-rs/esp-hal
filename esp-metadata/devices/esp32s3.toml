@@ -339,7 +339,7 @@ pins = [
     { pin = 26, functions = { 0 = "SPICS1" },                                              limitations = ["spi_psram"] },
     { pin = 27, functions = { 0 = "SPIHD"  },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 28, functions = { 0 = "SPIWP"  },                                              limitations = ["spi_flash", "spi_psram"] },
-    { pin = 29, functions = { 0 = "SPICS0" },                                              limitations = ["spi_flash", "spi_psram"] },
+    { pin = 29, functions = { 0 = "SPICS0" },                                              limitations = ["spi_flash"] },
     { pin = 30, functions = { 0 = "SPICLK" },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 31, functions = { 0 = "SPIQ"   },                                              limitations = ["spi_flash", "spi_psram"] },
     { pin = 32, functions = { 0 = "SPID"   },                                              limitations = ["spi_flash"] },
@@ -769,7 +769,7 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 1909 }
 
 [device.interrupts]
 support_status = "partial"
@@ -837,6 +837,7 @@ instances = [
     { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
 ]
 ram_size = 128
+version = 1
 has_sclk_divider = true
 
 [device.uhci]
@@ -846,7 +847,7 @@ support_status = "partial"
 support_status = { status = "not_supported", issue = 1905 }
 
 [device.ds]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
 support_status = "partial"

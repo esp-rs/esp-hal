@@ -31,4 +31,5 @@ exclude  = [
     "xtensa-lx-rt-proc-macros",
 
     "init-local-registry",
+    "compile-tests",
 ]

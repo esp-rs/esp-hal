@@ -83,9 +83,17 @@ define_regi2c! {
 }
 
 fn regi2c_enable_block(block: u8) -> usize {
+    // Enable I2C master clock
     MODEM_LPCON::regs()
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
+        .clk_conf_force_on()
+        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+
+    // Set I2C clock to 96MHz
+    const MODEM_LPCON_CLK_I2C_SEL_96M: u32 = 1 << 0; // FIXME add to PAC
+    MODEM_LPCON::regs().clk_conf().modify(|r, w| {
+        unsafe { w.bits(r.bits() | MODEM_LPCON_CLK_I2C_SEL_96M) };
+        w.clk_i2c_mst_en().set_bit()
+    });
 
     // Before config I2C register, enable corresponding slave.
     let i2c_sel_bits = I2C_ANA_MST::regs().ana_conf2().read();

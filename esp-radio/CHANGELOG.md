@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a crash when using advanced BLE scanning on certain chips (C6,H2,C5,C61) (#5458)
 
 ### Removed
 

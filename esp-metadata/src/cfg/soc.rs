@@ -293,6 +293,25 @@ impl ClockTreeNodeInstance {
         self.prefix_function("configure")
     }
 
+    fn node_ident_base(&self) -> String {
+        if self.group_template.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}_{}", self.group_template, self.node.name())
+        }
+    }
+
+    pub(super) fn freq_cache_static_name(&self) -> Ident {
+        format_ident!("{}_FREQ_CACHE", self.node_ident_base())
+    }
+
+    pub(super) fn refresh_downstream_function_name(&self) -> Ident {
+        format_ident!(
+            "refresh_{}_downstream",
+            self.node_ident_base().to_lowercase()
+        )
+    }
+
     fn current_config_function_name(&self) -> Ident {
         self.suffix_function("config")
     }
@@ -455,23 +474,24 @@ impl ClockTreeNodeInstance {
             frequency: Function {
                 _name: frequency_function_name.to_string(),
                 implementation: if self.is_configurable() {
-                    let config_field = self.properties.indexed_config_accessor();
+                    let cache_name = self.freq_cache_static_name();
+                    let cache_load = if self.properties.receiver.is_some() {
+                        quote! { #cache_name[self as usize].load(::core::sync::atomic::Ordering::Acquire) }
+                    } else {
+                        quote! { #cache_name.load(::core::sync::atomic::Ordering::Acquire) }
+                    };
                     quote! {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(#(#receiver,)* clocks: &mut ClockTree, config: #ty_name) -> u32 {
                             #frequency_function_impl
                         }
-                        pub fn #frequency_function_name(#(#receiver,)* clocks: &mut ClockTree) -> u32 {
-                            if let Some(config) = #config_field {
-                                #(#receiver.)* #config_frequency_function_name(clocks, config)
-                            } else {
-                                0
-                            }
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
+                            #cache_load
                         }
                     }
                 } else {
                     quote! {
-                        pub fn #frequency_function_name(#(#receiver,)* clocks: &mut ClockTree) -> u32 {
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
                             #frequency_function_impl
                         }
                     }
@@ -752,6 +772,192 @@ impl SystemClocks {
             })
             .collect::<Vec<_>>();
 
+        // Build AtomicU32 cache statics and per-node downstream refresh functions.
+        // refresh_stmt_by_key holds the token stream that refreshes one configurable node:
+        //   - scalar nodes: refreshes that single node
+        //   - template nodes: refreshes `instance` (a local variable) of that template
+        let mut freq_cache_statics: Vec<TokenStream> = vec![];
+        let mut refresh_stmt_by_key: IndexMap<String, TokenStream> = IndexMap::new();
+        let mut seen_cache_templates: HashSet<String> = HashSet::new();
+
+        for node_name in tree.dependency_graph.iter() {
+            let Some(node) = tree.try_get_node(&node_name) else {
+                continue;
+            };
+            if !node.is_configurable() {
+                continue;
+            }
+
+            let template_key = node.node_ident_base();
+
+            if !seen_cache_templates.insert(template_key.clone()) {
+                continue;
+            }
+
+            let cache_name = node.freq_cache_static_name();
+            let config_freq_fn = node.config_frequency_function_name();
+
+            if node.properties.receiver.is_some() {
+                let instances = tree.group_instances.get(&node.group_template).unwrap();
+                let instance_count = number(instances.len());
+                let field_name = node.properties.field_name();
+
+                freq_cache_statics.push(quote! {
+                    static #cache_name: [::core::sync::atomic::AtomicU32; #instance_count] =
+                        [const { ::core::sync::atomic::AtomicU32::new(0) }; #instance_count];
+                });
+                // Refresh stmt for template nodes uses an `instance` variable (passed by caller).
+                refresh_stmt_by_key.insert(
+                    template_key.clone(),
+                    quote! {
+                        if let Some(config) = clocks.#field_name[instance as usize] {
+                            #cache_name[instance as usize].store(
+                                instance.#config_freq_fn(clocks, config),
+                                ::core::sync::atomic::Ordering::Release,
+                            );
+                        }
+                    },
+                );
+            } else {
+                let config_field = node.properties.indexed_config_accessor();
+
+                freq_cache_statics.push(quote! {
+                    static #cache_name: ::core::sync::atomic::AtomicU32 =
+                        ::core::sync::atomic::AtomicU32::new(0);
+                });
+                refresh_stmt_by_key.insert(
+                    template_key,
+                    quote! {
+                        if let Some(config) = #config_field {
+                            #cache_name.store(
+                                #config_freq_fn(clocks, config),
+                                ::core::sync::atomic::Ordering::Release,
+                            );
+                        }
+                    },
+                );
+            }
+        }
+
+        // Helper: generates a `for child_instance in [...] { fn1(...); fn2(...); ... }` loop
+        // for a template-group child node.
+        let template_group_loop = |tree: &ProcessedClockData, group: &str, fns: &[Ident]| {
+            let instances = tree.group_instances.get(group).unwrap();
+            let child_enum = format_ident!(
+                "{}Instance",
+                group.from_case(Case::Constant).to_case(Case::Pascal)
+            );
+            let variants: Vec<_> = instances
+                .iter()
+                .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Pascal)))
+                .collect();
+            quote! {
+                for child_instance in [#(#child_enum::#variants,)*] {
+                    #(#fns(clocks, child_instance);)*
+                }
+            }
+        };
+
+        // For each configurable node, emit a targeted downstream refresh function.
+        // Each function refreshes itself and delegates to its direct configurable children's
+        // refresh functions, forming a call chain instead of inlining everything.
+        let mut downstream_refresh_fns: Vec<TokenStream> = vec![];
+        let mut seen_refresh_fns: HashSet<String> = HashSet::new();
+
+        for node_name in tree.dependency_graph.iter() {
+            let Some(node) = tree.try_get_node(&node_name) else {
+                continue;
+            };
+            if !node.is_configurable() {
+                continue;
+            }
+
+            let template_key = node.node_ident_base();
+
+            if !seen_refresh_fns.insert(template_key.clone()) {
+                continue;
+            }
+
+            let fn_name = node.refresh_downstream_function_name();
+            let self_stmt = refresh_stmt_by_key.get(&template_key).cloned();
+
+            // Build calls to direct configurable children's refresh functions.
+            let children = tree
+                .dependency_graph
+                .configurable_children_of(&node_name, tree);
+
+            if node.properties.receiver.is_some() {
+                // Template node: function takes a typed instance parameter.
+                // Same-template children receive the current instance; others loop over instances.
+                let enum_name = format_ident!(
+                    "{}Instance",
+                    node.group_template
+                        .from_case(Case::Constant)
+                        .to_case(Case::Pascal)
+                );
+                // Group cross-template children by group_template for a single loop per group.
+                let mut cross_template_fns: IndexMap<String, IndexSet<String>> = IndexMap::new();
+                let mut child_calls: Vec<TokenStream> = children
+                    .iter()
+                    .filter_map(|child_name| {
+                        let child = tree.try_get_node(child_name)?;
+                        let child_fn = child.refresh_downstream_function_name();
+                        if child.group_template == node.group_template {
+                            Some(quote! { #child_fn(clocks, instance); })
+                        } else if child.properties.receiver.is_some() {
+                            cross_template_fns
+                                .entry(child.group_template.clone())
+                                .or_default()
+                                .insert(child_fn.to_string());
+                            None
+                        } else {
+                            Some(quote! { #child_fn(clocks); })
+                        }
+                    })
+                    .collect();
+                for (group, fns) in &cross_template_fns {
+                    let fns: Vec<Ident> = fns.iter().map(|s| format_ident!("{s}")).collect();
+                    child_calls.push(template_group_loop(tree, group, &fns));
+                }
+                downstream_refresh_fns.push(quote! {
+                    fn #fn_name(clocks: &mut ClockTree, instance: #enum_name) {
+                        #self_stmt
+                        #(#child_calls)*
+                    }
+                });
+            } else {
+                // System (scalar) node: no instance parameter.
+                // Group template children by group_template for a single loop per group.
+                let mut template_group_fns: IndexMap<String, IndexSet<String>> = IndexMap::new();
+                let mut child_calls: Vec<TokenStream> = children
+                    .iter()
+                    .filter_map(|child_name| {
+                        let child = tree.try_get_node(child_name)?;
+                        let child_fn = child.refresh_downstream_function_name();
+                        if child.properties.receiver.is_some() {
+                            template_group_fns
+                                .entry(child.group_template.clone())
+                                .or_default()
+                                .insert(child_fn.to_string());
+                            None
+                        } else {
+                            Some(quote! { #child_fn(clocks); })
+                        }
+                    })
+                    .collect();
+                for (group, fns) in &template_group_fns {
+                    let fns: Vec<Ident> = fns.iter().map(|s| format_ident!("{s}")).collect();
+                    child_calls.push(template_group_loop(tree, group, &fns));
+                }
+                downstream_refresh_fns.push(quote! {
+                    fn #fn_name(clocks: &mut ClockTree) {
+                        #self_stmt
+                        #(#child_calls)*
+                    }
+                });
+            }
+        }
+
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
@@ -787,6 +993,8 @@ impl SystemClocks {
                             #(#clock_tree_state_field_names: #clock_tree_state_field_initializers,)*
                             #(#clock_tree_refcount_field_inits,)*
                         });
+
+                    #(#freq_cache_statics)*
 
                     #(#clock_tree_node_impls)*
 
@@ -825,6 +1033,7 @@ impl SystemClocks {
                         // CLOCK_BITMAP.fetch_and(!clock_id, Ordering::Relaxed);
                         last
                     }
+                    #(#downstream_refresh_fns)*
                 };
             }
         })

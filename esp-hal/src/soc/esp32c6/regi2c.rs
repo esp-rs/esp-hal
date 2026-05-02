@@ -151,6 +151,10 @@ fn regi2c_enable_block(block: u8) -> usize {
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
+    MODEM_LPCON::regs()
+        .i2c_mst_clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+
     // Before config I2C register, enable corresponding slave.
     let i2c_sel_bits = I2C_ANA_MST::regs().ana_conf2().read();
     let i2c_sel = match block {

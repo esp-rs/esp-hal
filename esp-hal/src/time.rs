@@ -717,7 +717,8 @@ pub(crate) mod implem {
 
     #[cfg(feature = "rt")]
     pub(crate) fn time_init() {
-        let apb = crate::Clocks::get().apb_clock.as_hz();
+        // FIXME: does this imply that clock management needs to be "rt", too?
+        let apb = crate::soc::clocks::apb_clk_frequency();
 
         let tg0 = TIMG0::regs();
 

@@ -200,21 +200,15 @@ impl<'d> SystemTimer<'d> {
                 // Assuming SYSTIMER runs from XTAL, the hardware always runs at 16 MHz.
                 16_000_000
             } else {
-                crate::soc::clocks::ClockTree::with(|clocks| {
-                    cfg_if::cfg_if! {
-                        if #[cfg(esp32s2)] {
-                            crate::soc::clocks::apb_clk_frequency(clocks) as u64
-                        } else if #[cfg(esp32h2)] {
-                            // The counters and comparators are driven using `XTAL_CLK`.
-                            // The average clock frequency is fXTAL_CLK/2, (16 MHz for XTAL = 32 MHz)
-                            (crate::soc::clocks::xtal_clk_frequency(clocks) / 2) as u64
-                        } else {
-                            // The counters and comparators are driven using `XTAL_CLK`.
-                            // The average clock frequency is fXTAL_CLK/2.5 (16 MHz for XTAL = 40 MHz)
-                            (crate::soc::clocks::xtal_clk_frequency(clocks) * 10 / 25) as u64
-                        }
+                cfg_if::cfg_if! {
+                    if #[cfg(esp32s2)] {
+                        crate::soc::clocks::apb_clk_frequency() as u64
+                    } else if #[cfg(esp32h2)] {
+                        (crate::soc::clocks::xtal_clk_frequency() / 2) as u64
+                    } else {
+                        (crate::soc::clocks::xtal_clk_frequency() * 10 / 25) as u64
                     }
-                })
+                }
             }
         }
     }

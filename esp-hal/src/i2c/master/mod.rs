@@ -1875,9 +1875,7 @@ impl Driver<'_> {
     fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
         let timeout = clock_config.timeout;
 
-        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::apb_clk_frequency(clocks)
-        });
+        let source_clk = crate::soc::clocks::apb_clk_frequency();
 
         let bus_freq = clock_config.frequency.as_hz();
 
@@ -1954,9 +1952,7 @@ impl Driver<'_> {
         let timeout = clock_config.timeout;
 
         // TODO: could be REF_TICK
-        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::apb_clk_frequency(clocks)
-        });
+        let source_clk = crate::soc::clocks::apb_clk_frequency();
 
         let bus_freq = clock_config.frequency.as_hz();
 
@@ -2011,9 +2007,7 @@ impl Driver<'_> {
     fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
         let timeout = clock_config.timeout;
 
-        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::xtal_clk_frequency(clocks)
-        });
+        let source_clk = crate::soc::clocks::xtal_clk_frequency();
 
         let bus_freq = clock_config.frequency.as_hz();
 

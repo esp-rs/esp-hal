@@ -542,6 +542,7 @@ mod async_tx_rx {
         timer::timg::TimerGroup,
         uart::{self, RxConfig, RxError, UartRx, UartTx},
     };
+    use hil_test::{assert, assert_eq, assert_ne};
 
     struct Context {
         rx: UartRx<'static, Async>,
@@ -788,6 +789,125 @@ mod async_tx_rx {
 
         assert_eq!(read, Ok(3));
         assert_eq!(&data[..3], &[1, 2, 3]);
+    }
+
+    #[test]
+    async fn async_rx_does_not_return_0(mut ctx: Context) {
+        // Ensure we read at least once, regardless of the implementation details of `read`.
+        ctx.rx
+            .apply_config(
+                &uart::Config::default().with_rx(RxConfig::default().with_fifo_full_threshold(30)),
+            )
+            .unwrap();
+
+        let mut read_success = false;
+        select(
+            async {
+                for _ in 0..5 {
+                    use embedded_io_async::Write;
+
+                    let _ = Write::write(&mut ctx.tx, b"hello world")
+                        .await
+                        .expect("Failed to write data");
+
+                    Timer::after_millis(50).await;
+                }
+                ctx.tx.flush_async().await.unwrap();
+            },
+            async {
+                let mut buf = [0; 128];
+                loop {
+                    use embedded_io_async::Read;
+
+                    let read_bytes = Read::read(&mut ctx.rx, &mut buf)
+                        .await
+                        .expect("Failed to read data");
+                    assert_ne!(read_bytes, 0, "read_async returned 0 bytes read");
+                    read_success = true;
+                }
+            },
+        )
+        .await;
+
+        assert!(read_success);
+    }
+}
+
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod async_tx_rx_split {
+    use embassy_futures::select::select;
+    use embassy_time::Timer;
+    use esp_hal::{
+        Async,
+        interrupt::software::SoftwareInterruptControl,
+        timer::timg::TimerGroup,
+        uart::{self, RxConfig, Uart, UartRx, UartTx},
+    };
+    use hil_test::assert_ne;
+
+    struct Context {
+        rx: UartRx<'static, Async>,
+        tx: UartTx<'static, Async>,
+    }
+    #[init]
+    async fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+        let (rx, tx) = Uart::new(peripherals.UART0, uart::Config::default())
+            .unwrap()
+            .with_tx(tx)
+            .with_rx(rx)
+            .into_async()
+            .split();
+
+        Context { rx, tx }
+    }
+
+    #[test]
+    async fn async_rx_does_not_return_0(mut ctx: Context) {
+        // Ensure we read at least once, regardless of the implementation details of `read`.
+        ctx.rx
+            .apply_config(
+                &uart::Config::default().with_rx(RxConfig::default().with_fifo_full_threshold(30)),
+            )
+            .unwrap();
+
+        let mut read_success = false;
+        select(
+            async {
+                for _ in 0..5 {
+                    use embedded_io_async::Write;
+
+                    let _ = Write::write(&mut ctx.tx, b"hello world")
+                        .await
+                        .expect("Failed to write data");
+
+                    Timer::after_millis(50).await;
+                }
+                ctx.tx.flush_async().await.unwrap();
+            },
+            async {
+                let mut buf = [0; 128];
+                loop {
+                    use embedded_io_async::Read;
+
+                    let read_bytes = Read::read(&mut ctx.rx, &mut buf)
+                        .await
+                        .expect("Failed to read data");
+                    assert_ne!(read_bytes, 0, "read_async returned 0 bytes read");
+                    read_success = true;
+                }
+            },
+        )
+        .await;
+
+        assert!(read_success);
     }
 }
 

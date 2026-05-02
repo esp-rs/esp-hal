@@ -147,7 +147,6 @@ impl ClockTreeNodeType for Multiplexer {
             .iter()
             .map(|variant| {
                 let name = variant.config_enum_variant_name();
-
                 quote! { #ty_name::#name }
             })
             .collect::<Vec<_>>();
@@ -159,8 +158,7 @@ impl ClockTreeNodeType for Multiplexer {
                 let upstream_node = instance.resolve_node(tree, &variant.outputs);
                 let frequency_fn = upstream_node.frequency_function_name();
                 let receiver = upstream_node.properties.receiver();
-
-                quote! { #(#receiver.)* #frequency_fn(clocks) }
+                quote! { #(#receiver.)* #frequency_fn() }
             })
             .collect::<Vec<_>>();
 
@@ -172,9 +170,7 @@ impl ClockTreeNodeType for Multiplexer {
             }
         } else {
             let variant_frequency = variant_frequencies.first().unwrap();
-            quote! {
-                #variant_frequency
-            }
+            quote! { #variant_frequency }
         }
     }
 
@@ -249,6 +245,12 @@ impl Multiplexer {
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let config_field = instance.properties.indexed_config_accessor();
         let receiver = instance.properties.receiver();
+        let refresh_fn = instance.refresh_downstream_function_name();
+        let refresh_call = if instance.properties.receiver.is_some() {
+            quote! { #refresh_fn(clocks, self); }
+        } else {
+            quote! { #refresh_fn(clocks); }
+        };
 
         let hal_impl = quote! { #(#receiver.)*#hal_impl };
 
@@ -317,6 +319,8 @@ impl Multiplexer {
         quote! {
             pub fn #apply_fn_name(#(#receiver,)* clocks: &mut ClockTree, new_selector: #ty_name) {
                 let old_selector = #config_field.replace(new_selector);
+
+                #refresh_call
 
                 #configures
 

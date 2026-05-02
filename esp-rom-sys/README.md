@@ -16,6 +16,19 @@ Since there can be only one version of this crate used in a dependency tree this
 
 That said, we cannot remove anything here. Degrading a symbol from hard linkage to weak linkage is allowed.
 
+## Dependency policy in the esp-hal workspace
+
+The workspace intentionally uses two dependency strategies for `esp-rom-sys`:
+
+- Most crates use a non-exact requirement on the `0.1.x` line (for example
+  `~0.1` / `~0.1.x`), so they can consume compatible patch updates.
+- Crates that are tightly coupled to a specific radio/blob behavior pin an exact
+  `esp-rom-sys` patch version (currently `esp-radio`).
+
+Only one exact `esp-rom-sys` pin should exist in the dependency graph at a
+time. This keeps Cargo resolution deterministic for radio stacks while
+preserving patch-level flexibility for other crates.
+
 ## [Documentation](https://docs.espressif.com/projects/rust/esp-rom-sys/latest/)
 
 ## Minimum Supported Rust Version (MSRV)

@@ -70,6 +70,13 @@ impl RsaMemoryPowerGuard {
 #[cfg(not(esp32))]
 impl Drop for RsaMemoryPowerGuard {
     fn drop(&mut self) {
+        unsafe {
+            // Stopping the peripheral's clock source pends an interrupt. Since the clocks
+            // are stopped when the handler runs, we're not able to clear the interrupt flag,
+            // which means the interrupt handler keeps getting triggered indefinitely.
+            // To prevent this, we disable interrupts manually before stopping the peripheral.
+            crate::peripherals::RSA::steal().disable_peri_interrupt_on_all_cores();
+        }
         crate::peripherals::SYSTEM::regs()
             .rsa_pd_ctrl()
             .modify(|_, w| {
@@ -1384,10 +1391,10 @@ impl RsaHandle<'_> {
         self.0.poll()
     }
 
-    /// Blocks until the work item to be processed.
+    /// Blocks until the work item is processed.
     #[inline]
-    pub fn wait_blocking(mut self) {
-        while !self.poll() {}
+    pub fn wait_blocking(self) {
+        self.0.wait_blocking();
     }
 
     /// Waits for the work item to be processed.
