@@ -422,22 +422,19 @@ impl Timer<'_> {
     }
 
     fn source_frequency(&self) -> Rate {
-        let hz = clocks::ClockTree::with(|clocks| {
-            cfg_if::cfg_if! {
-                if #[cfg(soc_has_clock_node_timg_function_clock)] {
-                    let timg = match self.timer_group() {
-                        0 => crate::soc::clocks::TimgInstance::Timg0,
-                        #[cfg(soc_has_timg1)]
-                        1 => crate::soc::clocks::TimgInstance::Timg1,
-                        _ => unreachable!()
-                    };
-
-                    timg.function_clock_frequency(clocks)
-                } else {
-                    crate::soc::clocks::apb_clk_frequency(clocks)
-                }
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg_function_clock)] {
+                let timg = match self.timer_group() {
+                    0 => crate::soc::clocks::TimgInstance::Timg0,
+                    #[cfg(soc_has_timg1)]
+                    1 => crate::soc::clocks::TimgInstance::Timg1,
+                    _ => unreachable!()
+                };
+                let hz = timg.function_clock_frequency();
+            } else {
+                let hz = crate::soc::clocks::apb_clk_frequency();
             }
-        });
+        }
         Rate::from_hz(hz)
     }
 
@@ -690,15 +687,13 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        let clk_src = clocks::ClockTree::with(|clocks| {
-            cfg_if::cfg_if! {
-                if #[cfg(soc_has_clock_node_timg_wdt_clock)] {
-                    Rate::from_hz(TG::clock_instance().wdt_clock_frequency(clocks))
-                } else {
-                    Rate::from_hz(clocks::apb_clk_frequency(clocks))
-                }
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg_wdt_clock)] {
+                let clk_src = Rate::from_hz(TG::clock_instance().wdt_clock_frequency());
+            } else {
+                let clk_src = Rate::from_hz(clocks::apb_clk_frequency());
             }
-        });
+        }
 
         let timeout_ticks = timeout.as_micros() * clk_src.as_mhz() as u64;
 

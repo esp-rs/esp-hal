@@ -430,10 +430,10 @@ fn configure_cpu_clk_impl(
         .modify(|_, w| unsafe { w.soc_clk_sel().bits(clock_source_sel0_bit) });
 
     // Store frequencies in expected places.
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 
-    let apb_freq = Rate::from_hz(apb_clk_frequency(clocks));
+    let apb_freq = Rate::from_hz(apb_clk_frequency());
     update_apb_frequency(apb_freq);
 
     ensure_voltage_minimal(clocks);

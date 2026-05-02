@@ -416,10 +416,10 @@ fn configure_cpu_clk_impl(
         })
     });
 
-    let apb_freq = Rate::from_hz(apb_clk_frequency(clocks));
+    let apb_freq = Rate::from_hz(apb_clk_frequency());
     update_apb_frequency(apb_freq);
 
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 }
 

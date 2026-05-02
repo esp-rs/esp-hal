@@ -1182,13 +1182,16 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
                 fn adv_stack_initEnv() -> i32;
                 fn extAdv_stack_initEnv() -> i32;
                 fn sync_stack_initEnv() -> i32;
+
+                fn base_stack_enable() -> i32;
+                fn adv_stack_enable() -> i32;
+                fn extAdv_stack_enable() -> i32;
+                fn scan_stack_enable() -> i32;
+                fn sync_stack_enable() -> i32;
             }
 
             let res = base_stack_initEnv();
             assert!(res == 0, "base_stack_initEnv returned {}", res);
-
-            let res = conn_stack_initEnv();
-            assert!(res == 0, "conn_stack_initEnv returned {}", res);
 
             let res = adv_stack_initEnv();
             assert!(res == 0, "adv_stack_initEnv returned {}", res);
@@ -1202,11 +1205,29 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
                 assert!(res == 0, "scan_stack_initEnv returned {}", res);
             }
 
+            let res = conn_stack_initEnv();
+            assert!(res == 0, "conn_stack_initEnv returned {}", res);
+
             let res = sync_stack_initEnv();
             assert!(res == 0, "sync_stack_initEnv returned {}", res);
 
             let res = r_esp_ble_msys_init(256, 320, 12, 24, 1);
             assert!(res == 0, "esp_ble_msys_init returned {}", res);
+
+            let res = base_stack_enable();
+            assert!(res == 0, "base_stack_enable returned {}", res);
+
+            let res = adv_stack_enable();
+            assert!(res == 0, "adv_stack_enable returned {}", res);
+
+            let res = extAdv_stack_enable();
+            assert!(res == 0, "extAdv_stack_enable returned {}", res);
+
+            let res = scan_stack_enable();
+            assert!(res == 0, "scan_stack_enable returned {}", res);
+
+            let res = sync_stack_enable();
+            assert!(res == 0, "sync_stack_enable returned {}", res);
         }
 
         #[cfg(feature = "coex")]
@@ -1263,6 +1284,12 @@ pub(crate) fn ble_deinit() {
         fn adv_stack_deinitEnv() -> i32;
         fn extAdv_stack_deinitEnv() -> i32;
         fn sync_stack_deinitEnv() -> i32;
+
+        fn base_stack_disable() -> i32;
+        fn adv_stack_disable() -> i32;
+        fn extAdv_stack_disable() -> i32;
+        fn scan_stack_disable() -> i32;
+        fn sync_stack_disable() -> i32;
     }
 
     #[cfg(esp32c2)]
@@ -1277,6 +1304,11 @@ pub(crate) fn ble_deinit() {
         #[cfg(not(esp32c2))]
         {
             npl::r_ble_controller_disable();
+            sync_stack_disable();
+            scan_stack_disable();
+            extAdv_stack_disable();
+            adv_stack_disable();
+            base_stack_disable();
             conn_stack_deinitEnv();
             sync_stack_deinitEnv();
             scan_stack_deinitEnv();

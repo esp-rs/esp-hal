@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The clock frequency accessor functions no longer need to lock the clock tree (#5461)
 
 ### Fixed
 
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - ESP32: removed unsupported Hall-effect sensor API (#5463)
+- The `Clocks` struct has been removed (#5461)
 
 ## [v1.1.0] - 2026-04-24
 

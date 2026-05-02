@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Redirecting...</title>
+<script>
+{#-
+  nginx sends users here as …/latest/?path=<decoded remainder>. We merge `path` onto `base`
+  (../<semver>/…) only when it looks like a rustdoc-relative path.
+-#}
+(function () {
+  var base = "{{ base }}";
+  var pathFromQuery = new URLSearchParams(location.search).get("path");
+
+  /* Reject junk `?path=` values, otherwise we only open `base`. */
+  function isAllowedDocPath(path) {
+    if (!path.length) return false;
+
+    /* Leading slash or backslash at the start turns `base + path` into an absolute-style URL. */
+    if (path.startsWith("/") || path.startsWith("\\")) return false;
+    if (path.indexOf("..") !== -1) return false;
+    if (path.indexOf(":") !== -1) return false;
+    if (path.indexOf("//") !== -1) return false;
+
+    return /^[0-9A-Za-z./_-]+$/.test(path);
+  }
+
+  /* Deep page under `base`, or semver root only if `path` is missing / invalid. */
+  if (pathFromQuery && isAllowedDocPath(pathFromQuery)) {
+    location.replace(base + pathFromQuery);
+  } else {
+    location.replace(base);
+  }
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url={{ base }}" /></noscript>
+</head>
+<body></body>
+</html>

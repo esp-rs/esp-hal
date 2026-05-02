@@ -30,7 +30,6 @@ esp-println = { path = "../esp-println", features = ["log-04"] }
 esp-radio = { path = "../esp-radio", features = [
     "log-04",
     "unstable",
-    "wifi",
 ], optional = true }
 esp-storage = { path = "../esp-storage", optional = true }
 embedded-storage = "0.3.1"
@@ -38,6 +37,11 @@ lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
 static_cell = "2.1.1"
 rtos-trace = { version = "0.2.0", optional = true }
+trouble-host = { version = "0.6.0", features = [
+    "default-packet-pool-mtu-255",
+    "derive",
+    "scan",
+] }
 
 [features]
 unstable = []

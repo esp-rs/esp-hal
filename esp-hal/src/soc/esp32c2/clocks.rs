@@ -18,7 +18,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    clock::Clocks,
+    clock::RtcClock,
     peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0, UART0, UART1},
     rtc_cntl::Rtc,
     soc::regi2c,
@@ -127,7 +127,7 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
         .clk_conf()
         .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
 
-    let (xtal_cycles, calibration_clock_frequency) = Clocks::measure_rtc_clock(
+    let (xtal_cycles, calibration_clock_frequency) = RtcClock::measure_rtc_clock(
         clocks,
         TimgCalibrationClockConfig::RcFastDivClk,
         TimgFunctionClockConfig::XtalClk,
@@ -452,10 +452,10 @@ fn configure_cpu_clk_impl(
         })
     });
 
-    let apb_freq = Rate::from_hz(apb_clk_frequency(clocks));
+    let apb_freq = Rate::from_hz(apb_clk_frequency());
     update_apb_frequency(apb_freq);
 
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 }
 

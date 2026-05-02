@@ -2712,7 +2712,6 @@ pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
         peripherals::{LP_AON, LP_CLKRST, LP_IO, LP_UART, LPWR},
-        soc::clocks::ClockTree,
         uart::{DataBits, Parity, StopBits},
     };
 
@@ -2873,10 +2872,10 @@ pub mod lp_uart {
         }
 
         fn change_baud_internal(&mut self, config: &Config) {
-            let clk = ClockTree::with(|clocks| match config.clock_source {
-                ClockSource::RcFast => crate::soc::clocks::rc_fast_clk_frequency(clocks),
-                ClockSource::Xtal => crate::soc::clocks::xtal_d2_clk_frequency(clocks),
-            });
+            let clk = match config.clock_source {
+                ClockSource::RcFast => crate::soc::clocks::rc_fast_clk_frequency(),
+                ClockSource::Xtal => crate::soc::clocks::xtal_d2_clk_frequency(),
+            };
 
             LP_CLKRST::regs().lpperi().modify(|_, w| {
                 w.lp_uart_clk_sel().bit(match config.clock_source {
@@ -3399,7 +3398,7 @@ impl Info {
                     _ => return Ok(()),
                 };
 
-                let actual_baud = clock.baud_rate_generator_frequency(clocks);
+                let actual_baud = clock.baud_rate_generator_frequency();
                 if actual_baud == 0 {
                     return Err(ConfigError::BaudrateNotAchievable);
                 }
