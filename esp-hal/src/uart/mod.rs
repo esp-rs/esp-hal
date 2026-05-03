@@ -2690,7 +2690,8 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
         | interrupts.at_cmd_char_det().bit_is_set()
         | interrupts.glitch_det().bit_is_set()
         | interrupts.frm_err().bit_is_set()
-        | interrupts.parity_err().bit_is_set();
+        | interrupts.parity_err().bit_is_set()
+        | interrupts.brk_det().bit_is_set();
     let tx_wake = interrupts.tx_done().bit_is_set() | interrupts.txfifo_empty().bit_is_set();
 
     uart.regs()
@@ -3021,10 +3022,10 @@ pub struct State {
     /// Waker for the asynchronous TX operations.
     pub tx_waker: AtomicWaker,
 
-    /// Stores whether the TX half is configured for async operation.
+    /// Stores whether the RX half is configured for async operation.
     pub is_rx_async: AtomicBool,
 
-    /// Stores whether the RX half is configured for async operation.
+    /// Stores whether the TX half is configured for async operation.
     pub is_tx_async: AtomicBool,
 }
 
