@@ -104,8 +104,8 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         11 => "Environment call from M-mode",
         12 => "Instruction page fault",
         13 => "Load page fault",
-        14 => "Reserved",
-        15 => "Store/AMO page fault",
+        14 => "Store/AMO page fault",
+        15 => "Reserved",
         _ => "UNKNOWN",
     };
 
