@@ -21,7 +21,7 @@ pub fn set_enabled(_interrupt: Interrupt, _enable: bool) {
 }
 
 /// Clears a peripheral interrupt.
-pub fn clear(interrupt: Interrupt) {
+pub fn clear(_interrupt: Interrupt) {
     todo!()
 }
 

@@ -81,7 +81,7 @@
 exception_vector:
     j _start_trap
 
-/* Place 1 vector interrupt handler at 0x78 */
+/* Place vector interrupt handler (number 30) at 0x78 */
 .org 0x78
 .global interrupt_vector
 .type interrupt_vector, @function
@@ -121,6 +121,3 @@ _start_trap:
     restore_general_regs
     /* mret to exit */
     mret
-
-.section .trap.rust, "ax"
-.align 4

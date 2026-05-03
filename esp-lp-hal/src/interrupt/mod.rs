@@ -12,24 +12,19 @@ cfg_if::cfg_if! {
         #[cfg(esp32c6)]
         pub use lp_core::*;
 
-        // Machine-mode critical section implementation.
-        mod critical_section;
-
         /// Portable interrupt binding and handling code
         pub mod shared;
         pub use shared::*;
     } else {
-        /// If interrupt handling is not enabled, need to provide a stubs functions for
-        /// start_trap_rust and DefaultHandler.
+        // If interrupt handling is not enabled, need to provide a stub DefaultHandler,
+        // to make the linker happy.
         #[doc(hidden)]
-        #[allow(dead_code)]
-        #[unsafe(link_section = ".trap.rust")]
-        #[unsafe(export_name = "_start_trap_rust")]
-        pub extern "C" fn stub_start_trap_rust(_trap_frame: *const u32, _irqs: u32) {}
-
-        #[doc(hidden)]
-        #[allow(dead_code)]
         #[unsafe(export_name = "DefaultHandler")]
+        #[unsafe(link_section = ".trap.rust")]
         pub fn stub_default_handler() {}
     }
 }
+
+/// LP core critical section implementation.
+/// Works with or without the interrupts feature.
+mod critical_section;

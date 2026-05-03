@@ -1,3 +1,5 @@
+    /*       Disable compressed instructions */
+    .option  norvc
 /**
  * Defines the assembly macros needed for custom instructions on the ULP RISCV core.
  * Adapted from the following ESP-IDF header:
@@ -229,4 +231,3 @@ _start_trap:
 
     /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
     retirq_insn
-

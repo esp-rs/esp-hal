@@ -61,10 +61,18 @@ cfg_if::cfg_if! {
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 // Assembly containing the reset, trap, and startup assembly procedures..
+#[cfg(not(feature = "interrupts"))]
 #[cfg(esp32c6)]
-global_asm!(include_str!("./lp_start.S"));
+global_asm!(include_str!("./asm/lp_start.S"));
+#[cfg(feature = "interrupts")]
+#[cfg(esp32c6)]
+global_asm!(include_str!("./asm/lp_start_with_interrupts.S"));
+#[cfg(not(feature = "interrupts"))]
 #[cfg(any(esp32s2, esp32s3))]
-global_asm!(include_str!("./ulp_riscv_start.S"));
+global_asm!(include_str!("./asm/ulp_riscv_start.S"));
+#[cfg(feature = "interrupts")]
+#[cfg(any(esp32s2, esp32s3))]
+global_asm!(include_str!("./asm/ulp_riscv_start_with_interrupts.S"));
 
 /// Wake up the HP core
 pub fn wake_hp_core() {
@@ -174,7 +182,9 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 /// Stops the ULP core, called from itself.
-fn ulp_riscv_halt() -> ! {
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn ulp_riscv_halt() -> ! {
     #[cfg(any(esp32s2, esp32s3))]
     {
         unsafe { &*pac::RTC_CNTL::PTR }

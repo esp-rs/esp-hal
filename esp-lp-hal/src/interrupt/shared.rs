@@ -253,6 +253,7 @@ pub extern "C" fn start_trap_rust(trap_frame: *const u32) {
 #[doc(hidden)]
 #[unsafe(link_section = ".trap.rust")]
 pub fn dispatch_exception(_trap_frame: &TrapFrame, _code: usize) {
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
@@ -266,10 +267,10 @@ pub fn dispatch_interrupt(_code: usize) {
 
     // Iterate the active interrupts, fetch their handler, and call it if set.
     for interrupt_nr in status.iterator() {
-        if let Ok(i) = Interrupt::try_from(interrupt_nr) {
-            if let Some(handler) = bound_handler(i) {
-                handler.callback()();
-            }
+        if let Ok(i) = Interrupt::try_from(interrupt_nr)
+            && let Some(handler) = bound_handler(i)
+        {
+            handler.callback()();
         }
     }
 }
@@ -279,6 +280,7 @@ pub fn dispatch_interrupt(_code: usize) {
 #[doc(hidden)]
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
+#[unsafe(link_section = ".trap.rust")]
 pub fn DefaultHandler() {}
 
 /// TODO: Write store_trap / load_trap functions, to generate the context saving assembly code,
