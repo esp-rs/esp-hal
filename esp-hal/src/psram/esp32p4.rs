@@ -3,6 +3,12 @@
 //! P4 has two PSRAM controllers wired to the same DQ pads
 //! The structure is looks same with DDR controller but not same.
 
+// Several ROM cache helpers and MMIO wrappers are staged for follow-up
+// PSRAM bring-up work (cache suspend/resume around config writes).
+// They're intentionally retained so the follow-up PR can wire them in
+// without re-deriving the constants.
+#![allow(dead_code)]
+
 /// PSRAM virtual address range (cached)
 pub const PSRAM_VADDR_START: usize = 0x4800_0000;
 
@@ -379,7 +385,7 @@ impl PsramPad {
         Self::Dq5,
         Self::Dq6,
         Self::Dq7,
-        /// Strobe0
+        // Strobe0
         Self::Dqs0,
         // DQ8 ~ DQ15
         Self::Dq8,
@@ -393,7 +399,7 @@ impl PsramPad {
         // Ck and Cs
         Self::Ck,
         Self::Cs,
-        /// Strobe1
+        // Strobe1
         Self::Dqs1,
     ];
 
@@ -422,10 +428,12 @@ impl PsramPad {
     }
 }
 
-/// Configure PSRAM PHY pads. Mirrors IDF `mspi_timing_ll_pin_drv_set(2)`
-/// + `mspi_timing_ll_enable_dqs(true)`. Both DQS XPD bits must be on
-/// for DDR reads to latch data; drive strength = 2 matches IDF default
-/// for AP HEX PSRAM at 200 MHz.
+/// Configure PSRAM PHY pads.
+///
+/// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
+/// `mspi_timing_ll_enable_dqs(true)`. Both DQS XPD bits must be on for
+/// DDR reads to latch data; drive strength = 2 matches IDF default for
+/// AP HEX PSRAM at 200 MHz.
 fn psram_pad_init() {
     unsafe {
         PsramPad::set_drv_all(2);
@@ -516,8 +524,7 @@ fn init_mr_registers() {
     // Read+modify+write MR8 (high byte is reserved/absent — pass 0).
     let (mut mr8, mr9) = psram_mr_read(MR_ADDR_MR8_MR9); // MR9 is unused
     mr8 &= !(0x3 | (1 << 2) | (1 << 3) | (1 << 6));
-    mr8 |= 3 // bl = 3 (32-byte burst)
-        | (0 << 2) // bt = 0
+    mr8 |= 3 // bt = 0
         | (1 << 3) // rbx = 1
         | (1 << 6); // x16 = 1
     psram_mr_write(MR_ADDR_MR8_MR9, mr8, mr9); // keep previous MR9
@@ -556,31 +563,10 @@ unsafe extern "C" {
     /// Linked from `esp32p4.rom.ld`: `esp_rom_spi_cmd_config = 0x4fc00108`.
     fn esp_rom_spi_cmd_config(spi_num: i32, pcmd: *mut EspRomSpiCmd);
 
-    /// `Cache_Suspend_L1_DCache = 0x4fc004f8`. Stops new D-cache fills,
-    /// drains in-flight transactions, returns previous-state token.
-    fn Cache_Suspend_L1_DCache() -> u32;
-    /// `Cache_Resume_L1_DCache = 0x4fc004fc`. Restores D-cache from token.
-    fn Cache_Resume_L1_DCache(autoload_state: u32);
-    /// `Cache_Suspend_L2_Cache = 0x4fc00508`.
-    fn Cache_Suspend_L2_Cache() -> u32;
-    /// `Cache_Resume_L2_Cache = 0x4fc0050c`.
-    fn Cache_Resume_L2_Cache(autoload_state: u32);
     /// `Cache_Invalidate_All = 0x4fc00404`. Invalidates all cache levels.
     fn Cache_Invalidate_All();
 }
 
-unsafe fn rom_cache_suspend_l1_dcache() -> u32 {
-    unsafe { Cache_Suspend_L1_DCache() }
-}
-unsafe fn rom_cache_resume_l1_dcache(s: u32) {
-    unsafe { Cache_Resume_L1_DCache(s) }
-}
-unsafe fn rom_cache_suspend_l2_cache() -> u32 {
-    unsafe { Cache_Suspend_L2_Cache() }
-}
-unsafe fn rom_cache_resume_l2_cache(s: u32) {
-    unsafe { Cache_Resume_L2_Cache(s) }
-}
 unsafe fn rom_cache_invalidate_all() {
     unsafe { Cache_Invalidate_All() }
 }
@@ -591,7 +577,7 @@ unsafe fn rom_cache_invalidate_all() {
 /// bounded variant surfaces a real failure as a returned error. After
 /// the bit clears, copies MISO bytes from W0..W{N} into `rx_buf`.
 fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
-    const SPI_CMD: u32 = MSPI1_BASE + 0x00;
+    const SPI_CMD: u32 = MSPI1_BASE;
     const SPI_W0: u32 = MSPI1_BASE + 0x58;
     const SPI_USR_TRIGGER: u32 = 1 << 18;
     const MAX_ITERS: u32 = 1_000_000;
@@ -616,7 +602,7 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
     // Copy MISO bytes from W0..W{N}.
     if !rx.is_empty() {
         let n_bytes = rx.len();
-        let n_words = (n_bytes + 3) / 4;
+        let n_words = n_bytes.div_ceil(4);
         for i in 0..n_words {
             let word = unsafe { mmio_read_32(SPI_W0 + (i as u32) * 4) };
             for b in 0..4 {
@@ -753,28 +739,6 @@ fn mmu_map_psram(mspi_base: u32, config: PsramConfig) {
         }
         rom_cache_invalidate_all();
     }
-}
-
-fn cache_suspend() {
-    let cache = unsafe { &*crate::pac::CACHE::PTR };
-    cache
-        .l1_dcache_ctrl()
-        .modify(|_, w| w.l1_dcache_shut_dbus0().set_bit());
-    while !cache
-        .l1_dcache_autoload_ctrl()
-        .read()
-        .l1_dcache_autoload_done()
-        .bit_is_set()
-    {
-        core::hint::spin_loop();
-    }
-}
-
-fn cache_resume() {
-    let cache = unsafe { &*crate::pac::CACHE::PTR };
-    cache
-        .l1_dcache_ctrl()
-        .modify(|_, w| w.l1_dcache_shut_dbus0().clear_bit());
 }
 
 #[allow(dead_code)]
@@ -946,7 +910,7 @@ fn configure_psram_mspi(base: u32) {
         mmio_setbits_32(base + 0x44, 0b1100_1011_1100 << 16); // bits 27, 26, 23, 21..18
 
         // SRAM_DRD_CMD / SRAM_DWR_CMD: 16-bit sync read/write commands.
-        mmio_write_32(base + 0x48, ((16 - 1) << 28) | 0x0000); // sync read  0x0000
+        mmio_write_32(base + 0x48, (16 - 1) << 28); // sync read  0x0000
         mmio_write_32(base + 0x4C, ((16 - 1) << 28) | 0x8080); // sync write 0x8080
 
         // MEM_CTRL1: splice enables (AXI burst optimization).

@@ -498,8 +498,9 @@ pub const DIS_WDT: EfuseField = EfuseField::new(0, 5, 180, 1);
 pub const DIS_SWD: EfuseField = EfuseField::new(0, 5, 181, 1);
 /// Use to configure glitch mode
 pub const PVT_GLITCH_MODE: EfuseField = EfuseField::new(0, 5, 182, 2);
-/// `[MAC_FACTORY]` MAC address
+/// `[MAC_FACTORY]` MAC address (low 32 bits)
 pub const MAC0: EfuseField = EfuseField::new(1, 0, 0, 32);
+/// `[MAC_FACTORY]` MAC address (high 16 bits)
 pub const MAC1: EfuseField = EfuseField::new(1, 0, 32, 16);
 /// Minor chip version
 pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(1, 2, 64, 4);
