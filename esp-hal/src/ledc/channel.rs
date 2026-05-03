@@ -605,7 +605,7 @@ where
 
             signal.connect_to(&self.output_pin);
         } else {
-            return Err(Error::Timer);
+            return Err(Error::Channel);
         }
 
         Ok(())
