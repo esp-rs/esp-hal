@@ -73,7 +73,7 @@ impl AccessPointConfig {
             return Err(WifiError::InvalidArguments);
         }
 
-        if self.password.len() > 64 {
+        if self.password.len() >= 64 {
             return Err(WifiError::InvalidArguments);
         }
 
