@@ -69,6 +69,8 @@ mod xtensa;
 use crate::pac;
 
 unstable_driver! {
+    // TODO: Remove this workaround of P4 and resolve true reason.
+    #[cfg(not(esp32p4))]
     pub mod software;
 }
 

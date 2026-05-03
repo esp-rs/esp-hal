@@ -7,16 +7,11 @@
 //!
 //! Clock hierarchy: XTAL -> CPLL -> CPU_ROOT -> CPU/APB dividers
 //! SPLL -> PLL_F240M/160M/120M/80M/20M (peripheral clocks)
-//!
-//! Ref: esp-idf rtc_clk.c, clk_tree_ll.h, clk_tree_defs.h
-//!      TRM v0.5 Ch 12 (Reset and Clock)
 #![allow(dead_code, reason = "Clock functions called from generated macro code")]
 
 define_clock_tree_types!();
 
 /// CPU clock frequency presets for ESP32-P4X (eco5 / chip revision v3.x).
-/// Ref: esp-idf rtc_clk.c:240 -- !CONFIG_ESP32P4_SELECTS_REV_LESS_V3 path
-///      TRM v0.5 Ch 2 -- HP CPU max frequency 400 MHz for v3.x
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -106,10 +101,8 @@ impl ClockConfig {
     }
 }
 
-// ============================================================
 // Clock node implementation functions (called from generated macro)
 // These must match the function names that define_clock_tree_types!() expects.
-// ============================================================
 
 // CPU_ROOT_CLK (mux: XTAL / CPLL / RC_FAST)
 fn configure_cpu_root_clk_impl(
@@ -163,7 +156,7 @@ fn configure_apb_clk_impl(
     _old_config: Option<ApbClkConfig>,
     _new_config: ApbClkConfig,
 ) {
-    // TODO(esp32p4): APB divider register in HP_SYS_CLKRST
+    // TODO: APB divider register in HP_SYS_CLKRST
     // For now, APB freq is derived from CPU freq via divider
 }
 
@@ -216,7 +209,7 @@ impl UartInstance {
         _old_config: Option<UartFunctionClockConfig>,
         _new_config: UartFunctionClockConfig,
     ) {
-        // TODO(esp32p4): Configure UART clock source selection
+        // TODO: Configure UART clock source selection
         // HP_SYS_CLKRST PERI_CLK_CTRL110-114 for UART0-4
     }
 
@@ -234,9 +227,7 @@ impl UartInstance {
     }
 }
 
-// ============================================================
 // Per-instance clock impl for TIMG
-// ============================================================
 
 impl TimgInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
@@ -249,7 +240,7 @@ impl TimgInstance {
         _old_config: Option<TimgFunctionClockConfig>,
         _new_config: TimgFunctionClockConfig,
     ) {
-        // TODO(esp32p4): Configure TIMG clock source
+        // TODO: Configure TIMG clock source
         // HP_SYS_CLKRST PERI_CLK_CTRL20/21
     }
 
@@ -261,13 +252,12 @@ impl TimgInstance {
         _old_config: Option<TimgWdtClockConfig>,
         _new_config: TimgWdtClockConfig,
     ) {
-        // TODO(esp32p4): Configure TIMG WDT clock source
+        // TODO: Configure TIMG WDT clock source
     }
 }
 
-// ============================================================
 // System clock impl functions
-// ============================================================
+
 
 // Mux enable stubs (mux nodes need enable functions too)
 fn enable_cpu_root_clk_impl(_clocks: &mut ClockTree, _en: bool) {}

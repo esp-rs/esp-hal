@@ -113,6 +113,9 @@ mod _p4_peripheral_clocks {
             Peripheral::Systimer,
             Peripheral::Iomux,
             Peripheral::UsbDevice,
+            // TODO: This should be removed before merged.
+            // UART0: bootloader uses GPIO37/38 for boot log while testing
+            Peripheral::Uart0,
         ];
         pub const COUNT: usize = Self::ALL.len();
         pub const ALL: &[Self] = &[
@@ -258,7 +261,7 @@ mod _p4_peripheral_clocks {
             }
             // -- PWM/Counter --
             Peripheral::Ledc => {
-                // TODO(esp32p4): LEDC uses SOC_CLK_CTRL3 in IDF, but PAC may differ.
+                // TODO: LEDC uses SOC_CLK_CTRL3 in IDF, but PAC may differ.
                 //                Only reset wiring is handled here for now.
             }
             Peripheral::Pcnt => {
@@ -364,7 +367,7 @@ mod _p4_peripheral_clocks {
             }
             // -- LCD/Camera --
             Peripheral::LcdCam => {
-                // TODO(esp32p4): LCD_CAM uses SOC_CLK_CTRL3 which may not be in PAC.
+                // TODO: LCD_CAM uses SOC_CLK_CTRL3 which may not be in PAC.
             }
         }
     }
@@ -571,8 +574,19 @@ impl Peripheral {
 
 #[cfg(esp32p4)]
 impl Peripheral {
-    pub const fn try_from(_value: u8) -> Option<Peripheral> {
-        None
+    /// Map a numeric peripheral id back to the enum variant.
+    ///
+    /// Our P4 `Peripheral` is `#[repr(u8)]` with values 0..=43 assigned
+    /// densely (see `_p4_peripheral_clocks`), so a simple range check
+    /// plus transmute is correct. Drivers like DMA call
+    /// `Peripheral::try_from(N).unwrap()` from a const context to
+    /// build a `GenericPeripheralGuard<N>`; if this returned `None`
+    /// the const-eval would panic and the user app would fail to build.
+    pub const fn try_from(value: u8) -> Option<Peripheral> {
+        if value >= Peripheral::COUNT as u8 {
+            return None;
+        }
+        Some(unsafe { core::mem::transmute::<u8, Peripheral>(value) })
     }
 }
 

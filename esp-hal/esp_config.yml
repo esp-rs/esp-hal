@@ -168,6 +168,22 @@ options:
             - "8"
     active: 'chip == "esp32s3"'
 
+  - name: l2-cache-size
+    description: "ESP32-P4 L2 cache size. Must match the 2nd-stage bootloader's
+      `CACHE.L2_CACHE_CACHESIZE_CONF` setting (TRM L2MEM Config 0..3). Default
+      `256KB` matches the IDF bootloader bundled by espflash."
+    default:
+      - value: '"256KB"'
+    constraints:
+      - type:
+          validator: enumeration
+          value:
+            - "0KB"
+            - "128KB"
+            - "256KB"
+            - "512KB"
+    active: 'chip == "esp32p4"'
+
   - name: min-chip-revision
     description: "The minimum chip revision required for the application to run, in format: major * 100 + minor."
     default:

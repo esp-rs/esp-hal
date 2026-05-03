@@ -57,7 +57,6 @@ rc_fast_clk_default = 20_000_000
 
 # Clock tree for ESP32-P4X (eco5 / chip revision v3.x)
 # 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)
-# Ref: esp-idf clk_tree_defs.h, clk_tree_ll.h, DS, TRM v0.5 Ch 12
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
@@ -192,7 +191,6 @@ peripherals = [
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
     # TODO: clarify EMAC <-> PAC mapping before exposing it.
-    # IDF has the LL header at components/esp_hal_emac/esp32p4/include/hal/emac_ll.h
     # but the esp32p4 PAC has not been generated with a matching peripheral yet.
     # { name = "EMAC" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
@@ -208,7 +206,6 @@ peripherals = [
 ]
 
 # UART: 5 instances (UART0-4), 128-byte FIFO
-# Ref: esp-idf uart_ll.h, TRM v0.5 Ch 46
 [device.uart]
 support_status = "partial"
 instances = [
@@ -222,13 +219,11 @@ ram_size = 128
 version = 2
 
 # SYSTIMER: 2 counter units, 3 alarm comparators, 16 MHz (XTAL/2.5)
-# Ref: esp-idf systimer_ll.h, TRM v0.5 Ch 17
 # PAC register names verified: unit_op(n), unit_value(n), target_conf(n),
 # trgt(n), comp_load(n) all match esp-hal systimer module expectations.
 [device.systimer]
 
 # GP Timer (TIMG): 2 groups, each with 2 timers + WDT
-# Ref: esp-idf timer_ll.h, TRM v0.5 Ch 18
 [device.gp_timer]
 support_status = "partial"
 instances = [
@@ -237,9 +232,7 @@ instances = [
 ]
 
 # SPI Master: 2 instances (GPSPI2, GPSPI3)
-# Ref: esp-idf spi_ll.h, TRM v0.5 Ch 47
 # SPI Master: SPI2 only (SPI2 and SPI3 have different PAC RegisterBlock types)
-# Ref: esp-idf spi_ll.h, TRM v0.5 Ch 47
 [device.spi_master]
 support_status = "partial"
 supports_dma = true
@@ -250,7 +243,6 @@ instances = [
 
 # I2C Master: 2 instances
 # P4 PAC: data register is read-only, TX uses txfifo_start_addr (fixed in i2c/master/mod.rs)
-# Ref: esp-idf i2c_ll.h, TRM v0.5 Ch 48
 [device.i2c_master]
 support_status = "partial"
 instances = [
@@ -280,31 +272,22 @@ gdma_version = 2
 separate_in_out_interrupts = true
 max_priority = 5
 
-# TWAI (CAN): 3 instances
-# Ref: esp-idf twai_ll.h, TRM v0.5 Ch 58
+# TODO: Check later with PAC and TRM both
 [device.twai]
-support_status = "partial"
-
-# ADC: HP ADC + LP ADC
-# Ref: TRM v0.5 Ch 38 (ADC), Ch 41 (LP ADC)
-# Note: P4 ADC calibration needs special value (4 not 1) -- not yet implemented
+support_status = "not_supported"
+# TODO: Check later with PAC and TRM both
 [device.adc]
-support_status = "partial"
-
-# Temperature sensor (LP_TSENS)
-# Ref: TRM v0.5 Ch 43 (Temperature Sensor)
+support_status = "not_supported"
+# TODO: Test or complete me
 # [device.temperature_sensor]
 # support_status = "partial"
 
-# Touch sensor (LP_TOUCH, 14 channels)
-# Ref: TRM v0.5 Ch 42 (Touch Sensor)
+# TODO: Test or complete me
 # [device.touch]
 # support_status = "partial"
 
-# AES: hardware accelerator
-# Ref: esp-idf aes_ll.h, TRM v0.5 Ch 28
 [device.aes]
-support_status = "partial"
+support_status = "not_supported"
 has_split_text_registers = true
 endianness_configurable = false
 dma = true
@@ -313,32 +296,26 @@ key_length = { options = [
     { bits = 256, encrypt_mode = 2, decrypt_mode = 6 },
 ] }
 
-# SHA: hardware accelerator
-# Ref: esp-idf sha_ll.h, TRM v0.5 Ch 34
 [device.sha]
-support_status = "partial"
+support_status = "not_supported"
 dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
-# PSRAM: cache-mapped external RAM (HEX mode)
-# Ref: esp-idf esp_psram_impl_ap_hex.c, TRM v0.5 Ch 9
 [device.psram]
 extmem_origin = 0x48000000
 
-# RSA: hardware accelerator
-# Ref: esp-idf mpi_ll.h, TRM v0.5 Ch 33
 [device.rsa]
-support_status = "partial"
+support_status = "not_supported"
 size_increment = 32
 memory_size_bytes = 384
+# TODO: complete with esp-idf ecc_ll.h and later version of TRM 0.5
 
-# ECC: hardware accelerator (eco5+ supported)
-# Ref: esp-idf ecc_ll.h, TRM v0.5 Ch 30
-# USB Serial/JTAG controller
 [device.usb_serial_jtag]
 
+# ECC: hardware accelerator (eco5+ supported)
 [device.ecc]
-support_status = "partial"
+support_status = "not_supported"
+
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
@@ -764,10 +741,8 @@ output_signals = [
     { name = "DBG_FLASH_D" },
 ]
 
-# 55 GPIO pins (0-54), IO MUX functions from esp-idf io_mux_reg.h
-# ADC channels from esp-idf adc_channel.h
+# 55 GPIO pins (0-54)
 # LP pins: GPIO0-5, GPIO12-23 (RTCIO capable)
-# Ref: DS, TRM v0.5 Ch 11, esp-idf gpio_periph.c, rtc_io_channel.h
 pins = [
     { pin =  0, lp = { 0 = "LP_GPIO0" } },
     { pin =  1, lp = { 0 = "LP_GPIO1" } },
