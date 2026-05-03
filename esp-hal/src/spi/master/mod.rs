@@ -2390,11 +2390,14 @@ impl Driver {
     fn update(&self) {
         cfg_if::cfg_if! {
             if #[cfg(esp32p4)] {
-                // P4 PAC: cmd.update() is write-only (no read method).
-                // Write update bit and wait a short time instead of polling.
+                // P4 PAC: cmd().update() is write-only -- no `read()` accessor,
+                // so we can't poll for the bit clearing like the other chips.
+                // Spin for ~10 cycles to let the hardware latch instead.
+                // TODO: file an esp-pacs issue/PR so the P4 SVD marks the SPI
+                // cmd().update field readable like other chips. Once that lands
+                // this branch can collapse into the general `else` arm below.
                 let reg_block = self.regs();
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
-                // Small delay for SPI register sync
                 for _ in 0..10 { core::hint::spin_loop(); }
             } else if #[cfg(not(any(esp32, esp32s2)))] {
                 let reg_block = self.regs();

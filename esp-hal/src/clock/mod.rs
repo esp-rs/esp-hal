@@ -496,15 +496,16 @@ fn rtc_slow_cal_period() -> u64 {
         }
     }
 
-    // P4: store registers are in LP_SYS (mapped as LP_AON in esp-hal).
-    // LP_SYS has lp_store0..lp_store14 registers.
-    #[cfg(esp32p4)]
-    {
-        LP_AON::regs().lp_store1().read().bits() as u64
-    }
-    #[cfg(not(esp32p4))]
-    {
-        LP_AON::regs().store1().read().bits() as u64
+    // P4: LP_SYS (mapped as LP_AON in esp-hal) names its scratch registers
+    // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
+    // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
+    // Once that lands this cfg branch can disappear.
+    cfg_if::cfg_if! {
+        if #[cfg(esp32p4)] {
+            LP_AON::regs().lp_store1().read().bits() as u64
+        } else {
+            LP_AON::regs().store1().read().bits() as u64
+        }
     }
 }
 
