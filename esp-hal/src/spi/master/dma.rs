@@ -230,7 +230,7 @@ impl<'d> SpiDma<'d, Blocking> {
 }
 
 impl<'d> SpiDma<'d, Async> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI instance into blocking mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
         self.spi.disable_peri_interrupt_on_all_cores();
@@ -551,11 +551,11 @@ where
         if !self.is_done() {
             self.spi_dma.cancel_transfer();
             self.spi_dma.wait_for_idle();
+        }
 
-            unsafe {
-                ManuallyDrop::drop(&mut self.spi_dma);
-                ManuallyDrop::drop(&mut self.dma_buf);
-            }
+        unsafe {
+            ManuallyDrop::drop(&mut self.spi_dma);
+            ManuallyDrop::drop(&mut self.dma_buf);
         }
     }
 }
@@ -889,7 +889,7 @@ impl<'d> SpiDmaBus<'d, Blocking> {
 }
 
 impl<'d> SpiDmaBus<'d, Async> {
-    /// Converts the SPI instance into async mode.
+    /// Converts the SPI instance into blocking mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> SpiDmaBus<'d, Blocking> {
         SpiDmaBus {
