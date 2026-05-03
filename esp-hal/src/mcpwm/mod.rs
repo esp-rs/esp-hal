@@ -181,9 +181,7 @@ impl PeripheralClockConfig {
     fn source_clock() -> Rate {
         // FIXME: this works right now because we configure the default clock source during startup.
         // Needs to be revisited when refactoring the MCPWM driver before stabilization.
-        ClockTree::with(|clocks| {
-            Rate::from_hz(clocks::McpwmInstance::Mcpwm0.function_clock_frequency(clocks))
-        })
+        Rate::from_hz(clocks::McpwmInstance::Mcpwm0.function_clock_frequency())
     }
 
     /// Get a clock configuration with the given prescaler.

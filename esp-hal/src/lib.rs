@@ -625,7 +625,7 @@ pub mod __macro_implementation {
 
 use crate::clock::{ClockConfig, CpuClock};
 #[cfg(feature = "rt")]
-use crate::{clock::Clocks, peripherals::Peripherals};
+use crate::peripherals::Peripherals;
 
 /// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
 pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
@@ -748,7 +748,7 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
-    Clocks::init(config.clock_config());
+    crate::clock::init(config.clock_config());
 
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 

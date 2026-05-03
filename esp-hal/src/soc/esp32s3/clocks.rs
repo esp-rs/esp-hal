@@ -157,7 +157,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         return;
     }
 
-    ensure_voltage_raised(clocks);
+    ensure_voltage_raised();
 
     // Analog part
     let pll_freq = unwrap!(clocks.pll_clk);
@@ -246,7 +246,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         w.bbpll_stop_force_low().clear_bit()
     });
 
-    ensure_voltage_minimal(clocks);
+    ensure_voltage_minimal();
 }
 
 fn configure_pll_clk_impl(
@@ -438,7 +438,7 @@ fn configure_cpu_clk_impl(
         _ => 0,
     };
 
-    ensure_voltage_raised(clocks);
+    ensure_voltage_raised();
     if new_config == CpuClkConfig::Pll {
         SYSTEM::regs().cpu_per_conf().modify(|_, w| {
             unsafe { w.cpuperiod_sel().bits(clock_source_sel2_bit) };
@@ -451,10 +451,10 @@ fn configure_cpu_clk_impl(
         w.soc_clk_sel().bits(clock_source_sel0_bit)
     });
 
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 
-    ensure_voltage_minimal(clocks);
+    ensure_voltage_minimal();
 }
 
 // There are totally 6 LDO slaves(all on by default). At the moment of switching LDO slave, LDO
@@ -561,8 +561,8 @@ fn pvt_supported() -> bool {
     (blk_major == 0 && blk_minor == 1) || (blk_major == 1 && blk_minor >= 2) || blk_major > 1
 }
 
-fn ensure_voltage_raised(clocks: &mut ClockTree) {
-    let cpu_freq = cpu_clk_frequency(clocks);
+fn ensure_voltage_raised() {
+    let cpu_freq = cpu_clk_frequency();
     let pd_slave = cpu_freq / 80_000_000;
 
     if cpu_freq == 240_000_000 {
@@ -590,8 +590,8 @@ fn ensure_voltage_raised(clocks: &mut ClockTree) {
         .modify(|_, w| unsafe { w.ldo_slave().bits(0x7 >> pd_slave) });
 }
 
-fn ensure_voltage_minimal(clocks: &mut ClockTree) {
-    let cpu_freq = cpu_clk_frequency(clocks);
+fn ensure_voltage_minimal() {
+    let cpu_freq = cpu_clk_frequency();
     let pd_slave = cpu_freq / 80_000_000;
 
     if cpu_freq < 240_000_000 {

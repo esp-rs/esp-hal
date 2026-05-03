@@ -46,7 +46,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     let Data::Struct(DataStruct { fields, .. }) = &input.data else {
         return ParseError::new(
             span,
-            "#[derive(Builder)] is only defined for structs, not for enums or unions!",
+            "#[derive(BuilderLite)] is only defined for structs, not for enums or unions!",
         )
         .to_compile_error();
     };
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
-                ::core::compile_error!{"#[derive(Builder)] is only defined for structs, not for enums or unions!"}
+                ::core::compile_error!{"#[derive(BuilderLite)] is only defined for structs, not for enums or unions!"}
             }
             .to_string()
         );

@@ -213,13 +213,10 @@ use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
-#[cfg(soc_has_clock_node_rmt_sclk)]
-use crate::soc::clocks;
 use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
-    clock::Clocks,
     gpio::{
         self,
         InputConfig,
@@ -229,6 +226,7 @@ use crate::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
+    soc::clocks,
     system::GenericPeripheralGuard,
     time::Rate,
 };
@@ -2253,17 +2251,13 @@ for_each_rmt_clock_source!(
             fn freq(self) -> crate::time::Rate {
                 match self {
                     #[cfg(rmt_supports_apb_clock)]
-                    ClockSource::Apb => Clocks::get().apb_clock,
+                    ClockSource::Apb => Rate::from_hz(clocks::apb_clk_frequency()),
 
                     #[cfg(rmt_supports_rcfast_clock)]
-                    ClockSource::RcFast => {
-                        Rate::from_hz(clocks::ClockTree::with(
-                            clocks::rc_fast_clk_frequency,
-                        ))
-                    }
+                    ClockSource::RcFast => Rate::from_hz(clocks::rc_fast_clk_frequency()),
 
                     #[cfg(rmt_supports_xtal_clock)]
-                    ClockSource::Xtal => Clocks::get().xtal_clock,
+                    ClockSource::Xtal => Rate::from_hz(clocks::xtal_clk_frequency()),
 
                     #[cfg(rmt_supports_pll80mhz_clock)]
                     ClockSource::Pll80MHz => Rate::from_mhz(80),

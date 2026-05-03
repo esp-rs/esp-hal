@@ -202,23 +202,26 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
 
 fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
     // ESP-IDF source: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_riscv.c#L87
+    fn configure_timer(cycles: u32) {
+        LPWR::regs()
+            .ulp_cp_timer_1()
+            .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles << 8) });
+        // enable the timer
+        LPWR::regs()
+            .ulp_cp_ctrl()
+            .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
+        LPWR::regs()
+            .ulp_cp_timer()
+            .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
+    }
     match wakeup_src {
         UlpCoreWakeupSource::HpCpu => {
-            // only wake-up when the HpCpu calls .run()
+            // wake-up immediately
+            configure_timer(0);
         }
         UlpCoreWakeupSource::Timer(sleep_cycles) => {
             // configure timer duration
-            let cycles = sleep_cycles.cycles() << 8;
-            LPWR::regs()
-                .ulp_cp_timer_1()
-                .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });
-            // enable the timer
-            LPWR::regs()
-                .ulp_cp_ctrl()
-                .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
-            LPWR::regs()
-                .ulp_cp_timer()
-                .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
+            configure_timer(sleep_cycles.cycles());
         }
     }
 }

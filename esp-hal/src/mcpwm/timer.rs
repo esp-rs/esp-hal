@@ -104,7 +104,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
     fn cfg1(&mut self) -> &pac::mcpwm0::timer::CFG1 {
         // SAFETY:
-        // We only grant access to our CFG0 register with the lifetime of &mut self
+        // We only grant access to our CFG1 register with the lifetime of &mut self
         unsafe { Self::tmr() }.cfg1()
     }
 
