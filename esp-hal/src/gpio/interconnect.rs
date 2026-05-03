@@ -838,7 +838,7 @@ impl<'d> OutputSignal<'d> {
         self
     }
 
-    /// Returns `true` if the input signal must be routed through the GPIO
+    /// Returns `true` if the output signal must be routed through the GPIO
     /// matrix.
     pub fn is_gpio_matrix_forced(&self) -> bool {
         self.flags.contains(OutputFlags::ForceGpioMatrix)
