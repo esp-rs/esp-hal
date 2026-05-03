@@ -553,7 +553,7 @@ enum Command {
         /// Indicates whether the receiver will send an ACK after this byte has
         /// been received.
         ack_value: Ack,
-        /// Length of data (in bytes) to be written. The maximum length is
+        /// Length of data (in bytes) to be read. The maximum length is
         #[doc = property!("i2c_master.fifo_size", str)]
         /// , while the minimum is 1.
         length: u8,
