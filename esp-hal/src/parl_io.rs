@@ -68,7 +68,7 @@
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIo, TxFourBits, ClkOutPin, TxConfig, TxPinConfigWithValidPin};
 //!
-//! // Initialize DMA buffer and descriptors for data reception
+//! // Initialize DMA buffer and descriptors for data transmission
 //! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 //! let dma_channel = peripherals.DMA_CH0;
 //!
@@ -495,7 +495,7 @@ impl RxClkPin for RxClkInPin<'_> {
     fn configure(&mut self) {
         let pcr = PCR::regs();
         pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
+            .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_RX, no divider
 
         self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
@@ -991,7 +991,7 @@ where
     Dm: DriverMode,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ParlIoTx").finish()
+        f.debug_struct("ParlIoRx").finish()
     }
 }
 
@@ -1404,7 +1404,7 @@ where
 }
 
 /// Represents an ongoing (or potentially finished) transfer using the PARL_IO
-/// TX.
+/// RX.
 pub struct ParlIoRxTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode> {
     parl_io: ManuallyDrop<ParlIoRx<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
