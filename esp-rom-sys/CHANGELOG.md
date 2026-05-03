@@ -16,9 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ECO5+ symbol addresses (sourced from ESP-IDF v6.0.1
   `esp32p4.rom.eco5*.ld`). The previous file used pre-ECO5 addresses and
   silently misnamed several ROM symbols on v3.x silicon (e.g.
-  `esp_rom_crc32_le` linked to the address that actually hosts
-  `crc32_be`). Verified end-to-end via runtime hw-vs-sw comparison
-  (12/12 PASS) on v3.2 ECO7 silicon.
+  `esp_rom_crc32_le` and `crc32_be`).
 
 ### Fixed
 

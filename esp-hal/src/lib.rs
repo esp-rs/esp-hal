@@ -197,16 +197,8 @@ fn main() -> ! {
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-// `define_clock_tree_types!()` reads doc strings from the chip's
-// `esp-metadata/devices/<chip>.toml` `[device.clock_tree]` section.
-// Other chips (C2/C3/C5/C6/C61/H2/S2/S3, ESP32) populate those strings;
-// our esp32p4.toml `[device.clock_tree]` is still partial, so the macro
-// emits undocumented public items for P4 with `unstable`. Downgrade
-// missing_docs to a warning for P4 only.
-//
-// TODO: fill the doc strings in `esp-metadata/devices/esp32p4.toml`
-// `[device.clock_tree]` so we can promote this back to `deny`. See
-// other chips' TOMLs for the field convention.
+// TODO(esp32p4): fill `[device.clock_tree]` doc strings in esp32p4.toml,
+// then promote back to `deny`. Until then, downgrade to warn for P4 only.
 #![cfg_attr(not(esp32p4), deny(missing_docs))]
 #![cfg_attr(esp32p4, warn(missing_docs))]
 #![deny(rust_2018_idioms, rustdoc::all)]
@@ -732,9 +724,13 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(soc_cpu_has_branch_predictor)]
     {
-        const MHCR_RS: u32 = 1 << 4;
-        const MHCR_BFE: u32 = 1 << 5;
-        const MHCR_BTB: u32 = 1 << 12;
+        // Enable branch predictor
+        // Note that the branch predictor will start cache requests and needs to be disabled when
+        // the cache is disabled.
+        // MHCR: CSR 0x7c1
+        const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
+        const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
+        const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
         unsafe {
             core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
         }
@@ -750,45 +746,35 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::clock::init(config.clock_config());
 
+    // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
     #[cfg(sleep_driver_supported)]
-    {
-        crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
-    }
+    crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
+    // Disable watchdog timers
     #[cfg(swd)]
-    {
-        rtc.swd.disable();
-    }
+    rtc.swd.disable();
 
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]
-    {
-        crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
-    }
+    crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
 
     #[cfg(timergroup_timg1)]
-    {
-        crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
-    }
+    crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
 
     crate::time::implem::time_init();
 
     #[cfg(gpio_driver_supported)]
-    {
-        crate::gpio::interrupt::bind_default_interrupt_handler();
-    }
+    crate::gpio::interrupt::bind_default_interrupt_handler();
 
     unsafe {
         esp_rom_sys::init_syscall_table();
     }
 
     #[cfg(all(riscv, write_vec_table_monitoring))]
-    {
-        crate::soc::setup_trap_section_protection();
-    }
+    crate::soc::setup_trap_section_protection();
 
     peripherals
 }

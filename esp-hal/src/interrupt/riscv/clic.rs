@@ -1,3 +1,16 @@
+// PAC drift workaround: every `cfg_if!` block in this file gates the
+// same silicon-level register write between two PAC naming conventions.
+// The pinned `esp32p4` PAC emits CLIC fields with `int_attr_*` prefix
+// and consolidates per-interrupt sub-fields under a single `int_ctrl`
+// register, while the other CLIC chips (ESP32-C5/C6/C61/H2) split them
+// into `int_attr`/`int_ie`/`int_ip`/`int_ctl` per index. The hardware
+// is the same; only the SVD-derived names differ.
+//
+// TODO: file an esp-pacs issue / PR to normalise the CLIC SVD across
+// RISC-V chips so the P4 names match the C5/C6/C61/H2 convention.
+// Once that lands and we bump the esp32p4 PAC pin, every cfg_if! here
+// can be removed in one pass.
+
 use super::{InterruptKind, Priority, RunLevel};
 use crate::{interrupt::ElevatedRunLevel, soc::pac::CLIC};
 
@@ -5,8 +18,7 @@ use crate::{interrupt::ElevatedRunLevel, soc::pac::CLIC};
 pub(super) fn init() {
     let clic = unsafe { CLIC::steal() };
 
-    // Set 3 level bits = 8 priority levels
-    // P4 PAC: int_config_nlbits() (not mnlbits())
+    // 3 level bits = 8 priority levels.
     cfg_if::cfg_if! {
         if #[cfg(esp32p4)] {
             clic.int_config()
@@ -17,8 +29,7 @@ pub(super) fn init() {
         }
     }
 
-    // Enable hardware vectoring
-    // ESP32-P4 uses consolidated int_ctrl registers; C5/C61 use separate int_attr.
+    // Enable hardware vectoring on every interrupt line.
     cfg_if::cfg_if! {
         if #[cfg(esp32p4)] {
             for int in clic.int_ctrl_iter() {

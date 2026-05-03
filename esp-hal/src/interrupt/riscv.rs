@@ -428,8 +428,6 @@ fn cpu_wait_mode_on() -> bool {
             // TODO: add HP_SYS_CLKRST.CPU_WAITI_CTRL0 (offset 0xF4) to the
             // esp32p4 PAC and replace this raw MMIO with the PAC accessor.
             const HP_SYS_CLKRST_CPU_WAITI_CTRL0: *const u32 = 0x500E_60F4 as *const u32;
-            // SAFETY: fixed MMIO address of a read-only status register. The
-            // volatile read has no side effects.
             let reg = unsafe { core::ptr::read_volatile(HP_SYS_CLKRST_CPU_WAITI_CTRL0) };
             (reg & (1 << Cpu::current() as u32)) == 0
         } else {

@@ -418,11 +418,23 @@ mod uart_printer {
 
     struct Device;
 
-    // ESP32-P4: ROM uart_tx_one_char at 0x4fc00054
-    // Ref: esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.ld
+    // ESP32-P4: resolve through the linker-provided ROM symbol
+    // (`esp_rom_uart_tx_one_char` -> `uart_tx_one_char2 = 0x4fc0_0058`,
+    // see esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.api.ld) instead of
+    // hardcoding the address. Matches the c5/c6/c61/h2 channel-aware path.
     #[cfg(feature = "esp32p4")]
     impl Functions for Device {
-        const TX_ONE_CHAR: usize = 0x4fc0_0054;
+        // Unused -- tx_byte() below resolves through the linker.
+        const TX_ONE_CHAR: usize = 0;
+
+        fn tx_byte(b: u8) {
+            unsafe extern "C" {
+                fn esp_rom_uart_tx_one_char(c: u8) -> i32;
+            }
+            unsafe {
+                esp_rom_uart_tx_one_char(b);
+            }
+        }
 
         fn flush() {
             // tx_one_char waits for TX FIFO space

@@ -61,6 +61,12 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         false
     };
+    ("assist_debug.has_sp_monitor") => {
+        false
+    };
+    ("assist_debug.has_region_monitor") => {
+        false
+    };
     ("dma.kind") => {
         "gdma"
     };
@@ -202,6 +208,18 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("lp_i2c_master.fifo_size") => {
+        32
+    };
+    ("lp_i2c_master.fifo_size", str) => {
+        stringify!(32)
+    };
+    ("lp_uart.ram_size") => {
+        32
+    };
+    ("lp_uart.ram_size", str) => {
+        stringify!(32)
+    };
     ("psram.octal_spi") => {
         false
     };
@@ -210,6 +228,15 @@ macro_rules! property {
     };
     ("psram.extmem_origin", str) => {
         stringify!(1207959552)
+    };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
+    ("rng.trng_supported") => {
+        false
     };
     ("rsa.size_increment") => {
         32
@@ -225,6 +252,12 @@ macro_rules! property {
     };
     ("sha.dma") => {
         true
+    };
+    ("sleep.light_sleep") => {
+        false
+    };
+    ("sleep.deep_sleep") => {
+        false
     };
     ("soc.cpu_has_branch_predictor") => {
         false
@@ -271,6 +304,9 @@ macro_rules! property {
     ("spi_master.has_clk_pre_div") => {
         false
     };
+    ("spi_slave.supports_dma") => {
+        false
+    };
     ("uart.ram_size") => {
         128
     };
@@ -287,6 +323,9 @@ macro_rules! property {
         false
     };
     ("uart.has_sclk_divider") => {
+        false
+    };
+    ("uhci.combined_uart_selector_field") => {
         false
     };
 }
@@ -2251,17 +2290,642 @@ macro_rules! implement_peripheral_clocks {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Peripheral {}
+        pub enum Peripheral {
+            /// ADC peripheral clock signal
+            Adc,
+            /// AES peripheral clock signal
+            Aes,
+            /// AHB_PDMA peripheral clock signal
+            AhbPdma,
+            /// AXI_PDMA peripheral clock signal
+            AxiPdma,
+            /// DMA peripheral clock signal
+            Dma,
+            /// DS peripheral clock signal
+            Ds,
+            /// ECC peripheral clock signal
+            Ecc,
+            /// ECDSA peripheral clock signal
+            Ecdsa,
+            /// EMAC peripheral clock signal
+            Emac,
+            /// GDMA peripheral clock signal
+            Gdma,
+            /// HMAC peripheral clock signal
+            Hmac,
+            /// I2C0 peripheral clock signal
+            I2c0,
+            /// I2C1 peripheral clock signal
+            I2c1,
+            /// I2S0 peripheral clock signal
+            I2s0,
+            /// I2S1 peripheral clock signal
+            I2s1,
+            /// I2S2 peripheral clock signal
+            I2s2,
+            /// IOMUX peripheral clock signal
+            Iomux,
+            /// LCD_CAM peripheral clock signal
+            LcdCam,
+            /// LEDC peripheral clock signal
+            Ledc,
+            /// MCPWM0 peripheral clock signal
+            Mcpwm0,
+            /// MCPWM1 peripheral clock signal
+            Mcpwm1,
+            /// PARL_IO peripheral clock signal
+            ParlIo,
+            /// PCNT peripheral clock signal
+            Pcnt,
+            /// RMT peripheral clock signal
+            Rmt,
+            /// RSA peripheral clock signal
+            Rsa,
+            /// SDMMC peripheral clock signal
+            Sdmmc,
+            /// SHA peripheral clock signal
+            Sha,
+            /// SPI2 peripheral clock signal
+            Spi2,
+            /// SPI3 peripheral clock signal
+            Spi3,
+            /// SYSTIMER peripheral clock signal
+            Systimer,
+            /// TIMG0 peripheral clock signal
+            Timg0,
+            /// TIMG1 peripheral clock signal
+            Timg1,
+            /// TWAI0 peripheral clock signal
+            Twai0,
+            /// TWAI1 peripheral clock signal
+            Twai1,
+            /// TWAI2 peripheral clock signal
+            Twai2,
+            /// UART0 peripheral clock signal
+            Uart0,
+            /// UART1 peripheral clock signal
+            Uart1,
+            /// UART2 peripheral clock signal
+            Uart2,
+            /// UART3 peripheral clock signal
+            Uart3,
+            /// UART4 peripheral clock signal
+            Uart4,
+            /// UHCI peripheral clock signal
+            Uhci,
+            /// USB_DEVICE peripheral clock signal
+            UsbDevice,
+            /// USB_OTG11 peripheral clock signal
+            UsbOtg11,
+            /// USB_OTG20 peripheral clock signal
+            UsbOtg20,
+        }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[];
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Iomux, Self::Systimer, Self::Uart0, Self::UsbDevice];
             const COUNT: usize = Self::ALL.len();
-            const ALL: &[Self] = &[];
+            const ALL: &[Self] = &[
+                Self::Adc,
+                Self::Aes,
+                Self::AhbPdma,
+                Self::AxiPdma,
+                Self::Dma,
+                Self::Ds,
+                Self::Ecc,
+                Self::Ecdsa,
+                Self::Emac,
+                Self::Gdma,
+                Self::Hmac,
+                Self::I2c0,
+                Self::I2c1,
+                Self::I2s0,
+                Self::I2s1,
+                Self::I2s2,
+                Self::Iomux,
+                Self::LcdCam,
+                Self::Ledc,
+                Self::Mcpwm0,
+                Self::Mcpwm1,
+                Self::ParlIo,
+                Self::Pcnt,
+                Self::Rmt,
+                Self::Rsa,
+                Self::Sdmmc,
+                Self::Sha,
+                Self::Spi2,
+                Self::Spi3,
+                Self::Systimer,
+                Self::Timg0,
+                Self::Timg1,
+                Self::Twai0,
+                Self::Twai1,
+                Self::Twai2,
+                Self::Uart0,
+                Self::Uart1,
+                Self::Uart2,
+                Self::Uart3,
+                Self::Uart4,
+                Self::Uhci,
+                Self::UsbDevice,
+                Self::UsbOtg11,
+                Self::UsbOtg20,
+            ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-            match peripheral {}
+            match peripheral {
+                Peripheral::Adc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.adc_apb_clk_en().bit(enable));
+                }
+                Peripheral::Aes => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::AhbPdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::AxiPdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.axi_pdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::Dma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::Ds => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::Ecdsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::Emac => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.emac_sys_clk_en().bit(enable));
+                }
+                Peripheral::Gdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::Hmac => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::I2c0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.i2c0_apb_clk_en().bit(enable));
+                }
+                Peripheral::I2c1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.i2c1_apb_clk_en().bit(enable));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.i2s0_apb_clk_en().bit(enable));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.i2s1_apb_clk_en().bit(enable));
+                }
+                Peripheral::I2s2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.i2s2_apb_clk_en().bit(enable));
+                }
+                Peripheral::Iomux => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl26()
+                        .modify(|_, w| w.iomux_clk_en().bit(enable));
+                }
+                Peripheral::LcdCam => {
+                    let _ = enable;
+                }
+                Peripheral::Ledc => {
+                    let _ = enable;
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.mcpwm0_apb_clk_en().bit(enable));
+                }
+                Peripheral::Mcpwm1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.mcpwm1_apb_clk_en().bit(enable));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.parlio_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.parlio_apb_clk_en().bit(enable));
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.pcnt_apb_clk_en().bit(enable));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.rmt_sys_clk_en().bit(enable));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::Sdmmc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.sdmmc_sys_clk_en().bit(enable));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.gpspi2_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.gpspi2_apb_clk_en().bit(enable));
+                }
+                Peripheral::Spi3 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.gpspi3_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.gpspi3_apb_clk_en().bit(enable));
+                }
+                Peripheral::Systimer => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.systimer_apb_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl21()
+                        .modify(|_, w| w.systimer_clk_en().bit(enable));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.timergrp0_apb_clk_en().bit(enable));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.timergrp1_apb_clk_en().bit(enable));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.twai0_apb_clk_en().bit(enable));
+                }
+                Peripheral::Twai1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.twai1_apb_clk_en().bit(enable));
+                }
+                Peripheral::Twai2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.twai2_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uart0_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uart0_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uart1_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uart1_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uart2_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uart2_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uart3 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uart3_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uart3_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uart4 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uart4_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uart4_apb_clk_en().bit(enable));
+                }
+                Peripheral::Uhci => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.uhci_sys_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.uhci_apb_clk_en().bit(enable));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.usb_device_apb_clk_en().bit(enable));
+                }
+                Peripheral::UsbOtg11 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.usb_otg11_sys_clk_en().bit(enable));
+                }
+                Peripheral::UsbOtg20 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.usb_otg20_sys_clk_en().bit(enable));
+                }
+            }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
-            match peripheral {}
+            match peripheral {
+                Peripheral::Adc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_adc().bit(reset));
+                }
+                Peripheral::Aes => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_aes().bit(reset));
+                }
+                Peripheral::AhbPdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_ahb_pdma().bit(reset));
+                }
+                Peripheral::AxiPdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_axi_pdma().bit(reset));
+                }
+                Peripheral::Dma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_ahb_pdma().bit(reset));
+                }
+                Peripheral::Ds => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_ds().bit(reset));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_ecc().bit(reset));
+                }
+                Peripheral::Ecdsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_ecdsa().bit(reset));
+                }
+                Peripheral::Emac => {
+                    let _ = reset;
+                }
+                Peripheral::Gdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en0()
+                        .modify(|_, w| w.rst_en_gdma().bit(reset));
+                }
+                Peripheral::Hmac => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_hmac().bit(reset));
+                }
+                Peripheral::I2c0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_i2c0().bit(reset));
+                }
+                Peripheral::I2c1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_i2c1().bit(reset));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_i2s0_apb().bit(reset));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_i2s1_apb().bit(reset));
+                }
+                Peripheral::I2s2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_i2s2_apb().bit(reset));
+                }
+                Peripheral::Iomux => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_iomux().bit(reset));
+                }
+                Peripheral::LcdCam => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_lcdcam().bit(reset));
+                }
+                Peripheral::Ledc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_ledc().bit(reset));
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_pwm0().bit(reset));
+                }
+                Peripheral::Mcpwm1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_pwm1().bit(reset));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| {
+                            w.rst_en_parlio()
+                                .bit(reset)
+                                .rst_en_parlio_rx()
+                                .bit(reset)
+                                .rst_en_parlio_tx()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_pcnt().bit(reset));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_rmt().bit(reset));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_rsa().bit(reset));
+                }
+                Peripheral::Sdmmc => {
+                    let _ = reset;
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_sha().bit(reset));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_spi2().bit(reset));
+                }
+                Peripheral::Spi3 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_spi3().bit(reset));
+                }
+                Peripheral::Systimer => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_stimer().bit(reset));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_timergrp0().bit(reset));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_timergrp1().bit(reset));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_can0().bit(reset));
+                }
+                Peripheral::Twai1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_can1().bit(reset));
+                }
+                Peripheral::Twai2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_can2().bit(reset));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| {
+                            w.rst_en_uart0_core()
+                                .bit(reset)
+                                .rst_en_uart0_apb()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| {
+                            w.rst_en_uart1_core()
+                                .bit(reset)
+                                .rst_en_uart1_apb()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| {
+                            w.rst_en_uart2_core()
+                                .bit(reset)
+                                .rst_en_uart2_apb()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Uart3 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| {
+                            w.rst_en_uart3_core()
+                                .bit(reset)
+                                .rst_en_uart3_apb()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Uart4 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| {
+                            w.rst_en_uart4_core()
+                                .bit(reset)
+                                .rst_en_uart4_apb()
+                                .bit(reset)
+                        });
+                }
+                Peripheral::Uhci => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en1()
+                        .modify(|_, w| w.rst_en_uhci().bit(reset));
+                }
+                Peripheral::UsbDevice => {
+                    let _ = reset;
+                }
+                Peripheral::UsbOtg11 => {
+                    let _ = reset;
+                }
+                Peripheral::UsbOtg20 => {
+                    let _ = reset;
+                }
+            }
         }
     };
 }
@@ -2383,6 +3047,30 @@ macro_rules! for_each_spi_master {
         true)); _for_each_inner_spi_master!((all(SPI2, Spi2, SPI2_CK[SPI2_CS] [SPI2_D,
         SPI2_Q, SPI2_WP, SPI2_HOLD], true), (SPI3, Spi3, SPI3_CK[SPI3_CS, SPI3_CS1,
         SPI3_CS2] [SPI3_D, SPI3_Q, SPI3_WP, SPI3_HOLD], true)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the SPI instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$sclk`, `$mosi`, `$miso`, `$cs`: signal names.
+///
+/// Example data: `(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_slave {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_slave { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_spi_slave!((all));
     };
 }
 #[macro_export]

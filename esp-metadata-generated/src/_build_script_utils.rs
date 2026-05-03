@@ -4253,7 +4253,10 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "lp_i2c_master_fifo_size=\"32\"",
+                    "lp_uart_ram_size=\"32\"",
                     "psram_extmem_origin=\"1207959552\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
                     "sha_dma",
@@ -4397,7 +4400,10 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"32\"",
+                    "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=psram_extmem_origin=\"1207959552\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sha_dma",
@@ -6546,7 +6552,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
-    println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
+    println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");

@@ -129,6 +129,89 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
     ] },
+] }, peripheral_clocks = { templates = [
+    # ESP32-P4 peripheral clock and reset gates -- all live in HP_SYS_CLKRST.
+    # Clock enables: SOC_CLK_CTRL0/1/2 + PERI_CLK_CTRL{21,26}.
+    # Resets:        HP_RST_EN0/1/2.
+    # Each peripheral overrides {{default_clk_en_template}} / {{default_rst_template}}
+    # to select the right shared register + bit field.
+    { name = "clk_en_template",         value = "{{default_clk_en_template}}" },
+    { name = "rst_template",            value = "{{default_rst_template}}" },
+    { name = "default_clk_en_template", value = "let _ = enable;" },
+    { name = "default_rst_template",    value = "let _ = reset;" },
+    # Reusable clock-enable building blocks (composed via {{default_clk_en_template}} = "{{X}}").
+    { name = "sys_clk_template",        value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.{{sys_field}}().bit(enable));" },
+    { name = "apb_clk_template",        value = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.{{apb_field}}().bit(enable));" },
+    { name = "sys_apb_clk_template",    value = "{{sys_clk_template}} {{apb_clk_template}}" },
+    { name = "crypto_clk_template",     value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.crypto_sys_clk_en().bit(enable));" },
+    # Reusable reset building blocks. Reset bit name is supplied via {{rst_field}}.
+    { name = "rst_en0_template",        value = "{{control}}::regs().hp_rst_en0().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "rst_en1_template",        value = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "rst_en2_template",        value = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "control",                 value = "crate::peripherals::HP_SYS_CLKRST" },
+], peripheral_clocks = [
+    # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
+    # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
+    { name = "Uart0", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart0_sys_clk_en", apb_field = "uart0_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart0_core().bit(reset).rst_en_uart0_apb().bit(reset));" }, keep_enabled = true },
+    { name = "Uart1", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart1_sys_clk_en", apb_field = "uart1_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart1_core().bit(reset).rst_en_uart1_apb().bit(reset));" } },
+    { name = "Uart2", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart2_sys_clk_en", apb_field = "uart2_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart2_core().bit(reset).rst_en_uart2_apb().bit(reset));" } },
+    { name = "Uart3", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart3_sys_clk_en", apb_field = "uart3_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart3_core().bit(reset).rst_en_uart3_apb().bit(reset));" } },
+    { name = "Uart4", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart4_sys_clk_en", apb_field = "uart4_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart4_core().bit(reset).rst_en_uart4_apb().bit(reset));" } },
+    # SPI -- sys_clk + apb_clk; reset in HP_RST_EN2.
+    { name = "Spi2", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi2_sys_clk_en", apb_field = "gpspi2_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_spi2" } },
+    { name = "Spi3", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi3_sys_clk_en", apb_field = "gpspi3_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_spi3" } },
+    # I2C master -- apb_clk only; reset in HP_RST_EN1.
+    { name = "I2c0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2c0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_i2c0" } },
+    { name = "I2c1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2c1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_i2c1" } },
+    # I2S -- apb_clk; reset in HP_RST_EN2.
+    { name = "I2s0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s0_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s0_apb" } },
+    { name = "I2s1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s1_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s1_apb" } },
+    { name = "I2s2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s2_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s2_apb" } },
+    # Timers -- Systimer also needs PERI_CLK_CTRL21.systimer_clk_en gate.
+    { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.systimer_apb_clk_en().bit(enable)); {{control}}::regs().peri_clk_ctrl21().modify(|_, w| w.systimer_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_stimer" }, keep_enabled = true },
+    { name = "Timg0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp0" } },
+    { name = "Timg1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp1" } },
+    # IO MUX -- gated via PERI_CLK_CTRL26; KEEP_ENABLED because GPIO depends on it.
+    { name = "Iomux", template_params = { default_clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_iomux" }, keep_enabled = true },
+    # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
+    { name = "Ledc",   template_params = { default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ledc" } },
+    { name = "Pcnt",   template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "pcnt_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pcnt" } },
+    { name = "Mcpwm0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm0" } },
+    { name = "Mcpwm1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm1" } },
+    # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.
+    { name = "Rmt", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "rmt_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_rmt" } },
+    # TWAI (CAN) -- reset bits named can0/can1/can2 in PAC.
+    { name = "Twai0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can0" } },
+    { name = "Twai1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can1" } },
+    { name = "Twai2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai2_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can2" } },
+    # USB -- reset is via LP-domain registers, leave rst as no-op here.
+    { name = "UsbOtg11",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg11_sys_clk_en" } },
+    { name = "UsbOtg20",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg20_sys_clk_en" } },
+    { name = "UsbDevice", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "usb_device_apb_clk_en" }, keep_enabled = true },
+    # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
+    { name = "Emac",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "emac_sys_clk_en" } },
+    { name = "Sdmmc", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en" } },
+    { name = "Uhci",  template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_uhci" } },
+    # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
+    { name = "Aes",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_aes" } },
+    { name = "Sha",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_sha" } },
+    { name = "Rsa",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_rsa" } },
+    { name = "Ecc",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecc" } },
+    { name = "Ecdsa", template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecdsa" } },
+    { name = "Hmac",  template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_hmac" } },
+    { name = "Ds",    template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ds" } },
+    # DMA -- P4 has multiple controllers (AHB-PDMA / AXI-PDMA / GDMA-DW). `Dma` is the GDMA-AHB
+    # variant esp-hal's DMA driver targets. `Gdma` covers the DW block at 0x5008_1000.
+    { name = "Dma",     template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
+    { name = "Gdma",    template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
+    { name = "AhbPdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
+    { name = "AxiPdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_axi_pdma" } },
+    # ADC.
+    { name = "Adc", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "adc_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_adc" } },
+    # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
+    { name = "ParlIo", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "parlio_sys_clk_en", apb_field = "parlio_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
+    # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
+    { name = "LcdCam", template_params = { default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_lcdcam" } },
 ] } }
 
 # HP L2MEM: 0x4FF0_0000 - 0x4FFC_0000 (768 KB)
@@ -277,13 +360,75 @@ support_status = "not_supported"
 # TODO: Check later with PAC and TRM both
 [device.adc]
 support_status = "not_supported"
-# TODO: Test or complete me
-# [device.temperature_sensor]
-# support_status = "partial"
+# Below: peripherals P4 silicon physically has, but no esp-hal driver
+# is wired up in this PR. All marked `not_supported` so the README's
+# chip-support table accurately shows ❌ rather than empty cells.
+# When the upstream driver lands or our local code path is added,
+# flip the relevant entry to `partial`.
+# Refs:
+#   .investigation/PERIPHERAL_TESTABILITY_w_logicpro.md
+#   .investigation/README_TABLE_AUDIT_P4.md
 
-# TODO: Test or complete me
-# [device.touch]
-# support_status = "partial"
+[device.assist_debug]
+support_status = "not_supported"
+[device.avc]
+support_status = "not_supported"  # P4 ANA_CMPR (CH0/CH1)
+[device.camera]
+support_status = "not_supported"  # LCD_CAM block, camera path
+# [device.dedicated_gpio] requires a `channels` table -- skip for now
+# until we map the P4 CPU GPIO instance list. README will show this row
+# blank for P4, accurate to the current driver state.
+[device.ds]
+support_status = "not_supported"  # Digital Signature
+[device.ecdsa]
+support_status = "not_supported"
+[device.ethernet]
+support_status = "not_supported"  # EMAC, RMII via GPIO 30/47/53 etc.
+[device.etm]
+support_status = "not_supported"  # Event Task Matrix
+[device.hmac]
+support_status = "not_supported"
+[device.i2c_slave]
+support_status = "not_supported"
+[device.i2s]
+support_status = "not_supported"  # 3 instances (I2S0/1/2)
+[device.ledc]
+support_status = "not_supported"
+[device.lp_i2c_master]
+support_status = "not_supported"
+fifo_size = 32  # placeholder until LP I2C driver lands; from c6 reference
+[device.lp_uart]
+support_status = "not_supported"
+ram_size = 32  # placeholder; LP UART RAM size on P4 needs verification
+[device.mcpwm]
+support_status = "not_supported"  # 2 instances (MCPWM0/1)
+[device.pcnt]
+support_status = "not_supported"
+[device.rgb_display]
+support_status = "not_supported"  # LCD path of LCD_CAM block
+# [device.rmt] requires ram_start / channel_ram_size / channels config -
+# left out until those are mapped from P4 TRM. README row stays blank.
+[device.rng]
+support_status = "not_supported"  # TRNG
+apb_cycle_wait_num = 16  # placeholder
+[device.lp_timer]
+support_status = "not_supported"  # RTC Timekeeping
+[device.sd_host]
+support_status = "not_supported"  # SDIO host
+[device.sd_slave]
+support_status = "not_supported"
+[device.sleep]
+support_status = "not_supported"  # PMU eco5 sleep -- placeholder TODO in esp-hal
+[device.spi_slave]
+support_status = "not_supported"
+[device.temp_sensor]
+support_status = "not_supported"  # LP_TSENS
+[device.touch]
+support_status = "not_supported"  # LP_TOUCH 14ch
+[device.uhci]
+support_status = "not_supported"
+[device.ulp_riscv]
+support_status = "not_supported"  # LP-core RISC-V (formerly "swd"/"lp_core")
 
 [device.aes]
 support_status = "not_supported"

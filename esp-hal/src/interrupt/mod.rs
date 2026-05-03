@@ -211,9 +211,6 @@ impl InterruptStatus {
                     #[cfg(esp32p4)]
                     {
                         let base = crate::soc::registers::INTERRUPT_MAP_BASE + 0x200;
-                        // SAFETY: fixed MMIO address of a read-only interrupt-status
-                        // register; `idx` is bounded by STATUS_WORDS (4) which stays
-                        // inside the 0x200..0x210 status-register window.
                         unsafe { ((base as *const u32).add(idx)).read_volatile() }
                     }
                     #[cfg(not(esp32p4))]
@@ -233,7 +230,6 @@ impl InterruptStatus {
                     #[cfg(esp32p4)]
                     {
                         let base = crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU + 0x200;
-                        // SAFETY: same as Core0 path above, against the Core1 block.
                         unsafe { ((base as *const u32).add(idx)).read_volatile() }
                     }
                     #[cfg(not(esp32p4))]
@@ -395,9 +391,6 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
             #[cfg(multi_core)]
             Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
         };
-        // SAFETY: `base` points at the per-core INT_MAP register array; `interrupt`
-        // is a peripheral-interrupt index which is bounded by the PAC's enum and
-        // always maps to a valid register slot inside the 120-entry array.
         unsafe {
             let reg = (base as *mut u32).add(interrupt as usize);
             reg.write_volatile(cpu_interrupt);
@@ -433,7 +426,6 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
             #[cfg(multi_core)]
             Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU,
         };
-        // SAFETY: matches map_raw -- same bounded INT_MAP array, read-only volatile.
         unsafe {
             let reg = (base as *const u32).add(interrupt as usize);
             reg.read_volatile() & 0x3F // 6-bit field

@@ -3363,10 +3363,10 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
         } else if #[cfg(esp32p4)] {
             // P4: data register is read-only (RX FIFO only). TX uses txfifo_start_addr.
             // PAC txfifo_start_addr is also read-only in SVD, use direct MMIO.
+            // TODO: file an esp-pacs issue/PR so the P4 SVD marks the TX FIFO
+            // port writable like other chips' I2C PAC. Once that lands, this
+            // branch can collapse into the general `else` arm below.
             let base = register_block as *const _ as usize;
-            // SAFETY: `register_block` is a borrow of a live I2C PAC register block.
-            // offset 0x100 is the TX FIFO write port inside the same block, so the
-            // computed pointer is valid MMIO for the peripheral we already hold.
             unsafe {
                 ((base + 0x100) as *mut u32).write_volatile(data as u32);
             }
