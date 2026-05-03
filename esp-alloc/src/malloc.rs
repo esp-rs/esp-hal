@@ -106,7 +106,7 @@ unsafe fn realloc_with_caps(
         let p = malloc_with_caps(new_size, caps);
         if !p.is_null() && !ptr.is_null() {
             let len = usize::min(
-                (ptr as *const u32).sub(1).read_volatile() as usize,
+                (ptr as *const u32).sub(1).read_volatile() as usize - 4,
                 new_size,
             );
             memcpy(p, ptr, len);
