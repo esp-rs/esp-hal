@@ -256,7 +256,6 @@ impl TimgInstance {
 
 // System clock impl functions
 
-
 // Mux enable stubs (mux nodes need enable functions too)
 fn enable_cpu_root_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}

@@ -7,7 +7,6 @@
 //! It references types and PMU registers that don't exist in current PAC:
 //!   - crate::clock::Clock, crate::efuse::Efuse (old API pattern)
 //!   - PMU hp_active/hp_modem/hp_sleep register groups
-//!
 
 // TODO: Implement sleep mode once PMU eco5 registers are validated.
 // TODO: reference florianL21's implementation

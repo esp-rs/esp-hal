@@ -10,7 +10,6 @@
 //!   eco4: power_pd_hpaon_cntl, power_pd_hpcpu_cntl, power_pd_hpwifi_cntl
 //!   eco5: power_pd_cnnt_cntl, power_pd_lpperi_cntl (hpaon/hpcpu/hpwifi removed)
 //!   Both: power_pd_top_cntl, power_pd_hpmem_cntl
-//!
 
 // TODO: REMOVE me when validate well
 // reference florianL21's original eco4 PMU code
@@ -123,8 +122,7 @@ pub(crate) fn init() {
     // 1. Clear all PMU power domain force flags
     pmu_power_domain_force_default();
 
-    // 2. Disable TIMG0 watchdog
-    //      TIMG WDT write protect key: 0x50D8_3AA1
+    // 2. Disable TIMG0 watchdog TIMG WDT write protect key: 0x50D8_3AA1
     let tg0 = TIMG0::regs();
     tg0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     tg0.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
@@ -136,15 +134,15 @@ pub(crate) fn init() {
     tg1.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
     tg1.wdtwprotect().write(|w| unsafe { w.bits(0) });
 
-    // 4. Disable LP_WDT (Low-Power Watchdog)
-    //      P4 PAC: config0() (not wdtconfig0()), wprotect() (not wdtwprotect())
+    // 4. Disable LP_WDT (Low-Power Watchdog) P4 PAC: config0() (not wdtconfig0()), wprotect() (not
+    //    wdtwprotect())
     let lp_wdt = LP_WDT::regs();
     lp_wdt.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     lp_wdt.config0().modify(|_, w| unsafe { w.bits(0) });
     lp_wdt.wprotect().write(|w| unsafe { w.bits(0) });
 
-    // 5. Disable SWD (Super Watchdog) by enabling auto-feed
-    //      LP_WDT SWD write protect key: 0x50D8_3AA1 (same key)
+    // 5. Disable SWD (Super Watchdog) by enabling auto-feed LP_WDT SWD write protect key:
+    //    0x50D8_3AA1 (same key)
     lp_wdt
         .swd_wprotect()
         .write(|w| unsafe { w.bits(0x50D8_3AA1) });
@@ -153,8 +151,7 @@ pub(crate) fn init() {
         .modify(|_, w| w.swd_auto_feed_en().set_bit());
     lp_wdt.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
-    // 6. Clear DCDC switch force flags
-    //      PMU_POWER_DCDC_SWITCH_REG (offset 0x10c)
+    // 6. Clear DCDC switch force flags PMU_POWER_DCDC_SWITCH_REG (offset 0x10c)
     let pmu = PMU::regs();
     pmu.power_dcdc_switch().modify(|_, w| {
         w.force_dcdc_switch_pu().bit(false);
@@ -188,8 +185,8 @@ pub(crate) fn init() {
         core::hint::spin_loop();
     }
 
-    // 9. Switch CPU clock source from XTAL to CPLL
-    //      LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel: 0=XTAL, 1=CPLL, 2=RC_FAST
+    // 9. Switch CPU clock source from XTAL to CPLL LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel:
+    //    0=XTAL, 1=CPLL, 2=RC_FAST
     crate::peripherals::LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(1) }); // 1 = CPLL
@@ -208,9 +205,8 @@ fn cpll_configure(freq_mhz: u32) {
     const I2C_CPLL_OC_DIV_7_0: u8 = 3;
     const I2C_CPLL_OC_DCUR: u8 = 6;
 
-    // 1. Enable CPLL power
-    //      PMU.imm_hp_ck_power: tie_high_xpd_pll, tie_high_xpd_pll_i2c
-    //      Note: PAC uses "pll" not "cpll" (eco4 PAC, single PLL)
+    // 1. Enable CPLL power PMU.imm_hp_ck_power: tie_high_xpd_pll, tie_high_xpd_pll_i2c Note: PAC
+    //    uses "pll" not "cpll" (eco4 PAC, single PLL)
     let pmu = PMU::regs();
     // PAC: tie_high_xpd_pll is 4-bit field (one bit per PLL: CPLL/SPLL/MPLL/PLLA).
     // Set all bits to enable all PLLs. Same for pll_i2c.
@@ -241,8 +237,7 @@ fn cpll_configure(freq_mhz: u32) {
     regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_DIV_7_0, div7_0);
     regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_DCUR, dcur);
 
-    // 3. Run CPLL calibration
-    //      HP_SYS_CLKRST.ana_pll_ctrl0.cpu_pll_cal_stop
+    // 3. Run CPLL calibration HP_SYS_CLKRST.ana_pll_ctrl0.cpu_pll_cal_stop
     let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
 
     // Start calibration: set cpu_pll_cal_stop = 0

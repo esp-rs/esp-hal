@@ -80,17 +80,16 @@ pub enum PsramMode {
 /// | `Mhz80`   | 320  | 4   | 2      | 2      | 18            | Conservative SI margin |
 /// | `Mhz200`  | 400  | 2   | 4      | 1      | 26            | IDF default |
 /// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Overclock, **silicon rev v3+ only** |
-///
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum SpiRamFreq {
     /// 20 MHz bus (MPLL 400 / div 20). Lowest-power option;
     /// rarely used outside debug.
-    Mhz20 = 20,
+    Mhz20  = 20,
     /// 80 MHz bus (MPLL 320 / div 4). Conservative; widest timing
     /// margin.
-    Mhz80 = 80,
+    Mhz80  = 80,
     /// 200 MHz bus (MPLL 400 / div 2). IDF default for AP HEX PSRAM.
     /// Validated on the EV board.
     #[default]
@@ -139,7 +138,6 @@ pub struct PsramConfig {
     pub core_clock: Option<MpllFreq>,
     /// PSRAM bus frequency. Default: 200 MHz.
     pub ram_frequency: SpiRamFreq,
-
     // TODO: ECC enable.
     // The MSPI0 controller has a ECC engine.
     // pub ecc: bool, // or any other enum.
@@ -339,30 +337,30 @@ const IOMUX_MSPI_BASE: u32 = 0x500E_1200;
 enum PsramPad {
     /// DQ0. Matches IDF `IOMUX_MSPI_PIN_PSRAM_D_PIN0_REG` (legacy SPI
     /// MOSI naming retained on the IOMUX register itself).
-    Dq0 = 0x1C,
+    Dq0  = 0x1C,
     /// DQ1. IDF `IOMUX_MSPI_PIN_PSRAM_Q_PIN0_REG` (legacy SPI MISO).
-    Dq1 = 0x20,
+    Dq1  = 0x20,
     /// DQ2. IDF `IOMUX_MSPI_PIN_PSRAM_WP_PIN0_REG` (legacy WP).
-    Dq2 = 0x24,
+    Dq2  = 0x24,
     /// DQ3. IDF `IOMUX_MSPI_PIN_PSRAM_HOLD_PIN0_REG` (legacy HOLD).
     /// In OPI/HEX DDR mode the controller does not treat this as a
     /// hold/freeze input -- it is a plain data line.
-    Dq3 = 0x28,
-    Dq4 = 0x2C,
-    Dq5 = 0x30,
-    Dq6 = 0x34,
-    Dq7 = 0x38,
+    Dq3  = 0x28,
+    Dq4  = 0x2C,
+    Dq5  = 0x30,
+    Dq6  = 0x34,
+    Dq7  = 0x38,
     Dqs0 = 0x3C,
-    Dq8 = 0x40,
-    Dq9 = 0x44,
+    Dq8  = 0x40,
+    Dq9  = 0x44,
     Dq10 = 0x48,
     Dq11 = 0x4C,
     Dq12 = 0x50,
     Dq13 = 0x54,
     Dq14 = 0x58,
     Dq15 = 0x5C,
-    Ck = 0x60,
-    Cs = 0x64,
+    Ck   = 0x60,
+    Cs   = 0x64,
     Dqs1 = 0x68,
 }
 
@@ -713,8 +711,8 @@ fn psram_detect_size() -> usize {
 ///
 /// ESP32-P4 has TWO independent MMUs:
 ///   - Flash MMU (id 0): registers in `SPI_MEM_C` (FLASH_SPI0)
-///   - PSRAM MMU (id 1): registers in `SPI_MEM_S` (PSRAM_MSPI0) at the
-///     `MMU_ITEM_INDEX_REG` / `MMU_ITEM_CONTENT_REG` offsets we use here.
+///   - PSRAM MMU (id 1): registers in `SPI_MEM_S` (PSRAM_MSPI0) at the `MMU_ITEM_INDEX_REG` /
+///     `MMU_ITEM_CONTENT_REG` offsets we use here.
 ///
 /// Each PSRAM MMU entry is a 32-bit word:
 ///   - bits [9:0] : physical page number (`SOC_MMU_PSRAM_VALID_VAL_MASK = 0x3FF`)
