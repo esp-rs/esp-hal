@@ -897,13 +897,13 @@ pub mod etm {
         /// ETM task to start the counter
         fn cnt_start(&self) -> Task;
 
-        /// ETM task to start the alarm
+        /// ETM task to stop the counter
         fn cnt_stop(&self) -> Task;
 
-        /// ETM task to stop the counter
+        /// ETM task to reload the counter
         fn cnt_reload(&self) -> Task;
 
-        /// ETM task to reload the counter
+        /// ETM task to capture the counter
         fn cnt_cap(&self) -> Task;
 
         /// ETM task to load the counter with the value stored when the last
