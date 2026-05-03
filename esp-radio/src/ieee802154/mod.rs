@@ -198,9 +198,9 @@ impl<'a> Ieee802154<'a> {
     pub fn received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
         raw::ensure_receive_enabled();
         if let Some(raw) = ieee802154_poll() {
-            let maybe_decoded = if raw.data[0] as usize > raw.data.len() {
-                // try to decode up to data.len()
-                mac::Frame::try_read(&raw.data[1..][..raw.data.len()], FooterMode::Explicit)
+            let maybe_decoded = if raw.data[0] as usize >= raw.data.len() {
+                // try to decode up to data.len() - 1 (since we skip byte 0)
+                mac::Frame::try_read(&raw.data[1..][..raw.data.len() - 1], FooterMode::Explicit)
             } else {
                 mac::Frame::try_read(&raw.data[1..][..raw.data[0] as usize], FooterMode::Explicit)
             };
@@ -208,7 +208,7 @@ impl<'a> Ieee802154<'a> {
             let result = match maybe_decoded {
                 Ok((decoded, _)) => {
                     // crc is not written to rx buffer
-                    let rssi = if (raw.data[0] as usize > raw.data.len()) || (raw.data[0] == 0) {
+                    let rssi = if (raw.data[0] as usize >= raw.data.len()) || (raw.data[0] == 0) {
                         raw.data[raw.data.len() - 1] as i8
                     } else {
                         raw.data[raw.data[0] as usize - 1] as i8
