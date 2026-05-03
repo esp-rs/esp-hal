@@ -651,8 +651,7 @@ impl Rwdt {
 /// ESP32-P4 LP_WDT implementation.
 /// P4 PAC uses config0/config1/.../feed/wprotect (no "wdt" prefix),
 /// and interrupt field is `lp_wdt` (not `wdt`).
-/// Ref: esp-idf lp_wdt_reg.h, lpwdt_ll.h
-///      TRM v0.5 Ch 19 (Watchdog Timers)
+/// Ref: TRM v0.5 Ch 19 (Watchdog Timers)
 /// Write protection key: 0x50D8_3AA1 (same as other chips)
 #[cfg(esp32p4)]
 impl Rwdt {

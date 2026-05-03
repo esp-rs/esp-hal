@@ -109,7 +109,6 @@ impl CpuClock {
             } else if #[cfg(esp32p4)] {
                 // ESP32-P4 v3.x (eco5): max 400 MHz via CPLL
                 // Ref: TRM v0.5 Ch 2 -- HP CPU max frequency 400 MHz for v3.x
-                //      esp-idf clk_tree_defs.h -- SOC_CPU_CLK_SRC_CPLL
                 Self::_400MHz
             } else {
                 Self::_240MHz

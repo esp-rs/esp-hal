@@ -7,8 +7,7 @@
 //! GPIO0-5 -> LP pin 0-5
 //! GPIO12-23 -> LP pin 6-17 (offset by 6)
 //!
-//! Ref: esp-idf rtc_io_ll.h for P4
-//!      TRM v0.5 Ch 11 (GPIO) -- LP_IO_MUX section
+//! Ref: TRM v0.5 Ch 11 (GPIO) -- LP_IO_MUX section
 //!      P4 PAC: lp_gpio (0x5012_A000), lp_io_mux (0x5012_B000)
 
 /// LP GPIO base address (from PAC)

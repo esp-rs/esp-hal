@@ -28,8 +28,7 @@ implement_peripheral_clocks!();
 ///   HP_RST_EN2 (0xc8): SPI/I2S/crypto/misc resets
 ///   PERI_CLK_CTRLxx: Per-peripheral clock dividers and enables
 ///
-/// Ref: esp-idf clk_gate_ll.h, hp_sys_clkrst_reg.h
-///      TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers)
+/// Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers)
 #[cfg(esp32p4)]
 mod _p4_peripheral_clocks {
     use crate::peripherals::HP_SYS_CLKRST;
@@ -167,9 +166,7 @@ mod _p4_peripheral_clocks {
     }
 
     /// Enable or disable peripheral clock.
-    /// Ref: esp-idf clk_gate_ll.h -- *_ll_enable_bus_clock() functions
-    ///      esp-idf hp_sys_clkrst_reg.h
-    ///      TRM v0.5 Ch 12
+    /// Ref: TRM v0.5 Ch 12
     pub(crate) unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
         let c = HP_SYS_CLKRST::regs();
         match peripheral {
@@ -373,8 +370,7 @@ mod _p4_peripheral_clocks {
     }
 
     /// Assert or de-assert peripheral reset.
-    /// Ref: esp-idf hp_sys_clkrst_reg.h -- HP_RST_EN0/1/2
-    ///      TRM v0.5 Ch 12
+    /// Ref: TRM v0.5 Ch 12
     #[allow(clippy::single_match)]
     pub(crate) unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         let c = HP_SYS_CLKRST::regs();

@@ -135,7 +135,6 @@ clocks = { system_clocks = { clock_tree = [
 # ROM bootloader reserves 0x4FF0_0000 - 0x4FF4_0000 (256 KB)
 # dram: usable application RAM (after ROM reserved region)
 # dram2_uninit: ROM reserved area, reclaimable after 2nd-stage bootloader
-# Ref: esp-idf soc.h -- SOC_DIRAM_ROM_RESERVE_HIGH = 0x4FF40000
 memory_map = { ranges = [
     { name = "dram", start = 0x4FF4_0000, end = 0x4FFC_0000 },
     { name = "dram2_uninit", start = 0x4FF0_0000, end = 0x4FF4_0000 },

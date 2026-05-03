@@ -3,9 +3,7 @@
 //! Used for PLL configuration (CPLL, SPLL, MPLL) and other analog peripherals.
 //! Accesses the LP_I2C_ANA_MST peripheral which bridges to internal analog I2C bus.
 //!
-//! Ref: esp-idf components/esp_hal_regi2c/esp32p4/regi2c_impl.c
-//!      esp-idf components/soc/esp32p4/register/hw_ver3/soc/lp_i2c_ana_mst_reg.h
-//!      TRM v0.5 Ch 49 (Analog I2C Controller)
+//! Ref: TRM v0.5 Ch 49 (Analog I2C Controller)
 
 // I2C slave addresses for analog blocks
 #[allow(dead_code)]
@@ -42,7 +40,6 @@ const REGI2C_PLLA_MST_SEL: u16 = 1 << 8;
 const REGI2C_SAR_I2C_MST_SEL: u16 = 1 << 7;
 
 /// I2C control register bit fields
-/// Ref: esp-idf regi2c_impl.c lines 32-55
 const REGI2C_RTC_BUSY_BIT: u32 = 1 << 25;
 const REGI2C_RTC_WR_CNTL_BIT: u32 = 1 << 24;
 const REGI2C_RTC_DATA_SHIFT: u32 = 16;
@@ -60,7 +57,6 @@ const LP_I2C_ANA_MST_ANA_CONF1_REG: u32 = LP_I2C_ANA_MST_BASE + 0x04;
 const LP_I2C_ANA_MST_ANA_CONF2_REG: u32 = LP_I2C_ANA_MST_BASE + 0x08;
 
 /// Select the I2C master for the given analog block.
-/// Ref: esp-idf regi2c_impl.c:83-117 -- regi2c_enable_block()
 fn regi2c_enable_block(block: u8) {
     // Clear both conf registers first
     unsafe {
@@ -99,7 +95,6 @@ fn wait_i2c_idle() {
 }
 
 /// Read an analog I2C register.
-/// Ref: esp-idf regi2c_impl.c:119-132 -- _regi2c_impl_read()
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     regi2c_enable_block(block);
     wait_i2c_idle();
@@ -119,7 +114,6 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
 }
 
 /// Write an analog I2C register.
-/// Ref: esp-idf regi2c_impl.c:151-164 -- _regi2c_impl_write()
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
     wait_i2c_idle();

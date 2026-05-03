@@ -2,9 +2,7 @@
 //!
 //! PMU power domain init and WDT disable for bare-metal boot.
 //!
-//! Register names validated against esp32p4 PAC (eco5) and esp-idf:
-//!   - esp-idf components/esp_hw_support/port/esp32p4/pmu_init.c
-//!   - esp-idf components/soc/esp32p4/register/hw_ver3/soc/pmu_reg.h
+//! Register names validated against esp32p4 PAC (eco5) and:
 //!   - TRM v0.5 Ch 16 (Low-Power Management)
 //!   - TRM v0.5 Ch 19 (Watchdog Timers)
 //!
@@ -13,14 +11,15 @@
 //!   eco5: power_pd_cnnt_cntl, power_pd_lpperi_cntl (hpaon/hpcpu/hpwifi removed)
 //!   Both: power_pd_top_cntl, power_pd_hpmem_cntl
 //!
-//! florianL21's original eco4 PMU code: esp32p4_florianl21_original.rs.bak
+
+// TODO: REMOVE me when validate well
+// reference florianL21's original eco4 PMU code
 
 use strum::FromRepr;
 
 use crate::peripherals::{LP_WDT, PMU, TIMG0, TIMG1};
 
 /// SOC Reset Reason.
-/// Ref: esp-idf components/soc/esp32p4/include/soc/reset_reasons.h
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 #[repr(usize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -70,9 +69,6 @@ pub enum SocResetReason {
 ///   - CNNT: power_pd_cnnt_cntl (connectivity, eco5 new -- replaces hpaon/hpcpu/hpwifi)
 ///   - HPMEM: power_pd_hpmem_cntl (HP memory)
 ///   - LPPERI: power_pd_lpperi_cntl (LP peripherals, eco5 new)
-///
-/// Ref: esp-idf pmu_init.c -- pmu_hp_system_init()
-///      esp-idf pmu_reg.h -- PMU_POWER_PD_*_CNTL_REG
 fn pmu_power_domain_force_default() {
     let pmu = PMU::regs();
 
@@ -122,9 +118,7 @@ fn pmu_power_domain_force_default() {
 /// This is the minimum needed for the chip to not reset itself during startup.
 /// Full clock configuration (PLL, CPU freq) is handled separately.
 ///
-/// Ref: esp-idf bootloader_esp32p4.c -- bootloader_super_wdt_auto_feed(),
-///      bootloader_clock_configure(), esp_rtc_init()
-///      TRM v0.5 Ch 19 (WDT), Ch 16 (Power Management)
+/// Ref: TRM v0.5 Ch 19 (WDT), Ch 16 (Power Management)
 pub(crate) fn init() {
     // 1. Clear all PMU power domain force flags
     pmu_power_domain_force_default();
@@ -204,9 +198,7 @@ pub(crate) fn init() {
 /// Configure CPLL for the given frequency (360 or 400 MHz).
 ///
 /// eco5 (v3.x) uses different I2C register values than eco4 (v1.x).
-/// Ref: esp-idf clk_tree_ll.h:375-425 -- clk_ll_cpll_set_config()
-///      esp-idf regi2c_cpll.h -- I2C_CPLL_OC_REF_DIV, I2C_CPLL_OC_DIV_7_0, I2C_CPLL_OC_DCUR
-///      TRM v0.5 Ch 12 -- CPLL configuration
+/// Ref: TRM v0.5 Ch 12 -- CPLL configuration
 fn cpll_configure(freq_mhz: u32) {
     use crate::soc::regi2c;
 
@@ -275,9 +267,7 @@ fn cpll_configure(freq_mhz: u32) {
 /// Configure SPLL (System PLL) for the given frequency (480 MHz typical).
 ///
 /// SPLL provides peripheral clocks: PLL_F240M/160M/120M/80M/20M.
-/// Ref: esp-idf clk_tree_ll.h:430-480 -- clk_ll_spll_set_config()
-///      esp-idf regi2c_syspll.h -- I2C_SYS_PLL_OC_REF_DIV, I2C_SYS_PLL_OC_DIV_7_0
-///      TRM v0.5 Ch 12 -- SPLL configuration
+/// Ref: TRM v0.5 Ch 12 -- SPLL configuration
 fn spll_configure(freq_mhz: u32) {
     use crate::soc::regi2c;
 

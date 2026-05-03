@@ -194,9 +194,7 @@ fn configure_lp_slow_clk_impl(
         });
 }
 
-// ============================================================
 // Per-instance clock impl for UART (called on UartInstance enum)
-// ============================================================
 
 impl UartInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
