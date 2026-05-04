@@ -1,24 +1,26 @@
-use std::{io::Read as _, process::Command};
+use std::{collections::HashSet, io::Read as _, process::Command};
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
+use strum::IntoEnumIterator as _;
 
-use crate::pr_changelog::{PrChangelog, validate};
+use crate::{Package, pr_changelog::{PrChangelog, validate}};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
 /// Check the changelog format of a PR description.
 ///
-/// When `--pr` is given the PR body and labels are fetched from GitHub. If no
-/// changelog entries are present and the `skip-changelog` label is not set the
-/// command fails.
+/// When `--pr` is given, the PR body, labels, and changed files are fetched
+/// from GitHub. For each package that was modified in the PR, a changelog entry
+/// must be present in the PR description — unless the `skip-changelog` label
+/// is set.
 ///
-/// When reading from stdin the label check is skipped (labels are unavailable).
+/// When reading from stdin only the format of the body is validated.
 pub fn check_pr_changelog(pr_number: Option<u64>) -> Result<()> {
     match pr_number {
         Some(pr) => {
             let info = fetch_pr_info(pr)?;
-            check_body_with_labels(pr, &info.body, &info.labels)
+            check_with_github_info(pr, &info)
         }
         None => {
             let mut body = String::new();
@@ -30,38 +32,62 @@ pub fn check_pr_changelog(pr_number: Option<u64>) -> Result<()> {
     }
 }
 
-/// Validate body format and — when no entries are found — require the
-/// `skip-changelog` label.
-fn check_body_with_labels(pr_number: u64, body: &str, labels: &[String]) -> Result<()> {
-    let errors = validate(body);
+fn check_with_github_info(pr_number: u64, info: &FetchedPrInfo) -> Result<()> {
+    // Validate format first.
+    let errors = validate(&info.body);
     if !errors.is_empty() {
         for error in &errors {
             log::error!("{error}");
         }
         bail!(
-            "{} format error(s) found in the PR #{pr_number} description.",
+            "{} format error(s) found in PR #{pr_number} description.",
             errors.len()
         );
     }
 
-    let has_entries = PrChangelog::parse(pr_number, body)?.is_some();
-    if !has_entries {
-        if labels.iter().any(|l| l == SKIP_LABEL) {
-            log::info!("PR #{pr_number}: no changelog entries, but `{SKIP_LABEL}` label is set — OK.");
-        } else {
-            bail!(
-                "PR #{pr_number} has no changelog entries and the `{SKIP_LABEL}` label is not set.\n\
-                 Add changelog entries to the PR description or apply the `{SKIP_LABEL}` label."
-            );
-        }
-    } else {
-        log::info!("PR #{pr_number}: changelog format is valid.");
+    // If the skip label is set, nothing else to check.
+    if info.labels.iter().any(|l| l == SKIP_LABEL) {
+        log::info!("PR #{pr_number}: `{SKIP_LABEL}` label is set — skipping changelog check.");
+        return Ok(());
     }
 
-    Ok(())
+    // Determine which published packages were touched.
+    let modified = modified_packages(&info.files);
+    if modified.is_empty() {
+        log::info!("PR #{pr_number}: no published packages modified — OK.");
+        return Ok(());
+    }
+
+    // Determine which crates have changelog entries in the PR body.
+    let covered: HashSet<String> = PrChangelog::parse(pr_number, &info.body)?
+        .map(|cl| {
+            cl.sections
+                .into_iter()
+                .map(|s| s.crate_name)
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+
+    let missing: Vec<&str> = modified
+        .iter()
+        .filter(|pkg| !covered.contains(*pkg))
+        .map(|s| s.as_str())
+        .collect();
+
+    if missing.is_empty() {
+        log::info!("PR #{pr_number}: all modified packages have changelog entries — OK.");
+        Ok(())
+    } else {
+        bail!(
+            "PR #{pr_number} modifies the following package(s) without a changelog entry: {}.\n\
+             Add entries to the `# Changelog` section of the PR description, \
+             or apply the `{SKIP_LABEL}` label.",
+            missing.join(", ")
+        )
+    }
 }
 
-/// Validate body format only (no label check — used when reading from stdin).
+/// Validate body format only (used when reading from stdin).
 fn check_body_format_only(body: &str) -> Result<()> {
     let errors = validate(body);
     if errors.is_empty() {
@@ -78,10 +104,31 @@ fn check_body_format_only(body: &str) -> Result<()> {
     }
 }
 
+/// Return the set of published package directory names touched by `files`.
+///
+/// Only packages that are published (have a `CHANGELOG.md`) are considered.
+fn modified_packages(files: &[GhFile]) -> HashSet<String> {
+    let published: HashSet<String> = Package::iter()
+        .filter(|p| p.is_published())
+        .map(|p| p.to_string())
+        .collect();
+
+    files
+        .iter()
+        .filter_map(|f| f.path.split('/').next())
+        .filter(|dir| published.contains(*dir))
+        .map(|s| s.to_string())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// GitHub API types
+
 #[derive(Debug, Deserialize)]
-struct PrInfo {
+struct GhPrInfo {
     body: String,
     labels: Vec<GhLabel>,
+    files: Vec<GhFile>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,18 +136,18 @@ struct GhLabel {
     name: String,
 }
 
-impl PrInfo {
-    fn labels(&self) -> Vec<String> {
-        self.labels.iter().map(|l| l.name.clone()).collect()
-    }
+#[derive(Debug, Deserialize)]
+struct GhFile {
+    path: String,
 }
 
 struct FetchedPrInfo {
     body: String,
     labels: Vec<String>,
+    files: Vec<GhFile>,
 }
 
-/// Use the `gh` CLI to fetch the body and labels of a pull request.
+/// Use the `gh` CLI to fetch the body, labels, and changed files of a PR.
 fn fetch_pr_info(pr_number: u64) -> Result<FetchedPrInfo> {
     let output = Command::new("gh")
         .args([
@@ -108,7 +155,7 @@ fn fetch_pr_info(pr_number: u64) -> Result<FetchedPrInfo> {
             "view",
             &pr_number.to_string(),
             "--json",
-            "body,labels",
+            "body,labels,files",
         ])
         .output()
         .context("Failed to invoke `gh`. Is the GitHub CLI installed and authenticated?")?;
@@ -120,11 +167,12 @@ fn fetch_pr_info(pr_number: u64) -> Result<FetchedPrInfo> {
         );
     }
 
-    let info: PrInfo = serde_json::from_slice(&output.stdout)
+    let info: GhPrInfo = serde_json::from_slice(&output.stdout)
         .context("Failed to parse `gh pr view` output")?;
 
     Ok(FetchedPrInfo {
-        labels: info.labels(),
         body: info.body,
+        labels: info.labels.into_iter().map(|l| l.name).collect(),
+        files: info.files,
     })
 }
