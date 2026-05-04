@@ -275,11 +275,11 @@ impl MultiCoreStrategy {
     /// * `False` otherwise
     pub(crate) fn post_write(&self, unpark: bool) {
         let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
-        if let MultiCoreStrategy::AutoPark = self {
-            if unpark {
-                for other_cpu in Cpu::other() {
-                    cpu_ctrl.unpark_core(other_cpu);
-                }
+        if let MultiCoreStrategy::AutoPark = self
+            && unpark
+        {
+            for other_cpu in Cpu::other() {
+                cpu_ctrl.unpark_core(other_cpu);
             }
         }
     }
