@@ -224,9 +224,14 @@ fn parse_changelog_item(item: &str) -> Result<ChangelogEntry> {
         )
     })?;
 
+    let text = text.trim();
+    if text.is_empty() {
+        bail!("Changelog entry description must not be empty: `- {item}`");
+    }
+
     Ok(ChangelogEntry {
         kind,
-        text: text.trim().to_string(),
+        text: text.to_string(),
     })
 }
 
@@ -521,6 +526,17 @@ Replace all uses of `OldType` with `NewType`.
         assert!(
             errors.is_empty(),
             "placeholder body should pass validation: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn validate_empty_description() {
+        let body = "# Changelog\n\n## esp-hal\n\n- Added: \n";
+        let errors = validate(body);
+        assert!(!errors.is_empty(), "expected error for empty description");
+        assert!(
+            errors.iter().any(|e| e.contains("must not be empty")),
+            "unexpected errors: {errors:?}"
         );
     }
 
