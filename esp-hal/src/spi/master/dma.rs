@@ -402,7 +402,7 @@ impl<'d> SpiDma<'d, Async> {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        let chunk_size = rx_buffer.capacity();
+        let chunk_size = rx_buffer.capacity().min(MAX_DMA_SIZE);
 
         for chunk in words.chunks_mut(chunk_size) {
             let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
@@ -432,7 +432,7 @@ impl<'d> SpiDma<'d, Async> {
         }
 
         let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
-        let chunk_size = tx_buffer.capacity();
+        let chunk_size = tx_buffer.capacity().min(MAX_DMA_SIZE);
 
         for chunk in words.chunks(chunk_size) {
             tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
@@ -460,7 +460,7 @@ impl<'d> SpiDma<'d, Async> {
         }
 
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity()).min(MAX_DMA_SIZE);
 
         let common_length = min(read.len(), write.len());
         let (read_common, read_remainder) = read.split_at_mut(common_length);
@@ -504,8 +504,10 @@ impl<'d> SpiDma<'d, Async> {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
+        let chunk_size = tx_buffer.capacity().min(MAX_DMA_SIZE);
+
         let mut spi = DropGuard::new(self, |spi| spi.cancel_transfer());
-        for chunk in words.chunks_mut(tx_buffer.capacity()) {
+        for chunk in words.chunks_mut(chunk_size) {
             tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
             unsafe {
@@ -955,7 +957,9 @@ where
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        for chunk in words.chunks_mut(rx_buffer.capacity()) {
+        let chunk_size = rx_buffer.capacity().min(MAX_DMA_SIZE);
+
+        for chunk in words.chunks_mut(chunk_size) {
             unsafe {
                 self.start_dma_transfer(chunk.len(), 0, rx_buffer, tx_buffer)?;
             }
@@ -979,7 +983,9 @@ where
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        for chunk in words.chunks(tx_buffer.capacity()) {
+        let chunk_size = tx_buffer.capacity().min(MAX_DMA_SIZE);
+
+        for chunk in words.chunks(chunk_size) {
             tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
             unsafe {
@@ -1004,7 +1010,7 @@ where
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity()).min(MAX_DMA_SIZE);
 
         let common_length = min(read.len(), write.len());
         let (read_common, read_remainder) = read.split_at_mut(common_length);
@@ -1045,7 +1051,7 @@ where
             return Err(Error::from(DmaError::BufferTooSmall));
         }
 
-        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity());
+        let chunk_size = min(rx_buffer.capacity(), tx_buffer.capacity()).min(MAX_DMA_SIZE);
 
         for chunk in words.chunks_mut(chunk_size) {
             tx_buffer.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
