@@ -999,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    #[cfg(all(spi_master_supports_dma, pcnt_driver_supported, feature = "unstable"))]
     fn dma_transfer_works_with_nothing_to_read(ctx: Context) {
         ctx.pcnt_unit
             .channel0
@@ -1024,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
+    #[cfg(all(spi_master_supports_dma, pcnt_driver_supported, feature = "unstable"))]
     async fn async_dma_transfer_works_with_nothing_to_read(ctx: Context) {
         ctx.pcnt_unit
             .channel0
