@@ -2,9 +2,58 @@ use std::{collections::BTreeMap, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
+use jiff::Timestamp;
 use serde::Deserialize;
 
 use crate::{changelog::Changelog, pr_changelog::PrChangelog};
+
+// ---------------------------------------------------------------------------
+// Baseline helpers
+
+/// Coarse date + exact Unix timestamp derived from a git ref.
+struct Baseline {
+    /// `YYYY-MM-DD` used for the GitHub `merged:>=` search qualifier.
+    date: String,
+    /// Exact committer Unix timestamp — used for client-side filtering so
+    /// PRs merged on the same calendar day as the ref are not dropped.
+    unix: i64,
+}
+
+/// Derive a `Baseline` from `git_ref` by running `git log` once.
+fn ref_to_baseline(workspace: &Path, git_ref: &str) -> Result<Baseline> {
+    // Request both the short date and the Unix timestamp in one invocation.
+    let output = Command::new("git")
+        .args(["log", "-1", "--format=%cs%n%ct", git_ref])
+        .current_dir(workspace)
+        .output()
+        .context("Failed to run `git log`")?;
+
+    if !output.status.success() {
+        bail!(
+            "`git log` failed for ref '{git_ref}': {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut lines = text.lines();
+
+    let date = lines
+        .next()
+        .filter(|s| !s.trim().is_empty())
+        .context("No date in `git log` output")?
+        .trim()
+        .to_string();
+
+    let unix = lines
+        .next()
+        .context("No Unix timestamp in `git log` output")?
+        .trim()
+        .parse::<i64>()
+        .context("Could not parse Unix timestamp from `git log`")?;
+
+    Ok(Baseline { date, unix })
+}
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 
@@ -40,8 +89,20 @@ pub(crate) fn collect_changelogs(
 ) -> Result<(BTreeMap<String, Changelog>, MigrationEntries)> {
     log::info!("Collecting PRs merged since `{since_ref}`…");
 
-    let merged_after = ref_to_timestamp(workspace, since_ref)?;
-    let prs = list_merged_prs(&merged_after, limit)?;
+    let baseline = ref_to_baseline(workspace, since_ref)?;
+    // Fetch with >= (inclusive date) to cast a wide enough net, then trim
+    // precisely client-side so PRs merged later on the same day as the
+    // baseline ref are not excluded.
+    let prs = list_merged_prs(&baseline.date, limit)?;
+    let prs: Vec<GhPr> = prs
+        .into_iter()
+        .filter(|pr| {
+            pr.merged_at
+                .parse::<Timestamp>()
+                .map(|t| t.as_second() > baseline.unix)
+                .unwrap_or(true) // keep if timestamp is unparseable
+        })
+        .collect();
 
     log::info!(
         "Found {} merged PR(s). Parsing changelog entries…",
@@ -169,31 +230,9 @@ struct GhPr {
     number: u64,
     #[serde(default)]
     body: String,
-}
-
-/// Return the date (`YYYY-MM-DD`) when `git_ref` was committed.
-///
-/// GitHub's search API accepts ISO 8601 dates; using the plain date avoids
-/// any timezone-offset parsing issues with the `merged:>DATE` qualifier.
-pub(crate) fn ref_to_timestamp(workspace: &Path, git_ref: &str) -> Result<String> {
-    let output = Command::new("git")
-        .args(["log", "-1", "--format=%cs", git_ref]) // %cs = short date YYYY-MM-DD
-        .current_dir(workspace)
-        .output()
-        .context("Failed to run `git log`")?;
-
-    if !output.status.success() {
-        bail!(
-            "`git log` failed for ref '{git_ref}': {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    let ts = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if ts.is_empty() {
-        bail!("Could not determine timestamp for ref '{git_ref}'");
-    }
-    Ok(ts)
+    /// RFC 3339 merge timestamp from GitHub (e.g. `2024-01-15T10:30:00Z`).
+    #[serde(rename = "mergedAt", default)]
+    merged_at: String,
 }
 
 /// Return the most recent tag reachable from `HEAD`.
@@ -215,8 +254,12 @@ fn latest_tag(workspace: &Path) -> Result<String> {
 }
 
 /// Fetch merged PRs from GitHub using the `gh` CLI.
-fn list_merged_prs(merged_after: &str, limit: u32) -> Result<Vec<GhPr>> {
-    let search = format!("repo:{UPSTREAM_REPO} is:pr is:merged merged:>{merged_after}");
+///
+/// `since_date` is a `YYYY-MM-DD` string used with `merged:>=` (inclusive) as
+/// a coarse server-side filter. The caller is responsible for precise
+/// client-side filtering using the exact `mergedAt` timestamp.
+fn list_merged_prs(since_date: &str, limit: u32) -> Result<Vec<GhPr>> {
+    let search = format!("repo:{UPSTREAM_REPO} is:pr is:merged merged:>={since_date}");
 
     let output = Command::new("gh")
         .args([
@@ -231,7 +274,7 @@ fn list_merged_prs(merged_after: &str, limit: u32) -> Result<Vec<GhPr>> {
             "--limit",
             &limit.to_string(),
             "--json",
-            "number,body",
+            "number,body,mergedAt",
         ])
         .output()
         .context("`gh pr list` failed. Is the GitHub CLI installed and authenticated?")?;
