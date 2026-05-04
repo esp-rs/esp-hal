@@ -1,15 +1,9 @@
-// PAC drift workaround: every `cfg_if!` block in this file gates the
-// same silicon-level register write between two PAC naming conventions.
-// The pinned `esp32p4` PAC emits CLIC fields with `int_attr_*` prefix
-// and consolidates per-interrupt sub-fields under a single `int_ctrl`
-// register, while the other CLIC chips (ESP32-C5/C6/C61/H2) split them
-// into `int_attr`/`int_ie`/`int_ip`/`int_ctl` per index. The hardware
-// is the same; only the SVD-derived names differ.
+// ESP32P4 follows pulp CLIC version 1.x
+// TODO: keep tracking future P4 revision to check changes of CLIC.
+// ref : https://github.com/pulp-platform/clic/blob/v1.0.1/src/gen/clic.hjson.tpl
 //
-// TODO: file an esp-pacs issue / PR to normalise the CLIC SVD across
-// RISC-V chips so the P4 names match the C5/C6/C61/H2 convention.
-// Once that lands and we bump the esp32p4 PAC pin, every cfg_if! here
-// can be removed in one pass.
+// ESP32C5, C61 follow pulp CLIC version 2.x
+// ref : https://github.com/pulp-platform/clic/blob/v2.0.0/src/gen/mclic.hjson
 
 use super::{InterruptKind, Priority, RunLevel};
 use crate::{interrupt::ElevatedRunLevel, soc::pac::CLIC};
