@@ -1,5 +1,7 @@
 name: Binary Size Analysis
 
+run-name: Binary size for PR
+
 on:
   workflow_dispatch:
     inputs:
@@ -19,6 +21,11 @@ on:
       chips:
         description: 'JSON array of chips to test, e.g. ["esp32c3","esp32c6"]'
         required: true
+        type: string
+      comment_id:
+        description: "Comment ID to update with binary size results"
+        required: false
+        default: ""
         type: string
 
 jobs:
@@ -231,6 +238,7 @@ jobs:
           merge-multiple: true
 
       - name: Generate Combined Report
+        if: needs.binary-size.result == 'success'
         id: combine
         working-directory: ${{ github.workspace }}
         run: cargo run -p xtask --features report -- generate-report --input results
@@ -243,15 +251,24 @@ jobs:
           echo "Processing PR Number: $ISSUE_NUMBER"
 
           COMMENTS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments)
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          RESULT="${{ needs.binary-size.result }}"
 
-          # 1) Prefer the trigger comment ("Triggered binary size analysis ...")
-          COMMENT_ID=$(echo "$COMMENTS" | jq -r '
-            .[]
-            | select(.user.login == "github-actions[bot]")
-            | select(.body | contains("Triggered binary size analysis"))
-            | .id' | head -n1)
+          COMMENT_ID="${{ github.event.inputs.comment_id }}"
 
-          # 2) Fallback to an existing Binary Size Report comment (for older runs)
+          {
+            echo "Run: $RUN_URL"
+            echo
+            if [ "$RESULT" = "success" ]; then
+              cat report.txt
+            else
+              echo "Binary size analysis **failed** (conclusion: $RESULT)."
+              echo
+              echo "Please inspect the workflow run for details."
+            fi
+          } > comment-body.md
+
+          # Fallback to an existing Binary Size Report comment (for older runs)
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             COMMENT_ID=$(echo "$COMMENTS" | jq -r '
               .[]
@@ -264,10 +281,10 @@ jobs:
             echo "Updating existing comment: $COMMENT_ID"
             gh api -X PATCH \
               repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
-              -f "body=$(cat report.txt)"
+              -f "body=$(cat comment-body.md)"
           else
             echo "Creating new comment"
             gh api -X POST \
               repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments \
-              -f "body=$(cat report.txt)"
+              -f "body=$(cat comment-body.md)"
           fi
