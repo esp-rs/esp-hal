@@ -1,12 +1,11 @@
 [package]
-name    = "embassy-usb-hid_host"
+name    = "embassy-usb-hid-host"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
 [dependencies]
 embassy-executor = "0.10.0"
-embassy-futures = "0.1"
 embassy-usb-host = { version = "0.1.0", default-features = false }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",

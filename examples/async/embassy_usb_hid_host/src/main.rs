@@ -1,6 +1,9 @@
-//! CDC-ACM serial port example using embassy.
+//! USB HID host example using embassy-usb-host.
 //!
 //! This example should be built in release mode.
+//!
+//! Connect a mouse or keyboard to the USB port, and it will log raw HID input reports to the
+//! console.
 //!
 //! The following wiring is assumed:
 //! - DP => GPIO20
@@ -10,7 +13,7 @@
 #![no_main]
 
 use embassy_executor::Spawner;
-use embassy_usb_host::{UsbHost, class::hid::HidHost};
+use embassy_usb_host::{BusRoute, BusState, class::hid::HidHost};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
@@ -33,19 +36,22 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
-    let mut host = UsbHost::new(Driver::new(usb));
+    static BUS_STATE: BusState = BusState::new();
+    let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");
 
     loop {
         // Wait for a device to connect
-        let speed = host.wait_for_connection().await;
+        let speed = bus_ctrl.wait_for_connection().await;
         info!("Device connected at speed {:?}", speed);
 
         // Enumerate the device
         let mut config_buf = [0u8; 256];
-        let result = host.enumerate(speed, &mut config_buf).await;
+        let result = bus
+            .enumerate(BusRoute::Direct(speed), &mut config_buf)
+            .await;
 
-        let (dev_desc, addr, config_len) = match result {
+        let (enum_info, config_len) = match result {
             Ok(r) => r,
             Err(e) => {
                 error!("Enumeration failed: {:?}", e);
@@ -55,16 +61,13 @@ async fn main(_spawner: Spawner) {
 
         info!(
             "Enumerated: VID={:04x} PID={:04x} addr={}",
-            dev_desc.vendor_id, dev_desc.product_id, addr
+            enum_info.device_desc.vendor_id,
+            enum_info.device_desc.product_id,
+            enum_info.device_address
         );
 
         // Try to create a HID host driver
-        let mut hid = match HidHost::new(
-            host.driver(),
-            &config_buf[..config_len],
-            addr,
-            dev_desc.max_packet_size0 as u16,
-        ) {
+        let mut hid = match HidHost::new(&bus, &config_buf[..config_len], &enum_info) {
             Ok(h) => h,
             Err(e) => {
                 error!("HID init failed: {:?}", e);

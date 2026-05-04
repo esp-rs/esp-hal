@@ -1,13 +1,5 @@
 //! USB OTG host driver for embassy-usb-host.
-use embassy_usb_driver::{
-    EndpointInfo,
-    host::{
-        DeviceEvent,
-        HostError,
-        UsbHostDriver,
-        channel::{Direction, Type},
-    },
-};
+use embassy_usb_driver::host::{DeviceEvent, UsbHostController};
 use embassy_usb_synopsys_otg::{
     PhyType,
     host::{HostState, OtgHost as OtgHostDriver, OtgHostInstance, on_host_interrupt},
@@ -58,25 +50,20 @@ impl<'d> Driver<'d> {
     }
 }
 
-impl<'d> UsbHostDriver for Driver<'d> {
-    type Channel<Ty: Type, D: Direction> =
-        <OtgHostDriver<'d, { Usb::MAX_HOST_CH_COUNT }> as UsbHostDriver>::Channel<Ty, D>;
+impl<'d> UsbHostController<'d> for Driver<'d> {
+    type Allocator =
+        <OtgHostDriver<'d, { Usb::MAX_HOST_CH_COUNT }> as UsbHostController<'d>>::Allocator;
 
-    async fn wait_for_device_event(&self) -> DeviceEvent {
+    fn allocator(&self) -> Self::Allocator {
+        self.inner.allocator()
+    }
+
+    async fn wait_for_device_event(&mut self) -> DeviceEvent {
         self.inner.wait_for_device_event().await
     }
 
-    async fn bus_reset(&self) {
+    async fn bus_reset(&mut self) {
         self.inner.bus_reset().await
-    }
-
-    fn alloc_channel<Ty: Type, D: Direction>(
-        &self,
-        addr: u8,
-        endpoint: &EndpointInfo,
-        pre: bool,
-    ) -> Result<Self::Channel<Ty, D>, HostError> {
-        self.inner.alloc_channel(addr, endpoint, pre)
     }
 }
 
