@@ -351,7 +351,7 @@ pub(crate) fn enable_wifi_power_domain() {
                 | FE_RST
                 | WIFIMAC_RST
                 | if cfg!(soc_has_bt) {
-                    BTBB_RST | BTMAC_RST | RW_BTMAC_RST | RW_BTMAC_REG_RST | BTBB_RST
+                    BTBB_RST | BTMAC_RST | RW_BTMAC_RST | RW_BTMAC_REG_RST | BTBB_REG_RST
                 } else {
                     0
                 };
