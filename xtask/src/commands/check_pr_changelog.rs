@@ -50,15 +50,16 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
         return Ok(());
     }
 
+    // Validate that all crate names referenced in the changelog exist and are published.
+    // This runs unconditionally so entries for unknown/unpublished packages always fail.
+    check_changelog_crate_names(workspace, pr_number, &info.body)?;
+
     // Determine which published packages were touched.
     let modified = modified_packages(workspace, &info.files);
     if modified.is_empty() {
         log::info!("PR #{pr_number}: no published packages modified — OK.");
         return Ok(());
     }
-
-    // Parse and validate crate names in the changelog entries.
-    check_changelog_crate_names(workspace, pr_number, &info.body)?;
 
     // Determine which crates have changelog entries in the PR body.
     let covered: HashSet<String> = PrChangelog::parse(pr_number, &info.body)?
