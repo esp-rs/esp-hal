@@ -230,11 +230,7 @@ impl<'d> SpiDma<'d, Blocking> {
 }
 
 impl<'d> SpiDma<'d, Async> {
-<<<<<<< HEAD
-    /// Converts the SPI instance into async mode.
-=======
     /// Converts the SPI instance into blocking mode.
->>>>>>> a2aac959 (Batched fixes (#5514))
     #[instability::unstable]
     pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
         self.spi.disable_peri_interrupt_on_all_cores();
