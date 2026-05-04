@@ -4,10 +4,7 @@ use anyhow::{Context, Result, bail};
 use clap::Args;
 use serde::Deserialize;
 
-use crate::{
-    changelog::Changelog,
-    pr_changelog::PrChangelog,
-};
+use crate::{changelog::Changelog, pr_changelog::PrChangelog};
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 
@@ -38,7 +35,10 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
     let merged_after = ref_to_timestamp(workspace, &since)?;
     let prs = list_merged_prs(&merged_after, args.limit)?;
 
-    log::info!("Found {} merged PR(s). Parsing changelog entries…", prs.len());
+    log::info!(
+        "Found {} merged PR(s). Parsing changelog entries…",
+        prs.len()
+    );
 
     let mut pr_changelogs: Vec<PrChangelog> = Vec::new();
     let mut skipped = 0usize;
@@ -83,10 +83,11 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
             }
 
             if let Some(guide) = &section.migration_guide {
-                migrations
-                    .entry(crate_name.clone())
-                    .or_default()
-                    .push((section.area.clone(), pr_cl.pr_number, guide.clone()));
+                migrations.entry(crate_name.clone()).or_default().push((
+                    section.area.clone(),
+                    pr_cl.pr_number,
+                    guide.clone(),
+                ));
             }
         }
     }

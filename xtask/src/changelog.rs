@@ -67,22 +67,26 @@ impl Changelog {
     /// `group` must be one of `"Added"`, `"Changed"`, `"Fixed"`, `"Removed"`.
     /// If the `Unreleased` section does not yet exist it is created.
     pub fn add_entry(&mut self, group: &str, text: &str, pr: u64) {
-        let unreleased = if let Some(e) = self.entries.iter_mut().find(|e| e.version == "Unreleased") {
-            e
-        } else {
-            self.entries.insert(0, ChangelogForVersion {
-                version: "Unreleased".to_string(),
-                date: None,
-                tag: None,
-                groups: vec![
-                    ChangelogGroup::new("Added"),
-                    ChangelogGroup::new("Changed"),
-                    ChangelogGroup::new("Fixed"),
-                    ChangelogGroup::new("Removed"),
-                ],
-            });
-            &mut self.entries[0]
-        };
+        let unreleased =
+            if let Some(e) = self.entries.iter_mut().find(|e| e.version == "Unreleased") {
+                e
+            } else {
+                self.entries.insert(
+                    0,
+                    ChangelogForVersion {
+                        version: "Unreleased".to_string(),
+                        date: None,
+                        tag: None,
+                        groups: vec![
+                            ChangelogGroup::new("Added"),
+                            ChangelogGroup::new("Changed"),
+                            ChangelogGroup::new("Fixed"),
+                            ChangelogGroup::new("Removed"),
+                        ],
+                    },
+                );
+                &mut self.entries[0]
+            };
 
         let target_group = if let Some(g) = unreleased.groups.iter_mut().find(|g| g.name == group) {
             g
