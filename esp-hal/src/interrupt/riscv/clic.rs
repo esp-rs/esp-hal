@@ -18,15 +18,8 @@ pub(super) fn init() {
     let clic = unsafe { CLIC::steal() };
 
     // 3 level bits = 8 priority levels.
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            clic.int_config()
-                .modify(|_, w| unsafe { w.int_config_nlbits().bits(3) });
-        } else {
-            clic.int_config()
-                .modify(|_, w| unsafe { w.mnlbits().bits(3) });
-        }
-    }
+    clic.int_config()
+        .modify(|_, w| unsafe { w.mnlbits().bits(3) });
 
     // Enable hardware vectoring on every interrupt line.
     cfg_if::cfg_if! {
