@@ -123,7 +123,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
 *   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
-*   If your change requires user code to be updated, describe the required migration steps in the `# Migration guide` section of the PR description.
+*   If your change requires user code to be updated, add a `# Migration guide` section. Each breaking change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the migration steps.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -165,6 +165,8 @@ heading, group entries by crate (and optionally by feature area) using H2 headin
 # Migration guide
 
 ## esp-hal/SPI driver
+
+### `SpiDevice::transfer` signature changed
 
 `SpiDevice::transfer` now takes `&mut [u8]` instead of `(&[u8], &mut [u8])`.
 Update your call sites accordingly.

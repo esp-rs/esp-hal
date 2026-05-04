@@ -21,8 +21,14 @@
 //!
 //! ## esp-hal/RMT driver
 //!
+//! ### `Foo` has been renamed to `Bar`
+//!
 //! Replace all uses of `Foo` with `Bar`.
 //! ```
+//!
+//! Migration guide sections **must** include an area (`## crate/area`) and each
+//! individual breaking change **must** be introduced by an H3 heading (`### Title`)
+//! before the body text.
 
 use std::fmt;
 
@@ -240,7 +246,13 @@ fn parse_migration_guide_block(body: &str, sections: &mut Vec<PrSection>) -> Res
             flush_migration(sections, &current, &current_lines);
             current_lines.clear();
             match parse_section_heading(h2) {
-                Some((crate_name, area)) => current = Some((crate_name, area)),
+                Some((crate_name, Some(area))) => {
+                    current = Some((crate_name, Some(area)));
+                }
+                Some((crate_name, None)) => bail!(
+                    "Migration guide section `## {crate_name}` must include an area \
+                     (e.g. `## {crate_name}/My area`)"
+                ),
                 None => bail!("Invalid section heading in `# Migration guide`: `## {h2}`"),
             }
         } else {
@@ -340,15 +352,52 @@ pub fn validate(body: &str) -> Vec<String> {
     }
 
     if let Some(after) = find_h1_section(body, "Migration guide") {
+        let mut in_section = false;
+        // True while inside a valid section but no `### title` has been seen yet.
+        let mut awaiting_h3 = false;
+
         for line in non_comment_lines(after) {
             if line.starts_with("# ") {
                 break;
             } else if let Some(h2) = line.strip_prefix("## ") {
-                if parse_section_heading(h2).is_none() {
-                    errors.push(format!(
-                        "Invalid section heading in `# Migration guide`: `## {h2}`"
-                    ));
+                in_section = false;
+                awaiting_h3 = false;
+                match parse_section_heading(h2) {
+                    Some((_, Some(_))) => {
+                        in_section = true;
+                        awaiting_h3 = true;
+                    }
+                    Some((crate_name, None)) => {
+                        errors.push(format!(
+                            "Migration guide section `## {crate_name}` must include an area \
+                             (e.g. `## {crate_name}/My area`)"
+                        ));
+                    }
+                    None => {
+                        errors.push(format!(
+                            "Invalid section heading in `# Migration guide`: `## {h2}`"
+                        ));
+                    }
                 }
+            } else if let Some(h3) = line.strip_prefix("### ") {
+                if !in_section {
+                    errors.push(format!(
+                        "`### {h3}` found before any `## crate/area` heading"
+                    ));
+                } else if h3.trim().is_empty() {
+                    errors.push(
+                        "Migration guide `### ` heading must have a non-empty title".to_string(),
+                    );
+                } else {
+                    awaiting_h3 = false;
+                }
+            } else if awaiting_h3 && !line.trim().is_empty() {
+                // Body text appearing before the first `###` in a section.
+                errors.push(format!(
+                    "Migration guide body text must be preceded by a `### Title` heading; \
+                     found: `{line}`"
+                ));
+                awaiting_h3 = false; // report only the first offending line per section
             }
         }
     }
@@ -378,6 +427,8 @@ This PR de-clutters the tantulum gluon autosequencers.
 # Migration guide
 
 ## esp-hal/LOL-area
+
+### The entropy pipeline must be reconfigured
 
 The entropy-driven commit pipeline must be re-aligned with a synthetic opcode vortex.
 All transient byte-lattices should undergo recursive de-serialization.
@@ -450,13 +501,15 @@ All transient byte-lattices should undergo recursive de-serialization.
 
 # Migration guide
 
-<!-- Add one or more ## <crate> or ## <crate>/<area> sections below.
-     Write free-form Markdown describing what users need to change.
+<!-- Add one or more ## <crate>/<area> sections below (area is required).
+     Each breaking change needs a ### Title heading followed by the migration steps.
      Only needed when user code must be updated.
 
-## esp-hal
+## esp-hal/SPI
 
-`OldType` has been renamed to `NewType`. Update your code accordingly.
+### `OldType` has been renamed to `NewType`
+
+Replace all uses of `OldType` with `NewType`.
 
 -->
 ";
@@ -524,7 +577,9 @@ All transient byte-lattices should undergo recursive de-serialization.
         let body = "\
 # Migration guide
 
-## esp-hal
+## esp-hal/SPI
+
+### The transfer API changed
 
 Some breaking change description.
 ";
@@ -532,11 +587,60 @@ Some breaking change description.
         assert_eq!(cl.sections.len(), 1);
         let section = &cl.sections[0];
         assert_eq!(section.crate_name, "esp-hal");
+        assert_eq!(section.area.as_deref(), Some("SPI"));
         assert!(
             section.changelog.is_empty(),
             "migration-guide-only section should have no changelog entries"
         );
         assert!(section.migration_guide.is_some());
+    }
+
+    #[test]
+    fn validate_rejects_migration_section_without_area() {
+        let body = "# Migration guide\n\n## esp-hal\n\n### Title\n\nContent.\n";
+        let errors = validate(body);
+        assert!(
+            !errors.is_empty(),
+            "expected error for migration section without area"
+        );
+        assert!(
+            errors.iter().any(|e| e.contains("must include an area")),
+            "unexpected errors: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_migration_body_before_h3() {
+        let body =
+            "# Migration guide\n\n## esp-hal/SPI\n\nBody text before any H3.\n\n### Title\n\nMore.\n";
+        let errors = validate(body);
+        assert!(
+            !errors.is_empty(),
+            "expected error for body text appearing before ### heading"
+        );
+        assert!(
+            errors.iter().any(|e| e.contains("### Title")),
+            "unexpected errors: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_migration_guide() {
+        let body = "\
+# Migration guide
+
+## esp-hal/SPI
+
+### The foobulator has been encabulated
+
+Update your call sites from `foo()` to `bar()`.
+
+### Another breaking change
+
+Do something else.
+";
+        let errors = validate(body);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
     }
 
     /// A heading like `## /Some area` must be rejected by the validator, not silently

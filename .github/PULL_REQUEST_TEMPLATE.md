@@ -44,12 +44,14 @@ Describe how you tested your changes.
 
 # Migration guide
 
-<!-- Add one or more ## <crate> or ## <crate>/<area> sections below.
-     Write free-form Markdown describing what users need to change.
+<!-- Add one or more ## <crate>/<area> sections below (area is required).
+     Each breaking change needs a ### Title heading followed by the migration steps.
      Only needed when user code must be updated.
 
-## esp-hal
+## esp-hal/SPI
 
-`OldType` has been renamed to `NewType`. Update your code accordingly.
+### `OldType` has been renamed to `NewType`
+
+Replace all uses of `OldType` with `NewType`.
 
 -->
