@@ -130,12 +130,11 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
         println!("# Migration guide\n");
         for (crate_name, entries) in &migrations {
             println!("## {crate_name}\n");
-            for (area, pr, guide) in entries {
+            for (area, _pr, guide) in entries {
                 if let Some(area) = area {
                     println!("### {area}\n");
                 }
                 println!("{guide}\n");
-                println!("*(from PR #{pr})*\n");
             }
         }
     }

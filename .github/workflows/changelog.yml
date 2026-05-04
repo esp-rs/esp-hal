@@ -95,7 +95,9 @@ jobs:
           Run \`cargo xtask check-pr-changelog\` locally to validate the format before pushing.
           EOF
 
-          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body-file /tmp/comment.md \
-            || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md
+          # Update existing bot comment if present, otherwise create a new one.
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body-file /tmp/comment.md 2>/dev/null \
+            || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md \
+            || true
 
           exit 1

@@ -336,6 +336,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // Starting a pre-release cycle from a stable version without also setting
 // `base` is an error, as it would produce a version lower than the current
 // one.
+//
+// CHANGELOG REVIEW REQUIRED
+// Changelog entries from recently merged PRs have been collected and merged
+// into each package's CHANGELOG.md (Unreleased section) and MIGRATING-*.md
+// files. Please review and adjust those files before running execute-plan:
+//   - Add, remove, or reword entries as appropriate.
+//   - Ensure migration guide content is accurate and complete.
 "#,
     );
 
