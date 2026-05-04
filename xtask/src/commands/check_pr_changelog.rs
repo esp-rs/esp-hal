@@ -26,7 +26,7 @@ pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()
             std::io::stdin()
                 .read_to_string(&mut body)
                 .context("Failed to read PR body from stdin")?;
-            check_body_format_only(&body)
+            check_body_format_only(workspace, &body)
         }
     }
 }
@@ -57,6 +57,9 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
         return Ok(());
     }
 
+    // Parse and validate crate names in the changelog entries.
+    check_changelog_crate_names(workspace, pr_number, &info.body)?;
+
     // Determine which crates have changelog entries in the PR body.
     let covered: HashSet<String> = PrChangelog::parse(pr_number, &info.body)?
         .map(|cl| {
@@ -86,13 +89,10 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
     }
 }
 
-/// Validate body format only (used when reading from stdin).
-fn check_body_format_only(body: &str) -> Result<()> {
+/// Validate body format and crate names (used when reading from stdin).
+fn check_body_format_only(workspace: &Path, body: &str) -> Result<()> {
     let errors = validate(body);
-    if errors.is_empty() {
-        log::info!("PR description changelog format is valid.");
-        Ok(())
-    } else {
+    if !errors.is_empty() {
         for error in &errors {
             log::error!("{error}");
         }
@@ -100,6 +100,44 @@ fn check_body_format_only(body: &str) -> Result<()> {
             "{} format error(s) found in the PR description.",
             errors.len()
         );
+    }
+    check_changelog_crate_names(workspace, 0, body)?;
+    log::info!("PR description changelog format is valid.");
+    Ok(())
+}
+
+/// Verify that every crate name referenced in the changelog sections of `body`
+/// corresponds to a published package in the workspace.
+///
+/// Fails if any referenced crate:
+/// - has no `Cargo.toml` in the workspace (unknown package), or
+/// - has `publish = false` (not a published package).
+fn check_changelog_crate_names(workspace: &Path, pr_number: u64, body: &str) -> Result<()> {
+    let Some(cl) = PrChangelog::parse(pr_number, body)? else {
+        return Ok(());
+    };
+
+    let mut bad: Vec<String> = Vec::new();
+
+    for section in &cl.sections {
+        let name = &section.crate_name;
+        let cargo_toml = workspace.join(name).join("Cargo.toml");
+
+        if !cargo_toml.exists() {
+            bad.push(format!("`{name}` (no such package in the workspace)"));
+        } else if !is_published(&cargo_toml) {
+            bad.push(format!("`{name}` (publish = false)"));
+        }
+    }
+
+    if bad.is_empty() {
+        Ok(())
+    } else {
+        bail!(
+            "Changelog entries reference package(s) that are not published:\n  {}\n\
+             Only published packages should have changelog entries.",
+            bad.join("\n  ")
+        )
     }
 }
 
