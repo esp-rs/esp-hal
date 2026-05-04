@@ -81,14 +81,16 @@ jobs:
           - Fixed: Short description of the fix
           \`\`\`
 
-          Migration guide entries go in the \`# Migration guide\` section:
+          Migration guide entries go in the \`# Migration guide\` section (area is required; each breaking change needs a \`### Title\` heading):
 
           \`\`\`markdown
           # Migration guide
 
-          ## esp-hal
+          ## esp-hal/SPI
 
-          Explain what changed and how to migrate existing code.
+          ### \`OldType\` has been renamed to \`NewType\`
+
+          Replace all uses of \`OldType\` with \`NewType\`.
           \`\`\`
 
           Please **revert** the changes to \`CHANGELOG.md\` and move your entries to the PR description instead.
