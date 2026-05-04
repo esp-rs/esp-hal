@@ -33,7 +33,7 @@ pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()
 }
 
 fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Result<()> {
-    fail_on_format_errors(pr_number, validate(&info.body))?;
+    fail_on_format_errors(Some(pr_number), validate(&info.body))?;
 
     // If the skip label is set, nothing else to check.
     if info.labels.iter().any(|l| l == SKIP_LABEL) {
@@ -73,30 +73,23 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
 
 /// Validate body format and crate names (used when reading from stdin).
 fn check_body(workspace: &Path, body: &str) -> Result<()> {
-    fail_on_format_errors(0, validate(body))?;
+    fail_on_format_errors(None, validate(body))?;
     parse_and_validate_crates(workspace, body)?;
     log::info!("PR description changelog format is valid.");
     Ok(())
 }
 
 /// Emit formatted errors and bail if `errors` is non-empty.
-fn fail_on_format_errors(pr_number: u64, errors: Vec<String>) -> Result<()> {
+fn fail_on_format_errors(pr_number: Option<u64>, errors: Vec<String>) -> Result<()> {
     if errors.is_empty() {
         return Ok(());
     }
     for error in &errors {
         log::error!("{error}");
     }
-    if pr_number == 0 {
-        bail!(
-            "{} format error(s) found in the PR description.",
-            errors.len()
-        );
-    } else {
-        bail!(
-            "{} format error(s) found in PR #{pr_number} description.",
-            errors.len()
-        );
+    match pr_number {
+        Some(pr) => bail!("{} format error(s) found in PR #{pr} description.", errors.len()),
+        None => bail!("{} format error(s) found in the PR description.", errors.len()),
     }
 }
 
@@ -135,7 +128,7 @@ fn modified_packages(workspace: &Path, files: &[GhFile]) -> HashSet<String> {
     files
         .iter()
         .filter_map(|f| f.path.split('/').next())
-        .collect::<HashSet<_>>()
+        .collect::<HashSet<_>>() // deduplicate: many files share the same top-level dir
         .into_iter()
         .filter(|dir| {
             let p = workspace.join(dir).join("Cargo.toml");

@@ -153,10 +153,13 @@ struct GhPr {
     body: String,
 }
 
-/// Return the ISO 8601 timestamp when `git_ref` was committed.
+/// Return the date (`YYYY-MM-DD`) when `git_ref` was committed.
+///
+/// GitHub's search API accepts ISO 8601 dates; using the plain date avoids
+/// any timezone-offset parsing issues with the `merged:>DATE` qualifier.
 fn ref_to_timestamp(workspace: &Path, git_ref: &str) -> Result<String> {
     let output = Command::new("git")
-        .args(["log", "-1", "--format=%cI", git_ref])
+        .args(["log", "-1", "--format=%cs", git_ref]) // %cs = short date YYYY-MM-DD
         .current_dir(workspace)
         .output()
         .context("Failed to run `git log`")?;
