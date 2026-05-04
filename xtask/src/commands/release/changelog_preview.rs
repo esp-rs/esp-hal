@@ -55,7 +55,7 @@ fn ref_to_baseline(workspace: &Path, git_ref: &str) -> Result<Baseline> {
     Ok(Baseline { date, unix })
 }
 
-const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
+use crate::UPSTREAM_REPO;
 
 /// Arguments for the `release changelog-preview` subcommand.
 #[derive(Debug, Args)]

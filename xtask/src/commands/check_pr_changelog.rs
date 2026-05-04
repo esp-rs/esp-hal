@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::Read as _, path::Path, process::Command};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::pr_changelog::{PrChangelog, PrSection, validate};
+use crate::{UPSTREAM_REPO, pr_changelog::{PrChangelog, PrSection, validate}};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
@@ -207,6 +207,8 @@ fn fetch_pr_info(pr_number: u64) -> Result<PrInfo> {
             "pr",
             "view",
             &pr_number.to_string(),
+            "--repo",
+            UPSTREAM_REPO,
             "--json",
             "body,labels,files",
         ])
