@@ -1,10 +1,13 @@
-use std::{collections::BTreeMap, process::Command};
+use std::{collections::BTreeMap, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use serde::Deserialize;
 
-use crate::pr_changelog::{EntryKind, PrChangelog};
+use crate::{
+    changelog::Changelog,
+    pr_changelog::PrChangelog,
+};
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 
@@ -13,8 +16,8 @@ const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 pub struct ChangelogPreviewArgs {
     /// Git ref (tag, branch, commit) to use as the baseline.
     ///
-    /// Only PRs merged after this ref was created are included.
-    /// Defaults to the most recently published tag on the `main` branch.
+    /// Only PRs merged after this ref are included.
+    /// Defaults to the most recently reachable tag.
     #[arg(long)]
     pub since: Option<String>,
 
@@ -24,25 +27,25 @@ pub struct ChangelogPreviewArgs {
 }
 
 /// Run the `release changelog-preview` subcommand.
-pub fn changelog_preview(args: ChangelogPreviewArgs) -> Result<()> {
+pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result<()> {
     let since = match args.since {
         Some(r) => r,
-        None => latest_tag()?,
+        None => latest_tag(workspace)?,
     };
 
     log::info!("Collecting PRs merged since `{since}`…");
 
-    let merged_after = ref_to_timestamp(&since)?;
+    let merged_after = ref_to_timestamp(workspace, &since)?;
     let prs = list_merged_prs(&merged_after, args.limit)?;
 
     log::info!("Found {} merged PR(s). Parsing changelog entries…", prs.len());
 
-    let mut changelogs: Vec<PrChangelog> = Vec::new();
+    let mut pr_changelogs: Vec<PrChangelog> = Vec::new();
     let mut skipped = 0usize;
 
     for pr in prs {
         match PrChangelog::parse(pr.number, &pr.body) {
-            Ok(Some(cl)) => changelogs.push(cl),
+            Ok(Some(cl)) => pr_changelogs.push(cl),
             Ok(None) => skipped += 1,
             Err(e) => {
                 log::warn!("PR #{}: parse error — {e}", pr.number);
@@ -55,97 +58,88 @@ pub fn changelog_preview(args: ChangelogPreviewArgs) -> Result<()> {
         log::info!("{skipped} PR(s) had no changelog entries and were skipped.");
     }
 
-    print_preview(&changelogs);
+    // Load each relevant crate's CHANGELOG.md, merge in the PR entries, and
+    // print only the Unreleased section.
+    //
+    // keyed by crate name (e.g. "esp-hal")
+    let mut changelogs: BTreeMap<String, Changelog> = BTreeMap::new();
+    // migration guide entries: crate → list of (area, pr, text)
+    let mut migrations: BTreeMap<String, Vec<(Option<String>, u64, String)>> = BTreeMap::new();
+
+    for pr_cl in &pr_changelogs {
+        for section in &pr_cl.sections {
+            let crate_name = &section.crate_name;
+
+            for entry in &section.changelog {
+                let changelog = changelogs
+                    .entry(crate_name.clone())
+                    .or_insert_with(|| load_changelog(workspace, crate_name));
+
+                changelog.add_entry(entry.kind.as_str(), &entry.text, pr_cl.pr_number);
+            }
+
+            if let Some(guide) = &section.migration_guide {
+                migrations
+                    .entry(crate_name.clone())
+                    .or_default()
+                    .push((section.area.clone(), pr_cl.pr_number, guide.clone()));
+            }
+        }
+    }
+
+    if changelogs.is_empty() && migrations.is_empty() {
+        println!("(No changelog entries found.)");
+        return Ok(());
+    }
+
+    // Print unreleased changelog sections
+    for (crate_name, changelog) in &changelogs {
+        if let Some(text) = changelog.format_unreleased() {
+            println!("<!-- {crate_name} -->");
+            println!("{text}");
+        }
+    }
+
+    // Print migration guide sections
+    if !migrations.is_empty() {
+        println!("---");
+        println!("# Migration guide\n");
+        for (crate_name, entries) in &migrations {
+            println!("## {crate_name}\n");
+            for (area, pr, guide) in entries {
+                if let Some(area) = area {
+                    println!("### {area}\n");
+                }
+                println!("{guide}\n");
+                println!("*(from PR #{pr})*\n");
+            }
+        }
+    }
 
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Preview renderer
-
-/// Group and render all collected changelog entries.
-fn print_preview(changelogs: &[PrChangelog]) {
-    // crate → area (or "") → kind → Vec<(pr, text)>
-    let mut changelog_map: BTreeMap<String, BTreeMap<String, BTreeMap<EntryKind, Vec<(u64, String)>>>> =
-        BTreeMap::new();
-    // crate → area (or "") → Vec<(pr, text)>
-    let mut migration_map: BTreeMap<String, BTreeMap<String, Vec<(u64, String)>>> =
-        BTreeMap::new();
-
-    for cl in changelogs {
-        for section in &cl.sections {
-            let area_key = section.area.clone().unwrap_or_default();
-
-            for entry in &section.changelog {
-                changelog_map
-                    .entry(section.crate_name.clone())
-                    .or_default()
-                    .entry(area_key.clone())
-                    .or_default()
-                    .entry(entry.kind)
-                    .or_default()
-                    .push((cl.pr_number, entry.text.clone()));
-            }
-
-            if let Some(guide) = &section.migration_guide {
-                migration_map
-                    .entry(section.crate_name.clone())
-                    .or_default()
-                    .entry(area_key.clone())
-                    .or_default()
-                    .push((cl.pr_number, guide.clone()));
-            }
-        }
-    }
-
-    if changelog_map.is_empty() && migration_map.is_empty() {
-        println!("(No changelog entries found.)");
-        return;
-    }
-
-    // --- Changelog ---
-    if !changelog_map.is_empty() {
-        println!("# Changelog\n");
-        for (crate_name, areas) in &changelog_map {
-            for (area, kinds) in areas {
-                if area.is_empty() {
-                    println!("## {crate_name}\n");
-                } else {
-                    println!("## {crate_name}/{area}\n");
-                }
-                for kind in [EntryKind::Added, EntryKind::Changed, EntryKind::Fixed, EntryKind::Removed] {
-                    if let Some(entries) = kinds.get(&kind) {
-                        for (pr, text) in entries {
-                            println!("- {kind}: {text} (#{pr})");
-                        }
-                    }
-                }
-                println!();
-            }
-        }
-    }
-
-    // --- Migration guide ---
-    if !migration_map.is_empty() {
-        println!("# Migration guide\n");
-        for (crate_name, areas) in &migration_map {
-            for (area, entries) in areas {
-                if area.is_empty() {
-                    println!("## {crate_name}\n");
-                } else {
-                    println!("## {crate_name}/{area}\n");
-                }
-                for (pr, guide) in entries {
-                    println!("{guide}\n");
-                    println!("*(from PR #{pr})*\n");
-                }
-            }
+/// Load and parse an existing `CHANGELOG.md` for the given crate name.
+///
+/// If no changelog exists (e.g. the crate name is unknown or has no file),
+/// returns an empty `Changelog`.
+fn load_changelog(workspace: &Path, crate_name: &str) -> Changelog {
+    let path = workspace.join(crate_name).join("CHANGELOG.md");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        log::debug!("No CHANGELOG.md found for '{crate_name}' (checked {path:?})");
+        return Changelog::empty();
+    };
+    match Changelog::parse(&text) {
+        Ok(cl) => cl,
+        Err(e) => {
+            log::warn!("Failed to parse {}: {e}", path.display());
+            Changelog::empty()
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// GitHub helpers
+// GitHub / git helpers
 
 #[derive(Debug, Deserialize)]
 struct GhPr {
@@ -154,10 +148,11 @@ struct GhPr {
     body: String,
 }
 
-/// Return the date-time string when `git_ref` was created (ISO 8601).
-fn ref_to_timestamp(git_ref: &str) -> Result<String> {
+/// Return the ISO 8601 timestamp when `git_ref` was committed.
+fn ref_to_timestamp(workspace: &Path, git_ref: &str) -> Result<String> {
     let output = Command::new("git")
         .args(["log", "-1", "--format=%cI", git_ref])
+        .current_dir(workspace)
         .output()
         .context("Failed to run `git log`")?;
 
@@ -176,9 +171,10 @@ fn ref_to_timestamp(git_ref: &str) -> Result<String> {
 }
 
 /// Return the most recent tag reachable from `HEAD`.
-fn latest_tag() -> Result<String> {
+fn latest_tag(workspace: &Path) -> Result<String> {
     let output = Command::new("git")
         .args(["describe", "--tags", "--abbrev=0"])
+        .current_dir(workspace)
         .output()
         .context("Failed to run `git describe`")?;
 
