@@ -1,40 +1,21 @@
-//! # USB On-The-Go (USB OTG)
+//! USB On-The-Go Full-Speed (OTG FS) peripheral driver.
 //!
-//! ## Overview
-//! The USB OTG Full-speed (FS) peripheral allows communication
-//! with USB devices using either blocking (usb-device) or asynchronous
-//! (embassy-usb) APIs.
+//! Supports three protocol stacks:
 //!
-//! It can operate as either a USB Host or Device, and supports full-speed (FS)
-//! and low-speed (LS) data rates of the USB 2.0 specification.
+//! - **[`usb-device`]** device mode — via the [`UsbBus`] re-export.
+//! - **[`embassy-usb`]** device mode — via [`embassy_usb_device`].
+//! - **[`embassy-usb-host`]** host mode — via [`embassy_usb_host`].
 //!
-//! The blocking driver uses the `esp_synopsys_usb_otg` crate, which provides
-//! the `USB bus` implementation and `USB peripheral traits`.
+//! Start by creating a [`Usb`] instance from the `USB0` peripheral and the
+//! D+ / D- pins, then pass it to the driver of your choice:
 //!
-//! The asynchronous driver uses the `embassy_usb_synopsys_otg` crate, which
-//! provides the `USB bus` and `USB device` implementations.
+//! ```rust, ignore
+//! let usb = Usb::new(peripherals.USB0, io.pins.gpio20, io.pins.gpio19);
+//! ```
 //!
-//! The module also relies on other peripheral modules, such as `GPIO`,
-//! `system`, and `clock control`, to configure and enable the `USB` peripheral.
-//!
-//! ## Configuration
-//! To use the USB OTG Full-speed peripheral driver, you need to initialize the
-//! peripheral and configure its settings. The [`Usb`] struct represents the USB
-//! peripheral and requires the GPIO pins that implement [`UsbDp`], and
-//! [`UsbDm`], which define the specific types used for USB pin selection.
-//!
-//! The returned `Usb` instance can be used with the `usb-device` crate, or it
-//! can be further configured with [`asynch::Driver`] to be used with the
-//! `embassy-usb` crate.
-//!
-//! ## Examples
-//! Visit the [USB Serial] example for an example of using the USB OTG
-//! peripheral.
-//!
-//! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/usb_serial/src/main.rs
-//!
-//! ## Implementation State
-//! - Low-speed (LS) is not supported.
+//! [`usb-device`]: https://crates.io/crates/usb-device
+//! [`embassy-usb`]: https://crates.io/crates/embassy-usb
+//! [`embassy-usb-host`]: https://crates.io/crates/embassy-usb-host
 
 pub use esp_synopsys_usb_otg::UsbBus;
 
