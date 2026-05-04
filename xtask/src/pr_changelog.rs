@@ -112,6 +112,11 @@ impl PrChangelog {
     /// Returns `Ok(None)` if the body contains neither a `# Changelog` nor a
     /// `# Migration guide` section.
     pub fn parse(pr_number: u64, body: &str) -> Result<Option<Self>> {
+        // Normalize line endings so the parser works regardless of whether the
+        // body came from GitHub (CRLF) or a local file (LF).
+        let body = body.replace("\r\n", "\n");
+        let body = body.as_str();
+
         let mut sections: Vec<PrSection> = Vec::new();
 
         parse_changelog_block(body, &mut sections)?;
@@ -287,6 +292,9 @@ fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
 ///
 /// Returns an empty `Vec` if the body is valid (or has no changelog sections at all).
 pub fn validate(body: &str) -> Vec<String> {
+    let body = body.replace("\r\n", "\n");
+    let body = body.as_str();
+
     let mut errors = Vec::new();
 
     if let Some(after) = find_h1_section(body, "Changelog") {
