@@ -32,20 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
-- ESP32: attenuation is now correctly set for ADC2 (#5463)
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
 - UART: prevent returning 0 from `read_async` (#5451)
 - ESP32-S2, ESP32-S3: Fixed a bug where `UlpCore.run()` with `UlpCoreWakeupSource::HpCpu` fails to wake the ULP Core (#5410)
-- RMT: allow maximum pulse length on both phases in `PulseCode` (#5501)
-- LEDC: fix off-by-one error in clock divisor calculation (#5496)
-- UART: Wake on detecting a break condition (#5488)
-- Crypto/Copy DMA: fix issue where `in_dscr_empty` was ignored (#5491, #5493)
-- MCPWM: fix `set_timestamp_b` to actually set timestamp for channel B (#5487)
-- SPI DMA: correctly drop bus and buffer if the transfer object is dropped (#5492)
 
 ### Removed
 
-- ESP32: removed unsupported Hall-effect sensor API (#5463)
 - The `Clocks` struct has been removed (#5461)
 
 ## [v1.1.0] - 2026-04-24
