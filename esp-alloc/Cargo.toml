@@ -120,6 +120,8 @@ esp32c61  = ["esp-sync/esp32c61"]
 ##
 esp32h2   = ["esp-sync/esp32h2"]
 ##
+esp32p4     = ["esp-sync/esp32p4"]
+##
 esp32     = ["esp-sync/esp32"]
 ##
 esp32s2   = ["esp-sync/esp32s2"]

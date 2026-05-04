@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(multi_core)]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
     fn critical_section_on_multi_core(p: Peripherals) {
         // TODO: test other locks, too
         use core::{cell::Cell, sync::atomic::AtomicBool};
