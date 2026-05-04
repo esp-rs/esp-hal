@@ -169,7 +169,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2s2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s2_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s2_apb" } },
     # Timers -- Systimer also needs PERI_CLK_CTRL21.systimer_clk_en gate.
     { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.systimer_apb_clk_en().bit(enable)); {{control}}::regs().peri_clk_ctrl21().modify(|_, w| w.systimer_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_stimer" }, keep_enabled = true },
-    { name = "Timg0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp0" } },
+    { name = "Timg0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp0" }, keep_enabled = true },
     { name = "Timg1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp1" } },
     # IO MUX -- gated via PERI_CLK_CTRL26; KEEP_ENABLED because GPIO depends on it.
     { name = "Iomux", template_params = { default_clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_iomux" }, keep_enabled = true },
@@ -227,6 +227,7 @@ peripherals = [
     # Minimal set for esp-hal compilation
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
+    { name = "SYSTEM", pac = "HP_SYS" },
     { name = "HP_SYS" },
     { name = "HP_SYS_CLKRST" },
     { name = "INTERRUPT_CORE0" },
@@ -285,6 +286,8 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 5 },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "ECC", interrupts = { peri = "ECC" } },
+
+    { name = "SW_INTERRUPT", virtual = true },
 ]
 
 # UART: 5 instances (UART0-4), 128-byte FIFO
@@ -306,18 +309,19 @@ version = 2
 [device.systimer]
 
 # GP Timer (TIMG): 2 groups, each with 2 timers + WDT
-[device.gp_timer]
+[device.timergroup]
 support_status = "partial"
 instances = [
-    { name = "timg0", sys_instance = "Timg0", interrupt = "TG0_T0_LEVEL" },
-    { name = "timg1", sys_instance = "Timg1", interrupt = "TG1_T0_LEVEL" },
+    { name = "timg0" },
+    { name = "timg1" },
 ]
+timg_has_divcnt_rst = true
 
 # SPI Master: 2 instances (GPSPI2, GPSPI3)
 # SPI Master: SPI2 only (SPI2 and SPI3 have different PAC RegisterBlock types)
 [device.spi_master]
 support_status = "partial"
-supports_dma = true
+supports_dma = false # TODO
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "SPI2_CK", sio = ["SPI2_D", "SPI2_Q", "SPI2_WP", "SPI2_HOLD"], cs = ["SPI2_CS"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"], cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"] },
@@ -348,7 +352,7 @@ max_bus_timeout = 0x1F
 # esp-hal's `Dma` singleton must be GDMA v2 compatible, hence PAC alias AHB_DMA above.
 # Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
-support_status = "partial"
+support_status = "not_supported" # PAC needs more work
 kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
