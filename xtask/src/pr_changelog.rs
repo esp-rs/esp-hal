@@ -627,8 +627,7 @@ Some breaking change description.
 
     #[test]
     fn validate_rejects_migration_body_before_h3() {
-        let body =
-            "# Migration guide\n\n## esp-hal/SPI\n\nBody text before any H3.\n\n### Title\n\nMore.\n";
+        let body = "# Migration guide\n\n## esp-hal/SPI\n\nBody text before any H3.\n\n### Title\n\nMore.\n";
         let errors = validate(body);
         assert!(
             !errors.is_empty(),

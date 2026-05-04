@@ -3,7 +3,10 @@ use std::{collections::HashSet, io::Read as _, path::Path, process::Command};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::{UPSTREAM_REPO, pr_changelog::{PrChangelog, PrSection, validate}};
+use crate::{
+    UPSTREAM_REPO,
+    pr_changelog::{PrChangelog, PrSection, validate},
+};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
