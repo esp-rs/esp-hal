@@ -6,13 +6,14 @@ use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
 
-pub use self::{build::*, check_changelog::*, release::*, run::*};
+pub use self::{build::*, check_changelog::*, check_pr_changelog::*, release::*, run::*};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
 };
 mod build;
 mod check_changelog;
+mod check_pr_changelog;
 #[cfg(feature = "report")]
 pub mod generate_report;
 #[cfg(feature = "semver-checks")]
