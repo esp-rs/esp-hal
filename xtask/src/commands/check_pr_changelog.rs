@@ -1,10 +1,9 @@
-use std::{collections::HashSet, io::Read as _, process::Command};
+use std::{collections::HashSet, io::Read as _, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
-use strum::IntoEnumIterator as _;
 
-use crate::{Package, pr_changelog::{PrChangelog, validate}};
+use crate::pr_changelog::{PrChangelog, validate};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
@@ -16,11 +15,11 @@ const SKIP_LABEL: &str = "skip-changelog";
 /// is set.
 ///
 /// When reading from stdin only the format of the body is validated.
-pub fn check_pr_changelog(pr_number: Option<u64>) -> Result<()> {
+pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()> {
     match pr_number {
         Some(pr) => {
             let info = fetch_pr_info(pr)?;
-            check_with_github_info(pr, &info)
+            check_with_github_info(workspace, pr, &info)
         }
         None => {
             let mut body = String::new();
@@ -32,7 +31,7 @@ pub fn check_pr_changelog(pr_number: Option<u64>) -> Result<()> {
     }
 }
 
-fn check_with_github_info(pr_number: u64, info: &FetchedPrInfo) -> Result<()> {
+fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo) -> Result<()> {
     // Validate format first.
     let errors = validate(&info.body);
     if !errors.is_empty() {
@@ -52,7 +51,7 @@ fn check_with_github_info(pr_number: u64, info: &FetchedPrInfo) -> Result<()> {
     }
 
     // Determine which published packages were touched.
-    let modified = modified_packages(&info.files);
+    let modified = modified_packages(workspace, &info.files);
     if modified.is_empty() {
         log::info!("PR #{pr_number}: no published packages modified — OK.");
         return Ok(());
@@ -106,19 +105,46 @@ fn check_body_format_only(body: &str) -> Result<()> {
 
 /// Return the set of published package directory names touched by `files`.
 ///
-/// Only packages that are published (have a `CHANGELOG.md`) are considered.
-fn modified_packages(files: &[GhFile]) -> HashSet<String> {
-    let published: HashSet<String> = Package::iter()
-        .filter(|p| p.is_published())
-        .map(|p| p.to_string())
-        .collect();
+/// A package is considered published when its `Cargo.toml` does not contain
+/// `publish = false`. Packages without a `Cargo.toml` at the workspace root
+/// level are ignored.
+fn modified_packages(workspace: &Path, files: &[GhFile]) -> HashSet<String> {
+    let mut result = HashSet::new();
 
-    files
+    for dir in files
         .iter()
         .filter_map(|f| f.path.split('/').next())
-        .filter(|dir| published.contains(*dir))
-        .map(|s| s.to_string())
-        .collect()
+        .collect::<HashSet<_>>()
+    {
+        let cargo_toml_path = workspace.join(dir).join("Cargo.toml");
+        if !cargo_toml_path.exists() {
+            continue;
+        }
+        if is_published(&cargo_toml_path) {
+            result.insert(dir.to_string());
+        } else {
+            log::debug!("Skipping '{dir}': publish = false");
+        }
+    }
+
+    result
+}
+
+/// Returns `true` when the `Cargo.toml` at `path` does not opt out of publishing.
+///
+/// A package is considered unpublished when it has `publish = false` in its
+/// `[package]` table. Missing the key, or any parse error, defaults to `true`.
+fn is_published(path: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return true;
+    };
+    let Ok(doc) = text.parse::<toml_edit::DocumentMut>() else {
+        return true;
+    };
+    doc.get("package")
+        .and_then(|p| p.get("publish"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
 }
 
 // ---------------------------------------------------------------------------

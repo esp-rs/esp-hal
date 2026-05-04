@@ -168,7 +168,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
-        Cli::CheckPrChangelog(args) => check_pr_changelog(args.pr),
+        Cli::CheckPrChangelog(args) => check_pr_changelog(&workspace, args.pr),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
