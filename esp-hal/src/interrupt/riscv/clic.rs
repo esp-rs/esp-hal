@@ -1,5 +1,10 @@
-// ESP32P4 follows pulp CLIC version 1.x
+// CLIC v1.x and v2.x currently coexist in this file. Depending on
+// ESP32-P4 mass production results and future esp-rs/esp-pacs patches,
+// this file may be split into clic_v1.rs / clic_v2.rs, or kept as is.
+//
 // TODO: keep tracking future P4 revision to check changes of CLIC.
+//
+// ESP32P4 follows pulp CLIC version 1.x
 // ref : https://github.com/pulp-platform/clic/blob/v1.0.1/src/gen/clic.hjson.tpl
 //
 // ESP32C5, C61 follow pulp CLIC version 2.x
@@ -209,7 +214,7 @@ core::arch::global_asm!(
         * If an interrupt occurs and is configured as (hardware) vectored, the CPU will jump to
         * MTVT[31:0] + 4 * interrupt_id
         *
-        * In the case of the ESP32-P4/ESP32-C5, the interrupt matrix, between the CPU interrupt lines
+        * In the case of the ESP32P4/ESP32C5, the interrupt matrix, between the CPU interrupt lines
         * and the peripherals, offers 32 lines, and the lower 16 interrupts are used for CLINT.
         */
     .balign 0x40
