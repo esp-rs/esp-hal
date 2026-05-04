@@ -93,7 +93,7 @@ fn generate_filter_snippet() {
                     // If a prefix matches, don't continue to the next directive
                     snippet.push_str(&format!(
                         "if _target.starts_with(\"{}\") {{ return level <= log_04::LevelFilter::{}; }}",
-                        &name, level
+                        name, level
                     ));
                 } else {
                     if global_level.is_some() {
