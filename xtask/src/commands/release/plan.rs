@@ -12,7 +12,12 @@ use crate::{
     Package,
     Version,
     cargo::CargoToml,
-    commands::{VersionBump, checker::min_package_update, do_version_bump, release::changelog_preview},
+    commands::{
+        VersionBump,
+        checker::min_package_update,
+        do_version_bump,
+        release::changelog_preview,
+    },
     git::{BackportInfo, current_branch, parse_backport_branch},
 };
 
@@ -386,7 +391,9 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         for path in &modified {
             println!("  {}", path.display());
         }
-        println!("Please review and adjust these files before running `cargo xrelease execute-plan`.");
+        println!(
+            "Please review and adjust these files before running `cargo xrelease execute-plan`."
+        );
     }
 
     Ok(())
@@ -552,16 +559,17 @@ fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std::path::Pat
         .map(|pkg| (pkg.package.to_string(), pkg))
         .collect();
 
-    let (changelogs, migrations) =
-        match changelog_preview::collect_changelogs(workspace, &since_ref, 500) {
-            Ok(r) => r,
-            Err(e) => {
-                log::warn!(
-                    "Could not collect changelog entries (is `gh` installed and authenticated?): {e}"
-                );
-                return vec![];
-            }
-        };
+    let (changelogs, migrations) = match changelog_preview::collect_changelogs(
+        workspace, &since_ref, 500,
+    ) {
+        Ok(r) => r,
+        Err(e) => {
+            log::warn!(
+                "Could not collect changelog entries (is `gh` installed and authenticated?): {e}"
+            );
+            return vec![];
+        }
+    };
 
     let mut modified: Vec<std::path::PathBuf> = Vec::new();
 
@@ -608,9 +616,7 @@ fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std::path::Pat
         let migration_path = crate::windows_safe_path(&migration_path);
 
         if !migration_path.exists() {
-            log::warn!(
-                "Migration guide {migration_file} not found for {crate_name}; skipping."
-            );
+            log::warn!("Migration guide {migration_file} not found for {crate_name}; skipping.");
             continue;
         }
 

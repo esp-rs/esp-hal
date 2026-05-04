@@ -90,8 +90,14 @@ fn fail_on_format_errors(pr_number: Option<u64>, errors: Vec<String>) -> Result<
         log::error!("{error}");
     }
     match pr_number {
-        Some(pr) => bail!("{} format error(s) found in PR #{pr} description.", errors.len()),
-        None => bail!("{} format error(s) found in the PR description.", errors.len()),
+        Some(pr) => bail!(
+            "{} format error(s) found in PR #{pr} description.",
+            errors.len()
+        ),
+        None => bail!(
+            "{} format error(s) found in the PR description.",
+            errors.len()
+        ),
     }
 }
 
