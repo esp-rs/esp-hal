@@ -23,17 +23,25 @@ pub struct ChangelogPreviewArgs {
     pub limit: u32,
 }
 
-/// Run the `release changelog-preview` subcommand.
-pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result<()> {
-    let since = match args.since {
-        Some(r) => r,
-        None => latest_tag(workspace)?,
-    };
+/// Migration guide entries: `(area, pr_number, guide_text)`.
+pub(crate) type MigrationEntries = BTreeMap<String, Vec<(Option<String>, u64, String)>>;
 
-    log::info!("Collecting PRs merged since `{since}`…");
+/// Collect PR changelog entries merged since `since_ref` into per-crate changelogs.
+///
+/// Returns a pair of maps:
+/// - Merged changelog entries keyed by crate name.
+/// - Migration guide entries keyed by crate name.
+///
+/// Requires the `gh` CLI to be installed and authenticated.
+pub(crate) fn collect_changelogs(
+    workspace: &Path,
+    since_ref: &str,
+    limit: u32,
+) -> Result<(BTreeMap<String, Changelog>, MigrationEntries)> {
+    log::info!("Collecting PRs merged since `{since_ref}`…");
 
-    let merged_after = ref_to_timestamp(workspace, &since)?;
-    let prs = list_merged_prs(&merged_after, args.limit)?;
+    let merged_after = ref_to_timestamp(workspace, since_ref)?;
+    let prs = list_merged_prs(&merged_after, limit)?;
 
     log::info!(
         "Found {} merged PR(s). Parsing changelog entries…",
@@ -58,13 +66,12 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
         log::info!("{skipped} PR(s) had no changelog entries and were skipped.");
     }
 
-    // Load each relevant crate's CHANGELOG.md, merge in the PR entries, and
-    // print only the Unreleased section.
+    // Load each relevant crate's CHANGELOG.md, merge in the PR entries.
     //
     // keyed by crate name (e.g. "esp-hal")
     let mut changelogs: BTreeMap<String, Changelog> = BTreeMap::new();
     // migration guide entries: crate → list of (area, pr, text)
-    let mut migrations: BTreeMap<String, Vec<(Option<String>, u64, String)>> = BTreeMap::new();
+    let mut migrations: MigrationEntries = BTreeMap::new();
 
     for pr_cl in &pr_changelogs {
         for section in &pr_cl.sections {
@@ -91,6 +98,18 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
             }
         }
     }
+
+    Ok((changelogs, migrations))
+}
+
+/// Run the `release changelog-preview` subcommand.
+pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result<()> {
+    let since = match args.since {
+        Some(r) => r,
+        None => latest_tag(workspace)?,
+    };
+
+    let (changelogs, migrations) = collect_changelogs(workspace, &since, args.limit)?;
 
     if changelogs.is_empty() && migrations.is_empty() {
         println!("(No changelog entries found.)");
@@ -157,7 +176,7 @@ struct GhPr {
 ///
 /// GitHub's search API accepts ISO 8601 dates; using the plain date avoids
 /// any timezone-offset parsing issues with the `merged:>DATE` qualifier.
-fn ref_to_timestamp(workspace: &Path, git_ref: &str) -> Result<String> {
+pub(crate) fn ref_to_timestamp(workspace: &Path, git_ref: &str) -> Result<String> {
     let output = Command::new("git")
         .args(["log", "-1", "--format=%cs", git_ref]) // %cs = short date YYYY-MM-DD
         .current_dir(workspace)

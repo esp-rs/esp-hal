@@ -12,7 +12,7 @@ use crate::{
     Package,
     Version,
     cargo::CargoToml,
-    commands::{VersionBump, checker::min_package_update, do_version_bump},
+    commands::{VersionBump, checker::min_package_update, do_version_bump, release::changelog_preview},
     git::{BackportInfo, current_branch, parse_backport_branch},
 };
 
@@ -365,6 +365,23 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         file, then run the following command: `cargo xrelease execute-plan`",
     );
 
+    // Merge PR changelog entries directly into CHANGELOG.md / MIGRATING-*.md files.
+    let modified = generate_changelog_draft(workspace, &plan);
+    if modified.is_empty() {
+        println!();
+        println!(
+            "Note: No changelog entries were merged. Run \
+            `cargo xtask release changelog-preview` manually if needed."
+        );
+    } else {
+        println!();
+        println!("Merged changelog entries into the following files:");
+        for path in &modified {
+            println!("  {}", path.display());
+        }
+        println!("Please review and adjust these files before running `cargo xrelease execute-plan`.");
+    }
+
     Ok(())
 }
 
@@ -499,6 +516,141 @@ fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
     related_crates_cb(package, &|p| {
         CargoToml::new(workspace, p).unwrap().repo_dependencies()
     })
+}
+
+/// Merge PR changelog and migration guide entries from recently-merged PRs
+/// directly into each package's `CHANGELOG.md` and `MIGRATING-*.md` files.
+///
+/// Returns the paths of files that were modified. Returns an empty list if the
+/// `gh` CLI is unavailable, no entries were found, or any other non-fatal
+/// problem occurred.
+fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std::path::PathBuf> {
+    if plan.packages.is_empty() {
+        return vec![];
+    }
+
+    // Use the oldest last-release tag as the baseline so we don't miss entries
+    // for packages that were last released earlier than others.
+    let since_ref = plan
+        .packages
+        .iter()
+        .map(|pkg| pkg.package.tag(&pkg.current_version))
+        .min_by_key(|tag| tag_commit_timestamp(workspace, tag))
+        .expect("packages is non-empty");
+
+    // Map crate name → PackagePlan for quick lookup.
+    let pkg_by_crate: HashMap<String, &PackagePlan> = plan
+        .packages
+        .iter()
+        .map(|pkg| (pkg.package.to_string(), pkg))
+        .collect();
+
+    let (changelogs, migrations) =
+        match changelog_preview::collect_changelogs(workspace, &since_ref, 500) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!(
+                    "Could not collect changelog entries (is `gh` installed and authenticated?): {e}"
+                );
+                return vec![];
+            }
+        };
+
+    let mut modified: Vec<std::path::PathBuf> = Vec::new();
+
+    // Merge changelog entries into each package's CHANGELOG.md.
+    for (crate_name, new_entries) in &changelogs {
+        let Some(_pkg) = pkg_by_crate.get(crate_name) else {
+            continue;
+        };
+        if new_entries.format_unreleased().is_none() {
+            continue;
+        }
+
+        let changelog_path = workspace.join(crate_name).join("CHANGELOG.md");
+        let changelog_path = crate::windows_safe_path(&changelog_path);
+
+        let written = match std::fs::write(&changelog_path, new_entries.to_string()) {
+            Ok(()) => true,
+            Err(e) => {
+                log::warn!("Could not write {}: {e}", changelog_path.display());
+                false
+            }
+        };
+        if written {
+            modified.push(changelog_path);
+        }
+    }
+
+    // Append migration guide entries to each package's active MIGRATING-*.md.
+    for (crate_name, entries) in &migrations {
+        let Some(pkg) = pkg_by_crate.get(crate_name) else {
+            continue;
+        };
+
+        // Patch releases don't have migration guides; skip them.
+        if pkg.bump.base == Some(Version::Patch) {
+            continue;
+        }
+
+        // The active migration guide is named after the current major.minor version
+        // (zeroed patch). It was created by `post_release` after the previous release.
+        let v = &pkg.current_version;
+        let migration_file = format!("MIGRATING-{}.{}.0.md", v.major, v.minor);
+        let migration_path = workspace.join(crate_name).join(&migration_file);
+        let migration_path = crate::windows_safe_path(&migration_path);
+
+        if !migration_path.exists() {
+            log::warn!(
+                "Migration guide {migration_file} not found for {crate_name}; skipping."
+            );
+            continue;
+        }
+
+        let mut content = match std::fs::read_to_string(&migration_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Could not read {}: {e}", migration_path.display());
+                continue;
+            }
+        };
+
+        // Append each entry's guide text under its area heading.
+        let mut appended = false;
+        for (area, _pr, guide) in entries {
+            if !content.ends_with('\n') {
+                content.push('\n');
+            }
+            content.push('\n');
+            if let Some(area) = area {
+                content.push_str(&format!("## {area}\n\n"));
+            }
+            content.push_str(guide.trim_end());
+            content.push('\n');
+            appended = true;
+        }
+
+        if appended {
+            match std::fs::write(&migration_path, &content) {
+                Ok(()) => modified.push(migration_path),
+                Err(e) => log::warn!("Could not write {}: {e}", migration_path.display()),
+            }
+        }
+    }
+
+    modified
+}
+
+/// Return the UNIX commit timestamp for `tag`, or `0` if unknown.
+fn tag_commit_timestamp(workspace: &Path, tag: &str) -> i64 {
+    Command::new("git")
+        .args(["log", "-1", "--format=%ct", tag])
+        .current_dir(workspace)
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().parse::<i64>().ok())
+        .unwrap_or(0)
 }
 
 fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> {
