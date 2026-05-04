@@ -393,7 +393,7 @@ impl PulseCode {
         let (Ok(length1), Ok(length2)) = (length1.try_into(), length2.try_into()) else {
             return None;
         };
-        if length1 > Self::MAX_LEN || length2 >= Self::MAX_LEN {
+        if length1 > Self::MAX_LEN || length2 > Self::MAX_LEN {
             return None;
         }
 

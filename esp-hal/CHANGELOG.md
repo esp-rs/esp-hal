@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The clock frequency accessor functions no longer need to lock the clock tree (#5461)
+- SPI: `SpiDmaBus` has been merged into `SpiDma`. `with_buffers` now returns `SpiDma` directly, and the buffer-taking transfer methods have been renamed to `read_buffer`, `write_buffer`, `transfer_buffers`, `half_duplex_read_buffer` and `half_duplex_write_buffer` to avoid conflicts with the `SpiBus` trait methods. (#5272)
 
 ### Fixed
 
@@ -24,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
 - UART: prevent returning 0 from `read_async` (#5451)
 - ESP32-S2, ESP32-S3: Fixed a bug where `UlpCore.run()` with `UlpCoreWakeupSource::HpCpu` fails to wake the ULP Core (#5410)
+- RMT: allow maximum pulse length on both phases in `PulseCode` (#5501)
+- LEDC: fix off-by-one error in clock divisor calculation (#5496)
+- UART: Wake on detecting a break condition (#5488)
+- Crypto/Copy DMA: fix issue where `in_dscr_empty` was ignored (#5491, #5493)
+- MCPWM: fix `set_timestamp_b` to actually set timestamp for channel B (#5487)
+- SPI DMA: correctly drop bus and buffer if the transfer object is dropped (#5492)
 
 ### Removed
 

@@ -540,7 +540,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_b(&mut self, value: u16) {
-        self.pin_a.set_timestamp(value)
+        self.pin_b.set_timestamp(value)
     }
 
     /// Configure the deadtime generator

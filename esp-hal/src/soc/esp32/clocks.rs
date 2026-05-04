@@ -110,26 +110,24 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         // Switch CPU to XTAL before reconfiguring PLL. The bootloader may have left the CPU
         // running on PLL, and changing PLL parameters while it is the active clock source would
         // cause instability.
-        ClockTree::with(|clocks| {
-            configure_xtal_clk(clocks, XtalClkConfig::_40);
-            configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
-            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
-        });
+        configure_xtal_clk(clocks, XtalClkConfig::_40);
+        configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
+        configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
         // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to
         // only run when requesting XTAL.
         if self.xtal_clk.is_none() {
-            let xtal = ClockTree::with(detect_xtal_freq);
+            let xtal = detect_xtal_freq(clocks);
             debug!("Auto-detected XTAL frequency: {}", xtal.value());
             self.xtal_clk = Some(xtal);
         }
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 
