@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5 and C61: Enable RTC timekeeping (#5449)
 - C61: usb-serial-jtag and debug-assist (#5427)
 - C61: dedicated gpio (#5426)
+- Initial ESP32-P4 (chip revision v3.0+) support (#5400)
+- P4: Initial peripheral support for GPIO, UART, I2C, SPI, DMA, USB Serial/JTAG, eFuse, SYSTIMER (#5400)
+- P4: AP-HEX PSRAM driver stub with configurable HP L2MEM cache/RAM split via `ESP_HAL_CONFIG_L2_CACHE_SIZE` (#5400)
 
 ### Changed
 

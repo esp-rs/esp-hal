@@ -12,11 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ESP32-P4: replace the imported pre-ECO5 ROM linker scripts with the
-  ECO5+ symbol addresses (sourced from ESP-IDF v6.0.1
-  `esp32p4.rom.eco5*.ld`). The previous file used pre-ECO5 addresses and
-  silently misnamed several ROM symbols on v3.x silicon (e.g.
-  `esp_rom_crc32_le` and `crc32_be`).
+- ESP32-P4: replace the pre-ECO5 ROM linker scripts with ECO5+ symbol addresses sourced from ESP-IDF v6.0.1 (#5400)
 
 ### Fixed
 
