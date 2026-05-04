@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, path::Path, process::Command};
+use std::{
+    collections::{BTreeMap, btree_map::Entry},
+    path::Path,
+    process::Command,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
@@ -139,9 +143,20 @@ pub(crate) fn collect_changelogs(
             let crate_name = &section.crate_name;
 
             for entry in &section.changelog {
-                let changelog = changelogs
-                    .entry(crate_name.clone())
-                    .or_insert_with(|| load_changelog(workspace, crate_name));
+                let changelog = match changelogs.entry(crate_name.clone()) {
+                    Entry::Occupied(e) => e.into_mut(),
+                    Entry::Vacant(e) => {
+                        match load_changelog(workspace, crate_name) {
+                            Ok(Some(cl)) => e.insert(cl),
+                            Ok(None) => e.insert(Changelog::empty()),
+                            Err(err) => {
+                                log::warn!("Skipping changelog entries for '{crate_name}': {err}");
+                                // Do not insert — prevents accidental overwrites.
+                                continue;
+                            }
+                        }
+                    }
+                };
 
                 let text = match &section.area {
                     Some(area) => format!("{area}: {}", entry.text),
@@ -205,21 +220,24 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
 
 /// Load and parse an existing `CHANGELOG.md` for the given crate name.
 ///
-/// If no changelog exists (e.g. the crate name is unknown or has no file),
-/// returns an empty `Changelog`.
-fn load_changelog(workspace: &Path, crate_name: &str) -> Changelog {
+/// Returns `Ok(None)` when no `CHANGELOG.md` exists for the crate (normal for
+/// new or changelog-free crates). Returns `Err` when the file exists but
+/// cannot be parsed — callers **must not** write a derived changelog back to
+/// disk in that case, to avoid accidentally overwriting good history with a
+/// partially-constructed file.
+fn load_changelog(workspace: &Path, crate_name: &str) -> Result<Option<Changelog>> {
     let path = workspace.join(crate_name).join("CHANGELOG.md");
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        log::debug!("No CHANGELOG.md found for '{crate_name}' (checked {path:?})");
-        return Changelog::empty();
-    };
-    match Changelog::parse(&text) {
-        Ok(cl) => cl,
-        Err(e) => {
-            log::warn!("Failed to parse {}: {e}", path.display());
-            Changelog::empty()
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::debug!("No CHANGELOG.md found for '{crate_name}' (checked {path:?})");
+            return Ok(None);
         }
-    }
+        Err(e) => return Err(e).context(format!("Failed to read {}", path.display())),
+    };
+    Changelog::parse(&text)
+        .map(Some)
+        .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 // ---------------------------------------------------------------------------
