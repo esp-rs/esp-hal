@@ -6,7 +6,7 @@ To help us review it efficiently, please ensure you've gone through the followin
 ### Submission Checklist 📝
 - [ ] I have updated existing examples or added new ones (if applicable).
 - [ ] I have used `cargo xtask fmt-packages` command to ensure that all changed code is formatted correctly.
-- [ ] I have added changelog entries and/or migration guide notes in the sections below (if applicable).
+- [ ] I have added changelog entries and/or migration guide notes in the sections below, or I will ask a maintainer to add the `skip-changelog` label if not applicable.
 - [ ] My changes are in accordance to the [esp-rs developer guidelines](https://github.com/esp-rs/esp-hal/blob/main/documentation/DEVELOPER-GUIDELINES.md)
 
 #### Extra:

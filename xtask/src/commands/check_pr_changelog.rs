@@ -7,14 +7,16 @@ use crate::pr_changelog::{PrChangelog, PrSection, validate};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
-/// Check the changelog format of a PR description.
+/// Validate the changelog entries in a PR description.
+///
+/// Changelog entries are optional — contributors are not required to add them.
+/// When entries are present their format is checked and the referenced crate
+/// names must be published workspace packages. If a published package was
+/// modified without any changelog entry, the check fails; a maintainer can
+/// apply the `skip-changelog` label to waive this requirement.
 ///
 /// When `--pr` is given, the PR body, labels, and changed files are fetched
-/// from GitHub. For each package that was modified in the PR, a changelog entry
-/// must be present in the PR description — unless the `skip-changelog` label
-/// is set.
-///
-/// When reading from stdin the body is parsed, its format and crate names are
+/// from GitHub. When reading from stdin the body format and crate names are
 /// validated, but the per-package coverage check is skipped (no file list).
 pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()> {
     match pr_number {
@@ -65,7 +67,7 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
         bail!(
             "PR #{pr_number} modifies the following package(s) without a changelog entry: {}.\n\
              Add entries to the `# Changelog` section of the PR description, \
-             or apply the `{SKIP_LABEL}` label.",
+             or ask a maintainer to apply the `{SKIP_LABEL}` label.",
             missing.join(", ")
         )
     }

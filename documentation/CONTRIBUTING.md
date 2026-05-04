@@ -122,8 +122,8 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   Add changelog entries and/or migration guide notes directly in the PR description using the structured sections provided by the template (see below). Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time from the PR descriptions.
-*   If your change requires user code to be changed, describe the required migration steps in the `# Migration guide` section of the PR description.
+*   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
+*   If your change requires user code to be updated, describe the required migration steps in the `# Migration guide` section of the PR description.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -137,9 +137,13 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 
 ## Changelog and Migration Guide Entries
 
-Changelog information is collected from pull request descriptions rather than from
-manually edited `CHANGELOG.md` files. When you open a PR, use the template sections
-at the bottom of the description to record your changes.
+Changelog entries are **optional for contributors**. If you don't add them a
+maintainer will either write them or apply the `skip-changelog` label before the
+PR is merged.
+
+If you do want to document your change, add entries directly in the PR description
+using the structured sections in the template. Do **not** edit `CHANGELOG.md` —
+those files are updated automatically at release time from the PR descriptions.
 
 ### Format
 
