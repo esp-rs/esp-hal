@@ -692,10 +692,10 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 #[cfg(dma_can_access_psram)]
                 align_buffer,
                 ..
-            } => {
+            } =>
+            {
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
-                    // Avoid copying the write_back buffer
                     if let Some(buffer) = buffer.as_ref() {
                         buffer.write_back();
                     }
@@ -940,8 +940,8 @@ where
     )]
     #[cfg_attr(
         esp32s2,
-        doc = "On ESP32-S2, transferring to PSRAM requires the buffer's _end_ to be 16-byte aligned,
-        otherwise the driver requires copying the entire buffer."
+        doc = "On ESP32-S2, receiving into to PSRAM requires the buffer's _end_ to be 16-byte
+        aligned, otherwise the driver requires copying the entire buffer."
     )]
     #[doc = ""]
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
