@@ -1896,12 +1896,11 @@ impl Chip {
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
-                    "i2s_version=\"2\"",
+                    "i2s_version=\"3\"",
                     "i2s_default_clock_source=\"2\"",
                     "i2s_mclk_divider_bit_width=\"9\"",
                     "i2s_max_ws_width=\"512\"",
                     "i2s_clock_configured_by_pcr",
-                    "i2s_conf1_fields_in_conf",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
                     "lp_i2c_master_fifo_size=\"16\"",
@@ -2153,12 +2152,11 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
-                    "cargo:rustc-cfg=i2s_version=\"2\"",
+                    "cargo:rustc-cfg=i2s_version=\"3\"",
                     "cargo:rustc-cfg=i2s_default_clock_source=\"2\"",
                     "cargo:rustc-cfg=i2s_mclk_divider_bit_width=\"9\"",
                     "cargo:rustc-cfg=i2s_max_ws_width=\"512\"",
                     "cargo:rustc-cfg=i2s_clock_configured_by_pcr",
-                    "cargo:rustc-cfg=i2s_conf1_fields_in_conf",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
@@ -3223,12 +3221,11 @@ impl Chip {
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
-                    "i2s_version=\"2\"",
+                    "i2s_version=\"3\"",
                     "i2s_default_clock_source=\"2\"",
                     "i2s_mclk_divider_bit_width=\"9\"",
                     "i2s_max_ws_width=\"512\"",
                     "i2s_clock_configured_by_pcr",
-                    "i2s_conf1_fields_in_conf",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
                     "phy_combo_module",
@@ -3420,12 +3417,11 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
-                    "cargo:rustc-cfg=i2s_version=\"2\"",
+                    "cargo:rustc-cfg=i2s_version=\"3\"",
                     "cargo:rustc-cfg=i2s_default_clock_source=\"2\"",
                     "cargo:rustc-cfg=i2s_mclk_divider_bit_width=\"9\"",
                     "cargo:rustc-cfg=i2s_max_ws_width=\"512\"",
                     "cargo:rustc-cfg=i2s_clock_configured_by_pcr",
-                    "cargo:rustc-cfg=i2s_conf1_fields_in_conf",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -3791,12 +3787,11 @@ impl Chip {
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
-                    "i2s_version=\"2\"",
+                    "i2s_version=\"3\"",
                     "i2s_default_clock_source=\"1\"",
                     "i2s_mclk_divider_bit_width=\"9\"",
                     "i2s_max_ws_width=\"512\"",
                     "i2s_clock_configured_by_pcr",
-                    "i2s_conf1_fields_in_conf",
                     "interrupts_status_registers=\"2\"",
                     "interrupt_controller=\"plic\"",
                     "parl_io_version=\"2\"",
@@ -4037,12 +4032,11 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
-                    "cargo:rustc-cfg=i2s_version=\"2\"",
+                    "cargo:rustc-cfg=i2s_version=\"3\"",
                     "cargo:rustc-cfg=i2s_default_clock_source=\"1\"",
                     "cargo:rustc-cfg=i2s_mclk_divider_bit_width=\"9\"",
                     "cargo:rustc-cfg=i2s_max_ws_width=\"512\"",
                     "cargo:rustc-cfg=i2s_clock_configured_by_pcr",
-                    "cargo:rustc-cfg=i2s_conf1_fields_in_conf",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
                     "cargo:rustc-cfg=parl_io_version=\"2\"",
@@ -6471,7 +6465,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(i2s_clock_configured_by_pcr)");
-    println!("cargo:rustc-check-cfg=cfg(i2s_conf1_fields_in_conf)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_branch_predictor)");
@@ -6608,7 +6601,7 @@ pub fn emit_check_cfg_directives() {
     );
     println!("cargo:rustc-check-cfg=cfg(i2c_master_ll_intr_mask, values(\"262143\",\"131071\"))");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_fifo_size, values(\"32\",\"16\"))");
-    println!("cargo:rustc-check-cfg=cfg(i2s_version, values(\"1\",\"2\"))");
+    println!("cargo:rustc-check-cfg=cfg(i2s_version, values(\"1\",\"2\",\"3\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_default_clock_source, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_mclk_divider_bit_width, values(\"6\",\"9\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_max_ws_width, values(\"128\",\"512\"))");

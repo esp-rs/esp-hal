@@ -238,9 +238,6 @@ macro_rules! property {
     ("i2s.clock_configured_by_pcr") => {
         true
     };
-    ("i2s.conf1_fields_in_conf") => {
-        false
-    };
     ("interrupts.status_registers") => {
         3
     };

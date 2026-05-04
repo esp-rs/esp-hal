@@ -1751,7 +1751,7 @@ mod private {
         }
     }
 
-    #[cfg(i2s_version = "2")]
+    #[cfg(not(i2s_version = "1"))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
@@ -1828,12 +1828,12 @@ mod private {
                 w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
-            #[cfg(not(i2s_conf1_fields_in_conf))]
+            #[cfg(i2s_version = "2")]
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(i2s_conf1_fields_in_conf)]
+            #[cfg(i2s_version = "3")]
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1859,12 +1859,12 @@ mod private {
                 w.mclk_sel().bit(true)
             });
 
-            #[cfg(not(i2s_conf1_fields_in_conf))]
+            #[cfg(i2s_version = "2")]
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(i2s_conf1_fields_in_conf)]
+            #[cfg(i2s_version = "3")]
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1894,13 +1894,13 @@ mod private {
                     .bits(clock_settings.mclk_divider as u8)
             });
 
-            #[cfg(not(i2s_conf1_fields_in_conf))]
+            #[cfg(i2s_version = "2")]
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            #[cfg(i2s_conf1_fields_in_conf)]
+            #[cfg(i2s_version = "3")]
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1931,13 +1931,13 @@ mod private {
                 w.i2s_mclk_sel().bit(true)
             });
 
-            #[cfg(not(i2s_conf1_fields_in_conf))]
+            #[cfg(i2s_version = "2")]
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            #[cfg(i2s_conf1_fields_in_conf)]
+            #[cfg(i2s_version = "3")]
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1969,7 +1969,7 @@ mod private {
             self.set_tx_clock(config.calculate_clock());
 
             self.regs().tx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(i2s_conf1_fields_in_conf))]
+                #[cfg(i2s_version = "2")]
                 w.tx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.tx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -1988,7 +1988,7 @@ mod private {
                 w.tx_tdm_en().set_bit();
                 w.tx_pdm_en().clear_bit();
                 w.tx_pcm_bypass().set_bit();
-                #[cfg(i2s_conf1_fields_in_conf)]
+                #[cfg(i2s_version = "3")]
                 w.tx_msb_shift().bit(config.msb_shift);
                 w.tx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
@@ -2035,7 +2035,7 @@ mod private {
             self.set_rx_clock(config.calculate_clock());
 
             self.regs().rx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(i2s_conf1_fields_in_conf))]
+                #[cfg(i2s_version = "2")]
                 w.rx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.rx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -2053,7 +2053,7 @@ mod private {
                 w.rx_tdm_en().set_bit();
                 w.rx_pdm_en().clear_bit();
                 w.rx_pcm_bypass().set_bit();
-                #[cfg(i2s_conf1_fields_in_conf)]
+                #[cfg(i2s_version = "3")]
                 w.rx_msb_shift().bit(config.msb_shift);
                 w.rx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
@@ -2394,7 +2394,7 @@ mod private {
         numerator: u32,
     }
 
-    #[cfg(i2s_version = "2")]
+    #[cfg(not(i2s_version = "1"))]
     pub struct I2sMclkDividers {
         x: u32,
         y: u32,
@@ -2466,7 +2466,7 @@ mod private {
             }
         }
 
-        #[cfg(i2s_version = "2")]
+        #[cfg(not(i2s_version = "1"))]
         fn mclk_dividers(&self) -> I2sMclkDividers {
             let x;
             let y;

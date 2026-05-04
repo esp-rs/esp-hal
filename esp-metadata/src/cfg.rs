@@ -464,9 +464,6 @@ driver_configs![
             #[serde(default)]
             /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,
-            #[serde(default)]
-            /// Whether CONF1 fields (BCK divider and MSB shift) live in TX/RX_CONF.
-            conf1_fields_in_conf: bool,
         }
     },
     IeeeProperties {

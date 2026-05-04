@@ -212,10 +212,10 @@ macro_rules! property {
         stringify!(32)
     };
     ("i2s.version") => {
-        2
+        3
     };
     ("i2s.version", str) => {
-        stringify!(2)
+        stringify!(3)
     };
     ("i2s.default_clock_source") => {
         2
@@ -236,9 +236,6 @@ macro_rules! property {
         stringify!(512)
     };
     ("i2s.clock_configured_by_pcr") => {
-        true
-    };
-    ("i2s.conf1_fields_in_conf") => {
         true
     };
     ("interrupts.status_registers") => {
