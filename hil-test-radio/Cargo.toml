@@ -16,6 +16,7 @@ required-features = ["esp-alloc"]
 name              = "wifi_ap_support"
 harness           = false
 required-features = ["esp-alloc"]
+path              = "src/bin/support/wifi_ap_support.rs"
 
 [dependencies]
 cfg-if             = "1"
@@ -27,14 +28,14 @@ embedded-io        = "0.7.1"
 embedded-io-async  = "0.7.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
-esp-hal            = { path = "../esp-hal", features = ["defmt"] }
-esp-rtos           = { path = "../esp-rtos", features = ["defmt"], optional = true }
+esp-hal            = { path = "../esp-hal" }
+esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
-esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
+esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
-embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting", "defmt"] }
+embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 
 # radio HIL deps
 embassy-net = { version = "0.8.0", features = [
@@ -55,7 +56,7 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt"]
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos/defmt", "esp-radio/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]

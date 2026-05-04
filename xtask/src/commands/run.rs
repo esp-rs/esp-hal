@@ -13,7 +13,7 @@ use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::{self, Metadata},
-    radio_hil_runner::run_radio_test,
+    radio_hil_runner::run_radio_test_elf,
 };
 
 // ----------------------------------------------------------------------------
@@ -183,7 +183,13 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
         if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
-            if meta.is_support_firmware() {
+            let is_support_firmware = radio_tests.iter().any(|candidate| {
+                candidate.supports_chip(args.chip)
+                    && candidate.harness_firmware().is_some_and(|name| {
+                        name == meta.binary_name() || name == meta.output_file_name()
+                    })
+            });
+            if is_support_firmware {
                 log::info!("Skipping support firmware '{}'", elf_name);
                 continue;
             }
@@ -202,7 +208,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = run_radio_test(&elf_path, harness_path.as_deref(), 120, None) {
+            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {

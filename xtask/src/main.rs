@@ -779,7 +779,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 test: None,
                 toolchain: None,
                 timings: false,
-                package: Some("hil-test".to_string()),
+                package: "hil-test".to_string(),
             },
             CargoAction::Build(Some(target_path.join("tests"))),
         )?;
@@ -792,7 +792,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 test: None,
                 toolchain: None,
                 timings: false,
-                package: Some("hil-test-radio".to_string()),
+                package: "hil-test-radio".to_string(),
             },
             CargoAction::Build(Some(target_path.join("tests"))),
         )

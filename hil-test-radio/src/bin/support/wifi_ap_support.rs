@@ -1,5 +1,4 @@
 //% CHIPS(has_wifi_ble): esp32c6
-//% SUPPORT_FIRMWARE: true
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio/unstable
 //% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
