@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(i2s_version = "1") => "DMA_I2S0",
-        cfg(not(i2s_version = "1")) => "DMA_CH0"
+        cfg(dma_kind = "pdma") => "DMA_I2S0",
+        cfg(dma_kind = "gdma") => "DMA_CH0"
     },
     "mclk" => {
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
