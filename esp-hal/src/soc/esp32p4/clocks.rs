@@ -98,8 +98,8 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(self) {
-        self.apply();
+    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+        self.apply(clocks);
     }
 }
 

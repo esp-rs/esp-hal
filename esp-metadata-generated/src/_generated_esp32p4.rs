@@ -2169,24 +2169,22 @@ macro_rules! define_clock_tree_types {
             pub lp_slow_clk: Option<LpSlowClkConfig>,
         }
         impl ClockConfig {
-            fn apply(&self) {
-                ClockTree::with(|clocks| {
-                    if let Some(config) = self.cpu_root_clk {
-                        configure_cpu_root_clk(clocks, config);
-                    }
-                    if let Some(config) = self.cpu_clk {
-                        configure_cpu_clk(clocks, config);
-                    }
-                    if let Some(config) = self.apb_clk {
-                        configure_apb_clk(clocks, config);
-                    }
-                    if let Some(config) = self.lp_fast_clk {
-                        configure_lp_fast_clk(clocks, config);
-                    }
-                    if let Some(config) = self.lp_slow_clk {
-                        configure_lp_slow_clk(clocks, config);
-                    }
-                });
+            fn apply(&self, clocks: &mut ClockTree) {
+                if let Some(config) = self.cpu_root_clk {
+                    configure_cpu_root_clk(clocks, config);
+                }
+                if let Some(config) = self.cpu_clk {
+                    configure_cpu_clk(clocks, config);
+                }
+                if let Some(config) = self.apb_clk {
+                    configure_apb_clk(clocks, config);
+                }
+                if let Some(config) = self.lp_fast_clk {
+                    configure_lp_fast_clk(clocks, config);
+                }
+                if let Some(config) = self.lp_slow_clk {
+                    configure_lp_slow_clk(clocks, config);
+                }
             }
         }
         fn increment_reference_count(refcount: &mut u32) -> bool {
