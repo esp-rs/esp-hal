@@ -75,7 +75,11 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
                     .entry(crate_name.clone())
                     .or_insert_with(|| load_changelog(workspace, crate_name));
 
-                changelog.add_entry(entry.kind.as_str(), &entry.text, pr_cl.pr_number);
+                let text = match &section.area {
+                    Some(area) => format!("{area}: {}", entry.text),
+                    None => entry.text.clone(),
+                };
+                changelog.add_entry(entry.kind.as_str(), &text, pr_cl.pr_number);
             }
 
             if let Some(guide) = &section.migration_guide {
