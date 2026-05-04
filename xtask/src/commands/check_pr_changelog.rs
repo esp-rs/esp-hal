@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::Read as _, path::Path, process::Command};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::pr_changelog::{PrChangelog, validate};
+use crate::pr_changelog::{PrChangelog, PrSection, validate};
 
 const SKIP_LABEL: &str = "skip-changelog";
 
@@ -14,7 +14,8 @@ const SKIP_LABEL: &str = "skip-changelog";
 /// must be present in the PR description — unless the `skip-changelog` label
 /// is set.
 ///
-/// When reading from stdin only the format of the body is validated.
+/// When reading from stdin the body is parsed, its format and crate names are
+/// validated, but the per-package coverage check is skipped (no file list).
 pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()> {
     match pr_number {
         Some(pr) => {
@@ -26,23 +27,13 @@ pub fn check_pr_changelog(workspace: &Path, pr_number: Option<u64>) -> Result<()
             std::io::stdin()
                 .read_to_string(&mut body)
                 .context("Failed to read PR body from stdin")?;
-            check_body_format_only(workspace, &body)
+            check_body(workspace, &body)
         }
     }
 }
 
-fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo) -> Result<()> {
-    // Validate format first.
-    let errors = validate(&info.body);
-    if !errors.is_empty() {
-        for error in &errors {
-            log::error!("{error}");
-        }
-        bail!(
-            "{} format error(s) found in PR #{pr_number} description.",
-            errors.len()
-        );
-    }
+fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Result<()> {
+    fail_on_format_errors(pr_number, validate(&info.body))?;
 
     // If the skip label is set, nothing else to check.
     if info.labels.iter().any(|l| l == SKIP_LABEL) {
@@ -50,9 +41,8 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
         return Ok(());
     }
 
-    // Validate that all crate names referenced in the changelog exist and are published.
-    // This runs unconditionally so entries for unknown/unpublished packages always fail.
-    check_changelog_crate_names(workspace, pr_number, &info.body)?;
+    // Parse once; reuse for both crate-name validation and coverage check.
+    let sections = parse_and_validate_crates(workspace, &info.body)?;
 
     // Determine which published packages were touched.
     let modified = modified_packages(workspace, &info.files);
@@ -61,19 +51,10 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
         return Ok(());
     }
 
-    // Determine which crates have changelog entries in the PR body.
-    let covered: HashSet<String> = PrChangelog::parse(pr_number, &info.body)?
-        .map(|cl| {
-            cl.sections
-                .into_iter()
-                .map(|s| s.crate_name)
-                .collect::<HashSet<_>>()
-        })
-        .unwrap_or_default();
-
+    let covered: HashSet<&str> = sections.iter().map(|s| s.crate_name.as_str()).collect();
     let missing: Vec<&str> = modified
         .iter()
-        .filter(|pkg| !covered.contains(*pkg))
+        .filter(|pkg| !covered.contains(pkg.as_str()))
         .map(|s| s.as_str())
         .collect();
 
@@ -91,39 +72,40 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &FetchedPrInfo
 }
 
 /// Validate body format and crate names (used when reading from stdin).
-fn check_body_format_only(workspace: &Path, body: &str) -> Result<()> {
-    let errors = validate(body);
-    if !errors.is_empty() {
-        for error in &errors {
-            log::error!("{error}");
-        }
-        bail!(
-            "{} format error(s) found in the PR description.",
-            errors.len()
-        );
-    }
-    check_changelog_crate_names(workspace, 0, body)?;
+fn check_body(workspace: &Path, body: &str) -> Result<()> {
+    fail_on_format_errors(0, validate(body))?;
+    parse_and_validate_crates(workspace, body)?;
     log::info!("PR description changelog format is valid.");
     Ok(())
 }
 
-/// Verify that every crate name referenced in the changelog sections of `body`
-/// corresponds to a published package in the workspace.
-///
-/// Fails if any referenced crate:
-/// - has no `Cargo.toml` in the workspace (unknown package), or
-/// - has `publish = false` (not a published package).
-fn check_changelog_crate_names(workspace: &Path, pr_number: u64, body: &str) -> Result<()> {
-    let Some(cl) = PrChangelog::parse(pr_number, body)? else {
+/// Emit formatted errors and bail if `errors` is non-empty.
+fn fail_on_format_errors(pr_number: u64, errors: Vec<String>) -> Result<()> {
+    if errors.is_empty() {
         return Ok(());
-    };
+    }
+    for error in &errors {
+        log::error!("{error}");
+    }
+    if pr_number == 0 {
+        bail!("{} format error(s) found in the PR description.", errors.len());
+    } else {
+        bail!("{} format error(s) found in PR #{pr_number} description.", errors.len());
+    }
+}
+
+/// Parse `body` and verify every referenced crate is a published workspace package.
+///
+/// Returns the parsed sections so callers can reuse them without re-parsing.
+fn parse_and_validate_crates(workspace: &Path, body: &str) -> Result<Vec<PrSection>> {
+    let sections = PrChangelog::parse(0, body)?
+        .map(|cl| cl.sections)
+        .unwrap_or_default();
 
     let mut bad: Vec<String> = Vec::new();
-
-    for section in &cl.sections {
+    for section in &sections {
         let name = &section.crate_name;
         let cargo_toml = workspace.join(name).join("Cargo.toml");
-
         if !cargo_toml.exists() {
             bad.push(format!("`{name}` (no such package in the workspace)"));
         } else if !is_published(&cargo_toml) {
@@ -132,7 +114,7 @@ fn check_changelog_crate_names(workspace: &Path, pr_number: u64, body: &str) -> 
     }
 
     if bad.is_empty() {
-        Ok(())
+        Ok(sections)
     } else {
         bail!(
             "Changelog entries reference package(s) that are not published:\n  {}\n\
@@ -143,36 +125,28 @@ fn check_changelog_crate_names(workspace: &Path, pr_number: u64, body: &str) -> 
 }
 
 /// Return the set of published package directory names touched by `files`.
-///
-/// A package is considered published when its `Cargo.toml` does not contain
-/// `publish = false`. Packages without a `Cargo.toml` at the workspace root
-/// level are ignored.
 fn modified_packages(workspace: &Path, files: &[GhFile]) -> HashSet<String> {
-    let mut result = HashSet::new();
-
-    for dir in files
+    files
         .iter()
         .filter_map(|f| f.path.split('/').next())
         .collect::<HashSet<_>>()
-    {
-        let cargo_toml_path = workspace.join(dir).join("Cargo.toml");
-        if !cargo_toml_path.exists() {
-            continue;
-        }
-        if is_published(&cargo_toml_path) {
-            result.insert(dir.to_string());
-        } else {
-            log::debug!("Skipping '{dir}': publish = false");
-        }
-    }
-
-    result
+        .into_iter()
+        .filter(|dir| {
+            let p = workspace.join(dir).join("Cargo.toml");
+            if !p.exists() {
+                return false;
+            }
+            let published = is_published(&p);
+            if !published {
+                log::debug!("Skipping '{dir}': publish = false");
+            }
+            published
+        })
+        .map(|s| s.to_string())
+        .collect()
 }
 
-/// Returns `true` when the `Cargo.toml` at `path` does not opt out of publishing.
-///
-/// A package is considered unpublished when it has `publish = false` in its
-/// `[package]` table. Missing the key, or any parse error, defaults to `true`.
+/// Returns `true` when the `Cargo.toml` at `path` does not have `publish = false`.
 fn is_published(path: &Path) -> bool {
     let Ok(text) = std::fs::read_to_string(path) else {
         return true;
@@ -190,15 +164,21 @@ fn is_published(path: &Path) -> bool {
 // GitHub API types
 
 #[derive(Debug, Deserialize)]
-struct GhPrInfo {
+struct PrInfo {
     body: String,
-    labels: Vec<GhLabel>,
+    labels: Vec<Label>,
     files: Vec<GhFile>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GhLabel {
+struct Label {
     name: String,
+}
+
+impl PartialEq<str> for Label {
+    fn eq(&self, other: &str) -> bool {
+        self.name == other
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -206,14 +186,8 @@ struct GhFile {
     path: String,
 }
 
-struct FetchedPrInfo {
-    body: String,
-    labels: Vec<String>,
-    files: Vec<GhFile>,
-}
-
 /// Use the `gh` CLI to fetch the body, labels, and changed files of a PR.
-fn fetch_pr_info(pr_number: u64) -> Result<FetchedPrInfo> {
+fn fetch_pr_info(pr_number: u64) -> Result<PrInfo> {
     let output = Command::new("gh")
         .args([
             "pr",
@@ -232,12 +206,5 @@ fn fetch_pr_info(pr_number: u64) -> Result<FetchedPrInfo> {
         );
     }
 
-    let info: GhPrInfo = serde_json::from_slice(&output.stdout)
-        .context("Failed to parse `gh pr view` output")?;
-
-    Ok(FetchedPrInfo {
-        body: info.body,
-        labels: info.labels.into_iter().map(|l| l.name).collect(),
-        files: info.files,
-    })
+    serde_json::from_slice(&output.stdout).context("Failed to parse `gh pr view` output")
 }

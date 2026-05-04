@@ -112,10 +112,8 @@ impl PrChangelog {
     /// Returns `Ok(None)` if the body contains neither a `# Changelog` nor a
     /// `# Migration guide` section.
     pub fn parse(pr_number: u64, body: &str) -> Result<Option<Self>> {
-        // Normalize line endings so the parser works regardless of whether the
-        // body came from GitHub (CRLF) or a local file (LF).
-        let body = body.replace("\r\n", "\n");
-        let body = body.as_str();
+        // Normalize CRLF (GitHub) to LF so the parser doesn't need to handle both.
+        let body = &body.replace("\r\n", "\n");
 
         let mut sections: Vec<PrSection> = Vec::new();
 
@@ -291,6 +289,7 @@ fn non_comment_lines(text: &str) -> impl Iterator<Item = &str> {
 
 /// Return the body text that follows a `# <title>` H1 heading (case-insensitive).
 ///
+/// Assumes LF-only line endings (callers must normalize first).
 /// Returns `None` if no matching heading is found.
 fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
     let needle = format!("# {title}");
@@ -298,13 +297,9 @@ fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
     for line in body.lines() {
         let line_len = line.len();
         if line.trim().eq_ignore_ascii_case(&needle) {
-            // Skip past the newline after this heading
-            let start = offset + line_len;
-            let rest = &body[start..];
-            return Some(rest.trim_start_matches('\n').trim_start_matches("\r\n"));
+            return Some(body[offset + line_len..].trim_start_matches('\n'));
         }
-        // +1 for the '\n'; handles both '\n' and '\r\n' bodies well enough
-        offset += line_len + 1;
+        offset += line_len + 1; // +1 for '\n'
     }
     None
 }
@@ -313,8 +308,7 @@ fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
 ///
 /// Returns an empty `Vec` if the body is valid (or has no changelog sections at all).
 pub fn validate(body: &str) -> Vec<String> {
-    let body = body.replace("\r\n", "\n");
-    let body = body.as_str();
+    let body = &body.replace("\r\n", "\n");
 
     let mut errors = Vec::new();
 
