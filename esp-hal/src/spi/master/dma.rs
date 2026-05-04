@@ -450,7 +450,7 @@ impl<'d> SpiDma<'d, Async> {
         self.wait_for_idle_async().await;
         self.driver().setup_full_duplex()?;
 
-        let mut descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_write(words) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
@@ -497,7 +497,7 @@ impl<'d> SpiDma<'d, Async> {
             },
         };
 
-        let mut tx_descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
@@ -1228,7 +1228,7 @@ where
         self.wait_for_idle();
         self.driver().setup_full_duplex()?;
 
-        let mut descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_buffer = match DmaOperationKind::for_write(words) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
@@ -1269,7 +1269,7 @@ where
             },
         };
 
-        let mut tx_descriptors = [DmaDescriptor::EMPTY; MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2];
+        let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
         let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
