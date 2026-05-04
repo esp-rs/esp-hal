@@ -53,7 +53,14 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
         return Ok(());
     }
 
-    let covered: HashSet<&str> = sections.iter().map(|s| s.crate_name.as_str()).collect();
+    // A section counts as "covered" only when it contains at least one
+    // changelog list item. A migration-guide-only section does not satisfy
+    // the changelog requirement.
+    let covered: HashSet<&str> = sections
+        .iter()
+        .filter(|s| !s.changelog.is_empty())
+        .map(|s| s.crate_name.as_str())
+        .collect();
     let missing: Vec<&str> = modified
         .iter()
         .filter(|pkg| !covered.contains(pkg.as_str()))

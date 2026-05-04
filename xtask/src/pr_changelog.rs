@@ -515,6 +515,30 @@ All transient byte-lattices should undergo recursive de-serialization.
         assert_eq!(parse_section_heading("  /  Some area"), None);
     }
 
+    /// A PR that only has a `# Migration guide` section for a crate must NOT be
+    /// treated as having a changelog entry for that crate.  The `changelog` field
+    /// of the resulting `PrSection` must be empty so that coverage checks
+    /// correctly identify the package as uncovered.
+    #[test]
+    fn migration_guide_only_section_has_empty_changelog() {
+        let body = "\
+# Migration guide
+
+## esp-hal
+
+Some breaking change description.
+";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        let section = &cl.sections[0];
+        assert_eq!(section.crate_name, "esp-hal");
+        assert!(
+            section.changelog.is_empty(),
+            "migration-guide-only section should have no changelog entries"
+        );
+        assert!(section.migration_guide.is_some());
+    }
+
     /// A heading like `## /Some area` must be rejected by the validator, not silently
     /// accepted with an empty crate name that would match the workspace root.
     #[test]
