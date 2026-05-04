@@ -128,10 +128,6 @@ impl<Dm> core::fmt::Debug for SpiDma<'_, Dm>
 where
     Dm: DriverMode + core::fmt::Debug,
 {
-    /// Formats the `SpiDma` instance for debugging purposes.
-    ///
-    /// This method returns a debug struct with the name "SpiDma" without
-    /// exposing internal details.
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SpiDma").field("spi", &self.spi).finish()
     }
@@ -139,9 +135,6 @@ where
 
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for SpiDma<'_, Blocking> {
-    /// Sets the interrupt handler
-    ///
-    /// Interrupts are not enabled at the peripheral level here.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
@@ -190,7 +183,9 @@ where
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
+        // DMA limitation - we must ensure the transfers complete before returning
+        // to user code, otherwise the user might access the buffers while the transfer
+        // is still in progress. Therefore, there is no such thing as "flushing".
         Ok(())
     }
 }
@@ -214,7 +209,9 @@ impl embedded_hal_async::spi::SpiBus for SpiDma<'_, Async> {
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        // All operations currently flush so this is no-op.
+        // DMA limitation - we must ensure the transfers complete before returning
+        // to user code, otherwise the user might access the buffers while the transfer
+        // is still in progress. Therefore, there is no such thing as "flushing".
         Ok(())
     }
 }
