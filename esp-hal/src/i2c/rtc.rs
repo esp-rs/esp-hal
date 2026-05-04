@@ -292,7 +292,7 @@ impl<'d> I2c<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Reads bytes from slave with given `address` and `register`.
+    /// Writes bytes to slave with given `address` and `register`.
     ///
     /// ## Example
     ///
