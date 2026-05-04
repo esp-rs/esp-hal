@@ -181,7 +181,7 @@ fn parse_changelog_block(body: &str, sections: &mut Vec<PrSection>) -> Result<()
 
     let mut current: Option<(String, Option<String>)> = None;
 
-    for line in after.lines() {
+    for line in non_comment_lines(after) {
         if line.starts_with("# ") {
             break;
         } else if let Some(h2) = line.strip_prefix("## ") {
@@ -234,7 +234,7 @@ fn parse_migration_guide_block(body: &str, sections: &mut Vec<PrSection>) -> Res
     let mut current: Option<(String, Option<String>)> = None;
     let mut current_lines: Vec<&str> = Vec::new();
 
-    for line in after.lines() {
+    for line in non_comment_lines(after) {
         if line.starts_with("# ") {
             break;
         } else if let Some(h2) = line.strip_prefix("## ") {
@@ -268,6 +268,27 @@ fn flush_migration(
     }
 }
 
+/// Iterate over lines of `text`, skipping any that fall inside `<!-- ... -->` blocks.
+fn non_comment_lines(text: &str) -> impl Iterator<Item = &str> {
+    let mut in_comment = false;
+    text.lines().filter(move |line| {
+        if in_comment {
+            if line.contains("-->") {
+                in_comment = false;
+            }
+            return false;
+        }
+        if line.contains("<!--") {
+            // Single-line comment: <!-- foo --> — skip but don't enter comment mode.
+            if !line.contains("-->") {
+                in_comment = true;
+            }
+            return false;
+        }
+        true
+    })
+}
+
 /// Return the body text that follows a `# <title>` H1 heading (case-insensitive).
 ///
 /// Returns `None` if no matching heading is found.
@@ -299,7 +320,7 @@ pub fn validate(body: &str) -> Vec<String> {
 
     if let Some(after) = find_h1_section(body, "Changelog") {
         let mut in_section = false;
-        for line in after.lines() {
+        for line in non_comment_lines(after) {
             if line.starts_with("# ") {
                 break;
             } else if let Some(h2) = line.strip_prefix("## ") {
@@ -324,7 +345,7 @@ pub fn validate(body: &str) -> Vec<String> {
     }
 
     if let Some(after) = find_h1_section(body, "Migration guide") {
-        for line in after.lines() {
+        for line in non_comment_lines(after) {
             if line.starts_with("# ") {
                 break;
             } else if let Some(h2) = line.strip_prefix("## ") {
@@ -408,6 +429,51 @@ All transient byte-lattices should undergo recursive de-serialization.
     fn parse_no_sections() {
         let body = "This PR fixes a typo in the README.\n\nNo changelog entries needed.";
         assert!(PrChangelog::parse(1, body).unwrap().is_none());
+    }
+
+    /// The PR template ships with placeholder entries inside HTML comments.
+    /// Those must not be treated as real changelog entries.
+    #[test]
+    fn parse_template_placeholders_are_ignored() {
+        // Matches the structure of .github/PULL_REQUEST_TEMPLATE.md
+        let body = "\
+## Thank you for your contribution!
+
+# Changelog
+
+<!-- Add one or more ## <crate> or ## <crate>/<area> sections below.
+     Each entry must start with one of: Added, Changed, Fixed, Removed.
+
+## esp-hal
+
+- Added: Brief description of what was added.
+- Changed: Brief description of what changed.
+- Fixed: Brief description of what was fixed.
+- Removed: Brief description of what was removed.
+
+-->
+
+# Migration guide
+
+<!-- Add one or more ## <crate> or ## <crate>/<area> sections below.
+     Write free-form Markdown describing what users need to change.
+     Only needed when user code must be updated.
+
+## esp-hal
+
+`OldType` has been renamed to `NewType`. Update your code accordingly.
+
+-->
+";
+        assert!(
+            PrChangelog::parse(1, body).unwrap().is_none(),
+            "placeholder content inside HTML comments should not produce changelog entries"
+        );
+        let errors = validate(body);
+        assert!(
+            errors.is_empty(),
+            "placeholder body should pass validation: {errors:?}"
+        );
     }
 
     #[test]
