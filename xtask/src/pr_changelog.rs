@@ -140,11 +140,12 @@ fn parse_section_heading(heading: &str) -> Option<(String, Option<String>)> {
         return None;
     }
     if let Some((crate_name, area)) = heading.split_once('/') {
+        let crate_name = crate_name.trim();
         let area = area.trim();
-        if area.is_empty() {
+        if crate_name.is_empty() || area.is_empty() {
             None
         } else {
-            Some((crate_name.trim().to_string(), Some(area.to_string())))
+            Some((crate_name.to_string(), Some(area.to_string())))
         }
     } else {
         Some((heading.to_string(), None))
@@ -501,7 +502,32 @@ All transient byte-lattices should undergo recursive de-serialization.
             parse_section_heading("esp-hal/RMT driver"),
             Some(("esp-hal".into(), Some("RMT driver".into())))
         );
+        assert_eq!(
+            parse_section_heading(" esp-hal / RMT driver"),
+            Some(("esp-hal".into(), Some("RMT driver".into())))
+        );
+        // Empty heading
         assert_eq!(parse_section_heading(""), None);
+        // Missing area after slash
         assert_eq!(parse_section_heading("esp-hal/"), None);
+        // Missing crate name before slash — must not produce an empty crate_name
+        assert_eq!(parse_section_heading("/Some area"), None);
+        assert_eq!(parse_section_heading("  /  Some area"), None);
+    }
+
+    /// A heading like `## /Some area` must be rejected by the validator, not silently
+    /// accepted with an empty crate name that would match the workspace root.
+    #[test]
+    fn validate_rejects_empty_crate_name() {
+        let body = "# Changelog\n\n## /Some area\n\n- Added: something\n";
+        let errors = validate(body);
+        assert!(
+            !errors.is_empty(),
+            "expected a validation error for `## /Some area` but got none"
+        );
+        assert!(
+            errors.iter().any(|e| e.contains("Invalid section heading")),
+            "unexpected errors: {errors:?}"
+        );
     }
 }
