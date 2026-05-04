@@ -217,10 +217,7 @@ macro_rules! property {
     ("i2s.clock_configured_by_pcr") => {
         false
     };
-    ("i2s.bck_divider_in_conf") => {
-        false
-    };
-    ("i2s.msb_shift_in_conf") => {
+    ("i2s.conf1_fields_in_conf") => {
         false
     };
     ("interrupts.status_registers") => {

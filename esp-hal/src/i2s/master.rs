@@ -1829,12 +1829,12 @@ mod private {
                 w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
-            #[cfg(not(i2s_bck_divider_in_conf))]
+            #[cfg(not(i2s_conf1_fields_in_conf))]
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(i2s_bck_divider_in_conf)]
+            #[cfg(i2s_conf1_fields_in_conf)]
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1861,12 +1861,12 @@ mod private {
                 w.mclk_sel().bit(true)
             });
 
-            #[cfg(not(i2s_bck_divider_in_conf))]
+            #[cfg(not(i2s_conf1_fields_in_conf))]
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
-            #[cfg(i2s_bck_divider_in_conf)]
+            #[cfg(i2s_conf1_fields_in_conf)]
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1896,13 +1896,13 @@ mod private {
                     .bits(clock_settings.mclk_divider as u8)
             });
 
-            #[cfg(not(i2s_bck_divider_in_conf))]
+            #[cfg(not(i2s_conf1_fields_in_conf))]
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            #[cfg(i2s_bck_divider_in_conf)]
+            #[cfg(i2s_conf1_fields_in_conf)]
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1933,13 +1933,13 @@ mod private {
                 w.i2s_mclk_sel().bit(true)
             });
 
-            #[cfg(not(i2s_bck_divider_in_conf))]
+            #[cfg(not(i2s_conf1_fields_in_conf))]
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
             });
 
-            #[cfg(i2s_bck_divider_in_conf)]
+            #[cfg(i2s_conf1_fields_in_conf)]
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_bck_div_num()
                     .bits((clock_settings.bclk_divider - 1) as u8)
@@ -1971,7 +1971,7 @@ mod private {
             self.set_tx_clock(config.calculate_clock());
 
             self.regs().tx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(i2s_msb_shift_in_conf))]
+                #[cfg(not(i2s_conf1_fields_in_conf))]
                 w.tx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.tx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -1990,7 +1990,7 @@ mod private {
                 w.tx_tdm_en().set_bit();
                 w.tx_pdm_en().clear_bit();
                 w.tx_pcm_bypass().set_bit();
-                #[cfg(i2s_msb_shift_in_conf)]
+                #[cfg(i2s_conf1_fields_in_conf)]
                 w.tx_msb_shift().bit(config.msb_shift);
                 w.tx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
@@ -2037,7 +2037,7 @@ mod private {
             self.set_rx_clock(config.calculate_clock());
 
             self.regs().rx_conf1().modify(|_, w| unsafe {
-                #[cfg(not(i2s_msb_shift_in_conf))]
+                #[cfg(not(i2s_conf1_fields_in_conf))]
                 w.rx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
                 w.rx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
@@ -2055,7 +2055,7 @@ mod private {
                 w.rx_tdm_en().set_bit();
                 w.rx_pdm_en().clear_bit();
                 w.rx_pcm_bypass().set_bit();
-                #[cfg(i2s_msb_shift_in_conf)]
+                #[cfg(i2s_conf1_fields_in_conf)]
                 w.rx_msb_shift().bit(config.msb_shift);
                 w.rx_big_endian()
                     .bit(config.endianness == Endianness::BigEndian);
