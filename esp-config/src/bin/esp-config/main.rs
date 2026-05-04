@@ -302,7 +302,7 @@ fn parse_configs(
                             parsed_val.parse_in_place(val).map_err(|_| {
                                 <std::string::String as Into<Box<dyn Error>>>::into(format!(
                                     "Unable to parse '{val}' for option '{}'",
-                                    &cfg.name
+                                    cfg.name
                                 ))
                             })?;
                             parsed_val

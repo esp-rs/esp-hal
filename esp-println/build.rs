@@ -92,8 +92,7 @@ fn generate_filter_snippet() {
                 if let Some(name) = directive.name {
                     // If a prefix matches, don't continue to the next directive
                     snippet.push_str(&format!(
-                        "if _target.starts_with(\"{}\") {{ return level <= log_04::LevelFilter::{}; }}",
-                        &name, level
+                        "if _target.starts_with(\"{name}\") {{ return level <= log_04::LevelFilter::{level}; }}"
                     ));
                 } else {
                     if global_level.is_some() {
