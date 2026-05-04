@@ -2553,7 +2553,7 @@ where
     I: dma_private::DmaSupportTx,
 {
     fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, false);
+        self.instance.peripheral_wait_dma(false, true);
     }
 }
 
