@@ -181,6 +181,12 @@ macro_rules! property {
     ("i2s.version", str) => {
         stringify!(1)
     };
+    ("i2s.default_clock_source") => {
+        2
+    };
+    ("i2s.default_clock_source", str) => {
+        stringify!(2)
+    };
     ("i2s.mclk_divider_bit_width") => {
         6
     };

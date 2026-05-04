@@ -1483,7 +1483,7 @@ mod private {
         fn set_clock(&self, clock_settings: I2sClockDividers) {
             self.regs().clkm_conf().modify(|r, w| unsafe {
                 // select PLL_160M
-                w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+                w.bits(r.bits() | (property!("i2s.default_clock_source") << 21))
             });
 
             #[cfg(esp32)]
@@ -1824,8 +1824,7 @@ mod private {
                 w.clk_en().set_bit();
                 w.tx_clk_active().set_bit();
                 // for now fixed at 160MHz
-                w.tx_clk_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                w.tx_clk_sel().bits(property!("i2s.default_clock_source"));
                 w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
             });
 
@@ -1855,8 +1854,7 @@ mod private {
             self.regs().rx_clkm_conf().modify(|_, w| unsafe {
                 w.rx_clk_active().set_bit();
                 // for now fixed at 160MHz
-                w.rx_clk_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                w.rx_clk_sel().bits(property!("i2s.default_clock_source"));
                 w.rx_clkm_div_num().bits(clock_settings.mclk_divider as u8);
                 w.mclk_sel().bit(true)
             });
@@ -1891,7 +1889,7 @@ mod private {
                 w.i2s_tx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_tx_clkm_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                    .bits(property!("i2s.default_clock_source"));
                 w.i2s_tx_clkm_div_num()
                     .bits(clock_settings.mclk_divider as u8)
             });
@@ -1927,7 +1925,7 @@ mod private {
                 w.i2s_rx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_rx_clkm_sel()
-                    .bits(crate::soc::constants::I2S_DEFAULT_CLK_SRC);
+                    .bits(property!("i2s.default_clock_source"));
                 w.i2s_rx_clkm_div_num()
                     .bits(clock_settings.mclk_divider as u8);
                 w.i2s_mclk_sel().bit(true)
@@ -2414,7 +2412,7 @@ mod private {
             // If data_bits is a power of two, use 256 as the mclk_multiple
             // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
             let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
-            let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
+            let sclk = crate::soc::i2s_sclk_frequency();
 
             let rate = sample_rate.as_hz();
 

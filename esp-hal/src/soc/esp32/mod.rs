@@ -16,12 +16,8 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32 as pac;
 
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) mod constants {
-    /// The base clock frequency for the I2S peripheral (Hertz).
-    pub const I2S_SCLK: u32 = 160_000_000;
-    /// The default clock source for I2S operations.
-    pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
+pub(crate) fn i2s_sclk_frequency() -> u32 {
+    clocks::pll_f160m_clk_frequency()
 }
 
 pub(crate) unsafe fn configure_cpu_caches() {}

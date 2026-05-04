@@ -651,6 +651,7 @@ deep_sleep = true
 ## Interfaces
 [device.i2s]
 version = 2
+default_clock_source = 1
 mclk_divider_bit_width = 9
 max_ws_width = 512
 clock_configured_by_pcr = true

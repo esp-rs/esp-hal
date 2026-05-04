@@ -436,7 +436,7 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
     // main difference is we are using fixed-point arithmetic here
     // plus adjusted for parallel interface clocking
 
-    let sclk = crate::soc::constants::I2S_SCLK; // for now it's fixed 160MHz and 96MHz (just H2)
+    let sclk = crate::soc::i2s_sclk_frequency();
 
     let rate = sample_rate.as_hz();
 
@@ -573,7 +573,7 @@ pub trait PrivateInstance: DmaEligible {
 
     fn set_clock(&self, clock_settings: I2sClockDividers) {
         self.regs().clkm_conf().modify(|r, w| unsafe {
-            w.bits(r.bits() | (crate::soc::constants::I2S_DEFAULT_CLK_SRC << 21))
+            w.bits(r.bits() | (property!("i2s.default_clock_source") << 21))
             // select PLL_160M
         });
 

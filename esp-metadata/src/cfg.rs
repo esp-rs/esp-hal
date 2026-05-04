@@ -455,6 +455,8 @@ driver_configs![
         properties: {
             /// Register-layout generation derived from the chip SVD.
             version: u32,
+            /// Default clock source selector written to the I2S clock source register.
+            default_clock_source: u32,
             /// Width of the MCLK divider field in the I2S clock register.
             mclk_divider_bit_width: u32,
             /// Largest WS divider value supported by the peripheral.
