@@ -25,6 +25,7 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
+pub mod pr_changelog;
 
 // ---------------------------------------------------------------------------
 // MCP tool registration
