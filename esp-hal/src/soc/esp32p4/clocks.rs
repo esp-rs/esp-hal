@@ -8,8 +8,14 @@
 //! Clock hierarchy: XTAL -> CPLL -> CPU_ROOT -> CPU/APB dividers
 //! SPLL -> PLL_F240M/160M/120M/80M/20M (peripheral clocks)
 #![allow(dead_code, reason = "Clock functions called from generated macro code")]
-#![allow(missing_docs, reason = "Clock-tree types come from a generated macro that does not emit doc strings")]
-#![allow(clippy::enum_variant_names, reason = "CPU frequency variant names follow the chip-spec MHz convention")]
+#![allow(
+    missing_docs,
+    reason = "Clock-tree types come from a generated macro that does not emit doc strings"
+)]
+#![allow(
+    clippy::enum_variant_names,
+    reason = "CPU frequency variant names follow the chip-spec MHz convention"
+)]
 
 define_clock_tree_types!();
 
