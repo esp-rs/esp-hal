@@ -10,7 +10,7 @@
 //! D+ / D- pins, then pass it to the driver of your choice:
 //!
 //! ```rust, ignore
-//! let usb = Usb::new(peripherals.USB0, io.pins.gpio20, io.pins.gpio19);
+//! let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
 //! ```
 //!
 //! [`usb-device`]: https://crates.io/crates/usb-device
@@ -96,7 +96,7 @@ impl<'d> Usb<'d> {
 
         InputSignal::USB_OTG_IDDIG.connect_to(&Level::High); // connected connector is mini-B side
         InputSignal::USB_SRP_BVALID.connect_to(&Level::High); // HIGH to force USB device mode
-        InputSignal::USB_OTG_VBUSVALID.connect_to(&Level::High); // receiving a valid Vbus from device
+        InputSignal::USB_OTG_VBUSVALID.connect_to(&Level::High); // receiving a valid Vbus from host
         InputSignal::USB_OTG_AVALID.connect_to(&Level::Low);
     }
 
@@ -131,8 +131,6 @@ impl<'d> Usb<'d> {
         // TODO
     }
 }
-
-// unsafe impl Sync for Usb<'_> {}
 
 unsafe impl esp_synopsys_usb_otg::UsbPeripheral for Usb<'_> {
     const REGISTERS: *const () = Self::REGISTERS;

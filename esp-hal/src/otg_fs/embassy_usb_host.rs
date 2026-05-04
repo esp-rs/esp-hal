@@ -10,13 +10,7 @@ use crate::{handler, interrupt::Priority, otg_fs::Usb};
 
 #[handler(priority = Priority::max())]
 fn interrupt_handler() {
-    unsafe {
-        on_host_interrupt(
-            Driver::REGISTERS,
-            &HOST_STATE,
-            Usb::MAX_EP_COUNT.min(Usb::MAX_HOST_CH_COUNT),
-        )
-    }
+    unsafe { on_host_interrupt(Driver::REGISTERS, &HOST_STATE, Usb::MAX_HOST_CH_COUNT) }
 }
 
 /// UsbHost
@@ -36,7 +30,7 @@ impl<'d> Driver<'d> {
             regs: Self::REGISTERS,
             state: &HOST_STATE,
             fifo_depth_words: Usb::FIFO_DEPTH_WORDS as u16,
-            channel_count: Usb::MAX_EP_COUNT.min(Usb::MAX_HOST_CH_COUNT),
+            channel_count: Usb::MAX_HOST_CH_COUNT,
             phy_type: PhyType::InternalFullSpeed,
         };
 
