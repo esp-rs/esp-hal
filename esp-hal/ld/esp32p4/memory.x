@@ -4,29 +4,31 @@
    fixed at 0x4FFAE000 to leave the v3.x ROM BSS/stack region (top
    ~72 KB of L2MEM) untouched.
 
+   CONFIG numbers follow TRM Figure 7.3-2 (HP L2MEM Address Layout):
+
      CONFIG   ESP_HAL_CONFIG_L2_CACHE_SIZE   L2 cache    L2 RAM ORIGIN
      ------   ----------------------------   --------    -------------
-       3      "512KB"                        512 KB      0x4FF80000
-       2      "256KB"                        256 KB      0x4FF40000
-       1      "128KB"  (IDF default)         128 KB      0x4FF20000
-       0      "0KB"                            0 KB      0x4FF00000
+       0      "512KB"                        512 KB      0x4FF80000
+       1      "256KB"                        256 KB      0x4FF40000
+       2      "128KB"  (IDF default)         128 KB      0x4FF20000
+       3      "0KB"                            0 KB      0x4FF00000
 */
 
 MEMORY
 {
-    /* CONFIG 3 */
+    /* CONFIG 0 */
 #IF ESP_HAL_CONFIG_L2_CACHE_SIZE_512KB
     RAM : ORIGIN = 0x4FF80000, LENGTH = 0x4FFAE000 - 0x4FF80000
 #ENDIF
-    /* CONFIG 2 */
+    /* CONFIG 1 */
 #IF ESP_HAL_CONFIG_L2_CACHE_SIZE_256KB
     RAM : ORIGIN = 0x4FF40000, LENGTH = 0x4FFAE000 - 0x4FF40000
 #ENDIF
-    /* CONFIG 1 */
+    /* CONFIG 2 */
 #IF ESP_HAL_CONFIG_L2_CACHE_SIZE_128KB
     RAM : ORIGIN = 0x4FF20000, LENGTH = 0x4FFAE000 - 0x4FF20000
 #ENDIF
-    /* CONFIG 0 */
+    /* CONFIG 3 */
 #IF ESP_HAL_CONFIG_L2_CACHE_SIZE_0KB
     RAM : ORIGIN = 0x4FF00000, LENGTH = 0x4FFAE000 - 0x4FF00000
 #ENDIF
