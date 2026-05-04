@@ -3,6 +3,7 @@ use clap::Subcommand;
 #[cfg(feature = "release")]
 pub mod bump_msrv;
 pub mod bump_version;
+pub mod changelog_preview;
 #[cfg(feature = "release")]
 pub mod execute_plan;
 #[cfg(feature = "release")]
@@ -16,6 +17,7 @@ pub mod semver_check;
 pub mod tag_releases;
 
 pub use bump_version::*;
+pub use changelog_preview::*;
 #[cfg(feature = "release")]
 pub use execute_plan::*;
 #[cfg(feature = "release")]
@@ -60,6 +62,11 @@ pub enum Release {
     /// - Create new migration guides for packages that have a migration guide
     #[cfg(feature = "release")]
     PostRelease(PostReleaseArgs),
+    /// Preview the changelog that would result from PRs merged since a given ref.
+    ///
+    /// Fetches merged pull requests from GitHub and renders changelog/migration-guide
+    /// entries from their descriptions. Requires the `gh` CLI.
+    ChangelogPreview(ChangelogPreviewArgs),
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:
