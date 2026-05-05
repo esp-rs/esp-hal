@@ -462,9 +462,15 @@ fn calibrate_rtc_slow_clock() {
         }
     }
 
-    LP_AON::regs()
-        .store1()
-        .write(|w| unsafe { w.bits(cal_val) });
+    cfg_if::cfg_if! {
+        if #[cfg(esp32p4)] {
+            let reg = LP_AON::regs().lp_store1();
+        } else {
+            let reg = LP_AON::regs().store1();
+        }
+    }
+
+    reg.write(|w| unsafe { w.bits(cal_val) });
 }
 
 /// The CPU clock frequency.
@@ -498,11 +504,13 @@ fn rtc_slow_cal_period() -> u64 {
     // Once that lands this cfg branch can disappear.
     cfg_if::cfg_if! {
         if #[cfg(esp32p4)] {
-            LP_AON::regs().lp_store1().read().bits() as u64
+            let reg = LP_AON::regs().lp_store1();
         } else {
-            LP_AON::regs().store1().read().bits() as u64
+            let reg = LP_AON::regs().store1();
         }
     }
+
+    reg.read().bits() as u64
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.

@@ -17,6 +17,8 @@
     reason = "CPU frequency variant names follow the chip-spec MHz convention"
 )]
 
+use crate::peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST};
+
 define_clock_tree_types!();
 
 /// CPU clock frequency presets for ESP32-P4X (eco5 / chip revision v3.x).
@@ -49,6 +51,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(3)), // /4 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        timg_calibration_clock: None,
     };
 
     const PRESET_360: ClockConfig = ClockConfig {
@@ -57,6 +60,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(3)), // /4 = 90 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        timg_calibration_clock: None,
     };
 
     const PRESET_200: ClockConfig = ClockConfig {
@@ -65,6 +69,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        timg_calibration_clock: None,
     };
 
     const PRESET_100: ClockConfig = ClockConfig {
@@ -73,6 +78,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        timg_calibration_clock: None,
     };
 }
 
@@ -124,7 +130,7 @@ fn configure_cpu_root_clk_impl(
         CpuRootClkConfig::Cpll => 1,
         CpuRootClkConfig::RcFast => 2,
     };
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(sel) });
 }
@@ -174,7 +180,7 @@ fn configure_lp_fast_clk_impl(
     _old_selector: Option<LpFastClkConfig>,
     new_selector: LpFastClkConfig,
 ) {
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_lp_clk_conf()
         .modify(|_, w| unsafe {
             w.lp_aonclkrst_fast_clk_sel().bits(match new_selector {
@@ -190,13 +196,13 @@ fn configure_lp_slow_clk_impl(
     _old_selector: Option<LpSlowClkConfig>,
     new_selector: LpSlowClkConfig,
 ) {
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_lp_clk_conf()
         .modify(|_, w| unsafe {
             w.lp_aonclkrst_slow_clk_sel().bits(match new_selector {
                 LpSlowClkConfig::RcSlow => 0,
                 LpSlowClkConfig::Xtal32k => 1,
-                LpSlowClkConfig::Rc32k => 2,
+                // LpSlowClkConfig::Rc32k => 2,
                 LpSlowClkConfig::OscSlow => 3,
             })
         });
@@ -286,3 +292,26 @@ fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_pll_f25m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_pll_f50m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+
+// TIMG_CALIBRATION_CLOCK
+
+fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here.
+}
+
+fn configure_timg_calibration_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
+) {
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl21()
+        .modify(|_, w| unsafe {
+            w.timergrp0_tgrt_clk_src_sel().bits(match new_config {
+                TimgCalibrationClockConfig::RcFastClk => 7,
+                TimgCalibrationClockConfig::RcSlowClk => 8,
+                TimgCalibrationClockConfig::Xtal32kClk => 10,
+                _ => todo!(),
+            })
+        });
+}
