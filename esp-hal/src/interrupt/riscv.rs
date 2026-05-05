@@ -15,7 +15,11 @@ pub use esp_riscv_rt::TrapFrame;
 
 #[cfg_attr(interrupt_controller = "riscv_basic", path = "riscv/basic.rs")]
 #[cfg_attr(interrupt_controller = "plic", path = "riscv/plic.rs")]
-#[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
+#[cfg_attr(esp32p4, path = "riscv/clic_v1.rs")]
+#[cfg_attr(
+    all(not(esp32p4), interrupt_controller = "clic"),
+    path = "riscv/clic_v2.rs"
+)]
 mod cpu_int;
 
 use crate::{
@@ -418,18 +422,8 @@ fn cpu_wait_mode_on() -> bool {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_pcr)] {
             crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        } else if #[cfg(all(multi_core, soc_has_hp_sys_clkrst))] {
-            // AMP-aware: read this core's CORE{N}_WAITI_ICG_EN bit in
-            // HP_SYS_CLKRST.CPU_WAITI_CTRL0 (hw_ver3). Each core answers
-            // locally, so AMP setups where cores run different firmware get
-            // the right per-core result.
-            //   ICG_EN = 1 -> this core's WFI may gate clock -> NOT safe
-            //   ICG_EN = 0 -> WFI will not gate             -> safe
-            // TODO: add HP_SYS_CLKRST.CPU_WAITI_CTRL0 (offset 0xF4) to the
-            // esp32p4 PAC and replace this raw MMIO with the PAC accessor.
-            const HP_SYS_CLKRST_CPU_WAITI_CTRL0: *const u32 = 0x500E_60F4 as *const u32;
-            let reg = unsafe { core::ptr::read_volatile(HP_SYS_CLKRST_CPU_WAITI_CTRL0) };
-            (reg & (1 << Cpu::current() as u32)) == 0
+        } else if #[cfg(soc_has_hp_sys)] {
+            crate::peripherals::HP_SYS::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
         } else {
             crate::peripherals::SYSTEM::regs()
                 .cpu_per_conf()

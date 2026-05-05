@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-P4: emit `pm_support_ext1_wakeup` and `pm_support_touch_sensor_wakeup` (#5400)
 - C5 and C61: I2S support (#5483)
 - More I2S flags for HW unification (#5483)
+- Initial ESP32-P4 support (#5400)
 
 ### Changed
 

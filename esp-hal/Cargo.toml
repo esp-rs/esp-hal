@@ -233,10 +233,7 @@ esp32c6 = [
     "esp-sync/esp32c6",
     "esp-metadata-generated/esp32c6",
 ]
-## ESP32-P4 (chip revision v3.x / eco5 only, RISC-V dual-core HP + LP core)
-## NOTE: This targets P4X (ESP32-P4NRW16X/32X) with chip revision >= v3.0.
-## NRND variants (without X suffix) are NOT supported.
-## Based on TRM v0.5 (Pre-release) and Chip Revision v3.x User Guide v1.0.
+## ESP32-P4 (chip revision >= v3.x)
 esp32p4 = [
     "dep:esp32p4",
     "esp-riscv-rt/rtc-ram",

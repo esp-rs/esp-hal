@@ -415,23 +415,14 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        // P4: LP_SYS (mapped as LP_AON) names its scratch registers
-        // `lp_store0..lp_store14`, while every other chip names them
-        // `store0..N`. esp-idf's `rtc_suppress_rom_log()` writes
-        // RTC_DISABLE_ROM_LOG = (1<<0) | (1<<16) to STORE4.
-        // TODO: file an esp-pacs issue/PR to rename the P4 fields to match;
-        // once that lands this cfg branch can collapse to a single line.
         cfg_if::cfg_if! {
             if #[cfg(esp32p4)] {
-                LP_AON::regs()
-                    .lp_store4()
-                    .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+                let reg = LP_AON::regs().lp_store4();
             } else {
-                LP_AON::regs()
-                    .store4()
-                    .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+                let reg = LP_AON::regs().store4();
             }
         }
+        reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 
     /// Register an interrupt handler for the RTC.

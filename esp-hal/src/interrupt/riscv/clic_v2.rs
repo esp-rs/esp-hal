@@ -1,15 +1,3 @@
-// CLIC v1.x and v2.x currently coexist in this file. Depending on
-// ESP32-P4 mass production results and future esp-rs/esp-pacs patches,
-// this file may be split into clic_v1.rs / clic_v2.rs, or kept as is.
-//
-// TODO: keep tracking future P4 revision to check changes of CLIC.
-//
-// ESP32P4 follows pulp CLIC version 1.x
-// ref : https://github.com/pulp-platform/clic/blob/v1.0.1/src/gen/clic.hjson.tpl
-//
-// ESP32C5, C61 follow pulp CLIC version 2.x
-// ref : https://github.com/pulp-platform/clic/blob/v2.0.0/src/gen/mclic.hjson
-
 use super::{InterruptKind, Priority, RunLevel};
 use crate::{interrupt::ElevatedRunLevel, soc::pac::CLIC};
 
@@ -22,59 +10,29 @@ pub(super) fn init() {
         .modify(|_, w| unsafe { w.mnlbits().bits(3) });
 
     // Enable hardware vectoring on every interrupt line.
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            for int in clic.int_ctrl_iter() {
-                int.modify(|_, w| unsafe {
-                    w.int_attr_shv().set_bit();
-                    w.int_attr_trig().bits(0) // positive level
-                });
-            }
-        } else {
-            for int in clic.int_attr_iter() {
-                int.modify(|_, w| {
-                    w.shv().hardware();
-                    w.trig().positive_level()
-                });
-            }
-        }
+    for int in clic.int_attr_iter() {
+        int.modify(|_, w| {
+            w.shv().hardware();
+            w.trig().positive_level()
+        });
     }
 }
 
 pub(super) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            clic.int_ctrl(cpu_interrupt as usize)
-                .modify(|_, w| w.int_ie().set_bit());
-        } else {
-            clic.int_ie(cpu_interrupt as usize)
-                .write(|w| w.int_ie().set_bit());
-        }
-    }
+    clic.int_ie(cpu_interrupt as usize)
+        .write(|w| w.int_ie().set_bit());
 }
 
 pub(super) fn set_kind_raw(cpu_interrupt: u32, kind: InterruptKind) {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            clic.int_ctrl(cpu_interrupt as usize)
-                .modify(|_, w| unsafe {
-                    w.int_attr_trig().bits(match kind {
-                        InterruptKind::Level => 0, // positive level
-                        InterruptKind::Edge => 1,  // positive edge
-                    })
-                });
-        } else {
-            clic.int_attr(cpu_interrupt as usize)
-                .modify(|_, w| match kind {
-                    InterruptKind::Level => w.trig().positive_level(),
-                    InterruptKind::Edge => w.trig().positive_edge(),
-                });
-        }
-    }
+    clic.int_attr(cpu_interrupt as usize)
+        .modify(|_, w| match kind {
+            InterruptKind::Level => w.trig().positive_level(),
+            InterruptKind::Edge => w.trig().positive_edge(),
+        });
 }
 
 pub(super) fn set_priority_raw(cpu_interrupt: u32, priority: Priority) {
@@ -85,41 +43,21 @@ pub(super) fn set_priority_raw(cpu_interrupt: u32, priority: Priority) {
     )));
     // The `ctl` field would only write the 3 programmable bits, but we have the correct final
     // value anyway so let's write it directly.
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            clic.int_ctrl(cpu_interrupt as usize)
-                .modify(|_, w| unsafe { w.int_ctl().bits(prio_bits) });
-        } else {
-            clic.int_ctl(cpu_interrupt as usize)
-                .write(|w| unsafe { w.bits(prio_bits) });
-        }
-    }
+    clic.int_ctl(cpu_interrupt as usize)
+        .write(|w| unsafe { w.bits(prio_bits) });
 }
 
 pub(super) fn clear_raw(cpu_interrupt: u32) {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            clic.int_ctrl(cpu_interrupt as usize)
-                .modify(|_, w| w.int_ip().clear_bit());
-        } else {
-            clic.int_ip(cpu_interrupt as usize)
-                .write(|w| w.int_ip().clear_bit());
-        }
-    }
+    clic.int_ip(cpu_interrupt as usize)
+        .write(|w| w.int_ip().clear_bit());
 }
 
 pub(super) fn cpu_interrupt_priority_raw(cpu_interrupt: u32) -> u8 {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
-            let prio_level = clic.int_ctrl(cpu_interrupt as usize).read().int_ctl().bits() as usize;
-        } else {
-            let prio_level = clic.int_ctl(cpu_interrupt as usize).read().bits() as usize;
-        }
-    }
+    let prio_level = clic.int_ctl(cpu_interrupt as usize).read().bits() as usize;
     bits_to_prio(prio_level)
 }
 

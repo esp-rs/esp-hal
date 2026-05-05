@@ -35,7 +35,7 @@ impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
         cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+            if #[cfg(esp32p4)] { // TODO: any with zcmp
                 // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
                 // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
                 // interrupt can still fire mid-instruction on cm.push (and possibly on
@@ -43,9 +43,7 @@ impl RawLock for SingleCoreInterruptLock {
                 // while mie is cleared, then restore the previous mintthresh on exit.
                 // Ref: esp-idf commit c27c33a83 "fix(riscv): implement a workaround for
                 // Zcmp hardware bug".
-                #[cfg(esp32p4)]
                 let old_mintthresh: u32;
-                #[cfg(esp32p4)]
                 unsafe {
                     core::arch::asm!(
                         "li   t0, 0xff",
@@ -57,10 +55,11 @@ impl RawLock for SingleCoreInterruptLock {
                 let mut mstatus = 0u32;
                 unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
                 let mie_bit = mstatus & 0b1000;
-                #[cfg(esp32p4)]
                 let token = mie_bit | ((old_mintthresh & 0xff) << 8);
-                #[cfg(not(esp32p4))]
-                let token = mie_bit;
+            } else if #[cfg(riscv)] {
+                let mut mstatus = 0u32;
+                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                let token = mstatus & 0b1000;
             } else if #[cfg(xtensa)] {
                 let token: u32;
                 unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
@@ -87,21 +86,24 @@ impl RawLock for SingleCoreInterruptLock {
         let token = token.inner();
 
         cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+            if #[cfg(esp32p4)] {
                 if (token & 0b1000) != 0 {
                     unsafe {
                         riscv::interrupt::enable();
                     }
                 }
                 // Restore mintthresh AFTER re-enabling mie (P4 Zcmp workaround, see enter()).
-                #[cfg(esp32p4)]
-                {
-                    let old_mintthresh = (token >> 8) & 0xff;
+                let old_mintthresh = (token >> 8) & 0xff;
+                unsafe {
+                    core::arch::asm!(
+                        "csrw 0x347, {0}",
+                        in(reg) old_mintthresh,
+                    );
+                }
+            } else if #[cfg(riscv)] {
+                if token != 0 {
                     unsafe {
-                        core::arch::asm!(
-                            "csrw 0x347, {0}",
-                            in(reg) old_mintthresh,
-                        );
+                        riscv::interrupt::enable();
                     }
                 }
             } else if #[cfg(xtensa)] {
