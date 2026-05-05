@@ -308,10 +308,12 @@ fn configure_timg_calibration_clock_impl(
         .peri_clk_ctrl21()
         .modify(|_, w| unsafe {
             w.timergrp0_tgrt_clk_src_sel().bits(match new_config {
+                TimgCalibrationClockConfig::MpllClk => 0,
+                TimgCalibrationClockConfig::SpllClk => 1,
+                TimgCalibrationClockConfig::CpllClk => 2,
                 TimgCalibrationClockConfig::RcFastClk => 7,
                 TimgCalibrationClockConfig::RcSlowClk => 8,
                 TimgCalibrationClockConfig::Xtal32kClk => 10,
-                _ => todo!(),
             })
         });
 }
