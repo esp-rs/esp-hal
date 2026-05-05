@@ -148,9 +148,8 @@ use crate::{
 mod eh;
 mod low_level;
 
-pub use low_level::{AnyI2c, Instance};
-
 use low_level::Driver;
+pub use low_level::{AnyI2c, Instance};
 
 const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
@@ -1258,4 +1257,3 @@ where
         Ok(())
     }
 }
-

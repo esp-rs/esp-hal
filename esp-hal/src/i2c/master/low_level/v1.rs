@@ -3,10 +3,7 @@ use super::*;
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
 /// i2c_ll_set_bus_timing in ESP-IDF
-pub(super) fn set_frequency(
-    driver: &Driver<'_>,
-    clock_config: &Config,
-) -> Result<(), ConfigError> {
+pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
 
     let source_clk = crate::soc::clocks::apb_clk_frequency();
