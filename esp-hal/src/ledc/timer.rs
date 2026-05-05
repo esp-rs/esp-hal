@@ -260,7 +260,7 @@ where
             divisor = (1_000_000u64 << 8) / frequency as u64 / precision as u64;
         }
 
-        if !(256..LEDC_TIMER_DIV_NUM_MAX).contains(&divisor) {
+        if !(256..=LEDC_TIMER_DIV_NUM_MAX).contains(&divisor) {
             return Err(Error::Divisor);
         }
 
