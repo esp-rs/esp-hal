@@ -616,7 +616,8 @@ impl<'d> SpiDma<'d, Async> {
     }
 }
 
-const LINK_DESCRIPTOR_COUNT: usize = MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2;
+// +1 to make sure we have enough descriptors to satisfy strict alignment requirements
+const LINK_DESCRIPTOR_COUNT: usize = MAX_DMA_SIZE.div_ceil(CHUNK_SIZE) + 2 + 1;
 
 enum MaybeCopyTxBuf<'a> {
     Copy(&'a mut ScopedDmaTxBuf<'static>),
