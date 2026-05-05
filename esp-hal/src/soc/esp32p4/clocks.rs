@@ -28,7 +28,6 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 400 MHz CPU clock (eco5 / v3.x maximum)
     /// CPLL -> CPU_ROOT -> CPU/1, APB divider /4 = 100MHz
-    #[default]
     _400MHz = 400,
 
     /// 360 MHz CPU clock (conservative)
@@ -40,6 +39,7 @@ pub enum CpuClock {
 
     /// 100 MHz CPU clock (ultra low power)
     /// CPLL -> CPU_ROOT -> CPU/4, APB /1 = 100MHz
+    #[default]
     _100MHz = 100,
 }
 
