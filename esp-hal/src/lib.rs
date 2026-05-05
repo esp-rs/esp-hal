@@ -278,7 +278,6 @@ metadata!(
 #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
-use esp_sync::RawMutex;
 pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
 #[cfg(all(xtensa, feature = "rt"))]
@@ -423,6 +422,7 @@ mod soc;
 // Some PAC-related utility
 use crate::pac::generic::{Readable, Reg, Resettable, W, Writable};
 
+#[cfg_attr(esp32p4, expect(unused))]
 trait RegisterToggle {
     type Reg: Readable + Resettable + Writable;
 
@@ -620,7 +620,8 @@ use crate::clock::{ClockConfig, CpuClock};
 use crate::peripherals::Peripherals;
 
 /// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
-pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
+#[cfg(feature = "rt")]
+pub(crate) static ESP_HAL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 #[procmacros::doc_replace]
 /// System configuration.

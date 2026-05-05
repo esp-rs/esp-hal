@@ -9,8 +9,8 @@
 // without re-deriving the constants.
 #![allow(dead_code)]
 
-/// PSRAM virtual address range (cached)
-pub const PSRAM_VADDR_START: usize = 0x4800_0000;
+use super::{EXTMEM_ORIGIN, PsramSize};
+use crate::peripherals::HP_SYS_CLKRST;
 
 /// MMU page size (64 KB)
 const MMU_PAGE_SIZE: usize = 0x10000;
@@ -138,7 +138,7 @@ pub struct PsramConfig {
     /// PSRAM interface mode (Hex 16-line vs Oct 8-line). Default: Hex.
     pub mode: PsramMode,
     /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
-    pub size: super::PsramSize,
+    pub size: PsramSize,
     /// MPLL override. `None` (default) derives the MPLL frequency
     /// from `ram_frequency` per the table on `SpiRamFreq`.
     pub core_clock: Option<MpllFreq>,
@@ -156,8 +156,8 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 }
 
 pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
-    let size = config.size.get();
-    PSRAM_VADDR_START..PSRAM_VADDR_START + size
+    let start = EXTMEM_ORIGIN;
+    start..start + config.size.get()
 }
 
 /// Per-speed timing parameters. Mirrors IDF's `#if CONFIG_SPIRAM_SPEED_*`
@@ -262,15 +262,16 @@ fn init_psram_inner(config: &mut PsramConfig) {
     configure_mpll(params.mpll_mhz);
 
     // Module clock + clock source
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-    clkrst
+    HP_SYS_CLKRST::regs()
         .soc_clk_ctrl0()
         .modify(|_, w| w.psram_sys_clk_en().set_bit());
-    clkrst.peri_clk_ctrl00().modify(|_, w| unsafe {
-        w.psram_pll_clk_en().set_bit();
-        w.psram_core_clk_en().set_bit();
-        w.psram_clk_src_sel().bits(1) // 1 = MPLL
-    });
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl00()
+        .modify(|_, w| unsafe {
+            w.psram_pll_clk_en().set_bit();
+            w.psram_core_clk_en().set_bit();
+            w.psram_clk_src_sel().bits(1) // 1 = MPLL
+        });
 
     // Controller + PHY pad bring-up.
     set_bus_clock(params.bus_div);
@@ -280,21 +281,13 @@ fn init_psram_inner(config: &mut PsramConfig) {
 
     // SoC MR init (via MSPI3 SPI direct)
     init_mr_registers();
-    let psram_size = match config.size {
-        super::PsramSize::AutoDetect => psram_detect_size(),
-        super::PsramSize::Size(s) => s,
-    };
 
-    config.size = super::PsramSize::Size(psram_size);
+    if config.size.is_auto() {
+        config.size = PsramSize::Size(psram_detect_size());
+    }
 
     configure_psram_mspi(MSPI0_BASE); // basic AXI configuration here
     mmu_map_psram(MSPI0_BASE, *config); // MMU mapping here
-
-    if psram_size > 0 {
-        let start = PSRAM_VADDR_START;
-        let end = start + psram_size;
-        unsafe { super::set_psram_range(start..end) };
-    }
 }
 
 /// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
@@ -718,8 +711,8 @@ fn mmu_map_psram(mspi_base: u32, config: PsramConfig) {
     const MMU_PADDR_MASK: u32 = 0x3FF; // 10 bits of physical page number
 
     let psram_size = match config.size {
-        super::PsramSize::AutoDetect => 32 * 1024 * 1024,
-        super::PsramSize::Size(s) => s,
+        PsramSize::AutoDetect => 32 * 1024 * 1024,
+        PsramSize::Size(s) => s,
     };
     let page_count = psram_size / MMU_PAGE_SIZE;
 
@@ -819,7 +812,7 @@ fn configure_mpll(freq_mhz: u32) {
 
     regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_DIV_REG_ADDR, div_val);
 
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
+    let clkrst = HP_SYS_CLKRST::regs();
     clkrst
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());

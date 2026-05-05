@@ -466,7 +466,7 @@ dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.psram]
-extmem_origin = 0x48000000
+extmem_origin = 0x4800_0000
 
 [device.rsa]
 support_status = "not_supported"

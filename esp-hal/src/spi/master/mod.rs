@@ -57,11 +57,12 @@ use enumset::{EnumSet, EnumSetType, enum_set};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
+#[cfg(spi_master_supports_dma)]
+use crate::RegisterToggle;
 use crate::{
     Async,
     Blocking,
     DriverMode,
-    RegisterToggle,
     asynch::AtomicWaker,
     gpio::{
         InputConfig,
