@@ -76,7 +76,7 @@ macro_rules! i2c_pins {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
             } else if #[cfg(esp32c2)] {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
-            } else if #[cfg(esp32c5)] {
+            } else if #[cfg(any(esp32c5, esp32p4))] {
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             } else { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
@@ -93,6 +93,8 @@ macro_rules! common_test_pins {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
             } else if #[cfg(esp32)] {
                 ($peripherals.GPIO2, $peripherals.GPIO4)
+            } else if #[cfg(esp32p4)] {
+                ($peripherals.GPIO7, $peripherals.GPIO8)
             } else { // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
@@ -112,6 +114,8 @@ macro_rules! unconnected_pin {
                 $peripherals.GPIO8
             } else if #[cfg(esp32c5)] {
                 $peripherals.GPIO28
+            } else if #[cfg(esp32p4)] {
+                $peripherals.GPIO35
             } else { // esp32c3, esp32c6, esp32c61, esp32h2
                 $peripherals.GPIO9
             }
