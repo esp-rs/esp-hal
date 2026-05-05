@@ -17,21 +17,25 @@
 //!
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
-//!
-//! ## Examples
-//!
-//! ### Reading interface MAC addresses
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::efuse::{self, InterfaceMacAddress};
-//!
-//! # {interface_mac}
-//! println!("MAC: {mac}");
-//! println!("MAC bytes: {:02x?}", mac.as_bytes());
-//! # {after_snippet}
-//! ```
+#![cfg_attr(
+    any(soc_has_wifi, soc_has_bt),
+    doc = r#"
 
+## Examples
+
+### Reading interface MAC addresses
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::efuse::{self, InterfaceMacAddress};
+
+# {interface_mac}
+println!("MAC: {mac}");
+println!("MAC bytes: {:02x?}", mac.as_bytes());
+# {after_snippet}
+```
+"#
+)]
 use core::{cmp, mem, slice, sync::atomic::Ordering};
 
 use bytemuck::AnyBitPattern;
