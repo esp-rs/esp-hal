@@ -46,7 +46,7 @@ esp_rtos::start_second_core(
 #![doc = ""]
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(docsrs, feature(doc_cfg))]

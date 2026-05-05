@@ -26,7 +26,7 @@
 //! for this crate:
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_backtrace_config_table.md"))]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![no_std]
 
