@@ -127,6 +127,12 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("i2c_master.version") => {
+        2
+    };
+    ("i2c_master.version", str) => {
+        stringify!(2)
+    };
     ("i2c_master.has_fsm_timeouts") => {
         false
     };

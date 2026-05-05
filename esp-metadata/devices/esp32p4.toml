@@ -327,6 +327,7 @@ instances = [
 # P4 PAC: data register is read-only, TX uses txfifo_start_addr (fixed in i2c/master/mod.rs)
 [device.i2c_master]
 support_status = "partial"
+version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2c0", scl = "I2C0_SCL", sda = "I2C0_SDA" },
     { name = "i2c1", sys_instance = "I2c1", scl = "I2C1_SCL", sda = "I2C1_SDA" },
