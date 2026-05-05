@@ -16,7 +16,10 @@
 
 use strum::FromRepr;
 
-use crate::peripherals::{LP_WDT, PMU, TIMG0, TIMG1};
+use crate::{
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, LP_WDT, PMU, TIMG0, TIMG1},
+    soc::regi2c,
+};
 
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
@@ -152,8 +155,7 @@ pub(crate) fn init() {
     lp_wdt.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
     // 6. Clear DCDC switch force flags PMU_POWER_DCDC_SWITCH_REG (offset 0x10c)
-    let pmu = PMU::regs();
-    pmu.power_dcdc_switch().modify(|_, w| {
+    PMU::regs().power_dcdc_switch().modify(|_, w| {
         w.force_dcdc_switch_pu().bit(false);
         w.force_dcdc_switch_pd().bit(false)
     });
@@ -163,20 +165,20 @@ pub(crate) fn init() {
     spll_configure(480);
 
     // 8. Set CPU divider to 1 (400 MHz CPU), MEM divider 2, APB divider 2
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-
     // Set CPU divider: cpu_clk_div_num = divider - 1 = 0
     // Ref: HP_SYS_CLKRST.root_clk_ctrl0.reg_cpu_clk_div_num
-    clkrst.root_clk_ctrl0().modify(|_, w| unsafe {
-        w.cpu_clk_div_num().bits(0); // CPU: /1 = 400 MHz
-        w.cpu_clk_div_numerator().bits(0);
-        w.cpu_clk_div_denominator().bits(0)
-    });
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl0()
+        .modify(|_, w| unsafe {
+            w.cpu_clk_div_num().bits(0); // CPU: /1 = 400 MHz
+            w.cpu_clk_div_numerator().bits(0);
+            w.cpu_clk_div_denominator().bits(0)
+        });
     // Trigger clock divider update
-    clkrst
+    HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| w.soc_clk_div_update().set_bit());
-    while clkrst
+    while HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .read()
         .soc_clk_div_update()
@@ -187,7 +189,7 @@ pub(crate) fn init() {
 
     // 9. Switch CPU clock source from XTAL to CPLL LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel:
     //    0=XTAL, 1=CPLL, 2=RC_FAST
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(1) }); // 1 = CPLL
 }
@@ -197,20 +199,11 @@ pub(crate) fn init() {
 /// eco5 (v3.x) uses different I2C register values than eco4 (v1.x).
 /// Ref: TRM v0.5 Ch 12 -- CPLL configuration
 fn cpll_configure(freq_mhz: u32) {
-    use crate::soc::regi2c;
-
-    // I2C CPLL register addresses
-    const I2C_CPLL: u8 = 0x67; // CPLL slave address
-    const I2C_CPLL_OC_REF_DIV: u8 = 2;
-    const I2C_CPLL_OC_DIV_7_0: u8 = 3;
-    const I2C_CPLL_OC_DCUR: u8 = 6;
-
     // 1. Enable CPLL power PMU.imm_hp_ck_power: tie_high_xpd_pll, tie_high_xpd_pll_i2c Note: PAC
     //    uses "pll" not "cpll" (eco4 PAC, single PLL)
-    let pmu = PMU::regs();
     // PAC: tie_high_xpd_pll is 4-bit field (one bit per PLL: CPLL/SPLL/MPLL/PLLA).
     // Set all bits to enable all PLLs. Same for pll_i2c.
-    pmu.imm_hp_ck_power().write(|w| unsafe {
+    PMU::regs().imm_hp_ck_power().write(|w| unsafe {
         w.tie_high_xpd_pll().bits(0xF);
         w.tie_high_xpd_pll_i2c().bits(0xF)
     });
@@ -233,25 +226,28 @@ fn cpll_configure(freq_mhz: u32) {
     // OC_DCUR: (dlref_sel << 6) | (dhref_sel << 4) | dcur = 0x73
     let dcur: u8 = 0x73; // dlref_sel=1, dhref_sel=3, dcur=3
 
-    regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_REF_DIV, lref);
-    regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_DIV_7_0, div7_0);
-    regi2c::regi2c_write(I2C_CPLL, 0, I2C_CPLL_OC_DCUR, dcur);
+    regi2c::I2C_CPLL_OC_REF_DIV.write_reg(lref);
+    regi2c::I2C_CPLL_OC_DIV_7_0.write_reg(div7_0);
+    regi2c::I2C_CPLL_OC_DCUR.write_reg(dcur);
 
     // 3. Run CPLL calibration HP_SYS_CLKRST.ana_pll_ctrl0.cpu_pll_cal_stop
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-
     // Start calibration: set cpu_pll_cal_stop = 0
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
 
     // Wait for calibration to complete
-    while !clkrst.ana_pll_ctrl0().read().cpu_pll_cal_end().bit_is_set() {
+    while !HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .cpu_pll_cal_end()
+        .bit_is_set()
+    {
         core::hint::spin_loop();
     }
 
     // Stop calibration: set cpu_pll_cal_stop = 1
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
 
@@ -264,14 +260,6 @@ fn cpll_configure(freq_mhz: u32) {
 /// SPLL provides peripheral clocks: PLL_F240M/160M/120M/80M/20M.
 /// Ref: TRM v0.5 Ch 12 -- SPLL configuration
 fn spll_configure(freq_mhz: u32) {
-    use crate::soc::regi2c;
-
-    // I2C SPLL register addresses
-    const I2C_SPLL: u8 = regi2c::REGI2C_SYS_PLL;
-    const I2C_SPLL_OC_REF_DIV: u8 = 2;
-    const I2C_SPLL_OC_DIV_7_0: u8 = 3;
-    const I2C_SPLL_OC_DCUR: u8 = 6;
-
     // PLL power already enabled in cpll_configure (PMU xpd_pll bits(0xF) enables all PLLs)
 
     // Configure SPLL via I2C analog registers
@@ -286,23 +274,26 @@ fn spll_configure(freq_mhz: u32) {
     let lref: u8 = 0x50; // dchgp=5, div_ref=0, oc_enb_fcal=0
     let dcur: u8 = 0x73; // dlref_sel=1, dhref_sel=3, dcur=3
 
-    regi2c::regi2c_write(I2C_SPLL, 0, I2C_SPLL_OC_REF_DIV, lref);
-    regi2c::regi2c_write(I2C_SPLL, 0, I2C_SPLL_OC_DIV_7_0, div7_0);
-    regi2c::regi2c_write(I2C_SPLL, 0, I2C_SPLL_OC_DCUR, dcur);
+    regi2c::I2C_SPLL_OC_REF_DIV.write_reg(lref);
+    regi2c::I2C_SPLL_OC_DIV_7_0.write_reg(div7_0);
+    regi2c::I2C_SPLL_OC_DCUR.write_reg(dcur);
 
     // Run SPLL calibration
     //      HP_SYS_CLKRST.ana_pll_ctrl0.sys_pll_cal_stop
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.sys_pll_cal_stop().clear_bit());
 
-    while !clkrst.ana_pll_ctrl0().read().sys_pll_cal_end().bit_is_set() {
+    while !HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .sys_pll_cal_end()
+        .bit_is_set()
+    {
         core::hint::spin_loop();
     }
 
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.sys_pll_cal_stop().set_bit());
 

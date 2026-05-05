@@ -247,6 +247,7 @@ peripherals = [
     { name = "HP_SYS_CLKRST" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
+    { name = "LP_I2C_ANA_MST" },
     { name = "CLIC" },
     { name = "IO_MUX" },
     # LP_AON / LPWR: compatibility aliases -- other chips expose an `LP_AON`

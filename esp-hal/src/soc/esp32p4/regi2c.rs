@@ -1,42 +1,32 @@
-//! I2C analog register access for ESP32-P4.
-//!
-//! Used for PLL configuration (CPLL, SPLL, MPLL) and other analog peripherals.
-//! Accesses the LP_I2C_ANA_MST peripheral which bridges to internal analog I2C bus.
-//!
-//! Ref: TRM v0.5 Ch 49 (Analog I2C Controller)
+use crate::rom::regi2c::{RegI2cMaster, RegI2cRegister, define_regi2c};
 
-// I2C slave addresses for analog blocks
-#[allow(dead_code)]
-pub(crate) const REGI2C_DIG_REG: u8 = 0x6d;
-#[allow(dead_code)]
-pub(crate) const REGI2C_CPU_PLL: u8 = 0x67;
-#[allow(dead_code)]
-pub(crate) const REGI2C_SDIO_PLL: u8 = 0x62;
-#[allow(dead_code)]
-pub(crate) const REGI2C_BIAS: u8 = 0x6a;
-#[allow(dead_code)]
-pub(crate) const REGI2C_MSPI: u8 = 0x63;
-#[allow(dead_code)]
-pub(crate) const REGI2C_SYS_PLL: u8 = 0x66;
-#[allow(dead_code)]
-pub(crate) const REGI2C_PLLA: u8 = 0x6f;
-#[allow(dead_code)]
-pub(crate) const REGI2C_SAR_I2C: u8 = 0x69;
+define_regi2c! {
+    master: REGI2C_SDIO_PLL(0x62, 0) {}
+    master: REGI2C_MSPI(0x63, 0) {}
+    master: REGI2C_SYS_PLL(0x66, 0) {
+        reg: I2C_SPLL_OC_REF_DIV(2) {}
+        reg: I2C_SPLL_OC_DIV_7_0(3) {}
+        reg: I2C_SPLL_OC_DCUR(6) {}
+    }
+    master: REGI2C_CPU_PLL(0x67, 0) {
+        reg: I2C_CPLL_OC_REF_DIV(2) {}
+        reg: I2C_CPLL_OC_DIV_7_0(3) {}
+        reg: I2C_CPLL_OC_DCUR(6) {}
+    }
+    master: REGI2C_SAR_I2C(0x69, 0) {}
+    master: REGI2C_BIAS(0x6a, 0) {}
+    master: REGI2C_DIG_REG(0x6d, 0) {}
+    master: REGI2C_PLLA(0x6f, 0) {}
+}
 
 // Master select bits in ANA_CONF2 register
 const REGI2C_DIG_REG_MST_SEL: u16 = 1 << 10;
 const REGI2C_PLL_CPU_MST_SEL: u16 = 1 << 11;
-#[allow(dead_code)]
 const REGI2C_PLL_SDIO_MST_SEL: u16 = 1 << 6;
-#[allow(dead_code)]
 const REGI2C_BIAS_MST_SEL: u16 = 1 << 12;
-#[allow(dead_code)]
 const REGI2C_MSPI_XTAL_MST_SEL: u16 = 1 << 9;
-#[allow(dead_code)]
 const REGI2C_PLL_SYS_MST_SEL: u16 = 1 << 5;
-#[allow(dead_code)]
 const REGI2C_PLLA_MST_SEL: u16 = 1 << 8;
-#[allow(dead_code)]
 const REGI2C_SAR_I2C_MST_SEL: u16 = 1 << 7;
 
 /// I2C control register bit fields
@@ -66,14 +56,14 @@ fn regi2c_enable_block(block: u8) {
 
     // Set the master select bit for this block
     let sel_bit: u32 = match block {
-        REGI2C_DIG_REG => REGI2C_DIG_REG_MST_SEL as u32,
-        REGI2C_CPU_PLL => REGI2C_PLL_CPU_MST_SEL as u32,
-        REGI2C_SDIO_PLL => REGI2C_PLL_SDIO_MST_SEL as u32,
-        REGI2C_BIAS => REGI2C_BIAS_MST_SEL as u32,
-        REGI2C_MSPI => REGI2C_MSPI_XTAL_MST_SEL as u32,
-        REGI2C_SYS_PLL => REGI2C_PLL_SYS_MST_SEL as u32,
-        REGI2C_PLLA => REGI2C_PLLA_MST_SEL as u32,
-        REGI2C_SAR_I2C => REGI2C_SAR_I2C_MST_SEL as u32,
+        v if v == REGI2C_DIG_REG.master => REGI2C_DIG_REG_MST_SEL as u32,
+        v if v == REGI2C_CPU_PLL.master => REGI2C_PLL_CPU_MST_SEL as u32,
+        v if v == REGI2C_SDIO_PLL.master => REGI2C_PLL_SDIO_MST_SEL as u32,
+        v if v == REGI2C_BIAS.master => REGI2C_BIAS_MST_SEL as u32,
+        v if v == REGI2C_MSPI.master => REGI2C_MSPI_XTAL_MST_SEL as u32,
+        v if v == REGI2C_SYS_PLL.master => REGI2C_PLL_SYS_MST_SEL as u32,
+        v if v == REGI2C_PLLA.master => REGI2C_PLLA_MST_SEL as u32,
+        v if v == REGI2C_SAR_I2C.master => REGI2C_SAR_I2C_MST_SEL as u32,
         _ => return,
     };
 
