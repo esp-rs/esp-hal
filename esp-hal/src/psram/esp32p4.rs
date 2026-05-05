@@ -10,7 +10,7 @@
 #![allow(dead_code)]
 
 use super::{EXTMEM_ORIGIN, PsramSize};
-use crate::peripherals::HP_SYS_CLKRST;
+use crate::peripherals::{HP_SYS_CLKRST, PMU};
 
 /// MMU page size (64 KB)
 const MMU_PAGE_SIZE: usize = 0x10000;
@@ -741,23 +741,48 @@ pub(crate) fn cache_writeback(addr: u32, size: u32) {
 
 /// Program the PMU external LDO regulators for the MSPI PHY
 fn psram_phy_ldo_init() {
-    const PMU_BASE: u32 = 0x5011_5000;
-    unsafe {
-        // P0 power-rail LDOs (general analog).
-        mmio_write_32(PMU_BASE + 0x1B8, 0x4020_0100); // EXT_LDO_P0_0P1A
-        mmio_write_32(PMU_BASE + 0x1BC, 0xB100_0000); // EXT_LDO_P0_0P1A_ANA
-        mmio_write_32(PMU_BASE + 0x1C0, 0x4020_0000); // EXT_LDO_P0_0P2A
-        mmio_write_32(PMU_BASE + 0x1C4, 0xA000_0000); // EXT_LDO_P0_0P2A_ANA
-        mmio_write_32(PMU_BASE + 0x1C8, 0x4020_0000); // EXT_LDO_P0_0P3A
-        mmio_write_32(PMU_BASE + 0x1CC, 0xA000_0000); // EXT_LDO_P0_0P3A_ANA
-        // P1 power-rail LDOs (MSPI PHY domain).
-        mmio_write_32(PMU_BASE + 0x1D0, 0x4020_0180); // EXT_LDO_P1_0P1A     XPD + current limit
-        mmio_write_32(PMU_BASE + 0x1D4, 0x5700_0000); // EXT_LDO_P1_0P1A_ANA analog tune (THE one for PSRAM)
-        mmio_write_32(PMU_BASE + 0x1D8, 0x4020_0000); // EXT_LDO_P1_0P2A
-        mmio_write_32(PMU_BASE + 0x1DC, 0xA000_0000); // EXT_LDO_P1_0P2A_ANA
-        mmio_write_32(PMU_BASE + 0x1E0, 0x4020_0000); // EXT_LDO_P1_0P3A
-        mmio_write_32(PMU_BASE + 0x1E4, 0xA000_0000); // EXT_LDO_P1_0P3A_ANA
-    }
+    PMU::regs()
+        .ext_ldo_p0_0p1a()
+        .write(|w| unsafe { w.bits(0x4020_0100) });
+    PMU::regs()
+        .ext_ldo_p0_0p1a_ana()
+        .write(|w| unsafe { w.bits(0xB100_0000) });
+
+    PMU::regs()
+        .ext_ldo_p0_0p2a()
+        .write(|w| unsafe { w.bits(0x4020_0000) });
+    PMU::regs()
+        .ext_ldo_p0_0p2a_ana()
+        .write(|w| unsafe { w.bits(0xA000_0000) });
+
+    PMU::regs()
+        .ext_ldo_p0_0p3a()
+        .write(|w| unsafe { w.bits(0x4020_0000) });
+    PMU::regs()
+        .ext_ldo_p0_0p3a_ana()
+        .write(|w| unsafe { w.bits(0xA000_0000) });
+
+    PMU::regs()
+        .ext_ldo_p1_0p1a()
+        .write(|w| unsafe { w.bits(0x4020_0180) });
+    PMU::regs()
+        .ext_ldo_p1_0p1a_ana()
+        .write(|w| unsafe { w.bits(0x5700_0000) });
+
+    PMU::regs()
+        .ext_ldo_p1_0p2a()
+        .write(|w| unsafe { w.bits(0x4020_0000) });
+    PMU::regs()
+        .ext_ldo_p1_0p2a_ana()
+        .write(|w| unsafe { w.bits(0xA000_0000) });
+
+    PMU::regs()
+        .ext_ldo_p1_0p3a()
+        .write(|w| unsafe { w.bits(0x4020_0000) });
+    PMU::regs()
+        .ext_ldo_p1_0p3a_ana()
+        .write(|w| unsafe { w.bits(0xA000_0000) });
+
     // Allow LDO output to settle before the MSPI PHY is exercised.
     crate::rom::ets_delay_us(50);
 }
