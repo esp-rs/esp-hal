@@ -15,11 +15,7 @@ pub use esp_riscv_rt::TrapFrame;
 
 #[cfg_attr(interrupt_controller = "riscv_basic", path = "riscv/basic.rs")]
 #[cfg_attr(interrupt_controller = "plic", path = "riscv/plic.rs")]
-#[cfg_attr(esp32p4, path = "riscv/clic_v1.rs")]
-#[cfg_attr(
-    all(not(esp32p4), interrupt_controller = "clic"),
-    path = "riscv/clic_v2.rs"
-)]
+#[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
 mod cpu_int;
 
 use crate::{
@@ -316,15 +312,6 @@ pub fn enable_direct(
             let clic = unsafe { crate::soc::pac::CLIC::steal() };
 
             // Enable hardware vectoring
-            #[cfg(esp32p4)]
-            clic.int_ctrl(cpu_interrupt as usize).modify(|_, w| unsafe {
-                // P4: CLIC uses consolidated int_ctrl register (not separate int_attr).
-                // int_ctrl contains: int_ip[0], int_ie[8], int_attr_shv[16],
-                //   int_attr_trig[17:18], int_attr_mode[22:23], int_ctl[24:31]
-                w.int_attr_shv().set_bit();
-                w.int_attr_trig().bits(0) // positive level
-            });
-            #[cfg(not(esp32p4))]
             clic.int_attr(cpu_interrupt as usize).modify(|_, w| {
                 w.shv().hardware();
                 w.trig().positive_level()
