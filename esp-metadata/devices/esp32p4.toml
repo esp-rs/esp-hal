@@ -9,7 +9,7 @@
 name   = "esp32p4"
 arch   = "riscv"
 target = "riscv32imafc-unknown-none-elf"
-cores  = 2
+cores  = 1 # FIXME: Temporarily set to 1, too many things want CPU_CTRL to be implemented
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
 symbols = [

@@ -44,10 +44,10 @@ macro_rules! property {
         "riscv"
     };
     ("cores") => {
-        2
+        1
     };
     ("cores", str) => {
-        stringify!(2)
+        stringify!(1)
     };
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
