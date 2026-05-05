@@ -77,7 +77,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         if: env.SKIP_CI != 'true'
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
 
@@ -108,6 +108,7 @@ jobs:
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32p4 --toolchain stable --no-lint --no-docs
 
   detect-extras-runner:
     needs: get-labels
@@ -166,13 +167,13 @@ jobs:
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src
 
@@ -184,7 +185,7 @@ jobs:
       - name: Build RISC-V docs
         if: matrix.group == 'riscv'
         shell: bash
-        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2
+        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4
 
   # --------------------------------------------------------------------------
   # MSRV
@@ -223,7 +224,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
@@ -235,7 +236,7 @@ jobs:
       - name: msrv RISC-V (esp-hal)
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: |
-          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2 --toolchain ${{ env.MSRV }}
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
         if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'

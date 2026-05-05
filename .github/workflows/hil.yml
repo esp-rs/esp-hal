@@ -146,6 +146,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
             host: armv7
+          - soc: esp32p4
+            rust-target: riscv32imafc-unknown-none-elf
+            runner: esp32p4
+            host: aarch64
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
             runner: esp32-jtag
@@ -244,6 +248,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
             host: armv7
+          - soc: esp32p4
+            rust-target: riscv32imafc-unknown-none-elf
+            runner: esp32p4
+            host: aarch64
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
             runner: esp32-jtag
@@ -392,6 +400,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
             host: armv7
+          - soc: esp32p4
+            rust-target: riscv32imafc-unknown-none-elf
+            runner: esp32p4
+            host: aarch64
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
             runner: esp32-jtag
@@ -482,6 +494,10 @@ jobs:
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32h2-usb
             host: armv7
+          - soc: esp32p4
+            rust-target: riscv32imafc-unknown-none-elf
+            runner: esp32p4
+            host: aarch64
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
             runner: esp32-jtag
