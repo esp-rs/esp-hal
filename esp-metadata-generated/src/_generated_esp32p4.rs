@@ -101,10 +101,10 @@ macro_rules! property {
         true
     };
     ("ecc.has_memory_clock_gate") => {
-        false
+        true
     };
     ("ecc.supports_enhanced_security") => {
-        false
+        true
     };
     ("ecc.mem_block_size") => {
         48
@@ -247,6 +247,9 @@ macro_rules! property {
     ("rng.trng_supported") => {
         false
     };
+    ("rng.is_lp_sys") => {
+        true
+    };
     ("rsa.version") => {
         3
     };
@@ -278,7 +281,7 @@ macro_rules! property {
         false
     };
     ("soc.cpu_has_csr_pc") => {
-        true
+        false
     };
     ("soc.multi_core_enabled") => {
         false
@@ -379,11 +382,15 @@ macro_rules! for_each_ecc_working_mode {
         _for_each_inner_ecc_working_mode!((7,
         AffinePointVerificationAndJacobianPointMultiplication));
         _for_each_inner_ecc_working_mode!((8, ModularAddition));
+        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
+        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
+        _for_each_inner_ecc_working_mode!((11, ModularDivision));
         _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
         AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
         JacobianPointMultiplication), (5, AffinePointAddition), (6,
         JacobianPointVerification), (7,
-        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition)));
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
     };
 }
 #[macro_export]
@@ -3413,6 +3420,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RNG peripheral singleton"] RNG <= LP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -3538,6 +3547,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((HP_SYS_CLKRST(unstable)));
+        _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
         _for_each_inner_peripheral!((LP_I2C_ANA_MST(unstable)));
@@ -3720,6 +3730,7 @@ macro_rules! for_each_peripheral {
         "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)), (@ peri_type #[doc
         = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)), (@ peri_type
         #[doc = "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
+        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= LP_SYS()
         (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
         INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -3798,15 +3809,16 @@ macro_rules! for_each_peripheral {
         (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43),
         (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50), (GPIO51),
         (GPIO52), (GPIO53), (GPIO54), (GPIO(unstable)), (SYSTEM(unstable)),
-        (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (INTERRUPT_CORE0(unstable)),
-        (INTERRUPT_CORE1(unstable)), (LP_I2C_ANA_MST(unstable)), (CLIC(unstable)),
-        (IO_MUX(unstable)), (LP_AON(unstable)), (LP_AON_CLKRST(unstable)),
-        (LP_SYS(unstable)), (LP_WDT(unstable)), (LPWR(unstable)), (PMU(unstable)),
-        (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (UART0(unstable)),
-        (UART1(unstable)), (UART2(unstable)), (UART3(unstable)), (UART4(unstable)),
-        (SPI2(unstable)), (SPI3(unstable)), (I2C0(unstable)), (I2C1(unstable)),
-        (TWAI0(unstable)), (TWAI1(unstable)), (TWAI2(unstable)), (PSRAM(unstable)),
-        (DMA(unstable)), (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
+        (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (RNG(unstable)),
+        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (LP_I2C_ANA_MST(unstable)), (CLIC(unstable)), (IO_MUX(unstable)),
+        (LP_AON(unstable)), (LP_AON_CLKRST(unstable)), (LP_SYS(unstable)),
+        (LP_WDT(unstable)), (LPWR(unstable)), (PMU(unstable)), (SYSTIMER(unstable)),
+        (TIMG0(unstable)), (TIMG1(unstable)), (UART0(unstable)), (UART1(unstable)),
+        (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI2(unstable)),
+        (SPI3(unstable)), (I2C0(unstable)), (I2C1(unstable)), (TWAI0(unstable)),
+        (TWAI1(unstable)), (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)),
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
         (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
         (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
         (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),

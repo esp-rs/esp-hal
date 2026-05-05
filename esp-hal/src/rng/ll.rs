@@ -64,7 +64,13 @@ fn read_one(wait_cycles: usize) -> u32 {
             if now.wrapping_sub(*last_wait_start) >= wait_cycles {
                 *last_wait_start = now;
 
-                Some(RNG::regs().data().read().bits())
+                cfg_if::cfg_if! {
+                    if #[cfg(rng_is_lp_sys)] {
+                        Some(RNG::regs().rng_data().read().bits())
+                    } else {
+                        Some(RNG::regs().data().read().bits())
+                    }
+                }
             } else {
                 None
             }

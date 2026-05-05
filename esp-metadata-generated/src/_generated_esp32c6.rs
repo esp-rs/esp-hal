@@ -322,6 +322,9 @@ macro_rules! property {
     ("rng.trng_supported") => {
         true
     };
+    ("rng.is_lp_sys") => {
+        false
+    };
     ("rsa.version") => {
         3
     };

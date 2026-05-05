@@ -51,7 +51,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 # - I3C
 
 [device.soc]
-cpu_has_csr_pc = true
+cpu_has_csr_pc = false
 # ESP32-P4 v3.x: 20 MHz RC_FAST default (TRM v0.5, Ch 12)
 rc_fast_clk_default = 20_000_000
 
@@ -245,6 +245,7 @@ peripherals = [
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "HP_SYS" },
     { name = "HP_SYS_CLKRST" },
+    { name = "RNG", pac = "LP_SYS" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "LP_I2C_ANA_MST" },
@@ -429,9 +430,13 @@ support_status = "not_supported"
 support_status = "not_supported"  # LCD path of LCD_CAM block
 # [device.rmt] requires ram_start / channel_ram_size / channels config -
 # left out until those are mapped from P4 TRM. README row stays blank.
+
 [device.rng]
-support_status = "not_supported"  # TRNG
+support_status = "partial"  # TRNG
+trng_supported = false  # TODO
 apb_cycle_wait_num = 16  # placeholder
+is_lp_sys = true
+
 [device.lp_timer]
 support_status = "not_supported"  # RTC Timekeeping
 [device.sd_host]
@@ -478,10 +483,8 @@ memory_size_bytes = 384
 
 [device.usb_serial_jtag]
 
-# ECC: hardware accelerator (eco5+ supported)
 [device.ecc]
-support_status = "not_supported"
-
+support_status = "partial"
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
@@ -491,6 +494,9 @@ working_modes = [
     { id = 6, mode = "jacobian_point_verification" },
     { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
     { id = 8, mode = "modular_addition" },
+    { id = 9, mode = "modular_subtraction" },
+    { id = 10, mode = "modular_multiplication" },
+    { id = 11, mode = "modular_division" }
 ]
 curves = [
     { id = 0, curve = 192 },
@@ -498,6 +504,8 @@ curves = [
     { id = 2, curve = 384 },
 ]
 separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true
 
 [device.gpio]
 support_status = "partial"

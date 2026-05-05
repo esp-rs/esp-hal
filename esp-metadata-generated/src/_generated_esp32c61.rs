@@ -265,6 +265,9 @@ macro_rules! property {
     ("rng.trng_supported") => {
         false
     };
+    ("rng.is_lp_sys") => {
+        false
+    };
     ("sha.dma") => {
         true
     };

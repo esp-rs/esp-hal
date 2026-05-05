@@ -294,10 +294,7 @@ pub mod gpio;
 #[cfg(i2c_master_driver_supported)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(
-    feature = "unstable",
-    any(ecc_driver_supported, hmac_driver_supported, sha_driver_supported)
-))]
+#[cfg(all(feature = "unstable", any(hmac_driver_supported, sha_driver_supported)))]
 mod reg_access;
 #[cfg(rng_driver_supported)]
 pub mod rng;
