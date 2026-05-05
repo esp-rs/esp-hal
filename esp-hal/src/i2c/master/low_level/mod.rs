@@ -1,5 +1,18 @@
 use super::*;
 
+cfg_if::cfg_if! {
+    if #[cfg(i2c_master_version = "1")] {
+        mod v1;
+        use v1 as version;
+    } else if #[cfg(i2c_master_version = "2")] {
+        mod v2;
+        use v2 as version;
+    } else if #[cfg(i2c_master_version = "3")] {
+        mod v3;
+        use v3 as version;
+    }
+}
+
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(super) struct I2cFuture<'a> {
     events: EnumSet<Event>,
@@ -560,207 +573,6 @@ impl Driver<'_> {
         }
     }
 
-    #[cfg(i2c_master_version = "1")]
-    /// Sets the frequency of the I2C interface by calculating and applying the
-    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
-    /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
-        let timeout = clock_config.timeout;
-
-        let source_clk = crate::soc::clocks::apb_clk_frequency();
-
-        let bus_freq = clock_config.frequency.as_hz();
-
-        let half_cycle: u32 = source_clk / bus_freq / 2;
-        let scl_low = half_cycle;
-        let scl_high = half_cycle;
-        let sda_hold = half_cycle / 2;
-        let sda_sample = scl_high / 2;
-        let setup = half_cycle;
-        let hold = half_cycle;
-
-        // SCL period. According to the TRM, we should always subtract 1 to SCL low
-        // period
-        let scl_low = scl_low - 1;
-        // Still according to the TRM, if filter is not enbled, we have to subtract 7,
-        // if SCL filter is enabled, we have to subtract:
-        //   8 if SCL filter is between 0 and 2 (included)
-        //   6 + SCL threshold if SCL filter is between 3 and 7 (included)
-        // to SCL high period
-        let mut scl_high = scl_high;
-        // In the "worst" case, we will subtract 13, make sure the result will still be
-        // correct
-
-        // FIXME since we always set the filter threshold to 7 we don't need conditional
-        // code here once that changes we need the conditional code here
-        scl_high -= 7 + 6;
-
-        // if (filter_cfg_en) {
-        //     if (thres <= 2) {
-        //         scl_high -= 8;
-        //     } else {
-        //         assert(hw->scl_filter_cfg.thres <= 7);
-        //         scl_high -= thres + 6;
-        //     }
-        // } else {
-        //    scl_high -= 7;
-        //}
-
-        let scl_high_period = scl_high;
-        let scl_low_period = scl_low;
-        // sda sample
-        let sda_hold_time = sda_hold;
-        let sda_sample_time = sda_sample;
-        // setup
-        let scl_rstart_setup_time = setup;
-        let scl_stop_setup_time = setup;
-        // hold
-        let scl_start_hold_time = hold;
-        let scl_stop_hold_time = hold;
-
-        configure_clock(
-            self.info,
-            0,
-            scl_low_period,
-            scl_high_period,
-            0,
-            sda_hold_time,
-            sda_sample_time,
-            scl_rstart_setup_time,
-            scl_stop_setup_time,
-            scl_start_hold_time,
-            scl_stop_hold_time,
-            timeout.apb_cycles(half_cycle)?,
-        )?;
-
-        Ok(())
-    }
-
-    #[cfg(i2c_master_version = "2")]
-    /// Sets the frequency of the I2C interface by calculating and applying the
-    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
-    /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
-        let timeout = clock_config.timeout;
-
-        // TODO: could be REF_TICK
-        let source_clk = crate::soc::clocks::apb_clk_frequency();
-
-        let bus_freq = clock_config.frequency.as_hz();
-
-        let half_cycle: u32 = source_clk / bus_freq / 2;
-        // SCL
-        let scl_low = half_cycle;
-        // default, scl_wait_high < scl_high
-        let scl_high = half_cycle / 2 + 2;
-        let scl_wait_high = half_cycle - scl_high;
-        let sda_hold = half_cycle / 2;
-        // scl_wait_high < sda_sample <= scl_high
-        let sda_sample = half_cycle / 2 - 1;
-        let setup = half_cycle;
-        let hold = half_cycle;
-
-        // scl period
-        let scl_low_period = scl_low - 1;
-        let scl_high_period = scl_high;
-        let scl_wait_high_period = scl_wait_high;
-        // sda sample
-        let sda_hold_time = sda_hold;
-        let sda_sample_time = sda_sample;
-        // setup
-        let scl_rstart_setup_time = setup;
-        let scl_stop_setup_time = setup;
-        // hold
-        let scl_start_hold_time = hold - 1;
-        let scl_stop_hold_time = hold;
-
-        configure_clock(
-            self.info,
-            0,
-            scl_low_period,
-            scl_high_period,
-            scl_wait_high_period,
-            sda_hold_time,
-            sda_sample_time,
-            scl_rstart_setup_time,
-            scl_stop_setup_time,
-            scl_start_hold_time,
-            scl_stop_hold_time,
-            timeout.apb_cycles(half_cycle)?,
-        )?;
-
-        Ok(())
-    }
-
-    #[cfg(i2c_master_version = "3")]
-    /// Sets the frequency of the I2C interface by calculating and applying the
-    /// associated timings - corresponds to i2c_ll_cal_bus_clk and
-    /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
-        let timeout = clock_config.timeout;
-
-        let source_clk = crate::soc::clocks::xtal_clk_frequency();
-
-        let bus_freq = clock_config.frequency.as_hz();
-
-        let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
-        let sclk_freq: u32 = source_clk / clkm_div;
-        let half_cycle: u32 = sclk_freq / bus_freq / 2;
-        // SCL
-        let scl_low = half_cycle;
-        // default, scl_wait_high < scl_high
-        // Make 80KHz as a boundary here, because when working at lower frequency, too
-        // much scl_wait_high will faster the frequency according to some
-        // hardware behaviors.
-        let scl_wait_high = if bus_freq >= 80 * 1000 {
-            half_cycle / 2 - 2
-        } else {
-            half_cycle / 4
-        };
-        let scl_high = half_cycle - scl_wait_high;
-        let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2;
-        let setup = half_cycle;
-        let hold = half_cycle;
-
-        // According to the Technical Reference Manual, the following timings must be
-        // subtracted by 1. However, according to the practical measurement and
-        // some hardware behaviour, if wait_high_period and scl_high minus one.
-        // The SCL frequency would be a little higher than expected. Therefore, the
-        // solution here is not to minus scl_high as well as scl_wait high, and
-        // the frequency will be absolutely accurate to all frequency
-        // to some extent.
-        let scl_low_period = scl_low - 1;
-        let scl_high_period = scl_high;
-        let scl_wait_high_period = scl_wait_high;
-        // sda sample
-        let sda_hold_time = sda_hold - 1;
-        let sda_sample_time = sda_sample - 1;
-        // setup
-        let scl_rstart_setup_time = setup - 1;
-        let scl_stop_setup_time = setup - 1;
-        // hold
-        let scl_start_hold_time = hold - 1;
-        let scl_stop_hold_time = hold - 1;
-
-        configure_clock(
-            self.info,
-            clkm_div,
-            scl_low_period,
-            scl_high_period,
-            scl_wait_high_period,
-            sda_hold_time,
-            sda_sample_time,
-            scl_rstart_setup_time,
-            scl_stop_setup_time,
-            scl_start_hold_time,
-            scl_stop_hold_time,
-            timeout.apb_cycles(half_cycle)?,
-        )?;
-
-        Ok(())
-    }
-
     /// Configures the I2C peripheral for a write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
@@ -839,12 +651,12 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             match addr {
                 I2cAddress::SevenBit(addr) => {
-                    write_fifo(self.regs(), (addr << 1) | OperationType::Write as u8);
+                    self.write_fifo((addr << 1) | OperationType::Write as u8);
                 }
             }
         }
         for b in bytes {
-            write_fifo(self.regs(), *b);
+            self.write_fifo(*b);
         }
 
         Ok(())
@@ -946,7 +758,7 @@ impl Driver<'_> {
             // Load address and R/W bit into FIFO
             match addr {
                 I2cAddress::SevenBit(addr) => {
-                    write_fifo(self.regs(), (addr << 1) | OperationType::Read as u8);
+                    self.write_fifo((addr << 1) | OperationType::Read as u8);
                 }
             }
         }
@@ -961,7 +773,7 @@ impl Driver<'_> {
 
         // Read bytes from FIFO
         for byte in buffer.iter_mut() {
-            *byte = read_fifo(self.regs());
+            *byte = self.read_fifo();
         }
 
         // The RX FIFO should be empty now. If it is not, it means we queued up reading
@@ -1120,58 +932,26 @@ impl Driver<'_> {
         self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
+    fn set_frequency(&self, config: &Config) -> Result<(), ConfigError> {
+        version::set_frequency(self, config)
+    }
+
+    fn reset_fifo(&self) {
+        version::reset_fifo(self);
+    }
+
+    fn read_fifo(&self) -> u8 {
+        version::read_fifo(self.regs())
+    }
+
+    fn write_fifo(&self, data: u8) {
+        version::write_fifo(self.regs(), data);
+    }
+
     /// Starts an I2C transmission.
     fn start_transmission(&self) {
         // Start transmission
         self.regs().ctr().modify(|_, w| w.trans_start().set_bit());
-    }
-
-    /// Resets the transmit and receive FIFO buffers
-    #[cfg(not(i2c_master_version = "1"))]
-    fn reset_fifo(&self) {
-        // First, reset the fifo buffers
-        self.regs().fifo_conf().write(|w| unsafe {
-            w.tx_fifo_rst().set_bit();
-            w.rx_fifo_rst().set_bit();
-            w.nonfifo_en().clear_bit();
-            w.fifo_prt_en().set_bit();
-            w.rxfifo_wm_thrhd().bits(1);
-            w.txfifo_wm_thrhd().bits(8)
-        });
-
-        self.regs().fifo_conf().modify(|_, w| {
-            w.tx_fifo_rst().clear_bit();
-            w.rx_fifo_rst().clear_bit()
-        });
-
-        self.regs().int_clr().write(|w| {
-            w.rxfifo_wm().clear_bit_by_one();
-            w.txfifo_wm().clear_bit_by_one()
-        });
-
-        self.update_registers();
-    }
-
-    /// Resets the transmit and receive FIFO buffers
-    #[cfg(i2c_master_version = "1")]
-    fn reset_fifo(&self) {
-        // First, reset the fifo buffers
-        self.regs().fifo_conf().write(|w| unsafe {
-            w.tx_fifo_rst().set_bit();
-            w.rx_fifo_rst().set_bit();
-            w.nonfifo_en().clear_bit();
-            w.nonfifo_rx_thres().bits(1);
-            w.nonfifo_tx_thres().bits(32)
-        });
-
-        self.regs().fifo_conf().modify(|_, w| {
-            w.tx_fifo_rst().clear_bit();
-            w.rx_fifo_rst().clear_bit()
-        });
-
-        self.regs()
-            .int_clr()
-            .write(|w| w.rxfifo_full().clear_bit_by_one());
     }
 
     fn start_write_operation(
@@ -2028,46 +1808,6 @@ where
     });
 
     Ok(())
-}
-
-fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_version = "2")] {
-            // Apparently the ESO can read just fine using DPORT,
-            // so use this workaround on S2 only.
-            let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
-            let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
-            unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
-        } else {
-            register_block.data().read().fifo_rdata().bits()
-        }
-    }
-}
-
-fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    cfg_if::cfg_if! {
-        if #[cfg(any(i2c_master_version = "1", i2c_master_version = "2"))] {
-            let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
-            let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
-            unsafe {
-                fifo_ptr.write_volatile(data as u32);
-            }
-        } else if #[cfg(esp32p4)] {
-            // P4: data register is read-only (RX FIFO only). TX uses txfifo_start_addr.
-            // PAC txfifo_start_addr is also read-only in SVD, use direct MMIO.
-            // TODO: file an esp-pacs issue/PR so the P4 SVD marks the TX FIFO
-            // port writable like other chips' I2C PAC. Once that lands, this
-            // branch can collapse into the general `else` arm below.
-            let base = register_block as *const _ as usize;
-            unsafe {
-                ((base + 0x100) as *mut u32).write_volatile(data as u32);
-            }
-        } else {
-            register_block
-                .data()
-                .write(|w| unsafe { w.fifo_rdata().bits(data) });
-        }
-    }
 }
 
 // Estimate the reason for an acknowledge check failure on a best effort basis.

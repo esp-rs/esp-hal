@@ -120,7 +120,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
 
 use crate::{
@@ -146,6 +145,7 @@ use crate::{
     time::{Duration, Instant, Rate},
 };
 
+mod eh;
 mod low_level;
 
 pub use low_level::{AnyI2c, Instance};
@@ -526,19 +526,6 @@ impl Operation<'_> {
     }
 }
 
-impl embedded_hal::i2c::Error for Error {
-    fn kind(&self) -> embedded_hal::i2c::ErrorKind {
-        use embedded_hal::i2c::ErrorKind;
-
-        match self {
-            Self::FifoExceeded => ErrorKind::Overrun,
-            Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
-            Self::AcknowledgeCheckFailed(reason) => ErrorKind::NoAcknowledge(reason.into()),
-            _ => ErrorKind::Other,
-        }
-    }
-}
-
 /// A generic I2C Command
 #[derive(Debug)]
 enum Command {
@@ -667,35 +654,6 @@ struct DriverConfig {
     config: Config,
     sda_pin: PinGuard,
     scl_pin: PinGuard,
-}
-
-#[instability::unstable]
-impl<Dm: DriverMode> embassy_embedded_hal::SetConfig for I2c<'_, Dm> {
-    type Config = Config;
-    type ConfigError = ConfigError;
-
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
-    }
-}
-
-impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2c<'_, Dm> {
-    type Error = Error;
-}
-
-impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
-    fn transaction(
-        &mut self,
-        address: u8,
-        operations: &mut [embedded_hal::i2c::Operation<'_>],
-    ) -> Result<(), Self::Error> {
-        self.driver()
-            .transaction_impl(
-                I2cAddress::SevenBit(address),
-                operations.iter_mut().map(Operation::from),
-            )
-            .inspect_err(|error| self.internal_recover(error))
-    }
 }
 
 impl<'d> I2c<'d, Blocking> {
@@ -1301,15 +1259,3 @@ where
     }
 }
 
-impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
-    async fn transaction(
-        &mut self,
-        address: u8,
-        operations: &mut [EhalOperation<'_>],
-    ) -> Result<(), Self::Error> {
-        self.driver()
-            .transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
-            .await
-            .inspect_err(|error| self.internal_recover(error))
-    }
-}
