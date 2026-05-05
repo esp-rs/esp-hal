@@ -50,6 +50,12 @@ esp32h2 = [
     "esp-rtos/esp32h2",
     "esp-hal/esp32h2",
 ]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-rtos/esp32p4",
+    "esp-hal/esp32p4",
+]
 esp32s3 = [
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
