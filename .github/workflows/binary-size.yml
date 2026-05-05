@@ -49,6 +49,9 @@ jobs:
             esp32c5|esp32c6|esp32c61|esp32h2)
               echo "rust-target=riscv32imac-unknown-none-elf" >> $GITHUB_OUTPUT
               ;;
+            esp32p4)
+              echo "rust-target=riscv32imafc-unknown-none-elf" >> $GITHUB_OUTPUT
+              ;;
             *)
               echo "Error: Unknown SoC: ${{ matrix.soc }}"
               exit 1

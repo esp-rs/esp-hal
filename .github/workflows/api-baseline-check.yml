@@ -48,7 +48,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         if: env.SKIP_CI != 'true'
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
 
