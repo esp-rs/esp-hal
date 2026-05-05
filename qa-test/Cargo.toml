@@ -113,6 +113,7 @@ esp32p4 = [
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-hal/esp32p4",
+    "esp-rtos/esp32p4",
     "esp-println/esp32p4",
 ]
 esp32s2 = [
