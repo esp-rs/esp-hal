@@ -3,12 +3,6 @@
 //! P4 has two PSRAM controllers wired to the same DQ pads
 //! The structure is looks same with DDR controller but not same.
 
-// Several ROM cache helpers and MMIO wrappers are staged for follow-up
-// PSRAM bring-up work (cache suspend/resume around config writes).
-// They're intentionally retained so the follow-up PR can wire them in
-// without re-deriving the constants.
-#![allow(dead_code)]
-
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
@@ -19,11 +13,9 @@ use crate::{
 const MMU_PAGE_SIZE: usize = 0x10000;
 
 /// PSRAM_MSPI0 base, AXI cache controller.
-/// CAUTION: Missing area of TRM.
 const MSPI0_BASE: u32 = 0x5008_E000;
 
 /// PSRAM_MSPI1 base, direct-command controller.
-/// CAUTION: Missing area of TRM.
 const MSPI1_BASE: u32 = 0x5008_F000;
 
 /// Volatile 32-bit read.
@@ -45,13 +37,6 @@ unsafe fn mmio_setbits_32(addr: u32, mask: u32) {
     unsafe { mmio_write_32(addr, mmio_read_32(addr) | mask) }
 }
 
-/// Read-modify-write: clear every bit of `mask`. Equivalent to
-/// `*addr &= !mask`.
-#[inline(always)]
-unsafe fn mmio_clrbits_32(addr: u32, mask: u32) {
-    unsafe { mmio_write_32(addr, mmio_read_32(addr) & !mask) }
-}
-
 /// Read-modify-write: clear `clear`-bits then set `set`-bits.
 /// Equivalent to `*addr = (*addr & !clear) | set`.
 #[inline(always)]
@@ -59,13 +44,7 @@ unsafe fn mmio_clrsetbits_32(addr: u32, clear: u32, set: u32) {
     unsafe { mmio_write_32(addr, (mmio_read_32(addr) & !clear) | set) }
 }
 
-/// PSRAM interface mode (line count of the data bus). Mirrors IDF's
-/// `CONFIG_SPIRAM_MODE_*`.
-///
-/// Only `Hex` is currently exercised by this driver; selecting `Oct`
-/// requires the cache-side controller config (`mem_sdin_hex` /
-/// `mem_sdout_hex` bits) and chip MR8.x16 to flip together. Wire that
-/// path before exposing.
+/// PSRAM interface mode (line count of the data bus).
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -73,37 +52,35 @@ pub enum PsramMode {
     /// 16-line DDR, AP HEX PSRAM with MR8.x16 = 1. Default.
     #[default]
     Hex,
-    /// 8-line DDR, MR8.x16 = 0. Not yet implemented in this driver.
-    Oct,
+    // TODO; selecting `Oct`
+    // requires the cache-side controller config (`mem_sdin_hex` /
+    // `mem_sdout_hex` bits) and chip MR8.x16 to flip together. Wire that
+    // path before exposing.
+    // Oct,
 }
 
-/// PSRAM bus frequency. Choice ties together MPLL freq + bus divider
-/// + chip-side read/write latency (each `SpiRamFreq` corresponds to a
-/// `(MPLL, div, RL, WL, RD_dummy_bits, WR_dummy_bits)` tuple).
+/// PSRAM bus frequency.
 ///
-/// Variants referenced from `CONFIG_SPIRAM_SPEED_*`.
-///
-/// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits | Use case |
-/// |-----------|------|-----|--------|--------|---------------|----------|
-/// | `Mhz20`   | 400  | 20  | 2      | 2      | 18            | Low-power / debug |
-/// | `Mhz80`   | 320  | 4   | 2      | 2      | 18            | Conservative SI margin |
-/// | `Mhz200`  | 400  | 2   | 4      | 1      | 26            | IDF default |
-/// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Overclock, **silicon rev v3+ only** |
+/// Choice ties together MPLL freq + bus divider + chip-side read/write latency.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum SpiRamFreq {
-    /// 20 MHz bus (MPLL 400 / div 20). Lowest-power option;
-    /// rarely used outside debug.
+    /// 20 MHz bus (MPLL 400 / div 20).
     Mhz20  = 20,
-    /// 80 MHz bus (MPLL 320 / div 4). Conservative; widest timing
-    /// margin.
+
+    /// 80 MHz bus (MPLL 320 / div 4).
+    ///
+    /// Conservative; widest timing margin.
     Mhz80  = 80,
-    /// 200 MHz bus (MPLL 400 / div 2). IDF default for AP HEX PSRAM.
-    /// Validated on the EV board.
+
+    /// 200 MHz bus (MPLL 400 / div 2).
+    ///
+    /// IDF default for AP HEX PSRAM.
     #[default]
     Mhz200 = 200,
-    /// 250 MHz bus (MPLL 500 / div 2). Top speed, silicon rev v3+ only.
+
+    /// 250 MHz bus (MPLL 500 / div 2).
     Mhz250 = 250,
 }
 
@@ -528,6 +505,7 @@ const ESP_ROM_SPIFLASH_OPI_DTR_MODE: u32 = 7;
 /// Maps to `PSRAM_CTRLR_LL_MSPI_ID_3` in IDF (`PSRAM_MSPI1` = 0x5008_F000).
 const ROM_SPI_PSRAM_CMD_NUM: i32 = 3;
 /// CS mask: PSRAM lives on CS1 (bit 1). Flash on CS0.
+#[expect(dead_code)]
 const ROM_SPI_PSRAM_CS_MASK: u8 = 1 << 1;
 
 unsafe extern "C" {
@@ -694,11 +672,7 @@ fn mmu_map_psram(mspi_base: u32, config: &PsramConfig) {
     const MMU_ACCESS_PSRAM: u32 = 1 << 10;
     const MMU_PADDR_MASK: u32 = 0x3FF; // 10 bits of physical page number
 
-    let psram_size = match config.size {
-        PsramSize::AutoDetect => 32 * 1024 * 1024,
-        PsramSize::Size(s) => s,
-    };
-    let page_count = psram_size / MMU_PAGE_SIZE;
+    let page_count = config.size.get() / MMU_PAGE_SIZE;
 
     // Note: we do NOT call Cache_Suspend_*. The ROM helpers expect
     // interrupts/scheduler state we can't guarantee in init context, and
