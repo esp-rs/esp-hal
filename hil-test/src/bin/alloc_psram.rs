@@ -1,10 +1,11 @@
 //! Allocator and PSRAM-related tests
 
 //% CHIPS:
-//% CHIPS(llff, tlsf): esp32 esp32s2 esp32c5 esp32c61 esp32s3
+//% CHIPS(llff, tlsf): esp32 esp32s2 esp32c5 esp32c61 esp32s3 esp32p4
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
-//% FEATURES: unstable esp-storage esp-alloc/nightly
+//% FEATURES: unstable esp-alloc/nightly
+//% FEATURES(esp32 esp32s2 esp32c5 esp32c61 esp32s3): esp-storage
 
 #![no_std]
 #![no_main]
@@ -13,27 +14,17 @@ use hil_test as _;
 
 extern crate alloc;
 
-#[embedded_test::tests]
+#[embedded_test::tests(default_timeout = 30)] // P4 PSRAM can get large
 mod tests {
     use alloc::vec::Vec as AllocVec;
 
     use allocator_api2::vec::Vec;
-    use embedded_storage::*;
     use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
-    use esp_bootloader_esp_idf::partitions;
-    use esp_hal::peripherals::FLASH;
-    use esp_storage::FlashStorage;
-
-    struct Context<'a> {
-        flash: FLASH<'a>,
-    }
 
     #[init]
-    fn init() -> Context<'static> {
+    fn init() {
         let p = esp_hal::init(esp_hal::Config::default());
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
-
-        Context { flash: p.FLASH }
     }
 
     // alloc::vec::Vec tests
@@ -143,6 +134,35 @@ mod tests {
             for i in 0..free {
                 assert_eq!(vec[i], (i % 256) as u8);
             }
+        }
+    }
+}
+
+#[cfg(not(esp32p4))]
+#[embedded_test::tests]
+mod storage_tests {
+    use alloc::vec::Vec as AllocVec;
+
+    use allocator_api2::vec::Vec;
+    use embedded_storage::*;
+    use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
+    use esp_bootloader_esp_idf::partitions;
+    use esp_hal::peripherals::FLASH;
+    use esp_storage::FlashStorage;
+
+    struct Context<'a> {
+        #[cfg(not(esp32p4))]
+        flash: FLASH<'a>,
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let p = esp_hal::init(esp_hal::Config::default());
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        Context {
+            #[cfg(not(esp32p4))]
+            flash: p.FLASH,
         }
     }
 
