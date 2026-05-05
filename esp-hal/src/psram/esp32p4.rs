@@ -62,6 +62,13 @@ pub enum PsramMode {
 /// PSRAM bus frequency.
 ///
 /// Choice ties together MPLL freq + bus divider + chip-side read/write latency.
+///
+/// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits | Use case               |
+/// |-----------|------|-----|--------|--------|---------------|------------------------|
+/// | `Mhz20`   | 400  | 20  | 2      | 2      | 18            | Low-power / debug      |
+/// | `Mhz80`   | 320  | 4   | 2      | 2      | 18            | Conservative SI margin |
+/// | `Mhz200`  | 400  | 2   | 4      | 1      | 26            | IDF default            |
+/// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Overclock              |
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
