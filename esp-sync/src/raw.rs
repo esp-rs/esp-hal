@@ -100,6 +100,13 @@ impl RawLock for SingleCoreInterruptLock {
                         in(reg) old_mintthresh,
                     );
                 }
+
+                // The delay between the moment we unmask the interrupt threshold register
+                // and the moment the potential requested interrupt is triggered is not
+                // null: up to three machine cycles/instructions can be executed.
+                riscv::asm::nop();
+                riscv::asm::nop();
+                riscv::asm::nop();
             } else if #[cfg(riscv)] {
                 if token != 0 {
                     unsafe {

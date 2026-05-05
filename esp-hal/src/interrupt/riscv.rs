@@ -359,6 +359,14 @@ pub fn enable_direct(
     cpu_int::set_priority_raw(cpu_interrupt as u32, level);
     cpu_int::set_kind_raw(cpu_interrupt as u32, InterruptKind::Level);
     cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
+
+    #[cfg(esp32p4)]
+    unsafe {
+        // Write back the cache to make sure the new interrupt handler is visible to the CPU.
+        crate::soc::cache_writeback_addr(mtvt_table as u32, 48 * 4);
+        // Invalidate the cache to make sure the CPU does not read from a stale instruction cache.
+        crate::soc::cache_invalidate_addr(mtvt_table as u32, 48 * 4);
+    }
 }
 
 // helper: returns correctly encoded RISC-V `jal` instruction
