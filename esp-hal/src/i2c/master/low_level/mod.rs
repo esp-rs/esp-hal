@@ -1,17 +1,9 @@
 use super::*;
 
-cfg_if::cfg_if! {
-    if #[cfg(i2c_master_version = "1")] {
-        mod v1;
-        use v1 as version;
-    } else if #[cfg(i2c_master_version = "2")] {
-        mod v2;
-        use v2 as version;
-    } else if #[cfg(i2c_master_version = "3")] {
-        mod v3;
-        use v3 as version;
-    }
-}
+#[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
+#[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
+#[cfg_attr(i2c_master_version = "3", path = "v3.rs")]
+mod version;
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(super) struct I2cFuture<'a> {

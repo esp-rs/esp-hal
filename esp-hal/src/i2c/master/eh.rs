@@ -1,6 +1,6 @@
 use embedded_hal::i2c::Operation as EhalOperation;
 
-use super::*;
+use super::{Async, Config, ConfigError, DriverMode, Error, I2c, I2cAddress, Operation};
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {

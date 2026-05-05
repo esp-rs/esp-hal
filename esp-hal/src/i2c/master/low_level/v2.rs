@@ -1,4 +1,4 @@
-use super::*;
+use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
