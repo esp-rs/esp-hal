@@ -454,13 +454,13 @@ driver_configs![
         name: "I2S",
         properties: {
             /// Register-layout generation derived from the chip SVD.
-            version: u32,
+            version: Option<u32>,
             /// Default clock source selector written to the I2S clock source register.
-            default_clock_source: u32,
+            default_clock_source: Option<u32>,
             /// Width of the MCLK divider field in the I2S clock register.
-            mclk_divider_bit_width: u32,
+            mclk_divider_bit_width: Option<u32>,
             /// Largest WS divider value supported by the peripheral.
-            max_ws_width: u32,
+            max_ws_width: Option<u32>,
             #[serde(default)]
             /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,

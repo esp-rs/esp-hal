@@ -199,6 +199,9 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("i2s.clock_configured_by_pcr") => {
+        false
+    };
     ("interrupts.status_registers") => {
         3
     };
