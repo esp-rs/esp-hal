@@ -577,14 +577,7 @@ jobs:
       needs.auth.outputs.allowed == 'true' &&
       startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.find-run.outputs.run_id }}
-      comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
-      - uses: actions/checkout@v4 # for `require`
-        with:
-          fetch-depth: 1
-
       - name: Extract parameters from comment
         id: extract
         run: |
