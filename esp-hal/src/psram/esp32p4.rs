@@ -10,7 +10,10 @@
 #![allow(dead_code)]
 
 use super::{EXTMEM_ORIGIN, PsramSize};
-use crate::peripherals::{HP_SYS_CLKRST, PMU};
+use crate::{
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
+    soc::regi2c,
+};
 
 /// MMU page size (64 KB)
 const MMU_PAGE_SIZE: usize = 0x10000;
@@ -789,18 +792,11 @@ fn psram_phy_ldo_init() {
 
 /// Configure MPLL to target frequency for PSRAM clock.
 fn configure_mpll(freq_mhz: u32) {
-    use crate::soc::regi2c;
-
-    const I2C_MPLL: u8 = 0x63;
-    const I2C_MPLL_DIV_REG_ADDR: u8 = 2;
-    const I2C_MPLL_DHREF: u8 = 3;
-    const I2C_MPLL_IR_CAL_RSTB: u8 = 5;
-
     // Power up the MPLL analog block.
-    let pmu = crate::peripherals::PMU::regs();
-    pmu.rf_pwc().modify(|_, w| w.mspi_phy_xpd().set_bit());
-    let lp_clkrst = crate::peripherals::LP_AON_CLKRST::regs();
-    lp_clkrst
+    PMU::regs()
+        .rf_pwc()
+        .modify(|_, w| w.mspi_phy_xpd().set_bit());
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| w.lp_aonclkrst_hp_mpll_500m_clk_en().set_bit());
 
@@ -809,28 +805,31 @@ fn configure_mpll(freq_mhz: u32) {
     let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
     let div_val: u8 = (div << 3) | ref_div;
 
-    let dhref = regi2c::regi2c_read(I2C_MPLL, 0, I2C_MPLL_DHREF);
-    regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_DHREF, dhref | (3 << 4));
+    let dhref = regi2c::I2C_MPLL_DHREF.read();
+    regi2c::I2C_MPLL_DHREF.write_reg(dhref | (3 << 4));
 
-    let rstb = regi2c::regi2c_read(I2C_MPLL, 0, I2C_MPLL_IR_CAL_RSTB);
-    regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_IR_CAL_RSTB, rstb & 0xDF);
-    regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_IR_CAL_RSTB, rstb | (1 << 5));
+    let rstb = regi2c::I2C_MPLL_IR_CAL_RSTB.read();
+    regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb & 0xDF);
+    regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb | (1 << 5));
+    regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
 
-    regi2c::regi2c_write(I2C_MPLL, 0, I2C_MPLL_DIV_REG_ADDR, div_val);
-
-    let clkrst = HP_SYS_CLKRST::regs();
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());
     let mut t = 1_000_000_u32;
-    while !clkrst.ana_pll_ctrl0().read().mspi_cal_end().bit_is_set() {
+    while !HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .mspi_cal_end()
+        .bit_is_set()
+    {
         t = t.saturating_sub(1);
         if t == 0 {
             break;
         }
         core::hint::spin_loop();
     }
-    clkrst
+    HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().set_bit());
     // cal_end timeout (t == 0): surfaces later via `psram_detect_size` fallback.

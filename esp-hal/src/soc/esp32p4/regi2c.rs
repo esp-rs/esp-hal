@@ -2,7 +2,11 @@ use crate::rom::regi2c::{RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
     master: REGI2C_SDIO_PLL(0x62, 0) {}
-    master: REGI2C_MSPI(0x63, 0) {}
+    master: REGI2C_MSPI(0x63, 0) {
+        reg: I2C_MPLL_DIV_REG_ADDR(2) {}
+        reg: I2C_MPLL_DHREF(3) {}
+        reg: I2C_MPLL_IR_CAL_RSTB(5) {}
+    }
     master: REGI2C_SYS_PLL(0x66, 0) {
         reg: I2C_SPLL_OC_REF_DIV(2) {}
         reg: I2C_SPLL_OC_DIV_7_0(3) {}
