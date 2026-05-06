@@ -9,7 +9,7 @@
 name   = "esp32p4"
 arch   = "riscv"
 target = "riscv32imafc-unknown-none-elf"
-cores  = 1 # FIXME: Temporarily set to 1, too many things want CPU_CTRL to be implemented
+cores  = 2
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
 symbols = [
@@ -49,6 +49,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 # - I3C
 
 [device.soc]
+multi_core_enabled = true
 cpu_has_csr_pc = false
 # ESP32-P4 v3.x: 20 MHz RC_FAST default (TRM v0.5, Ch 12)
 rc_fast_clk_default = 20_000_000
@@ -303,6 +304,7 @@ peripherals = [
     { name = "ECC", interrupts = { peri = "ECC" } },
 
     { name = "SW_INTERRUPT", virtual = true },
+    { name = "CPU_CTRL", virtual = true },
 ]
 
 # UART: 5 instances (UART0-4), 128-byte FIFO
