@@ -6,12 +6,18 @@ crate::unstable_module! {
     pub mod clocks;
 }
 
+#[cfg(multi_core)]
+pub(crate) mod cpu_control;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
 pub(crate) fn pre_init() {
-    // TODO: Check if anything needs to be done here
+    // Ensure Core 1 is marked as parked before any is_running() call.
+    #[cfg(multi_core)]
+    unsafe {
+        cpu_control::internal_park_core(crate::system::Cpu::AppCpu, true);
+    }
 }
 
 const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
