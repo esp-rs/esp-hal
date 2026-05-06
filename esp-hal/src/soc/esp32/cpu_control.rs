@@ -202,6 +202,13 @@ where
         }
     }
 
+    // The ROM has already handed off to us; clear the AppCpu boot address so a
+    // subsequent reset doesn't see a stale entry point. Matches IDF's
+    // `call_start_cpu1`.
+    DPORT::regs()
+        .appcpu_ctrl_d()
+        .write(|w| unsafe { w.appcpu_boot_addr().bits(0) });
+
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
     unsafe { crate::interrupt::init_vectoring() };
 
