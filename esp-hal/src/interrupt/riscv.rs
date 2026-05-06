@@ -495,6 +495,11 @@ pub(crate) unsafe fn init_vectoring() {
         }
     };
 
+    // Configure CLIC for hardware-vectored mode (shv=1) and set nlbits.
+    // Must run on each core since CLIC control registers are per-core.
+    #[cfg(feature = "rt")]
+    cpu_int::init();
+
     // Configure and enable vectored interrupts
     for (int, prio) in PRIORITY_TO_INTERRUPT.iter().copied().zip(Priority::iter()) {
         let num = int as u32;
@@ -558,8 +563,6 @@ pub(crate) mod rt {
     #[unsafe(no_mangle)]
     unsafe fn _setup_interrupts() {
         crate::interrupt::setup_interrupts();
-
-        cpu_int::init();
 
         #[cfg(interrupt_controller = "plic")]
         unsafe {
