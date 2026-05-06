@@ -62,7 +62,7 @@ pub fn software_reset() -> ! {
 }
 
 /// Set App cpu Entry code, code can be called in PRO CPU.
-#[cfg(esp32s3)]
+#[cfg(any(esp32s3, esp32p4))]
 #[inline(always)]
 pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
     unsafe extern "C" {
