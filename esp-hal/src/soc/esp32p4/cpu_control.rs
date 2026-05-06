@@ -1,5 +1,5 @@
 use crate::{
-    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
+    peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
     system::{Cpu, multi_core},
 };
 
@@ -12,6 +12,18 @@ pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
             Cpu::AppCpu => w.hpcore1_sw_stall_code().bits(code),
         }
     });
+
+    // On unstall, wait for the corestalled status bit to drop, matching IDF's
+    // cpu_utility_ll_unstall_cpu. We do *not* wait on stall: if the target core
+    // was in WFI when the stall took effect, the status bit may never assert,
+    // making the check unreliable.
+    if !park {
+        let st = HP_SYS::regs().cpu_corestalled_st();
+        match core {
+            Cpu::ProCpu => while st.read().reg_core0_corestalled_st().bit_is_set() {},
+            Cpu::AppCpu => while st.read().reg_core1_corestalled_st().bit_is_set() {},
+        }
+    }
 }
 
 #[instability::unstable]
