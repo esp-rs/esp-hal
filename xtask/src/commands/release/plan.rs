@@ -141,10 +141,19 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         .map(|pkg| CargoToml::new(workspace, *pkg).map(|cargo_toml| (*pkg, cargo_toml)))
         .collect::<Result<HashMap<_, _>>>()?;
 
-    // Determine package dependencies (package -> dependencies)
+    // Determine package dependencies (package -> dependencies). Restrict deps
+    // to the in-scope set so the graph is self-contained — otherwise
+    // `topological_sort` spins forever waiting for a dep that will never be
+    // emitted (e.g. on a backport branch where `packages_to_release` is just
+    // the single backport package).
     let mut dep_graph = HashMap::new();
     for (package, toml) in package_tomls.iter_mut() {
-        dep_graph.insert(*package, toml.repo_dependencies());
+        let deps = toml
+            .repo_dependencies()
+            .into_iter()
+            .filter(|d| packages_to_release.contains(d))
+            .collect();
+        dep_graph.insert(*package, deps);
     }
 
     // Topological sort the packages into a release order. Note that this is not a stable order,
@@ -496,6 +505,7 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
     let mut sorted = Vec::new();
     let mut dep_graph = dep_graph.clone();
     while !dep_graph.is_empty() {
+        let before = sorted.len();
         dep_graph.retain(|pkg, deps| {
             deps.retain(|dep| !sorted.contains(dep));
 
@@ -506,6 +516,15 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
                 true
             }
         });
+
+        // No package was removed this pass — the remaining graph is either
+        // cyclic or references deps not in the graph. Either way, looping
+        // again would spin forever. Panic with the offending state so a
+        // future regression fails loudly instead of pegging a CPU.
+        assert!(
+            sorted.len() > before,
+            "topological_sort made no progress; remaining graph: {dep_graph:?}"
+        );
     }
 
     sorted
@@ -552,6 +571,16 @@ mod tests {
                 Package::EspRtos
             ]
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "topological_sort made no progress")]
+    fn test_topological_sort_dangling_dep_panics() {
+        // Graph references a package that isn't a key — previously caused an
+        // infinite loop. Now the assert in `topological_sort` catches it.
+        let mut dep_graph = HashMap::new();
+        dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
+        let _ = topological_sort(&dep_graph);
     }
 
     #[test]
