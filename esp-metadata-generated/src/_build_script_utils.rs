@@ -935,6 +935,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"1\"",
                     "uart_has_sclk_divider",
+                    "uart_has_sclk_enable",
                     "wifi_mac_version=\"1\"",
                 ],
                 cfgs: &[
@@ -1096,6 +1097,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -1415,6 +1417,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"1\"",
                     "uart_has_sclk_divider",
+                    "uart_has_sclk_enable",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -1629,6 +1632,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -1998,6 +2002,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
+                    "uart_has_sclk_enable",
                     "uhci_combined_uart_selector_field",
                     "wifi_mac_version=\"3\"",
                     "wifi_has_5g",
@@ -2259,6 +2264,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=uhci_combined_uart_selector_field",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
                     "cargo:rustc-cfg=wifi_has_5g",
@@ -2684,6 +2690,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
+                    "uart_has_sclk_enable",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"2\"",
                     "wifi_csi_supported",
@@ -2970,6 +2977,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"2\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
@@ -3317,6 +3325,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
+                    "uart_has_sclk_enable",
                     "wifi_has_wifi6",
                     "wifi_mac_version=\"3\"",
                     "wifi_csi_supported",
@@ -3518,6 +3527,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=wifi_mac_version=\"3\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
@@ -3913,6 +3923,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
                     "uart_peripheral_controls_mem_clk",
+                    "uart_has_sclk_enable",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32h2",
@@ -4163,6 +4174,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -5705,6 +5717,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"1\"",
                     "uart_has_sclk_divider",
+                    "uart_has_sclk_enable",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -5965,6 +5978,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
+                    "cargo:rustc-cfg=uart_has_sclk_enable",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -6464,6 +6478,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_dma_segmented_transfer)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_divcnt_rst)");
     println!("cargo:rustc-check-cfg=cfg(uart_has_sclk_divider)");
+    println!("cargo:rustc-check-cfg=cfg(uart_has_sclk_enable)");
     println!("cargo:rustc-check-cfg=cfg(esp32c3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ds)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_fe)");

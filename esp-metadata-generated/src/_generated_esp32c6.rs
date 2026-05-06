@@ -424,6 +424,9 @@ macro_rules! property {
     ("uart.has_sclk_divider") => {
         false
     };
+    ("uart.has_sclk_enable") => {
+        true
+    };
     ("uhci.combined_uart_selector_field") => {
         false
     };

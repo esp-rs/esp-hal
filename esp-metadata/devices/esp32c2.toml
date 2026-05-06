@@ -441,6 +441,7 @@ instances = [
 ram_size = 128
 version = 1
 has_sclk_divider = true
+has_sclk_enable = true
 
 [device.rng]
 support_status = "partial"

@@ -723,6 +723,9 @@ driver_configs![
             // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.
             #[serde(default)]
             has_sclk_divider: bool,
+            // Whether the UART's CLK_CONF register has an SCLK enable bit.
+            #[serde(default)]
+            has_sclk_enable: bool,
         }
     },
     UhciProperties {

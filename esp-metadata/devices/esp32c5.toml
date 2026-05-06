@@ -624,6 +624,7 @@ instances = [
 ram_size = 128
 version = 2
 peripheral_controls_mem_clk = true
+has_sclk_enable = true
 
 [device.uhci]
 support_status = "partial"

@@ -310,6 +310,9 @@ macro_rules! property {
     ("uart.has_sclk_divider") => {
         true
     };
+    ("uart.has_sclk_enable") => {
+        true
+    };
     ("wifi.has_wifi6") => {
         false
     };
