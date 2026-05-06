@@ -80,11 +80,15 @@ fn gen_blocking(f: ItemFn) -> TokenStream {
 }
 
 fn gen_async(f: ItemFn) -> TokenStream {
-    let fargs = f.sig.inputs.clone();
-    let out = f.sig.output.clone();
-    let f_body = f.block.clone();
+    let ItemFn {
+        attrs: fattrs,
+        block: f_body,
+        sig,
+        ..
+    } = f;
+    let fargs = sig.inputs;
+    let out = sig.output;
 
-    let fattrs = &f.attrs;
     let lint_attrs: Vec<&Attribute> = fattrs
         .iter()
         .filter(|a| {
@@ -139,7 +143,6 @@ fn esp_hal_crate() -> syn::Ident {
 /// Collects multiple errors and emits them all at once.
 ///
 /// Must be consumed via [`Ctxt::check`]; dropping without checking panics.
-#[derive(Default)]
 struct Ctxt {
     errors: RefCell<Option<Vec<syn::Error>>>,
 }
@@ -223,6 +226,22 @@ mod tests {
             result.to_string(),
             quote::quote! {
                 ::core::compile_error! { "This attribute accepts no arguments" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_blocking_rejects_bad_return_type() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! { fn main() -> u32 { 0 } }.into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error! { "main function must either not return a value, return `()` or return `!`" }
             }
             .to_string()
         );

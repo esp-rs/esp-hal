@@ -312,13 +312,13 @@ pub mod uart;
 
 mod macros;
 
-#[cfg(feature = "rt")]
-pub use procmacros::main;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
 #[cfg(any(lp_core, ulp_riscv_core))]
 pub use procmacros::load_lp_code;
+#[cfg(feature = "rt")]
+pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]
