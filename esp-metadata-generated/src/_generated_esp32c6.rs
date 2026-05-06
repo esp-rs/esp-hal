@@ -5413,8 +5413,98 @@ macro_rules! for_each_lp_function {
         GPIO5), ((LP_GPIO6, LP_GPIOn, 6), GPIO6), ((LP_GPIO7, LP_GPIOn, 7), GPIO7)));
     };
 }
-/// Defines the `InputSignal` and `OutputSignal` enums.
+/// This macro can be used to generate code for each IOMUX-only digital function of each GPIO.
 ///
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers
+/// (not routable through the GPIO matrix). Use this to implement signal-specific traits for
+/// peripherals whose pins must bypass the GPIO matrix (e.g., EMAC, USB).
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the alternate function.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
+///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
+///   group to which the signal belongs.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+/// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+///
+/// Example data:
+/// - `(EMAC_RXD0, GPIO25, _5)`
+/// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_iomux_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_iomux_function!((FSPIQ, GPIO2, _2));
+        _for_each_inner_iomux_function!((MTMS, GPIO4, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO4, _2));
+        _for_each_inner_iomux_function!((MTDI, GPIO5, _0));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO5, _2));
+        _for_each_inner_iomux_function!((MTCK, GPIO6, _0));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO6, _2));
+        _for_each_inner_iomux_function!((MTDO, GPIO7, _0));
+        _for_each_inner_iomux_function!((FSPID, GPIO7, _2));
+        _for_each_inner_iomux_function!((U0TXD, GPIO16, _0));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO16, _2));
+        _for_each_inner_iomux_function!((U0RXD, GPIO17, _0));
+        _for_each_inner_iomux_function!((FSPICS1, GPIO17, _2));
+        _for_each_inner_iomux_function!((SDIO_CMD, GPIO18, _0));
+        _for_each_inner_iomux_function!((FSPICS2, GPIO18, _2));
+        _for_each_inner_iomux_function!((SDIO_CLK, GPIO19, _0));
+        _for_each_inner_iomux_function!((FSPICS3, GPIO19, _2));
+        _for_each_inner_iomux_function!((SDIO_DATA0, GPIO20, _0));
+        _for_each_inner_iomux_function!((FSPICS4, GPIO20, _2));
+        _for_each_inner_iomux_function!((SDIO_DATA1, GPIO21, _0));
+        _for_each_inner_iomux_function!((FSPICS5, GPIO21, _2));
+        _for_each_inner_iomux_function!((SDIO_DATA2, GPIO22, _0));
+        _for_each_inner_iomux_function!((SDIO_DATA3, GPIO23, _0));
+        _for_each_inner_iomux_function!((SPICS0, GPIO24, _0));
+        _for_each_inner_iomux_function!((SPIQ, GPIO25, _0));
+        _for_each_inner_iomux_function!((SPIWP, GPIO26, _0));
+        _for_each_inner_iomux_function!((SPIHD, GPIO28, _0));
+        _for_each_inner_iomux_function!((SPICLK, GPIO29, _0));
+        _for_each_inner_iomux_function!((SPID, GPIO30, _0));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO16, _2));
+        _for_each_inner_iomux_function!(((FSPICS1, FSPICSn, 1), GPIO17, _2));
+        _for_each_inner_iomux_function!(((FSPICS2, FSPICSn, 2), GPIO18, _2));
+        _for_each_inner_iomux_function!(((FSPICS3, FSPICSn, 3), GPIO19, _2));
+        _for_each_inner_iomux_function!(((SDIO_DATA0, SDIO_DATAn, 0), GPIO20, _0));
+        _for_each_inner_iomux_function!(((FSPICS4, FSPICSn, 4), GPIO20, _2));
+        _for_each_inner_iomux_function!(((SDIO_DATA1, SDIO_DATAn, 1), GPIO21, _0));
+        _for_each_inner_iomux_function!(((FSPICS5, FSPICSn, 5), GPIO21, _2));
+        _for_each_inner_iomux_function!(((SDIO_DATA2, SDIO_DATAn, 2), GPIO22, _0));
+        _for_each_inner_iomux_function!(((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO24, _0));
+        _for_each_inner_iomux_function!((all(FSPIQ, GPIO2, _2), (MTMS, GPIO4, _0),
+        (FSPIHD, GPIO4, _2), (MTDI, GPIO5, _0), (FSPIWP, GPIO5, _2), (MTCK, GPIO6, _0),
+        (FSPICLK, GPIO6, _2), (MTDO, GPIO7, _0), (FSPID, GPIO7, _2), (U0TXD, GPIO16, _0),
+        (FSPICS0, GPIO16, _2), (U0RXD, GPIO17, _0), (FSPICS1, GPIO17, _2), (SDIO_CMD,
+        GPIO18, _0), (FSPICS2, GPIO18, _2), (SDIO_CLK, GPIO19, _0), (FSPICS3, GPIO19,
+        _2), (SDIO_DATA0, GPIO20, _0), (FSPICS4, GPIO20, _2), (SDIO_DATA1, GPIO21, _0),
+        (FSPICS5, GPIO21, _2), (SDIO_DATA2, GPIO22, _0), (SDIO_DATA3, GPIO23, _0),
+        (SPICS0, GPIO24, _0), (SPIQ, GPIO25, _0), (SPIWP, GPIO26, _0), (SPIHD, GPIO28,
+        _0), (SPICLK, GPIO29, _0), (SPID, GPIO30, _0)));
+        _for_each_inner_iomux_function!((all_expanded((FSPICS0, FSPICSn, 0), GPIO16, _2),
+        ((FSPICS1, FSPICSn, 1), GPIO17, _2), ((FSPICS2, FSPICSn, 2), GPIO18, _2),
+        ((FSPICS3, FSPICSn, 3), GPIO19, _2), ((SDIO_DATA0, SDIO_DATAn, 0), GPIO20, _0),
+        ((FSPICS4, FSPICSn, 4), GPIO20, _2), ((SDIO_DATA1, SDIO_DATAn, 1), GPIO21, _0),
+        ((FSPICS5, FSPICSn, 5), GPIO21, _2), ((SDIO_DATA2, SDIO_DATAn, 2), GPIO22, _0),
+        ((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0), ((SPICS0, SPICSn, 0), GPIO24, _0)));
+    };
+}
 /// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

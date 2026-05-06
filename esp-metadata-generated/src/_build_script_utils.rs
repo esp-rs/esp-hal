@@ -276,6 +276,7 @@ impl Chip {
                     "bt_driver_supported",
                     "dac_driver_supported",
                     "dma_driver_supported",
+                    "ethernet_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "i2s_driver_supported",
@@ -488,6 +489,7 @@ impl Chip {
                     "cargo:rustc-cfg=bt_driver_supported",
                     "cargo:rustc-cfg=dac_driver_supported",
                     "cargo:rustc-cfg=dma_driver_supported",
+                    "cargo:rustc-cfg=ethernet_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=i2s_driver_supported",
@@ -6391,6 +6393,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(bt_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dac_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(ethernet_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(gpio_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(i2s_driver_supported)");

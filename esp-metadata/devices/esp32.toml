@@ -865,7 +865,7 @@ version = 1
 support_status = "not_supported"
 
 [device.ethernet]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.camera]
 support_status = "not_supported"
