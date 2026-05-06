@@ -313,7 +313,7 @@ pub mod uart;
 mod macros;
 
 #[cfg(feature = "rt")]
-pub use procmacros::blocking_main as main;
+pub use procmacros::main;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]

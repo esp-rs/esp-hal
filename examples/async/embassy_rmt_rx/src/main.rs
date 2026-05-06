@@ -36,7 +36,7 @@ async fn signal_task(mut pin: Output<'static>) {
     }
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
 

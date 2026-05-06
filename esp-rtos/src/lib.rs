@@ -36,7 +36,7 @@ esp_rtos::start_second_core(
 //! # }
 //! ```
 //! 
-//! To write `async` code, enable the `embassy` feature, and mark the main function with `#[esp_rtos::main]`.
+//! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
 //!
@@ -96,7 +96,7 @@ use esp_hal::{
 };
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
-pub use macros::rtos_main as main;
+pub use macros::main;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 

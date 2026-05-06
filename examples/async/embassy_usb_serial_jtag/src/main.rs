@@ -60,7 +60,7 @@ async fn reader(
     }
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
 
