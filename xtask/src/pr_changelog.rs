@@ -752,24 +752,24 @@ Do something else.
 
     #[test]
     fn parse_rejects_marker_mixed_with_entries_marker_first() {
-        let body =
-            "# Changelog\n\n## esp-hal\n\n- No changelog necessary.\n- Added: Something.\n";
+        let body = "# Changelog\n\n## esp-hal\n\n- No changelog necessary.\n- Added: Something.\n";
         assert!(PrChangelog::parse(1, body).is_err());
     }
 
     #[test]
     fn parse_rejects_marker_mixed_with_entries_entry_first() {
-        let body =
-            "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
+        let body = "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
         assert!(PrChangelog::parse(1, body).is_err());
     }
 
     #[test]
     fn validate_rejects_marker_mixed_with_entries() {
-        let body =
-            "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
+        let body = "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
         let errors = validate(body);
-        assert!(!errors.is_empty(), "expected error for mixed marker + entry");
+        assert!(
+            !errors.is_empty(),
+            "expected error for mixed marker + entry"
+        );
         assert!(
             errors.iter().any(|e| e.contains("No changelog necessary")),
             "unexpected errors: {errors:?}"
@@ -800,7 +800,11 @@ Do something else.
 ";
         let cl = PrChangelog::parse(1, body).unwrap().unwrap();
         assert_eq!(cl.sections.len(), 2);
-        let hal = cl.sections.iter().find(|s| s.crate_name == "esp-hal").unwrap();
+        let hal = cl
+            .sections
+            .iter()
+            .find(|s| s.crate_name == "esp-hal")
+            .unwrap();
         assert!(!hal.exempted);
         assert_eq!(hal.changelog.len(), 1);
         let meta = cl

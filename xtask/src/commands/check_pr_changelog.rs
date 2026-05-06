@@ -20,8 +20,16 @@ const MANUAL_CHANGELOG_LABEL: &str = "manual-changelog";
 /// Changelog entries are optional — contributors are not required to add them.
 /// When entries are present their format is checked and the referenced crate
 /// names must be published workspace packages. If a published package was
-/// modified without any changelog entry, the check fails; a maintainer can
-/// apply the `skip-changelog` label to waive this requirement.
+/// modified without any changelog entry, the check fails.
+///
+/// Two labels affect the behaviour:
+///
+/// - `skip-changelog` — skips the entire check (format, crate names, coverage). Applied by a
+///   maintainer when the PR genuinely needs no changelog tracking.
+/// - `manual-changelog` — skips only the per-package coverage check. Format and crate-name
+///   validation still run so that any PR description entries that happen to be present are still
+///   well-formed.  Applied by a maintainer when the changelog is being updated by directly editing
+///   `CHANGELOG.md` (backports, hotfixes, curated release notes, etc.).
 ///
 /// When `--pr` is given, the PR body, labels, and changed files are fetched
 /// from GitHub. When reading from stdin the body format and crate names are
