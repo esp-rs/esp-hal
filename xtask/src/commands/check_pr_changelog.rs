@@ -56,12 +56,12 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
         return Ok(());
     }
 
-    // A section counts as "covered" only when it contains at least one
-    // changelog list item. A migration-guide-only section does not satisfy
-    // the changelog requirement.
+    // A section counts as "covered" when it has at least one changelog list
+    // item, or when the author explicitly wrote `- No changelog necessary.`.
+    // A migration-guide-only section does not satisfy the changelog requirement.
     let covered: HashSet<&str> = sections
         .iter()
-        .filter(|s| !s.changelog.is_empty())
+        .filter(|s| !s.changelog.is_empty() || s.exempted)
         .map(|s| s.crate_name.as_str())
         .collect();
     let missing: Vec<&str> = modified
@@ -76,7 +76,8 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
     } else {
         bail!(
             "PR #{pr_number} modifies the following package(s) without a changelog entry: {}.\n\
-             Add entries to the `# Changelog` section of the PR description, \
+             Add entries to the `# Changelog` section of the PR description, write \
+             `- No changelog necessary.` under the crate's heading to explicitly exempt it, \
              or ask a maintainer to apply the `{SKIP_LABEL}` label.",
             missing.join(", ")
         )

@@ -32,6 +32,9 @@ Describe how you tested your changes.
 
 <!-- Add one or more ## <crate> or ## <crate>/<area> sections below.
      Each entry must start with one of: Added, Changed, Fixed, Removed.
+     To explicitly declare that a crate needs no changelog entry, write:
+       - No changelog necessary.
+     as the sole item under that crate's heading.
 
 ## esp-hal
 

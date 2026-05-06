@@ -183,6 +183,27 @@ Each item in the `# Changelog` section must begin with one of:
 | `Fixed`   | Bug fixes                                          |
 | `Removed` | Removed API or feature                             |
 
+### Skipping the changelog for a specific crate
+
+If your PR touches a published crate but the change genuinely needs no
+user-visible entry (e.g. a documentation fix, an internal refactor, or a
+build-system tweak), you can exempt that crate by writing the special marker
+as the **sole** item in its `# Changelog` section:
+
+```markdown
+# Changelog
+
+## esp-metadata
+
+- No changelog necessary.
+```
+
+This tells CI that the omission is intentional.  The marker must be the only
+item in the section — combining it with real entries is an error.
+
+When the whole PR needs no changelog at all, a maintainer can apply the
+`skip-changelog` label instead.
+
 ### Validation
 
 You can validate your PR description locally before pushing:

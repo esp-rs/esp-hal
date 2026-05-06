@@ -34,6 +34,18 @@ use std::fmt;
 
 use anyhow::{Result, bail};
 
+/// Exact text of the per-crate changelog exemption marker.
+///
+/// A PR author can write `- No changelog necessary.` as the sole item under a
+/// `## <crate>` section in the `# Changelog` block to explicitly declare that
+/// the crate's changes do not need a public changelog entry.  The CI coverage
+/// check will then treat that crate as "covered", so the `skip-changelog` label
+/// is not required.
+///
+/// The marker must be the **only** item in its section; mixing it with real
+/// changelog entries is an error.
+pub const NO_CHANGELOG_MARKER: &str = "No changelog necessary.";
+
 /// The kind of a changelog entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EntryKind {
@@ -88,6 +100,9 @@ pub struct PrSection {
     pub changelog: Vec<ChangelogEntry>,
     /// Free-form migration guide text (from `# Migration guide`).
     pub migration_guide: Option<String>,
+    /// Set when the author wrote `- No changelog necessary.` to explicitly
+    /// declare that this crate's changes need no public changelog entry.
+    pub exempted: bool,
 }
 
 impl PrSection {
@@ -97,11 +112,12 @@ impl PrSection {
             area,
             changelog: Vec::new(),
             migration_guide: None,
+            exempted: false,
         }
     }
 
     pub fn has_content(&self) -> bool {
-        !self.changelog.is_empty() || self.migration_guide.is_some()
+        self.exempted || !self.changelog.is_empty() || self.migration_guide.is_some()
     }
 }
 
@@ -198,10 +214,25 @@ fn parse_changelog_block(body: &str, sections: &mut Vec<PrSection>) -> Result<()
             let Some((crate_name, area)) = &current else {
                 bail!("Changelog list item found before any section heading: `- {item}`");
             };
-            let entry = parse_changelog_item(item)?;
-            get_or_insert_section(sections, crate_name, area.as_deref())
-                .changelog
-                .push(entry);
+            let section = get_or_insert_section(sections, crate_name, area.as_deref());
+            if item.trim() == NO_CHANGELOG_MARKER {
+                if !section.changelog.is_empty() {
+                    bail!(
+                        "`- {NO_CHANGELOG_MARKER}` in `## {crate_name}` cannot appear alongside \
+                         real changelog entries; use one or the other"
+                    );
+                }
+                section.exempted = true;
+            } else {
+                if section.exempted {
+                    bail!(
+                        "Changelog entry in `## {crate_name}` cannot appear alongside \
+                         `- {NO_CHANGELOG_MARKER}`; use one or the other"
+                    );
+                }
+                let entry = parse_changelog_item(item)?;
+                section.changelog.push(entry);
+            }
         }
     }
 
@@ -332,10 +363,17 @@ pub fn validate(body: &str) -> Vec<String> {
 
     if let Some(after) = find_h1_section(body, "Changelog") {
         let mut in_section = false;
+        // Per-section state for detecting marker/entry mixing.
+        let mut section_exempted = false;
+        let mut section_has_entries = false;
+
         for line in non_comment_lines(after) {
             if line.starts_with("# ") {
                 break;
             } else if let Some(h2) = line.strip_prefix("## ") {
+                // Entering a new section — reset per-section state.
+                section_exempted = false;
+                section_has_entries = false;
                 if parse_section_heading(h2).is_some() {
                     in_section = true;
                 } else {
@@ -349,8 +387,26 @@ pub fn validate(body: &str) -> Vec<String> {
                     errors.push(format!(
                         "List item found before any section heading: `- {item}`"
                     ));
-                } else if let Err(e) = parse_changelog_item(item) {
-                    errors.push(e.to_string());
+                } else if item.trim() == NO_CHANGELOG_MARKER {
+                    if section_has_entries {
+                        errors.push(format!(
+                            "`- {NO_CHANGELOG_MARKER}` cannot appear alongside real changelog \
+                             entries in the same section; use one or the other"
+                        ));
+                    }
+                    section_exempted = true;
+                } else {
+                    if section_exempted {
+                        errors.push(format!(
+                            "Changelog entry cannot appear alongside `- {NO_CHANGELOG_MARKER}` \
+                             in the same section; use one or the other"
+                        ));
+                    }
+                    if let Err(e) = parse_changelog_item(item) {
+                        errors.push(e.to_string());
+                    } else {
+                        section_has_entries = true;
+                    }
                 }
             }
         }
@@ -672,5 +728,87 @@ Do something else.
             errors.iter().any(|e| e.contains("Invalid section heading")),
             "unexpected errors: {errors:?}"
         );
+    }
+
+    // ---- NO_CHANGELOG_MARKER tests ----
+
+    #[test]
+    fn parse_exemption_marker() {
+        let body = "# Changelog\n\n## esp-metadata\n\n- No changelog necessary.\n";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        let section = &cl.sections[0];
+        assert_eq!(section.crate_name, "esp-metadata");
+        assert!(section.exempted, "section should be marked as exempted");
+        assert!(section.changelog.is_empty());
+    }
+
+    #[test]
+    fn validate_accepts_exemption_marker() {
+        let body = "# Changelog\n\n## esp-metadata\n\n- No changelog necessary.\n";
+        let errors = validate(body);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    }
+
+    #[test]
+    fn parse_rejects_marker_mixed_with_entries_marker_first() {
+        let body =
+            "# Changelog\n\n## esp-hal\n\n- No changelog necessary.\n- Added: Something.\n";
+        assert!(PrChangelog::parse(1, body).is_err());
+    }
+
+    #[test]
+    fn parse_rejects_marker_mixed_with_entries_entry_first() {
+        let body =
+            "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
+        assert!(PrChangelog::parse(1, body).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_marker_mixed_with_entries() {
+        let body =
+            "# Changelog\n\n## esp-hal\n\n- Added: Something.\n- No changelog necessary.\n";
+        let errors = validate(body);
+        assert!(!errors.is_empty(), "expected error for mixed marker + entry");
+        assert!(
+            errors.iter().any(|e| e.contains("No changelog necessary")),
+            "unexpected errors: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn exempted_section_has_content() {
+        let mut section = PrSection::new("esp-metadata".into(), None);
+        assert!(!section.has_content());
+        section.exempted = true;
+        assert!(section.has_content());
+    }
+
+    /// Two crates in one PR: one exempted, one with a real entry.
+    #[test]
+    fn parse_mixed_exempted_and_real() {
+        let body = "\
+# Changelog
+
+## esp-hal
+
+- Added: The new thing.
+
+## esp-metadata
+
+- No changelog necessary.
+";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 2);
+        let hal = cl.sections.iter().find(|s| s.crate_name == "esp-hal").unwrap();
+        assert!(!hal.exempted);
+        assert_eq!(hal.changelog.len(), 1);
+        let meta = cl
+            .sections
+            .iter()
+            .find(|s| s.crate_name == "esp-metadata")
+            .unwrap();
+        assert!(meta.exempted);
+        assert!(meta.changelog.is_empty());
     }
 }
