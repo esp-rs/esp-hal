@@ -1,4 +1,16 @@
-use super::{Async, Blocking, Config, ConfigError, DriverMode, IoError, RxError, TxError, Uart, UartRx, UartTx};
+use super::{
+    Async,
+    Blocking,
+    Config,
+    ConfigError,
+    DriverMode,
+    IoError,
+    RxError,
+    TxError,
+    Uart,
+    UartRx,
+    UartTx,
+};
 use crate::interrupt::InterruptHandler;
 
 #[instability::unstable]

@@ -1,7 +1,6 @@
-use super::*;
-
 use portable_atomic::AtomicBool;
 
+use super::*;
 use crate::asynch::AtomicWaker;
 
 #[cfg_attr(uart_version = "1", path = "v1.rs")]
@@ -12,7 +11,6 @@ mod version;
 pub(super) fn sync_regs(register_block: &RegisterBlock) {
     version::sync_regs(register_block);
 }
-
 
 #[derive(Debug, EnumSetType)]
 pub(super) enum TxEvent {
@@ -153,7 +151,6 @@ impl Drop for UartTxFuture {
         self.uart.enable_listen_tx(self.events, false);
     }
 }
-
 
 /// Interrupt handler for all UART instances
 /// Clears and disables interrupts that have occurred and have their enable

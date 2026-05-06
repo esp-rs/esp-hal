@@ -1,5 +1,12 @@
 use super::{
-    CtsConfig, ConfigError, HwFlowControl, Info, RegisterBlock, RtsConfig, StopBits, SwFlowControl,
+    ConfigError,
+    CtsConfig,
+    HwFlowControl,
+    Info,
+    RegisterBlock,
+    RtsConfig,
+    StopBits,
+    SwFlowControl,
 };
 
 #[inline(always)]
@@ -69,18 +76,18 @@ pub(super) fn change_flow_control(
             xon_threshold,
             xoff_threshold,
         } => {
-            info.regs().swfc_conf0().modify(|_, w| {
-                w.xonoff_del().set_bit().sw_flow_con_en().set_bit()
-            });
+            info.regs()
+                .swfc_conf0()
+                .modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
             info.regs().swfc_conf1().modify(|_, w| unsafe {
                 w.xon_threshold()
                     .bits(xon_threshold)
                     .xoff_threshold()
                     .bits(xoff_threshold)
             });
-            info.regs().swfc_conf0().modify(|_, w| unsafe {
-                w.xon_char().bits(xon_char).xoff_char().bits(xoff_char)
-            });
+            info.regs()
+                .swfc_conf0()
+                .modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
         }
         SwFlowControl::Disabled => {
             let reg = info.regs().swfc_conf0();

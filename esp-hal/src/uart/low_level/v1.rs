@@ -1,5 +1,12 @@
 use super::{
-    CtsConfig, ConfigError, HwFlowControl, Info, RegisterBlock, RtsConfig, StopBits, SwFlowControl,
+    ConfigError,
+    CtsConfig,
+    HwFlowControl,
+    Info,
+    RegisterBlock,
+    RtsConfig,
+    StopBits,
+    SwFlowControl,
 };
 
 #[inline(always)]

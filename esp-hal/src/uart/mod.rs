@@ -53,6 +53,18 @@ mod low_level;
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 use enumset::{EnumSet, EnumSetType};
+pub use low_level::Instance;
+use low_level::{
+    Info,
+    RxEvent,
+    State,
+    TxEvent,
+    UartClockGuard,
+    UartRxFuture,
+    UartTxFuture,
+    rx_event_check_for_error,
+    sync_regs,
+};
 
 use crate::{
     Async,
@@ -75,9 +87,6 @@ use crate::{
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
-
-use low_level::{sync_regs, Info, Instance, State, UartClockGuard, UartRxFuture, UartTxFuture};
-use low_level::{rx_event_check_for_error, RxEvent, TxEvent};
 
 crate::any_peripheral! {
     /// Any UART peripheral.
@@ -120,7 +129,6 @@ impl AnyUart<'_> {
         self.bind_peri_interrupt(handler);
     }
 }
-
 
 /// UART RX Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -2345,4 +2353,3 @@ pub mod lp_uart {
         }
     }
 }
-
