@@ -49,6 +49,7 @@ crate::unstable_driver! {
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
+use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -754,6 +755,26 @@ impl<'d> UartTx<'d, Async> {
 
         Ok(())
     }
+
+    /// Sends a break signal for a specified duration in bit time.
+    ///
+    /// Duration is in bits, the time it takes to transfer one bit at the
+    /// current baud rate.
+    ///
+    /// This function restores the original TX line state after the break signal is sent, even if
+    /// the future is cancelled.
+    #[instability::unstable]
+    pub async fn send_break_async<D: DelayNs>(&mut self, delay: &mut D, bits: u32) {
+        // Calculate total delay in microseconds
+        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
+        let delay_us = (total_delay_us as u32).max(1);
+
+        let break_guard = self.start_break();
+
+        delay.delay_us(delay_us).await;
+
+        core::mem::drop(break_guard);
+    }
 }
 
 impl<'d, Dm> UartTx<'d, Dm>
@@ -869,6 +890,18 @@ where
     /// current baud rate. The delay during the break is just busy-waiting.
     #[instability::unstable]
     pub fn send_break(&mut self, bits: u32) {
+        // Calculate total delay in microseconds
+        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
+        let delay_us = (total_delay_us as u32).max(1);
+
+        let break_guard = self.start_break();
+
+        crate::rom::ets_delay_us(delay_us);
+
+        core::mem::drop(break_guard);
+    }
+
+    fn start_break(&mut self) -> impl Drop + '_ {
         // Read the current TX inversion state
         let original_conf0 = self.uart.info().regs().conf0().read();
         let original_txd_inv = original_conf0.txd_inv().bit();
@@ -882,21 +915,15 @@ where
 
         sync_regs(self.uart.info().regs());
 
-        // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
-        // Use u64 to avoid overflow, then convert back to u32
-        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
-        let delay_us = (total_delay_us as u32).max(1);
-
-        crate::rom::ets_delay_us(delay_us);
-
-        // Restore the original register state
-        self.uart
-            .info()
-            .regs()
-            .conf0()
-            .write(|w| unsafe { w.bits(original_conf0.bits()) });
-
-        sync_regs(self.uart.info().regs());
+        // Restore the original register state when dropped.
+        DropGuard::new(self, move |this| {
+            this.uart
+                .info()
+                .regs()
+                .conf0()
+                .write(|w| unsafe { w.bits(original_conf0.bits()) });
+            sync_regs(this.uart.info().regs());
+        })
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -1681,6 +1708,18 @@ impl<'d> Uart<'d, Async> {
     #[instability::unstable]
     pub async fn wait_for_break_async(&mut self) {
         self.rx.wait_for_break_async().await
+    }
+
+    /// Sends a break signal for a specified duration in bit time.
+    ///
+    /// Duration is in bits, the time it takes to transfer one bit at the
+    /// current baud rate.
+    ///
+    /// This function restores the original TX line state after the break signal is sent, even if
+    /// the future is cancelled.
+    #[instability::unstable]
+    pub async fn send_break_async<D: DelayNs>(&mut self, delay: &mut D, bits: u32) {
+        self.tx.send_break_async(delay, bits).await
     }
 }
 
