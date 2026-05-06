@@ -3,10 +3,10 @@ use super::{
 };
 
 #[inline(always)]
-pub(super) fn sync_regs(register_block: &RegisterBlock) {
+pub(super) fn sync_regs(_register_block: &RegisterBlock) {
     #[cfg(not(any(esp32, esp32s2)))]
     {
-        let update_reg = register_block.id();
+        let update_reg = _register_block.id();
 
         update_reg.modify(|_, w| w.reg_update().set_bit());
 
@@ -19,7 +19,7 @@ pub(super) fn sync_regs(register_block: &RegisterBlock) {
 pub(super) fn set_rx_timeout(
     info: &Info,
     timeout: Option<u8>,
-    symbol_len: u8,
+    _symbol_len: u8,
 ) -> Result<(), ConfigError> {
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
@@ -33,7 +33,7 @@ pub(super) fn set_rx_timeout(
         #[cfg(esp32)]
         let timeout_reg = timeout;
         #[cfg(not(esp32))]
-        let timeout_reg = timeout as u16 * symbol_len as u16;
+        let timeout_reg = timeout as u16 * _symbol_len as u16;
 
         if timeout_reg > MAX_THRHD {
             return Err(ConfigError::TimeoutTooLong);
