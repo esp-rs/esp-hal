@@ -24,6 +24,19 @@ pub(crate) fn pre_init() {
     }
 }
 
+pub(crate) fn enable_branch_predictor() {
+    // Enable branch predictor
+    // Note that the branch predictor will start cache requests and needs to be disabled when
+    // the cache is disabled.
+    // MHCR: CSR 0x7c1
+    const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
+    const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
+    const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+    unsafe {
+        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+    }
+}
+
 const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
 const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;

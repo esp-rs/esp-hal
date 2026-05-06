@@ -21,6 +21,7 @@ symbols = [
 ]
 
 [device.soc]
+cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_has_prv_mode = true # TODO
 rc_fast_clk_default = 17_500_000

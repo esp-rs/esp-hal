@@ -278,7 +278,7 @@ macro_rules! property {
         false
     };
     ("soc.cpu_has_branch_predictor") => {
-        false
+        true
     };
     ("soc.cpu_has_csr_pc") => {
         false

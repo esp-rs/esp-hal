@@ -109,6 +109,8 @@ fn start_core1_init_impl<F>() -> !
 where
     F: FnOnce(),
 {
+    crate::soc::enable_branch_predictor();
+
     unsafe {
         #[cfg(all(feature = "rt", stack_guard_monitoring))]
         {
