@@ -48,6 +48,16 @@ For example, to release `esp-println`, run `cargo xrelease plan esp-println`.
 
 The release is a multi-step process. Each step in the process will tell you what to do next.
 
+### Patch releases
+
+Patch releases are made from backport branches (e.g. `esp-hal-1.1.x`).
+Ensure bug-fix PRs are cherry-picked to the backport branch first (label with
+`{package}-backport` on `main` to trigger automatic cherry-pick PRs).
+
+The standard `plan` → `execute-plan` → `publish-plan` → `post-release` flow
+works from a backport branch — the tooling auto-detects it, scopes to the
+single backport package, and forces Patch bumps. No `--allow-non-main` needed.
+
 ## Test/example metadata use
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the
