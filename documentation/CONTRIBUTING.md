@@ -204,6 +204,23 @@ item in the section — combining it with real entries is an error.
 When the whole PR needs no changelog at all, a maintainer can apply the
 `skip-changelog` label instead.
 
+### Manually editing `CHANGELOG.md`
+
+In rare cases — such as backports, hotfixes, or curated release notes that
+cannot be expressed through the structured PR description format — a maintainer
+can apply the `manual-changelog` label to a PR.  This label:
+
+- Allows direct edits to `CHANGELOG.md` files (the automated "no direct
+  CHANGELOG.md edits" check is skipped).
+- Skips the per-package coverage check (the PR is not required to have
+  structured entries in the description).
+- Still validates any PR description entries that *are* present, as a
+  safety net against formatting accidents.
+
+Do **not** use `manual-changelog` for routine changes — the structured PR
+description format exists precisely to keep changelog maintenance consistent
+and automatable.
+
 ### Validation
 
 You can validate your PR description locally before pushing:

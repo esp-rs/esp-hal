@@ -10,6 +10,11 @@ use crate::{
 
 const SKIP_LABEL: &str = "skip-changelog";
 
+/// When this label is present contributors may edit `CHANGELOG.md` directly
+/// and the per-package coverage check is skipped.  The PR-description format
+/// is still validated (a useful safety net if entries were added by accident).
+const MANUAL_CHANGELOG_LABEL: &str = "manual-changelog";
+
 /// Validate the changelog entries in a PR description.
 ///
 /// Changelog entries are optional — contributors are not required to add them.
@@ -48,6 +53,17 @@ fn check_with_github_info(workspace: &Path, pr_number: u64, info: &PrInfo) -> Re
 
     // Parse once; reuse for both crate-name validation and coverage check.
     let sections = parse_and_validate_crates(workspace, &info.body)?;
+
+    // If the manual-changelog label is set, direct CHANGELOG.md edits are
+    // permitted and the per-package coverage check is skipped.  Format
+    // validation above still runs.
+    if info.labels.iter().any(|l| l == MANUAL_CHANGELOG_LABEL) {
+        log::info!(
+            "PR #{pr_number}: `{MANUAL_CHANGELOG_LABEL}` label is set — \
+             skipping per-package coverage check."
+        );
+        return Ok(());
+    }
 
     // Determine which published packages were touched.
     let modified = modified_packages(workspace, &info.files);

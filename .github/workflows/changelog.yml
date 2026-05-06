@@ -3,7 +3,7 @@ name: Changelog check
 on:
   pull_request:
     # Run on labeled/unlabeled in addition to defaults to detect
-    # adding/removing the skip-changelog label.
+    # adding/removing the skip-changelog or manual-changelog labels.
     types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
 
 permissions:
@@ -36,12 +36,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   no-changelog-edits:
-    # Release PRs (labelled `release-pr`) legitimately modify CHANGELOG.md —
-    # skip this check for them.
+    # Release PRs (labelled `release-pr`) and PRs where the author is taking
+    # full manual control of the changelog (`manual-changelog`) legitimately
+    # modify CHANGELOG.md — skip this check for them.
     needs: get-labels
     if: |
       !github.event.pull_request.draft &&
-      !contains(needs.get-labels.outputs.labels, 'release-pr')
+      !contains(needs.get-labels.outputs.labels, 'release-pr') &&
+      !contains(needs.get-labels.outputs.labels, 'manual-changelog')
     runs-on: ubuntu-latest
     steps:
       - name: Check for direct CHANGELOG.md edits
