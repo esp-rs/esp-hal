@@ -1,6 +1,8 @@
+#[cfg(feature = "unstable")]
+use crate::system::multi_core;
 use crate::{
     peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
-    system::{Cpu, multi_core},
+    system::Cpu,
 };
 
 pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
@@ -79,6 +81,7 @@ pub(crate) fn disable_core1() {
         .modify(|_, w| w.rst_en_core1_global().set_bit());
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // Enable Core 1's CPU clock.
     HP_SYS_CLKRST::regs()
@@ -100,6 +103,7 @@ pub(crate) fn start_core1(entry_point: *const u32) {
 /// are not yet initialised. The naked prologue handles that before calling
 /// regular Rust.
 #[unsafe(naked)]
+#[cfg(feature = "unstable")]
 pub(crate) extern "C" fn start_core1_init<F>() -> !
 where
     F: FnOnce(),
@@ -124,6 +128,7 @@ where
     )
 }
 
+#[cfg(feature = "unstable")]
 fn start_core1_init_impl<F>() -> !
 where
     F: FnOnce(),
