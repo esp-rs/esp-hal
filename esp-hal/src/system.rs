@@ -365,6 +365,8 @@ pub enum SleepSource {
 /// ```
 #[inline]
 pub fn software_reset() -> ! {
+    #[cfg(esp32p4)]
+    crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
 }
 

@@ -1,62 +1,75 @@
 use crate::{
-    peripherals::{HP_SYS_CLKRST, PMU},
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
     system::{Cpu, multi_core},
 };
 
 pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
     // 0x86 = stalled, 0xFF = running (matches IDF cpu_utility_ll.h)
     let code: u8 = if park { 0x86 } else { 0xFF };
-    match core {
-        Cpu::ProCpu => PMU::regs()
-            .cpu_sw_stall()
-            .modify(|_, w| unsafe { w.hpcore0_sw_stall_code().bits(code) }),
-        Cpu::AppCpu => PMU::regs()
-            .cpu_sw_stall()
-            .modify(|_, w| unsafe { w.hpcore1_sw_stall_code().bits(code) }),
-    };
+    PMU::regs().cpu_sw_stall().modify(|_, w| unsafe {
+        match core {
+            Cpu::ProCpu => w.hpcore0_sw_stall_code().bits(code),
+            Cpu::AppCpu => w.hpcore1_sw_stall_code().bits(code),
+        }
+    });
 }
 
 #[instability::unstable]
 pub fn is_running(core: Cpu) -> bool {
+    let stall_reg = PMU::regs().cpu_sw_stall().read();
     let code = match core {
-        Cpu::ProCpu => PMU::regs()
-            .cpu_sw_stall()
-            .read()
-            .hpcore0_sw_stall_code()
-            .bits(),
-        Cpu::AppCpu => PMU::regs()
-            .cpu_sw_stall()
-            .read()
-            .hpcore1_sw_stall_code()
-            .bits(),
+        Cpu::ProCpu => stall_reg.hpcore0_sw_stall_code().bits(),
+        Cpu::AppCpu => stall_reg.hpcore1_sw_stall_code().bits(),
     };
     code != 0x86
 }
 
-pub(crate) fn start_core1(entry_point: *const u32) {
-    // Enable Core 1's CPU clock if not already on.
-    if !HP_SYS_CLKRST::regs()
-        .soc_clk_ctrl0()
-        .read()
-        .core1_cpu_clk_en()
-        .bit()
-    {
-        HP_SYS_CLKRST::regs()
-            .soc_clk_ctrl0()
-            .modify(|_, w| w.core1_cpu_clk_en().set_bit());
-    }
+/// Prepare Core 1 for an imminent system reset.
+///
+/// Mirrors IDF's `esp_restart_noos()` pre-reset sequence for ESP32-P4:
+/// 1. Briefly reset Core 1's CPU (LP AON domain, so it takes effect even with global reset still
+///    cleared from a previous `start_core1` call).
+/// 2. Stall Core 1 via PMU (LP AON domain — this value **persists** through the system software
+///    reset, keeping Core 1 stalled during the ROM bootloader phase and preventing it from
+///    interfering with USB Serial/JTAG).
+///
+/// Must be called before any `software_reset()` when Core 1 is running.
+pub(crate) fn pre_system_reset() {
+    // Assert a brief CPU reset pulse for Core 1 (LP AON → persists, self-clears).
+    LP_AON_CLKRST::regs()
+        .lp_aonclkrst_hpcpu_reset_ctrl0()
+        .modify(|_, w| w.lp_aonclkrst_hpcore1_sw_reset().set_bit());
 
-    // Release Core 1 from global reset if it is currently held in reset.
-    if HP_SYS_CLKRST::regs()
+    // Stall Core 1 via PMU (LP AON domain). The stall code 0x86 persists through
+    // the subsequent software reset and keeps Core 1 stalled during ROM boot.
+    unsafe { internal_park_core(Cpu::AppCpu, true) };
+}
+
+/// Disable Core 1's CPU clock and hold it in global reset.
+///
+/// Called from `pre_init` on every boot to undo any state left by a previous
+/// run that survived a software reset (HP_SYS_CLKRST registers are not
+/// cleared by software-triggered resets, only by a power-on or EN-pin reset).
+/// Mirrors IDF's single-core-mode disable sequence for ESP32-P4.
+pub(crate) fn disable_core1() {
+    HP_SYS_CLKRST::regs()
+        .soc_clk_ctrl0()
+        .modify(|_, w| w.core1_cpu_clk_en().clear_bit());
+    HP_SYS_CLKRST::regs()
         .hp_rst_en0()
-        .read()
-        .rst_en_core1_global()
-        .bit()
-    {
-        HP_SYS_CLKRST::regs()
-            .hp_rst_en0()
-            .modify(|_, w| w.rst_en_core1_global().clear_bit());
-    }
+        .modify(|_, w| w.rst_en_core1_global().set_bit());
+}
+
+pub(crate) fn start_core1(entry_point: *const u32) {
+    // Enable Core 1's CPU clock.
+    HP_SYS_CLKRST::regs()
+        .soc_clk_ctrl0()
+        .modify(|_, w| w.core1_cpu_clk_en().set_bit());
+
+    // Release Core 1 from global reset.
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_core1_global().clear_bit());
 
     // Hand the entry point to the ROM, which Core 1 is polling.
     crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);

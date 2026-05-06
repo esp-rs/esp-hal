@@ -13,10 +13,14 @@ pub(crate) mod regi2c;
 pub(crate) use esp32p4 as pac;
 
 pub(crate) fn pre_init() {
-    // Ensure Core 1 is marked as parked before any is_running() call.
     #[cfg(multi_core)]
     unsafe {
+        // Stall Core 1 first (PMU stall), then disable its clock and assert
+        // global reset. This undoes any state left by start_core1() that
+        // may have survived a software reset, preventing Core 1 from running
+        // during the ROM bootloader phase and interfering with espflash.
         cpu_control::internal_park_core(crate::system::Cpu::AppCpu, true);
+        cpu_control::disable_core1();
     }
 }
 
