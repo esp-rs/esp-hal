@@ -156,6 +156,9 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static,
 
     let interrupt = match IRQ {
         0 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR0,
+        1 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR1,
+        2 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR2,
+        3 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
         _ => panic!("Invalid IRQ number"),
     };
 
