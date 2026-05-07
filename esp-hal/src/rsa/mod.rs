@@ -13,6 +13,9 @@
 //! The RSA accelerator also supports operands of different lengths, which
 //! provides more flexibility during the computation.
 
+#[cfg_attr(rsa_version = "1", path = "low_level/v1.rs")]
+#[cfg_attr(rsa_version = "2", path = "low_level/v2.rs")]
+#[cfg_attr(rsa_version = "3", path = "low_level/v3.rs")]
 mod low_level;
 
 use core::{marker::PhantomData, ptr::NonNull, task::Poll};

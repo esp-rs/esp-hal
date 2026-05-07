@@ -1,4 +1,4 @@
-use super::RegisterBlock;
+use crate::pac::rsa::RegisterBlock;
 
 pub(super) fn enable_disable_interrupt(regs: &RegisterBlock, enable: bool) {
     regs.int_ena().write(|w| w.int_ena().bit(enable));

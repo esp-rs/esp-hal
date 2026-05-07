@@ -1,4 +1,4 @@
-use super::RegisterBlock;
+use crate::pac::rsa::RegisterBlock;
 
 pub(super) fn enable_disable_interrupt(regs: &RegisterBlock, enable: bool) {
     // Can't seem to actually disable the interrupt, but esp-idf still writes the register.
