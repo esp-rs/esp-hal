@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+
+### Removed
+
+
+## [v1.1.1] - 2026-05-07
+
+### Fixed
+
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
 - ESP32: attenuation is now correctly set for ADC2 (#5463)
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
@@ -1628,4 +1636,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
 [v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
 [v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...esp-hal-v1.1.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...HEAD
+[v1.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.1.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.1...HEAD
