@@ -270,15 +270,10 @@ impl core::error::Error for WakeConfigError {}
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[non_exhaustive]
+#[instability::unstable]
 pub struct WaitForOptions {
     /// Enable waking from light sleep on the configured event.
     wake_enable: bool,
-}
-
-impl Default for WaitForOptions {
-    fn default() -> Self {
-        Self { wake_enable: false }
-    }
 }
 
 /// Pull setting for a GPIO.
