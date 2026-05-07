@@ -599,6 +599,7 @@ clock_sources.supported = [ "RefTick", "Apb" ]
 clock_sources.default = "Apb"
 
 [device.rsa]
+version = 2
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 512

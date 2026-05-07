@@ -596,6 +596,8 @@ driver_configs![
         name: "RSA",
         has_computed_properties: true,
         properties: {
+            /// Register-layout generation derived from the chip SVD.
+            version: u32,
             size_increment: u32,
             memory_size_bytes: u32,
         }

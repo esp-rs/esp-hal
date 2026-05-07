@@ -280,6 +280,12 @@ macro_rules! property {
     ("rng.trng_supported") => {
         true
     };
+    ("rsa.version") => {
+        2
+    };
+    ("rsa.version", str) => {
+        stringify!(2)
+    };
     ("rsa.size_increment") => {
         32
     };

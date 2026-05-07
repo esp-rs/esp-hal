@@ -564,6 +564,7 @@ bus_timeout_is_exponential = true
 support_status = { status = "not_supported", issue = 1909 }
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384

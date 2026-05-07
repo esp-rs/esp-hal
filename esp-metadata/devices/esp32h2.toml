@@ -580,6 +580,7 @@ clock_sources.supported = ["Xtal", "RcFast" ]
 clock_sources.default = "Xtal"
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384

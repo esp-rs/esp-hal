@@ -681,6 +681,7 @@ clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
 clock_sources.default = "Pll80MHz"
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384

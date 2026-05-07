@@ -450,6 +450,7 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 extmem_origin = 0x48000000
 
 [device.rsa]
+version = 3
 support_status = "not_supported"
 size_increment = 32
 memory_size_bytes = 384
