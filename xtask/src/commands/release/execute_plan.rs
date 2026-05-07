@@ -101,7 +101,13 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             }
         };
 
-        let new_version = update_package(&mut package, &step.bump, !args.no_dry_run)?;
+        let skip_dependent_rewrites = plan.backport.is_some();
+        let new_version = update_package(
+            &mut package,
+            &step.bump,
+            !args.no_dry_run,
+            skip_dependent_rewrites,
+        )?;
 
         step.tag_name = package.package.tag(&new_version);
         step.new_version = new_version;
