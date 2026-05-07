@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - P4: Initial peripheral support for GPIO, UART, I2C, SPI, DMA, USB Serial/JTAG, eFuse, SYSTIMER (#5400)
 - P4: AP-HEX PSRAM driver stub with configurable HP L2MEM cache/RAM split via `ESP_HAL_CONFIG_L2_CACHE_SIZE` (#5400)
 - C5 and C61: I2S support (#5483)
+- `handle_gpio_interrupt` and `wake_pin()` for user-defined GPIO ISRs (#5531)
 
 ### Changed
 
