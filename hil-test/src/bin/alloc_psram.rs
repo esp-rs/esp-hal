@@ -1,11 +1,15 @@
 //! Allocator and PSRAM-related tests
 
+// TODO: clean configurations up once esp-storage is enabled for the P4
+
 //% CHIPS:
-//% CHIPS(llff, tlsf): esp32 esp32s2 esp32c5 esp32c61 esp32s3 esp32p4
+//% CHIPS(llff, tlsf): esp32p4
+//% CHIPS(llff_with_storage): esp32 esp32s2 esp32c5 esp32c61 esp32s3
+//% CHIPS(tlsf_with_storage): esp32 esp32s2 esp32c5 esp32c61 esp32s3
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-alloc/nightly
-//% FEATURES(esp32 esp32s2 esp32c5 esp32c61 esp32s3): esp-storage
+//% FEATURES(llff_with_storage): esp-storage
 
 #![no_std]
 #![no_main]
@@ -138,20 +142,15 @@ mod tests {
     }
 }
 
-#[cfg(not(esp32p4))]
+#[cfg(feature = "esp-storage")]
 #[embedded_test::tests]
 mod storage_tests {
-    use alloc::vec::Vec as AllocVec;
-
-    use allocator_api2::vec::Vec;
     use embedded_storage::*;
-    use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
     use esp_bootloader_esp_idf::partitions;
     use esp_hal::peripherals::FLASH;
     use esp_storage::FlashStorage;
 
     struct Context<'a> {
-        #[cfg(not(esp32p4))]
         flash: FLASH<'a>,
     }
 
@@ -160,10 +159,7 @@ mod storage_tests {
         let p = esp_hal::init(esp_hal::Config::default());
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
-        Context {
-            #[cfg(not(esp32p4))]
-            flash: p.FLASH,
-        }
+        Context { flash: p.FLASH }
     }
 
     #[test]
