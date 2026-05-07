@@ -16,7 +16,7 @@ use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
     // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info

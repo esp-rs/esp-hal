@@ -33,7 +33,7 @@ static mut BOOT_COUNT: u32 = 0;
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
 static mut PRE_SLEEP_US: u64 = 0;
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);

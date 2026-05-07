@@ -50,9 +50,6 @@
 //! would be slightly more complicated to prevent the user from breaking things.
 //! (If the user were to clear the interrupt status, we would need to re-enable
 //! it, for PinFuture to detect the completion).
-//!
-//! TODO: currently, direct-binding a GPIO interrupt handler will completely
-//! break the async API. We will need to expose a way to handle async events.
 
 use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;
@@ -203,16 +200,55 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
         // interrupt handler.
         USER_INTERRUPT_HANDLER.call();
 
-        // Handle the async interrupts
-        for (bank, intrs) in banks {
-            // Get the mask of active async pins and clear the relevant bits to signal
-            // completion. This way the user may clear the interrupt status
-            // without worrying about the async bit being cleared.
-            let async_pins = bank.async_operations().load(Ordering::Relaxed);
+        process_async_banks(banks);
+    });
+}
 
-            // Wake up the tasks
-            handle_async_pins(bank, async_pins, intrs);
+/// Internal entry point for [`crate::gpio::handle_gpio_interrupt`].
+///
+/// Kept here (rather than at the public callsite) because this module owns
+/// the GPIO ISR critical section and the per-bank dispatch routine, both of
+/// which are private to this module.
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[ram]
+pub(super) unsafe fn handle_gpio_interrupt_impl() {
+    GPIO_LOCK.lock(|| {
+        let banks = interrupt_status();
+        process_async_banks(banks);
+    });
+}
+
+#[inline]
+pub(super) fn process_async_banks(banks: [(GpioBank, u32); GpioBank::COUNT]) {
+    for (bank, intrs) in banks {
+        let async_pins = bank.async_operations().load(Ordering::Relaxed);
+
+        handle_async_pins(bank, async_pins, intrs);
+    }
+}
+
+/// Internal entry point for [`crate::gpio::wake_pin`].
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[ram]
+pub(super) unsafe fn wake_pin_impl(pin: u8) {
+    GPIO_LOCK.lock(|| {
+        let any = unsafe { AnyPin::steal(pin) };
+        let bank = any.bank();
+        let mask = any.mask();
+
+        // Only act if this pin is registered as an async waiter.
+        let async_pins = bank.async_operations().load(Ordering::Relaxed);
+        if async_pins & mask == 0 {
+            return;
         }
+
+        handle_async_pins(bank, mask, mask);
     });
 }
 

@@ -194,7 +194,7 @@ fn main() -> ! {
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 // TODO(esp32p4): fill `[device.clock_tree]` doc strings in esp32p4.toml,
@@ -312,13 +312,13 @@ pub mod uart;
 
 mod macros;
 
-#[cfg(feature = "rt")]
-pub use procmacros::blocking_main as main;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
 #[cfg(any(lp_core, ulp_riscv_core))]
 pub use procmacros::load_lp_code;
+#[cfg(feature = "rt")]
+pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]

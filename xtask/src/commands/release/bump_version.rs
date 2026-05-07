@@ -106,20 +106,28 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version for each given package:
     for package in args.packages {
         let mut package = CargoToml::new(workspace, package)?;
-        update_package(&mut package, &bump, false)?;
+        update_package(&mut package, &bump, false, false)?;
     }
 
     Ok(())
 }
 
 /// Update the specified package by bumping its version, updating its changelog,
+///
+/// `skip_dependent_rewrites` skips rewriting intra-workspace path-dep version
+/// requirements on sibling crates. Set this on backport patch releases: those
+/// requirements use `~X.Y.Z`, which already accepts the new patch (since
+/// `~1.1.0` resolves to `>=1.1.0, <1.2.0`), and per semver patch releases
+/// cannot introduce new APIs that would justify tightening the floor. Bumping
+/// them anyway is pure churn.
 pub fn update_package(
     package: &mut CargoToml,
     version: &VersionBump,
     dry_run: bool,
+    skip_dependent_rewrites: bool,
 ) -> Result<semver::Version> {
     check_crate_before_bumping(package)?;
-    let new_version = bump_crate_version(package, version, dry_run)?;
+    let new_version = bump_crate_version(package, version, dry_run, skip_dependent_rewrites)?;
     finalize_changelog(package, &new_version, dry_run)?;
     finalize_placeholders(package, &new_version, dry_run)?;
 
@@ -227,6 +235,7 @@ fn bump_crate_version(
     bumped_package: &mut CargoToml,
     amount: &VersionBump,
     dry_run: bool,
+    skip_dependent_rewrites: bool,
 ) -> Result<semver::Version> {
     let prev_version = bumped_package.package_version();
 
@@ -242,6 +251,14 @@ fn bump_crate_version(
         log::info!("Update {} to {version}", bumped_package.package);
         bumped_package.set_version(&version);
         bumped_package.save()?;
+    }
+
+    if skip_dependent_rewrites {
+        log::info!(
+            "  Skipping intra-workspace dependent rewrites for {}",
+            bumped_package.package,
+        );
+        return Ok(version);
     }
 
     let package_name = bumped_package.package.to_string();

@@ -651,6 +651,11 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         docs_path.join("esp-rs.svg"),
     )
     .context("Failed to copy esp-rs.svg")?;
+    fs::copy(
+        resources_path.join("esp-rs-grey-bg.svg"),
+        docs_path.join("esp-rs-grey-bg.svg"),
+    )
+    .context("Failed to copy esp-rs-grey-bg.svg")?;
 
     let meta = generate_documentation_meta_for_index(workspace)?;
 

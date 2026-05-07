@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unified the `#[main]` and `#[rtos_main]` macros into a single `#[main]` macro that can be used with both `esp-hal` and `esp-rtos` (#5541)
 
 ### Fixed
 

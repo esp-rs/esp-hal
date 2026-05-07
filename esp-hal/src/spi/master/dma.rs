@@ -937,12 +937,12 @@ where
     #[cfg_attr(
         esp32,
         doc = "On ESP32, transferring from internal SRAM requires copying the entire buffer if it is
-        not 4-byte aligned. This is a limitation of the current implementation."
+not 4-byte aligned. This is a limitation of the current implementation."
     )]
     #[cfg_attr(
         esp32s2,
-        doc = "On ESP32-S2, receiving into to PSRAM requires the buffer's _end_ to be 16-byte
-        aligned, otherwise the driver requires copying the entire buffer."
+        doc = "On ESP32-S2, receiving into PSRAM requires the buffer's _end_ to be 16-byte
+aligned, otherwise the driver requires copying the entire buffer."
     )]
     #[doc = ""]
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will

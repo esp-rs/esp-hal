@@ -62,7 +62,7 @@ async fn reader(mut rx: UartRx<'static, Async>, signal: &'static Signal<NoopRawM
     }
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
 

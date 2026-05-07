@@ -690,6 +690,33 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
     }
 }
 
+/// Drive the GPIO async API from a user-installed raw GPIO interrupt handler.
+///
+/// This is the entry point that lets users who bypass esp-hal's GPIO ISR
+/// dispatch (typically by defining their own `#[unsafe(no_mangle)]
+/// unsafe extern "C" fn GPIO()`, or by registering their own handler via
+/// [`crate::interrupt::bind_handler`]) keep the GPIO async API working.
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[instability::unstable]
+pub unsafe fn handle_gpio_interrupt() {
+    unsafe { interrupt::handle_gpio_interrupt_impl() }
+}
+
+/// Complete any in-flight async wait on a single GPIO pin.
+///
+/// Per-pin counterpart of [`handle_gpio_interrupt`].
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[instability::unstable]
+pub unsafe fn wake_pin(pin: u8) {
+    unsafe { interrupt::wake_pin_impl(pin) }
+}
+
 for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         #[instability::unstable]
