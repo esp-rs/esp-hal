@@ -31,3 +31,4 @@ release_plan.jsonc
 api-baseline/
 
 .mcp.json
+.cursor/

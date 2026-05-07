@@ -1,6 +1,6 @@
 use embedded_hal::i2c::Operation as EhalOperation;
 
-use super::{Async, Config, ConfigError, DriverMode, Error, I2c, I2cAddress, Operation};
+use super::{Async, DriverMode, Error, I2c, I2cAddress, Operation};
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
@@ -17,8 +17,8 @@ impl embedded_hal::i2c::Error for Error {
 
 #[instability::unstable]
 impl<Dm: DriverMode> embassy_embedded_hal::SetConfig for I2c<'_, Dm> {
-    type Config = Config;
-    type ConfigError = ConfigError;
+    type Config = super::Config;
+    type ConfigError = super::ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
