@@ -26,6 +26,8 @@ use crate::peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU};
 pub enum LpCoreWakeupSource {
     /// Wakeup source from the HP (High Performance) CPU.
     HpCpu,
+    /// Wakeup source from LP IO interrupt status
+    LpIo,
 }
 
 /// Clock sources for the LP core
@@ -119,6 +121,7 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
     // Set wake-up sources
     let src = match wakeup_src {
         LpCoreWakeupSource::HpCpu => 0x01,
+        LpCoreWakeupSource::LpIo => 0x04,
     };
     pmu.lp_cpu_pwr1()
         .modify(|_, w| unsafe { w.lp_cpu_wakeup_en().bits(src) });
@@ -133,5 +136,6 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
         LpCoreWakeupSource::HpCpu => {
             pmu.hp_lp_cpu_comm().write(|w| w.hp_trigger_lp().set_bit());
         }
+        LpCoreWakeupSource::LpIo => {}
     }
 }

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5 and C61: I2S support (#5483)
 
 ### Changed
+- ESP32-S2, ESP32-S3: Renamed `UlpWakeupSource` to `WakeFromUlpCoreWakeupSource`, to differentiate it from `UlpCoreWakeupSource` (#5206)
 
 - The clock frequency accessor functions no longer need to lock the clock tree (#5461)
 - SPI: `SpiDmaBus` has been merged into `SpiDma`. `with_buffers` now returns `SpiDma` directly, and the buffer-taking transfer methods have been renamed to `read_buffer`, `write_buffer`, `transfer_buffers`, `half_duplex_read_buffer` and `half_duplex_write_buffer` to avoid conflicts with the `SpiBus` trait methods. (#5272)
@@ -101,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C61: Add SHA and ECC support (#5354)
 - A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
 - Add I2S loopback logic to the peripheral driver. (#5349)
+- ESP32-S2, ESP32-S3: Add `wakeup_enable()` method to `LowPowerInput` and `LowPowerOutputOpenDrain`, allowing ULP core to be woken up from GPIO. (#5134)
 
 ### Changed
 

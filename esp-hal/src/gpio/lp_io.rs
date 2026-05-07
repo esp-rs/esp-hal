@@ -30,7 +30,10 @@
 use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
-use crate::peripherals::{GPIO, LP_AON, LP_IO};
+use crate::{
+    gpio::WakeEvent,
+    peripherals::{GPIO, LP_AON, LP_IO},
+};
 
 /// A GPIO output pin configured for low power operation
 pub struct LowPowerOutput<'d, const PIN: u8> {
@@ -110,6 +113,14 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
         LP_IO::regs()
             .gpio(PIN as usize)
             .modify(|_, w| w.fun_wpd().bit(enable));
+    }
+
+    /// Allows this pin to wakeup the LP core, when LpCoreWakeupSource::Gpio is used.
+    pub fn wakeup_enable(&self, event: Option<WakeEvent>) {
+        let pin_reg = LP_IO::regs().pin(PIN as usize);
+        let wake_en = event.is_some();
+        let int_type = event.map_or(0, |e| e as u8);
+        pin_reg.write(|w| unsafe { w.int_type().bits(int_type).wakeup_enable().bit(wake_en) });
     }
 }
 

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* Provides interrupt vector symbols */
+INCLUDE device.x
+
 ENTRY(reset_vector)
 
 VECTOR_TABLE_LENGTH = 0x80;
@@ -36,6 +39,8 @@ SECTIONS
         
         KEEP(*(.init));
         KEEP(*(.init.rust));        
+        KEEP(*(.trap));        
+        KEEP(*(.trap.rust));        
         *(.text)
         *(.text*)
     } > ram

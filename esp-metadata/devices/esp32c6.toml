@@ -30,6 +30,7 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
+    "riscv_coproc_supported",
 ]
 
 [device.soc]
