@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5 and C61: I2S support (#5483)
 - UART: `send_break_async` (#5536)
 - `handle_gpio_interrupt` and `wake_pin()` for user-defined GPIO ISRs (#5531)
+- GPIO: `Input::wait_for_with_options()` allows waking from light sleep while waiting for event (#5551)
 
 ### Changed
 
