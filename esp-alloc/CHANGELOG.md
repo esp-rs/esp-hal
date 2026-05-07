@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `realloc_with_caps` over-reading issue (#5502)
 
 ### Removed
 
