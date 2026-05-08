@@ -27,6 +27,8 @@
 #![no_std]
 #![no_main]
 
+use core::task::{Context, Poll};
+
 use embassy_executor::Spawner;
 use embassy_net::{
     Runner,
@@ -39,13 +41,20 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    ethernet::{Ethernet, EthernetDmaStorage, clock::ExternalRefClock, phy::generic::GenericPhy},
+    ethernet::{
+        Ethernet,
+        EthernetDmaStorage,
+        clock::ExternalRefClock,
+        mac::LinkState,
+        phy::{MdioDriver, Phy, PhyError, generic::GenericPhy},
+    },
     gpio::{Level, Output, OutputConfig},
     interrupt::software::SoftwareInterruptControl,
     rng::Rng,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
+use futures_util::FutureExt;
 use reqwless::{
     client::HttpClient,
     request::{Method, RequestBuilder},
@@ -65,7 +74,57 @@ static STACK_RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
 static TCP_CLIENT_STATE: ConstStaticCell<TcpClientState<1, 1500, 1500>> =
     ConstStaticCell::new(TcpClientState::new());
 
-type EthDriver = Ethernet<'static, esp_hal::Async, GenericPhy>;
+type EthDriver = Ethernet<'static, esp_hal::Async, ExamplePhy>;
+
+/// A custom PHY implementation that wraps [`GenericPhy`], and uses embassy-time
+/// to implement polling instead of the busy looping done by GenericPhy.
+struct ExamplePhy {
+    phy: GenericPhy,
+    timer: Timer,
+    cached_link_state: LinkState,
+}
+
+impl ExamplePhy {
+    fn new(address: u8) -> Self {
+        Self {
+            phy: GenericPhy::new(address),
+            timer: Timer::after_ticks(0),
+            cached_link_state: LinkState { up: false },
+        }
+    }
+}
+
+impl Phy for ExamplePhy {
+    fn address(&self) -> u8 {
+        self.phy.address()
+    }
+
+    fn init(&mut self, mdio: &MdioDriver<'_>) -> Result<(), PhyError> {
+        self.phy.init(mdio)
+    }
+
+    fn poll_link(&mut self, mdio: &MdioDriver<'_>, cx: Option<&mut Context<'_>>) -> LinkState {
+        if let Some(cx) = cx {
+            if matches!(self.timer.poll_unpin(cx), Poll::Pending) {
+                return self.cached_link_state;
+            }
+
+            // Timer done, re-arm it
+            self.timer = Timer::after(Duration::from_millis(500));
+
+            // Ensure the next wakeup is scheduled
+            let _ = self.timer.poll_unpin(cx);
+        }
+
+        // Poll the PHY for link state. Do not pass `cx`, we're handling the scheduling.
+        self.cached_link_state = self.phy.poll_link(mdio, None);
+
+        // Uncomment to observe how often the link state is polled
+        // println!("Polled link state: {:?}", self.cached_link_state);
+
+        self.cached_link_state
+    }
+}
 
 #[esp_rtos::main]
 async fn main(spawner: Spawner) {
@@ -93,7 +152,7 @@ async fn main(spawner: Spawner) {
         STORAGE.take(),
         MAC_ADDR,
         ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
-        GenericPhy::new(1),
+        ExamplePhy::new(1),
         peripherals.GPIO25, // RXD0
         peripherals.GPIO26, // RXD1
         peripherals.GPIO27, // RX_DV

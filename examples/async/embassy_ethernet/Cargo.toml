@@ -25,6 +25,7 @@ esp-hal = { path = "../../../esp-hal", features = [
 ] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
 esp-rtos    = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
+futures-util = { version = "0.3", default-features = false }
 reqwless = { version = "0.14.0", default-features = false }
 static_cell = "2.1.0"
 
