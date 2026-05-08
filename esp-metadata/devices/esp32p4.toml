@@ -284,11 +284,11 @@ peripherals = [
     { name = "DMA_CH1", virtual = true },
     { name = "DMA_CH2", virtual = true },
 
+    #{ name = "ETH", virtual = true },
+    #{ name = "EMAC_DMA", hidden = true },
+    #{ name = "EMAC_MAC", hidden = true },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
-    # TODO: clarify EMAC <-> PAC mapping before exposing it.
-    # but the esp32p4 PAC has not been generated with a matching peripheral yet.
-    # { name = "EMAC" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
     { name = "MCPWM1", interrupts = { peri = "PWM1" } },

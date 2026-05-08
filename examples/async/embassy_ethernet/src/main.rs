@@ -149,6 +149,7 @@ async fn main(spawner: Spawner) {
     // ── Ethernet ─────────────────────────────────────────────────────────────
 
     let eth: EthDriver = Ethernet::new_rmii(
+        peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
         ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
@@ -161,9 +162,6 @@ async fn main(spawner: Spawner) {
         peripherals.GPIO21, // TX_EN
         peripherals.GPIO23, // MDC
         peripherals.GPIO18, // MDIO
-        peripherals.EMAC_MAC,
-        peripherals.EMAC_DMA,
-        peripherals.EMAC_EXT,
     )
     .expect("Ethernet init failed")
     .into_async();

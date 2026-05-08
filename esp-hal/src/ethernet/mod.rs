@@ -55,7 +55,7 @@ use crate::{
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     interrupt,
-    peripherals::{EMAC_DMA, EMAC_EXT, EMAC_MAC, Interrupt},
+    peripherals::{EMAC_DMA, ETH, Interrupt},
     private::Sealed,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -243,10 +243,7 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     rx: RDesRing<'d>,
     phy: P,
     mac_addr: [u8; 6],
-    // Ownership tokens — hold the singletons to prevent re-use.
-    _mac: EMAC_MAC<'d>,
-    _dma: EMAC_DMA<'d>,
-    _ext: EMAC_EXT<'d>,
+    _eth: ETH<'d>,
     _mode: PhantomData<DM>,
 }
 
@@ -254,6 +251,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Creates an RMII Ethernet driver.
     #[expect(clippy::too_many_arguments)]
     pub fn new_rmii<const RX: usize, const TX: usize>(
+        eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
         mac_addr: [u8; 6],
         clock: impl RmiiClockConfig,
@@ -266,9 +264,6 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         tx_en: impl EmacTxEn + 'd,
         mdc: impl PeripheralOutput<'d>,
         mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
-        emac_mac: EMAC_MAC<'d>,
-        emac_dma: EMAC_DMA<'d>,
-        emac_ext: EMAC_EXT<'d>,
     ) -> Result<Self, Error> {
         let clock_guard = GenericPeripheralGuard::new();
 
@@ -285,20 +280,13 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         // Configure ref-clock pin + EMAC_EXT clock source + PHY interface.
         clock.configure();
 
-        init_common(
-            clock_guard,
-            storage,
-            mac_addr,
-            phy,
-            emac_mac,
-            emac_dma,
-            emac_ext,
-        )
+        init_common(clock_guard, storage, mac_addr, phy, eth)
     }
 
     /// Creates a MII Ethernet driver.
     #[expect(clippy::too_many_arguments)]
     pub fn new_mii<const RX: usize, const TX: usize>(
+        eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
         mac_addr: [u8; 6],
         phy: P,
@@ -320,9 +308,6 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         col: impl PeripheralInput<'d>,
         mdc: impl PeripheralOutput<'d>,
         mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
-        emac_mac: EMAC_MAC<'d>,
-        emac_dma: EMAC_DMA<'d>,
-        emac_ext: EMAC_EXT<'d>,
     ) -> Result<Self, Error> {
         let clock_guard = GenericPeripheralGuard::new();
 
@@ -353,15 +338,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
         clock::MiiClock.configure();
 
-        init_common(
-            clock_guard,
-            storage,
-            mac_addr,
-            phy,
-            emac_mac,
-            emac_dma,
-            emac_ext,
-        )
+        init_common(clock_guard, storage, mac_addr, phy, eth)
     }
 
     /// Returns the received frame data if one is ready.
@@ -396,9 +373,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             phy: self.phy,
             mac_addr: self.mac_addr,
             _clock_guard: self._clock_guard,
-            _mac: self._mac,
-            _dma: self._dma,
-            _ext: self._ext,
+            _eth: self._eth,
             _mode: PhantomData,
         }
     }
@@ -514,9 +489,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             phy: self.phy,
             mac_addr: self.mac_addr,
             _clock_guard: self._clock_guard,
-            _mac: self._mac,
-            _dma: self._dma,
-            _ext: self._ext,
+            _eth: self._eth,
             _mode: PhantomData,
         }
     }
@@ -548,9 +521,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     storage: &'d mut EthernetDmaStorage<RX, TX>,
     mac_addr: [u8; 6],
     mut phy: P,
-    emac_mac: EMAC_MAC<'d>,
-    emac_dma: EMAC_DMA<'d>,
-    emac_ext: EMAC_EXT<'d>,
+    eth: ETH<'d>,
 ) -> Result<Ethernet<'d, Blocking, P>, Error> {
     let regs = EmacRegs::new();
 
@@ -586,9 +557,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
         phy,
         mac_addr,
         _clock_guard: clock_guard,
-        _mac: emac_mac,
-        _dma: emac_dma,
-        _ext: emac_ext,
+        _eth: eth,
         _mode: PhantomData,
     })
 }
