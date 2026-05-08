@@ -147,7 +147,12 @@ async fn main(spawner: Spawner) {
     // ── PHY reset ─────────────────────────────────────────────────────────────
     // GPIO5 drives the IP101GRI active-low NRESET pin.  Assert reset for at
     // least 100 ms, then release and wait ≥ 300 ms for the PHY to stabilise.
+    #[cfg(feature = "esp32")]
     let mut phy_reset = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
+
+    #[cfg(feature = "esp32p4")]
+    let mut phy_reset = Output::new(peripherals.GPIO51, Level::Low, OutputConfig::default());
+
     Timer::after(Duration::from_millis(100)).await;
     phy_reset.set_high();
     Timer::after(Duration::from_millis(300)).await;
