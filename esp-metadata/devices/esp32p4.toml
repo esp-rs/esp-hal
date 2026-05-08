@@ -62,7 +62,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
     { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # eco5 default 400MHz
     { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480_000_000" }, # System PLL
-    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # Media PLL
+    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500_000_000" }, # Media PLL
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
     # Low-speed clocks
@@ -71,16 +71,16 @@ clocks = { system_clocks = { clock_tree = [
     { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
     { name = "RC32K_CLK",    type = "source", output = "32768"   },
 
-    # SPLL divider taps (from 480 MHz SPLL)
+    # SPLL divider taps
     { name = "PLL_F20M",  type = "generic", output = "SPLL_CLK / 24" },
     { name = "PLL_F80M",  type = "generic", output = "SPLL_CLK / 6"  },
     { name = "PLL_F120M", type = "generic", output = "SPLL_CLK / 4"  },
     { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
 
-    # MPLL divider taps (from 400 MHz MPLL)
-    { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 16" },
-    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 8"  },
+    # MPLL divider taps
+    { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
+    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10"  },
 
     # XTAL half
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
@@ -92,10 +92,15 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
 
+    # TODO: model fractional divider parameters
     # CPU_CLK divider (HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num)
     { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
+    # MEM_CLK divider
+    { name = "MEM_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    # SYS_CLK divider
+    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "MEM_CLK / (divisor + 1)" },
     # APB_CLK divider
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)" },
 
     # LP clocks
     { name = "LP_FAST_CLK", type = "mux", variants = [

@@ -19,20 +19,30 @@ use crate::peripherals::{EMAC_DMA, EMAC_MAC};
 fn mdc_csr_clock_range() -> u8 {
     #[cfg(esp32p4)]
     {
-        // Encoding matches esp-idf emac_esp.c runtime selection for ESP32-P4.
-        match crate::clock::cpu_clock().as_hz() {
-            hz if hz >= 300_000_000 => 6, // 300–500 MHz → /204
-            hz if hz >= 250_000_000 => 5, // 250–300 MHz → /124
-            hz if hz >= 150_000_000 => 4, // 150–250 MHz → /102
-            hz if hz >= 100_000_000 => 1, // 100–150 MHz → /62
-            hz if hz >= 60_000_000 => 0,  //  60–100 MHz → /42
-            hz if hz >= 35_000_000 => 3,  //  35–60  MHz → /26
-            _ => 2,                       //  20–35  MHz → /16
+        // Matches emac_hal_set_csr_clock_range() in esp-idf (emac_hal.c).
+        // The P4 EMAC (DWC_gmac) only defines encoding values 0–5; value 6+
+        // is reserved and must not be used. The CSR clock source is the SYS
+        // (CPU) clock.
+        //
+        // emac_crs_div_table = {42, 62, 16, 26, 102, 124}
+        //   encoding 0 → /42  (60–100 MHz)
+        //   encoding 1 → /62  (100–150 MHz)
+        //   encoding 2 → /16  (20–35 MHz)
+        //   encoding 3 → /26  (35–60 MHz)
+        //   encoding 4 → /102 (150–250 MHz)
+        //   encoding 5 → /124 (≥ 250 MHz, slightly over 2.5 MHz spec at high SYS clocks)
+        match crate::clock::ll::sys_clk_frequency() {
+            hz if hz >= 250_000_000 => 5, // /124
+            hz if hz >= 150_000_000 => 4, // /102
+            hz if hz >= 100_000_000 => 1, // /62
+            hz if hz >= 60_000_000 => 0,  // /42
+            hz if hz >= 35_000_000 => 3,  // /26
+            _ => 2,                       // /16
         }
     }
     #[cfg(not(esp32p4))]
     {
-        3 // ESP32: 80 MHz APB; value 3 works in practice
+        3 // ESP32: 80 MHz APB → /26, works in practice
     }
 }
 

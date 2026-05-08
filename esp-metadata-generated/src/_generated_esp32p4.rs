@@ -298,6 +298,12 @@ macro_rules! property {
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };
+    ("clock_tree.mem_clk.divisor") => {
+        (0, 255)
+    };
+    ("clock_tree.sys_clk.divisor") => {
+        (0, 255)
+    };
     ("clock_tree.apb_clk.divisor") => {
         (0, 255)
     };
@@ -952,6 +958,34 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
+/// // MEM_CLK
+///
+/// fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_mem_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<MemClkConfig>,
+///     _new_config: MemClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
+/// // SYS_CLK
+///
+/// fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_sys_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<SysClkConfig>,
+///     _new_config: SysClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // APB_CLK
 ///
 /// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1125,9 +1159,61 @@ macro_rules! define_clock_tree_types {
                 self.divisor as u32
             }
         }
-        /// Configures the `APB_CLK` clock node.
+        /// Configures the `MEM_CLK` clock node.
         ///
         /// The output is calculated as `OUTPUT = CPU_CLK / (divisor + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct MemClkConfig {
+            divisor: u32,
+        }
+        impl MemClkConfig {
+            /// Creates a new configuration for the MEM_CLK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255,
+                    "`MEM_CLK` divisor must be between 0 and 255 (inclusive)."
+                );
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor as u32
+            }
+        }
+        /// Configures the `SYS_CLK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = MEM_CLK / (divisor + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct SysClkConfig {
+            divisor: u32,
+        }
+        impl SysClkConfig {
+            /// Creates a new configuration for the SYS_CLK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255,
+                    "`SYS_CLK` divisor must be between 0 and 255 (inclusive)."
+                );
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor as u32
+            }
+        }
+        /// Configures the `APB_CLK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = SYS_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct ApbClkConfig {
@@ -1298,6 +1384,8 @@ macro_rules! define_clock_tree_types {
         pub struct ClockTree {
             cpu_root_clk: Option<CpuRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
+            mem_clk: Option<MemClkConfig>,
+            sys_clk: Option<SysClkConfig>,
             apb_clk: Option<ApbClkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
@@ -1339,6 +1427,14 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the CPU_CLK clock tree node
             pub fn cpu_clk(&self) -> Option<CpuClkConfig> {
                 self.cpu_clk
+            }
+            /// Returns the current configuration of the MEM_CLK clock tree node
+            pub fn mem_clk(&self) -> Option<MemClkConfig> {
+                self.mem_clk
+            }
+            /// Returns the current configuration of the SYS_CLK clock tree node
+            pub fn sys_clk(&self) -> Option<SysClkConfig> {
+                self.sys_clk
             }
             /// Returns the current configuration of the APB_CLK clock tree node
             pub fn apb_clk(&self) -> Option<ApbClkConfig> {
@@ -1417,6 +1513,8 @@ macro_rules! define_clock_tree_types {
             ::esp_sync::NonReentrantMutex::new(ClockTree {
                 cpu_root_clk: None,
                 cpu_clk: None,
+                mem_clk: None,
+                sys_clk: None,
                 apb_clk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
@@ -1449,6 +1547,10 @@ macro_rules! define_clock_tree_types {
         static CPU_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CPU_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static MEM_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static SYS_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -1526,7 +1628,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn mpll_clk_frequency() -> u32 {
-            400000000
+            500000000
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_CLK");
@@ -1717,7 +1819,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn pll_f25m_frequency() -> u32 {
-            (mpll_clk_frequency() / 16)
+            (mpll_clk_frequency() / 20)
         }
         pub fn request_pll_f50m(clocks: &mut ClockTree) {
             trace!("Requesting PLL_F50M");
@@ -1736,7 +1838,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn pll_f50m_frequency() -> u32 {
-            (mpll_clk_frequency() / 8)
+            (mpll_clk_frequency() / 10)
         }
         pub fn request_xtal_d2_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_D2_CLK");
@@ -1834,6 +1936,60 @@ macro_rules! define_clock_tree_types {
         pub fn cpu_clk_frequency() -> u32 {
             CPU_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
+        pub fn configure_mem_clk(clocks: &mut ClockTree, config: MemClkConfig) {
+            let old_config = clocks.mem_clk.replace(config);
+            refresh_mem_clk_downstream(clocks);
+            configure_mem_clk_impl(clocks, old_config, config);
+        }
+        pub fn mem_clk_config(clocks: &mut ClockTree) -> Option<MemClkConfig> {
+            clocks.mem_clk
+        }
+        pub fn request_mem_clk(clocks: &mut ClockTree) {
+            trace!("Requesting MEM_CLK");
+            trace!("Enabling MEM_CLK");
+            request_cpu_clk(clocks);
+            enable_mem_clk_impl(clocks, true);
+        }
+        pub fn release_mem_clk(clocks: &mut ClockTree) {
+            trace!("Releasing MEM_CLK");
+            trace!("Disabling MEM_CLK");
+            enable_mem_clk_impl(clocks, false);
+            release_cpu_clk(clocks);
+        }
+        #[allow(unused_variables)]
+        pub fn mem_clk_config_frequency(clocks: &mut ClockTree, config: MemClkConfig) -> u32 {
+            (cpu_clk_frequency() / (config.divisor() + 1))
+        }
+        pub fn mem_clk_frequency() -> u32 {
+            MEM_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn configure_sys_clk(clocks: &mut ClockTree, config: SysClkConfig) {
+            let old_config = clocks.sys_clk.replace(config);
+            refresh_sys_clk_downstream(clocks);
+            configure_sys_clk_impl(clocks, old_config, config);
+        }
+        pub fn sys_clk_config(clocks: &mut ClockTree) -> Option<SysClkConfig> {
+            clocks.sys_clk
+        }
+        pub fn request_sys_clk(clocks: &mut ClockTree) {
+            trace!("Requesting SYS_CLK");
+            trace!("Enabling SYS_CLK");
+            request_mem_clk(clocks);
+            enable_sys_clk_impl(clocks, true);
+        }
+        pub fn release_sys_clk(clocks: &mut ClockTree) {
+            trace!("Releasing SYS_CLK");
+            trace!("Disabling SYS_CLK");
+            enable_sys_clk_impl(clocks, false);
+            release_mem_clk(clocks);
+        }
+        #[allow(unused_variables)]
+        pub fn sys_clk_config_frequency(clocks: &mut ClockTree, config: SysClkConfig) -> u32 {
+            (mem_clk_frequency() / (config.divisor() + 1))
+        }
+        pub fn sys_clk_frequency() -> u32 {
+            SYS_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             let old_config = clocks.apb_clk.replace(config);
             refresh_apb_clk_downstream(clocks);
@@ -1846,7 +2002,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting APB_CLK");
             if increment_reference_count(&mut clocks.apb_clk_refcount) {
                 trace!("Enabling APB_CLK");
-                request_cpu_clk(clocks);
+                request_sys_clk(clocks);
                 enable_apb_clk_impl(clocks, true);
             }
         }
@@ -1855,12 +2011,12 @@ macro_rules! define_clock_tree_types {
             if decrement_reference_count(&mut clocks.apb_clk_refcount) {
                 trace!("Disabling APB_CLK");
                 enable_apb_clk_impl(clocks, false);
-                release_cpu_clk(clocks);
+                release_sys_clk(clocks);
             }
         }
         #[allow(unused_variables)]
         pub fn apb_clk_config_frequency(clocks: &mut ClockTree, config: ApbClkConfig) -> u32 {
-            (cpu_clk_frequency() / (config.divisor() + 1))
+            (sys_clk_frequency() / (config.divisor() + 1))
         }
         pub fn apb_clk_frequency() -> u32 {
             APB_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
@@ -2343,6 +2499,10 @@ macro_rules! define_clock_tree_types {
             pub cpu_root_clk: Option<CpuRootClkConfig>,
             /// `CPU_CLK` configuration.
             pub cpu_clk: Option<CpuClkConfig>,
+            /// `MEM_CLK` configuration.
+            pub mem_clk: Option<MemClkConfig>,
+            /// `SYS_CLK` configuration.
+            pub sys_clk: Option<SysClkConfig>,
             /// `APB_CLK` configuration.
             pub apb_clk: Option<ApbClkConfig>,
             /// `LP_FAST_CLK` configuration.
@@ -2359,6 +2519,12 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.cpu_clk {
                     configure_cpu_clk(clocks, config);
+                }
+                if let Some(config) = self.mem_clk {
+                    configure_mem_clk(clocks, config);
+                }
+                if let Some(config) = self.sys_clk {
+                    configure_sys_clk(clocks, config);
                 }
                 if let Some(config) = self.apb_clk {
                     configure_apb_clk(clocks, config);
@@ -2397,6 +2563,24 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.cpu_clk {
                 CPU_CLK_FREQ_CACHE.store(
                     cpu_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            refresh_mem_clk_downstream(clocks);
+        }
+        fn refresh_mem_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.mem_clk {
+                MEM_CLK_FREQ_CACHE.store(
+                    mem_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            refresh_sys_clk_downstream(clocks);
+        }
+        fn refresh_sys_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.sys_clk {
+                SYS_CLK_FREQ_CACHE.store(
+                    sys_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
