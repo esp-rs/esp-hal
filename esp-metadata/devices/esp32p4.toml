@@ -284,9 +284,9 @@ peripherals = [
     { name = "DMA_CH1", virtual = true },
     { name = "DMA_CH2", virtual = true },
 
-    #{ name = "ETH", virtual = true },
-    #{ name = "EMAC_DMA", hidden = true },
-    #{ name = "EMAC_MAC", hidden = true },
+    { name = "ETH", virtual = true },
+    { name = "EMAC_DMA", hidden = true },
+    { name = "EMAC_MAC", hidden = true },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
@@ -406,8 +406,10 @@ support_status = "not_supported"  # LCD_CAM block, camera path
 support_status = "not_supported"  # Digital Signature
 [device.ecdsa]
 support_status = "not_supported"
+
 [device.ethernet]
-support_status = "not_supported"  # EMAC, RMII via GPIO 30/47/53 etc.
+support_status = "partial"
+
 [device.etm]
 support_status = "not_supported"  # Event Task Matrix
 [device.hmac]
