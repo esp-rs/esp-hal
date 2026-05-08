@@ -61,6 +61,7 @@ use crate::{
 };
 
 #[cfg_attr(esp32, path = "clock/esp32.rs")]
+#[cfg_attr(esp32p4, path = "clock/esp32p4.rs")]
 pub mod clock;
 pub(crate) mod dma;
 pub(crate) mod embassy_net;
@@ -258,10 +259,6 @@ emac_pin!(RmiiRxd1, "RMII RXD1 pin");
 
 // RMII traits
 for_each_iomux_function! {
-    (EMAC_RMII_CLK, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiClkIn, $gpio, $af);
-        implement_trait!(RmiiClkOut, $gpio, $af);
-    };
     (EMAC_TXEN, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiTxEn, $gpio, $af);
     };
@@ -290,6 +287,14 @@ for_each_iomux_function! {
     };
     (EMAC_CLK_180, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiClkOut, $gpio, $af);
+    };
+
+    // ESP32-P4-specific: MPLL-derived 50 MHz reference clock output pad.
+    (REF_50M_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiClkOut, $gpio, $af);
+    };
+    (EMAC_RMII_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiClkIn, $gpio, $af);
     };
 }
 
