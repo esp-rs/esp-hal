@@ -39,7 +39,7 @@
 //! # {after_snippet}
 //! ```
 
-use core::{marker::PhantomData, ptr, task::Context};
+use core::{marker::PhantomData, task::Context};
 
 use crate::{
     Async,
@@ -57,6 +57,7 @@ use crate::{
     interrupt,
     peripherals::{EMAC_DMA, EMAC_EXT, EMAC_MAC, Interrupt},
     private::Sealed,
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 #[cfg_attr(esp32, path = "clock/esp32.rs")]
@@ -232,27 +233,12 @@ fn eth_mac_isr() {
     }
 }
 
-// ── Module clock enable ───────────────────────────────────────────────────────
-
-/// Enables the EMAC module clock via `DPORT.wifi_clk_en` bit 14.
-///
-/// Must be called before any EMAC register access. The EMAC belongs to the
-/// WiFi clock group; this bit must be set explicitly even when `esp-radio`
-/// is not in use.
-fn enable_emac_module_clock() {
-    const DPORT_WIFI_CLK_EN_REG: u32 = 0x3FF0_0040;
-    const DPORT_WIFI_CLK_EMAC_EN: u32 = 1 << 14;
-    unsafe {
-        let reg = DPORT_WIFI_CLK_EN_REG as *mut u32;
-        ptr::write_volatile(reg, ptr::read_volatile(reg) | DPORT_WIFI_CLK_EMAC_EN);
-    }
-}
-
 // ── Ethernet struct ───────────────────────────────────────────────────────────
 
 /// EMAC Ethernet driver.
 pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     regs: EmacRegs,
+    _clock_guard: GenericPeripheralGuard<{ Peripheral::Emac as u8 }>,
     tx: TDesRing<'d>,
     rx: RDesRing<'d>,
     phy: P,
@@ -284,7 +270,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         emac_dma: EMAC_DMA<'d>,
         emac_ext: EMAC_EXT<'d>,
     ) -> Result<Self, Error> {
-        enable_emac_module_clock();
+        let clock_guard = GenericPeripheralGuard::new();
 
         // Configure IOMUX-only data pins (alt function 5).
         rxd0.configure_iomux();
@@ -299,7 +285,15 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         // Configure ref-clock pin + EMAC_EXT clock source + PHY interface.
         clock.configure();
 
-        init_common(storage, mac_addr, phy, emac_mac, emac_dma, emac_ext)
+        init_common(
+            clock_guard,
+            storage,
+            mac_addr,
+            phy,
+            emac_mac,
+            emac_dma,
+            emac_ext,
+        )
     }
 
     /// Creates a MII Ethernet driver.
@@ -330,7 +324,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         emac_dma: EMAC_DMA<'d>,
         emac_ext: EMAC_EXT<'d>,
     ) -> Result<Self, Error> {
-        enable_emac_module_clock();
+        let clock_guard = GenericPeripheralGuard::new();
 
         rxd0.configure_iomux();
         rxd1.configure_iomux();
@@ -359,7 +353,15 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
         clock::MiiClock.configure();
 
-        init_common(storage, mac_addr, phy, emac_mac, emac_dma, emac_ext)
+        init_common(
+            clock_guard,
+            storage,
+            mac_addr,
+            phy,
+            emac_mac,
+            emac_dma,
+            emac_ext,
+        )
     }
 
     /// Returns the received frame data if one is ready.
@@ -393,6 +395,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             rx: self.rx,
             phy: self.phy,
             mac_addr: self.mac_addr,
+            _clock_guard: self._clock_guard,
             _mac: self._mac,
             _dma: self._dma,
             _ext: self._ext,
@@ -510,6 +513,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             rx: self.rx,
             phy: self.phy,
             mac_addr: self.mac_addr,
+            _clock_guard: self._clock_guard,
             _mac: self._mac,
             _dma: self._dma,
             _ext: self._ext,
@@ -540,6 +544,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
 // ── Shared init ───────────────────────────────────────────────────────────────
 
 fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
+    clock_guard: GenericPeripheralGuard<{ Peripheral::Emac as u8 }>,
     storage: &'d mut EthernetDmaStorage<RX, TX>,
     mac_addr: [u8; 6],
     mut phy: P,
@@ -558,7 +563,6 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
 
     // Configure MAC defaults.
     regs.mac_init(Speed::_100M, mac::Duplex::Full);
-    regs.mac_frame_filter_default();
     regs.set_mac_address(&mac_addr);
 
     // Build descriptor rings from the erased slice references.
@@ -581,6 +585,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
         rx,
         phy,
         mac_addr,
+        _clock_guard: clock_guard,
         _mac: emac_mac,
         _dma: emac_dma,
         _ext: emac_ext,

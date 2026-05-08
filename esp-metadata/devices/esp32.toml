@@ -281,9 +281,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Rsa", template_params = { reg_group = "peri", peripheral = "crypto_rsa" } },
     { name = "Sha", template_params = { reg_group = "peri", peripheral = "crypto_sha" } },
 
-    #{ name = "Emac", template_params = { reg_group = "wifi_clk" } },
-    #{ name = "SdioHost", template_params = { reg_group = "wifi_clk" } },
-    #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
+    { name = "Emac", template_params = { reg_group = "wifi" } },
+    #{ name = "SdioHost", template_params = { reg_group = "wifi" } },
+    #{ name = "SdioSlave", template_params = { reg_group = "wifi" } },
 
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Uart2" },

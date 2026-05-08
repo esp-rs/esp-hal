@@ -25,21 +25,15 @@
 //! buffers. In MII mode the PHY drives both `TX_CLK` and `RX_CLK` at 25 MHz (100 Mbps)
 //! or 2.5 MHz (10 Mbps) — no internal clock generation is required.
 
+use esp_rom_sys::rom::ets_delay_us;
+
 use crate::{
+    efuse::ChipRevision,
     ethernet::{EmacClkOut, EmacRmiiClkIn, RmiiClockConfig},
     peripherals::{EMAC_EXT, LPWR},
     private::Sealed,
     soc::regi2c,
 };
-
-/// Pre-computed APLL parameters for 50 MHz output from a 40 MHz crystal.
-///
-/// Formula: `f_apll = f_xtal * (4 + sdm2 + sdm1/256 + sdm0/65536) / ((o_div + 2) * 2)`
-/// → `40 * (4 + 6 + 0 + 0) / ((2 + 2) * 2) = 40 * 10 / 8 = 50 MHz` ✓
-const APLL_SDM2_50MHZ: u8 = 6;
-const APLL_SDM1_50MHZ: u8 = 0;
-const APLL_SDM0_50MHZ: u8 = 0;
-const APLL_ODIV_50MHZ: u8 = 2;
 
 /// RMII reference clock provided externally by the PHY.
 pub struct ExternalRefClock<P>(P);
@@ -99,24 +93,64 @@ impl<P: EmacClkOut> RmiiClockConfig for ApllClock<P> {
         // Configure the APLL clock output pad.
         self.0.configure_iomux();
 
+        // TODO: refactor into clock tree code
+
+        // Reference formula:
+        // apll_freq = xtal_freq * (4 + sdm2 + sdm1/256 + sdm0/65536) / ((o_div + 2) * 2)
+        //             ----------------------------------------------   -----------------
+        //                  350 MHz <= Numerator <= 500 MHz                Denominator
+
+        const APLL_ODIV_50MHZ: u8 = 2; // Fixed - prescribes numerator = 400 MHz
+
+        // SDM = (400MHz / f_xtal) - 4; Q6.16
+        let f_xtal = crate::clock::ll::xtal_clk_frequency();
+        let f_xtal_mhz = f_xtal / 1_000_000;
+
+        // SDM is a Q6.16 fixed-point number
+        let sdm = ((400 << 16) / f_xtal_mhz) - (4 << 16);
+
+        let sdm2 = (sdm >> 16) as u8;
+        let sdm1 = ((sdm >> 8) & 0xff) as u8;
+        let sdm0 = (sdm & 0xff) as u8;
+
+        trace!("SDM2: {}, SDM1: {}, SDM0: {}", sdm2, sdm1, sdm0);
+
         // Power up the APLL.
         LPWR::regs().ana_conf().modify(|_, w| {
             w.plla_force_pd().clear_bit();
             w.plla_force_pu().set_bit()
         });
 
-        // Program Σ-Δ modulator coefficients for 50 MHz (40 MHz XTAL assumed).
-        regi2c::I2C_APLL_DSDM2.write_field(APLL_SDM2_50MHZ);
-        regi2c::I2C_APLL_DSDM1.write_field(APLL_SDM1_50MHZ);
-        regi2c::I2C_APLL_DSDM0.write_field(APLL_SDM0_50MHZ);
+        regi2c::I2C_APLL_DSDM2.write_field(sdm2);
+        regi2c::I2C_APLL_DSDM1.write_field(sdm1);
+        regi2c::I2C_APLL_DSDM0.write_field(sdm0);
+        // APLL configuration parameters
+        const CLK_LL_APLL_SDM_STOP_VAL_1: u8 = 0x09;
+        const CLK_LL_APLL_SDM_STOP_VAL_2_REV0: u8 = 0x69;
+        const CLK_LL_APLL_SDM_STOP_VAL_2_REV1: u8 = 0x49;
+        regi2c::I2C_APLL_SDM_CTRL.write_reg(CLK_LL_APLL_SDM_STOP_VAL_1);
+        if crate::soc::chip_revision_above(ChipRevision::from_combined(100)) {
+            regi2c::I2C_APLL_SDM_CTRL.write_reg(CLK_LL_APLL_SDM_STOP_VAL_2_REV1);
+        } else {
+            regi2c::I2C_APLL_SDM_CTRL.write_reg(CLK_LL_APLL_SDM_STOP_VAL_2_REV0);
+        }
         regi2c::I2C_APLL_OR_OUTPUT_DIV.write_field(APLL_ODIV_50MHZ);
 
-        // Release SDM reset, then start SDM.
-        regi2c::I2C_APLL_SDM_RSTB.write_field(1);
-        regi2c::I2C_APLL_SDM_STOP.write_field(0);
+        // Trigger IR calibration / start SDM.
+        const APLL_CALIBRATION_DELAY: u8 = 0x0F;
+        const APLL_CALIBRATION_RSTB: u8 = 0x10;
+        const APLL_CALIBRATION_START: u8 = 0x20;
+        regi2c::I2C_APLL_IR_CAL.write_reg(APLL_CALIBRATION_DELAY);
+        regi2c::I2C_APLL_IR_CAL
+            .write_reg(APLL_CALIBRATION_DELAY | APLL_CALIBRATION_RSTB | APLL_CALIBRATION_START);
+        // This seems wrong, is RSTB and START swapped?
+        regi2c::I2C_APLL_IR_CAL.write_reg(APLL_CALIBRATION_DELAY | APLL_CALIBRATION_RSTB);
 
-        // Trigger IR calibration.
-        regi2c::I2C_APLL_IR_CAL_START.write_field(1);
+        // Wait for calibration to complete.
+        while regi2c::I2C_APLL_OR_CAL_END.read() == 0 {
+            // use ets_delay_us so the RTC bus doesn't get flooded
+            ets_delay_us(1);
+        }
 
         EMAC_EXT::regs()
             .ex_phyinf_conf()

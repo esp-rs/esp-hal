@@ -1,7 +1,6 @@
 //! Generic PHY driver.
 //!
-//! Standard IEEE 802.3 Clause 22 PHYs with auto-negotiation support. This driver works with either
-//! variant by relying only on the standard registers.
+//! Standard IEEE 802.3 Clause 22 PHYs with auto-negotiation support.
 
 use core::task::Context;
 

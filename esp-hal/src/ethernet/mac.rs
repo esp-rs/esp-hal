@@ -161,6 +161,9 @@ impl EmacRegs {
             w.rx().set_bit();
             w.tx().set_bit()
         });
+
+        // Enable pass-all-multicast mode.
+        EMAC_MAC::regs().emacff().modify(|_, w| w.pam().set_bit());
     }
 
     // ── MAC address ───────────────────────────────────────────────────────
@@ -173,19 +176,13 @@ impl EmacRegs {
             | (addr[1] as u32) << 8
             | (addr[0] as u32);
 
-        EMAC_MAC::regs()
-            .emacaddr0high()
-            .write(|w| unsafe { w.address0_hi().bits(hi as u16) });
+        EMAC_MAC::regs().emacaddr0high().write(|w| unsafe {
+            w.address0_hi().bits(hi as u16);
+            w.address_enable0().set_bit()
+        });
         EMAC_MAC::regs()
             .emacaddr0low()
             .write(|w| unsafe { w.bits(lo) });
-    }
-
-    // ── Frame filter ──────────────────────────────────────────────────────
-
-    /// Enables pass-all-multicast mode.
-    pub fn mac_frame_filter_default(&self) {
-        EMAC_MAC::regs().emacff().modify(|_, w| w.pam().set_bit());
     }
 
     // ── MDIO ─────────────────────────────────────────────────────────────
