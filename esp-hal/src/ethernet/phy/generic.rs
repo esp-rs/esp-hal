@@ -109,9 +109,11 @@ impl Phy for GenericPhy {
         };
 
         // Read BMSR twice: first read clears the latch-low LINK_STATUS bit on
-        // some PHYs (including LAN8720A); the second read gives the real state.
+        // some PHYs; the second read gives the real state.
         let _ = mdio.read(addr, BMSR);
         let bmsr_val = mdio.read(addr, BMSR);
+
+        trace!("bmsr_val: {:x}", bmsr_val);
 
         if bmsr_val & bmsr::LINK_STATUS == 0 {
             return LINK_STATE_DOWN;

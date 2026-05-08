@@ -86,8 +86,8 @@ use crate::{
     ethernet::phy::PhyError,
     gpio::{
         AlternateFunction,
-        DriveMode,
         DriveStrength,
+        InputConfig,
         OutputConfig,
         Pin,
         interconnect::{self, PeripheralInput, PeripheralOutput},
@@ -635,21 +635,17 @@ fn configure_mdio<'d>(
     mdc: impl PeripheralOutput<'d>,
     mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
 ) {
-    // MDC is output-only; MDIO is bidirectional open-drain.
+    // MDC is output-only; MDIO is bidirectional, controlled by the peripheral.
     let mdc: interconnect::OutputSignal<'_> = mdc.into();
     mdc.apply_output_config(&OutputConfig::default().with_drive_strength(DriveStrength::_20mA));
     crate::gpio::OutputSignal::EMAC_MDC.connect_to(&mdc);
 
     let mdio: interconnect::OutputSignal<'_> = mdio.into();
-    mdio.apply_output_config(
-        &OutputConfig::default()
-            .with_drive_mode(DriveMode::OpenDrain)
-            .with_drive_strength(DriveStrength::_20mA),
-    );
+    mdio.apply_output_config(&OutputConfig::default().with_drive_strength(DriveStrength::_20mA));
+    mdio.apply_input_config(&InputConfig::default());
     crate::gpio::InputSignal::EMAC_MDI.connect_to(&mdio);
     crate::gpio::OutputSignal::EMAC_MDO.connect_to(&mdio);
     mdio.set_input_enable(true);
-    mdio.set_output_enable(true);
 }
 
 impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
