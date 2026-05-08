@@ -46,6 +46,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    ethernet::phy::PhyError,
     gpio::{
         AlternateFunction,
         DriveMode,
@@ -87,8 +88,8 @@ pub enum Error {
     FrameTooLarge,
     /// No received frame is currently available.
     NoFrame,
-    /// PHY initialization timed out.
-    PhyTimeout,
+    /// PHY (initialization) error.
+    Phy(PhyError),
 }
 
 /// Sealed trait implemented by all RMII clock configurations.
@@ -763,7 +764,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
 
     // Init PHY (MDIO requires DMA/MAC clocks to be running after reset).
     let mdio = MdioDriver::new(&EmacRegs);
-    phy.init(&mdio).map_err(|_| Error::PhyTimeout)?;
+    phy.init(&mdio).map_err(Error::Phy)?;
 
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);

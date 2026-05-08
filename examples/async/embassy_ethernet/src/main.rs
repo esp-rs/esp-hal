@@ -188,7 +188,7 @@ async fn main(spawner: Spawner) {
             rx_dv: peripherals.GPIO28,
             txd0: peripherals.GPIO34,
             txd1: peripherals.GPIO35,
-            tx_en: peripherals.GPIO33,
+            tx_en: peripherals.GPIO49,
             mdc: peripherals.GPIO31,
             mdio: peripherals.GPIO52,
         },

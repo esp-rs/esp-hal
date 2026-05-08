@@ -4,20 +4,20 @@
 //!
 //! The ESP32-P4 EMAC needs a 50 MHz reference clock for RMII.
 //!
-//! - **[`ExternalRefClock`]** — the PHY drives the reference clock into one of the
-//!   `EMAC_RMII_CLK` input pads (GPIO32, GPIO44, or GPIO50). This is the recommended
-//!   configuration when the PHY has an integrated oscillator.
+//! - **[`ExternalRefClock`]** — the PHY drives the reference clock into one of the `EMAC_RMII_CLK`
+//!   input pads (GPIO32, GPIO44, or GPIO50). This is the recommended configuration when the PHY has
+//!   an integrated oscillator.
 //!
-//! - **[`InternalRefClock`]** — the ESP32-P4 MPLL generates a 50 MHz clock and drives
-//!   it out on a `REF_50M_CLK` pad (GPIO23 or GPIO39). This signal must be looped back
-//!   externally into one of the `EMAC_RMII_CLK` input pads.
+//! - **[`InternalRefClock`]** — the ESP32-P4 MPLL generates a 50 MHz clock and drives it out on a
+//!   `REF_50M_CLK` pad (GPIO23 or GPIO39). This signal must be looped back externally into one of
+//!   the `EMAC_RMII_CLK` input pads.
 //!
 //! # MII clock source
 //!
 //! The PHY drives `TX_CLK` and `RX_CLK` separately at 25 MHz (100 Mbps) or
 //! 2.5 MHz (10 Mbps). No internal clock generation is required.
 
-use core::hint::spin_loop;
+use esp_rom_sys::rom::ets_delay_us;
 
 use crate::{
     ethernet::{RmiiClkIn, RmiiClkOut, RmiiClockConfig},
@@ -26,10 +26,7 @@ use crate::{
 };
 
 /// Number of spin-loop iterations to wait after enabling the EMAC clock tree.
-///
-/// Matched against the IDF v5.3 baseline (~280 µs at 360 MHz). Required to
-/// allow the clock tree and peripheral to stabilise before any EMAC MMIO access.
-const CLOCK_STABILIZE_SPINS: usize = 100_000;
+const CLOCK_STABILIZE_US: u32 = 300;
 
 // ── ExternalRefClock ─────────────────────────────────────────────────────────
 
@@ -70,10 +67,9 @@ pub struct InternalRefClock<POut, PIn> {
 impl<POut, PIn> InternalRefClock<POut, PIn> {
     /// Creates an internal MPLL clock configuration.
     ///
-    /// - `ref_clk_out` — the pad that will output the 50 MHz `REF_50M_CLK`
-    ///   signal (GPIO23 or GPIO39).
-    /// - `ref_clk_in` — the pad that receives the looped-back signal (GPIO32,
-    ///   GPIO44, or GPIO50).
+    /// - `ref_clk_out` — the pad that will output the 50 MHz `REF_50M_CLK` signal (GPIO23 or
+    ///   GPIO39).
+    /// - `ref_clk_in` — the pad that receives the looped-back signal (GPIO32, GPIO44, or GPIO50).
     pub fn new(ref_clk_out: POut, ref_clk_in: PIn) -> Self {
         Self {
             ref_clk_out,
@@ -123,23 +119,27 @@ fn configure_rmii_input() {
         .gmac_ctrl0()
         .modify(|_, w| unsafe { w.phy_intf_sel().bits(4) }); // 4 = RMII
 
-    HP_SYS_CLKRST::regs().peri_clk_ctrl00().modify(|_, w| unsafe {
-        // pad_emac_ref_clk_en stays clear for external-input topology;
-        // for MPLL output it is set afterwards by the caller.
-        w.pad_emac_ref_clk_en().clear_bit();
-        // Source: 0 = pad_emac_txrx_clk (the combined RMII ref pad).
-        w.emac_rmii_clk_src_sel().bits(0);
-        w.emac_rmii_clk_en().set_bit();
-        w.emac_rx_clk_src_sel().clear_bit(); // 0 = pad_emac_txrx_clk
-        w.emac_rx_clk_en().set_bit()
-    });
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl00()
+        .modify(|_, w| unsafe {
+            // pad_emac_ref_clk_en stays clear for external-input topology;
+            // for MPLL output it is set afterwards by the caller.
+            w.pad_emac_ref_clk_en().clear_bit();
+            // Source: 0 = pad_emac_txrx_clk (the combined RMII ref pad).
+            w.emac_rmii_clk_src_sel().bits(0);
+            w.emac_rmii_clk_en().set_bit();
+            w.emac_rx_clk_src_sel().clear_bit(); // 0 = pad_emac_txrx_clk
+            w.emac_rx_clk_en().set_bit()
+        });
 
-    HP_SYS_CLKRST::regs().peri_clk_ctrl01().modify(|_, w| unsafe {
-        w.emac_tx_clk_src_sel().clear_bit(); // 0 = pad_emac_txrx_clk
-        w.emac_tx_clk_en().set_bit();
-        w.emac_rx_clk_div_num().bits(1); // div 1 = 100 Mbps default
-        w.emac_tx_clk_div_num().bits(1)
-    });
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl01()
+        .modify(|_, w| unsafe {
+            w.emac_tx_clk_src_sel().clear_bit(); // 0 = pad_emac_txrx_clk
+            w.emac_tx_clk_en().set_bit();
+            w.emac_rx_clk_div_num().bits(1); // div 1 = 100 Mbps default
+            w.emac_tx_clk_div_num().bits(1)
+        });
 
     // LP pad gate: use the combined txrx clock pad, not the separate tx/rx pads.
     LP_AON_CLKRST::regs()
@@ -185,20 +185,24 @@ fn configure_mii() {
         .gmac_ctrl0()
         .modify(|_, w| unsafe { w.phy_intf_sel().bits(0) }); // 0 = MII
 
-    HP_SYS_CLKRST::regs().peri_clk_ctrl00().modify(|_, w| unsafe {
-        w.pad_emac_ref_clk_en().clear_bit();
-        w.emac_rmii_clk_en().clear_bit();
-        w.emac_rmii_clk_src_sel().bits(0);
-        w.emac_rx_clk_src_sel().set_bit(); // 1 = pad_emac_rx_clk
-        w.emac_rx_clk_en().set_bit()
-    });
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl00()
+        .modify(|_, w| unsafe {
+            w.pad_emac_ref_clk_en().clear_bit();
+            w.emac_rmii_clk_en().clear_bit();
+            w.emac_rmii_clk_src_sel().bits(0);
+            w.emac_rx_clk_src_sel().set_bit(); // 1 = pad_emac_rx_clk
+            w.emac_rx_clk_en().set_bit()
+        });
 
-    HP_SYS_CLKRST::regs().peri_clk_ctrl01().modify(|_, w| unsafe {
-        w.emac_tx_clk_src_sel().set_bit(); // 1 = pad_emac_tx_clk
-        w.emac_tx_clk_en().set_bit();
-        w.emac_rx_clk_div_num().bits(0); // div 0 = 25 MHz (no division)
-        w.emac_tx_clk_div_num().bits(0)
-    });
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl01()
+        .modify(|_, w| unsafe {
+            w.emac_tx_clk_src_sel().set_bit(); // 1 = pad_emac_tx_clk
+            w.emac_tx_clk_en().set_bit();
+            w.emac_rx_clk_div_num().bits(0); // div 0 = 25 MHz (no division)
+            w.emac_tx_clk_div_num().bits(0)
+        });
 
     LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_clk_ctrl()
@@ -230,7 +234,5 @@ fn deassert_reset() {
 
 /// Spin-waits for the EMAC clock tree to stabilise after configuration.
 fn clock_stabilize() {
-    for _ in 0..CLOCK_STABILIZE_SPINS {
-        spin_loop();
-    }
+    ets_delay_us(CLOCK_STABILIZE_US);
 }
