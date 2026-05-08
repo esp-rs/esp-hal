@@ -31,8 +31,17 @@ static_cell = "2.1.0"
 
 [features]
 esp32 = [
+    "esp-println/esp32",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
     "esp-rtos/esp32",
+]
+
+esp32p4 = [
+    "esp-println/esp32p4",
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+    "esp-rtos/esp32p4",
 ]

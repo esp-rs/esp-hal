@@ -1,28 +1,29 @@
-//! EMAC Ethernet DHCP Example — ESP32-Ethernet-Kit v1.2 (IP101GRI)
+//! Ethernet DHCP Example
 //!
-//! Demonstrates RMII Ethernet on the **[ESP32-Ethernet-Kit v1.2]** devboard: initialises the
-//! Ethernet peripheral, waits for a DHCP-assigned IP address, then periodically issues an HTTP
-//! GET request to httpbin.org and prints the response body.
+//! Demonstrates RMII Ethernet: initialises the Ethernet peripheral, waits for a DHCP-assigned IP
+//! address, then periodically issues an HTTP GET request to httpbin.org and prints the response
+//! body.
 //!
-//! The dev kit uses an IP101GRI PHY, which is compatible with `GenericPhy`.
+//! The example is configured for ESP32-Ethernet-Kit v1.2 and ESP32-P4-Function EV Board.
+//!
+//! The dev kits use an IP101GRI PHY, which is compatible with `GenericPhy`, but this example
+//! showcases a more efficient wrapper using embassy-time.
 //!
 //! # Board pin mapping
 //!
-//! | Signal       | GPIO |
-//! |--------------|------|
-//! | REF_CLK (in) | 0    |
-//! | MDC          | 23   |
-//! | MDIO         | 18   |
-//! | RXD0         | 25   |
-//! | RXD1         | 26   |
-//! | RX_DV / CRS  | 27   |
-//! | TXD0         | 19   |
-//! | TXD1         | 22   |
-//! | TX_EN        | 21   |
-//! | PHY Reset    | 5    |
-//! | PHY address  | 1    |
-//!
-//! [ESP32-Ethernet-Kit v1.2]: https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-ethernet-kit/index.html
+//! | Signal       | ESP32-Ethernet-Kit v1.2 | ESP32-P4-Function EV Board |
+//! |--------------|-------------------------|----------------------------|
+//! | REF_CLK (in) |                    0    |                       50   |
+//! | MDC          |                    23   |                       31   |
+//! | MDIO         |                    18   |                       52   |
+//! | RXD0         |                    25   |                       29   |
+//! | RXD1         |                    26   |                       30   |
+//! | RX_DV / CRS  |                    27   |                       28   |
+//! | TXD0         |                    19   |                       34   |
+//! | TXD1         |                    22   |                       35   |
+//! | TX_EN        |                    21   |                       49   |
+//! | PHY Reset    |                    5    |                       51   |
+//! | PHY address  |                    1    |                        1   |
 
 #![no_std]
 #![no_main]
@@ -153,6 +154,7 @@ async fn main(spawner: Spawner) {
 
     // ── Ethernet ─────────────────────────────────────────────────────────────
 
+    #[cfg(feature = "esp32")]
     let eth: EthDriver = Ethernet::new(
         peripherals.ETH,
         STORAGE.take(),
@@ -168,6 +170,27 @@ async fn main(spawner: Spawner) {
             tx_en: peripherals.GPIO21,
             mdc: peripherals.GPIO23,
             mdio: peripherals.GPIO18,
+        },
+    )
+    .expect("Ethernet init failed")
+    .into_async();
+
+    #[cfg(feature = "esp32p4")]
+    let eth: EthDriver = Ethernet::new(
+        peripherals.ETH,
+        STORAGE.take(),
+        MAC_ADDR,
+        ExamplePhy::new(1),
+        RmiiPinBundle {
+            clock: ExternalRefClock::new(peripherals.GPIO50), // REF_CLK from IP101GRI REFCLKO
+            rxd0: peripherals.GPIO29,
+            rxd1: peripherals.GPIO30,
+            rx_dv: peripherals.GPIO28,
+            txd0: peripherals.GPIO34,
+            txd1: peripherals.GPIO35,
+            tx_en: peripherals.GPIO33,
+            mdc: peripherals.GPIO31,
+            mdio: peripherals.GPIO52,
         },
     )
     .expect("Ethernet init failed")
