@@ -1,4 +1,41 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "clk_in_gpio" => {
+        cfg(esp32) => "GPIO0",
+        cfg(esp32p4) => "GPIO50",
+    },
+    "rxd0_gpio" => {
+        cfg(esp32) => "GPIO25",
+        cfg(esp32p4) => "GPIO29",
+    },
+    "rxd1_gpio" => {
+        cfg(esp32) => "GPIO26",
+        cfg(esp32p4) => "GPIO30",
+    },
+    "rxdv_gpio" => {
+        cfg(esp32) => "GPIO27",
+        cfg(esp32p4) => "GPIO28",
+    },
+    "txd0_gpio" => {
+        cfg(esp32) => "GPIO19",
+        cfg(esp32p4) => "GPIO34",
+    },
+    "txd1_gpio" => {
+        cfg(esp32) => "GPIO22",
+        cfg(esp32p4) => "GPIO35",
+    },
+    "txen_gpio" => {
+        cfg(esp32) => "GPIO21",
+        cfg(esp32p4) => "GPIO49",
+    },
+    "mdc_gpio" => {
+        cfg(esp32) => "GPIO23",
+        cfg(esp32p4) => "GPIO31",
+    },
+    "mdio_gpio" => {
+        cfg(esp32) => "GPIO18",
+        cfg(esp32p4) => "GPIO52",
+    }
+))]
 //! EMAC Ethernet driver for ESP32.
 //!
 //! The driver provides blocking and async Ethernet APIs.
@@ -21,17 +58,17 @@
 //!     peripherals.ETH,
 //!     &mut storage,
 //!     [0x02, 0x00, 0x00, 0x12, 0x34, 0x56],
-//!     GenericPhy::new(1),
+//!     GenericPhy::new_auto(),
 //!     RmiiPinBundle {
-//!         clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from PHY on GPIO0
-//!         rxd0: peripherals.GPIO25,
-//!         rxd1: peripherals.GPIO26,
-//!         rx_dv: peripherals.GPIO27,
-//!         txd0: peripherals.GPIO19,
-//!         txd1: peripherals.GPIO22,
-//!         tx_en: peripherals.GPIO21,
-//!         mdc: peripherals.GPIO23,
-//!         mdio: peripherals.GPIO18,
+//!         clock: ExternalRefClock::new(peripherals.__clk_in_gpio__), // REF_CLK from PHY
+//!         rxd0: peripherals.__rxd0_gpio__,
+//!         rxd1: peripherals.__rxd1_gpio__,
+//!         rx_dv: peripherals.__rxdv_gpio__,
+//!         txd0: peripherals.__txd0_gpio__,
+//!         txd1: peripherals.__txd1_gpio__,
+//!         tx_en: peripherals.__txen_gpio__,
+//!         mdc: peripherals.__mdc_gpio__,
+//!         mdio: peripherals.__mdio_gpio__,
 //!     },
 //! )
 //! .unwrap();
