@@ -95,6 +95,8 @@ impl<'a> MdioDriver<'a> {
 pub enum PhyError {
     /// The PHY did not respond within the expected time.
     Timeout,
+    /// No PHY was found on the MDIO bus during auto-address discovery.
+    NotFound,
 }
 
 /// Trait implemented by all PHY drivers.

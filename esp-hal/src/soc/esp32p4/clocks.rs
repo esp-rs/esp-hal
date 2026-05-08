@@ -17,7 +17,12 @@
     reason = "CPU frequency variant names follow the chip-spec MHz convention"
 )]
 
-use crate::peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST};
+use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
+
+use crate::{
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST},
+    time::Rate,
+};
 
 define_clock_tree_types!();
 
@@ -161,6 +166,9 @@ fn configure_cpu_clk_impl(
     {
         core::hint::spin_loop();
     }
+
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
+    ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 }
 
 // APB_CLK divider

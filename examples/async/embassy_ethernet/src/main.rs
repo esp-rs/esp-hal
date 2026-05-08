@@ -87,9 +87,9 @@ struct ExamplePhy {
 }
 
 impl ExamplePhy {
-    fn new(address: u8) -> Self {
+    fn new_auto() -> Self {
         Self {
-            phy: GenericPhy::new(address),
+            phy: GenericPhy::new_auto(),
             timer: Timer::after_ticks(0),
             cached_link_state: LinkState {
                 up: false,
@@ -164,7 +164,7 @@ async fn main(spawner: Spawner) {
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExamplePhy::new(1),
+        ExamplePhy::new_auto(),
         RmiiPinBundle {
             clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
             rxd0: peripherals.GPIO25,
@@ -185,7 +185,7 @@ async fn main(spawner: Spawner) {
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExamplePhy::new(1),
+        ExamplePhy::new_auto(),
         RmiiPinBundle {
             clock: ExternalRefClock::new(peripherals.GPIO50), // REF_CLK from IP101GRI REFCLKO
             rxd0: peripherals.GPIO29,
