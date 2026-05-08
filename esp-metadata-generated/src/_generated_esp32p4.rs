@@ -134,10 +134,10 @@ macro_rules! property {
         false
     };
     ("gpio.func_in_sel_offset") => {
-        0
+        1
     };
     ("gpio.func_in_sel_offset", str) => {
-        stringify!(0)
+        stringify!(1)
     };
     ("gpio.input_signal_max") => {
         203
@@ -4108,17 +4108,55 @@ macro_rules! for_each_lp_function {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0));
         _for_each_inner_lp_function!((LP_GPIO1, GPIO1));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5));
+        _for_each_inner_lp_function!((LP_GPIO12, GPIO12));
+        _for_each_inner_lp_function!((LP_GPIO13, GPIO13));
         _for_each_inner_lp_function!((LP_GPIO14, GPIO14));
         _for_each_inner_lp_function!((LP_GPIO15, GPIO15));
+        _for_each_inner_lp_function!((LP_GPIO16, GPIO16));
+        _for_each_inner_lp_function!((LP_GPIO17, GPIO17));
+        _for_each_inner_lp_function!((LP_GPIO18, GPIO18));
+        _for_each_inner_lp_function!((LP_GPIO19, GPIO19));
+        _for_each_inner_lp_function!((LP_GPIO20, GPIO20));
+        _for_each_inner_lp_function!((LP_GPIO21, GPIO21));
+        _for_each_inner_lp_function!((LP_GPIO22, GPIO22));
+        _for_each_inner_lp_function!((LP_GPIO23, GPIO23));
         _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0));
         _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
+        _for_each_inner_lp_function!(((LP_GPIO12, LP_GPIOn, 12), GPIO12));
+        _for_each_inner_lp_function!(((LP_GPIO13, LP_GPIOn, 13), GPIO13));
         _for_each_inner_lp_function!(((LP_GPIO14, LP_GPIOn, 14), GPIO14));
         _for_each_inner_lp_function!(((LP_GPIO15, LP_GPIOn, 15), GPIO15));
-        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0), (LP_GPIO1, GPIO1),
-        (LP_GPIO14, GPIO14), (LP_GPIO15, GPIO15)));
-        _for_each_inner_lp_function!((all_expanded((LP_GPIO0, LP_GPIOn, 0), GPIO0),
-        ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO14, LP_GPIOn, 14), GPIO14),
-        ((LP_GPIO15, LP_GPIOn, 15), GPIO15)));
+        _for_each_inner_lp_function!(((LP_GPIO16, LP_GPIOn, 16), GPIO16));
+        _for_each_inner_lp_function!(((LP_GPIO17, LP_GPIOn, 17), GPIO17));
+        _for_each_inner_lp_function!(((LP_GPIO18, LP_GPIOn, 18), GPIO18));
+        _for_each_inner_lp_function!(((LP_GPIO19, LP_GPIOn, 19), GPIO19));
+        _for_each_inner_lp_function!(((LP_GPIO20, LP_GPIOn, 20), GPIO20));
+        _for_each_inner_lp_function!(((LP_GPIO21, LP_GPIOn, 21), GPIO21));
+        _for_each_inner_lp_function!(((LP_GPIO22, LP_GPIOn, 22), GPIO22));
+        _for_each_inner_lp_function!(((LP_GPIO23, LP_GPIOn, 23), GPIO23));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0), (LP_GPIO1, GPIO1), (LP_GPIO2,
+        GPIO2), (LP_GPIO3, GPIO3), (LP_GPIO4, GPIO4), (LP_GPIO5, GPIO5), (LP_GPIO12,
+        GPIO12), (LP_GPIO13, GPIO13), (LP_GPIO14, GPIO14), (LP_GPIO15, GPIO15),
+        (LP_GPIO16, GPIO16), (LP_GPIO17, GPIO17), (LP_GPIO18, GPIO18), (LP_GPIO19,
+        GPIO19), (LP_GPIO20, GPIO20), (LP_GPIO21, GPIO21), (LP_GPIO22, GPIO22),
+        (LP_GPIO23, GPIO23))); _for_each_inner_lp_function!((all_expanded((LP_GPIO0,
+        LP_GPIOn, 0), GPIO0), ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO2, LP_GPIOn, 2),
+        GPIO2), ((LP_GPIO3, LP_GPIOn, 3), GPIO3), ((LP_GPIO4, LP_GPIOn, 4), GPIO4),
+        ((LP_GPIO5, LP_GPIOn, 5), GPIO5), ((LP_GPIO12, LP_GPIOn, 12), GPIO12),
+        ((LP_GPIO13, LP_GPIOn, 13), GPIO13), ((LP_GPIO14, LP_GPIOn, 14), GPIO14),
+        ((LP_GPIO15, LP_GPIOn, 15), GPIO15), ((LP_GPIO16, LP_GPIOn, 16), GPIO16),
+        ((LP_GPIO17, LP_GPIOn, 17), GPIO17), ((LP_GPIO18, LP_GPIOn, 18), GPIO18),
+        ((LP_GPIO19, LP_GPIOn, 19), GPIO19), ((LP_GPIO20, LP_GPIOn, 20), GPIO20),
+        ((LP_GPIO21, LP_GPIOn, 21), GPIO21), ((LP_GPIO22, LP_GPIOn, 22), GPIO22),
+        ((LP_GPIO23, LP_GPIOn, 23), GPIO23)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
