@@ -29,7 +29,7 @@ use esp_rom_sys::rom::ets_delay_us;
 
 use crate::{
     efuse::ChipRevision,
-    ethernet::{EmacClkOut, EmacRmiiClkIn, RmiiClockConfig},
+    ethernet::{RmiiClkIn, RmiiClkOut, RmiiClockConfig},
     peripherals::{EMAC_EXT, LPWR},
     private::Sealed,
     soc::regi2c,
@@ -52,7 +52,7 @@ impl<P> ExternalRefClock<P> {
 
 impl<P> Sealed for ExternalRefClock<P> {}
 
-impl<P: EmacRmiiClkIn> RmiiClockConfig for ExternalRefClock<P> {
+impl<P: RmiiClkIn> RmiiClockConfig for ExternalRefClock<P> {
     fn configure(self) {
         // Configure the pad (IOMUX AF5, input buffer enabled).
         self.0.configure_iomux();
@@ -93,7 +93,7 @@ impl<P> ApllClock<P> {
 
 impl<P> Sealed for ApllClock<P> {}
 
-impl<P: EmacClkOut> RmiiClockConfig for ApllClock<P> {
+impl<P: RmiiClkOut> RmiiClockConfig for ApllClock<P> {
     fn configure(self) {
         // Configure the APLL clock output pad.
         self.0.configure_iomux();

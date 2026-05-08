@@ -4414,6 +4414,7 @@ impl Chip {
                     "ecc_has_curve_p192",
                     "ecc_has_curve_p256",
                     "ecc_has_curve_p384",
+                    "ethernet_mii_via_gpio_matrix",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"62\"",
@@ -4588,6 +4589,7 @@ impl Chip {
                     "cargo:rustc-cfg=ecc_has_curve_p192",
                     "cargo:rustc-cfg=ecc_has_curve_p256",
                     "cargo:rustc-cfg=ecc_has_curve_p384",
+                    "cargo:rustc-cfg=ethernet_mii_via_gpio_matrix",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"62\"",
@@ -6726,6 +6728,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
+    println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spll_clk)");
