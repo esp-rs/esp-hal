@@ -1,8 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! EMAC Ethernet driver for ESP32.
 //!
-//! The driver wraps the three ESP32 EMAC PAC singletons (`EMAC_MAC`,
-//! `EMAC_DMA`, `EMAC_EXT`) and provides blocking and async Ethernet APIs.
+//! The driver provides blocking and async Ethernet APIs.
 //!
 //! # Quick start (RMII, external reference clock)
 //!
@@ -18,6 +17,7 @@
 //! let mut storage: EthernetDmaStorage<10, 10> = EthernetDmaStorage::new();
 //!
 //! let mut eth = Ethernet::new_rmii(
+//!     peripherals.ETH,
 //!     &mut storage,
 //!     [0x02, 0x00, 0x00, 0x12, 0x34, 0x56],
 //!     ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from PHY on GPIO0
@@ -30,9 +30,6 @@
 //!     peripherals.GPIO21,
 //!     peripherals.GPIO23,
 //!     peripherals.GPIO18, // MDC, MDIO
-//!     peripherals.EMAC_MAC,
-//!     peripherals.EMAC_DMA,
-//!     peripherals.EMAC_EXT,
 //! )
 //! .unwrap();
 //! // `eth` has type `Ethernet<'_, Blocking, GenericPhy>`
@@ -92,11 +89,10 @@ pub enum Error {
 
 /// Sealed trait implemented by all RMII clock configurations.
 pub trait RmiiClockConfig: Sealed {
-    /// Configures EMAC_EXT and any related hardware (e.g. APLL) for RMII,
-    /// including the clock input/output GPIO pad.
+    /// Configures the hardware for RMII, including the clock input/output GPIO pad.
     ///
     /// Consumes `self` so that the pin carried inside the struct is configured
-    /// and ownership is transferred to the EMAC peripheral.
+    /// and ownership is transferred to the peripheral.
     fn configure(self);
 }
 
@@ -237,13 +233,12 @@ fn eth_mac_isr() {
 
 /// EMAC Ethernet driver.
 pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
-    regs: EmacRegs,
+    _eth: ETH<'d>,
     _clock_guard: GenericPeripheralGuard<{ Peripheral::Emac as u8 }>,
     tx: TDesRing<'d>,
     rx: RDesRing<'d>,
     phy: P,
     mac_addr: [u8; 6],
-    _eth: ETH<'d>,
     _mode: PhantomData<DM>,
 }
 
@@ -277,7 +272,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
         configure_mdio(mdc, mdio);
 
-        // Configure ref-clock pin + EMAC_EXT clock source + PHY interface.
+        // Configure ref-clock pin + clock source + PHY interface.
         clock.configure();
 
         init_common(clock_guard, storage, mac_addr, phy, eth)
@@ -350,7 +345,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             None => {
                 // receive() may have recycled error frames back to DMA ownership
                 // without a poll-demand write. Poke the RX DMA so it resumes.
-                self.regs.demand_rx_poll();
+                EmacRegs.demand_rx_poll();
                 Err(Error::NoFrame)
             }
         }
@@ -359,15 +354,14 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Releases the current RX descriptor back to DMA.
     pub fn pop_rx(&mut self) {
         self.rx.pop();
-        self.regs.demand_rx_poll();
+        EmacRegs.demand_rx_poll();
     }
 
     /// Converts to async mode, enabling DMA interrupts and binding the ISR.
     pub fn into_async(self) -> Ethernet<'d, Async, P> {
-        self.regs.dma_enable_interrupts(true);
+        EmacRegs.dma_enable_interrupts(true);
         interrupt::bind_handler(Interrupt::ETH_MAC, eth_mac_isr);
         Ethernet {
-            regs: self.regs,
             tx: self.tx,
             rx: self.rx,
             phy: self.phy,
@@ -407,7 +401,7 @@ impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
             dma::TxError::RingFull => Error::TxFull,
             dma::TxError::FrameTooLarge => Error::FrameTooLarge,
         })?;
-        self.regs.demand_tx_poll();
+        EmacRegs.demand_tx_poll();
         Ok(())
     }
 
@@ -416,7 +410,7 @@ impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
     /// Async callers are encouraged to pass the context to allow the PHY driver to wake them when
     /// the link state needs to be re-polled.
     pub fn poll_link(&mut self, cx: Option<&mut Context<'_>>) -> LinkState {
-        let mdio = MdioDriver::new(&self.regs);
+        let mdio = MdioDriver::new(&EmacRegs);
         self.phy.poll_link(&mdio, cx)
     }
 
@@ -432,7 +426,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
         loop {
             match self.tx.transmit(frame) {
                 Ok(()) => {
-                    self.regs.demand_tx_poll();
+                    EmacRegs.demand_tx_poll();
                     return Ok(());
                 }
                 Err(dma::TxError::FrameTooLarge) => return Err(Error::FrameTooLarge),
@@ -468,12 +462,12 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
                 let len = data.len();
                 if len > buf.len() {
                     self.rx.pop();
-                    self.regs.demand_rx_poll();
+                    EmacRegs.demand_rx_poll();
                     return Err(Error::FrameTooLarge);
                 }
                 buf[..len].copy_from_slice(data);
                 self.rx.pop();
-                self.regs.demand_rx_poll();
+                EmacRegs.demand_rx_poll();
                 return Ok(len);
             }
         }
@@ -481,9 +475,8 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
 
     /// Converts back to blocking mode, disabling all DMA interrupts.
     pub fn into_blocking(self) -> Ethernet<'d, Blocking, P> {
-        self.regs.dma_disable_interrupts();
+        EmacRegs.dma_disable_interrupts();
         Ethernet {
-            regs: self.regs,
             tx: self.tx,
             rx: self.rx,
             phy: self.phy,
@@ -510,7 +503,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
     /// Releases the current RX descriptor back to the DMA engine.
     pub fn release_rx(&mut self) {
         self.rx.pop();
-        self.regs.demand_rx_poll();
+        EmacRegs.demand_rx_poll();
     }
 }
 
@@ -523,35 +516,32 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     mut phy: P,
     eth: ETH<'d>,
 ) -> Result<Ethernet<'d, Blocking, P>, Error> {
-    let regs = EmacRegs::new();
-
     // DMA soft-reset (also enables enhanced 32B descriptor format).
-    regs.dma_soft_reset();
+    EmacRegs.dma_soft_reset();
 
     // Init PHY (MDIO requires DMA/MAC clocks to be running after reset).
-    let mdio = MdioDriver::new(&regs);
+    let mdio = MdioDriver::new(&EmacRegs);
     phy.init(&mdio).map_err(|_| Error::PhyTimeout)?;
 
     // Configure MAC defaults.
-    regs.mac_init(Speed::_100M, mac::Duplex::Full);
-    regs.set_mac_address(&mac_addr);
+    EmacRegs.mac_init(Speed::_100M, mac::Duplex::Full);
+    EmacRegs.set_mac_address(&mac_addr);
 
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);
     let rx = RDesRing::new(&mut storage.rx_descs, &mut storage.rx_bufs);
 
     // Program descriptor list addresses into DMA.
-    regs.set_descriptor_lists(tx.base_ptr() as u32, rx.base_ptr() as u32);
+    EmacRegs.set_descriptor_lists(tx.base_ptr() as u32, rx.base_ptr() as u32);
 
     // In blocking mode all DMA interrupts stay disabled; async mode enables
     // them via into_async().
-    regs.dma_disable_interrupts();
+    EmacRegs.dma_disable_interrupts();
 
     // Start both DMA engines.
-    regs.dma_start();
+    EmacRegs.dma_start();
 
     Ok(Ethernet {
-        regs,
         tx,
         rx,
         phy,

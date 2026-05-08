@@ -11,11 +11,6 @@ use crate::peripherals::{EMAC_DMA, EMAC_MAC};
 /// Value 3 selects APB/42 ≈ 1.9 MHz MDC clock (APB = 80 MHz on ESP32).
 const MDC_CSR_CLOCK_RANGE: u8 = 3;
 
-/// PHY interface selection for RMII mode in `EMAC_EXT.ex_phyinf_conf`.
-pub(super) const PHY_INTF_RMII: u8 = 4;
-/// PHY interface selection for MII mode in `EMAC_EXT.ex_phyinf_conf`.
-pub(super) const PHY_INTF_MII: u8 = 0;
-
 /// Link speed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -47,16 +42,12 @@ pub struct LinkState {
 /// Zero-sized handle that provides register-level operations on the three EMAC
 /// blocks.
 ///
-/// All methods use `EMAC_MAC::regs()` / `EMAC_DMA::regs()` / `EMAC_EXT::regs()`
-/// static accessors; the singleton ownership is tracked by the `Ethernet` struct.
+/// All methods use `EMAC_MAC::regs()` / `EMAC_DMA::regs()` static accessors; the singleton
+/// ownership is tracked by the `Ethernet` struct.
 #[derive(Clone, Copy)]
 pub(super) struct EmacRegs;
 
 impl EmacRegs {
-    pub const fn new() -> Self {
-        Self
-    }
-
     // ── DMA soft-reset ────────────────────────────────────────────────────
 
     /// Issues a DMA soft-reset and spins until the hardware clears the bit.

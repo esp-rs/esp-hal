@@ -35,6 +35,11 @@ use crate::{
     soc::regi2c,
 };
 
+/// PHY interface selection for RMII mode in `EMAC_EXT.ex_phyinf_conf`.
+pub(super) const PHY_INTF_RMII: u8 = 4;
+/// PHY interface selection for MII mode in `EMAC_EXT.ex_phyinf_conf`.
+pub(super) const PHY_INTF_MII: u8 = 0;
+
 /// RMII reference clock provided externally by the PHY.
 pub struct ExternalRefClock<P>(P);
 
@@ -54,7 +59,7 @@ impl<P: EmacRmiiClkIn> RmiiClockConfig for ExternalRefClock<P> {
 
         EMAC_EXT::regs()
             .ex_phyinf_conf()
-            .modify(|_, w| unsafe { w.phy_intf_sel().bits(super::mac::PHY_INTF_RMII) });
+            .modify(|_, w| unsafe { w.phy_intf_sel().bits(PHY_INTF_RMII) });
 
         EMAC_EXT::regs().ex_oscclk_conf().modify(|_, w| {
             // clk_sel = 1: select external clock input
@@ -154,7 +159,7 @@ impl<P: EmacClkOut> RmiiClockConfig for ApllClock<P> {
 
         EMAC_EXT::regs()
             .ex_phyinf_conf()
-            .modify(|_, w| unsafe { w.phy_intf_sel().bits(super::mac::PHY_INTF_RMII) });
+            .modify(|_, w| unsafe { w.phy_intf_sel().bits(PHY_INTF_RMII) });
 
         EMAC_EXT::regs().ex_clkout_conf().modify(|_, w| unsafe {
             // div_num=0, h_div_num=0 → output divider = 1 (no division)
@@ -187,7 +192,7 @@ impl MiiClock {
     pub(super) fn configure(&self) {
         EMAC_EXT::regs()
             .ex_phyinf_conf()
-            .modify(|_, w| unsafe { w.phy_intf_sel().bits(super::mac::PHY_INTF_MII) });
+            .modify(|_, w| unsafe { w.phy_intf_sel().bits(PHY_INTF_MII) });
 
         EMAC_EXT::regs().ex_clk_ctrl().modify(|_, w| {
             w.mii_clk_tx_en().set_bit();

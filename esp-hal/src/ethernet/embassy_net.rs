@@ -36,7 +36,6 @@ const MTU: usize = 1514;
 /// pointing directly into the DMA RX buffer — no copy is performed.
 pub struct EthernetRxToken<'a, 'd> {
     rx: &'a mut RDesRing<'d>,
-    regs: &'a EmacRegs,
 }
 
 /// Transmit token.
@@ -47,7 +46,6 @@ pub struct EthernetRxToken<'a, 'd> {
 /// pointing directly into the DMA TX buffer — no copy is performed.
 pub struct EthernetTxToken<'a, 'd> {
     tx: &'a mut TDesRing<'d>,
-    regs: &'a EmacRegs,
 }
 
 impl<'a, 'd> RxToken for EthernetRxToken<'a, 'd> {
@@ -65,7 +63,7 @@ impl<'a, 'd> RxToken for EthernetRxToken<'a, 'd> {
         // so we can recycle the descriptor.
         self.rx.pop();
         // Poke the RX DMA in case it suspended waiting for a CPU-owned descriptor.
-        self.regs.demand_rx_poll();
+        EmacRegs.demand_rx_poll();
         r
     }
 }
@@ -82,7 +80,7 @@ impl<'a, 'd> TxToken for EthernetTxToken<'a, 'd> {
         let r = f(&mut buf[..capped]);
         // After f returns the &mut borrow on buf ends, we can commit.
         self.tx.commit(capped);
-        self.regs.demand_tx_poll();
+        EmacRegs.demand_tx_poll();
         r
     }
 }
@@ -110,19 +108,13 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         // Poke the RX DMA unconditionally: receive() may have recycled error
         // frames back to DMA ownership without a poll-demand write, which
         // would leave the GMAC RX channel suspended.
-        self.regs.demand_rx_poll();
+        EmacRegs.demand_rx_poll();
         let tx_ready = self.tx.available_buf().is_some();
 
         if rx_ready && tx_ready {
             Some((
-                EthernetRxToken {
-                    rx: &mut self.rx,
-                    regs: &self.regs,
-                },
-                EthernetTxToken {
-                    tx: &mut self.tx,
-                    regs: &self.regs,
-                },
+                EthernetRxToken { rx: &mut self.rx },
+                EthernetTxToken { tx: &mut self.tx },
             ))
         } else {
             None
@@ -132,10 +124,7 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
     fn transmit(&mut self, cx: &mut Context<'_>) -> Option<Self::TxToken<'_>> {
         TX_WAKER.register(cx.waker());
         if self.tx.available_buf().is_some() {
-            Some(EthernetTxToken {
-                tx: &mut self.tx,
-                regs: &self.regs,
-            })
+            Some(EthernetTxToken { tx: &mut self.tx })
         } else {
             None
         }
