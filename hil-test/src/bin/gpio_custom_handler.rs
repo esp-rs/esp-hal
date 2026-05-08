@@ -9,7 +9,7 @@
 //! let user-defined raw `GPIO()` handlers re-enable the async API
 //! (regression coverage for esp-rs/esp-hal#2659).
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
 //% FEATURES: unstable embassy
 
 #![no_std]
