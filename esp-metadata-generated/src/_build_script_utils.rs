@@ -4470,6 +4470,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
+                    "usb_otg_fifo_depth_words=\"200\"",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32p4",
@@ -4639,6 +4640,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
+                    "cargo:rustc-cfg=usb_otg_fifo_depth_words=\"200\"",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -5105,6 +5107,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_version=\"1\"",
+                    "usb_otg_fifo_depth_words=\"256\"",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -5331,6 +5334,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"1\"",
+                    "cargo:rustc-cfg=usb_otg_fifo_depth_words=\"256\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -5785,6 +5789,7 @@ impl Chip {
                     "uart_version=\"1\"",
                     "uart_has_sclk_divider",
                     "uart_has_sclk_enable",
+                    "usb_otg_fifo_depth_words=\"256\"",
                     "wifi_mac_version=\"1\"",
                     "wifi_csi_supported",
                 ],
@@ -6045,6 +6050,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_version=\"1\"",
                     "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=uart_has_sclk_enable",
+                    "cargo:rustc-cfg=usb_otg_fifo_depth_words=\"256\"",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                     "cargo:rustc-cfg=wifi_csi_supported",
                 ],
@@ -6809,4 +6815,5 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
+    println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
 }

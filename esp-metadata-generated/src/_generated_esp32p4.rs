@@ -373,6 +373,12 @@ macro_rules! property {
     ("uhci.combined_uart_selector_field") => {
         false
     };
+    ("usb_otg.fifo_depth_words") => {
+        200
+    };
+    ("usb_otg.fifo_depth_words", str) => {
+        stringify!(200)
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

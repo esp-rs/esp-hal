@@ -881,6 +881,8 @@ max_ws_width = 128
 [device.sd_host]
 [device.twai]
 [device.usb_otg]
+fifo_depth_words = 256
+
 [device.usb_serial_jtag]
 
 ## Miscellaneous

@@ -1734,14 +1734,6 @@ impl<'lt> AnyPin<'lt> {
                     });
             }
 
-            macro_rules! disable_usb_pads {
-                ($gpio:ident) => {
-                    if self.number() == crate::peripherals::$gpio::NUMBER {
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
-                    }
-                };
-            }
-
             #[cfg(soc_has_usb_fs)]
             macro_rules! disable_usb_fs_pads {
                 ($gpio:ident) => {
@@ -1755,8 +1747,16 @@ impl<'lt> AnyPin<'lt> {
             }
 
             for_each_analog_function! {
-                (USJ_DM, $gpio:ident) => { disable_usb_pads!($gpio) };
-                (USJ_DP, $gpio:ident) => { disable_usb_pads!($gpio) };
+                (USJ_DM, $gpio:ident) => {
+                    if self.number() == crate::peripherals::$gpio::NUMBER {
+                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                    }
+                };
+                (USJ_DP, $gpio:ident) => {
+                    if self.number() == crate::peripherals::$gpio::NUMBER {
+                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                    }
+                };
                 (USB_FS_DM, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
                 (USB_FS_DP, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
             }

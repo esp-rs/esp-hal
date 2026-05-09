@@ -117,46 +117,19 @@ impl Bus<'_> {
 
         let r = Driver::REGISTERS;
 
-        // Wait for AHB ready.
-        while !r.grstctl().read().ahbidl() {}
+        // Soft-reset the DWC core. Handles both the legacy (csrst self-clear)
+        // and the >= v4.20a (csrstdone) reset completion paths.
+        self.inner.core_soft_reset();
 
-        // Configure as device.
-        r.gusbcfg().modify(|w| {
-            // Force device mode
-            w.set_fdmod(true);
-            w.set_srpcap(false);
-        });
+        // Write GUSBCFG: forces device mode (FDMOD), selects the embedded
+        // full-speed serial PHY (PHYSEL=1, UTMI/ULPI disabled), and waits
+        // for the core to enter device mode (GINTSTS.CMOD = 0). PHYSEL must
+        // be 1 for the FS PHY; without it the core stays attached to the
+        // (non-existent) UTMI/ULPI PHY and never drives D+/D-.
+        self.inner.configure_as_device();
+        self.inner.config_v5();
 
-        // Perform core soft-reset. DWC OTG cores >= v4.20a use a
-        // different sequence: csrst no longer self-clears; instead
-        // csftrstdone (bit 29) is set and csrst must be cleared manually.
-        // Read core ID before asserting reset (same as esp-idf).
-        const DWC_CORE_ID_4_20A: u32 = 0x4F54420A;
-        let core_id = r.snpsid().read();
-        trace!("core_id: {:x}", core_id);
-
-        while !r.grstctl().read().ahbidl() {}
-        r.grstctl().modify(|w| w.set_csrst(true));
-
-        if core_id >= DWC_CORE_ID_4_20A {
-            while !r.grstctl().read().csrstdone() {}
-            r.grstctl().modify(|w| {
-                w.set_csrst(false);
-                w.set_csrstdone(true);
-            });
-        } else {
-            while r.grstctl().read().csrst() {}
-        }
-
-        // Wait for the core to enter device mode. The DWC OTG databook requires
-        // up to 25ms after FDMOD is set before device-mode registers are valid.
-        // GINTSTS.CMOD = 0 means device mode is active.
-        while r.gintsts().read().cmod() {}
-        trace!("reset done");
-
-        self.inner.config_v1();
-
-        // Enable PHY clock
+        // Clear PCGCCTL.StopPclk and other gates so the PHY clock is running.
         r.pcgcctl().write(|w| w.0 = 0);
 
         self._usb._usb.bind_peri_interrupt(interrupt_handler);

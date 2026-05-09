@@ -488,6 +488,8 @@ memory_size_bytes = 384
 # TODO: complete with esp-idf ecc_ll.h and later version of TRM 0.5
 
 [device.usb_otg]
+fifo_depth_words = 200
+
 [device.usb_serial_jtag]
 
 [device.ecc]

@@ -763,7 +763,9 @@ driver_configs![
     UsbOtgProperties {
         driver: usb_otg,
         name: "USB OTG FS",
-        properties: {}
+        properties: {
+            fifo_depth_words: u32,
+        }
     },
     UsbSerialJtagProperties {
         driver: usb_serial_jtag,

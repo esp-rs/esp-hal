@@ -406,6 +406,12 @@ macro_rules! property {
     ("uhci.combined_uart_selector_field") => {
         false
     };
+    ("usb_otg.fifo_depth_words") => {
+        256
+    };
+    ("usb_otg.fifo_depth_words", str) => {
+        stringify!(256)
+    };
     ("wifi.has_wifi6") => {
         false
     };

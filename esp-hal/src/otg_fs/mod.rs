@@ -30,11 +30,13 @@ pub mod embassy_usb_host;
 
 /// USB D+ (data plus) pin.
 pub trait UsbFsDp: crate::private::Sealed {
+    #[doc(hidden)]
     fn configure(&self);
 }
 
 /// USB D- (data minus) pin.
 pub trait UsbFsDm: crate::private::Sealed {
+    #[doc(hidden)]
     fn configure(&self);
 }
 
@@ -67,7 +69,7 @@ pub struct Usb<'d> {
 
 impl<'d> Usb<'d> {
     const REGISTERS: *const () = USB_FS::PTR.cast();
-    const FIFO_DEPTH_WORDS: usize = 256;
+    const FIFO_DEPTH_WORDS: usize = property!("usb_otg.fifo_depth_words");
 
     // S2/S3 are identical: Six additional endpoints (endpoint numbers 1 to 6), configurable as IN
     // or OUT
