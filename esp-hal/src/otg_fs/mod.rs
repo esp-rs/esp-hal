@@ -75,12 +75,19 @@ impl<'d> Usb<'d> {
     }
 
     fn _enable() {
+        #[cfg(esp32p4)]
+        Self::_p4_init();
+
         peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
             w.usb_pad_enable().set_bit();
             w.phy_sel().clear_bit();
-            w.clk_en().set_bit();
-            w.ahb_clk_force_on().set_bit();
-            w.phy_clk_force_on().set_bit()
+            #[cfg(not(esp32p4))]
+            {
+                w.clk_en().set_bit();
+                w.ahb_clk_force_on().set_bit();
+                w.phy_clk_force_on().set_bit();
+            }
+            w
         });
 
         #[cfg(esp32s3)]
@@ -98,12 +105,18 @@ impl<'d> Usb<'d> {
     }
 
     fn _enable_host() {
+        #[cfg(esp32p4)]
+        Self::_p4_init();
+
         peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
             w.usb_pad_enable().set_bit();
             w.phy_sel().clear_bit();
-            w.clk_en().set_bit();
-            w.ahb_clk_force_on().set_bit();
-            w.phy_clk_force_on().set_bit();
+            #[cfg(not(esp32p4))]
+            {
+                w.clk_en().set_bit();
+                w.ahb_clk_force_on().set_bit();
+                w.phy_clk_force_on().set_bit();
+            }
             w.pad_pull_override().set_bit();
             w.dp_pulldown().set_bit();
             w.dm_pulldown().set_bit();
@@ -122,6 +135,22 @@ impl<'d> Usb<'d> {
         InputSignal::USB_FS_IDDIG.connect_to(&Level::Low); // Indicate A-Device
         InputSignal::USB_FS_VBUSVALID.connect_to(&Level::High);
         InputSignal::USB_FS_AVALID.connect_to(&Level::High); // Assume valid A device
+    }
+
+    #[cfg(esp32p4)]
+    fn _p4_init() {
+        // Assert then deassert reset for USB_DWC_FS and USB_WRAP.
+        peripherals::LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
+            .modify(|_, w| w.lp_aonclkrst_rst_en_usb_otg11().set_bit());
+        peripherals::LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
+            .modify(|_, w| w.lp_aonclkrst_rst_en_usb_otg11().clear_bit());
+
+        // Enable the 48MHz FSLS PHY clock.
+        peripherals::LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_usb_clkrst_ctrl0()
+            .modify(|_, w| w.lp_aonclkrst_usb_otg11_48m_clk_en().set_bit());
     }
 
     fn _disable() {
