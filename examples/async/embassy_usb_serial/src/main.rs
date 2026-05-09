@@ -3,8 +3,12 @@
 //! This example should be built in release mode.
 //!
 //! The following wiring is assumed:
-//! - DP => GPIO20
-//! - DM => GPIO19
+//! - ESP32-S2/S3:
+//!   - DP => GPIO20
+//!   - DM => GPIO19
+//! - ESP32-P4:
+//!   - DP => GPIO27
+//!   - DM => GPIO26
 
 #![no_std]
 #![no_main]
