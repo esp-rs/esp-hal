@@ -200,8 +200,8 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Twai1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can1" } },
     { name = "Twai2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai2_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can2" } },
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
-    { name = "UsbOtg11",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg11_sys_clk_en" } },
-    { name = "UsbOtg20",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg20_sys_clk_en" } },
+    { name = "UsbFs",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg11_sys_clk_en" } },
+    { name = "UsbHs",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg20_sys_clk_en" } },
     { name = "UsbDevice", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "usb_device_apb_clk_en" }, keep_enabled = true },
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "emac_sys_clk_en" } },
@@ -303,6 +303,9 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 5 },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "ECC", interrupts = { peri = "ECC" } },
+    { name = "USB_FS", interrupts = { peri = "USB_FS" } },
+    { name = "USB_HS", interrupts = { peri = "USB_HS" } },
+    { name = "USB_WRAP", hidden = true },
 
     { name = "SW_INTERRUPT", virtual = true },
     { name = "CPU_CTRL", virtual = true },
@@ -484,6 +487,7 @@ size_increment = 32
 memory_size_bytes = 384
 # TODO: complete with esp-idf ecc_ll.h and later version of TRM 0.5
 
+[device.usb_otg]
 [device.usb_serial_jtag]
 
 [device.ecc]
@@ -616,10 +620,10 @@ input_signals = [
     { name = "MII_MDI", id = 107 },
     { name = "EMAC_PHY_COL", id = 108 },
     { name = "EMAC_PHY_CRS", id = 109 },
-    { name = "USB_OTG11_IDDIG", id = 110 },
-    { name = "USB_OTG11_AVALID", id = 111 },
-    { name = "USB_SRP_BVALID", id = 112 },
-    { name = "USB_OTG11_VBUSVALID", id = 113 },
+    { name = "USB_FS_IDDIG", id = 110 },
+    { name = "USB_FS_AVALID", id = 111 },
+    { name = "USB_FS_SRP_BVALID", id = 112 },
+    { name = "USB_FS_VBUSVALID", id = 113 },
     { name = "USB_SRP_SESSEND", id = 114 },
     { name = "ULPI_CLK", id = 117 },
     { name = "USB_HSPHY_REFCLK", id = 118 },
@@ -949,17 +953,12 @@ pins = [
     { pin = 21,                                                        lp = { 0 = "LP_GPIO21" }, analog = { 1 = "ADC1_CH5" } },
     { pin = 22, functions = {                    4 = "DBG_PSRAM_CK" }, lp = { 0 = "LP_GPIO22" }, analog = { 1 = "ADC1_CH6" } },
     { pin = 23, functions = { 3 = "REF_50M_CLK", 4 = "DBG_PSRAM_CS" }, lp = { 0 = "LP_GPIO23" }, analog = { 1 = "ADC1_CH7" } },
-    # Pins 24/25 are the default USB-Serial/JTAG pair (PHY0). Use the canonical
-    # `USB_DM`/`USB_DP` names so `disable_usb_pads!` (see esp-hal gpio/mod.rs)
-    # and the `UsbJtag` pin-limitation auto-derive pick them up like on every
-    # other chip. `usb_jtag` limitation is set automatically via the names.
-    { pin = 24,                                 analog = { 0 = "USB_DM" } },
-    { pin = 25,                                 analog = { 0 = "USB_DP" } },
-    # Pins 26/27 are the USB OTG FS (PHY1) pair. Kept under the PHY1 names
-    # until the P4 OTG FS driver lands -- at that point consider whether to
-    # rename to USB_DM/USB_DP so the same helpers fire here too.
-    { pin = 26,                                 analog = { 0 = "USB_PHY1_DM" }, limitations = ["usb_jtag"] },
-    { pin = 27,                                 analog = { 0 = "USB_PHY1_DP" }, limitations = ["usb_jtag"] },
+    # Default PHY assignment: 24/25 are USB-Serial/JTAG, 26/27 are USB OTG FS. USB HS uses dedicated (non-GPIO) pins.
+    # FIXME: provide a mechanism to swap them
+    { pin = 24,                                 analog = { 0 = "USJ_DM" } },
+    { pin = 25,                                 analog = { 0 = "USJ_DP" } },
+    { pin = 26,                                 analog = { 0 = "USB_FS_DM" } },
+    { pin = 27,                                 analog = { 0 = "USB_FS_DP" } },
     { pin = 28, functions = {                   2 = "SPI2_CS",   3 = "EMAC_PHY_RXDV", 4 = "DBG_PSRAM_D"     } },
     { pin = 29, functions = {                   2 = "SPI2_D",    3 = "EMAC_PHY_RXD0", 4 = "DBG_PSRAM_Q"     } },
     { pin = 30, functions = {                   2 = "SPI2_CK",   3 = "EMAC_PHY_RXD1", 4 = "DBG_PSRAM_WP"    } },

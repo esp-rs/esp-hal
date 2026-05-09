@@ -137,11 +137,11 @@ impl Bus<'_> {
         // Enable PHY clock
         r.pcgcctl().write(|w| w.0 = 0);
 
-        self._usb._usb0.bind_peri_interrupt(interrupt_handler);
+        self._usb._usb.bind_peri_interrupt(interrupt_handler);
     }
 
     fn disable(&mut self) {
-        self._usb._usb0.disable_peri_interrupt_on_all_cores();
+        self._usb._usb.disable_peri_interrupt_on_all_cores();
 
         Usb::_disable();
     }

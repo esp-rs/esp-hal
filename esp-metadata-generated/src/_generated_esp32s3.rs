@@ -3158,10 +3158,10 @@ macro_rules! implement_peripheral_clocks {
             UartMem,
             /// UHCI0 peripheral clock signal
             Uhci0,
-            /// USB peripheral clock signal
-            Usb,
             /// USB_DEVICE peripheral clock signal
             UsbDevice,
+            /// USB_FS peripheral clock signal
+            UsbFs,
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
@@ -3204,8 +3204,8 @@ macro_rules! implement_peripheral_clocks {
                 Self::Uart2,
                 Self::UartMem,
                 Self::Uhci0,
-                Self::Usb,
                 Self::UsbDevice,
+                Self::UsbFs,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -3365,15 +3365,15 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en0()
                         .modify(|_, w| w.uhci0_clk_en().bit(enable));
                 }
-                Peripheral::Usb => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.usb_clk_en().bit(enable));
-                }
                 Peripheral::UsbDevice => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en1()
                         .modify(|_, w| w.usb_device_clk_en().bit(enable));
+                }
+                Peripheral::UsbFs => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en0()
+                        .modify(|_, w| w.usb_clk_en().bit(enable));
                 }
             }
         }
@@ -3534,15 +3534,15 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en0()
                         .modify(|_, w| w.uhci0_rst().bit(reset));
                 }
-                Peripheral::Usb => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.usb_rst().bit(reset));
-                }
                 Peripheral::UsbDevice => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en1()
                         .modify(|_, w| w.usb_device_rst().bit(reset));
+                }
+                Peripheral::UsbFs => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en0()
+                        .modify(|_, w| w.usb_rst().bit(reset));
                 }
             }
         }
@@ -3992,8 +3992,8 @@ macro_rules! for_each_peripheral {
         UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
         { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
@@ -4097,9 +4097,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UART2));
         _for_each_inner_peripheral!((UHCI0(unstable)));
-        _for_each_inner_peripheral!((USB0(unstable)));
+        _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
-        _for_each_inner_peripheral!((USB_WRAP(unstable)));
         _for_each_inner_peripheral!((WCL(unstable)));
         _for_each_inner_peripheral!((XTS_AES(unstable)));
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
@@ -4363,8 +4362,8 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt })), (@ peri_type #[doc = "UART2 peripheral singleton"]
         UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UHCI0 peripheral singleton"]
-        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
@@ -4410,11 +4409,11 @@ macro_rules! for_each_peripheral {
         (SDHOST(unstable)), (SENS(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),
-        (UART0), (UART1), (UART2), (UHCI0(unstable)), (USB0(unstable)),
-        (USB_DEVICE(unstable)), (USB_WRAP(unstable)), (WCL(unstable)),
-        (XTS_AES(unstable)), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (DMA_CH2(unstable)), (DMA_CH3(unstable)), (DMA_CH4(unstable)), (ADC1(unstable)),
-        (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
+        (UART0), (UART1), (UART2), (UHCI0(unstable)), (USB_FS(unstable)),
+        (USB_DEVICE(unstable)), (WCL(unstable)), (XTS_AES(unstable)),
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
+        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)), (WIFI)));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (SPI3, Spi3, 1),
@@ -4614,9 +4613,9 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC2_CH5, GPIO16));
         _for_each_inner_analog_function!((ADC2_CH6, GPIO17));
         _for_each_inner_analog_function!((ADC2_CH7, GPIO18));
-        _for_each_inner_analog_function!((USB_DM, GPIO19));
+        _for_each_inner_analog_function!((USB_FS_DM, GPIO19));
         _for_each_inner_analog_function!((ADC2_CH8, GPIO19));
-        _for_each_inner_analog_function!((USB_DP, GPIO20));
+        _for_each_inner_analog_function!((USB_FS_DP, GPIO20));
         _for_each_inner_analog_function!((ADC2_CH9, GPIO20));
         _for_each_inner_analog_function!(((TOUCH1, TOUCHn, 1), GPIO1));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1));
@@ -4660,8 +4659,8 @@ macro_rules! for_each_analog_function {
         (ADC1_CH9, GPIO10), (TOUCH11, GPIO11), (ADC2_CH0, GPIO11), (TOUCH12, GPIO12),
         (ADC2_CH1, GPIO12), (TOUCH13, GPIO13), (ADC2_CH2, GPIO13), (TOUCH14, GPIO14),
         (ADC2_CH3, GPIO14), (XTAL_32K_P, GPIO15), (ADC2_CH4, GPIO15), (XTAL_32K_N,
-        GPIO16), (ADC2_CH5, GPIO16), (ADC2_CH6, GPIO17), (ADC2_CH7, GPIO18), (USB_DM,
-        GPIO19), (ADC2_CH8, GPIO19), (USB_DP, GPIO20), (ADC2_CH9, GPIO20)));
+        GPIO16), (ADC2_CH5, GPIO16), (ADC2_CH6, GPIO17), (ADC2_CH7, GPIO18), (USB_FS_DM,
+        GPIO19), (ADC2_CH8, GPIO19), (USB_FS_DP, GPIO20), (ADC2_CH9, GPIO20)));
         _for_each_inner_analog_function!((all_expanded((TOUCH1, TOUCHn, 1), GPIO1),
         ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1), ((TOUCH2, TOUCHn, 2), GPIO2), ((ADC1_CH1,
         ADCn_CHm, 1, 1), GPIO2), ((TOUCH3, TOUCHn, 3), GPIO3), ((ADC1_CH2, ADCn_CHm, 1,
@@ -4852,10 +4851,10 @@ macro_rules! define_io_mux_signals {
             USB_EXTPHY_VP           = 55,
             USB_EXTPHY_VM           = 56,
             USB_EXTPHY_RCV          = 57,
-            USB_OTG_IDDIG           = 58,
-            USB_OTG_AVALID          = 59,
-            USB_SRP_BVALID          = 60,
-            USB_OTG_VBUSVALID       = 61,
+            USB_FS_IDDIG            = 58,
+            USB_FS_AVALID           = 59,
+            USB_FS_SRP_BVALID       = 60,
+            USB_FS_VBUSVALID        = 61,
             USB_SRP_SESSEND         = 62,
             SPI3_CLK                = 66,
             SPI3_Q                  = 67,

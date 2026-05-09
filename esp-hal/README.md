@@ -113,7 +113,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ❌       | ⚒️      |
 | ULP (FSM)                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ❌       | ⚒️      | ⚒️      |
-| USB OTG FS                |       |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
+| USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      |
 

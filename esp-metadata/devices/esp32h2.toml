@@ -344,8 +344,8 @@ pins = [
     { pin = 23, functions = { 0 = "U0RXD", 2 = "FSPICS1" } },
     { pin = 24, functions = { 0 = "U0TXD", 2 = "FSPICS2" } },
     { pin = 25, functions = {              2 = "FSPICS3" }, limitations = ["strapping"] },
-    { pin = 26, functions = {              2 = "FSPICS4" }, analog = { 0 = "USB_DM" } },
-    { pin = 27, functions = {              2 = "FSPICS5" }, analog = { 0 = "USB_DP" } },
+    { pin = 26, functions = {              2 = "FSPICS4" }, analog = { 0 = "USJ_DM" } },
+    { pin = 27, functions = {              2 = "FSPICS5" }, analog = { 0 = "USJ_DP" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },

@@ -4161,8 +4161,8 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ZCD1, GPIO11));
         _for_each_inner_analog_function!((XTAL_32K_P, GPIO13));
         _for_each_inner_analog_function!((XTAL_32K_N, GPIO14));
-        _for_each_inner_analog_function!((USB_DM, GPIO26));
-        _for_each_inner_analog_function!((USB_DP, GPIO27));
+        _for_each_inner_analog_function!((USJ_DM, GPIO26));
+        _for_each_inner_analog_function!((USJ_DP, GPIO27));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1));
         _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2));
         _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3));
@@ -4172,7 +4172,7 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ZCD1, ZCDn, 1), GPIO11));
         _for_each_inner_analog_function!((all(ADC1_CH0, GPIO1), (ADC1_CH1, GPIO2),
         (ADC1_CH2, GPIO3), (ADC1_CH3, GPIO4), (ADC1_CH4, GPIO5), (ZCD0, GPIO10), (ZCD1,
-        GPIO11), (XTAL_32K_P, GPIO13), (XTAL_32K_N, GPIO14), (USB_DM, GPIO26), (USB_DP,
+        GPIO11), (XTAL_32K_P, GPIO13), (XTAL_32K_N, GPIO14), (USJ_DM, GPIO26), (USJ_DP,
         GPIO27))); _for_each_inner_analog_function!((all_expanded((ADC1_CH0, ADCn_CHm, 1,
         0), GPIO1), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2),
         GPIO3), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5),

@@ -351,8 +351,8 @@ pins = [
     { pin =  10, functions = { 0 = "SDIO_CMD",   2 = "FSPICS0" } },
     { pin =  11, functions = { 0 = "U0TXD" } },
     { pin =  12, functions = { 0 = "U0RXD" } },
-    { pin =  13, functions = { 0 = "SDIO_DATA3" },                                           analog = { 0 = "USB_DM" } },
-    { pin =  14, functions = { 0 = "SDIO_DATA2" },                                           analog = { 0 = "USB_DP" } },
+    { pin =  13, functions = { 0 = "SDIO_DATA3" },                                           analog = { 0 = "USJ_DM" } },
+    { pin =  14, functions = { 0 = "SDIO_DATA2" },                                           analog = { 0 = "USJ_DP" } },
     { pin =  15,                                                limitations = ["spi_psram"] }, # CS1
     { pin =  16,                                                limitations = ["spi_flash"] }, # CS0
     { pin =  17,                                                limitations = ["spi_flash", "spi_psram"] }, # SPIQ

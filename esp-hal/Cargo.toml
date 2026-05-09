@@ -21,13 +21,15 @@ check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
-    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
+    { features = ["unstable", "rt", "__usb_otg"],     if = 'chip_has("usb_otg_driver_supported") && !chip_has("soc_has_usb_hs")' },
+    { features = ["unstable", "rt", "__embassy_usb"], if = 'chip_has("usb_otg_driver_supported") && chip_has("soc_has_usb_hs")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
-        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+        { if = 'chip_has("usb_otg_driver_supported") && !chip_has("soc_has_usb_hs")', features = ["__usb_otg"] }, # For now, P4 is embassy-usb only
+        { if = 'chip_has("usb_otg_driver_supported")', features = ["__embassy_usb"] },
         { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
     ] },
 ]
@@ -108,9 +110,9 @@ esp32c5 = { version = "0.2",  features = ["critical-section", "rt"], optional = 
 esp32c6 = { version = "0.23", features = ["critical-section", "rt"], optional = true }
 esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = true }
 esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true }
-esp32p4 = { version = "0.2",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4a8000b" }
+esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -232,6 +234,7 @@ esp32c6 = [
 ## ESP32-P4 (chip revision >= v3.x)
 esp32p4 = [
     "dep:esp32p4",
+    "__usb_otg",
     "esp-riscv-rt/rtc-ram",
     "esp-riscv-rt/clic-48",
     "procmacros/rtc-fast",

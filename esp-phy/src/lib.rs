@@ -210,7 +210,7 @@ impl PhyState {
 
         #[cfg(all(
             phy_enable_usb,
-            any(soc_has_usb0, soc_has_usb_device),
+            any(soc_has_usb_fs, soc_has_usb_device),
             not(any(esp32s2, esp32h2))
         ))]
         unsafe {

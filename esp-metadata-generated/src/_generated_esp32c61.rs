@@ -3432,12 +3432,12 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((XTAL_32K_N, GPIO1));
         _for_each_inner_analog_function!((ZCD0, GPIO8));
         _for_each_inner_analog_function!((ZCD1, GPIO9));
-        _for_each_inner_analog_function!((USB_DM, GPIO12));
-        _for_each_inner_analog_function!((USB_DP, GPIO13));
+        _for_each_inner_analog_function!((USJ_DM, GPIO12));
+        _for_each_inner_analog_function!((USJ_DP, GPIO13));
         _for_each_inner_analog_function!(((ZCD0, ZCDn, 0), GPIO8));
         _for_each_inner_analog_function!(((ZCD1, ZCDn, 1), GPIO9));
         _for_each_inner_analog_function!((all(XTAL_32K_P, GPIO0), (XTAL_32K_N, GPIO1),
-        (ZCD0, GPIO8), (ZCD1, GPIO9), (USB_DM, GPIO12), (USB_DP, GPIO13)));
+        (ZCD0, GPIO8), (ZCD1, GPIO9), (USJ_DM, GPIO12), (USJ_DP, GPIO13)));
         _for_each_inner_analog_function!((all_expanded((ZCD0, ZCDn, 0), GPIO8), ((ZCD1,
         ZCDn, 1), GPIO9)));
     };

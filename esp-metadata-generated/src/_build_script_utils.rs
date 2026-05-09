@@ -4355,6 +4355,9 @@ impl Chip {
                     "soc_has_sha",
                     "soc_has_rsa",
                     "soc_has_ecc",
+                    "soc_has_usb_fs",
+                    "soc_has_usb_hs",
+                    "soc_has_usb_wrap",
                     "soc_has_sw_interrupt",
                     "soc_has_cpu_ctrl",
                     "spi_octal",
@@ -4374,6 +4377,7 @@ impl Chip {
                     "systimer_driver_supported",
                     "timergroup_driver_supported",
                     "uart_driver_supported",
+                    "usb_otg_driver_supported",
                     "usb_serial_jtag_driver_supported",
                     "i2c_master_i2c0",
                     "i2c_master_i2c1",
@@ -4520,6 +4524,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sha",
                     "cargo:rustc-cfg=soc_has_rsa",
                     "cargo:rustc-cfg=soc_has_ecc",
+                    "cargo:rustc-cfg=soc_has_usb_fs",
+                    "cargo:rustc-cfg=soc_has_usb_hs",
+                    "cargo:rustc-cfg=soc_has_usb_wrap",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_cpu_ctrl",
                     "cargo:rustc-cfg=spi_octal",
@@ -4539,6 +4546,7 @@ impl Chip {
                     "cargo:rustc-cfg=systimer_driver_supported",
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=usb_otg_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=i2c_master_i2c1",
@@ -4755,11 +4763,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 26,
-                        limitations: &["usb_jtag"],
+                        limitations: &[],
                     },
                     PinInfo {
                         pin: 27,
-                        limitations: &["usb_jtag"],
+                        limitations: &[],
                     },
                     PinInfo {
                         pin: 28,
@@ -4920,7 +4928,7 @@ impl Chip {
                     "soc_has_uart0",
                     "soc_has_uart1",
                     "soc_has_uhci0",
-                    "soc_has_usb0",
+                    "soc_has_usb_fs",
                     "soc_has_usb_wrap",
                     "soc_has_xts_aes",
                     "soc_has_wifi",
@@ -5146,7 +5154,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_uart0",
                     "cargo:rustc-cfg=soc_has_uart1",
                     "cargo:rustc-cfg=soc_has_uhci0",
-                    "cargo:rustc-cfg=soc_has_usb0",
+                    "cargo:rustc-cfg=soc_has_usb_fs",
                     "cargo:rustc-cfg=soc_has_usb_wrap",
                     "cargo:rustc-cfg=soc_has_xts_aes",
                     "cargo:rustc-cfg=soc_has_wifi",
@@ -5421,11 +5429,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 19,
-                        limitations: &["usb_jtag"],
+                        limitations: &[],
                     },
                     PinInfo {
                         pin: 20,
-                        limitations: &["usb_jtag"],
+                        limitations: &[],
                     },
                     PinInfo {
                         pin: 21,
@@ -5573,7 +5581,7 @@ impl Chip {
                     "soc_has_uart1",
                     "soc_has_uart2",
                     "soc_has_uhci0",
-                    "soc_has_usb0",
+                    "soc_has_usb_fs",
                     "soc_has_usb_device",
                     "soc_has_usb_wrap",
                     "soc_has_wcl",
@@ -5833,7 +5841,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_uart1",
                     "cargo:rustc-cfg=soc_has_uart2",
                     "cargo:rustc-cfg=soc_has_uhci0",
-                    "cargo:rustc-cfg=soc_has_usb0",
+                    "cargo:rustc-cfg=soc_has_usb_fs",
                     "cargo:rustc-cfg=soc_has_usb_device",
                     "cargo:rustc-cfg=soc_has_usb_wrap",
                     "cargo:rustc-cfg=soc_has_wcl",
@@ -6691,7 +6699,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_uart4)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_usb_fs)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_usb_hs)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_usb_wrap)");
     println!("cargo:rustc-check-cfg=cfg(spi_octal)");
+    println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
@@ -6706,14 +6718,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_syscon)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_usb0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_usb_wrap)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
-    println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
     println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
