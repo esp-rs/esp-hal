@@ -81,12 +81,11 @@ impl<'d> Usb<'d> {
         peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
             w.usb_pad_enable().set_bit();
             w.phy_sel().clear_bit();
-            #[cfg(not(esp32p4))]
-            {
-                w.clk_en().set_bit();
-                w.ahb_clk_force_on().set_bit();
-                w.phy_clk_force_on().set_bit();
-            }
+            w.clk_en().set_bit();
+            w.ahb_clk_force_on().set_bit();
+            w.phy_clk_force_on().set_bit();
+            w.pad_pull_override().clear_bit();
+
             w
         });
 
@@ -111,12 +110,9 @@ impl<'d> Usb<'d> {
         peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
             w.usb_pad_enable().set_bit();
             w.phy_sel().clear_bit();
-            #[cfg(not(esp32p4))]
-            {
-                w.clk_en().set_bit();
-                w.ahb_clk_force_on().set_bit();
-                w.phy_clk_force_on().set_bit();
-            }
+            w.clk_en().set_bit();
+            w.ahb_clk_force_on().set_bit();
+            w.phy_clk_force_on().set_bit();
             w.pad_pull_override().set_bit();
             w.dp_pulldown().set_bit();
             w.dm_pulldown().set_bit();
@@ -139,18 +135,26 @@ impl<'d> Usb<'d> {
 
     #[cfg(esp32p4)]
     fn _p4_init() {
-        // Assert then deassert reset for USB_DWC_FS and USB_WRAP.
-        peripherals::LP_AON_CLKRST::regs()
-            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-            .modify(|_, w| w.lp_aonclkrst_rst_en_usb_otg11().set_bit());
-        peripherals::LP_AON_CLKRST::regs()
-            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-            .modify(|_, w| w.lp_aonclkrst_rst_en_usb_otg11().clear_bit());
-
         // Enable the 48MHz FSLS PHY clock.
+
+        use crate::RegisterToggle;
         peripherals::LP_AON_CLKRST::regs()
             .lp_aonclkrst_hp_usb_clkrst_ctrl0()
             .modify(|_, w| w.lp_aonclkrst_usb_otg11_48m_clk_en().set_bit());
+
+        // Assert then deassert reset for USB_DWC_FS and USB_WRAP.
+        peripherals::LP_AON_CLKRST::regs()
+            .lp_aonclkrst_hp_usb_clkrst_ctrl1()
+            .toggle(|w, en| w.lp_aonclkrst_rst_en_usb_otg11().bit(en));
+
+        // GPIO26 = DM, GPIO27 = DP: set to maximum drive strength (40mA) for
+        // USB FSLS signal integrity. The pads are shared with the GPIO peripheral.
+        peripherals::IO_MUX::regs()
+            .gpio(26)
+            .modify(|_, w| unsafe { w.fun_drv().bits(3) });
+        peripherals::IO_MUX::regs()
+            .gpio(27)
+            .modify(|_, w| unsafe { w.fun_drv().bits(3) });
     }
 
     fn _disable() {

@@ -127,10 +127,32 @@ impl Bus<'_> {
             w.set_srpcap(false);
         });
 
-        // Perform core soft-reset
+        // Perform core soft-reset. DWC OTG cores >= v4.20a use a
+        // different sequence: csrst no longer self-clears; instead
+        // csftrstdone (bit 29) is set and csrst must be cleared manually.
+        // Read core ID before asserting reset (same as esp-idf).
+        const DWC_CORE_ID_4_20A: u32 = 0x4F54420A;
+        let core_id = r.snpsid().read();
+        trace!("core_id: {:x}", core_id);
+
         while !r.grstctl().read().ahbidl() {}
         r.grstctl().modify(|w| w.set_csrst(true));
-        while r.grstctl().read().csrst() {}
+
+        if core_id >= DWC_CORE_ID_4_20A {
+            while !r.grstctl().read().csrstdone() {}
+            r.grstctl().modify(|w| {
+                w.set_csrst(false);
+                w.set_csrstdone(true);
+            });
+        } else {
+            while r.grstctl().read().csrst() {}
+        }
+
+        // Wait for the core to enter device mode. The DWC OTG databook requires
+        // up to 25ms after FDMOD is set before device-mode registers are valid.
+        // GINTSTS.CMOD = 0 means device mode is active.
+        while r.gintsts().read().cmod() {}
+        trace!("reset done");
 
         self.inner.config_v1();
 
