@@ -209,10 +209,10 @@ macro_rules! property {
         false
     };
     ("interrupts.status_registers") => {
-        3
+        5
     };
     ("interrupts.status_registers", str) => {
-        stringify!(3)
+        stringify!(5)
     };
     ("interrupts.disabled_interrupt") => {
         0

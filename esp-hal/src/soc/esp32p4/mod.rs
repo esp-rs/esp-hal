@@ -10,12 +10,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
-pub(crate) mod registers {
-    pub const INTERRUPT_MAP_BASE: u32 = 0x500D_6000;
-    #[expect(dead_code)]
-    pub const INTERRUPT_MAP_BASE_APP_CPU: u32 = 0x500D_6800;
-}
-
 pub(crate) fn pre_init() {
     // TODO: Check if anything needs to be done here
 }

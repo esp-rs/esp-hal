@@ -14,7 +14,6 @@ trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_te
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "very_large_intr_status",
     "spi_octal",
 
     # ROM capabilities
@@ -35,11 +34,10 @@ symbols = [
 
 [device.interrupts]
 support_status = "partial"
-# ESP32-P4 uses CLIC with 48 interrupt lines (TRM v0.5, Ch 14)
-# "very_large_intr_status" uses 3 status registers (same as C5/C61)
-status_registers = 3
+status_registers = 5
 software_interrupt_count = 4
 software_interrupt_delay = 24
+# ESP32-P4 uses CLIC with 48 interrupt lines (TRM v0.5, Ch 14)
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
 # TODO: align with newer TRM revisions after v0.5. The v0.5 TRM still has

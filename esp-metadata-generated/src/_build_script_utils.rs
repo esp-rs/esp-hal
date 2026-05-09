@@ -4346,7 +4346,6 @@ impl Chip {
                     "soc_has_rsa",
                     "soc_has_ecc",
                     "soc_has_sw_interrupt",
-                    "very_large_intr_status",
                     "spi_octal",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -4406,7 +4405,7 @@ impl Chip {
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
-                    "interrupts_status_registers=\"3\"",
+                    "interrupts_status_registers=\"5\"",
                     "interrupt_controller=\"clic\"",
                     "lp_i2c_master_fifo_size=\"32\"",
                     "lp_uart_ram_size=\"32\"",
@@ -4507,7 +4506,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_rsa",
                     "cargo:rustc-cfg=soc_has_ecc",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
-                    "cargo:rustc-cfg=very_large_intr_status",
                     "cargo:rustc-cfg=spi_octal",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -4567,7 +4565,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
-                    "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
+                    "cargo:rustc-cfg=interrupts_status_registers=\"5\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
@@ -6677,7 +6675,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_uart4)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc)");
-    println!("cargo:rustc-check-cfg=cfg(very_large_intr_status)");
     println!("cargo:rustc-check-cfg=cfg(spi_octal)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
@@ -6750,7 +6747,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2s_default_clock_source, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_mclk_divider_bit_width, values(\"6\",\"9\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_max_ws_width, values(\"128\",\"512\"))");
-    println!("cargo:rustc-check-cfg=cfg(interrupts_status_registers, values(\"3\",\"2\",\"4\"))");
+    println!(
+        "cargo:rustc-check-cfg=cfg(interrupts_status_registers, values(\"3\",\"2\",\"5\",\"4\"))"
+    );
     println!(
         "cargo:rustc-check-cfg=cfg(interrupt_controller, \
          values(\"xtensa\",\"riscv_basic\",\"clic\",\"plic\"))"
