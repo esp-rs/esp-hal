@@ -20,7 +20,7 @@
 //! ```
 
 use crate::{
-    gpio::InputSignal,
+    gpio::{InputSignal, Pin},
     peripherals::{self, USB_FS},
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
@@ -29,17 +29,33 @@ pub mod embassy_usb_device;
 pub mod embassy_usb_host;
 
 /// USB D+ (data plus) pin.
-pub trait UsbFsDp: crate::private::Sealed {}
+pub trait UsbFsDp: crate::private::Sealed {
+    fn configure(&self);
+}
 
 /// USB D- (data minus) pin.
-pub trait UsbFsDm: crate::private::Sealed {}
+pub trait UsbFsDm: crate::private::Sealed {
+    fn configure(&self);
+}
 
 for_each_analog_function! {
     (USB_FS_DM, $gpio:ident) => {
-        impl UsbFsDm for crate::peripherals::$gpio<'_> {}
+        impl UsbFsDm for crate::peripherals::$gpio<'_> {
+            fn configure(&self) {
+                peripherals::IO_MUX::regs()
+                    .gpio(self.number() as usize)
+                    .modify(|_, w| unsafe { w.fun_drv().bits(3) });
+            }
+        }
     };
     (USB_FS_DP, $gpio:ident) => {
-        impl UsbFsDp for crate::peripherals::$gpio<'_> {}
+        impl UsbFsDp for crate::peripherals::$gpio<'_> {
+            fn configure(&self) {
+                peripherals::IO_MUX::regs()
+                    .gpio(self.number() as usize)
+                    .modify(|_, w| unsafe { w.fun_drv().bits(3) });
+            }
+        }
     };
 }
 
@@ -63,10 +79,13 @@ impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
     pub fn new(
         usb: peripherals::USB_FS<'d>,
-        _usb_dp: impl UsbFsDp + 'd,
-        _usb_dm: impl UsbFsDm + 'd,
+        usb_dp: impl UsbFsDp + 'd,
+        usb_dm: impl UsbFsDm + 'd,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
+
+        usb_dp.configure();
+        usb_dm.configure();
 
         Self {
             _usb: usb,
@@ -146,15 +165,6 @@ impl<'d> Usb<'d> {
         peripherals::LP_AON_CLKRST::regs()
             .lp_aonclkrst_hp_usb_clkrst_ctrl1()
             .toggle(|w, en| w.lp_aonclkrst_rst_en_usb_otg11().bit(en));
-
-        // GPIO26 = DM, GPIO27 = DP: set to maximum drive strength (40mA) for
-        // USB FSLS signal integrity. The pads are shared with the GPIO peripheral.
-        peripherals::IO_MUX::regs()
-            .gpio(26)
-            .modify(|_, w| unsafe { w.fun_drv().bits(3) });
-        peripherals::IO_MUX::regs()
-            .gpio(27)
-            .modify(|_, w| unsafe { w.fun_drv().bits(3) });
     }
 
     fn _disable() {
