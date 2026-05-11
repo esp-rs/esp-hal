@@ -6,7 +6,7 @@ use embassy_usb_synopsys_otg::{
     otg_v1::Otg,
 };
 
-use crate::{handler, interrupt::Priority, otg_fs::Usb};
+use crate::{handler, interrupt::Priority, usb::otg_fs::Usb};
 
 #[handler(priority = Priority::max())]
 fn interrupt_handler() {

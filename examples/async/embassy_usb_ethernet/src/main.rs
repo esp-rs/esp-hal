@@ -31,11 +31,11 @@ use embassy_usb::{
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    otg_fs::{
+    timer::timg::TimerGroup,
+    usb::otg_fs::{
         Usb,
         embassy_usb_device::{Config, Driver as UsbDriver},
     },
-    timer::timg::TimerGroup,
 };
 use picoserve::AppBuilder as AppBuilderTrait;
 use static_cell::StaticCell;
