@@ -66,6 +66,26 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
+#[cfg(feature = "unstable")]
+#[inline(always)]
+pub(super) fn sar_domain_can_be_disabled() -> bool {
+    // On chips with APB_SARADC clock tracking, this ADC instance still owns one
+    // guard while `try_disable(self)` runs. If refcount != 1, someone else is active.
+    #[cfg(not(esp32))]
+    if crate::system::PeripheralClockControl::ref_count(crate::system::Peripheral::ApbSarAdc) != 1
+    {
+        return false;
+    }
+
+    // TRNG uses SAR entropy source and must keep the SAR domain enabled.
+    #[cfg(all(rng_driver_supported, rng_trng_supported))]
+    if crate::rng::TrngSource::is_enabled() {
+        return false;
+    }
+
+    true
+}
+
 /// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
