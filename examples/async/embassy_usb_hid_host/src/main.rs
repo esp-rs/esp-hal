@@ -17,8 +17,8 @@ use embassy_usb_host::{BusRoute, BusState, class::hid::HidHost};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    otg_fs::{Usb, embassy_usb_host::Driver},
     timer::timg::TimerGroup,
+    usb::otg_fs::{Usb, embassy_usb_host::Driver},
 };
 use log::*;
 

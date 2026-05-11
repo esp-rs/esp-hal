@@ -17,7 +17,7 @@ use embassy_usb_synopsys_otg::{
 };
 use procmacros::handler;
 
-use crate::{interrupt::Priority, otg_fs::Usb};
+use crate::{interrupt::Priority, usb::otg_fs::Usb};
 
 static DEVICE_STATE: State<{ Usb::MAX_EP_COUNT }> = State::new();
 

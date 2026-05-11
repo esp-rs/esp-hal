@@ -23,11 +23,11 @@ use embassy_usb::{
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    otg_fs::{
+    timer::timg::TimerGroup,
+    usb::otg_fs::{
         Usb,
         embassy_usb_device::{Config, Driver},
     },
-    timer::timg::TimerGroup,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
