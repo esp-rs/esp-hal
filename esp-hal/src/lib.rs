@@ -395,7 +395,11 @@ unstable_driver! {
     pub mod tsens;
     #[cfg(twai_driver_supported)]
     pub mod twai;
-    #[cfg(any(usb_serial_jtag_driver_supported, usb_otg_driver_supported))]
+    #[cfg(any(
+        usb_otg_driver_supported,
+        usb_otg_hs_driver_supported,
+        usb_serial_jtag_driver_supported,
+    ))]
     pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
