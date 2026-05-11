@@ -508,6 +508,9 @@ memory_size_bytes = 384
 [device.usb_otg]
 fifo_depth_words = 200
 
+[device.usb_otg_hs]
+fifo_depth_words = 896
+
 [device.usb_serial_jtag]
 
 [device.ecc]
