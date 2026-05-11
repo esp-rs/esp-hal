@@ -133,6 +133,8 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
     fn link_state(&mut self, cx: &mut Context<'_>) -> LinkState {
         let state = self.poll_link(Some(cx));
         if state.up {
+            self.set_speed(state.speed);
+            self.set_duplex(state.duplex);
             LinkState::Up
         } else {
             LinkState::Down

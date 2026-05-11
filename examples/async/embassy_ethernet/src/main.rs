@@ -45,7 +45,7 @@ use esp_hal::{
         Ethernet,
         EthernetDmaStorage,
         clock::ExternalRefClock,
-        mac::LinkState,
+        mac::{Duplex, LinkState, Speed},
         phy::{MdioDriver, Phy, PhyError, generic::GenericPhy},
     },
     gpio::{Level, Output, OutputConfig},
@@ -89,7 +89,11 @@ impl ExamplePhy {
         Self {
             phy: GenericPhy::new(address),
             timer: Timer::after_ticks(0),
-            cached_link_state: LinkState { up: false },
+            cached_link_state: LinkState {
+                up: false,
+                speed: Speed::_100M,
+                duplex: Duplex::Full,
+            },
         }
     }
 }

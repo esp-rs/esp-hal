@@ -68,7 +68,7 @@ use core::task::Poll;
 
 pub use dma::EthernetDmaStorage;
 use dma::{RDesRing, TDesRing};
-use mac::{EmacRegs, LinkState, Speed};
+use mac::{Duplex, EmacRegs, LinkState, Speed};
 use phy::{MdioDriver, Phy};
 
 // ── Driver error ─────────────────────────────────────────────────────────────
@@ -239,6 +239,8 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     rx: RDesRing<'d>,
     phy: P,
     mac_addr: [u8; 6],
+    speed: Speed,
+    duplex: Duplex,
     _mode: PhantomData<DM>,
 }
 
@@ -366,6 +368,8 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
             rx: self.rx,
             phy: self.phy,
             mac_addr: self.mac_addr,
+            speed: self.speed,
+            duplex: self.duplex,
             _clock_guard: self._clock_guard,
             _eth: self._eth,
             _mode: PhantomData,
@@ -395,6 +399,22 @@ fn configure_mdio<'d>(
 }
 
 impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
+    /// Configures the MAC for the given speed.
+    pub fn set_speed(&mut self, speed: Speed) {
+        if speed != self.speed {
+            EmacRegs.set_speed(speed);
+            self.speed = speed;
+        }
+    }
+
+    /// Configures the MAC for the given speed.
+    pub fn set_duplex(&mut self, duplex: Duplex) {
+        if duplex != self.duplex {
+            EmacRegs.set_duplex(duplex);
+            self.duplex = duplex;
+        }
+    }
+
     /// Copies `frame` into the next TX slot and initiates transmission.
     pub fn transmit(&mut self, frame: &[u8]) -> Result<(), Error> {
         self.tx.transmit(frame).map_err(|e| match e {
@@ -485,6 +505,8 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             rx: self.rx,
             phy: self.phy,
             mac_addr: self.mac_addr,
+            speed: self.speed,
+            duplex: self.duplex,
             _clock_guard: self._clock_guard,
             _eth: self._eth,
             _mode: PhantomData,
@@ -527,16 +549,28 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     let mdio = MdioDriver::new(&EmacRegs);
     phy.init(&mdio).map_err(|_| Error::PhyTimeout)?;
 
-    // Configure MAC defaults.
-    EmacRegs.mac_init(Speed::_100M, mac::Duplex::Full);
-    EmacRegs.set_mac_address(&mac_addr);
-
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);
     let rx = RDesRing::new(&mut storage.rx_descs, &mut storage.rx_bufs);
 
     // Program descriptor list addresses into DMA.
     EmacRegs.set_descriptor_lists(tx.base_ptr() as u32, rx.base_ptr() as u32);
+
+    let mut eth = Ethernet {
+        tx,
+        rx,
+        phy,
+        mac_addr,
+        speed: Speed::_100M,
+        duplex: Duplex::Full,
+        _clock_guard: clock_guard,
+        _eth: eth,
+        _mode: PhantomData,
+    };
+
+    // Configure MAC defaults.
+    EmacRegs.mac_init(eth.speed, eth.duplex);
+    EmacRegs.set_mac_address(&eth.mac_addr);
 
     // In blocking mode all DMA interrupts stay disabled; async mode enables
     // them via into_async().
@@ -545,13 +579,5 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     // Start both DMA engines.
     EmacRegs.dma_start();
 
-    Ok(Ethernet {
-        tx,
-        rx,
-        phy,
-        mac_addr,
-        _clock_guard: clock_guard,
-        _eth: eth,
-        _mode: PhantomData,
-    })
+    Ok(eth)
 }

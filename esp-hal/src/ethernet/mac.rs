@@ -163,6 +163,20 @@ impl EmacRegs {
         EMAC_MAC::regs().emacff().modify(|_, w| w.pam().set_bit());
     }
 
+    /// Configures the MAC for the given speed.
+    pub fn set_speed(&self, speed: Speed) {
+        EMAC_MAC::regs()
+            .emacconfig()
+            .modify(|_, w| w.fespeed().bit(speed == Speed::_100M));
+    }
+
+    /// Configures the MAC for the given speed.
+    pub fn set_duplex(&self, duplex: Duplex) {
+        EMAC_MAC::regs()
+            .emacconfig()
+            .modify(|_, w| w.duplex().bit(duplex == Duplex::Full));
+    }
+
     // ── MAC address ───────────────────────────────────────────────────────
 
     /// Programs the unicast MAC address (filter slot 0).
