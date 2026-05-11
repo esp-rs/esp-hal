@@ -233,8 +233,12 @@ impl<'d> Rtc<'d> {
 
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                 rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+                // Wait >= 1 LP_SLOW_CLK period for the strobe to populate
+                // main_buf0. Without this, the first post-boot read returns
+                // stale values and downstream wake targets miss the counter.
+                crate::rom::ets_delay_us(100);
 
                 let h = rtc_cntl
                     .main_buf0_high()
@@ -281,8 +285,15 @@ impl<'d> Rtc<'d> {
 
         let rtc_cntl = LP_AON::regs();
 
-        let l = rtc_cntl.store2().read().bits() as u64;
-        let h = rtc_cntl.store3().read().bits() as u64;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32p4)] {
+                let l = rtc_cntl.lp_store2().read().bits() as u64;
+                let h = rtc_cntl.lp_store3().read().bits() as u64;
+            } else {
+                let l = rtc_cntl.store2().read().bits() as u64;
+                let h = rtc_cntl.store3().read().bits() as u64;
+            }
+        }
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
@@ -297,12 +308,23 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = LP_AON::regs();
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
-        rtc_cntl
-            .store2() // Low bits
-            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-        rtc_cntl
-            .store3() // High bits
-            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32p4)] {
+                rtc_cntl
+                    .lp_store2() // Low bits
+                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+                rtc_cntl
+                    .lp_store3() // High bits
+                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+            } else {
+                rtc_cntl
+                    .store2() // Low bits
+                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+                rtc_cntl
+                    .store3() // High bits
+                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+            }
+        }
     }
 
     #[procmacros::doc_replace]
@@ -433,7 +455,7 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))] {
                 let interrupt = Interrupt::LP_WDT;
             } else {
                 let interrupt = Interrupt::RTC_CORE;

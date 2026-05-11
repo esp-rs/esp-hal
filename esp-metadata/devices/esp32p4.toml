@@ -257,6 +257,7 @@ peripherals = [
     { name = "LP_AON", pac = "LP_SYS" },
     { name = "LP_AON_CLKRST" },
     { name = "LP_SYS" },
+    { name = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
     { name = "PMU" },
@@ -433,13 +434,17 @@ support_status = "not_supported"  # LCD path of LCD_CAM block
 support_status = "not_supported"  # TRNG
 apb_cycle_wait_num = 16  # placeholder
 [device.lp_timer]
-support_status = "not_supported"  # RTC Timekeeping
+# RTC Timekeeping -- enabled to satisfy `lp_timer_driver_supported` cfg
+# used by `Rtc::time_since_boot_raw` (driver implementation lives in
+# `rtc_cntl/mod.rs` and reads LP_TIMER directly via PAC).
+support_status = "partial"
 [device.sd_host]
 support_status = "not_supported"  # SDIO host
 [device.sd_slave]
 support_status = "not_supported"
 [device.sleep]
-support_status = "not_supported"  # PMU eco5 sleep -- placeholder TODO in esp-hal
+support_status = "partial"
+light_sleep = true
 [device.spi_slave]
 support_status = "not_supported"
 [device.temp_sensor]
