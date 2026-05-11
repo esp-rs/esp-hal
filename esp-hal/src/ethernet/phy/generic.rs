@@ -5,8 +5,8 @@
 use core::task::Context;
 
 use crate::ethernet::{
-    mac::LinkState,
-    phy::{ANAR, BMCR, BMSR, MdioDriver, Phy, PhyError, an, bmcr, bmsr},
+    mac::{Duplex, LinkState, Speed},
+    phy::{ANAR, ANLPAR, BMCR, BMSR, MdioDriver, Phy, PhyError, an, bmcr, bmsr},
 };
 
 /// Maximum iterations to wait for the PHY reset bit to self-clear.
@@ -61,13 +61,40 @@ impl Phy for GenericPhy {
         let bmsr_val = mdio.read(self.addr, BMSR);
 
         if bmsr_val & bmsr::LINK_STATUS == 0 {
-            return LinkState { up: false };
+            return LinkState {
+                up: false,
+                speed: Speed::_100M,
+                duplex: Duplex::Full,
+            };
         }
 
         if bmsr_val & bmsr::AN_COMPLETE == 0 {
-            return LinkState { up: false };
+            return LinkState {
+                up: false,
+                speed: Speed::_100M,
+                duplex: Duplex::Full,
+            };
         }
 
-        LinkState { up: true }
+        // Link is up and auto-negotiation is complete. read ANLPAR to
+        // determine the negotiated speed/duplex.
+
+        let anlpar_val = mdio.read(self.addr, ANLPAR);
+        let speed = if anlpar_val & an::BASE_100_FULL != 0 || anlpar_val & an::BASE_100_HALF != 0 {
+            Speed::_100M
+        } else {
+            Speed::_10M
+        };
+        let duplex = if anlpar_val & an::BASE_10_FULL != 0 || anlpar_val & an::BASE_100_FULL != 0 {
+            Duplex::Full
+        } else {
+            Duplex::Half
+        };
+
+        LinkState {
+            up: true,
+            speed,
+            duplex,
+        }
     }
 }

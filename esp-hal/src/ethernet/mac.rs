@@ -14,6 +14,7 @@ const MDC_CSR_CLOCK_RANGE: u8 = 3;
 /// Link speed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Speed {
     /// 10 Mbit/s
     _10M,
@@ -24,6 +25,7 @@ pub enum Speed {
 /// Link duplex mode.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Duplex {
     /// Half duplex
     Half,
@@ -37,6 +39,10 @@ pub enum Duplex {
 pub struct LinkState {
     /// Whether the link is established.
     pub up: bool,
+    /// Link speed (valid if `up` is true).
+    pub speed: Speed,
+    /// Link duplex mode (valid if `up` is true).
+    pub duplex: Duplex,
 }
 
 /// Zero-sized handle that provides register-level operations on the three EMAC
