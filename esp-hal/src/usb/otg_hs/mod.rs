@@ -38,7 +38,7 @@ impl<'d> Usb<'d> {
     const FIFO_DEPTH_WORDS: usize = property!("usb_otg_hs.fifo_depth_words");
 
     const MAX_EP_COUNT: usize = 16;
-    const MAX_HOST_CH_COUNT: usize = 16;
+    const MAX_HOST_CH_COUNT: usize = 12; // 16 but embassy crate asserts < 12
 
     /// Creates a new `Usb` instance.
     pub fn new(usb: peripherals::USB_HS<'d>) -> Self {
