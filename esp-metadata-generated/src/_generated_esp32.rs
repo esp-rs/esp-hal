@@ -4549,9 +4549,9 @@ macro_rules! for_each_lp_function {
 }
 /// This macro can be used to generate code for each IOMUX-only digital function of each GPIO.
 ///
-/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers
-/// (not routable through the GPIO matrix). Use this to implement signal-specific traits for
-/// peripherals whose pins must bypass the GPIO matrix (e.g., EMAC, USB).
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+/// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+/// GPIO matrix (e.g., EMAC, USB).
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
