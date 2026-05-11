@@ -48,7 +48,6 @@ async fn main(_spawner: Spawner) {
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x303A, 0x3001);
-    config.bcd_usb = embassy_usb::UsbVersion::Two; // Unknown why TwoOne (default) doesn't work.
     config.max_packet_size_0 = 64;
     config.manufacturer = Some("Espressif");
     config.product = Some("USB-serial example");
@@ -79,7 +78,8 @@ async fn main(_spawner: Spawner) {
     );
 
     // Create classes on the builder.
-    let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
+    // High-speed requires max packet size to be 512.
+    let mut class = CdcAcmClass::new(&mut builder, &mut state, 512);
 
     // Build the builder.
     let mut usb = builder.build();
