@@ -470,6 +470,10 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
                 EmacRegs.demand_rx_poll();
                 return Ok(len);
             }
+
+            // receive() may have recycled error frames back to DMA ownership
+            // without a poll-demand write. Poke the RX DMA so it resumes.
+            EmacRegs.demand_rx_poll();
         }
     }
 
