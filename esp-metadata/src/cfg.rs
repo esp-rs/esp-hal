@@ -589,6 +589,9 @@ driver_configs![
             apb_cycle_wait_num: u32,
             #[serde(default)]
             trng_supported: bool,
+            // true if RNG is not its own peripheral - triggers a different register naming scheme
+            #[serde(default)]
+            is_lp_sys: bool,
         }
     },
     RsaProperties {

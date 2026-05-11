@@ -642,14 +642,8 @@ jobs:
           echo "chips_escaped=$CHIPS_ESCAPED" >> $GITHUB_OUTPUT
           echo "Parsed — example: $EXAMPLE_NAME | package: $PACKAGE | chips: $CHIPS_JSON"
 
-      - name: Dispatch Binary Size Analysis
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: binary-size.yml
-          ref: ${{ github.event.repository.default_branch }}
-          inputs: '{"pr_number":"${{ github.event.issue.number }}","example_name":"${{ steps.extract.outputs.example_name }}","package":"${{ steps.extract.outputs.package }}","chips":"${{ steps.extract.outputs.chips_escaped }}"}'
-
       - name: Confirm in PR
+        id: comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
@@ -659,3 +653,22 @@ jobs:
             on chips `${{ steps.extract.outputs.chips }}`
             for #${{ github.event.issue.number }}.
             Results will be posted as a comment when ready.
+
+      - name: Dispatch Binary Size Analysis
+        id: dispatch
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: binary-size.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: '{"pr_number":"${{ github.event.issue.number }}","comment_id":"${{ steps.comment.outputs.comment-id }}","example_name":"${{ steps.extract.outputs.example_name }}","package":"${{ steps.extract.outputs.package }}","chips":"${{ steps.extract.outputs.chips_escaped }}"}'
+
+      - name: Add run URL to comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          body: >
+            Triggered **binary size analysis** for #${{ github.event.issue.number }}
+            (example: `${{ steps.extract.outputs.example_name }}`, chips: `${{ steps.extract.outputs.chips }}`).
+
+            Run: ${{ steps.dispatch.outputs.runUrlHtml }}
+          edit-mode: replace

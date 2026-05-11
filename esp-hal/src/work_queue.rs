@@ -528,6 +528,7 @@ pub(crate) struct Handle<'t, T: Sync + Send> {
 }
 
 impl<'t, T: Sync + Send> Handle<'t, T> {
+    #[cfg(sha_driver_supported)]
     pub(crate) fn from_completed_work_item(
         queue: &'t WorkQueue<T>,
         work_item: &'t mut WorkItem<T>,
@@ -738,6 +739,7 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
     }
 
     /// Creates a Handle for a work item that does not need to be put into the queue.
+    #[cfg(sha_driver_supported)]
     pub fn post_completed<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         Handle::from_completed_work_item(queue, &mut self.work_item)
     }
