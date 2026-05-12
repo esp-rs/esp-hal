@@ -1,6 +1,6 @@
 use core::{
     marker::PhantomData,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use super::{AdcConfig, Attenuation};
@@ -14,7 +14,6 @@ pub(super) const NUM_ATTENS: usize = 10;
 // ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
 // state to prevent unexpected behaviour
 static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
-static ADC_ACTIVE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 /// ADC Error
 #[derive(Debug)]
@@ -309,33 +308,12 @@ where
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
-        ADC_ACTIVE_COUNT.fetch_add(1, Ordering::Relaxed);
-
         Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _phantom: PhantomData,
         }
-    }
-
-    /// Attempts to disable ADC SAR power configuration.
-    ///
-    /// Returns `Err(self)` if a conversion is in progress or SAR power is still
-    /// shared with another user.
-    pub fn try_disable(self) -> Result<(), Self> {
-        if self.active_channel.is_some()
-            || ADC_ACTIVE_COUNT.load(Ordering::Relaxed) != 1
-            || !super::sar_domain_can_be_disabled()
-        {
-            return Err(self);
-        }
-
-        SENS::regs()
-            .sar_meas_wait2()
-            .modify(|_, w| unsafe { w.force_xpd_sar().bits(0) });
-
-        Ok(())
     }
 
     /// Request that the ADC begin a conversion on the specified pin
@@ -393,9 +371,3 @@ impl Drop for ADC2<'_> {
     }
 }
 
-impl<ADC, Dm: crate::DriverMode> Drop for Adc<'_, ADC, Dm> {
-    fn drop(&mut self) {
-        let prev = ADC_ACTIVE_COUNT.fetch_sub(1, Ordering::Relaxed);
-        debug_assert!(prev > 0);
-    }
-}

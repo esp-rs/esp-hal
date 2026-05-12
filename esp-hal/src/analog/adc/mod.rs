@@ -66,24 +66,34 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
-#[cfg(feature = "unstable")]
-#[inline(always)]
-pub(super) fn sar_domain_can_be_disabled() -> bool {
-    // On chips with APB_SARADC clock tracking, this ADC instance still owns one
-    // guard while `try_disable(self)` runs. If refcount != 1, someone else is active.
-    #[cfg(not(esp32))]
-    if crate::system::PeripheralClockControl::ref_count(crate::system::Peripheral::ApbSarAdc) != 1
+#[cfg(all(feature = "unstable", not(esp32)))]
+pub(crate) fn on_apb_saradc_clock_release() {
+    #[cfg(any(esp32s2, esp32s3))]
     {
-        return false;
+        let sensors = crate::peripherals::SENS::regs();
+
+        #[cfg(esp32s2)]
+        sensors
+            .sar_meas1_ctrl1()
+            .modify(|_, w| w.rtc_saradc_clkgate_en().clear_bit());
+
+        #[cfg(esp32s3)]
+        sensors
+            .sar_peri_clk_gate_conf()
+            .modify(|_, w| w.saradc_clk_en().clear_bit());
+
+        sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
+            w.sarclk_en().clear_bit();
+            w.force_xpd_sar().bits(0)
+        });
     }
 
-    // TRNG uses SAR entropy source and must keep the SAR domain enabled.
-    #[cfg(all(rng_driver_supported, rng_trng_supported))]
-    if crate::rng::TrngSource::is_enabled() {
-        return false;
+    #[cfg(riscv)]
+    {
+        crate::peripherals::APB_SARADC::regs()
+            .ctrl()
+            .modify(|_, w| unsafe { w.xpd_sar_force().bits(0) });
     }
-
-    true
 }
 
 /// The approximate attenuation of the ADC pin.

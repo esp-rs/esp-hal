@@ -341,22 +341,6 @@ where
         }
     }
 
-    /// Attempts to disable ADC SAR power configuration.
-    ///
-    /// Returns `Err(self)` if a conversion is in progress or SAR power is still
-    /// shared with another user.
-    pub fn try_disable(self) -> Result<(), Self> {
-        if self.active_channel.is_some() || !super::sar_domain_can_be_disabled() {
-            return Err(self);
-        }
-
-        APB_SARADC::regs()
-            .ctrl()
-            .modify(|_, w| unsafe { w.xpd_sar_force().bits(0) });
-
-        Ok(())
-    }
-
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCX, Async> {
         acquire_async_adc();
