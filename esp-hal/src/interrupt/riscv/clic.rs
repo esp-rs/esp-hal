@@ -203,6 +203,73 @@ _mtvt_table:
 
     .size _mtvt_table, .-_mtvt_table
     .option pop
+    "#
+);
 
+// Core 2
+#[cfg(multi_core)]
+core::arch::global_asm!(
+    r#"
+    .section .trap, "ax"
+
+    /* Prevent the compiler from generating 2-byte instruction in the vector tables */
+    .option push
+    .option norvc
+
+    .balign 0x40
+    .global _mtvt_table2
+    .type _mtvt_table2, @function
+_mtvt_table2:
+    .word 0
+    .word _start_Trap1_trap
+    .word _start_Trap2_trap
+    .word _start_Trap3_trap
+    .word _start_Trap4_trap
+    .word _start_Trap5_trap
+    .word _start_Trap6_trap
+    .word _start_Trap7_trap
+    .word _start_Trap8_trap
+    .word _start_Trap9_trap
+    .word _start_Trap10_trap
+    .word _start_Trap11_trap
+    .word _start_Trap12_trap
+    .word _start_Trap13_trap
+    .word _start_Trap14_trap
+    .word _start_Trap15_trap
+    .word _start_Trap16_trap
+    .word _start_Trap17_trap
+    .word _start_Trap18_trap
+    .word _start_Trap19_trap
+    .word _start_Trap20_trap
+    .word _start_Trap21_trap
+    .word _start_Trap22_trap
+    .word _start_Trap23_trap
+    .word _start_Trap24_trap
+    .word _start_Trap25_trap
+    .word _start_Trap26_trap
+    .word _start_Trap27_trap
+    .word _start_Trap28_trap
+    .word _start_Trap29_trap
+    .word _start_Trap30_trap
+    .word _start_Trap31_trap
+    .word _start_Trap32_trap
+    .word _start_Trap33_trap
+    .word _start_Trap34_trap
+    .word _start_Trap35_trap
+    .word _start_Trap36_trap
+    .word _start_Trap37_trap
+    .word _start_Trap38_trap
+    .word _start_Trap39_trap
+    .word _start_Trap40_trap
+    .word _start_Trap41_trap
+    .word _start_Trap42_trap
+    .word _start_Trap43_trap
+    .word _start_Trap44_trap
+    .word _start_Trap45_trap
+    .word _start_Trap46_trap
+    .word _start_Trap47_trap
+
+    .size _mtvt_table2, .-_mtvt_table2
+    .option pop
     "#
 );
