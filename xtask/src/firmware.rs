@@ -21,6 +21,7 @@ pub struct Metadata {
     features: Vec<String>,
     tag: Option<String>,
     description: Option<String>,
+    harness_firmware: Option<String>,
     env_vars: HashMap<String, String>,
     cargo_config: Vec<String>,
 }
@@ -93,6 +94,11 @@ impl Metadata {
         self.description.clone()
     }
 
+    /// Optional support firmware binary to run on a second target.
+    pub fn harness_firmware(&self) -> Option<&str> {
+        self.harness_firmware.as_deref()
+    }
+
     /// Check if the example matches the given filter.
     pub fn matches(&self, filter: Option<&str>) -> bool {
         let Some(filter) = filter else {
@@ -117,6 +123,7 @@ pub struct Configuration {
     features: Vec<String>,
     esp_config: HashMap<String, String>,
     tag: Option<String>,
+    harness_firmware: Option<String>,
 }
 
 struct ConfigurationCollector<'a> {
@@ -274,6 +281,11 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 "TAG" => {
                     relevant_metadata.apply(|meta| meta.tag = Some(meta_line.value.to_string()));
                 }
+                // Optional support firmware binary that must run on another target.
+                "HARNESS-FIRMWARE" => {
+                    relevant_metadata
+                        .apply(|meta| meta.harness_firmware = Some(meta_line.value.to_string()));
+                }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
         }
@@ -288,6 +300,11 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
+            }
+
+            // Harness firmware is a selector, inherit if empty
+            if meta.harness_firmware.is_none() {
+                meta.harness_firmware = all_configuration.harness_firmware.clone();
             }
 
             // Other values are merged
@@ -320,6 +337,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     configuration_name: configuration.name.clone(),
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
+                    harness_firmware: configuration.harness_firmware.clone(),
                     env_vars: configuration.esp_config.clone(),
                     cargo_config: configuration.cargo_config.clone(),
                 })
@@ -373,6 +391,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
                 features: vec![],
                 tag: None,
                 description: description.clone(),
+                harness_firmware: None,
                 env_vars: HashMap::new(),
                 cargo_config: Vec::new(),
             });
@@ -380,6 +399,15 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     }
 
     Ok(examples)
+}
+
+/// Find the metadata entry for an artifact/test name.
+pub fn find_test_by_name<'a>(tests: &'a [Metadata], name: &str) -> Option<&'a Metadata> {
+    tests.iter().find(|test| {
+        test.binary_name() == name
+            || test.output_file_name() == name
+            || test.name_with_configuration() == name
+    })
 }
 
 fn parse_description(text: &str) -> Option<String> {

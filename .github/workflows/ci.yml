@@ -21,7 +21,7 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.88.0"
-  DEFMT_LOG: trace
+  DEFMT_LOG: info
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -334,7 +334,7 @@ jobs:
             './**/*.md'
             './**/*.toml'
 
-  # Single dummy for PR CI, per-chip matrix jobs live in hil.yml and are aggregated there.
+  # Dummy HIL test-build check for PRs
   #
   # Real test builds run in hil.yml on merge_group (and `/hil full`). See:
   # https://github.com/orgs/community/discussions/102764

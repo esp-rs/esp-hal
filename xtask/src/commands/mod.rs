@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
@@ -10,6 +13,7 @@ pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
+    firmware,
 };
 mod build;
 mod check_changelog;
@@ -294,6 +298,10 @@ pub struct TestsArgs {
     /// Emit crate build timings
     #[arg(long)]
     pub timings: bool,
+
+    /// "hil-test" or "hil-test-radio"
+    #[arg(default_value = "hil-test")]
+    pub package: String,
 }
 
 // ----------------------------------------------------------------------------
@@ -418,7 +426,16 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 /// Execute the given action on the specified HIL tests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
     // Absolute path of the 'hil-test' package's root:
-    let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
+    let package_name = args.package.as_str();
+
+    let package_path = match package_name {
+        "hil-test" => crate::windows_safe_path(&workspace.join("hil-test")),
+        "hil-test-radio" => crate::windows_safe_path(&workspace.join("hil-test-radio")),
+        other => bail!(
+            "Unknown package: {}. Use 'hil-test' or 'hil-test-radio'",
+            other
+        ),
+    };
 
     // Determine the appropriate build target for the given package and chip:
     let target = Package::HilTest.target_triple(&args.chip)?;
@@ -426,12 +443,28 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Load all test metadata first so we can differentiate between:
     // - unknown test selectors (typos)
     // - valid tests that are unsupported for the selected chip.
-    let mut all_tests = crate::firmware::load(&package_path.join("src").join("bin"))?;
+    let bins_root = package_path.join("src").join("bin");
+    let mut all_tests = crate::firmware::load(&bins_root)?;
+    if package_name == "hil-test-radio" {
+        let support_root = bins_root.join("support");
+        if support_root.exists() {
+            all_tests.extend(crate::firmware::load(&support_root)?);
+        }
+    }
     all_tests.sort_by_key(|a| a.binary_name());
-    let tests = all_tests
+    let tests_for_chip = all_tests
         .iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
+
+    // Radio tests reuse the normal HIL flow; the only difference is a pre-step
+    // that builds and flashes the support firmware on a secondary probe.
+    let is_radio_package = package_name == "hil-test-radio";
+    let referenced_harnesses = if is_radio_package {
+        collect_referenced_harnesses(&all_tests, args.chip)
+    } else {
+        HashSet::new()
+    };
 
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
@@ -441,6 +474,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     }
 
     let mut commands = CargoCommandBatcher::new();
+    let mut artifact_meta = HashMap::<String, firmware::Metadata>::new();
     // Execute the specified action:
     // If user sets some specific test(s)
     if let Some(test_arg) = args.test.as_deref() {
@@ -460,10 +494,14 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 None => (Some(selected), None),
             };
 
-            let run_test_extra_args = (action == CargoAction::Run)
-                .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
-                .flatten()
-                .unwrap_or(&[]);
+            let run_test_extra_args = if is_radio_package && action == CargoAction::Run {
+                &[]
+            } else {
+                (action == CargoAction::Run)
+                    .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+                    .flatten()
+                    .unwrap_or(&[])
+            };
 
             let matched: Vec<_> = all_tests
                 .iter()
@@ -471,6 +509,25 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 .collect();
 
             if matched.is_empty() {
+                if is_radio_package
+                    && let Some(radio_meta) =
+                        resolve_radio_module_alias(&all_tests, args.chip, selected)
+                {
+                    let command = crate::generate_build_command(
+                        &package_path,
+                        args.chip,
+                        &target,
+                        &radio_meta,
+                        action.clone(),
+                        false,
+                        args.toolchain.as_deref(),
+                        args.timings,
+                        &[],
+                    )?;
+                    artifact_meta.insert(command.artifact_name.clone(), radio_meta);
+                    commands.push(command);
+                    continue;
+                }
                 unknown_selected.push(selected.to_string());
             } else {
                 let matched_for_chip: Vec<_> = matched
@@ -495,6 +552,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                         args.timings,
                         run_test_extra_args,
                     )?;
+                    artifact_meta.insert(command.artifact_name.clone(), test.clone());
                     commands.push(command);
                 }
             }
@@ -512,7 +570,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             bail!("Test not found: {}", unknown_selected.join(", "))
         }
     } else {
-        for test in tests {
+        for test in tests_for_chip {
             let command = crate::generate_build_command(
                 &package_path,
                 args.chip,
@@ -524,28 +582,112 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 args.timings,
                 &[],
             )?;
+            artifact_meta.insert(command.artifact_name.clone(), test.clone());
             commands.push(command);
         }
     }
 
-    let mut failed = Vec::new();
+    let mut harness_for_artifact = HashMap::<String, firmware::Metadata>::new();
+    if is_radio_package {
+        for test in artifact_meta.values() {
+            if is_support_firmware(test, &referenced_harnesses) {
+                continue;
+            }
+            let Some(harness_name) = test.harness_firmware() else {
+                continue;
+            };
 
-    for c in commands.build(false) {
+            let Some(harness_meta) = all_tests.iter().find(|candidate| {
+                if !candidate.supports_chip(args.chip) {
+                    return false;
+                }
+
+                let harness_basename = harness_name.rsplit('/').next().unwrap_or(harness_name);
+                candidate.binary_name() == harness_name
+                    || candidate.output_file_name() == harness_name
+                    || candidate.binary_name() == harness_basename
+                    || candidate.output_file_name() == harness_basename
+            }) else {
+                bail!(
+                    "Missing harness firmware '{harness_name}' required by '{}'",
+                    test.output_file_name()
+                );
+            };
+
+            harness_for_artifact.insert(test.output_file_name(), harness_meta.clone());
+        }
+    }
+
+    let mut failed = Vec::new();
+    let built_commands = commands.build(false);
+
+    let mut built_harness = HashMap::<String, PathBuf>::new();
+
+    for c in built_commands {
         let repeat = if matches!(action, CargoAction::Run) {
             args.repeat
         } else {
             1
         };
 
+        let radio_meta = artifact_meta.get(&c.artifact_name);
+
+        // Support firmware never runs as a DUT; it's used only as a pre-step
+        // for whichever DUT requests it via `HARNESS-FIRMWARE`.
+        if matches!(action, CargoAction::Run)
+            && radio_meta.is_some_and(|m| is_support_firmware(m, &referenced_harnesses))
+        {
+            log::info!("Skipping support firmware '{}' as DUT", c.artifact_name);
+            continue;
+        }
+
         println!(
             "Command: cargo {}",
             c.command.join(" ").replace("---", "\n    ---")
         );
+
         for i in 0..repeat {
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            if c.run(false).is_err() {
+
+            if matches!(action, CargoAction::Run)
+                && let Some(harness_meta) = harness_for_artifact.get(&c.artifact_name)
+            {
+                let harness_path = match build_radio_harness(
+                    workspace,
+                    &package_path,
+                    args.chip,
+                    &target,
+                    args.toolchain.as_deref(),
+                    args.timings,
+                    harness_meta,
+                    &mut built_harness,
+                ) {
+                    Ok(path) => path,
+                    Err(e) => {
+                        failed.push(c.artifact_name.clone());
+                        log::error!(
+                            "Failed to build harness firmware '{}' for '{}': {e}",
+                            harness_meta.output_file_name(),
+                            c.artifact_name
+                        );
+                        break;
+                    }
+                };
+
+                let harness_spec = crate::radio_hil_runner::HarnessSpec {
+                    binary_path: &harness_path,
+                    target: &target,
+                };
+                if let Err(e) =
+                    crate::radio_hil_runner::run_radio_test(&c, Some(harness_spec), None)
+                {
+                    failed.push(c.artifact_name.clone());
+                    log::error!("Radio test '{}' failed: {}", c.artifact_name, e);
+                    break;
+                }
+            } else if c.run(false).is_err() {
                 failed.push(c.artifact_name.clone());
             }
         }
@@ -558,6 +700,104 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     }
 
     Ok(())
+}
+
+/// Build the harness firmware required by a radio HIL test (if not already
+/// built) and return the resulting ELF path. Results are cached in
+/// `built_harness` so repeated tests sharing a harness only build it once.
+fn build_radio_harness(
+    workspace: &Path,
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    toolchain: Option<&str>,
+    timings: bool,
+    harness: &firmware::Metadata,
+    built_harness: &mut HashMap<String, PathBuf>,
+) -> Result<PathBuf> {
+    let artifact_name = harness.output_file_name();
+    if let Some(path) = built_harness.get(&artifact_name) {
+        return Ok(path.clone());
+    }
+
+    let builder = crate::generate_build_command(
+        package_path,
+        chip,
+        target,
+        harness,
+        CargoAction::Build(None),
+        false,
+        toolchain,
+        timings,
+        &[],
+    )?;
+    let built = CargoCommandBatcher::build_one_for_cargo(&builder);
+    log::info!(
+        "Building harness firmware: cargo {}",
+        built.command.join(" ")
+    );
+    built
+        .run(false)
+        .with_context(|| format!("Failed to build harness firmware '{artifact_name}'"))?;
+
+    let path = crate::radio_hil_runner::resolve_release_binary(workspace, target, &artifact_name);
+    if !path.exists() {
+        bail!(
+            "Harness firmware '{artifact_name}' built successfully but binary not found at {}",
+            path.display()
+        );
+    }
+
+    built_harness.insert(artifact_name, path.clone());
+    Ok(path)
+}
+
+fn resolve_radio_module_alias(
+    all_tests: &[firmware::Metadata],
+    chip: Chip,
+    selected: &str,
+) -> Option<firmware::Metadata> {
+    let module_file = format!("{selected}.rs");
+    let module_decl = format!("mod {selected};");
+
+    all_tests
+        .iter()
+        .find(|test| {
+            test.supports_chip(chip)
+                && test.harness_firmware().is_none()
+                && std::fs::read_to_string(test.example_path()).is_ok_and(|source| {
+                    source.contains(&module_file) || source.contains(&module_decl)
+                })
+        })
+        .cloned()
+}
+
+fn collect_referenced_harnesses(all_tests: &[firmware::Metadata], chip: Chip) -> HashSet<String> {
+    let mut harnesses = HashSet::new();
+    for test in all_tests {
+        if !test.supports_chip(chip) {
+            continue;
+        }
+        if let Some(harness) = test.harness_firmware() {
+            harnesses.insert(harness.to_string());
+            if let Some(basename) = harness.rsplit('/').next() {
+                harnesses.insert(basename.to_string());
+            }
+        }
+    }
+    harnesses
+}
+
+fn is_support_firmware(meta: &firmware::Metadata, referenced_harnesses: &HashSet<String>) -> bool {
+    let binary = meta.binary_name();
+    let output = meta.output_file_name();
+
+    referenced_harnesses.contains(binary.as_str())
+        || referenced_harnesses.contains(output.as_str())
+        || meta
+            .example_path()
+            .to_string_lossy()
+            .contains("/src/bin/support/")
 }
 
 fn move_artifacts(chip: Chip, action: &CargoAction) {
