@@ -14,8 +14,9 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
-use core::cell::RefCell;
 #[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
+use core::cell::RefCell;
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2, esp32p4))]
 use core::time::Duration;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -72,13 +73,13 @@ pub enum WakeupLevel {
 /// # {after_snippet}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2, esp32p4))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2, esp32p4))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {
