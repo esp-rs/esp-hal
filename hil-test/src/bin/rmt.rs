@@ -530,6 +530,35 @@ mod tests {
     }
 
     #[test]
+    fn rmt_frequency_accessor_reports_configured_rate(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+        assert_eq!(rmt.frequency(), FREQ);
+
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        assert_eq!(esp_hal::clock::ll::RmtInstance::Rmt.sclk_frequency(), FREQ.as_hz());
+    }
+
+    #[test]
+    #[cfg(esp32c6)]
+    fn rmt_frequency_is_not_apb_on_default_esp32c6(mut ctx: Context) {
+        // Reproducer for #5532: with the default ESP32-C6 clock configuration, APB runs at
+        // 40 MHz, while the RMT driver configures the RMT counter clock to 80 MHz. Code that
+        // derives pulse lengths from APB will therefore generate pulses that are too short.
+        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+
+        let apb_frequency = Rate::from_hz(esp_hal::clock::ll::apb_clk_frequency());
+
+        assert_eq!(apb_frequency.as_hz(), 40_000_000);
+        assert_eq!(rmt.frequency().as_hz(), 80_000_000);
+
+        let ticks_for_400ns = |frequency: Rate| {
+            ((400_u64 * u64::from(frequency.as_hz())) / 1_000_000_000) as u16
+        };
+        assert_eq!(ticks_for_400ns(apb_frequency), 16);
+        assert_eq!(ticks_for_400ns(rmt.frequency()), 32);
+    }
+
+    #[test]
     fn rmt_loopback_simple(mut ctx: Context) {
         // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig::default();

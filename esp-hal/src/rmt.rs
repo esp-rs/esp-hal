@@ -735,6 +735,7 @@ for_each_rmt_channel!(
                 Dm: crate::DriverMode,
             {
                 peripheral: RMT<'rmt>,
+                frequency: Rate,
                 $(
                     #[doc = concat!("RMT Channel ", $num)]
                     pub [<channel $num>]: ChannelCreator<'rmt, Dm, $num>,
@@ -746,14 +747,25 @@ for_each_rmt_channel!(
             where
                 Dm: crate::DriverMode,
             {
-                fn create(peripheral: RMT<'rmt>) -> Self {
+                fn create(peripheral: RMT<'rmt>, frequency: Rate) -> Self {
                     Self {
                         peripheral,
+                        frequency,
                         $(
                             [<channel $num>]: ChannelCreator::conjure(),
                         )+
                         _mode: PhantomData,
                     }
+                }
+
+                /// Returns the configured RMT counter clock frequency.
+                ///
+                /// This is the actual frequency after the global RMT clock divider has been
+                /// configured. Pulse code lengths are expressed in cycles of
+                /// this clock divided by the channel divider configured with
+                /// [`TxChannelConfig::with_clk_divider`] or [`RxChannelConfig::with_clk_divider`].
+                pub fn frequency(&self) -> Rate {
+                    self.frequency
                 }
             }
 
@@ -764,6 +776,7 @@ for_each_rmt_channel!(
 
                     Rmt {
                         peripheral: self.peripheral,
+                        frequency: self.frequency,
                         $(
                             [<channel $num>]: unsafe { self.[<channel $num>].into_async() },
                         )+
@@ -901,7 +914,12 @@ impl ChannelIndex {
 }
 
 impl<'rmt> Rmt<'rmt, Blocking> {
-    /// Create a new RMT instance
+    /// Create a new RMT instance.
+    ///
+    /// The `frequency` parameter configures the global RMT counter clock. Use
+    /// [`Rmt::frequency`] to retrieve the actual configured frequency when
+    /// converting real-time pulse durations to [`PulseCode`] lengths; this is
+    /// not necessarily the APB clock frequency.
     ///
     /// ## Errors
     ///
@@ -909,11 +927,11 @@ impl<'rmt> Rmt<'rmt, Blocking> {
     /// - [`ConfigError::UnreachableTargetFrequency`].
     pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
         let clk_src = ClockSource::default();
-        let div = self::chip_specific::validate_clock(clk_src, frequency)?;
+        let (div, counter_frequency) = self::chip_specific::validate_clock(clk_src, frequency)?;
 
         // Only create the peripheral guards after validate_clock() to avoid that this function
         // contains lots of code to drop them again on error.
-        let this = Rmt::create(peripheral);
+        let this = Rmt::create(peripheral, counter_frequency);
 
         self::chip_specific::configure_clock(clk_src, div);
         Ok(this)
@@ -2313,6 +2331,8 @@ mod chip_specific {
     use enumset::EnumSet;
     #[cfg(place_rmt_driver_in_ram)]
     use procmacros::ram;
+    #[cfg(soc_has_clock_node_rmt_sclk)]
+    use crate::soc::clocks;
 
     use super::{
         ChannelIndex,
@@ -2331,7 +2351,10 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn validate_clock(source: ClockSource, frequency: Rate) -> Result<u8, ConfigError> {
+    pub(super) fn validate_clock(
+        source: ClockSource,
+        frequency: Rate,
+    ) -> Result<(u8, Rate), ConfigError> {
         let src_clock = source.freq();
 
         if frequency > src_clock {
@@ -2343,12 +2366,17 @@ mod chip_specific {
             .checked_div(frequency.as_hz())
             .ok_or(ConfigError::UnreachableTargetFrequency)?;
 
-        u8::try_from(div - 1).map_err(|_| ConfigError::UnreachableTargetFrequency)
+        let div = u8::try_from(div - 1).map_err(|_| ConfigError::UnreachableTargetFrequency)?;
+        let actual_frequency = src_clock / (u32::from(div) + 1);
+
+        Ok((div, actual_frequency))
     }
 
     pub(super) fn configure_clock(source: ClockSource, div: u8) {
         #[cfg(soc_has_clock_node_rmt_sclk)]
-        let _ = source;
+        clocks::ClockTree::with(|clocks| {
+            clocks::RmtInstance::Rmt.configure_sclk(clocks, source.into());
+        });
 
         #[cfg(not(soc_has_pcr))]
         RMT::regs().sys_conf().modify(|_, w| unsafe {
@@ -2877,12 +2905,15 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn validate_clock(source: ClockSource, frequency: Rate) -> Result<u8, ConfigError> {
+    pub(super) fn validate_clock(
+        source: ClockSource,
+        frequency: Rate,
+    ) -> Result<(u8, Rate), ConfigError> {
         if frequency != source.freq() {
             return Err(ConfigError::UnreachableTargetFrequency);
         }
 
-        Ok(1)
+        Ok((1, frequency))
     }
 
     pub(super) fn configure_clock(source: ClockSource, _div: u8) {
