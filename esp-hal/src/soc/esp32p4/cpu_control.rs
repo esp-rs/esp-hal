@@ -150,7 +150,6 @@ where
                 "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
             ));
             crate::debugger::set_stack_watchpoint(guard as usize);
-            crate::interrupt::init_vectoring();
         }
         crate::interrupt::init_vectoring();
     }

@@ -405,8 +405,8 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     let guard = cpu_control
         .start_app_core_with_stack_guard_offset(stack, Some(stack_guard_offset), move || {
             trace!("Second core running");
-            task::setup_smp(int1);
             SCHEDULER.with(move |scheduler| {
+                task::setup_smp(int1);
                 // Make sure the whole struct is captured, not just a !Send field.
                 let ptrs = stack_ptrs;
                 assert!(

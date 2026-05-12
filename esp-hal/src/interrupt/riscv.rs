@@ -366,7 +366,6 @@ pub fn enable_direct(
     super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
     cpu_int::set_priority_raw(cpu_interrupt as u32, level);
     cpu_int::set_kind_raw(cpu_interrupt as u32, InterruptKind::Level);
-    info!("bound? {:x}", mtvt_table as u32);
     cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
 }
 
