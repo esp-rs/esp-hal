@@ -556,7 +556,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     // Program descriptor list addresses into DMA.
     EmacRegs.set_descriptor_lists(tx.base_ptr() as u32, rx.base_ptr() as u32);
 
-    let mut eth = Ethernet {
+    let eth = Ethernet {
         tx,
         rx,
         phy,
