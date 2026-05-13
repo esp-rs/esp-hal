@@ -94,7 +94,7 @@ pub enum SpiInterrupt {
 }
 
 /// The size of the FIFO buffer for SPI
-const FIFO_SIZE: usize = property!("spi_master.fifo_size") as usize;
+const FIFO_SIZE: usize = property!("spi_master.fifo_size");
 
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00;
