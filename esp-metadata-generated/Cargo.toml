@@ -9,6 +9,8 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+# Generated crate: release notes live in source/metadata crates, not here.
+changelog-exempt = true
 check-configs = [
     { features = [] },
     { features = ["build-script"] },

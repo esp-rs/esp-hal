@@ -22,6 +22,11 @@ const MANUAL_CHANGELOG_LABEL: &str = "manual-changelog";
 /// names must be published workspace packages. If a published package was
 /// modified without any changelog entry, the check fails.
 ///
+/// Published crates that are machine-generated or otherwise should not drive
+/// user-facing release notes may set `changelog-exempt = true` under
+/// `[package.metadata.espressif]` in their `Cargo.toml`. Such crates are
+/// omitted from the per-PR coverage check (no `# Changelog` section required).
+///
 /// Two labels affect the behaviour:
 ///
 /// - `skip-changelog` — skips the entire check (format, crate names, coverage). Applied by a
@@ -167,6 +172,10 @@ fn parse_and_validate_crates(workspace: &Path, body: &str) -> Result<Vec<PrSecti
 }
 
 /// Return the set of published package directory names touched by `files`.
+///
+/// Packages with `[package.metadata.espressif] changelog-exempt = true` are
+/// excluded: they are published but do not require a `# Changelog` section when
+/// modified.
 fn modified_packages(workspace: &Path, files: &[GhFile]) -> HashSet<String> {
     files
         .iter()
@@ -181,8 +190,13 @@ fn modified_packages(workspace: &Path, files: &[GhFile]) -> HashSet<String> {
             let published = is_published(&p);
             if !published {
                 log::debug!("Skipping '{dir}': publish = false");
+                return false;
             }
-            published
+            if is_changelog_exempt(&p) {
+                log::debug!("Skipping '{dir}': changelog-exempt = true");
+                return false;
+            }
+            true
         })
         .map(|s| s.to_string())
         .collect()
@@ -200,6 +214,22 @@ fn is_published(path: &Path) -> bool {
         .and_then(|p| p.get("publish"))
         .and_then(|v| v.as_bool())
         .unwrap_or(true)
+}
+
+/// `true` when `[package.metadata.espressif] changelog-exempt = true`.
+fn is_changelog_exempt(path: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(doc) = text.parse::<toml_edit::DocumentMut>() else {
+        return false;
+    };
+    doc.get("package")
+        .and_then(|p| p.get("metadata"))
+        .and_then(|m| m.get("espressif"))
+        .and_then(|e| e.get("changelog-exempt"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
