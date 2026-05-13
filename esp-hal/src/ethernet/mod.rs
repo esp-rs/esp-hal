@@ -10,26 +10,29 @@
 //! use esp_hal::ethernet::{
 //!     Ethernet,
 //!     EthernetDmaStorage,
+//!     RmiiPinBundle,
 //!     clock::ExternalRefClock,
 //!     phy::generic::GenericPhy,
 //! };
 //!
 //! let mut storage: EthernetDmaStorage<10, 10> = EthernetDmaStorage::new();
 //!
-//! let mut eth = Ethernet::new_rmii(
+//! let mut eth = Ethernet::new(
 //!     peripherals.ETH,
 //!     &mut storage,
 //!     [0x02, 0x00, 0x00, 0x12, 0x34, 0x56],
-//!     ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from PHY on GPIO0
 //!     GenericPhy::new(1),
-//!     peripherals.GPIO25,
-//!     peripherals.GPIO26,
-//!     peripherals.GPIO27,
-//!     peripherals.GPIO19,
-//!     peripherals.GPIO22,
-//!     peripherals.GPIO21,
-//!     peripherals.GPIO23,
-//!     peripherals.GPIO18, // MDC, MDIO
+//!     RmiiPinBundle {
+//!         clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from PHY on GPIO0
+//!         rxd0: peripherals.GPIO25,
+//!         rxd1: peripherals.GPIO26,
+//!         rx_dv: peripherals.GPIO27,
+//!         txd0: peripherals.GPIO19,
+//!         txd1: peripherals.GPIO22,
+//!         tx_en: peripherals.GPIO21,
+//!         mdc: peripherals.GPIO23,
+//!         mdio: peripherals.GPIO18,
+//!     },
 //! )
 //! .unwrap();
 //! // `eth` has type `Ethernet<'_, Blocking, GenericPhy>`
@@ -206,6 +209,240 @@ for_each_iomux_function! {
     };
 }
 
+/// RMII or MII pad wiring for [`Ethernet::new`].
+pub trait EthernetPinBundle: crate::private::Sealed {
+    /// Applies the required configuration. Intended to be
+    /// called by the Ethernet driver internally.
+    fn apply(self);
+}
+
+/// Wired RMII pads and RMII clock (pass to [`Ethernet::new`]).
+#[allow(
+    missing_docs,
+    reason = "The field names are indicative of their function."
+)]
+pub struct RmiiPinBundle<C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio> {
+    pub clock: C,
+    pub rxd0: Rxd0,
+    pub rxd1: Rxd1,
+    pub rx_dv: RxDv,
+    pub txd0: Txd0,
+    pub txd1: Txd1,
+    pub tx_en: TxEn,
+    pub mdc: Mdc,
+    pub mdio: Mdio,
+}
+
+impl<C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio> crate::private::Sealed
+    for RmiiPinBundle<C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio>
+{
+}
+
+impl<'d, C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio> EthernetPinBundle
+    for RmiiPinBundle<C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio>
+where
+    C: RmiiClockConfig,
+    Rxd0: EmacRxd0 + 'd,
+    Rxd1: EmacRxd1 + 'd,
+    RxDv: EmacRxDv + 'd,
+    Txd0: EmacTxd0 + 'd,
+    Txd1: EmacTxd1 + 'd,
+    TxEn: EmacTxEn + 'd,
+    Mdc: PeripheralOutput<'d>,
+    Mdio: PeripheralInput<'d> + PeripheralOutput<'d>,
+{
+    fn apply(self) {
+        self.rxd0.configure_iomux();
+        self.rxd1.configure_iomux();
+        self.rx_dv.configure_iomux();
+        self.txd0.configure_iomux();
+        self.txd1.configure_iomux();
+        self.tx_en.configure_iomux();
+
+        configure_mdio(self.mdc, self.mdio);
+        self.clock.configure();
+    }
+}
+
+/// Wired MII pads (pass to [`Ethernet::new`]).
+#[allow(
+    missing_docs,
+    reason = "The field names are indicative of their function."
+)]
+pub struct MiiPinBundle<
+    Rxd0,
+    Rxd1,
+    RxDv,
+    Txd0,
+    Txd1,
+    TxEn,
+    Rxd2,
+    Rxd3,
+    Txd2,
+    Txd3,
+    TxClk,
+    RxClk,
+    TxEr,
+    RxEr,
+    Crs,
+    Col,
+    Mdc,
+    Mdio,
+> {
+    pub rxd0: Rxd0,
+    pub rxd1: Rxd1,
+    pub rx_dv: RxDv,
+    pub txd0: Txd0,
+    pub txd1: Txd1,
+    pub tx_en: TxEn,
+    pub rxd2: Rxd2,
+    pub rxd3: Rxd3,
+    pub txd2: Txd2,
+    pub txd3: Txd3,
+    pub tx_clk: TxClk,
+    pub rx_clk: RxClk,
+    pub tx_er: TxEr,
+    pub rx_er: RxEr,
+    pub crs: Crs,
+    pub col: Col,
+    pub mdc: Mdc,
+    pub mdio: Mdio,
+}
+
+impl<
+    Rxd0,
+    Rxd1,
+    RxDv,
+    Txd0,
+    Txd1,
+    TxEn,
+    Rxd2,
+    Rxd3,
+    Txd2,
+    Txd3,
+    TxClk,
+    RxClk,
+    TxEr,
+    RxEr,
+    Crs,
+    Col,
+    Mdc,
+    Mdio,
+> crate::private::Sealed
+    for MiiPinBundle<
+        Rxd0,
+        Rxd1,
+        RxDv,
+        Txd0,
+        Txd1,
+        TxEn,
+        Rxd2,
+        Rxd3,
+        Txd2,
+        Txd3,
+        TxClk,
+        RxClk,
+        TxEr,
+        RxEr,
+        Crs,
+        Col,
+        Mdc,
+        Mdio,
+    >
+{
+}
+
+impl<
+    'd,
+    Rxd0,
+    Rxd1,
+    RxDv,
+    Txd0,
+    Txd1,
+    TxEn,
+    Rxd2,
+    Rxd3,
+    Txd2,
+    Txd3,
+    TxClk,
+    RxClk,
+    TxEr,
+    RxEr,
+    Crs,
+    Col,
+    Mdc,
+    Mdio,
+> EthernetPinBundle
+    for MiiPinBundle<
+        Rxd0,
+        Rxd1,
+        RxDv,
+        Txd0,
+        Txd1,
+        TxEn,
+        Rxd2,
+        Rxd3,
+        Txd2,
+        Txd3,
+        TxClk,
+        RxClk,
+        TxEr,
+        RxEr,
+        Crs,
+        Col,
+        Mdc,
+        Mdio,
+    >
+where
+    Rxd0: EmacRxd0 + 'd,
+    Rxd1: EmacRxd1 + 'd,
+    RxDv: EmacRxDv + 'd,
+    Txd0: EmacTxd0 + 'd,
+    Txd1: EmacTxd1 + 'd,
+    TxEn: EmacTxEn + 'd,
+    Rxd2: EmacRxd2 + 'd,
+    Rxd3: EmacRxd3 + 'd,
+    Txd2: EmacTxd2 + 'd,
+    Txd3: EmacTxd3 + 'd,
+    TxClk: EmacTxClk + 'd,
+    RxClk: EmacRxClk + 'd,
+    TxEr: EmacTxEr + 'd,
+    RxEr: EmacRxEr + 'd,
+    Crs: PeripheralInput<'d>,
+    Col: PeripheralInput<'d>,
+    Mdc: PeripheralOutput<'d>,
+    Mdio: PeripheralInput<'d> + PeripheralOutput<'d>,
+{
+    fn apply(self) {
+        self.rxd0.configure_iomux();
+        self.rxd1.configure_iomux();
+        self.rx_dv.configure_iomux();
+        self.txd0.configure_iomux();
+        self.txd1.configure_iomux();
+        self.tx_en.configure_iomux();
+        self.rxd2.configure_iomux();
+        self.rxd3.configure_iomux();
+        self.txd2.configure_iomux();
+        self.txd3.configure_iomux();
+        self.tx_clk.configure_iomux();
+        self.rx_clk.configure_iomux();
+        self.tx_er.configure_iomux();
+        self.rx_er.configure_iomux();
+
+        configure_mdio(self.mdc, self.mdio);
+
+        let crs: interconnect::InputSignal<'_> = self.crs.into();
+        crs.set_input_enable(true);
+        crate::gpio::InputSignal::EMAC_CRS.connect_to(&crs);
+
+        let col: interconnect::InputSignal<'_> = self.col.into();
+        col.set_input_enable(true);
+        crate::gpio::InputSignal::EMAC_COL.connect_to(&col);
+
+        clock::MiiClock.configure();
+    }
+}
+
 // ── Async wakers ──────────────────────────────────────────────────────────────
 
 pub(super) static RX_WAKER: AtomicWaker = AtomicWaker::new();
@@ -245,95 +482,17 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
 }
 
 impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
-    /// Creates an RMII Ethernet driver.
-    #[expect(clippy::too_many_arguments)]
-    pub fn new_rmii<const RX: usize, const TX: usize>(
-        eth: ETH<'d>,
-        storage: &'d mut EthernetDmaStorage<RX, TX>,
-        mac_addr: [u8; 6],
-        clock: impl RmiiClockConfig,
-        phy: P,
-        rxd0: impl EmacRxd0 + 'd,
-        rxd1: impl EmacRxd1 + 'd,
-        rx_dv: impl EmacRxDv + 'd,
-        txd0: impl EmacTxd0 + 'd,
-        txd1: impl EmacTxd1 + 'd,
-        tx_en: impl EmacTxEn + 'd,
-        mdc: impl PeripheralOutput<'d>,
-        mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
-    ) -> Result<Self, Error> {
-        let clock_guard = GenericPeripheralGuard::new();
-
-        // Configure IOMUX-only data pins (alt function 5).
-        rxd0.configure_iomux();
-        rxd1.configure_iomux();
-        rx_dv.configure_iomux();
-        txd0.configure_iomux();
-        txd1.configure_iomux();
-        tx_en.configure_iomux();
-
-        configure_mdio(mdc, mdio);
-
-        // Configure ref-clock pin + clock source + PHY interface.
-        clock.configure();
-
-        init_common(clock_guard, storage, mac_addr, phy, eth)
-    }
-
-    /// Creates a MII Ethernet driver.
-    #[expect(clippy::too_many_arguments)]
-    pub fn new_mii<const RX: usize, const TX: usize>(
+    /// Creates an Ethernet driver using RMII (`RmiiPinBundle`) or MII (`MiiPinBundle`).
+    pub fn new<const RX: usize, const TX: usize>(
         eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
         mac_addr: [u8; 6],
         phy: P,
-        rxd0: impl EmacRxd0 + 'd,
-        rxd1: impl EmacRxd1 + 'd,
-        rx_dv: impl EmacRxDv + 'd,
-        txd0: impl EmacTxd0 + 'd,
-        txd1: impl EmacTxd1 + 'd,
-        tx_en: impl EmacTxEn + 'd,
-        rxd2: impl EmacRxd2 + 'd,
-        rxd3: impl EmacRxd3 + 'd,
-        txd2: impl EmacTxd2 + 'd,
-        txd3: impl EmacTxd3 + 'd,
-        tx_clk: impl EmacTxClk + 'd,
-        rx_clk: impl EmacRxClk + 'd,
-        tx_er: impl EmacTxEr + 'd,
-        rx_er: impl EmacRxEr + 'd,
-        crs: impl PeripheralInput<'d>,
-        col: impl PeripheralInput<'d>,
-        mdc: impl PeripheralOutput<'d>,
-        mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
+        pins: impl EthernetPinBundle + 'd,
     ) -> Result<Self, Error> {
         let clock_guard = GenericPeripheralGuard::new();
 
-        rxd0.configure_iomux();
-        rxd1.configure_iomux();
-        rx_dv.configure_iomux();
-        txd0.configure_iomux();
-        txd1.configure_iomux();
-        tx_en.configure_iomux();
-        rxd2.configure_iomux();
-        rxd3.configure_iomux();
-        txd2.configure_iomux();
-        txd3.configure_iomux();
-        tx_clk.configure_iomux();
-        rx_clk.configure_iomux();
-        tx_er.configure_iomux();
-        rx_er.configure_iomux();
-
-        configure_mdio(mdc, mdio);
-
-        let crs: interconnect::InputSignal<'_> = crs.into();
-        crs.set_input_enable(true);
-        crate::gpio::InputSignal::EMAC_CRS.connect_to(&crs);
-
-        let col: interconnect::InputSignal<'_> = col.into();
-        col.set_input_enable(true);
-        crate::gpio::InputSignal::EMAC_COL.connect_to(&col);
-
-        clock::MiiClock.configure();
+        pins.apply();
 
         init_common(clock_guard, storage, mac_addr, phy, eth)
     }

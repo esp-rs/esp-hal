@@ -5,10 +5,9 @@
 //! The ESP32 EMAC needs a 50 MHz reference clock for RMII.  There are two
 //! hardware modes:
 //!
-//! - **[`ExternalRefClock`]** — the PHY drives the reference clock into `EMAC_TX_CLK`. Pass an
-//!   instance of this struct wrapping the chosen GPIO to
-//!   [`Ethernet::new_rmii`][crate::ethernet::Ethernet::new_rmii]. This is the recommended
-//!   configuration when the PHY has an integrated oscillator.
+//! - **[`ExternalRefClock`]** — the PHY drives `EMAC_TX_CLK`. Set [`RmiiPinBundle::clock`] (see
+//!   [`RmiiPinBundle`][crate::ethernet::RmiiPinBundle]) when calling
+//!   [`Ethernet::new`][crate::ethernet::Ethernet::new]; use this when the PHY has an oscillator.
 //!
 //! - **[`ApllClock`]** — the ESP32 APLL is tuned to 50 MHz and the output is routed through
 //!   `EMAC_CLK_OUT` or `EMAC_CLK_180`. The EMAC_EXT block feeds this clock back into the MAC. Use
@@ -21,9 +20,10 @@
 //!
 //! # MII clock source
 //!
-//! Using [`Ethernet::new_mii`][crate::ethernet::Ethernet::new_mii] enables the EMAC_EXT MII clock
-//! buffers. In MII mode the PHY drives both `TX_CLK` and `RX_CLK` at 25 MHz (100 Mbps)
-//! or 2.5 MHz (10 Mbps) — no internal clock generation is required.
+//! Using [`Ethernet::new`][crate::ethernet::Ethernet::new] with
+//! [`MiiPinBundle`][crate::ethernet::MiiPinBundle] enables the EMAC_EXT MII clock buffers. In MII
+//! mode the PHY drives both `TX_CLK` and `RX_CLK` at 25 MHz (100 Mbps) or 2.5 MHz (10 Mbps) — no
+//! internal clock generation is required.
 
 use esp_rom_sys::rom::ets_delay_us;
 

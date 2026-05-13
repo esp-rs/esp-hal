@@ -44,6 +44,7 @@ use esp_hal::{
     ethernet::{
         Ethernet,
         EthernetDmaStorage,
+        RmiiPinBundle,
         clock::ExternalRefClock,
         mac::{Duplex, LinkState, Speed},
         phy::{MdioDriver, Phy, PhyError, generic::GenericPhy},
@@ -152,20 +153,22 @@ async fn main(spawner: Spawner) {
 
     // ── Ethernet ─────────────────────────────────────────────────────────────
 
-    let eth: EthDriver = Ethernet::new_rmii(
+    let eth: EthDriver = Ethernet::new(
         peripherals.ETH,
         STORAGE.take(),
         MAC_ADDR,
-        ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
         ExamplePhy::new(1),
-        peripherals.GPIO25, // RXD0
-        peripherals.GPIO26, // RXD1
-        peripherals.GPIO27, // RX_DV
-        peripherals.GPIO19, // TXD0
-        peripherals.GPIO22, // TXD1
-        peripherals.GPIO21, // TX_EN
-        peripherals.GPIO23, // MDC
-        peripherals.GPIO18, // MDIO
+        RmiiPinBundle {
+            clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from IP101GRI REFCLKO
+            rxd0: peripherals.GPIO25,
+            rxd1: peripherals.GPIO26,
+            rx_dv: peripherals.GPIO27,
+            txd0: peripherals.GPIO19,
+            txd1: peripherals.GPIO22,
+            tx_en: peripherals.GPIO21,
+            mdc: peripherals.GPIO23,
+            mdio: peripherals.GPIO18,
+        },
     )
     .expect("Ethernet init failed")
     .into_async();

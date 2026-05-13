@@ -255,8 +255,7 @@ impl RDes {
 /// Static backing storage for all DMA descriptor rings and packet buffers.
 ///
 /// `TX` is the number of transmit slots; `RX` is the number of receive slots.
-/// Pass a mutable reference to [`Ethernet::new_rmii`][super::Ethernet::new_rmii] or
-/// [`Ethernet::new_mii`][super::Ethernet::new_mii].
+/// Pass a mutable reference to [`Ethernet::new`][super::Ethernet::new].
 pub struct EthernetDmaStorage<const RX: usize, const TX: usize> {
     pub(super) rx_descs: [RDes; RX],
     pub(super) tx_descs: [TDes; TX],
