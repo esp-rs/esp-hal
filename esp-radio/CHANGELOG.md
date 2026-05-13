@@ -9,14 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Interface::station()`, `Interface::try_station()`, `Interface::access_point()`, and `Interface::try_access_point()` singleton constructors (#5480)
-- `WifiController::esp_now()` and `WifiController::sniffer()` methods to create ESP-NOW and sniffer instances tied to the controller's lifetime (#5480)
-- `Drop` impl for `Sniffer` that disables promiscuous mode and unregisters the callback (#5480)
 
 ### Changed
 
-- `wifi::new()` now returns `WifiController` instead of `(WifiController, Interfaces)` (#5480)
-- `Interface` no longer has a lifetime parameter and is no longer `Clone`/`Copy` (singleton semantics) (#5480)
 
 ### Fixed
 
@@ -24,8 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed minor issues (#5490, #5495, #5499)
 
 ### Removed
-
-- Removed the `Interfaces` struct; interfaces and sub-peripherals are now created independently (#5480)
 
 
 ## [v0.18.0] - 2026-04-16
