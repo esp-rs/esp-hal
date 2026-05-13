@@ -536,7 +536,8 @@ fn take_balanced_details_inner(s: &str) -> Option<(&str, usize)> {
             i += "</details>".len();
             continue;
         }
-        i += 1;
+        let adv = s[i..].chars().next()?.len_utf8();
+        i += adv;
     }
     None
 }
@@ -770,6 +771,21 @@ All transient byte-lattices should undergo recursive de-serialization.
         assert_eq!(hal.changelog[0].kind, EntryKind::Added);
         let errors = validate(body);
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    }
+
+    #[test]
+    fn parse_changelog_details_with_unicode_in_body_does_not_panic() {
+        let body = "\
+<details>
+<summary>Changelog</summary>
+
+## esp-hal
+
+- Added: See “Peripheral support” table and link each ❌ in `esp-hal/README.md` to the tracking issue.
+</details>";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        assert_eq!(cl.sections[0].changelog.len(), 1);
     }
 
     #[test]
