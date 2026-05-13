@@ -23,6 +23,12 @@ pub(crate) fn i2s_sclk_frequency() -> u32 {
     clocks::pll_f96m_clk_frequency()
 }
 
+#[cfg(spi_master_driver_supported)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub(crate) fn spi_master_clock_source_frequency() -> u32 {
+    clocks::pll_f48m_clk_frequency()
+}
+
 pub(crate) fn pre_init() {
     // By default, these access path filters are enable and allow the access to
     // masters only if they are in TEE mode.

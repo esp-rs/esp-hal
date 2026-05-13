@@ -690,11 +690,13 @@ mod spi_slave {
 #[embedded_test::tests(default_timeout = 3)]
 #[cfg(spi_master_supports_dma)]
 mod qspi_dma {
+    #[cfg(pcnt_driver_supported)]
+    use esp_hal::gpio::Flex;
     use esp_hal::{
         Blocking,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
-        gpio::{AnyPin, Flex, Input, InputConfig, Level, Output, OutputConfig, Pull},
+        gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
         spi::{
             Mode,
             master::{Address, Command, Config, DataMode, Spi, SpiDma},
@@ -775,6 +777,7 @@ mod qspi_dma {
         transfer.wait()
     }
 
+    #[cfg(pcnt_driver_supported)]
     fn transfer_write_cpu<'s>(
         mut spi: Spi<'s, Blocking>,
         tx_buf: &[u8],

@@ -45,7 +45,7 @@ cfg_if::cfg_if! {
 
 #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
+    if #[cfg(dma_kind = "pdma")] {
         type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
     } else {
         type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
@@ -135,7 +135,7 @@ fn run_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
 }
 
 /// Async version of [`run_test_in_all_memory_regions`].
-#[cfg(feature = "unstable")]
+#[cfg(all(feature = "unstable", pcnt_driver_supported, spi_master_supports_dma))]
 async fn run_async_test_in_all_memory_regions<const BUFFER_SIZE: usize>(
     mut test_fn: impl AsyncFnMut(&mut [u8], &mut [u8]),
 ) {

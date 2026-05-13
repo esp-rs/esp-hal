@@ -2,17 +2,18 @@ use core::{
     cell::{Cell, UnsafeCell},
     cmp::min,
     mem::{ManuallyDrop, MaybeUninit},
+    pin::Pin,
     ptr::NonNull,
     sync::atomic::{Ordering, fence},
+    task::{Context, Poll},
 };
 
 #[cfg(feature = "unstable")]
 use embedded_hal::spi::{ErrorType, SpiBus};
 
 use super::*;
-#[cfg(dma_can_access_psram)]
-use crate::{dma::ManualWritebackBuffer, soc::is_slice_in_psram};
 use crate::{
+    RegisterToggle,
     dma::{
         CHUNK_SIZE,
         Channel,
@@ -32,18 +33,21 @@ use crate::{
         prepare_for_rx,
         prepare_for_tx,
     },
+    pac::spi2::RegisterBlock,
     private::DropGuard,
     soc::is_slice_in_dram,
     spi::DmaError,
 };
+#[cfg(dma_can_access_psram)]
+use crate::{dma::ManualWritebackBuffer, soc::is_slice_in_psram};
 
 const MAX_DMA_SIZE: usize = 32736;
 
 impl<'d> Spi<'d, Blocking> {
     #[doc_replace(
         "dma_channel" => {
-            cfg(any(esp32, esp32s2)) => "DMA_SPI2",
-            _ => "DMA_CH0",
+            cfg(dma_kind = "pdma") => "DMA_SPI2",
+            cfg(dma_kind = "gdma") => "DMA_CH0",
         }
     )]
     /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
@@ -72,8 +76,8 @@ impl<'d> Spi<'d, Blocking> {
 
 #[doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "DMA_SPI2",
-        _ => "DMA_CH0",
+        cfg(dma_kind = "pdma") => "DMA_SPI2",
+        cfg(dma_kind = "gdma") => "DMA_CH0",
     }
 )]
 /// DMA-controlled SPI driver.
@@ -268,7 +272,7 @@ impl<'d> SpiDma<'d, Blocking> {
         let rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
 
         cfg_if::cfg_if! {
-            if #[cfg(all(esp32, spi_address_workaround))] {
+            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
                 static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
                 let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
                 let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
@@ -369,7 +373,7 @@ impl<'d> SpiDma<'d, Async> {
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 if !self.0.interrupts().is_disjoint(Self::DONE_EVENTS) {
-                    #[cfg(any(esp32, esp32s2))]
+                    #[cfg(any(spi_master_version = "1", spi_master_version = "2"))]
                     // Need to poll for done-ness even after interrupt fires.
                     if self.0.busy() {
                         cx.waker().wake_by_ref();
@@ -748,7 +752,7 @@ impl DmaOperationKind {
         fn is_dma_compatible(buffer: &[u8], _direction: TransferDirection) -> bool {
             // FIXME: lazy workaround for ESP32 TX DMA alignment requirements.
             // `prepare_for_tx` and `prepare_for_rx` should be updated to handle ESP32.
-            #[cfg(esp32)]
+            #[cfg(spi_master_version = "1")]
             if !((buffer.as_ptr() as usize).is_multiple_of(4) && buffer.len().is_multiple_of(4)) {
                 return false;
             }
@@ -758,7 +762,7 @@ impl DmaOperationKind {
             }
             #[cfg(dma_can_access_psram)]
             if is_slice_in_psram(buffer) {
-                #[cfg(esp32s2)]
+                #[cfg(spi_master_version = "2")]
                 if _direction == TransferDirection::In {
                     // For some reason, having tail bytes in internal RAM causes issues, so we
                     // force copying if the end of the PSRAM buffer is not aligned.
@@ -893,7 +897,7 @@ where
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
-    #[cfg(all(esp32, spi_address_workaround))]
+    #[cfg(all(spi_master_version = "1", spi_address_workaround))]
     unsafe fn set_up_address_workaround(
         &mut self,
         cmd: Command,
@@ -968,16 +972,19 @@ where
     ///
     /// Data is copied in two cases:
     ///   - When the buffer is not located in a memory region that can be accessed by the DMA.
-    #[cfg_attr(not(any(esp32c5, esp32c61)), doc = "The DMA cannot read flash memory.")]
+    #[cfg_attr(
+        not(spi_master_dma_can_access_flash),
+        doc = "The DMA cannot read flash memory."
+    )]
     ///   - When the alignment of the buffer does not meet the DMA's requirements, the unaligned
     ///     parts of the buffer are copied.
     #[cfg_attr(
-        esp32,
+        spi_master_version = "1",
         doc = "On ESP32, transferring from internal SRAM requires copying the entire buffer if it is
 not 4-byte aligned. This is a limitation of the current implementation."
     )]
     #[cfg_attr(
-        esp32s2,
+        spi_master_version = "2",
         doc = "On ESP32-S2, receiving into PSRAM requires the buffer's _end_ to be 16-byte
 aligned, otherwise the driver requires copying the entire buffer."
     )]
@@ -1171,7 +1178,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_write: usize,
         buffer: &mut impl DmaTxBuffer,
     ) -> Result<(), Error> {
-        #[cfg(all(esp32, spi_address_workaround))]
+        #[cfg(all(spi_master_version = "1", spi_address_workaround))]
         {
             // On the ESP32, if we don't have data, the address is always sent
             // on a single line, regardless of its data mode.
@@ -1225,14 +1232,17 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
+    #[doc_replace(
+        "max_frequency" => {
+            cfg(esp32h2) => "48MHz",
+            _ => "80MHz",
+        }
+    )]
     /// Change the bus configuration.
     ///
     /// # Errors
     ///
-    /// If frequency passed in config exceeds
-    #[cfg_attr(not(esp32h2), doc = " 80MHz")]
-    #[cfg_attr(esp32h2, doc = " 48MHz")]
-    /// or is below 70kHz,
+    /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
     /// [`ConfigError::UnsupportedFrequency`] error will be returned.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
@@ -1652,7 +1662,7 @@ impl DmaDriver {
         tx_buffer: &mut impl DmaTxBuffer,
         channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
     ) -> Result<(), Error> {
-        #[cfg(esp32s2)]
+        #[cfg(spi_master_version = "2")]
         {
             // without this a transfer after a write will fail
             self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
@@ -1676,7 +1686,7 @@ impl DmaDriver {
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
-            #[cfg(esp32)]
+            #[cfg(spi_master_version = "1")]
             {
                 // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
                 // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506

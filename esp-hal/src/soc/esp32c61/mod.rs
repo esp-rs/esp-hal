@@ -19,6 +19,12 @@ pub(crate) fn i2s_sclk_frequency() -> u32 {
     clocks::pll_f160m_frequency()
 }
 
+#[cfg(spi_master_driver_supported)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub(crate) fn spi_master_clock_source_frequency() -> u32 {
+    clocks::pll_f80m_frequency()
+}
+
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.
     // FIXME: this is a temporary workaround until we have a proper solution for TEE security modes.

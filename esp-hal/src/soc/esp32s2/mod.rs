@@ -26,6 +26,12 @@ pub(crate) fn i2s_sclk_frequency() -> u32 {
     }
 }
 
+#[cfg(spi_master_driver_supported)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub(crate) fn spi_master_clock_source_frequency() -> u32 {
+    clocks::apb_clk_frequency()
+}
+
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]

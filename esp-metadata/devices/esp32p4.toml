@@ -338,6 +338,8 @@ timg_has_divcnt_rst = true
 # SPI Master: 2 instances (GPSPI2, GPSPI3)
 # SPI Master: SPI2 only (SPI2 and SPI3 have different PAC RegisterBlock types)
 [device.spi_master]
+version = 3
+fifo_size = 64
 support_status = "partial"
 supports_dma = false # TODO
 instances = [

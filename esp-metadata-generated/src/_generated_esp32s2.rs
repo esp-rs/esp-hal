@@ -340,6 +340,21 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 1048575)
     };
+    ("spi_master.version") => {
+        2
+    };
+    ("spi_master.version", str) => {
+        stringify!(2)
+    };
+    ("spi_master.fifo_size") => {
+        72
+    };
+    ("spi_master.fifo_size", str) => {
+        stringify!(72)
+    };
+    ("spi_master.bit_order_is_bool") => {
+        true
+    };
     ("spi_master.supports_dma") => {
         true
     };
@@ -353,6 +368,9 @@ macro_rules! property {
         true
     };
     ("spi_master.has_clk_pre_div") => {
+        false
+    };
+    ("spi_master.dma_can_access_flash") => {
         false
     };
     ("spi_slave.supports_dma") => {

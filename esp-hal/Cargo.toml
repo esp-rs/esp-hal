@@ -111,7 +111,7 @@ esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = 
 esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
 esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
 esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true }
-esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f6f4ad1f804eebab59dbaf425684865781466e4c" }
+esp32p4 = { version = "0.2",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4a8000b" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }

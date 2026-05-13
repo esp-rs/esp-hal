@@ -11,6 +11,12 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
+#[cfg(spi_master_driver_supported)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub(crate) fn spi_master_clock_source_frequency() -> u32 {
+    clocks::apb_clk_frequency()
+}
+
 pub(crate) fn pre_init() {
     #[cfg(multi_core)]
     unsafe {

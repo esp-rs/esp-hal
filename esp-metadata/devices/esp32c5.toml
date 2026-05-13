@@ -597,6 +597,9 @@ clock_sources.supported = ["Xtal", "RcFast", "Pll80MHz"]
 clock_sources.default = "Pll80MHz"
 
 [device.spi_master]
+dma_can_access_flash = true
+version = 3
+fifo_size = 64
 support_status = "supported"
 supports_dma = true
 has_app_interrupts = true
@@ -605,7 +608,6 @@ has_clk_pre_div = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
-
 [device.spi_slave]
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
