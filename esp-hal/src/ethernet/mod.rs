@@ -526,7 +526,7 @@ impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
         }
     }
 
-    /// Configures the MAC for the given speed.
+    /// Configures the MAC for the given duplex mode.
     pub fn set_duplex(&mut self, duplex: Duplex) {
         if duplex != self.duplex {
             EmacRegs.set_duplex(duplex);
@@ -639,7 +639,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
 
     /// Peeks at the next received frame without consuming it.
     ///
-    /// Returns `Some((len, data_slice))` if a valid frame is ready, or `None`.
+    /// Returns `Some(data_slice)` if a valid frame is ready, or `None`.
     /// The caller must call [`release_rx`][Self::release_rx] after processing.
     pub fn peek_rx(&mut self) -> Option<&mut [u8]> {
         self.rx.receive()

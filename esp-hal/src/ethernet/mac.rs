@@ -170,7 +170,7 @@ impl EmacRegs {
             .modify(|_, w| w.fespeed().bit(speed == Speed::_100M));
     }
 
-    /// Configures the MAC for the given speed.
+    /// Configures the MAC for the given duplex mode.
     pub fn set_duplex(&self, duplex: Duplex) {
         EMAC_MAC::regs()
             .emacconfig()
