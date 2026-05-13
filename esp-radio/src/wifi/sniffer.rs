@@ -88,9 +88,8 @@ impl Sniffer<'_> {
 
         // If registering the callback fails we panic, so release the singleton
         // bit first so the panic doesn't leave the slot permanently occupied.
-        let res = esp_wifi_result!(unsafe {
-            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
-        });
+        let res =
+            esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) });
         if res.is_err() {
             release(SNIFFER_BIT);
             unwrap!(res);
@@ -143,7 +142,10 @@ impl Drop for Sniffer<'_> {
         // the callback slot and release the singleton bit, otherwise a future
         // Sniffer could never be created.
         if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(false) }) {
-            warn!("Failed to disable promiscuous mode on sniffer drop: {:?}", e);
+            warn!(
+                "Failed to disable promiscuous mode on sniffer drop: {:?}",
+                e
+            );
         }
         if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(None) }) {
             warn!(
