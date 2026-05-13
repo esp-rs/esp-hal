@@ -24,7 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
             LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             COMMIT_MSG=$(git log -1 --pretty=%B)

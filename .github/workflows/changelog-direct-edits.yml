@@ -1,0 +1,88 @@
+# Warn when a PR edits CHANGELOG.md directly. This runs on pull_request_target so
+# GITHUB_TOKEN can comment on fork PRs (pull_request gives a read-only token for forks).
+# This job only uses the GitHub API — it does not check out the PR branch.
+name: Changelog direct-edit warning
+
+on:
+  pull_request_target:
+    types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  get-labels:
+    uses: ./.github/workflows/get-labels.yml
+
+  no-changelog-edits:
+    # Release PRs (labelled `release-pr`) and PRs where the author is taking
+    # full manual control of the changelog (`manual-changelog`) legitimately
+    # modify CHANGELOG.md — skip this check for them.
+    needs: get-labels
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(needs.get-labels.outputs.labels, 'release-pr') &&
+      !contains(needs.get-labels.outputs.labels, 'manual-changelog')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for direct CHANGELOG.md edits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          changed=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json files \
+            --jq '[.files[].path | select(endswith("/CHANGELOG.md") or . == "CHANGELOG.md")] | join("\n")')
+
+          if [ -z "$changed" ]; then
+            echo "No CHANGELOG.md files were edited — OK."
+            exit 0
+          fi
+
+          echo "The following CHANGELOG.md file(s) were edited directly:"
+          echo "$changed"
+
+          file_list=$(echo "$changed" | sed 's/^/- `/' | sed 's/$/`/')
+
+          cat > /tmp/comment.md <<EOF
+          <!-- xtask-changelog-edit-warning -->
+          ## :warning: Do not edit \`CHANGELOG.md\` manually
+
+          This PR modifies the following changelog file(s) directly:
+
+          ${file_list}
+
+          Changelog entries are no longer maintained by hand. Instead, add your entries to the **PR description** under the \`# Changelog\` section:
+
+          \`\`\`markdown
+          # Changelog
+
+          ## esp-hal
+
+          - Added: Short description of the change
+          - Fixed: Short description of the fix
+          \`\`\`
+
+          Migration guide entries go in the \`# Migration guide\` section (area is required; each breaking change needs a \`### Title\` heading):
+
+          \`\`\`markdown
+          # Migration guide
+
+          ## esp-hal/SPI
+
+          ### \`OldType\` has been renamed to \`NewType\`
+
+          Replace all uses of \`OldType\` with \`NewType\`.
+          \`\`\`
+
+          Please **revert** the changes to \`CHANGELOG.md\` and move your entries to the PR description instead.
+          Run \`cargo xtask check-pr-changelog\` locally to validate the format before pushing.
+          EOF
+
+          # Update existing bot comment if present, otherwise create a new one.
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body-file /tmp/comment.md 2>/dev/null \
+            || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md \
+            || true
+
+          exit 1
