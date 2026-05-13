@@ -261,8 +261,9 @@ fn parse_changelog_subsection(text: &str, sections: &mut Vec<PrSection>) -> Resu
 fn parse_changelog_item(item: &str) -> Result<ChangelogEntry> {
     let Some((kind_str, text)) = item.split_once(": ") else {
         bail!(
-            "Changelog list item must start with 'Added: ', 'Changed: ', 'Fixed: ' or \
-             'Removed: '; got: `- {item}`"
+            r#"Changelog list item must start with a category followed by a colon, or '- No changelog necessary.'; got: `- {item}`.
+
+Accepted categories: Added, Changed, Fixed, Removed"#
         );
     };
 
@@ -371,9 +372,9 @@ fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
     None
 }
 
-/// Like [`find_h1_section`], but ignores `# <title>` headings whose first character falls inside one
-/// of the `[start, end)` byte ranges (e.g. `# Changelog` nested in a `<details>` block whose body
-/// is parsed separately).
+/// Like [`find_h1_section`], but ignores `# <title>` headings whose first character falls inside
+/// one of the `[start, end)` byte ranges (e.g. `# Changelog` nested in a `<details>` block whose
+/// body is parsed separately).
 fn find_h1_section_outside_ranges<'a>(
     body: &'a str,
     title: &str,
@@ -384,9 +385,7 @@ fn find_h1_section_outside_ranges<'a>(
     for line in body.lines() {
         let line_len = line.len();
         if line.trim().eq_ignore_ascii_case(&needle) {
-            let excluded = ranges
-                .iter()
-                .any(|&(s, e)| offset >= s && offset < e);
+            let excluded = ranges.iter().any(|&(s, e)| offset >= s && offset < e);
             if !excluded {
                 return Some(body[offset + line_len..].trim_start_matches('\n'));
             }
@@ -456,10 +455,11 @@ fn find_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
         return Some(0);
     }
     let ned = needle.as_bytes();
-    haystack
-        .as_bytes()
-        .windows(ned.len())
-        .position(|w| w.iter().zip(ned.iter()).all(|(a, b)| a.eq_ignore_ascii_case(b)))
+    haystack.as_bytes().windows(ned.len()).position(|w| {
+        w.iter()
+            .zip(ned.iter())
+            .all(|(a, b)| a.eq_ignore_ascii_case(b))
+    })
 }
 
 /// The slice must begin with `<details`; the next character after the word is `>` or whitespace.
