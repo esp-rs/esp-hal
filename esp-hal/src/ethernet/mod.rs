@@ -132,8 +132,6 @@ emac_iomux_trait!(EmacTxd2, "GPIO that carries `EMAC_TXD2`.");
 emac_iomux_trait!(EmacTxd3, "GPIO that carries `EMAC_TXD3`.");
 emac_iomux_trait!(EmacTxClk, "GPIO that carries `EMAC_TX_CLK`.");
 emac_iomux_trait!(EmacRxClk, "GPIO that carries `EMAC_RX_CLK`.");
-emac_iomux_trait!(EmacTxEr, "GPIO that carries `EMAC_TX_ER`.");
-emac_iomux_trait!(EmacRxEr, "GPIO that carries `EMAC_RX_ER`.");
 
 emac_iomux_trait!(
     EmacRmiiClkIn,
@@ -200,12 +198,6 @@ for_each_iomux_function! {
     (EMAC_TX_CLK, $gpio:ident, $af:ident) => {
         implement_trait!(EmacRmiiClkIn, $gpio, $af);
         implement_trait!(EmacTxClk, $gpio, $af);
-    };
-    (EMAC_TX_ER, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxEr, $gpio, $af);
-    };
-    (EMAC_RX_ER, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxEr, $gpio, $af);
     };
 }
 
@@ -282,8 +274,6 @@ pub struct MiiPinBundle<
     Txd3,
     TxClk,
     RxClk,
-    TxEr,
-    RxEr,
     Crs,
     Col,
     Mdc,
@@ -301,34 +291,14 @@ pub struct MiiPinBundle<
     pub txd3: Txd3,
     pub tx_clk: TxClk,
     pub rx_clk: RxClk,
-    pub tx_er: TxEr,
-    pub rx_er: RxEr,
     pub crs: Crs,
     pub col: Col,
     pub mdc: Mdc,
     pub mdio: Mdio,
 }
 
-impl<
-    Rxd0,
-    Rxd1,
-    RxDv,
-    Txd0,
-    Txd1,
-    TxEn,
-    Rxd2,
-    Rxd3,
-    Txd2,
-    Txd3,
-    TxClk,
-    RxClk,
-    TxEr,
-    RxEr,
-    Crs,
-    Col,
-    Mdc,
-    Mdio,
-> crate::private::Sealed
+impl<Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Rxd2, Rxd3, Txd2, Txd3, TxClk, RxClk, Crs, Col, Mdc, Mdio>
+    crate::private::Sealed
     for MiiPinBundle<
         Rxd0,
         Rxd1,
@@ -342,8 +312,6 @@ impl<
         Txd3,
         TxClk,
         RxClk,
-        TxEr,
-        RxEr,
         Crs,
         Col,
         Mdc,
@@ -366,8 +334,6 @@ impl<
     Txd3,
     TxClk,
     RxClk,
-    TxEr,
-    RxEr,
     Crs,
     Col,
     Mdc,
@@ -386,8 +352,6 @@ impl<
         Txd3,
         TxClk,
         RxClk,
-        TxEr,
-        RxEr,
         Crs,
         Col,
         Mdc,
@@ -406,8 +370,6 @@ where
     Txd3: EmacTxd3 + 'd,
     TxClk: EmacTxClk + 'd,
     RxClk: EmacRxClk + 'd,
-    TxEr: EmacTxEr + 'd,
-    RxEr: EmacRxEr + 'd,
     Crs: PeripheralInput<'d>,
     Col: PeripheralInput<'d>,
     Mdc: PeripheralOutput<'d>,
@@ -426,8 +388,6 @@ where
         self.txd3.configure_iomux();
         self.tx_clk.configure_iomux();
         self.rx_clk.configure_iomux();
-        self.tx_er.configure_iomux();
-        self.rx_er.configure_iomux();
 
         configure_mdio(self.mdc, self.mdio);
 
