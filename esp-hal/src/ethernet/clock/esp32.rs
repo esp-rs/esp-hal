@@ -5,8 +5,8 @@
 //! The ESP32 EMAC needs a 50 MHz reference clock for RMII.  There are two
 //! hardware modes:
 //!
-//! - **[`ExternalRefClock`]** — the PHY drives `EMAC_TX_CLK`. Set [`RmiiPinBundle::clock`] (see
-//!   [`RmiiPinBundle`][crate::ethernet::RmiiPinBundle]) when calling
+//! - **[`ExternalRefClock`]** — the PHY drives `EMAC_TX_CLK`. Set
+//!   [`RmiiPinBundle::clock`][crate::ethernet::RmiiPinBundle::clock] when calling
 //!   [`Ethernet::new`][crate::ethernet::Ethernet::new]; use this when the PHY has an oscillator.
 //!
 //! - **[`ApllClock`]** — the ESP32 APLL is tuned to 50 MHz and the output is routed through
