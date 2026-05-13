@@ -535,7 +535,10 @@ mod tests {
         assert_eq!(rmt.frequency(), FREQ);
 
         #[cfg(soc_has_clock_node_rmt_sclk)]
-        assert_eq!(esp_hal::clock::ll::RmtInstance::Rmt.sclk_frequency(), FREQ.as_hz());
+        assert_eq!(
+            esp_hal::clock::ll::RmtInstance::Rmt.sclk_frequency(),
+            FREQ.as_hz()
+        );
     }
 
     #[test]
@@ -551,9 +554,8 @@ mod tests {
         assert_eq!(apb_frequency.as_hz(), 40_000_000);
         assert_eq!(rmt.frequency().as_hz(), 80_000_000);
 
-        let ticks_for_400ns = |frequency: Rate| {
-            ((400_u64 * u64::from(frequency.as_hz())) / 1_000_000_000) as u16
-        };
+        let ticks_for_400ns =
+            |frequency: Rate| ((400_u64 * u64::from(frequency.as_hz())) / 1_000_000_000) as u16;
         assert_eq!(ticks_for_400ns(apb_frequency), 16);
         assert_eq!(ticks_for_400ns(rmt.frequency()), 32);
     }

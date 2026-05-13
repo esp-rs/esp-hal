@@ -1134,7 +1134,7 @@ impl RmtClockGuard {
         #[cfg(soc_has_clock_node_rmt_sclk)]
         clocks::ClockTree::with(|clocks| {
             if clocks::RmtInstance::Rmt.sclk_config(clocks).is_none() {
-                clocks::RmtInstance::Rmt.configure_sclk(clocks, ClockSource::default().into());
+                clocks::RmtInstance::Rmt.configure_sclk(clocks, ClockSource::default());
             }
 
             clocks::RmtInstance::Rmt.request_sclk(clocks);
@@ -2231,84 +2231,7 @@ impl DynChannelAccess<Rx> {
     }
 }
 
-for_each_rmt_clock_source!(
-    (all $(($name:ident, $bits:literal)),+) => {
-        #[derive(Clone, Copy, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[repr(u8)]
-        enum ClockSource {
-            $(
-                #[allow(unused)]
-                $name = $bits,
-            )+
-        }
-    };
-
-    (is_boolean) => {
-        impl ClockSource {
-            fn bit(self) -> bool {
-                match (self as u8) {
-                    0 => false,
-                    1 => true,
-                    _ => unreachable!("should be removed by the compiler!"),
-                }
-            }
-        }
-    };
-
-    (default ($name:ident)) => {
-        impl ClockSource {
-            fn default() -> Self {
-                Self::$name
-            }
-
-            fn bits(self) -> u8 {
-                self as u8
-            }
-
-            fn freq(self) -> crate::time::Rate {
-                match self {
-                    #[cfg(rmt_supports_apb_clock)]
-                    ClockSource::Apb => Rate::from_hz(clocks::apb_clk_frequency()),
-
-                    #[cfg(rmt_supports_rcfast_clock)]
-                    ClockSource::RcFast => Rate::from_hz(clocks::rc_fast_clk_frequency()),
-
-                    #[cfg(rmt_supports_xtal_clock)]
-                    ClockSource::Xtal => Rate::from_hz(clocks::xtal_clk_frequency()),
-
-                    #[cfg(rmt_supports_pll80mhz_clock)]
-                    ClockSource::Pll80MHz => Rate::from_mhz(80),
-
-                    #[cfg(rmt_supports_reftick_clock)]
-                    ClockSource::RefTick => todo!(),
-                }
-            }
-        }
-    };
-);
-
-#[cfg(soc_has_clock_node_rmt_sclk)]
-impl From<ClockSource> for clocks::RmtSclkConfig {
-    fn from(value: ClockSource) -> Self {
-        match value {
-            #[cfg(rmt_supports_apb_clock)]
-            ClockSource::Apb => Self::ApbClk,
-
-            #[cfg(rmt_supports_rcfast_clock)]
-            ClockSource::RcFast => Self::RcFastClk,
-
-            #[cfg(rmt_supports_xtal_clock)]
-            ClockSource::Xtal => Self::XtalClk,
-
-            #[cfg(rmt_supports_pll80mhz_clock)]
-            ClockSource::Pll80MHz => Self::PllF80m,
-
-            #[cfg(rmt_supports_reftick_clock)]
-            ClockSource::RefTick => unreachable!(),
-        }
-    }
-}
+type ClockSource = clocks::RmtSclkConfig;
 
 // Obtain maximum value for a register field from the PAC's register spec.
 macro_rules! max_from_register_spec {
@@ -2331,8 +2254,6 @@ mod chip_specific {
     use enumset::EnumSet;
     #[cfg(place_rmt_driver_in_ram)]
     use procmacros::ram;
-    #[cfg(soc_has_clock_node_rmt_sclk)]
-    use crate::soc::clocks;
 
     use super::{
         ChannelIndex,
@@ -2349,13 +2270,15 @@ mod chip_specific {
         Tx,
         WAKER,
     };
-    use crate::{peripherals::RMT, time::Rate};
+    use crate::{peripherals::RMT, soc::clocks, time::Rate};
 
     pub(super) fn validate_clock(
         source: ClockSource,
         frequency: Rate,
     ) -> Result<(u8, Rate), ConfigError> {
-        let src_clock = source.freq();
+        let src_clock = clocks::ClockTree::with(|clocks| {
+            Rate::from_hz(clocks::RmtInstance::Rmt.sclk_config_frequency(clocks, source))
+        });
 
         if frequency > src_clock {
             return Err(ConfigError::UnreachableTargetFrequency);
@@ -2373,19 +2296,12 @@ mod chip_specific {
     }
 
     pub(super) fn configure_clock(source: ClockSource, div: u8) {
-        #[cfg(soc_has_clock_node_rmt_sclk)]
         clocks::ClockTree::with(|clocks| {
-            clocks::RmtInstance::Rmt.configure_sclk(clocks, source.into());
+            clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
         });
 
         #[cfg(not(soc_has_pcr))]
         RMT::regs().sys_conf().modify(|_, w| unsafe {
-            #[cfg(not(soc_has_clock_node_rmt_sclk))]
-            {
-                w.clk_en().clear_bit();
-                w.sclk_sel().bits(source.bits());
-            }
-
             w.sclk_div_num().bits(div);
             w.sclk_div_a().bits(0);
             w.sclk_div_b().bits(0);
@@ -2397,21 +2313,9 @@ mod chip_specific {
             use crate::peripherals::PCR;
 
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                #[cfg(not(soc_has_clock_node_rmt_sclk))]
-                cfg_if::cfg_if!(
-                    if #[cfg(any(esp32c5, esp32c6))] {
-                        w.sclk_sel().bits(source.bits());
-                    } else {
-                        w.sclk_sel().bit(source.bit());
-                    }
-                );
-
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
-                #[cfg(not(soc_has_clock_node_rmt_sclk))]
-                w.sclk_en().set_bit();
-
                 w
             });
 
@@ -2897,19 +2801,22 @@ mod chip_specific {
         Event,
         Level,
         MemSize,
-        NUM_CHANNELS,
         RMT_LOCK,
         Rx,
         Tx,
         WAKER,
     };
-    use crate::{peripherals::RMT, time::Rate};
+    use crate::{peripherals::RMT, soc::clocks, time::Rate};
 
     pub(super) fn validate_clock(
         source: ClockSource,
         frequency: Rate,
     ) -> Result<(u8, Rate), ConfigError> {
-        if frequency != source.freq() {
+        let source_frequency = clocks::ClockTree::with(|clocks| {
+            Rate::from_hz(clocks::RmtInstance::Rmt.sclk_config_frequency(clocks, source))
+        });
+
+        if frequency != source_frequency {
             return Err(ConfigError::UnreachableTargetFrequency);
         }
 
@@ -2919,15 +2826,11 @@ mod chip_specific {
     pub(super) fn configure_clock(source: ClockSource, _div: u8) {
         let rmt = RMT::regs();
 
-        for ch_num in 0..NUM_CHANNELS {
-            rmt.chconf1(ch_num)
-                .modify(|_, w| w.ref_always_on().bit(source.bit()));
-        }
+        clocks::ClockTree::with(|clocks| {
+            clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
+        });
 
         rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
-
-        #[cfg(not(esp32))]
-        rmt.apb_conf().modify(|_, w| w.clk_en().set_bit());
     }
 
     #[crate::handler]

@@ -63,7 +63,7 @@ peripherals = [
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
     { name = "PCNT" },
-    { name = "RMT" },
+    { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
@@ -256,6 +256,12 @@ clocks = { system_clocks = { clock_tree = [
         ] } },
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
+    ] },
+    { group = "RMT", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "REF_TICK", outputs = "REF_TICK" },
+            { name = "APB_CLK",  outputs = "APB_CLK", default = true },
+        ] },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates
@@ -810,9 +816,6 @@ ram_start = 0x3ff56800
 channel_ram_size = 64
 channels = ["RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx"]
 has_per_channel_clock = true
-clock_sources.supported = [ "RefTick", "Apb" ]
-# Power-on value is RefTick!
-clock_sources.default = "Apb"
 
 [device.rsa]
 support_status = "partial"

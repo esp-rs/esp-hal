@@ -18,7 +18,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -678,6 +678,27 @@ impl TimgInstance {
             w.use_xtal()
                 .bit(new_config == TimgFunctionClockConfig::XtalClk)
         });
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        RMT::regs().apb_conf().modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        for ch_num in 0..4 {
+            RMT::regs()
+                .chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().bit(new_config == RmtSclkConfig::ApbClk));
+        }
     }
 }
 

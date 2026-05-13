@@ -20,7 +20,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -747,6 +747,27 @@ impl McpwmInstance {
         _new_config: McpwmFunctionClockConfig,
     ) {
         // Nothing to do.
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        for ch_num in 0..8 {
+            RMT::regs()
+                .chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().bit(new_config == RmtSclkConfig::ApbClk));
+        }
     }
 }
 
