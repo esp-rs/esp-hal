@@ -1071,8 +1071,15 @@ fn wifi_deinit() -> Result<(), crate::WifiError> {
     // Drain RX queues before deinit so that any stale PacketBuffers are freed
     // while the driver is still alive. Without this, an Interface that outlives
     // the controller could hold PacketBuffers with dangling `eb` pointers.
-    DATA_QUEUE_RX_STA.with(|q| while q.pop_front().is_some() {});
-    DATA_QUEUE_RX_AP.with(|q| while q.pop_front().is_some() {});
+    //
+    // PacketBuffer::drop must run outside the queue's critical section because it
+    // calls `esp_wifi_internal_free_rx_buffer`, which takes an internal mutex.
+    while let Some(packet) = DATA_QUEUE_RX_STA.with(|q| q.pop_front()) {
+        drop(packet);
+    }
+    while let Some(packet) = DATA_QUEUE_RX_AP.with(|q| q.pop_front()) {
+        drop(packet);
+    }
 
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
@@ -1362,6 +1369,7 @@ static SINGLETONS: AtomicU8 = AtomicU8::new(0);
 
 const STA_BIT: u8 = 1 << 0;
 const AP_BIT: u8 = 1 << 1;
+#[cfg(feature = "sniffer")]
 pub(super) const SNIFFER_BIT: u8 = 1 << 2;
 
 pub(super) fn try_acquire(bit: u8) -> bool {
