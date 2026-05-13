@@ -1,7 +1,9 @@
 //! Parser for changelog entries embedded in pull request descriptions.
 //!
 //! Pull requests may contain a `# Changelog` section and/or a `# Migration guide`
-//! section. This module extracts structured data from those sections.
+//! section. Changelog entries may also be placed inside
+//! `<details><summary>Changelog</summary>…</details>` (GitHub's collapsible region).
+//! This module extracts structured data from those sections.
 //!
 //! # Expected format
 //!
@@ -195,11 +197,27 @@ fn get_or_insert_section<'a>(
 }
 
 /// Parse the `# Changelog` block and populate `sections`.
+///
+/// Changelog entries may appear after a `# Changelog` heading and/or inside
+/// `<details><summary>Changelog</summary> … </details>` (GitHub PR folding).
 fn parse_changelog_block(body: &str, sections: &mut Vec<PrSection>) -> Result<()> {
-    let Some(after) = find_h1_section(body, "Changelog") else {
-        return Ok(());
-    };
+    let detail_parts = collect_changelog_details_parts(body);
+    let ranges: Vec<(usize, usize)> = detail_parts.iter().map(|p| p.span).collect();
 
+    if let Some(after) = find_h1_section_outside_ranges(body, "Changelog", &ranges) {
+        let cleaned = scrub_h1_changelog_tail(body, after, &ranges);
+        parse_changelog_subsection(&cleaned, sections)?;
+    }
+    for part in &detail_parts {
+        parse_changelog_subsection(part.markdown, sections)?;
+    }
+    Ok(())
+}
+
+/// Parse one contiguous changelog region (markdown after `# Changelog` and/or inside
+/// a Changelog `<details>` block).
+fn parse_changelog_subsection(text: &str, sections: &mut Vec<PrSection>) -> Result<()> {
+    let after = strip_optional_h1(text, "Changelog");
     let mut current: Option<(String, Option<String>)> = None;
 
     for line in non_comment_lines(after) {
@@ -353,6 +371,242 @@ fn find_h1_section<'a>(body: &'a str, title: &str) -> Option<&'a str> {
     None
 }
 
+/// Like [`find_h1_section`], but ignores `# <title>` headings whose first character falls inside one
+/// of the `[start, end)` byte ranges (e.g. `# Changelog` nested in a `<details>` block whose body
+/// is parsed separately).
+fn find_h1_section_outside_ranges<'a>(
+    body: &'a str,
+    title: &str,
+    ranges: &[(usize, usize)],
+) -> Option<&'a str> {
+    let needle = format!("# {title}");
+    let mut offset = 0usize;
+    for line in body.lines() {
+        let line_len = line.len();
+        if line.trim().eq_ignore_ascii_case(&needle) {
+            let excluded = ranges
+                .iter()
+                .any(|&(s, e)| offset >= s && offset < e);
+            if !excluded {
+                return Some(body[offset + line_len..].trim_start_matches('\n'));
+            }
+        }
+        offset += line_len + 1;
+    }
+    None
+}
+
+/// Remove `<details>…</details>` regions that hold a Changelog summary from `tail`, where `tail`
+/// must be a substring of `body` (see [`parse_changelog_block`]). Prevents folded regions from
+/// being parsed twice when a top-level `# Changelog` also wraps entries in `<details>`.
+fn scrub_h1_changelog_tail(body: &str, tail: &str, detail_spans: &[(usize, usize)]) -> String {
+    let base = (tail.as_ptr() as usize) - (body.as_ptr() as usize);
+    let tail_end = base + tail.len();
+    let mut rel_spans: Vec<(usize, usize)> = detail_spans
+        .iter()
+        .filter_map(|&(s, e)| {
+            let rs = s.max(base);
+            let re = e.min(tail_end);
+            (rs < re).then_some((rs - base, re - base))
+        })
+        .collect();
+    rel_spans.sort_by_key(|k| k.0);
+    if rel_spans.is_empty() {
+        return tail.to_string();
+    }
+    let mut out = String::with_capacity(tail.len());
+    let mut pos = 0usize;
+    for (s, e) in rel_spans {
+        out.push_str(&tail[pos..s]);
+        out.push('\n');
+        pos = e;
+    }
+    out.push_str(&tail[pos..]);
+    out
+}
+
+/// Returns the tail after `text`'s first line when that line is `# <title>` (case-insensitive),
+/// otherwise returns `text` unchanged.
+fn strip_optional_h1<'a>(text: &'a str, title: &str) -> &'a str {
+    let t = text.trim_start();
+    let needle = format!("# {title}");
+    let Some(first) = t.lines().next() else {
+        return t;
+    };
+    if first.trim().eq_ignore_ascii_case(&needle) {
+        let rest = &t[first.len()..];
+        return rest.trim_start_matches('\n').trim_start();
+    }
+    t
+}
+
+fn starts_with_ignore_case(haystack: &str, needle: &str) -> bool {
+    let h = haystack.as_bytes();
+    let n = needle.as_bytes();
+    h.len() >= n.len()
+        && h[..n.len()]
+            .iter()
+            .zip(n.iter())
+            .all(|(a, b)| a.eq_ignore_ascii_case(b))
+}
+
+/// Case-insensitive substring search (both strings must be ASCII-only for tags).
+fn find_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    let ned = needle.as_bytes();
+    haystack
+        .as_bytes()
+        .windows(ned.len())
+        .position(|w| w.iter().zip(ned.iter()).all(|(a, b)| a.eq_ignore_ascii_case(b)))
+}
+
+/// The slice must begin with `<details`; the next character after the word is `>` or whitespace.
+fn is_opening_details_tag(s: &str) -> bool {
+    if !starts_with_ignore_case(s, "<details") {
+        return false;
+    }
+    let rest = &s["<details".len()..];
+    rest.chars()
+        .next()
+        .is_some_and(|c| c == '>' || c.is_whitespace())
+}
+
+/// One `<details><summary>Changelog</summary> … </details>` region in a PR body.
+struct ChangelogDetailsPart<'a> {
+    /// Byte range `[start, end)` covering the full `<details>…</details>` in the original body.
+    span: (usize, usize),
+    markdown: &'a str,
+}
+
+/// Changelog bodies from `<details><summary>Changelog</summary> … </details>` blocks.
+fn collect_changelog_details_parts<'a>(body: &'a str) -> Vec<ChangelogDetailsPart<'a>> {
+    let mut out = Vec::new();
+    let mut pos = 0usize;
+    while pos < body.len() {
+        let rest = &body[pos..];
+        let Some(rel) = find_case_insensitive(rest, "<details") else {
+            break;
+        };
+        let open_at = pos + rel;
+        let from_open = &body[open_at..];
+        if !is_opening_details_tag(from_open) {
+            pos = open_at + 1;
+            continue;
+        }
+        let after_tag_word = &from_open["<details".len()..];
+        let Some(gt) = after_tag_word.find('>') else {
+            break;
+        };
+        let inner_start = open_at + "<details".len() + gt + 1;
+        let inner_region = &body[inner_start..];
+        let Some((inner_content, consumed)) = take_balanced_details_inner(inner_region) else {
+            break;
+        };
+        let block_end = inner_start + consumed;
+        if let Some(md) = body_after_changelog_summary(inner_content) {
+            out.push(ChangelogDetailsPart {
+                span: (open_at, block_end),
+                markdown: md,
+            });
+        }
+        pos = block_end;
+    }
+    out
+}
+
+/// `s` begins immediately after the opening `<details…>` `>`. Returns `(inner, total_bytes)`.
+fn take_balanced_details_inner(s: &str) -> Option<(&str, usize)> {
+    let mut i = 0usize;
+    let mut depth = 1i32;
+    while i < s.len() {
+        if is_opening_details_tag(&s[i..]) {
+            let after = &s[i + "<details".len()..];
+            let gt = after.find('>')?;
+            i += "<details".len() + gt + 1;
+            depth += 1;
+            continue;
+        }
+        if starts_with_ignore_case(&s[i..], "</details>") {
+            depth -= 1;
+            if depth == 0 {
+                return Some((&s[..i], i + "</details>".len()));
+            }
+            i += "</details>".len();
+            continue;
+        }
+        i += 1;
+    }
+    None
+}
+
+/// `details_inner` is the markup between `<details…>` and its matching `</details>`.
+fn body_after_changelog_summary(details_inner: &str) -> Option<&str> {
+    let s = details_inner.trim_start();
+    let summary_rel = find_case_insensitive(s, "<summary")?;
+    let after_summary_word = &s[summary_rel + "<summary".len()..];
+    let gt = after_summary_word.find('>')?;
+    let summary_value_and_rest = &after_summary_word[gt + 1..];
+    let close_rel = find_case_insensitive(summary_value_and_rest, "</summary>")?;
+    let title = summary_value_and_rest[..close_rel].trim();
+    if !title.eq_ignore_ascii_case("Changelog") {
+        return None;
+    }
+    let after = &summary_value_and_rest[close_rel + "</summary>".len()..];
+    Some(after.trim_start())
+}
+
+fn validate_changelog_subsection(after: &str, errors: &mut Vec<String>) {
+    let after = strip_optional_h1(after, "Changelog");
+    let mut in_section = false;
+    let mut section_exempted = false;
+    let mut section_has_entries = false;
+
+    for line in non_comment_lines(after) {
+        if line.starts_with("# ") {
+            break;
+        } else if let Some(h2) = line.strip_prefix("## ") {
+            section_exempted = false;
+            section_has_entries = false;
+            if parse_section_heading(h2).is_some() {
+                in_section = true;
+            } else {
+                in_section = false;
+                errors.push(format!(
+                    "Invalid section heading in `# Changelog`: `## {h2}`"
+                ));
+            }
+        } else if let Some(item) = line.strip_prefix("- ") {
+            if !in_section {
+                errors.push(format!(
+                    "List item found before any section heading: `- {item}`"
+                ));
+            } else if item.trim() == NO_CHANGELOG_MARKER {
+                if section_has_entries {
+                    errors.push(format!(
+                        "`- {NO_CHANGELOG_MARKER}` cannot appear alongside real changelog \
+                         entries in the same section; use one or the other"
+                    ));
+                }
+                section_exempted = true;
+            } else {
+                if section_exempted {
+                    errors.push(format!(
+                        "Changelog entry cannot appear alongside `- {NO_CHANGELOG_MARKER}` \
+                         in the same section; use one or the other"
+                    ));
+                }
+                if let Err(e) = parse_changelog_item(item) {
+                    errors.push(e.to_string());
+                } else {
+                    section_has_entries = true;
+                }
+            }
+        }
+    }
+}
+
 /// Validate a PR description body, returning human-readable error messages.
 ///
 /// Returns an empty `Vec` if the body is valid (or has no changelog sections at all).
@@ -361,55 +615,15 @@ pub fn validate(body: &str) -> Vec<String> {
 
     let mut errors = Vec::new();
 
-    if let Some(after) = find_h1_section(body, "Changelog") {
-        let mut in_section = false;
-        // Per-section state for detecting marker/entry mixing.
-        let mut section_exempted = false;
-        let mut section_has_entries = false;
+    let detail_parts = collect_changelog_details_parts(body);
+    let ranges: Vec<(usize, usize)> = detail_parts.iter().map(|p| p.span).collect();
 
-        for line in non_comment_lines(after) {
-            if line.starts_with("# ") {
-                break;
-            } else if let Some(h2) = line.strip_prefix("## ") {
-                // Entering a new section — reset per-section state.
-                section_exempted = false;
-                section_has_entries = false;
-                if parse_section_heading(h2).is_some() {
-                    in_section = true;
-                } else {
-                    in_section = false;
-                    errors.push(format!(
-                        "Invalid section heading in `# Changelog`: `## {h2}`"
-                    ));
-                }
-            } else if let Some(item) = line.strip_prefix("- ") {
-                if !in_section {
-                    errors.push(format!(
-                        "List item found before any section heading: `- {item}`"
-                    ));
-                } else if item.trim() == NO_CHANGELOG_MARKER {
-                    if section_has_entries {
-                        errors.push(format!(
-                            "`- {NO_CHANGELOG_MARKER}` cannot appear alongside real changelog \
-                             entries in the same section; use one or the other"
-                        ));
-                    }
-                    section_exempted = true;
-                } else {
-                    if section_exempted {
-                        errors.push(format!(
-                            "Changelog entry cannot appear alongside `- {NO_CHANGELOG_MARKER}` \
-                             in the same section; use one or the other"
-                        ));
-                    }
-                    if let Err(e) = parse_changelog_item(item) {
-                        errors.push(e.to_string());
-                    } else {
-                        section_has_entries = true;
-                    }
-                }
-            }
-        }
+    if let Some(after) = find_h1_section_outside_ranges(body, "Changelog", &ranges) {
+        let cleaned = scrub_h1_changelog_tail(body, after, &ranges);
+        validate_changelog_subsection(&cleaned, &mut errors);
+    }
+    for part in &detail_parts {
+        validate_changelog_subsection(part.markdown, &mut errors);
     }
 
     if let Some(after) = find_h1_section(body, "Migration guide") {
@@ -536,6 +750,76 @@ All transient byte-lattices should undergo recursive de-serialization.
     fn parse_no_sections() {
         let body = "This PR fixes a typo in the README.\n\nNo changelog entries needed.";
         assert!(PrChangelog::parse(1, body).unwrap().is_none());
+    }
+
+    #[test]
+    fn parse_changelog_inside_details_without_hash_heading() {
+        let body = "\
+<details>
+<summary>Changelog</summary>
+
+## esp-hal
+
+- Added: A change from a folded section.
+</details>";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        let hal = &cl.sections[0];
+        assert_eq!(hal.crate_name, "esp-hal");
+        assert_eq!(hal.changelog.len(), 1);
+        assert_eq!(hal.changelog[0].kind, EntryKind::Added);
+        let errors = validate(body);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    }
+
+    #[test]
+    fn parse_changelog_details_with_optional_hash_heading_no_duplicate() {
+        let body = "\
+<details>
+<summary>Changelog</summary>
+
+# Changelog
+
+## esp-hal
+
+- Changed: Tweaked after an inner H1.
+</details>";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        assert_eq!(cl.sections[0].changelog.len(), 1);
+        assert_eq!(cl.sections[0].changelog[0].kind, EntryKind::Changed);
+    }
+
+    #[test]
+    fn parse_changelog_top_level_plus_details_merges() {
+        let body = "\
+# Changelog
+
+## esp-radio
+
+- Fixed: Top-level section.
+
+<details>
+<summary>Changelog</summary>
+
+## esp-hal
+
+- Added: From details only.
+</details>";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 2);
+        assert!(
+            cl.sections
+                .iter()
+                .any(|s| s.crate_name == "esp-radio" && s.changelog.len() == 1)
+        );
+        assert!(
+            cl.sections
+                .iter()
+                .any(|s| s.crate_name == "esp-hal" && s.changelog.len() == 1)
+        );
+        let errors = validate(body);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
     }
 
     /// The PR template ships with placeholder entries inside HTML comments.
