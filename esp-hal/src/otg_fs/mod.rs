@@ -15,8 +15,12 @@
 //! Start by creating a [`Usb`] instance from the `USB_FS` peripheral and the
 //! D+ / D- pins, then pass it to the driver of your choice:
 //!
-//! ```rust, ignore
+//! ```rust, no_run
+//! # {before_snippet}
+//! use esp_hal::otg_fs::Usb;
+//!
 //! let usb = Usb::new(peripherals.USB_FS, peripherals.__dp__, peripherals.__dm__);
+//! # {after_snippet}
 //! ```
 
 use crate::{
