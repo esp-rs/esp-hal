@@ -63,7 +63,7 @@ use esp_hal::system::Cpu;
 use esp_hal::time::{Duration, Instant};
 use esp_sync::NonReentrantMutex;
 use event::EVENT_CHANNEL;
-use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
+use portable_atomic::{AtomicU8, AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 
 pub(crate) use self::os_adapter::*;
@@ -1358,8 +1358,19 @@ impl InterfaceType {
     }
 }
 
-static STA_TAKEN: AtomicBool = AtomicBool::new(false);
-static AP_TAKEN: AtomicBool = AtomicBool::new(false);
+static SINGLETONS: AtomicU8 = AtomicU8::new(0);
+
+const STA_BIT: u8 = 1 << 0;
+const AP_BIT: u8 = 1 << 1;
+pub(super) const SNIFFER_BIT: u8 = 1 << 2;
+
+pub(super) fn try_acquire(bit: u8) -> bool {
+    SINGLETONS.fetch_or(bit, Ordering::AcqRel) & bit == 0
+}
+
+pub(super) fn release(bit: u8) {
+    SINGLETONS.fetch_and(!bit, Ordering::Release);
+}
 
 /// Wi-Fi interface.
 ///
@@ -1393,12 +1404,12 @@ impl Interface {
     ///
     /// Returns `None` if a station interface already exists.
     pub fn try_station() -> Option<Self> {
-        if STA_TAKEN.swap(true, Ordering::AcqRel) {
-            None
-        } else {
+        if try_acquire(STA_BIT) {
             Some(Self {
                 mode: InterfaceType::Station,
             })
+        } else {
+            None
         }
     }
 
@@ -1416,12 +1427,12 @@ impl Interface {
     ///
     /// Returns `None` if an access-point interface already exists.
     pub fn try_access_point() -> Option<Self> {
-        if AP_TAKEN.swap(true, Ordering::AcqRel) {
-            None
-        } else {
+        if try_acquire(AP_BIT) {
             Some(Self {
                 mode: InterfaceType::AccessPoint,
             })
+        } else {
+            None
         }
     }
 
@@ -1459,10 +1470,11 @@ impl Interface {
 
 impl Drop for Interface {
     fn drop(&mut self) {
-        match self.mode {
-            InterfaceType::Station => STA_TAKEN.store(false, Ordering::Release),
-            InterfaceType::AccessPoint => AP_TAKEN.store(false, Ordering::Release),
-        }
+        let bit = match self.mode {
+            InterfaceType::Station => STA_BIT,
+            InterfaceType::AccessPoint => AP_BIT,
+        };
+        release(bit);
     }
 }
 

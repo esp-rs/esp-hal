@@ -3,9 +3,8 @@
 use core::marker::PhantomData;
 
 use esp_sync::NonReentrantMutex;
-use portable_atomic::{AtomicBool, Ordering};
 
-use super::RxControlInfo;
+use super::{RxControlInfo, SNIFFER_BIT, release, try_acquire};
 use crate::{
     WifiError,
     sys::include::{
@@ -63,7 +62,6 @@ impl PromiscuousPkt<'_> {
     }
 }
 
-static SNIFFER_TAKEN: AtomicBool = AtomicBool::new(false);
 static SNIFFER_CB: NonReentrantMutex<Option<fn(PromiscuousPkt<'_>)>> = NonReentrantMutex::new(None);
 
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
@@ -86,10 +84,7 @@ pub struct Sniffer<'d> {
 
 impl Sniffer<'_> {
     pub(crate) fn new() -> Self {
-        assert!(
-            !SNIFFER_TAKEN.swap(true, Ordering::AcqRel),
-            "sniffer already in use"
-        );
+        assert!(try_acquire(SNIFFER_BIT), "sniffer already in use");
 
         unwrap!(esp_wifi_result!(unsafe {
             esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
@@ -143,6 +138,6 @@ impl Drop for Sniffer<'_> {
             esp_wifi_set_promiscuous_rx_cb(None);
         }
         SNIFFER_CB.with(|callback| *callback = None);
-        SNIFFER_TAKEN.store(false, Ordering::Release);
+        release(SNIFFER_BIT);
     }
 }
