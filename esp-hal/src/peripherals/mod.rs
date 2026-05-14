@@ -4,7 +4,7 @@
 //! and re-exports them to allow users to access and use them in their
 //! applications.
 //!
-//! Should be noted that that the module also re-exports the [Interrupt] enum
+//! Should be noted that the module also re-exports the [Interrupt] enum
 //! from the PAC, allowing users to handle interrupts associated with these
 //! peripherals.
 

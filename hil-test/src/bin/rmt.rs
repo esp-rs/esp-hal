@@ -354,7 +354,7 @@ fn do_rmt_loopback_inner(
         core::mem::drop(rx_transaction);
         core::mem::drop(tx_transaction);
 
-        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        // The test should fail here when the delay above is increased, e.g. to 100ms.
         assert!(!rx_done);
         assert!(!tx_done);
     } else {
@@ -414,7 +414,7 @@ async fn do_rmt_loopback_async_inner(
         let rx_poll = poll_once(rx_fut);
         let tx_poll = poll_once(tx_fut);
 
-        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        // The test should fail here when the delay above is increased, e.g. to 100ms.
         assert!(rx_poll.is_pending());
         assert!(tx_poll.is_pending());
     } else {
