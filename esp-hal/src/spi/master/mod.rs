@@ -45,7 +45,7 @@ mod low_level;
 pub use dma::*;
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-use enumset::{EnumSet, EnumSetType};
+use enumset::EnumSetType;
 use low_level::{Driver, SpiWrapper};
 pub use low_level::{Info, Instance, QspiInstance, State};
 use procmacros::doc_replace;

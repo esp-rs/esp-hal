@@ -10,6 +10,7 @@ use core::{
 
 #[cfg(feature = "unstable")]
 use embedded_hal::spi::{ErrorType, SpiBus};
+use enumset::EnumSet;
 
 use super::*;
 use crate::{
