@@ -17,7 +17,7 @@ use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
-    usb::otg_hs::{Usb, embassy_usb_host::Driver},
+    usb::otg::{Usb, embassy_usb_host::Driver},
 };
 use log::*;
 
@@ -34,7 +34,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new(peripherals.USB_HS);
+    let usb = Usb::new_hs(peripherals.USB_HS);
     static BUS_STATE: BusState = BusState::new();
     let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");
