@@ -1,10 +1,6 @@
-//! USB On-The-Go Full-Speed (OTG FS) peripheral driver.
+//! USB peripheral driver.
 //!
-//! Supports three protocol stacks:
-//!
-//! - **[`usb-device`]** device mode — via the [`UsbBus`] re-export.
-//! - **[`embassy-usb`]** device mode — via [`embassy_usb_device`].
-//! - **[`embassy-usb-host`]** host mode — via [`embassy_usb_host`].
+//! This module provides support for `embassy-usb` (both host and device).
 //!
 //! Start by creating a [`Usb`] instance from the `USB0` peripheral and the
 //! D+ / D- pins, then pass it to the driver of your choice:
@@ -12,12 +8,6 @@
 //! ```rust, ignore
 //! let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
 //! ```
-//!
-//! [`usb-device`]: https://crates.io/crates/usb-device
-//! [`embassy-usb`]: https://crates.io/crates/embassy-usb
-//! [`embassy-usb-host`]: https://crates.io/crates/embassy-usb-host
-
-pub use esp_synopsys_usb_otg::UsbBus;
 
 use crate::{
     gpio::InputSignal,
@@ -53,7 +43,6 @@ pub struct Usb<'d> {
 
 impl<'d> Usb<'d> {
     const REGISTERS: *const () = USB0::PTR.cast();
-    const HIGH_SPEED: bool = false;
     const FIFO_DEPTH_WORDS: usize = 256;
 
     // S2/S3 are identical: Six additional endpoints (endpoint numbers 1 to 6), configurable as IN
@@ -129,21 +118,5 @@ impl<'d> Usb<'d> {
 
     fn _disable() {
         // TODO
-    }
-}
-
-unsafe impl esp_synopsys_usb_otg::UsbPeripheral for Usb<'_> {
-    const REGISTERS: *const () = Self::REGISTERS;
-    const HIGH_SPEED: bool = Self::HIGH_SPEED;
-    const FIFO_DEPTH_WORDS: usize = Self::FIFO_DEPTH_WORDS;
-    const ENDPOINT_COUNT: usize = Self::MAX_EP_COUNT;
-
-    fn enable() {
-        Self::_enable();
-    }
-
-    fn ahb_frequency_hz(&self) -> u32 {
-        // unused
-        80_000_000
     }
 }

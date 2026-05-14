@@ -75,7 +75,6 @@ digest                   = { version = "0.10.7", default-features = false, featu
 embassy-usb-driver       = { version = "0.2", optional = true }
 embassy-usb-synopsys-otg = { version = "0.3", optional = true, features = ["host"] }
 embedded-can             = { version = "0.4.1", optional = true }
-esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
@@ -138,9 +137,6 @@ __bluetooth = []
 __usb_otg = [
     "dep:embassy-usb-driver",
     "dep:embassy-usb-synopsys-otg",
-    "dep:esp-synopsys-usb-otg",
-    "esp-synopsys-usb-otg/esp32sx",
-    "esp-synopsys-usb-otg/fs",
 ]
 
 #! ### Runtime support
