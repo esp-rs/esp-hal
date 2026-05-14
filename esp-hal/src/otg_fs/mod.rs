@@ -1,9 +1,9 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "dm" => {
+    "dm_pin" => {
         cfg(any(esp32s2, esp32s3)) => "GPIO19",
         cfg(esp32p4) => "GPIO26",
     },
-    "dp" => {
+    "dp_pin" => {
         cfg(any(esp32s2, esp32s3)) => "GPIO20",
         cfg(esp32p4) => "GPIO27",
     },
@@ -19,7 +19,11 @@
 //! # {before_snippet}
 //! use esp_hal::otg_fs::Usb;
 //!
-//! let usb = Usb::new(peripherals.USB_FS, peripherals.__dp__, peripherals.__dm__);
+//! let usb = Usb::new(
+//!     peripherals.USB_FS,
+//!     peripherals.__dp_pin__,
+//!     peripherals.__dm_pin__,
+//! );
 //! # {after_snippet}
 //! ```
 
