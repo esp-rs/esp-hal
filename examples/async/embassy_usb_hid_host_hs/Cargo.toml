@@ -30,3 +30,11 @@ debug            = true
 debug-assertions = true
 lto              = "fat"
 codegen-units    = 1
+
+[patch.crates-io]
+embassy-usb-synopsys-otg = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }
+embassy-usb-driver = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }
+embassy-executor = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }
+embassy-time = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }
+embassy-time-queue-utils = { git = "https://github.com/bugadani/embassy", rev = "6676033f9" }

@@ -19,7 +19,7 @@ use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
-    usb::otg_hs::{
+    usb::otg::{
         Usb,
         embassy_usb_device::{Config, Driver},
     },
@@ -38,7 +38,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new(peripherals.USB_HS);
+    let usb = Usb::new_hs(peripherals.USB_HS);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
