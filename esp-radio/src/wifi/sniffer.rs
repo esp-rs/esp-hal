@@ -138,9 +138,11 @@ impl Sniffer<'_> {
 
 impl Drop for Sniffer<'_> {
     fn drop(&mut self) {
-        // Best-effort cleanup: log on failure but keep going so we still clear
-        // the callback slot and release the singleton bit, otherwise a future
-        // Sniffer could never be created.
+        // Clear the user callback first so the C trampoline becomes a no-op even
+        // if it fires during the teardown window below.
+        SNIFFER_CB.with(|callback| *callback = None);
+        // Best-effort cleanup: log on failure but keep going so we still release
+        // the singleton bit, otherwise a future Sniffer could never be created.
         if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(false) }) {
             warn!(
                 "Failed to disable promiscuous mode on sniffer drop: {:?}",
@@ -153,7 +155,6 @@ impl Drop for Sniffer<'_> {
                 e
             );
         }
-        SNIFFER_CB.with(|callback| *callback = None);
         release(SNIFFER_BIT);
     }
 }

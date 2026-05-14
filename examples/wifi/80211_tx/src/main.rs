@@ -48,13 +48,13 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // We must initialize some kind of interface and start it and start the controller in station
-    // mode.
+    // The sniffer borrows the controller, so we only need the controller here —
+    // no station/AP `Interface` is required for raw 802.11 transmit.
     let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut sniffer = controller.sniffer();
 
-    // Create a buffer, which can hold the enitre serialized beacon frame.
+    // Create a buffer, which can hold the entire serialized beacon frame.
     let mut beacon = [0u8; 300];
     let length = beacon
         .pwrite(
