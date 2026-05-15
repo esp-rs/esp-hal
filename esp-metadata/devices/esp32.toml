@@ -342,6 +342,7 @@ kind = "pdma"
 supports_mem2mem = false
 
 [device.gpio]
+version = 1
 support_status = "supported"
 has_bank_1 = true
 gpio_function = 2

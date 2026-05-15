@@ -109,6 +109,12 @@ macro_rules! property {
     ("ecc.mem_block_size") => {
         48
     };
+    ("gpio.version") => {
+        3
+    };
+    ("gpio.version", str) => {
+        stringify!(3)
+    };
     ("gpio.has_bank_1") => {
         true
     };

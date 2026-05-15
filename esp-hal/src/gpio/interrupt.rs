@@ -55,9 +55,15 @@ use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;
 
 use crate::{
-    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, set_int_enable},
+    gpio::{
+        AnyPin,
+        GPIO_LOCK,
+        GpioBank,
+        InputPin,
+        low_level::{InterruptStatusRegisterAccess, set_int_enable},
+    },
     interrupt::Priority,
-    peripherals::{GPIO, Interrupt},
+    peripherals::Interrupt,
     ram,
 };
 #[cfg(feature = "rt")]
@@ -102,11 +108,16 @@ pub(crate) fn bind_default_interrupt_handler() {
 
     // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
-    for cpu in cores() {
+    let mut is_mapped = false;
+    super::low_level::for_each_interrupt_core(|cpu| {
         if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
-            info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
-            return;
+            is_mapped = true;
         }
+    });
+
+    if is_mapped {
+        info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
+        return;
     }
 
     interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
@@ -114,36 +125,18 @@ pub(crate) fn bind_default_interrupt_handler() {
     // On ESP32, there are separate interrupt status registers for each core, we need to enable the
     // interrupt handler on each core otherwise GPIOs listening on the App CPU will not receive
     // interrupts.
-    #[cfg(esp32)]
-    crate::interrupt::enable_on_cpu(
-        crate::system::Cpu::AppCpu,
-        Interrupt::GPIO,
-        Priority::Priority1,
-    );
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        // On ESP32, the interrupt fires on the core that started listening for a pin event.
-        fn cores() -> impl Iterator<Item = crate::system::Cpu> {
-            crate::system::Cpu::all()
-        }
-    } else {
-        fn cores() -> [crate::system::Cpu; 1] {
-            [crate::system::Cpu::current()]
-        }
-    }
+    super::low_level::enable_additional_default_interrupts(Interrupt::GPIO, Priority::Priority1);
 }
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
 pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    for cpu in cores() {
+    super::low_level::for_each_interrupt_core(|cpu| {
         // Only change priority if the interrupt is mapped to the core, otherwise we would enable
         // the interrupt unconditionally, which we don't want to do.
         if crate::interrupt::mapped_to(cpu, interrupt).is_some() {
             crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
         }
-    }
+    });
 }
 
 /// The default GPIO interrupt handler, when the user has not set one.
@@ -250,39 +243,6 @@ pub(super) unsafe fn wake_pin_impl(pin: u8) {
 
         handle_async_pins(bank, mask, mask);
     });
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-    #[cfg(gpio_has_bank_1)]
-    Bank1,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                match self {
-                    Self::Bank0 => GPIO::regs().status().read().bits(),
-                    Self::Bank1 => GPIO::regs().status1().read().bits(),
-                }
-            } else if #[cfg(esp32p4)] {
-                // P4 PAC: intr_0() (Core0 GPIO interrupt status)
-                match self {
-                    Self::Bank0 => GPIO::regs().intr_0().read().bits(),
-                    #[cfg(gpio_has_bank_1)]
-                    Self::Bank1 => GPIO::regs().intr1_0().read().bits(),
-                }
-            } else {
-                match self {
-                    Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
-                    #[cfg(gpio_has_bank_1)]
-                    Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
-                }
-            }
-        }
-    }
 }
 
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {

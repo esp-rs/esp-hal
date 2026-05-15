@@ -517,6 +517,7 @@ has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.gpio]
+version = 3
 support_status = "partial"
 has_bank_1 = true
 separate_in_out_interrupts = true
