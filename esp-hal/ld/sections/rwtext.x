@@ -12,12 +12,15 @@
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
-
+  
   _rwtext_start = .;
 
-  *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+  /* Xtensa L32R requires literals before code (see comment in `text.x`). */
+  *(.rwtext.literal .rwtext.literal.*)
+  *(.rwtext .rwtext.*)
   /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
-  *:esp_rom_spiflash.*(.literal .literal.* .text .text.*)
+  *:esp_rom_spiflash.*(.literal .literal.*)
+  *:esp_rom_spiflash.*(.text .text.*)
 
   #IF ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK
     INCLUDE "rwtext_hook.x"

@@ -52,45 +52,39 @@ EXTERN(__default_naked_level_7_interrupt);
 /* Define output sections */
 SECTIONS {
 
-  .vectors :
+  .vectors : SUBALIGN(0x40)
   {
     /*
-      Each vector has 64 bytes that it must fit inside. For each vector we calculate the size of the previous one,
-      and subtract that from 64 and start the new vector there.
+      Each Xtensa vector has 64 bytes that it must fit inside. We use
+      SUBALIGN(0x40) so each input section is padded out to 64 bytes,
+      placing successive vectors at the architecturally fixed offsets.
+
+      GNU ld and LLD disagree on the semantics of `. = <const>` inside an
+      output section — GNU ld treats it as section-relative while LLD treats
+      it as absolute — so this script avoids any bare-constant location
+      counter assignments. The gap before DoubleExceptionVector and the
+      trailing pad to 0x400 are expressed with `. = . + N`, which behaves
+      identically in both linkers.
     */
     _init_start = ABSOLUTE(.);
-    . = 0x0;
     KEEP(*(.WindowOverflow4.text));
-    . = 0x40;
     KEEP(*(.WindowUnderflow4.text));
-    . = 0x80;
     KEEP(*(.WindowOverflow8.text));
-    . = 0xC0;
     KEEP(*(.WindowUnderflow8.text));
-    . = 0x100;
     KEEP(*(.WindowOverflow12.text));
-    . = 0x140;
     KEEP(*(.WindowUnderflow12.text));
-    . = 0x180;
     KEEP(*(.Level2InterruptVector.text));
-    . = 0x1C0;
     KEEP(*(.Level3InterruptVector.text));
-    . = 0x200;
     KEEP(*(.Level4InterruptVector.text));
-    . = 0x240;
     KEEP(*(.Level5InterruptVector.text));
-    . = 0x280;
     KEEP(*(.DebugExceptionVector.text));
-    . = 0x2C0;
     KEEP(*(.NMIExceptionVector.text));
-    . = 0x300;
     KEEP(*(.KernelExceptionVector.text));
-    . = 0x340;
     KEEP(*(.UserExceptionVector.text));
-    /* mind the gap */
-    . = 0x3C0;
+    /* mind the gap: 0x40 of padding between the UserExceptionVector slot
+       (ends at 0x380) and the DoubleExceptionVector slot at 0x3C0. */
+    . = . + 0x40;
     KEEP(*(.DoubleExceptionVector.text));
-    . = 0x400;
     _init_end = ABSOLUTE(.);
   } > vectors_seg
 }

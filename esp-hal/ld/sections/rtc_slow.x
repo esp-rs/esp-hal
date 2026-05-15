@@ -3,7 +3,9 @@
 SECTIONS {
   .rtc_slow.text : {
    . = ALIGN(4);
-   *(.rtc_slow.literal .rtc_slow.text .rtc_slow.literal.* .rtc_slow.text.*)
+   /* Xtensa L32R requires literals before code (see comment in `text.x`). */
+   *(.rtc_slow.literal .rtc_slow.literal.*)
+   *(.rtc_slow.text .rtc_slow.text.*)
    . = ALIGN(4);
   } > rtc_slow_seg AT > RODATA
 
