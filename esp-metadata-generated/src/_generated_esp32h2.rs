@@ -253,6 +253,18 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         31
     };
+    ("ledc.version") => {
+        3
+    };
+    ("ledc.version", str) => {
+        stringify!(3)
+    };
+    ("ledc.channel_count") => {
+        6
+    };
+    ("ledc.channel_count", str) => {
+        stringify!(6)
+    };
     ("parl_io.version") => {
         2
     };

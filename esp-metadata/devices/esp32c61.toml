@@ -408,6 +408,8 @@ zero_extend_writes = true
 [device.usb_serial_jtag]
 
 [device.ledc]
+version = 3
+channel_count = 6
 support_status = { status = "not_supported", issue = 5418 }
 
 [device.etm]
