@@ -135,9 +135,9 @@ impl InterruptStatusRegisterAccess {
     }
 }
 
-pub(crate) fn bank(gpio_num: u8) -> GpioBank {
+pub(crate) fn bank(_gpio_num: u8) -> GpioBank {
     #[cfg(gpio_has_bank_1)]
-    if gpio_num >= 32 {
+    if _gpio_num >= 32 {
         return GpioBank::_1;
     }
 
