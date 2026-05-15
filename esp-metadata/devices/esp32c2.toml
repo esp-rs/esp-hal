@@ -464,6 +464,8 @@ deep_sleep = true
 
 ## Interfaces
 [device.ledc]
+version = 2
+channel_count = 6
 
 ## Miscellaneous
 [device.io_mux]

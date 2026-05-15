@@ -429,6 +429,8 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "not_supported"  # 3 instances (I2S0/1/2)
 [device.ledc]
+version = 2
+channel_count = 8
 support_status = "not_supported"
 [device.lp_i2c_master]
 support_status = "not_supported"

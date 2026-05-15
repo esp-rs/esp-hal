@@ -217,6 +217,18 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(3)
     };
+    ("ledc.version") => {
+        1
+    };
+    ("ledc.version", str) => {
+        stringify!(1)
+    };
+    ("ledc.channel_count") => {
+        8
+    };
+    ("ledc.channel_count", str) => {
+        stringify!(8)
+    };
     ("phy.combo_module") => {
         true
     };

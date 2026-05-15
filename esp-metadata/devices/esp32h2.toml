@@ -664,6 +664,8 @@ max_ws_width = 512
 clock_configured_by_pcr = true
 
 [device.ledc]
+version = 3
+channel_count = 6
 [device.mcpwm]
 [device.pcnt]
 [device.twai]

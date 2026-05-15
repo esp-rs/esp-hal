@@ -691,6 +691,8 @@ mclk_divider_bit_width = 6
 max_ws_width = 128
 
 [device.ledc]
+version = 2
+channel_count = 8
 [device.pcnt]
 [device.twai]
 [device.usb_otg]
