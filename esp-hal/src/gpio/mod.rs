@@ -72,7 +72,10 @@ use interconnect::PeripheralOutput;
 mod asynch;
 mod embedded_hal_impls;
 pub(crate) mod interrupt;
+mod low_level;
 use interrupt::*;
+pub use low_level::GpioBank;
+use low_level::{gpio_intr_enable, is_int_enabled, set_int_enable};
 
 mod placeholder;
 
@@ -80,8 +83,6 @@ use core::fmt::Display;
 
 use esp_sync::RawMutex;
 pub use placeholder::NoPin;
-use portable_atomic::AtomicU32;
-use strum::EnumCount;
 
 use crate::{
     asynch::AtomicWaker,
@@ -503,123 +504,6 @@ pub trait TouchPin: Pin {
     /// Set a pins touch threshold for interrupts.
     #[doc(hidden)]
     fn set_threshold(&self, threshold: u16, _: private::Internal);
-}
-
-#[doc(hidden)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, EnumCount)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum GpioBank {
-    _0,
-    #[cfg(gpio_has_bank_1)]
-    _1,
-}
-
-impl GpioBank {
-    fn async_operations(self) -> &'static AtomicU32 {
-        static FLAGS: [AtomicU32; GpioBank::COUNT] = [const { AtomicU32::new(0) }; GpioBank::COUNT];
-
-        &FLAGS[self as usize]
-    }
-
-    fn offset(self) -> u8 {
-        match self {
-            Self::_0 => 0,
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => 32,
-        }
-    }
-
-    fn write_out_en(self, word: u32, enable: bool) {
-        if enable {
-            self.write_out_en_set(word);
-        } else {
-            self.write_out_en_clear(word);
-        }
-    }
-
-    fn write_out_en_clear(self, word: u32) {
-        match self {
-            Self::_0 => GPIO::regs()
-                .enable_w1tc()
-                .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs()
-                .enable1_w1tc()
-                .write(|w| unsafe { w.bits(word) }),
-        };
-    }
-
-    fn write_out_en_set(self, word: u32) {
-        match self {
-            Self::_0 => GPIO::regs()
-                .enable_w1ts()
-                .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs()
-                .enable1_w1ts()
-                .write(|w| unsafe { w.bits(word) }),
-        };
-    }
-
-    fn read_input(self) -> u32 {
-        match self {
-            Self::_0 => GPIO::regs().in_().read().bits(),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs().in1().read().bits(),
-        }
-    }
-
-    fn read_output(self) -> u32 {
-        match self {
-            Self::_0 => GPIO::regs().out().read().bits(),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs().out1().read().bits(),
-        }
-    }
-
-    fn read_interrupt_status(self) -> u32 {
-        match self {
-            Self::_0 => GPIO::regs().status().read().bits(),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs().status1().read().bits(),
-        }
-    }
-
-    fn write_interrupt_status_clear(self, word: u32) {
-        match self {
-            Self::_0 => GPIO::regs()
-                .status_w1tc()
-                .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs()
-                .status1_w1tc()
-                .write(|w| unsafe { w.bits(word) }),
-        };
-    }
-
-    fn write_output(self, word: u32, set: bool) {
-        if set {
-            self.write_output_set(word);
-        } else {
-            self.write_output_clear(word);
-        }
-    }
-
-    fn write_output_set(self, word: u32) {
-        match self {
-            Self::_0 => GPIO::regs().out_w1ts().write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs().out1_w1ts().write(|w| unsafe { w.bits(word) }),
-        };
-    }
-
-    fn write_output_clear(self, word: u32) {
-        match self {
-            Self::_0 => GPIO::regs().out_w1tc().write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_has_bank_1)]
-            Self::_1 => GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) }),
-        };
-    }
 }
 
 /// Any GPIO pin.
@@ -1696,12 +1580,7 @@ impl private::Sealed for AnyPin<'_> {}
 
 impl<'lt> AnyPin<'lt> {
     fn bank(&self) -> GpioBank {
-        #[cfg(gpio_has_bank_1)]
-        if self.number() >= 32 {
-            return GpioBank::_1;
-        }
-
-        GpioBank::_0
+        low_level::bank(self.number())
     }
 
     pub(crate) fn disable_usb_pads(&self) {
@@ -1930,8 +1809,7 @@ impl<'lt> AnyPin<'lt> {
         let pull_up = config.pull == Pull::Up;
         let pull_down = config.pull == Pull::Down;
 
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
+        low_level::prepare_pin_pull(self, pull_up, pull_down);
 
         io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
@@ -1963,21 +1841,6 @@ impl<'lt> AnyPin<'lt> {
         nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) -> Result<(), WakeConfigError> {
-        /// Assembles a valid value for the int_ena pin register field.
-        fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    match crate::system::Cpu::current() {
-                        crate::system::Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
-                        crate::system::Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
-                    }
-                } else {
-                    // ESP32 and ESP32-C3 have separate bits for maskable and NMI interrupts.
-                    int_enable as u8 | ((nmi_enable as u8) << 1)
-                }
-            }
-        }
-
         if wake_up_from_light_sleep {
             match event {
                 Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
@@ -2008,8 +1871,7 @@ impl<'lt> AnyPin<'lt> {
         let pull_up = config.pull == Pull::Up;
         let pull_down = config.pull == Pull::Down;
 
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
+        low_level::prepare_pin_pull(self, pull_up, pull_down);
 
         io_mux_reg(self.number()).modify(|_, w| {
             unsafe { w.fun_drv().bits(config.drive_strength as u8) };
@@ -2367,26 +2229,6 @@ impl RtcPinWithResistors for AnyPin<'_> {
             (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
         }
     }
-}
-
-/// Set GPIO event listening.
-///
-/// - `gpio_num`: the pin to configure
-/// - `int_ena`: maskable and non-maskable CPU interrupt bits. None to leave unchanged.
-/// - `int_type`: interrupt type, see [Event] (or 0 to disable)
-/// - `wake_up_from_light_sleep`: whether to wake up from light sleep
-fn set_int_enable(gpio_num: u8, int_ena: Option<u8>, int_type: u8, wake_up_from_light_sleep: bool) {
-    GPIO::regs().pin(gpio_num as usize).modify(|_, w| unsafe {
-        if let Some(int_ena) = int_ena {
-            w.int_ena().bits(int_ena);
-        }
-        w.int_type().bits(int_type);
-        w.wakeup_enable().bit(wake_up_from_light_sleep)
-    });
-}
-
-fn is_int_enabled(gpio_num: u8) -> bool {
-    GPIO::regs().pin(gpio_num as usize).read().int_ena().bits() != 0
 }
 
 for_each_gpio! {
