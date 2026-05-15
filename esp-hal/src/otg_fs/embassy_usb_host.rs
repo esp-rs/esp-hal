@@ -35,7 +35,7 @@ impl<'d> Driver<'d> {
         };
 
         Usb::_enable_host();
-        peri._usb0.bind_peri_interrupt(interrupt_handler);
+        peri._usb.bind_peri_interrupt(interrupt_handler);
 
         Self {
             inner: OtgHostDriver::new(instance),
@@ -63,7 +63,7 @@ impl<'d> UsbHostController<'d> for Driver<'d> {
 
 impl<'d> Drop for Driver<'d> {
     fn drop(&mut self) {
-        self._usb._usb0.disable_peri_interrupt_on_all_cores();
+        self._usb._usb.disable_peri_interrupt_on_all_cores();
 
         Usb::_disable();
     }

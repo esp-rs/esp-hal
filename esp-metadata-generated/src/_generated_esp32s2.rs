@@ -406,6 +406,12 @@ macro_rules! property {
     ("uhci.combined_uart_selector_field") => {
         false
     };
+    ("usb_otg.fifo_depth_words") => {
+        256
+    };
+    ("usb_otg.fifo_depth_words", str) => {
+        stringify!(256)
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -3135,8 +3141,8 @@ macro_rules! implement_peripheral_clocks {
             Uhci0,
             /// UHCI1 peripheral clock signal
             Uhci1,
-            /// USB peripheral clock signal
-            Usb,
+            /// USB_FS peripheral clock signal
+            UsbFs,
             /// WDG peripheral clock signal
             Wdg,
         }
@@ -3175,7 +3181,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::UartMem,
                 Self::Uhci0,
                 Self::Uhci1,
-                Self::Usb,
+                Self::UsbFs,
                 Self::Wdg,
             ];
         }
@@ -3331,7 +3337,7 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en0()
                         .modify(|_, w| w.uhci1_clk_en().bit(enable));
                 }
-                Peripheral::Usb => {
+                Peripheral::UsbFs => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
                         .modify(|_, w| w.usb_clk_en().bit(enable));
@@ -3502,7 +3508,7 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en0()
                         .modify(|_, w| w.uhci1_rst().bit(reset));
                 }
-                Peripheral::Usb => {
+                Peripheral::UsbFs => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
                         .modify(|_, w| w.usb_rst().bit(reset));
@@ -3697,21 +3703,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO17 peripheral singleton"]
         GPIO17 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO18 peripheral singleton"] GPIO18 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO19 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
-        #[doc = "</section>"] GPIO19 <= virtual())); _for_each_inner_peripheral!((@
-        peri_type #[doc = "GPIO20 peripheral singleton (Limitations exist)"] #[doc = ""]
-        #[doc = "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
-        #[doc = "</section>"] GPIO20 <= virtual())); _for_each_inner_peripheral!((@
-        peri_type #[doc = "GPIO21 peripheral singleton"] GPIO21 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO19 peripheral singleton"]
+        GPIO19 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO20 peripheral singleton"] GPIO20 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO21 peripheral singleton"]
+        GPIO21 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -3939,7 +3935,7 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
         UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB0 peripheral singleton"] USB0 <= USB0(USB : { bind_peri_interrupt,
+        "USB_FS peripheral singleton"] USB_FS <= USB_FS(USB : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "USB_WRAP peripheral singleton"]
         USB_WRAP <= USB_WRAP() (unstable))); _for_each_inner_peripheral!((@ peri_type
@@ -4030,8 +4026,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TWAI0(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UHCI0(unstable)));
-        _for_each_inner_peripheral!((USB0(unstable)));
-        _for_each_inner_peripheral!((USB_WRAP(unstable)));
+        _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((XTS_AES(unstable)));
         _for_each_inner_peripheral!((WIFI));
         _for_each_inner_peripheral!((DMA_SPI2(unstable)));
@@ -4077,18 +4072,8 @@ macro_rules! for_each_peripheral {
         "GPIO16 peripheral singleton"] GPIO16 <= virtual()), (@ peri_type #[doc =
         "GPIO17 peripheral singleton"] GPIO17 <= virtual()), (@ peri_type #[doc =
         "GPIO18 peripheral singleton"] GPIO18 <= virtual()), (@ peri_type #[doc =
-        "GPIO19 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
-        #[doc = "</section>"] GPIO19 <= virtual()), (@ peri_type #[doc =
-        "GPIO20 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
-        #[doc = "</section>"] GPIO20 <= virtual()), (@ peri_type #[doc =
+        "GPIO19 peripheral singleton"] GPIO19 <= virtual()), (@ peri_type #[doc =
+        "GPIO20 peripheral singleton"] GPIO20 <= virtual()), (@ peri_type #[doc =
         "GPIO21 peripheral singleton"] GPIO21 <= virtual()), (@ peri_type #[doc =
         "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -4276,8 +4261,8 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UHCI0 peripheral singleton"]
-        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@ peri_type
         #[doc = "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)), (@
@@ -4316,14 +4301,13 @@ macro_rules! for_each_peripheral {
         (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
         (SYSCON(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
         (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
-        (USB0(unstable)), (USB_WRAP(unstable)), (XTS_AES(unstable)), (WIFI),
-        (DMA_SPI2(unstable)), (DMA_SPI3(unstable)), (DMA_I2S0(unstable)),
-        (DMA_CRYPTO(unstable)), (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)),
-        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
-        (ULP_RISCV_CORE(unstable)))); _for_each_inner_peripheral!((dma_eligible(I2S0,
-        I2s0, 0), (SPI2, Spi2, 1), (SPI3, Spi3, 2), (UHCI0, Uhci0, 3), (AES, Aes, 4),
-        (SHA, Sha, 5)));
+        (USB_FS(unstable)), (XTS_AES(unstable)), (WIFI), (DMA_SPI2(unstable)),
+        (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_CRYPTO(unstable)),
+        (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)), (DAC1(unstable)),
+        (DAC2(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
+        (PSRAM(unstable)), (SW_INTERRUPT(unstable)), (ULP_RISCV_CORE(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(I2S0, I2s0, 0), (SPI2, Spi2, 1), (SPI3,
+        Spi3, 2), (UHCI0, Uhci0, 3), (AES, Aes, 4), (SHA, Sha, 5)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -4512,9 +4496,9 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC2_CH6, GPIO17));
         _for_each_inner_analog_function!((DAC_2, GPIO18));
         _for_each_inner_analog_function!((ADC2_CH7, GPIO18));
-        _for_each_inner_analog_function!((USB_DM, GPIO19));
+        _for_each_inner_analog_function!((USB_FS_DM, GPIO19));
         _for_each_inner_analog_function!((ADC2_CH8, GPIO19));
-        _for_each_inner_analog_function!((USB_DP, GPIO20));
+        _for_each_inner_analog_function!((USB_FS_DP, GPIO20));
         _for_each_inner_analog_function!((ADC2_CH9, GPIO20));
         _for_each_inner_analog_function!(((TOUCH1, TOUCHn, 1), GPIO1));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1));
@@ -4561,7 +4545,7 @@ macro_rules! for_each_analog_function {
         (ADC2_CH1, GPIO12), (TOUCH13, GPIO13), (ADC2_CH2, GPIO13), (TOUCH14, GPIO14),
         (ADC2_CH3, GPIO14), (XTAL_32K_P, GPIO15), (ADC2_CH4, GPIO15), (XTAL_32K_N,
         GPIO16), (ADC2_CH5, GPIO16), (DAC_1, GPIO17), (ADC2_CH6, GPIO17), (DAC_2,
-        GPIO18), (ADC2_CH7, GPIO18), (USB_DM, GPIO19), (ADC2_CH8, GPIO19), (USB_DP,
+        GPIO18), (ADC2_CH7, GPIO18), (USB_FS_DM, GPIO19), (ADC2_CH8, GPIO19), (USB_FS_DP,
         GPIO20), (ADC2_CH9, GPIO20)));
         _for_each_inner_analog_function!((all_expanded((TOUCH1, TOUCHn, 1), GPIO1),
         ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1), ((TOUCH2, TOUCHn, 2), GPIO2), ((ADC1_CH1,
@@ -4730,10 +4714,10 @@ macro_rules! define_io_mux_signals {
             USB_EXTPHY_VP     = 61,
             USB_EXTPHY_VM     = 62,
             USB_EXTPHY_RCV    = 63,
-            USB_OTG_IDDIG     = 64,
-            USB_OTG_AVALID    = 65,
-            USB_SRP_BVALID    = 66,
-            USB_OTG_VBUSVALID = 67,
+            USB_FS_IDDIG      = 64,
+            USB_FS_AVALID     = 65,
+            USB_FS_SRP_BVALID = 66,
+            USB_FS_VBUSVALID  = 67,
             USB_SRP_SESSEND   = 68,
             SPI3_CLK          = 72,
             SPI3_Q            = 73,

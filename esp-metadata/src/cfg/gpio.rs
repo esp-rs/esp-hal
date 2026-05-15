@@ -148,7 +148,7 @@ impl PinConfig {
         // Resolve implicit limitations - based on pin alternate functions
         let implicit: &[(&[&str], PinLimitation)] = &[
             (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
-            (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
+            (&["USJ_DP", "USJ_DM"], PinLimitation::UsbJtag),
             (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
         ];
 

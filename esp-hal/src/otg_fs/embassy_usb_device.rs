@@ -117,31 +117,26 @@ impl Bus<'_> {
 
         let r = Driver::REGISTERS;
 
-        // Wait for AHB ready.
-        while !r.grstctl().read().ahbidl() {}
+        // Soft-reset the DWC core. Handles both the legacy (csrst self-clear)
+        // and the >= v4.20a (csrstdone) reset completion paths.
+        self.inner.core_soft_reset();
 
-        // Configure as device.
-        r.gusbcfg().modify(|w| {
-            // Force device mode
-            w.set_fdmod(true);
-            w.set_srpcap(false);
-        });
+        // Write GUSBCFG: forces device mode (FDMOD), selects the embedded
+        // full-speed serial PHY (PHYSEL=1, UTMI/ULPI disabled), and waits
+        // for the core to enter device mode (GINTSTS.CMOD = 0). PHYSEL must
+        // be 1 for the FS PHY; without it the core stays attached to the
+        // (non-existent) UTMI/ULPI PHY and never drives D+/D-.
+        self.inner.configure_as_device();
+        self.inner.config_v5();
 
-        // Perform core soft-reset
-        while !r.grstctl().read().ahbidl() {}
-        r.grstctl().modify(|w| w.set_csrst(true));
-        while r.grstctl().read().csrst() {}
-
-        self.inner.config_v1();
-
-        // Enable PHY clock
+        // Clear PCGCCTL.StopPclk and other gates so the PHY clock is running.
         r.pcgcctl().write(|w| w.0 = 0);
 
-        self._usb._usb0.bind_peri_interrupt(interrupt_handler);
+        self._usb._usb.bind_peri_interrupt(interrupt_handler);
     }
 
     fn disable(&mut self) {
-        self._usb._usb0.disable_peri_interrupt_on_all_cores();
+        self._usb._usb.disable_peri_interrupt_on_all_cores();
 
         Usb::_disable();
     }

@@ -3,8 +3,12 @@
 //! This example should be built in release mode.
 //!
 //! The following wiring is assumed:
-//! - DP => GPIO20
-//! - DM => GPIO19
+//! - ESP32-S2/S3:
+//!   - DP => GPIO20
+//!   - DM => GPIO19
+//! - ESP32-P4:
+//!   - DP => GPIO27
+//!   - DM => GPIO26
 
 #![no_std]
 #![no_main]
@@ -39,7 +43,11 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
+    #[cfg(not(feature = "esp32p4"))]
+    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+
+    #[cfg(feature = "esp32p4")]
+    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
