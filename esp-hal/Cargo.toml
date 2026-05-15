@@ -58,7 +58,7 @@ esp-rom-sys              = { version = "~0.1", path = "../esp-rom-sys" }
 bitfield                 = "0.19"
 delegate                 = "0.13"
 document-features        = "0.2"
-embassy-futures          = "0.1.2"
+embassy-futures          = "0.1"
 embassy-sync             = "0.8"
 fugit                    = "0.3.7"
 instability              = "0.3.12"
@@ -72,7 +72,7 @@ procmacros               = { version = "0.22.0", package = "esp-hal-procmacros",
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
 digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
-embassy-usb-driver       = { version = "0.2.1", optional = true }
+embassy-usb-driver       = { version = "0.2", optional = true }
 embassy-usb-synopsys-otg = { version = "0.3.3", optional = true, features = ["host"] }
 embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
