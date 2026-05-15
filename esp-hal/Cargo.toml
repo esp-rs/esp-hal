@@ -21,15 +21,13 @@ check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
-    { features = ["unstable", "rt", "__usb_otg"],     if = 'chip_has("usb_otg_driver_supported") && !chip_has("soc_has_usb_hs")' },
-    { features = ["unstable", "rt", "__embassy_usb"], if = 'chip_has("usb_otg_driver_supported") && chip_has("soc_has_usb_hs")' },
+    { features = ["unstable", "rt", "__usb_otg"],   if = 'chip_has("usb_otg_driver_supported")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
-        { if = 'chip_has("usb_otg_driver_supported") && !chip_has("soc_has_usb_hs")', features = ["__usb_otg"] }, # For now, P4 is embassy-usb only
-        { if = 'chip_has("usb_otg_driver_supported")', features = ["__embassy_usb"] },
+        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
         { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
     ] },
 ]
