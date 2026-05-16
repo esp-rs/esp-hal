@@ -5413,7 +5413,7 @@ macro_rules! for_each_lp_function {
         GPIO5), ((LP_GPIO6, LP_GPIOn, 6), GPIO6), ((LP_GPIO7, LP_GPIOn, 7), GPIO7)));
     };
 }
-/// This macro can be used to generate code for each IOMUX-only digital function of each GPIO.
+/// This macro can be used to generate code for each IOMUX digital function of each GPIO.
 ///
 /// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
 /// Use this to implement signal-specific traits for peripherals whose pins must bypass the
@@ -5505,6 +5505,8 @@ macro_rules! for_each_iomux_function {
         ((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0), ((SPICS0, SPICSn, 0), GPIO24, _0)));
     };
 }
+/// Defines the `InputSignal` and `OutputSignal` enums.
+///
 /// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

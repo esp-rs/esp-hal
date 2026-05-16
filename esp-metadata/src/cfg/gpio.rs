@@ -661,7 +661,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
 
-        /// This macro can be used to generate code for each IOMUX-only digital function of each GPIO.
+        /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
         ///
         /// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
         /// Use this to implement signal-specific traits for peripherals whose pins must bypass the
@@ -689,6 +689,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_iomux
+
+        /// Defines the `InputSignal` and `OutputSignal` enums.
         ///
         /// This macro is intended to be called in esp-hal only.
         #[macro_export]
