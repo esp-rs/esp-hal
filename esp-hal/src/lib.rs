@@ -349,8 +349,6 @@ unstable_module! {
     pub mod etm;
     #[cfg(usb_otg_driver_supported)]
     pub mod otg_fs;
-    #[cfg(ethernet_driver_supported)]
-    pub mod ethernet;
     #[cfg(soc_has_psram)] // DMA needs some things from here
     pub mod psram;
 }
@@ -401,6 +399,8 @@ unstable_driver! {
     pub mod twai;
     #[cfg(usb_serial_jtag_driver_supported)]
     pub mod usb_serial_jtag;
+    #[cfg(ethernet_driver_supported)]
+    pub mod ethernet;
 }
 
 /// State of the CPU saved when entering exception or interrupt
