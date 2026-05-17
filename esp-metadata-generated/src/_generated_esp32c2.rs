@@ -61,6 +61,12 @@ macro_rules! property {
     ("bt.controller") => {
         "npl"
     };
+    ("dedicated_gpio.version") => {
+        3
+    };
+    ("dedicated_gpio.version", str) => {
+        stringify!(3)
+    };
     ("dedicated_gpio.needs_initialization") => {
         false
     };
@@ -111,6 +117,12 @@ macro_rules! property {
     };
     ("ecc.mem_block_size") => {
         32
+    };
+    ("gpio.version") => {
+        2
+    };
+    ("gpio.version", str) => {
+        stringify!(2)
     };
     ("gpio.has_bank_1") => {
         false

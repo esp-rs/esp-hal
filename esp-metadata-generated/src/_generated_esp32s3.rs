@@ -70,6 +70,12 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm"
     };
+    ("dedicated_gpio.version") => {
+        2
+    };
+    ("dedicated_gpio.version", str) => {
+        stringify!(2)
+    };
     ("dedicated_gpio.needs_initialization") => {
         true
     };
@@ -105,6 +111,12 @@ macro_rules! property {
     };
     ("dma.gdma_version", str) => {
         stringify!(1)
+    };
+    ("gpio.version") => {
+        2
+    };
+    ("gpio.version", str) => {
+        stringify!(2)
     };
     ("gpio.has_bank_1") => {
         true

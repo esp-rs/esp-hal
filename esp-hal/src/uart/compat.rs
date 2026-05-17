@@ -1,7 +1,16 @@
-#[cfg(feature = "unstable")]
-use super::{Async, Config, ConfigError, IoError, RxError, TxError, UartRx};
-use super::{Blocking, DriverMode, Uart, UartTx};
-#[cfg(feature = "unstable")]
+use super::{
+    Async,
+    Blocking,
+    Config,
+    ConfigError,
+    DriverMode,
+    IoError,
+    RxError,
+    TxError,
+    Uart,
+    UartRx,
+    UartTx,
+};
 use crate::interrupt::InterruptHandler;
 
 #[instability::unstable]

@@ -328,6 +328,8 @@ driver_configs![
         driver: dedicated_gpio,
         name: "Dedicated GPIO",
         properties: {
+            /// Low-level access generation derived from CPU instruction/CSR support.
+            version: u32,
             #[serde(default)]
             needs_initialization: bool,
             #[serde(flatten)]
@@ -394,6 +396,8 @@ driver_configs![
         name: "GPIO",
         has_computed_properties: true,
         properties: {
+            /// Digital GPIO register-layout generation derived from the chip SVD.
+            version: u32,
             #[serde(default)]
             has_bank_1: bool,
             gpio_function: u32,

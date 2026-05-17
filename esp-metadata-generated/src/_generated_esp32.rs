@@ -79,6 +79,12 @@ macro_rules! property {
     ("dma.separate_in_out_interrupts") => {
         false
     };
+    ("gpio.version") => {
+        1
+    };
+    ("gpio.version", str) => {
+        stringify!(1)
+    };
     ("gpio.has_bank_1") => {
         true
     };
