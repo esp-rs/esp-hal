@@ -2152,8 +2152,6 @@ mod private {
         }
 
         fn rx_start(&self, len: usize) {
-            let len = len - 1;
-
             self.regs()
                 .rxeof_num()
                 .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
@@ -2675,7 +2673,7 @@ pub mod asynch {
             }
 
             // start: set I2S_RX_START
-            self.i2s.rx_start(len);
+            self.i2s.rx_start(0xFFF);
 
             let state = RxCircularState::new(&mut self.rx_chain);
             Ok(I2sReadDmaTransferAsync {
