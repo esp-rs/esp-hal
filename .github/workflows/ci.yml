@@ -181,6 +181,51 @@ jobs:
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32p4 --toolchain stable --no-lint --no-docs
 
+  # --------------------------------------------------------------------------
+  # Xtensa LLD linking
+  #
+  # Verifies that the Xtensa examples link successfully with LLD (`rust-lld`)
+  # instead of GNU LD. RISC-V already links with `rust-lld`, so only the
+  # Xtensa chips are exercised here. Kept intentionally small.
+  #
+  # TODO: expand this to also cover the radio examples (Wi-Fi/BLE) once the
+  # Xtensa LLD fixes from https://github.com/espressif/llvm-project/pull/130
+  # are merged and included in the esp Rust toolchain.
+  xtensa-lld:
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      # Link with LLD rather than GNU LD. Setting `RUSTFLAGS` overrides the
+      # `rustflags` (and thus the linker selection) from each example's
+      # `.cargo/config.toml`.
+      RUSTFLAGS: "-C link-arg=-Tlinkall.x -C linker=rust-lld"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        chip:
+          - esp32
+          - esp32s2
+          - esp32s3
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.95.0.0
+
+      - name: Build hello_world with LLD
+        working-directory: examples/hello_world
+        run: cargo +esp build --release --target xtensa-${{ matrix.chip }}-none-elf --features ${{ matrix.chip }}
+
+      - name: Build embassy_hello_world with LLD
+        working-directory: examples/async/embassy_hello_world
+        run: cargo +esp build --release --target xtensa-${{ matrix.chip }}-none-elf --features ${{ matrix.chip }}
+
   extras:
     needs: calculate
     if: needs.calculate.outputs.run-extras == 'true'
@@ -654,6 +699,7 @@ jobs:
     if: always()
     needs:
       - esp-hal
+      - xtensa-lld
       - docs
       - msrv
       - host-tests
