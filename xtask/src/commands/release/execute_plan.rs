@@ -1,14 +1,21 @@
-use std::{path::Path, process::Command};
+use std::{path::Path, process::Command, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use esp_metadata::Chip;
+use serde::Deserialize;
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
-    commands::{VersionBump, checker::generate_baseline, release::plan::Plan, update_package},
+    commands::{
+        VersionBump,
+        checker::generate_baseline,
+        do_version_bump,
+        release::plan::Plan,
+        update_package,
+    },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -56,6 +63,8 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             plan.packages[0].bump
         );
     }
+
+    ensure_versions_are_unpublished(&plan)?;
 
     // Make code changes
     for step in plan.packages.iter_mut() {
@@ -171,6 +180,69 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Deserialize)]
+struct CratesIoVersions {
+    versions: Vec<CratesIoVersion>,
+}
+
+#[derive(Deserialize)]
+struct CratesIoVersion {
+    num: semver::Version,
+    yanked: bool,
+}
+
+fn ensure_versions_are_unpublished(plan: &Plan) -> Result<()> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("esp-hal xtask release preflight")
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .context("Failed to create crates.io client")?;
+
+    for step in &plan.packages {
+        if !step.package.is_published() {
+            continue;
+        }
+
+        let package = step.package.to_string();
+        let target_version = do_version_bump(&step.current_version, &step.bump)
+            .with_context(|| format!("Failed to calculate target version for {package}"))?;
+        let url = format!("https://crates.io/api/v1/crates/{package}/versions");
+        let response = client
+            .get(&url)
+            .send()
+            .with_context(|| format!("Failed to query crates.io versions for {package}"))?;
+
+        ensure!(
+            response.status().is_success(),
+            "Failed to query crates.io versions for {package}: {}",
+            response.status()
+        );
+
+        let versions = response
+            .json::<CratesIoVersions>()
+            .with_context(|| format!("Failed to parse crates.io versions for {package}"))?;
+
+        if let Some(yanked) = published_version_status(&versions, &target_version) {
+            let yanked = if yanked { " yanked" } else { "" };
+            bail!(
+                "Cannot release {package} {}: this version already exists on crates.io{yanked}. Choose a new version before executing the release plan.",
+                target_version
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn published_version_status(versions: &CratesIoVersions, target: &semver::Version) -> Option<bool> {
+    versions
+        .versions
+        .iter()
+        .find(|version| &version.num == target)
+        .map(|version| version.yanked)
 }
 
 pub(crate) struct Branch {
@@ -620,5 +692,45 @@ branch 'foo' set up to track 'origin/foo'.
                 .expect("Failed to create PR URL");
             assert_eq!(url, expected_url);
         }
+    }
+
+    #[test]
+    fn detects_existing_crates_io_version() {
+        let versions = CratesIoVersions {
+            versions: vec![
+                CratesIoVersion {
+                    num: semver::Version::parse("0.1.0").unwrap(),
+                    yanked: false,
+                },
+                CratesIoVersion {
+                    num: semver::Version::parse("0.2.0").unwrap(),
+                    yanked: true,
+                },
+            ],
+        };
+
+        assert_eq!(
+            published_version_status(&versions, &semver::Version::parse("0.1.0").unwrap()),
+            Some(false)
+        );
+        assert_eq!(
+            published_version_status(&versions, &semver::Version::parse("0.2.0").unwrap()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn ignores_unpublished_crates_io_version() {
+        let versions = CratesIoVersions {
+            versions: vec![CratesIoVersion {
+                num: semver::Version::parse("0.1.0").unwrap(),
+                yanked: false,
+            }],
+        };
+
+        assert_eq!(
+            published_version_status(&versions, &semver::Version::parse("0.1.1").unwrap()),
+            None
+        );
     }
 }
