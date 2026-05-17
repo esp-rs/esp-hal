@@ -157,6 +157,7 @@ macro_rules! any_peripheral {
             ///
             /// You must ensure that you're only using one instance of this type at a time.
             #[inline]
+            #[allow(unused)]
             pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
                 any::delegate!(self, inner => { Self::from(inner.clone_unchecked()) })
             }}
@@ -170,6 +171,7 @@ macro_rules! any_peripheral {
             ///
             /// [Peripheral singleton]: crate#peripheral-singletons
             #[inline]
+            #[allow(unused)]
             pub fn reborrow(&mut self) -> $name<'_> {
                 unsafe { self.clone_unchecked() }
             }
@@ -211,6 +213,7 @@ let uart0 = any_peri1
 "#
             )]
             #[inline]
+            #[allow(unused)]
             pub fn downcast<P>(self) -> Result<P, Self>
             where
                 Self: TryInto<P, Error = Self>

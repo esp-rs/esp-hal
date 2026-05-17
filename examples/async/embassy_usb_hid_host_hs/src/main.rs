@@ -5,9 +5,8 @@
 //! Connect a mouse or keyboard to the USB port, and it will log raw HID input reports to the
 //! console.
 //!
-//! The following wiring is assumed:
-//! - DP => GPIO20
-//! - DM => GPIO19
+//! The example uses the HS USB port of the ESP32-P4.
+//! This port uses dedicated pins, not GPIOs.
 
 #![no_std]
 #![no_main]
@@ -35,7 +34,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+    let usb = Usb::new_hs(peripherals.USB_HS);
     static BUS_STATE: BusState = BusState::new();
     let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");

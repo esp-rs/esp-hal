@@ -261,3 +261,10 @@ incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+
+[patch.crates-io]
+embassy-usb-synopsys-otg = { git = "https://github.com/bugadani/embassy", branch = "synopsys" }
+embassy-usb-driver = { git = "https://github.com/bugadani/embassy", branch = "synopsys" }
+embassy-time = { git = "https://github.com/bugadani/embassy", branch = "synopsys" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "synopsys" }
+embassy-time-queue-utils = { git = "https://github.com/bugadani/embassy", branch = "synopsys" }
