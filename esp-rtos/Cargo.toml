@@ -53,7 +53,7 @@ macros = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-ha
 portable-atomic = { version = "1.11", default-features = false }
 
 # Optional dependencies that enable ecosystem support.
-embassy-time-driver = { version = "0.2", features = [ "tick-hz-1_000_000" ], optional = true }
+embassy-time-driver = { version = "0.2.2", features = [ "tick-hz-1_000_000" ], optional = true }
 embassy-executor = { version = "0.10", optional = true }
 embassy-time-queue-utils = { version = "0.3", optional = true }
 
