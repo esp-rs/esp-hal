@@ -62,8 +62,8 @@ SECTIONS {
       GNU ld and LLD disagree on the semantics of `. = <const>` inside an
       output section — GNU ld treats it as section-relative while LLD treats
       it as absolute — so this script avoids any bare-constant location
-      counter assignments. The gap before DoubleExceptionVector and the
-      trailing pad to 0x400 are expressed with `. = . + N`, which behaves
+      counter assignments. The only padding left is the gap before
+      DoubleExceptionVector, expressed with `. = . + N`, which behaves
       identically in both linkers.
     */
     _init_start = ABSOLUTE(.);
