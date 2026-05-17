@@ -382,7 +382,10 @@ driver_configs![
     EthernetProperties {
         driver: ethernet,
         name: "Ethernet",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            mii_via_gpio_matrix: bool,
+        }
     },
     EtmProperties {
         driver: etm,

@@ -62,7 +62,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
     { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # eco5 default 400MHz
     { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480_000_000" }, # System PLL
-    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # Media PLL
+    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500_000_000" }, # Media PLL
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
     # Low-speed clocks
@@ -71,16 +71,16 @@ clocks = { system_clocks = { clock_tree = [
     { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
     { name = "RC32K_CLK",    type = "source", output = "32768"   },
 
-    # SPLL divider taps (from 480 MHz SPLL)
+    # SPLL divider taps
     { name = "PLL_F20M",  type = "generic", output = "SPLL_CLK / 24" },
     { name = "PLL_F80M",  type = "generic", output = "SPLL_CLK / 6"  },
     { name = "PLL_F120M", type = "generic", output = "SPLL_CLK / 4"  },
     { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
 
-    # MPLL divider taps (from 400 MHz MPLL)
-    { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 16" },
-    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 8"  },
+    # MPLL divider taps
+    { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
+    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10"  },
 
     # XTAL half
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
@@ -92,10 +92,15 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
 
+    # TODO: model fractional divider parameters
     # CPU_CLK divider (HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num)
     { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
+    # MEM_CLK divider
+    { name = "MEM_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    # SYS_CLK divider
+    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "MEM_CLK / (divisor + 1)" },
     # APB_CLK divider
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)" },
 
     # LP clocks
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -284,9 +289,9 @@ peripherals = [
     { name = "DMA_CH1", virtual = true },
     { name = "DMA_CH2", virtual = true },
 
-    #{ name = "ETH", virtual = true },
-    #{ name = "EMAC_DMA", hidden = true },
-    #{ name = "EMAC_MAC", hidden = true },
+    { name = "ETH", virtual = true },
+    { name = "EMAC_DMA", hidden = true },
+    { name = "EMAC_MAC", hidden = true },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
@@ -406,8 +411,11 @@ support_status = "not_supported"  # LCD_CAM block, camera path
 support_status = "not_supported"  # Digital Signature
 [device.ecdsa]
 support_status = "not_supported"
+
 [device.ethernet]
-support_status = "not_supported"  # EMAC, RMII via GPIO 30/47/53 etc.
+support_status = "partial"
+mii_via_gpio_matrix = true
+
 [device.etm]
 support_status = "not_supported"  # Event Task Matrix
 [device.hmac]
@@ -615,9 +623,9 @@ input_signals = [
     { name = "PWM1_CAP0", id = 104 },
     { name = "PWM1_CAP1", id = 105 },
     { name = "PWM1_CAP2", id = 106 },
-    { name = "MII_MDI", id = 107 },
-    { name = "EMAC_PHY_COL", id = 108 },
-    { name = "EMAC_PHY_CRS", id = 109 },
+    { name = "EMAC_MDI", id = 107 },
+    { name = "EMAC_COL", id = 108 },
+    { name = "EMAC_CRS", id = 109 },
     { name = "USB_FS_IDDIG", id = 110 },
     { name = "USB_FS_AVALID", id = 111 },
     { name = "USB_FS_SRP_BVALID", id = 112 },
@@ -642,12 +650,12 @@ input_signals = [
     { name = "CAM_H_ENABLE", id = 159 },
     { name = "CAM_H_SYNC", id = 160 },
     { name = "CAM_V_SYNC", id = 161 },
-    { name = "EMAC_PHY_RXDV", id = 178 },
-    { name = "EMAC_PHY_RXD0", id = 179 },
-    { name = "EMAC_PHY_RXD1", id = 180 },
-    { name = "EMAC_PHY_RXD2", id = 181 },
-    { name = "EMAC_PHY_RXD3", id = 182 },
-    { name = "EMAC_PHY_RXER", id = 183 },
+    { name = "EMAC_RXDV", id = 178 },
+    { name = "EMAC_RXD0", id = 179 },
+    { name = "EMAC_RXD1", id = 180 },
+    { name = "EMAC_RXD2", id = 181 },
+    { name = "EMAC_RXD3", id = 182 },
+    { name = "EMAC_RXER", id = 183 },
     { name = "EMAC_RX_CLK", id = 184 },
     { name = "EMAC_TX_CLK", id = 185 },
     { name = "PARLIO_RX_CLK", id = 186 },
@@ -819,8 +827,8 @@ output_signals = [
     { name = "TWAI0_STANDBY", id = 105 },
     { name = "TWAI1_STANDBY", id = 106 },
     { name = "TWAI2_STANDBY", id = 107 },
-    { name = "MII_MDC", id = 108 },
-    { name = "MII_MDO", id = 109 },
+    { name = "EMAC_MDC", id = 108 },
+    { name = "EMAC_MDO", id = 109 },
     { name = "USB_SRP_DISCHRGVBUS", id = 110 },
     { name = "USB_OTG11_IDPULLUP", id = 111 },
     { name = "USB_OTG11_DPPULLDOWN", id = 112 },
@@ -848,12 +856,12 @@ output_signals = [
     { name = "LCD_H_ENABLE", id = 151 },
     { name = "LCD_H_SYNC", id = 152 },
     { name = "LCD_V_SYNC", id = 153 },
-    { name = "EMAC_PHY_TXEN", id = 178 },
-    { name = "EMAC_PHY_TXD0", id = 179 },
-    { name = "EMAC_PHY_TXD1", id = 180 },
-    { name = "EMAC_PHY_TXD2", id = 181 },
-    { name = "EMAC_PHY_TXD3", id = 182 },
-    { name = "EMAC_PHY_TXER", id = 183 },
+    { name = "EMAC_TXEN", id = 178 },
+    { name = "EMAC_TXD0", id = 179 },
+    { name = "EMAC_TXD1", id = 180 },
+    { name = "EMAC_TXD2", id = 181 },
+    { name = "EMAC_TXD3", id = 182 },
+    { name = "EMAC_TXER", id = 183 },
     { name = "PARLIO_RX_CLK", id = 186 },
     { name = "PARLIO_TX_CLK", id = 187 },
     { name = "PARLIO_TX_DATA0", id = 188 },
@@ -957,31 +965,31 @@ pins = [
     { pin = 25,                                 analog = { 0 = "USJ_DP" } },
     { pin = 26,                                 analog = { 0 = "USB_FS_DM" } },
     { pin = 27,                                 analog = { 0 = "USB_FS_DP" } },
-    { pin = 28, functions = {                   2 = "SPI2_CS",   3 = "EMAC_PHY_RXDV", 4 = "DBG_PSRAM_D"     } },
-    { pin = 29, functions = {                   2 = "SPI2_D",    3 = "EMAC_PHY_RXD0", 4 = "DBG_PSRAM_Q"     } },
-    { pin = 30, functions = {                   2 = "SPI2_CK",   3 = "EMAC_PHY_RXD1", 4 = "DBG_PSRAM_WP"    } },
-    { pin = 31, functions = {                   2 = "SPI2_Q",    3 = "EMAC_PHY_RXER", 4 = "DBG_PSRAM_HOLD"  } },
+    { pin = 28, functions = {                   2 = "SPI2_CS",   3 = "EMAC_RXDV",     4 = "DBG_PSRAM_D"     } },
+    { pin = 29, functions = {                   2 = "SPI2_D",    3 = "EMAC_RXD0",     4 = "DBG_PSRAM_Q"     } },
+    { pin = 30, functions = {                   2 = "SPI2_CK",   3 = "EMAC_RXD1",     4 = "DBG_PSRAM_WP"    } },
+    { pin = 31, functions = {                   2 = "SPI2_Q",    3 = "EMAC_RXER",     4 = "DBG_PSRAM_HOLD"  } },
     { pin = 32, functions = {                   2 = "SPI2_HOLD", 3 = "EMAC_RMII_CLK", 4 = "DBG_PSRAM_DQ4"   }, limitations = ["strapping"] },
-    { pin = 33, functions = {                   2 = "SPI2_WP",   3 = "EMAC_PHY_TXEN", 4 = "DBG_PSRAM_DQ5"   }, limitations = ["strapping"] },
-    { pin = 34, functions = {                   2 = "SPI2_IO4",  3 = "EMAC_PHY_TXD0", 4 = "DBG_PSRAM_DQ6"   }, limitations = ["strapping"] },
-    { pin = 35, functions = {                   2 = "SPI2_IO5",  3 = "EMAC_PHY_TXD1", 4 = "DBG_PSRAM_DQ7"   }, limitations = ["strapping"] },
-    { pin = 36, functions = {                   2 = "SPI2_IO6",  3 = "EMAC_PHY_TXER", 4 = "DBG_PSRAM_DQS_0" }, limitations = ["strapping"] },
+    { pin = 33, functions = {                   2 = "SPI2_WP",   3 = "EMAC_TXEN",     4 = "DBG_PSRAM_DQ5"   }, limitations = ["strapping"] },
+    { pin = 34, functions = {                   2 = "SPI2_IO4",  3 = "EMAC_TXD0",     4 = "DBG_PSRAM_DQ6"   }, limitations = ["strapping"] },
+    { pin = 35, functions = {                   2 = "SPI2_IO5",  3 = "EMAC_TXD1",     4 = "DBG_PSRAM_DQ7"   }, limitations = ["strapping"] },
+    { pin = 36, functions = {                   2 = "SPI2_IO6",  3 = "EMAC_TXER",     4 = "DBG_PSRAM_DQS_0" }, limitations = ["strapping"] },
     { pin = 37, functions = { 0 = "UART0_TXD",  2 = "SPI2_IO7" }, limitations = ["strapping"] },
     { pin = 38, functions = { 0 = "UART0_RXD",  2 = "SPI2_DQS" }, limitations = ["strapping"] },
     { pin = 39, functions = { 0 = "SD1_CDATA0", 2 = "BIST",      3 = "REF_50M_CLK",   4 = "DBG_PSRAM_DQ8"   } },
-    { pin = 40, functions = { 0 = "SD1_CDATA1", 2 = "BIST",      3 = "EMAC_PHY_TXEN", 4 = "DBG_PSRAM_DQ9"   } },
-    { pin = 41, functions = { 0 = "SD1_CDATA2", 2 = "BIST",      3 = "EMAC_PHY_TXD0", 4 = "DBG_PSRAM_DQ10"  } },
-    { pin = 42, functions = { 0 = "SD1_CDATA3", 2 = "BIST",      3 = "EMAC_PHY_TXD1", 4 = "DBG_PSRAM_DQ11"  } },
-    { pin = 43, functions = { 0 = "SD1_CCLK",   2 = "BIST",      3 = "EMAC_PHY_TXER", 4 = "DBG_PSRAM_DQ12"  } },
+    { pin = 40, functions = { 0 = "SD1_CDATA1", 2 = "BIST",      3 = "EMAC_TXEN",     4 = "DBG_PSRAM_DQ9"   } },
+    { pin = 41, functions = { 0 = "SD1_CDATA2", 2 = "BIST",      3 = "EMAC_TXD0",     4 = "DBG_PSRAM_DQ10"  } },
+    { pin = 42, functions = { 0 = "SD1_CDATA3", 2 = "BIST",      3 = "EMAC_TXD1",     4 = "DBG_PSRAM_DQ11"  } },
+    { pin = 43, functions = { 0 = "SD1_CCLK",   2 = "BIST",      3 = "EMAC_TXER",     4 = "DBG_PSRAM_DQ12"  } },
     { pin = 44, functions = { 0 = "SD1_CCMD",   2 = "BIST",      3 = "EMAC_RMII_CLK", 4 = "DBG_PSRAM_DQ13"  } },
-    { pin = 45, functions = { 0 = "SD1_CDATA4", 2 = "BIST",      3 = "EMAC_PHY_RXDV", 4 = "DBG_PSRAM_DQ14"  } },
-    { pin = 46, functions = { 0 = "SD1_CDATA5", 2 = "BIST",      3 = "EMAC_PHY_RXD0", 4 = "DBG_PSRAM_DQ15"  } },
-    { pin = 47, functions = { 0 = "SD1_CDATA6", 2 = "BIST",      3 = "EMAC_PHY_RXD1", 4 = "DBG_PSRAM_DQS_1" } },
-    { pin = 48, functions = { 0 = "SD1_CDATA7", 2 = "BIST",      3 = "EMAC_PHY_RXER" } },
-    { pin = 49, functions = {                                    3 = "EMAC_PHY_TXEN", 4 = "DBG_FLASH_CS"   }, analog = { 1 = "ADC2_CH0" } },
+    { pin = 45, functions = { 0 = "SD1_CDATA4", 2 = "BIST",      3 = "EMAC_RXDV",     4 = "DBG_PSRAM_DQ14"  } },
+    { pin = 46, functions = { 0 = "SD1_CDATA5", 2 = "BIST",      3 = "EMAC_RXD0",     4 = "DBG_PSRAM_DQ15"  } },
+    { pin = 47, functions = { 0 = "SD1_CDATA6", 2 = "BIST",      3 = "EMAC_RXD1",     4 = "DBG_PSRAM_DQS_1" } },
+    { pin = 48, functions = { 0 = "SD1_CDATA7", 2 = "BIST",      3 = "EMAC_RXER" } },
+    { pin = 49, functions = {                                    3 = "EMAC_TXEN",     4 = "DBG_FLASH_CS"   }, analog = { 1 = "ADC2_CH0" } },
     { pin = 50, functions = {                                    3 = "EMAC_RMII_CLK", 4 = "DBG_FLASH_Q"    }, analog = { 1 = "ADC2_CH1" } },
-    { pin = 51, functions = {                                    3 = "EMAC_PHY_RXDV", 4 = "DBG_FLASH_WP"   }, analog = { 1 = "ADC2_CH2" } },
-    { pin = 52, functions = {                                    3 = "EMAC_PHY_RXD0", 4 = "DBG_FLASH_HOLD" }, analog = { 1 = "ADC2_CH3" } },
-    { pin = 53, functions = {                                    3 = "EMAC_PHY_RXD1", 4 = "DBG_FLASH_CK"   }, analog = { 1 = "ADC2_CH4" } },
-    { pin = 54, functions = {                                    3 = "EMAC_PHY_RXER", 4 = "DBG_FLASH_D"    }, analog = { 1 = "ADC2_CH5" } },
+    { pin = 51, functions = {                                    3 = "EMAC_RXDV",     4 = "DBG_FLASH_WP"   }, analog = { 1 = "ADC2_CH2" } },
+    { pin = 52, functions = {                                    3 = "EMAC_RXD0",     4 = "DBG_FLASH_HOLD" }, analog = { 1 = "ADC2_CH3" } },
+    { pin = 53, functions = {                                    3 = "EMAC_RXD1",     4 = "DBG_FLASH_CK"   }, analog = { 1 = "ADC2_CH4" } },
+    { pin = 54, functions = {                                    3 = "EMAC_RXER",     4 = "DBG_FLASH_D"    }, analog = { 1 = "ADC2_CH5" } },
 ]

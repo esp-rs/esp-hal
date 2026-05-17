@@ -1,4 +1,41 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "clk_in_gpio" => {
+        cfg(esp32) => "GPIO0",
+        cfg(esp32p4) => "GPIO50",
+    },
+    "rxd0_gpio" => {
+        cfg(esp32) => "GPIO25",
+        cfg(esp32p4) => "GPIO29",
+    },
+    "rxd1_gpio" => {
+        cfg(esp32) => "GPIO26",
+        cfg(esp32p4) => "GPIO30",
+    },
+    "rxdv_gpio" => {
+        cfg(esp32) => "GPIO27",
+        cfg(esp32p4) => "GPIO28",
+    },
+    "txd0_gpio" => {
+        cfg(esp32) => "GPIO19",
+        cfg(esp32p4) => "GPIO34",
+    },
+    "txd1_gpio" => {
+        cfg(esp32) => "GPIO22",
+        cfg(esp32p4) => "GPIO35",
+    },
+    "txen_gpio" => {
+        cfg(esp32) => "GPIO21",
+        cfg(esp32p4) => "GPIO49",
+    },
+    "mdc_gpio" => {
+        cfg(esp32) => "GPIO23",
+        cfg(esp32p4) => "GPIO31",
+    },
+    "mdio_gpio" => {
+        cfg(esp32) => "GPIO18",
+        cfg(esp32p4) => "GPIO52",
+    }
+))]
 //! EMAC Ethernet driver for ESP32.
 //!
 //! The driver provides blocking and async Ethernet APIs.
@@ -21,17 +58,17 @@
 //!     peripherals.ETH,
 //!     &mut storage,
 //!     [0x02, 0x00, 0x00, 0x12, 0x34, 0x56],
-//!     GenericPhy::new(1),
+//!     GenericPhy::new_auto(),
 //!     RmiiPinBundle {
-//!         clock: ExternalRefClock::new(peripherals.GPIO0), // REF_CLK from PHY on GPIO0
-//!         rxd0: peripherals.GPIO25,
-//!         rxd1: peripherals.GPIO26,
-//!         rx_dv: peripherals.GPIO27,
-//!         txd0: peripherals.GPIO19,
-//!         txd1: peripherals.GPIO22,
-//!         tx_en: peripherals.GPIO21,
-//!         mdc: peripherals.GPIO23,
-//!         mdio: peripherals.GPIO18,
+//!         clock: ExternalRefClock::new(peripherals.__clk_in_gpio__), // REF_CLK from PHY
+//!         rxd0: peripherals.__rxd0_gpio__,
+//!         rxd1: peripherals.__rxd1_gpio__,
+//!         rx_dv: peripherals.__rxdv_gpio__,
+//!         txd0: peripherals.__txd0_gpio__,
+//!         txd1: peripherals.__txd1_gpio__,
+//!         tx_en: peripherals.__txen_gpio__,
+//!         mdc: peripherals.__mdc_gpio__,
+//!         mdio: peripherals.__mdio_gpio__,
 //!     },
 //! )
 //! .unwrap();
@@ -46,10 +83,11 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    ethernet::phy::PhyError,
     gpio::{
         AlternateFunction,
-        DriveMode,
         DriveStrength,
+        InputConfig,
         OutputConfig,
         Pin,
         interconnect::{self, PeripheralInput, PeripheralOutput},
@@ -61,6 +99,7 @@ use crate::{
 };
 
 #[cfg_attr(esp32, path = "clock/esp32.rs")]
+#[cfg_attr(esp32p4, path = "clock/esp32p4.rs")]
 pub mod clock;
 pub(crate) mod dma;
 pub(crate) mod embassy_net;
@@ -86,8 +125,8 @@ pub enum Error {
     FrameTooLarge,
     /// No received frame is currently available.
     NoFrame,
-    /// PHY initialization timed out.
-    PhyTimeout,
+    /// PHY (initialization) error.
+    Phy(PhyError),
 }
 
 /// Sealed trait implemented by all RMII clock configurations.
@@ -106,7 +145,7 @@ pub trait RmiiClockConfig: Sealed {
 // the GPIO numbers documented in the ESP32 TRM, making wrong-pin errors
 // compile-time failures.
 
-macro_rules! emac_iomux_trait {
+macro_rules! emac_pin {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
         pub trait $name: crate::private::Sealed {
@@ -115,28 +154,6 @@ macro_rules! emac_iomux_trait {
         }
     };
 }
-
-emac_iomux_trait!(EmacRxd0, "GPIO that carries `EMAC_RXD0`.");
-emac_iomux_trait!(EmacRxd1, "GPIO that carries `EMAC_RXD1`.");
-emac_iomux_trait!(EmacRxDv, "GPIO that carries `EMAC_RX_DV`.");
-emac_iomux_trait!(EmacTxd0, "GPIO that carries `EMAC_TXD0`.");
-emac_iomux_trait!(EmacTxd1, "GPIO that carries `EMAC_TXD1`.");
-emac_iomux_trait!(EmacTxEn, "GPIO that carries `EMAC_TX_EN`.");
-emac_iomux_trait!(
-    EmacClkOut,
-    "GPIO that carries `EMAC_CLK_OUT` / `EMAC_CLK_180`."
-);
-emac_iomux_trait!(EmacRxd2, "GPIO that carries `EMAC_RXD2`.");
-emac_iomux_trait!(EmacRxd3, "GPIO that carries `EMAC_RXD3`.");
-emac_iomux_trait!(EmacTxd2, "GPIO that carries `EMAC_TXD2`.");
-emac_iomux_trait!(EmacTxd3, "GPIO that carries `EMAC_TXD3`.");
-emac_iomux_trait!(EmacTxClk, "GPIO that carries `EMAC_TX_CLK`.");
-emac_iomux_trait!(EmacRxClk, "GPIO that carries `EMAC_RX_CLK`.");
-
-emac_iomux_trait!(
-    EmacRmiiClkIn,
-    "GPIO suitable for use as the RMII reference clock input pin."
-);
 
 macro_rules! implement_trait {
     ($trait:ident, $gpio:ident, $af:ident) => {
@@ -154,50 +171,168 @@ macro_rules! implement_trait {
     };
 }
 
-// FIXME: signal names are ESP32-specific
+// MII traits
+cfg_if::cfg_if! {
+    if #[cfg(ethernet_mii_via_gpio_matrix)] {
+        macro_rules! mii_pin {
+            ($name:ident, $doc:literal $(, in=$input:ident)? $(, out=$output:ident)?) => {
+                #[doc = $doc]
+                pub trait $name: crate::gpio::InputPin + crate::gpio::OutputPin + Sized {
+                    #[doc(hidden)]
+                    fn configure_iomux(self) { // Intentionally consumes to allow converting
+                        let peri_signal: interconnect::OutputSignal<'_> = self.into();
+                        $(
+                            let signal = crate::gpio::InputSignal::$input;
+
+                            signal.connect_to(&peri_signal);
+                            peri_signal.set_input_enable(true);
+                        )?
+                        $(
+                            let signal = crate::gpio::OutputSignal::$output;
+                            peri_signal.apply_output_config(
+                                &OutputConfig::default()
+                                    .with_drive_strength(DriveStrength::_20mA),
+                            );
+                            signal.connect_to(&peri_signal);
+                            peri_signal.set_output_enable(true);
+                        )?
+                    }
+                }
+            };
+        }
+        mii_pin!(MiiTxClk, "MII TX clock pin", in = EMAC_TX_CLK);
+        mii_pin!(MiiTxEn, "MII TX enable pin", out = EMAC_TXEN);
+        mii_pin!(MiiTxd0, "MII TXD0 pin", out = EMAC_TXD0);
+        mii_pin!(MiiTxd1, "MII TXD1 pin", out = EMAC_TXD1);
+        mii_pin!(MiiTxd2, "MII TXD2 pin", out = EMAC_TXD2);
+        mii_pin!(MiiTxd3, "MII TXD3 pin", out = EMAC_TXD3);
+        mii_pin!(MiiRxClk, "MII RX clock pin", in = EMAC_RX_CLK);
+        mii_pin!(MiiRxDv, "MII RX data valid pin", in = EMAC_RXDV);
+        mii_pin!(MiiRxd0, "MII RXD0 pin", in = EMAC_RXD0);
+        mii_pin!(MiiRxd1, "MII RXD1 pin", in = EMAC_RXD1);
+        mii_pin!(MiiRxd2, "MII RXD2 pin", in = EMAC_RXD2);
+        mii_pin!(MiiRxd3, "MII RXD3 pin", in = EMAC_RXD3);
+
+        for_each_gpio! {
+            ($n:literal, $gpio:ident $($_rest:tt)*) => {
+                impl MiiTxClk for crate::peripherals::$gpio<'_> {}
+                impl MiiTxEn for crate::peripherals::$gpio<'_> {}
+                impl MiiTxd0 for crate::peripherals::$gpio<'_> {}
+                impl MiiTxd1 for crate::peripherals::$gpio<'_> {}
+                impl MiiTxd2 for crate::peripherals::$gpio<'_> {}
+                impl MiiTxd3 for crate::peripherals::$gpio<'_> {}
+                impl MiiRxClk for crate::peripherals::$gpio<'_> {}
+                impl MiiRxDv for crate::peripherals::$gpio<'_> {}
+                impl MiiRxd0 for crate::peripherals::$gpio<'_> {}
+                impl MiiRxd1 for crate::peripherals::$gpio<'_> {}
+                impl MiiRxd2 for crate::peripherals::$gpio<'_> {}
+                impl MiiRxd3 for crate::peripherals::$gpio<'_> {}
+            };
+        }
+    } else {
+        emac_pin!(MiiTxClk, "MII TX clock pin");
+        emac_pin!(MiiTxEn,  "MII TX enable pin");
+        emac_pin!(MiiTxd0,  "MII TXD0 pin");
+        emac_pin!(MiiTxd1,  "MII TXD1 pin");
+        emac_pin!(MiiTxd2,  "MII TXD2 pin");
+        emac_pin!(MiiTxd3,  "MII TXD3 pin");
+        emac_pin!(MiiRxClk, "MII RX clock pin");
+        emac_pin!(MiiRxDv,  "MII RX data valid pin");
+        emac_pin!(MiiRxd0,  "MII RXD0 pin");
+        emac_pin!(MiiRxd1,  "MII RXD1 pin");
+        emac_pin!(MiiRxd2,  "MII RXD2 pin");
+        emac_pin!(MiiRxd3,  "MII RXD3 pin");
+
+        for_each_iomux_function! {
+            (EMAC_TX_CLK, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxClk, $gpio, $af);
+            };
+            (EMAC_TXEN, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxEn, $gpio, $af);
+            };
+            (EMAC_TXD0, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxd0, $gpio, $af);
+            };
+            (EMAC_TXD1, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxd1, $gpio, $af);
+            };
+            (EMAC_TXD2, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxd2, $gpio, $af);
+            };
+            (EMAC_TXD3, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiTxd3, $gpio, $af);
+            };
+
+            (EMAC_RX_CLK, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxClk, $gpio, $af);
+            };
+            (EMAC_RXDV, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxDv, $gpio, $af);
+            };
+            (EMAC_RXD0, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxd0, $gpio, $af);
+            };
+            (EMAC_RXD1, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxd1, $gpio, $af);
+            };
+            (EMAC_RXD2, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxd2, $gpio, $af);
+            };
+            (EMAC_RXD3, $gpio:ident, $af:ident) => {
+                implement_trait!(MiiRxd3, $gpio, $af);
+            };
+        }
+    }
+}
+
+// RMII traits
+emac_pin!(RmiiClkIn, "RMII CLK input pin");
+emac_pin!(RmiiClkOut, "RMII CLK output pin");
+emac_pin!(RmiiTxEn, "RMII TX enable pin");
+emac_pin!(RmiiTxd0, "RMII TXD0 pin");
+emac_pin!(RmiiTxd1, "RMII TXD1 pin");
+emac_pin!(RmiiCrsDv, "RMII CRS/DV pin");
+emac_pin!(RmiiRxd0, "RMII RXD0 pin");
+emac_pin!(RmiiRxd1, "RMII RXD1 pin");
+
+// RMII traits
 for_each_iomux_function! {
-    (EMAC_RXD0, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxd0, $gpio, $af);
-    };
-    (EMAC_RXD1, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxd1, $gpio, $af);
-    };
-    (EMAC_RX_DV, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxDv, $gpio, $af);
+    (EMAC_TXEN, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiTxEn, $gpio, $af);
     };
     (EMAC_TXD0, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxd0, $gpio, $af);
+        implement_trait!(RmiiTxd0, $gpio, $af);
     };
     (EMAC_TXD1, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxd1, $gpio, $af);
+        implement_trait!(RmiiTxd1, $gpio, $af);
     };
-    (EMAC_TX_EN, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxEn, $gpio, $af);
+    (EMAC_RXDV, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiCrsDv, $gpio, $af);
     };
-    (EMAC_RX_CLK, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxClk, $gpio, $af);
+    (EMAC_RXD0, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiRxd0, $gpio, $af);
+    };
+    (EMAC_RXD1, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiRxd1, $gpio, $af);
+    };
+
+    // ESP32-specific
+    (EMAC_TX_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiClkIn, $gpio, $af);
     };
     (EMAC_CLK_OUT, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacClkOut, $gpio, $af);
+        implement_trait!(RmiiClkOut, $gpio, $af);
     };
     (EMAC_CLK_180, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacClkOut, $gpio, $af);
+        implement_trait!(RmiiClkOut, $gpio, $af);
     };
-    (EMAC_RXD2, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxd2, $gpio, $af);
+
+    // ESP32-P4-specific: MPLL-derived 50 MHz reference clock output pad.
+    (REF_50M_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiClkOut, $gpio, $af);
     };
-    (EMAC_RXD3, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRxd3, $gpio, $af);
-    };
-    (EMAC_TXD2, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxd2, $gpio, $af);
-    };
-    (EMAC_TXD3, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacTxd3, $gpio, $af);
-    };
-    (EMAC_TX_CLK, $gpio:ident, $af:ident) => {
-        implement_trait!(EmacRmiiClkIn, $gpio, $af);
-        implement_trait!(EmacTxClk, $gpio, $af);
+    (EMAC_RMII_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RmiiClkIn, $gpio, $af);
     };
 }
 
@@ -234,12 +369,12 @@ impl<'d, C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio> EthernetPinBundle
     for RmiiPinBundle<C, Rxd0, Rxd1, RxDv, Txd0, Txd1, TxEn, Mdc, Mdio>
 where
     C: RmiiClockConfig,
-    Rxd0: EmacRxd0 + 'd,
-    Rxd1: EmacRxd1 + 'd,
-    RxDv: EmacRxDv + 'd,
-    Txd0: EmacTxd0 + 'd,
-    Txd1: EmacTxd1 + 'd,
-    TxEn: EmacTxEn + 'd,
+    Rxd0: RmiiRxd0 + 'd,
+    Rxd1: RmiiRxd1 + 'd,
+    RxDv: RmiiCrsDv + 'd,
+    Txd0: RmiiTxd0 + 'd,
+    Txd1: RmiiTxd1 + 'd,
+    TxEn: RmiiTxEn + 'd,
     Mdc: PeripheralOutput<'d>,
     Mdio: PeripheralInput<'d> + PeripheralOutput<'d>,
 {
@@ -358,18 +493,18 @@ impl<
         Mdio,
     >
 where
-    Rxd0: EmacRxd0 + 'd,
-    Rxd1: EmacRxd1 + 'd,
-    RxDv: EmacRxDv + 'd,
-    Txd0: EmacTxd0 + 'd,
-    Txd1: EmacTxd1 + 'd,
-    TxEn: EmacTxEn + 'd,
-    Rxd2: EmacRxd2 + 'd,
-    Rxd3: EmacRxd3 + 'd,
-    Txd2: EmacTxd2 + 'd,
-    Txd3: EmacTxd3 + 'd,
-    TxClk: EmacTxClk + 'd,
-    RxClk: EmacRxClk + 'd,
+    Rxd0: MiiRxd0 + 'd,
+    Rxd1: MiiRxd1 + 'd,
+    RxDv: MiiRxDv + 'd,
+    Txd0: MiiTxd0 + 'd,
+    Txd1: MiiTxd1 + 'd,
+    TxEn: MiiTxEn + 'd,
+    Rxd2: MiiRxd2 + 'd,
+    Rxd3: MiiRxd3 + 'd,
+    Txd2: MiiTxd2 + 'd,
+    Txd3: MiiTxd3 + 'd,
+    TxClk: MiiTxClk + 'd,
+    RxClk: MiiRxClk + 'd,
     Crs: PeripheralInput<'d>,
     Col: PeripheralInput<'d>,
     Mdc: PeripheralOutput<'d>,
@@ -442,7 +577,7 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
 }
 
 impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
-    /// Creates an Ethernet driver using RMII (`RmiiPinBundle`) or MII (`MiiPinBundle`).
+    /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
     pub fn new<const RX: usize, const TX: usize>(
         eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
@@ -500,21 +635,17 @@ fn configure_mdio<'d>(
     mdc: impl PeripheralOutput<'d>,
     mdio: impl PeripheralInput<'d> + PeripheralOutput<'d>,
 ) {
-    // MDC is output-only; MDIO is bidirectional open-drain.
+    // MDC is output-only; MDIO is bidirectional, controlled by the peripheral.
     let mdc: interconnect::OutputSignal<'_> = mdc.into();
     mdc.apply_output_config(&OutputConfig::default().with_drive_strength(DriveStrength::_20mA));
     crate::gpio::OutputSignal::EMAC_MDC.connect_to(&mdc);
 
     let mdio: interconnect::OutputSignal<'_> = mdio.into();
-    mdio.apply_output_config(
-        &OutputConfig::default()
-            .with_drive_mode(DriveMode::OpenDrain)
-            .with_drive_strength(DriveStrength::_20mA),
-    );
+    mdio.apply_output_config(&OutputConfig::default().with_drive_strength(DriveStrength::_20mA));
+    mdio.apply_input_config(&InputConfig::default());
     crate::gpio::InputSignal::EMAC_MDI.connect_to(&mdio);
     crate::gpio::OutputSignal::EMAC_MDO.connect_to(&mdio);
     mdio.set_input_enable(true);
-    mdio.set_output_enable(true);
 }
 
 impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
@@ -666,7 +797,7 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
 
     // Init PHY (MDIO requires DMA/MAC clocks to be running after reset).
     let mdio = MdioDriver::new(&EmacRegs);
-    phy.init(&mdio).map_err(|_| Error::PhyTimeout)?;
+    phy.init(&mdio).map_err(Error::Phy)?;
 
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);
