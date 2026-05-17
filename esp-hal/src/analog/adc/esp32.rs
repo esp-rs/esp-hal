@@ -370,3 +370,4 @@ impl Drop for ADC2<'_> {
         release_adc2(private::Internal);
     }
 }
+

@@ -66,6 +66,36 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
+#[cfg(all(feature = "unstable", not(esp32)))]
+pub(crate) fn on_apb_saradc_clock_release() {
+    #[cfg(any(esp32s2, esp32s3))]
+    {
+        let sensors = crate::peripherals::SENS::regs();
+
+        #[cfg(esp32s2)]
+        sensors
+            .sar_meas1_ctrl1()
+            .modify(|_, w| w.rtc_saradc_clkgate_en().clear_bit());
+
+        #[cfg(esp32s3)]
+        sensors
+            .sar_peri_clk_gate_conf()
+            .modify(|_, w| w.saradc_clk_en().clear_bit());
+
+        sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
+            w.sarclk_en().clear_bit();
+            w.force_xpd_sar().bits(0)
+        });
+    }
+
+    #[cfg(riscv)]
+    {
+        crate::peripherals::APB_SARADC::regs()
+            .ctrl()
+            .modify(|_, w| unsafe { w.xpd_sar_force().bits(0) });
+    }
+}
+
 /// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the

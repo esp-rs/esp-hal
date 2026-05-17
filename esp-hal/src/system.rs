@@ -194,6 +194,11 @@ impl PeripheralClockControl {
                 if prev > 1 {
                     return false;
                 }
+
+                #[cfg(all(feature = "unstable", adc_driver_supported, not(esp32)))]
+                if peripheral == Peripheral::ApbSarAdc {
+                    crate::analog::adc::on_apb_saradc_clock_release();
+                }
             };
         } else if !enable {
             assert!(*ref_count == 0);
