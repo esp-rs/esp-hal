@@ -399,6 +399,8 @@ unstable_driver! {
     pub mod twai;
     #[cfg(usb_serial_jtag_driver_supported)]
     pub mod usb_serial_jtag;
+    #[cfg(ethernet_driver_supported)]
+    pub mod ethernet;
 }
 
 /// State of the CPU saved when entering exception or interrupt

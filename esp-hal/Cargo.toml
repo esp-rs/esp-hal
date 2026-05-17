@@ -74,6 +74,7 @@ procmacros               = { version = "0.22.0", package = "esp-hal-procmacros",
 digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
 embassy-usb-driver       = { version = "0.2", optional = true }
 embassy-usb-synopsys-otg = { version = "0.3.3", optional = true, features = ["host"] }
+embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 nb                       = { version = "1.1", optional = true }
 
@@ -101,7 +102,7 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.40", features = ["critical-section", "rt"], optional = true }
+esp32   = { version = "0.40", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "ddcad65f6cbc6dff463a6bb3e49fb80261fd9956" }
 esp32c2 = { version = "0.29", features = ["critical-section", "rt"], optional = true }
 esp32c3 = { version = "0.32", features = ["critical-section", "rt"], optional = true }
 esp32c5 = { version = "0.2",  features = ["critical-section", "rt"], optional = true }
@@ -186,7 +187,8 @@ esp32   = [
     "esp-sync/esp32",
     "esp-metadata-generated/esp32",
     "dep:sha1",
-    "dep:sha2"
+    "dep:sha2",
+    "dep:embassy-net-driver-02",
 ]
 ##
 esp32c2 = [

@@ -4236,6 +4236,75 @@ macro_rules! for_each_lp_function {
         GPIO14)));
     };
 }
+/// This macro can be used to generate code for each IOMUX digital function of each GPIO.
+///
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+/// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+/// GPIO matrix (e.g., EMAC, USB).
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the alternate function.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
+///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
+///   group to which the signal belongs.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+/// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+///
+/// Example data:
+/// - `(EMAC_RXD0, GPIO25, _5)`
+/// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_iomux_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_iomux_function!((FSPIQ, GPIO0, _2));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO1, _2));
+        _for_each_inner_iomux_function!((MTMS, GPIO2, _0));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO2, _2));
+        _for_each_inner_iomux_function!((MTDI, GPIO3, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO3, _2));
+        _for_each_inner_iomux_function!((MTCK, GPIO4, _0));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO4, _2));
+        _for_each_inner_iomux_function!((MTDO, GPIO5, _0));
+        _for_each_inner_iomux_function!((FSPID, GPIO5, _2));
+        _for_each_inner_iomux_function!((U0RXD, GPIO23, _0));
+        _for_each_inner_iomux_function!((FSPICS1, GPIO23, _2));
+        _for_each_inner_iomux_function!((U0TXD, GPIO24, _0));
+        _for_each_inner_iomux_function!((FSPICS2, GPIO24, _2));
+        _for_each_inner_iomux_function!((FSPICS3, GPIO25, _2));
+        _for_each_inner_iomux_function!((FSPICS4, GPIO26, _2));
+        _for_each_inner_iomux_function!((FSPICS5, GPIO27, _2));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO1, _2));
+        _for_each_inner_iomux_function!(((FSPICS1, FSPICSn, 1), GPIO23, _2));
+        _for_each_inner_iomux_function!(((FSPICS2, FSPICSn, 2), GPIO24, _2));
+        _for_each_inner_iomux_function!(((FSPICS3, FSPICSn, 3), GPIO25, _2));
+        _for_each_inner_iomux_function!(((FSPICS4, FSPICSn, 4), GPIO26, _2));
+        _for_each_inner_iomux_function!(((FSPICS5, FSPICSn, 5), GPIO27, _2));
+        _for_each_inner_iomux_function!((all(FSPIQ, GPIO0, _2), (FSPICS0, GPIO1, _2),
+        (MTMS, GPIO2, _0), (FSPIWP, GPIO2, _2), (MTDI, GPIO3, _0), (FSPIHD, GPIO3, _2),
+        (MTCK, GPIO4, _0), (FSPICLK, GPIO4, _2), (MTDO, GPIO5, _0), (FSPID, GPIO5, _2),
+        (U0RXD, GPIO23, _0), (FSPICS1, GPIO23, _2), (U0TXD, GPIO24, _0), (FSPICS2,
+        GPIO24, _2), (FSPICS3, GPIO25, _2), (FSPICS4, GPIO26, _2), (FSPICS5, GPIO27,
+        _2))); _for_each_inner_iomux_function!((all_expanded((FSPICS0, FSPICSn, 0),
+        GPIO1, _2), ((FSPICS1, FSPICSn, 1), GPIO23, _2), ((FSPICS2, FSPICSn, 2), GPIO24,
+        _2), ((FSPICS3, FSPICSn, 3), GPIO25, _2), ((FSPICS4, FSPICSn, 4), GPIO26, _2),
+        ((FSPICS5, FSPICSn, 5), GPIO27, _2)));
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

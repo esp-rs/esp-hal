@@ -206,6 +206,7 @@ impl Chip {
                     "soc_has_dport",
                     "soc_has_system",
                     "soc_has_efuse",
+                    "soc_has_eth",
                     "soc_has_emac_dma",
                     "soc_has_emac_ext",
                     "soc_has_emac_mac",
@@ -276,6 +277,7 @@ impl Chip {
                     "bt_driver_supported",
                     "dac_driver_supported",
                     "dma_driver_supported",
+                    "ethernet_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "i2s_driver_supported",
@@ -418,6 +420,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dport",
                     "cargo:rustc-cfg=soc_has_system",
                     "cargo:rustc-cfg=soc_has_efuse",
+                    "cargo:rustc-cfg=soc_has_eth",
                     "cargo:rustc-cfg=soc_has_emac_dma",
                     "cargo:rustc-cfg=soc_has_emac_ext",
                     "cargo:rustc-cfg=soc_has_emac_mac",
@@ -488,6 +491,7 @@ impl Chip {
                     "cargo:rustc-cfg=bt_driver_supported",
                     "cargo:rustc-cfg=dac_driver_supported",
                     "cargo:rustc-cfg=dma_driver_supported",
+                    "cargo:rustc-cfg=ethernet_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=i2s_driver_supported",
@@ -6321,6 +6325,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dport)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_system)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_efuse)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_eth)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_emac_dma)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_emac_ext)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_emac_mac)");
@@ -6391,6 +6396,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(bt_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dac_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(ethernet_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(gpio_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(i2s_driver_supported)");

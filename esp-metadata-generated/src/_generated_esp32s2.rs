@@ -4662,6 +4662,151 @@ macro_rules! for_each_lp_function {
         ((RTC_GPIO21, RTC_GPIOn, 21), GPIO21)));
     };
 }
+/// This macro can be used to generate code for each IOMUX digital function of each GPIO.
+///
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+/// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+/// GPIO matrix (e.g., EMAC, USB).
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the alternate function.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
+///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
+///   group to which the signal belongs.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+/// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+///
+/// Example data:
+/// - `(EMAC_RXD0, GPIO25, _5)`
+/// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_iomux_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_iomux_function!((SUBSPICS1, GPIO8, _3));
+        _for_each_inner_iomux_function!((SUBSPIHD, GPIO9, _3));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO9, _4));
+        _for_each_inner_iomux_function!((FSPIIO4, GPIO10, _2));
+        _for_each_inner_iomux_function!((SUBSPICS0, GPIO10, _3));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO10, _4));
+        _for_each_inner_iomux_function!((FSPIIO5, GPIO11, _2));
+        _for_each_inner_iomux_function!((SUBSPID, GPIO11, _3));
+        _for_each_inner_iomux_function!((FSPID, GPIO11, _4));
+        _for_each_inner_iomux_function!((FSPIIO6, GPIO12, _2));
+        _for_each_inner_iomux_function!((SUBSPICLK, GPIO12, _3));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO12, _4));
+        _for_each_inner_iomux_function!((FSPIIO7, GPIO13, _2));
+        _for_each_inner_iomux_function!((SUBSPIQ, GPIO13, _3));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO13, _4));
+        _for_each_inner_iomux_function!((FSPIDQS, GPIO14, _2));
+        _for_each_inner_iomux_function!((SUBSPIWP, GPIO14, _3));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO14, _4));
+        _for_each_inner_iomux_function!((U0RTS, GPIO15, _2));
+        _for_each_inner_iomux_function!((U0CTS, GPIO16, _2));
+        _for_each_inner_iomux_function!((U1TXD, GPIO17, _2));
+        _for_each_inner_iomux_function!((U1RXD, GPIO18, _2));
+        _for_each_inner_iomux_function!((CLK_OUT3, GPIO18, _3));
+        _for_each_inner_iomux_function!((U1RTS, GPIO19, _2));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO19, _3));
+        _for_each_inner_iomux_function!((U1CTS, GPIO20, _2));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO20, _3));
+        _for_each_inner_iomux_function!((SPICS1, GPIO26, _0));
+        _for_each_inner_iomux_function!((SPIHD, GPIO27, _0));
+        _for_each_inner_iomux_function!((SPIWP, GPIO28, _0));
+        _for_each_inner_iomux_function!((SPICS0, GPIO29, _0));
+        _for_each_inner_iomux_function!((SPICLK, GPIO30, _0));
+        _for_each_inner_iomux_function!((SPIQ, GPIO31, _0));
+        _for_each_inner_iomux_function!((SPID, GPIO32, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO33, _2));
+        _for_each_inner_iomux_function!((SUBSPIHD, GPIO33, _3));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO34, _2));
+        _for_each_inner_iomux_function!((SUBSPICS0, GPIO34, _3));
+        _for_each_inner_iomux_function!((FSPID, GPIO35, _2));
+        _for_each_inner_iomux_function!((SUBSPID, GPIO35, _3));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO36, _2));
+        _for_each_inner_iomux_function!((SUBSPICLK, GPIO36, _3));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO37, _2));
+        _for_each_inner_iomux_function!((SUBSPIQ, GPIO37, _3));
+        _for_each_inner_iomux_function!((SPIDQS, GPIO37, _4));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO38, _2));
+        _for_each_inner_iomux_function!((SUBSPIWP, GPIO38, _3));
+        _for_each_inner_iomux_function!((MTCK, GPIO39, _0));
+        _for_each_inner_iomux_function!((CLK_OUT3, GPIO39, _2));
+        _for_each_inner_iomux_function!((SUBSPICS1, GPIO39, _3));
+        _for_each_inner_iomux_function!((MTDO, GPIO40, _0));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO40, _2));
+        _for_each_inner_iomux_function!((MTDI, GPIO41, _0));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO41, _2));
+        _for_each_inner_iomux_function!((MTMS, GPIO42, _0));
+        _for_each_inner_iomux_function!((U0TXD, GPIO43, _0));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO43, _2));
+        _for_each_inner_iomux_function!((U0RXD, GPIO44, _0));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO44, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS1, SUBSPICSn, 1), GPIO8, _3));
+        _for_each_inner_iomux_function!(((FSPIIO4, FSPIIOn, 4), GPIO10, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS0, SUBSPICSn, 0), GPIO10, _3));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO10, _4));
+        _for_each_inner_iomux_function!(((FSPIIO5, FSPIIOn, 5), GPIO11, _2));
+        _for_each_inner_iomux_function!(((FSPIIO6, FSPIIOn, 6), GPIO12, _2));
+        _for_each_inner_iomux_function!(((FSPIIO7, FSPIIOn, 7), GPIO13, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO18, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO19, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO20, _3));
+        _for_each_inner_iomux_function!(((SPICS1, SPICSn, 1), GPIO26, _0));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO29, _0));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO34, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS0, SUBSPICSn, 0), GPIO34, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO39, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS1, SUBSPICSn, 1), GPIO39, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO40, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO41, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO43, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO44, _2));
+        _for_each_inner_iomux_function!((all(SUBSPICS1, GPIO8, _3), (SUBSPIHD, GPIO9,
+        _3), (FSPIHD, GPIO9, _4), (FSPIIO4, GPIO10, _2), (SUBSPICS0, GPIO10, _3),
+        (FSPICS0, GPIO10, _4), (FSPIIO5, GPIO11, _2), (SUBSPID, GPIO11, _3), (FSPID,
+        GPIO11, _4), (FSPIIO6, GPIO12, _2), (SUBSPICLK, GPIO12, _3), (FSPICLK, GPIO12,
+        _4), (FSPIIO7, GPIO13, _2), (SUBSPIQ, GPIO13, _3), (FSPIQ, GPIO13, _4), (FSPIDQS,
+        GPIO14, _2), (SUBSPIWP, GPIO14, _3), (FSPIWP, GPIO14, _4), (U0RTS, GPIO15, _2),
+        (U0CTS, GPIO16, _2), (U1TXD, GPIO17, _2), (U1RXD, GPIO18, _2), (CLK_OUT3, GPIO18,
+        _3), (U1RTS, GPIO19, _2), (CLK_OUT2, GPIO19, _3), (U1CTS, GPIO20, _2), (CLK_OUT1,
+        GPIO20, _3), (SPICS1, GPIO26, _0), (SPIHD, GPIO27, _0), (SPIWP, GPIO28, _0),
+        (SPICS0, GPIO29, _0), (SPICLK, GPIO30, _0), (SPIQ, GPIO31, _0), (SPID, GPIO32,
+        _0), (FSPIHD, GPIO33, _2), (SUBSPIHD, GPIO33, _3), (FSPICS0, GPIO34, _2),
+        (SUBSPICS0, GPIO34, _3), (FSPID, GPIO35, _2), (SUBSPID, GPIO35, _3), (FSPICLK,
+        GPIO36, _2), (SUBSPICLK, GPIO36, _3), (FSPIQ, GPIO37, _2), (SUBSPIQ, GPIO37, _3),
+        (SPIDQS, GPIO37, _4), (FSPIWP, GPIO38, _2), (SUBSPIWP, GPIO38, _3), (MTCK,
+        GPIO39, _0), (CLK_OUT3, GPIO39, _2), (SUBSPICS1, GPIO39, _3), (MTDO, GPIO40, _0),
+        (CLK_OUT2, GPIO40, _2), (MTDI, GPIO41, _0), (CLK_OUT1, GPIO41, _2), (MTMS,
+        GPIO42, _0), (U0TXD, GPIO43, _0), (CLK_OUT1, GPIO43, _2), (U0RXD, GPIO44, _0),
+        (CLK_OUT2, GPIO44, _2)));
+        _for_each_inner_iomux_function!((all_expanded((SUBSPICS1, SUBSPICSn, 1), GPIO8,
+        _3), ((FSPIIO4, FSPIIOn, 4), GPIO10, _2), ((SUBSPICS0, SUBSPICSn, 0), GPIO10,
+        _3), ((FSPICS0, FSPICSn, 0), GPIO10, _4), ((FSPIIO5, FSPIIOn, 5), GPIO11, _2),
+        ((FSPIIO6, FSPIIOn, 6), GPIO12, _2), ((FSPIIO7, FSPIIOn, 7), GPIO13, _2),
+        ((CLK_OUT3, CLK_OUTn, 3), GPIO18, _3), ((CLK_OUT2, CLK_OUTn, 2), GPIO19, _3),
+        ((CLK_OUT1, CLK_OUTn, 1), GPIO20, _3), ((SPICS1, SPICSn, 1), GPIO26, _0),
+        ((SPICS0, SPICSn, 0), GPIO29, _0), ((FSPICS0, FSPICSn, 0), GPIO34, _2),
+        ((SUBSPICS0, SUBSPICSn, 0), GPIO34, _3), ((CLK_OUT3, CLK_OUTn, 3), GPIO39, _2),
+        ((SUBSPICS1, SUBSPICSn, 1), GPIO39, _3), ((CLK_OUT2, CLK_OUTn, 2), GPIO40, _2),
+        ((CLK_OUT1, CLK_OUTn, 1), GPIO41, _2), ((CLK_OUT1, CLK_OUTn, 1), GPIO43, _2),
+        ((CLK_OUT2, CLK_OUTn, 2), GPIO44, _2)));
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

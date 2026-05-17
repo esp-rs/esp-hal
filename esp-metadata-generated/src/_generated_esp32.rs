@@ -3080,6 +3080,8 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AES peripheral clock signal
             Aes,
+            /// EMAC peripheral clock signal
+            Emac,
             /// I2C_EXT0 peripheral clock signal
             I2cExt0,
             /// I2C_EXT1 peripheral clock signal
@@ -3132,6 +3134,7 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
+                Self::Emac,
                 Self::I2cExt0,
                 Self::I2cExt1,
                 Self::I2s0,
@@ -3163,6 +3166,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .peri_clk_en()
                         .modify(|_, w| w.crypto_aes_clk_en().bit(enable));
+                }
+                Peripheral::Emac => {
+                    crate::peripherals::SYSTEM::regs()
+                        .wifi_clk_en()
+                        .modify(|_, w| w.emac_clk_en().bit(enable));
                 }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -3287,6 +3295,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .peri_rst_en()
                         .modify(|_, w| w.crypto_aes_rst().bit(reset));
+                }
+                Peripheral::Emac => {
+                    crate::peripherals::SYSTEM::regs()
+                        .wifi_rst_en()
+                        .modify(|_, w| w.emac_rst().bit(reset));
                 }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -3752,13 +3765,15 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
         SYSTEM <= DPORT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
-        EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <=
-        FLASH_ENCRYPTION() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
+        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_EXT peripheral singleton"]
+        EMAC_EXT <= EMAC_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <= FLASH_ENCRYPTION()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "FRC_TIMER peripheral singleton"] FRC_TIMER <= FRC_TIMER() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
         GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3875,9 +3890,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((BB(unstable)));
         _for_each_inner_peripheral!((DPORT(unstable)));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
-        _for_each_inner_peripheral!((EMAC_DMA(unstable)));
-        _for_each_inner_peripheral!((EMAC_EXT(unstable)));
-        _for_each_inner_peripheral!((EMAC_MAC(unstable)));
+        _for_each_inner_peripheral!((ETH(unstable)));
         _for_each_inner_peripheral!((FLASH_ENCRYPTION(unstable)));
         _for_each_inner_peripheral!((FRC_TIMER(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
@@ -4098,23 +4111,24 @@ macro_rules! for_each_peripheral {
         "DPORT peripheral singleton"] DPORT <= DPORT() (unstable)), (@ peri_type #[doc =
         "SYSTEM peripheral singleton"] SYSTEM <= DPORT() (unstable)), (@ peri_type #[doc
         = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc
-        = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@
-        peri_type #[doc = "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT()
-        (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
-        EMAC_MAC() (unstable)), (@ peri_type #[doc =
-        "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <= FLASH_ENCRYPTION()
-        (unstable)), (@ peri_type #[doc = "FRC_TIMER peripheral singleton"] FRC_TIMER <=
-        FRC_TIMER() (unstable)), (@ peri_type #[doc = "GPIO peripheral singleton"] GPIO
-        <= GPIO() (unstable)), (@ peri_type #[doc = "GPIO_SD peripheral singleton"]
-        GPIO_SD <= GPIO_SD() (unstable)), (@ peri_type #[doc =
-        "HINF peripheral singleton"] HINF <= HINF() (unstable)), (@ peri_type #[doc =
-        "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
-        "I2C1 peripheral singleton"] I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
-        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "I2S1 peripheral singleton"] I2S1 <= I2S1(I2S1 : { bind_peri_interrupt,
+        = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@ peri_type
+        #[doc = "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT() (unstable)), (@
+        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC()
+        (unstable)), (@ peri_type #[doc = "FLASH_ENCRYPTION peripheral singleton"]
+        FLASH_ENCRYPTION <= FLASH_ENCRYPTION() (unstable)), (@ peri_type #[doc =
+        "FRC_TIMER peripheral singleton"] FRC_TIMER <= FRC_TIMER() (unstable)), (@
+        peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@
+        peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD()
+        (unstable)), (@ peri_type #[doc = "HINF peripheral singleton"] HINF <= HINF()
+        (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0 <=
+        I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type #[doc = "I2C1 peripheral singleton"]
+        I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type #[doc = "I2S0 peripheral singleton"]
+        I2S0 <= I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "I2S1 peripheral singleton"] I2S1 <= I2S1(I2S1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
         #[doc = "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)), (@ peri_type
@@ -4179,21 +4193,20 @@ macro_rules! for_each_peripheral {
         (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO25), (GPIO26),
         (GPIO27), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38),
         (GPIO39), (AES(unstable)), (APB_CTRL(unstable)), (BB(unstable)),
-        (DPORT(unstable)), (SYSTEM(unstable)), (EMAC_DMA(unstable)),
-        (EMAC_EXT(unstable)), (EMAC_MAC(unstable)), (FLASH_ENCRYPTION(unstable)),
-        (FRC_TIMER(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HINF(unstable)),
-        (I2C0), (I2C1), (I2S0(unstable)), (I2S1(unstable)), (IO_MUX(unstable)),
-        (LEDC(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)), (NRX(unstable)),
-        (PCNT(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
-        (LPWR(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)), (SDHOST(unstable)),
-        (SENS(unstable)), (SHA(unstable)), (SLC(unstable)), (SLCHOST(unstable)),
-        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (TIMG0(unstable)),
-        (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UART2),
-        (UHCI0(unstable)), (UHCI1(unstable)), (WIFI), (DMA_SPI2(unstable)),
-        (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_I2S1(unstable)),
-        (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)),
-        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)),
-        (SW_INTERRUPT(unstable)), (TOUCH(unstable))));
+        (DPORT(unstable)), (SYSTEM(unstable)), (ETH(unstable)),
+        (FLASH_ENCRYPTION(unstable)), (FRC_TIMER(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HINF(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
+        (I2S1(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
+        (MCPWM1(unstable)), (NRX(unstable)), (PCNT(unstable)), (RMT(unstable)),
+        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_I2C(unstable)),
+        (RTC_IO(unstable)), (SDHOST(unstable)), (SENS(unstable)), (SHA(unstable)),
+        (SLC(unstable)), (SLCHOST(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2),
+        (SPI3), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)), (UART0),
+        (UART1), (UART2), (UHCI0(unstable)), (UHCI1(unstable)), (WIFI),
+        (DMA_SPI2(unstable)), (DMA_SPI3(unstable)), (DMA_I2S0(unstable)),
+        (DMA_I2S1(unstable)), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
+        (CPU_CTRL(unstable)), (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
+        (PSRAM(unstable)), (SW_INTERRUPT(unstable)), (TOUCH(unstable))));
         _for_each_inner_peripheral!((dma_eligible(I2S0, I2s0, 0), (I2S1, I2s1, 1), (SPI2,
         Spi2, 2), (SPI3, Spi3, 3), (UHCI0, Uhci0, 4), (UHCI1, Uhci1, 5)));
     };
@@ -4532,6 +4545,212 @@ macro_rules! for_each_lp_function {
         ((RTC_GPIO5, RTC_GPIOn, 5), GPIO35), ((RTC_GPIO0, RTC_GPIOn, 0), GPIO36),
         ((RTC_GPIO1, RTC_GPIOn, 1), GPIO37), ((RTC_GPIO2, RTC_GPIOn, 2), GPIO38),
         ((RTC_GPIO3, RTC_GPIOn, 3), GPIO39)));
+    };
+}
+/// This macro can be used to generate code for each IOMUX digital function of each GPIO.
+///
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+/// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+/// GPIO matrix (e.g., EMAC, USB).
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the alternate function.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
+///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
+///   group to which the signal belongs.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+/// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+///
+/// Example data:
+/// - `(EMAC_RXD0, GPIO25, _5)`
+/// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_iomux_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_iomux_function!((CLK_OUT1, GPIO0, _1));
+        _for_each_inner_iomux_function!((EMAC_TX_CLK, GPIO0, _5));
+        _for_each_inner_iomux_function!((U0TXD, GPIO1, _0));
+        _for_each_inner_iomux_function!((CLK_OUT3, GPIO1, _1));
+        _for_each_inner_iomux_function!((EMAC_RXD2, GPIO1, _5));
+        _for_each_inner_iomux_function!((HSPIWP, GPIO2, _1));
+        _for_each_inner_iomux_function!((HS2_DATA0, GPIO2, _3));
+        _for_each_inner_iomux_function!((SD_DATA0, GPIO2, _4));
+        _for_each_inner_iomux_function!((U0RXD, GPIO3, _0));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO3, _1));
+        _for_each_inner_iomux_function!((HSPIHD, GPIO4, _1));
+        _for_each_inner_iomux_function!((HS2_DATA1, GPIO4, _3));
+        _for_each_inner_iomux_function!((SD_DATA1, GPIO4, _4));
+        _for_each_inner_iomux_function!((EMAC_TX_ER, GPIO4, _5));
+        _for_each_inner_iomux_function!((VSPICS0, GPIO5, _1));
+        _for_each_inner_iomux_function!((HS1_DATA6, GPIO5, _3));
+        _for_each_inner_iomux_function!((EMAC_RX_CLK, GPIO5, _5));
+        _for_each_inner_iomux_function!((SD_CLK, GPIO6, _0));
+        _for_each_inner_iomux_function!((SPICLK, GPIO6, _1));
+        _for_each_inner_iomux_function!((HS1_CLK, GPIO6, _3));
+        _for_each_inner_iomux_function!((U1CTS, GPIO6, _4));
+        _for_each_inner_iomux_function!((SD_DATA0, GPIO7, _0));
+        _for_each_inner_iomux_function!((SPIQ, GPIO7, _1));
+        _for_each_inner_iomux_function!((HS1_DATA0, GPIO7, _3));
+        _for_each_inner_iomux_function!((U2RTS, GPIO7, _4));
+        _for_each_inner_iomux_function!((SD_DATA1, GPIO8, _0));
+        _for_each_inner_iomux_function!((SPID, GPIO8, _1));
+        _for_each_inner_iomux_function!((HS1_DATA1, GPIO8, _3));
+        _for_each_inner_iomux_function!((U2CTS, GPIO8, _4));
+        _for_each_inner_iomux_function!((SD_DATA2, GPIO9, _0));
+        _for_each_inner_iomux_function!((SPIHD, GPIO9, _1));
+        _for_each_inner_iomux_function!((HS1_DATA2, GPIO9, _3));
+        _for_each_inner_iomux_function!((U1RXD, GPIO9, _4));
+        _for_each_inner_iomux_function!((SD_DATA3, GPIO10, _0));
+        _for_each_inner_iomux_function!((SPIWP, GPIO10, _1));
+        _for_each_inner_iomux_function!((HS1_DATA3, GPIO10, _3));
+        _for_each_inner_iomux_function!((U1TXD, GPIO10, _4));
+        _for_each_inner_iomux_function!((SD_CMD, GPIO11, _0));
+        _for_each_inner_iomux_function!((SPICS0, GPIO11, _1));
+        _for_each_inner_iomux_function!((HS1_CMD, GPIO11, _3));
+        _for_each_inner_iomux_function!((U1RTS, GPIO11, _4));
+        _for_each_inner_iomux_function!((MTDI, GPIO12, _0));
+        _for_each_inner_iomux_function!((HSPIQ, GPIO12, _1));
+        _for_each_inner_iomux_function!((HS2_DATA2, GPIO12, _3));
+        _for_each_inner_iomux_function!((SD_DATA2, GPIO12, _4));
+        _for_each_inner_iomux_function!((EMAC_TXD3, GPIO12, _5));
+        _for_each_inner_iomux_function!((MTCK, GPIO13, _0));
+        _for_each_inner_iomux_function!((HSPID, GPIO13, _1));
+        _for_each_inner_iomux_function!((HS2_DATA3, GPIO13, _3));
+        _for_each_inner_iomux_function!((SD_DATA3, GPIO13, _4));
+        _for_each_inner_iomux_function!((EMAC_RX_ER, GPIO13, _5));
+        _for_each_inner_iomux_function!((MTMS, GPIO14, _0));
+        _for_each_inner_iomux_function!((HSPICLK, GPIO14, _1));
+        _for_each_inner_iomux_function!((HS2_CLK, GPIO14, _3));
+        _for_each_inner_iomux_function!((SD_CLK, GPIO14, _4));
+        _for_each_inner_iomux_function!((EMAC_TXD2, GPIO14, _5));
+        _for_each_inner_iomux_function!((MTDO, GPIO15, _0));
+        _for_each_inner_iomux_function!((HSPICS0, GPIO15, _1));
+        _for_each_inner_iomux_function!((HS2_CMD, GPIO15, _3));
+        _for_each_inner_iomux_function!((SD_CMD, GPIO15, _4));
+        _for_each_inner_iomux_function!((EMAC_RXD3, GPIO15, _5));
+        _for_each_inner_iomux_function!((HS1_DATA4, GPIO16, _3));
+        _for_each_inner_iomux_function!((U2RXD, GPIO16, _4));
+        _for_each_inner_iomux_function!((EMAC_CLK_OUT, GPIO16, _5));
+        _for_each_inner_iomux_function!((HS1_DATA5, GPIO17, _3));
+        _for_each_inner_iomux_function!((U2TXD, GPIO17, _4));
+        _for_each_inner_iomux_function!((EMAC_CLK_180, GPIO17, _5));
+        _for_each_inner_iomux_function!((VSPICLK, GPIO18, _1));
+        _for_each_inner_iomux_function!((HS1_DATA7, GPIO18, _3));
+        _for_each_inner_iomux_function!((VSPIQ, GPIO19, _1));
+        _for_each_inner_iomux_function!((U0CTS, GPIO19, _3));
+        _for_each_inner_iomux_function!((EMAC_TXD0, GPIO19, _5));
+        _for_each_inner_iomux_function!((VSPIHD, GPIO21, _1));
+        _for_each_inner_iomux_function!((EMAC_TX_EN, GPIO21, _5));
+        _for_each_inner_iomux_function!((VSPIWP, GPIO22, _1));
+        _for_each_inner_iomux_function!((U0RTS, GPIO22, _3));
+        _for_each_inner_iomux_function!((EMAC_TXD1, GPIO22, _5));
+        _for_each_inner_iomux_function!((VSPID, GPIO23, _1));
+        _for_each_inner_iomux_function!((HS1_STROBE, GPIO23, _3));
+        _for_each_inner_iomux_function!((EMAC_RXD0, GPIO25, _5));
+        _for_each_inner_iomux_function!((EMAC_RXD1, GPIO26, _5));
+        _for_each_inner_iomux_function!((EMAC_RX_DV, GPIO27, _5));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO0, _1));
+        _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO1, _1));
+        _for_each_inner_iomux_function!(((EMAC_RXD2, EMAC_RXDn, 2), GPIO1, _5));
+        _for_each_inner_iomux_function!(((HS2_DATA0, HSn_DATAm, 2, 0), GPIO2, _3));
+        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO2, _4));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO3, _1));
+        _for_each_inner_iomux_function!(((HS2_DATA1, HSn_DATAm, 2, 1), GPIO4, _3));
+        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO4, _4));
+        _for_each_inner_iomux_function!(((VSPICS0, VSPICSn, 0), GPIO5, _1));
+        _for_each_inner_iomux_function!(((HS1_DATA6, HSn_DATAm, 1, 6), GPIO5, _3));
+        _for_each_inner_iomux_function!(((HS1_CLK, HSn_CLK, 1), GPIO6, _3));
+        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO7, _0));
+        _for_each_inner_iomux_function!(((HS1_DATA0, HSn_DATAm, 1, 0), GPIO7, _3));
+        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO8, _0));
+        _for_each_inner_iomux_function!(((HS1_DATA1, HSn_DATAm, 1, 1), GPIO8, _3));
+        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO9, _0));
+        _for_each_inner_iomux_function!(((HS1_DATA2, HSn_DATAm, 1, 2), GPIO9, _3));
+        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO10, _0));
+        _for_each_inner_iomux_function!(((HS1_DATA3, HSn_DATAm, 1, 3), GPIO10, _3));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO11, _1));
+        _for_each_inner_iomux_function!(((HS1_CMD, HSn_CMD, 1), GPIO11, _3));
+        _for_each_inner_iomux_function!(((HS2_DATA2, HSn_DATAm, 2, 2), GPIO12, _3));
+        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO12, _4));
+        _for_each_inner_iomux_function!(((EMAC_TXD3, EMAC_TXDn, 3), GPIO12, _5));
+        _for_each_inner_iomux_function!(((HS2_DATA3, HSn_DATAm, 2, 3), GPIO13, _3));
+        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO13, _4));
+        _for_each_inner_iomux_function!(((HS2_CLK, HSn_CLK, 2), GPIO14, _3));
+        _for_each_inner_iomux_function!(((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5));
+        _for_each_inner_iomux_function!(((HSPICS0, HSPICSn, 0), GPIO15, _1));
+        _for_each_inner_iomux_function!(((HS2_CMD, HSn_CMD, 2), GPIO15, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD3, EMAC_RXDn, 3), GPIO15, _5));
+        _for_each_inner_iomux_function!(((HS1_DATA4, HSn_DATAm, 1, 4), GPIO16, _3));
+        _for_each_inner_iomux_function!(((HS1_DATA5, HSn_DATAm, 1, 5), GPIO17, _3));
+        _for_each_inner_iomux_function!(((EMAC_CLK_180, EMAC_CLK_n, 180), GPIO17, _5));
+        _for_each_inner_iomux_function!(((HS1_DATA7, HSn_DATAm, 1, 7), GPIO18, _3));
+        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO19, _5));
+        _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5));
+        _for_each_inner_iomux_function!(((HS1_STROBE, HSn_STROBE, 1), GPIO23, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO25, _5));
+        _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO26, _5));
+        _for_each_inner_iomux_function!((all(CLK_OUT1, GPIO0, _1), (EMAC_TX_CLK, GPIO0,
+        _5), (U0TXD, GPIO1, _0), (CLK_OUT3, GPIO1, _1), (EMAC_RXD2, GPIO1, _5), (HSPIWP,
+        GPIO2, _1), (HS2_DATA0, GPIO2, _3), (SD_DATA0, GPIO2, _4), (U0RXD, GPIO3, _0),
+        (CLK_OUT2, GPIO3, _1), (HSPIHD, GPIO4, _1), (HS2_DATA1, GPIO4, _3), (SD_DATA1,
+        GPIO4, _4), (EMAC_TX_ER, GPIO4, _5), (VSPICS0, GPIO5, _1), (HS1_DATA6, GPIO5,
+        _3), (EMAC_RX_CLK, GPIO5, _5), (SD_CLK, GPIO6, _0), (SPICLK, GPIO6, _1),
+        (HS1_CLK, GPIO6, _3), (U1CTS, GPIO6, _4), (SD_DATA0, GPIO7, _0), (SPIQ, GPIO7,
+        _1), (HS1_DATA0, GPIO7, _3), (U2RTS, GPIO7, _4), (SD_DATA1, GPIO8, _0), (SPID,
+        GPIO8, _1), (HS1_DATA1, GPIO8, _3), (U2CTS, GPIO8, _4), (SD_DATA2, GPIO9, _0),
+        (SPIHD, GPIO9, _1), (HS1_DATA2, GPIO9, _3), (U1RXD, GPIO9, _4), (SD_DATA3,
+        GPIO10, _0), (SPIWP, GPIO10, _1), (HS1_DATA3, GPIO10, _3), (U1TXD, GPIO10, _4),
+        (SD_CMD, GPIO11, _0), (SPICS0, GPIO11, _1), (HS1_CMD, GPIO11, _3), (U1RTS,
+        GPIO11, _4), (MTDI, GPIO12, _0), (HSPIQ, GPIO12, _1), (HS2_DATA2, GPIO12, _3),
+        (SD_DATA2, GPIO12, _4), (EMAC_TXD3, GPIO12, _5), (MTCK, GPIO13, _0), (HSPID,
+        GPIO13, _1), (HS2_DATA3, GPIO13, _3), (SD_DATA3, GPIO13, _4), (EMAC_RX_ER,
+        GPIO13, _5), (MTMS, GPIO14, _0), (HSPICLK, GPIO14, _1), (HS2_CLK, GPIO14, _3),
+        (SD_CLK, GPIO14, _4), (EMAC_TXD2, GPIO14, _5), (MTDO, GPIO15, _0), (HSPICS0,
+        GPIO15, _1), (HS2_CMD, GPIO15, _3), (SD_CMD, GPIO15, _4), (EMAC_RXD3, GPIO15,
+        _5), (HS1_DATA4, GPIO16, _3), (U2RXD, GPIO16, _4), (EMAC_CLK_OUT, GPIO16, _5),
+        (HS1_DATA5, GPIO17, _3), (U2TXD, GPIO17, _4), (EMAC_CLK_180, GPIO17, _5),
+        (VSPICLK, GPIO18, _1), (HS1_DATA7, GPIO18, _3), (VSPIQ, GPIO19, _1), (U0CTS,
+        GPIO19, _3), (EMAC_TXD0, GPIO19, _5), (VSPIHD, GPIO21, _1), (EMAC_TX_EN, GPIO21,
+        _5), (VSPIWP, GPIO22, _1), (U0RTS, GPIO22, _3), (EMAC_TXD1, GPIO22, _5), (VSPID,
+        GPIO23, _1), (HS1_STROBE, GPIO23, _3), (EMAC_RXD0, GPIO25, _5), (EMAC_RXD1,
+        GPIO26, _5), (EMAC_RX_DV, GPIO27, _5)));
+        _for_each_inner_iomux_function!((all_expanded((CLK_OUT1, CLK_OUTn, 1), GPIO0,
+        _1), ((CLK_OUT3, CLK_OUTn, 3), GPIO1, _1), ((EMAC_RXD2, EMAC_RXDn, 2), GPIO1,
+        _5), ((HS2_DATA0, HSn_DATAm, 2, 0), GPIO2, _3), ((SD_DATA0, SD_DATAn, 0), GPIO2,
+        _4), ((CLK_OUT2, CLK_OUTn, 2), GPIO3, _1), ((HS2_DATA1, HSn_DATAm, 2, 1), GPIO4,
+        _3), ((SD_DATA1, SD_DATAn, 1), GPIO4, _4), ((VSPICS0, VSPICSn, 0), GPIO5, _1),
+        ((HS1_DATA6, HSn_DATAm, 1, 6), GPIO5, _3), ((HS1_CLK, HSn_CLK, 1), GPIO6, _3),
+        ((SD_DATA0, SD_DATAn, 0), GPIO7, _0), ((HS1_DATA0, HSn_DATAm, 1, 0), GPIO7, _3),
+        ((SD_DATA1, SD_DATAn, 1), GPIO8, _0), ((HS1_DATA1, HSn_DATAm, 1, 1), GPIO8, _3),
+        ((SD_DATA2, SD_DATAn, 2), GPIO9, _0), ((HS1_DATA2, HSn_DATAm, 1, 2), GPIO9, _3),
+        ((SD_DATA3, SD_DATAn, 3), GPIO10, _0), ((HS1_DATA3, HSn_DATAm, 1, 3), GPIO10,
+        _3), ((SPICS0, SPICSn, 0), GPIO11, _1), ((HS1_CMD, HSn_CMD, 1), GPIO11, _3),
+        ((HS2_DATA2, HSn_DATAm, 2, 2), GPIO12, _3), ((SD_DATA2, SD_DATAn, 2), GPIO12,
+        _4), ((EMAC_TXD3, EMAC_TXDn, 3), GPIO12, _5), ((HS2_DATA3, HSn_DATAm, 2, 3),
+        GPIO13, _3), ((SD_DATA3, SD_DATAn, 3), GPIO13, _4), ((HS2_CLK, HSn_CLK, 2),
+        GPIO14, _3), ((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5), ((HSPICS0, HSPICSn, 0),
+        GPIO15, _1), ((HS2_CMD, HSn_CMD, 2), GPIO15, _3), ((EMAC_RXD3, EMAC_RXDn, 3),
+        GPIO15, _5), ((HS1_DATA4, HSn_DATAm, 1, 4), GPIO16, _3), ((HS1_DATA5, HSn_DATAm,
+        1, 5), GPIO17, _3), ((EMAC_CLK_180, EMAC_CLK_n, 180), GPIO17, _5), ((HS1_DATA7,
+        HSn_DATAm, 1, 7), GPIO18, _3), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO19, _5),
+        ((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5), ((HS1_STROBE, HSn_STROBE, 1), GPIO23,
+        _3), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO25, _5), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO26,
+        _5)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
