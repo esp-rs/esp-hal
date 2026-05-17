@@ -695,6 +695,8 @@ version = 2
 # TODO: model chip select signal (active low)
 
 [device.ledc]
+version = 3
+channel_count = 6
 support_status = { status = "not_supported", issue = 5161 }
 
 [device.mcpwm]

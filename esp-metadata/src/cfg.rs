@@ -496,7 +496,11 @@ driver_configs![
     LedcProperties {
         driver: ledc,
         name: "LEDC",
-        properties: {}
+        properties: {
+            /// Register-layout generation derived from the chip SVD.
+            version: u32,
+            channel_count: u32,
+        }
     },
     LpI2cMasterProperties {
         driver: lp_i2c_master,

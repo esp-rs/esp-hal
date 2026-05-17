@@ -876,6 +876,8 @@ max_ws_width = 128
 [device.camera]
 [device.rgb_display]
 [device.ledc]
+version = 2
+channel_count = 8
 [device.mcpwm]
 [device.pcnt]
 [device.sd_host]
