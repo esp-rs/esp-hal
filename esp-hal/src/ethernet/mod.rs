@@ -577,7 +577,7 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
 }
 
 impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
-    /// Creates an Ethernet driver using RMII (`RmiiPinBundle`) or MII (`MiiPinBundle`).
+    /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
     pub fn new<const RX: usize, const TX: usize>(
         eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
