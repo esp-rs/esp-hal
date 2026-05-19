@@ -367,9 +367,22 @@ where
                 uhci_per: self.uhci_per,
                 uart_tx,
                 channel_tx: self.channel.tx,
-                _guard: self._guard.clone(),
+                _guard: self._guard,
             },
         )
+    }
+
+    /// Join the UhciRx and UhciTx into a Uhci instance
+    pub fn join(rx: UhciRx<'d, Dm>, tx: UhciTx<'d, Dm>) -> Self {
+        Self {
+            uart: Uart::join(rx.uart_rx, tx.uart_tx),
+            uhci_per: tx.uhci_per,
+            channel: Channel {
+                rx: rx.channel_rx,
+                tx: tx.channel_tx,
+            },
+            _guard: tx._guard,
+        }
     }
 
     /// Sets the config to the UHCI peripheral, Rx part

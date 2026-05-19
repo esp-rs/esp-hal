@@ -2008,6 +2008,33 @@ where
         (self.rx, self.tx)
     }
 
+    #[procmacros::doc_replace]
+    /// Join the UART transmitter and receiver into a single instance
+    ///
+    /// This allows to go back to an UART instance after splitting it into
+    /// separate transmitter and receiver components.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    ///
+    /// // The UART can be split into separate Transmit and Receive components:
+    /// let (rx, tx) = uart.split();
+    ///
+    /// // These components can then later be joined back together:
+    /// let _uart = Uart::join(rx, tx);
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn join(rx: UartRx<'d, Dm>, tx: UartTx<'d, Dm>) -> Self {
+        Self { rx, tx }
+    }
+
     /// Reads and clears errors set by received data.
     #[instability::unstable]
     pub fn check_for_rx_errors(&mut self) -> Result<(), RxError> {
