@@ -5,7 +5,7 @@ use core::{
 
 use super::{AdcConfig, Attenuation};
 use crate::{
-    peripherals::{ADC1, ADC2, SENS},
+    peripherals::{ADC1, ADC2, APB_CTRL, SENS},
     private,
 };
 
@@ -175,9 +175,18 @@ impl RegisterAccess for ADC2<'_> {
     }
 
     fn clear_dig_force() {
-        SENS::regs()
-            .sar_read_ctrl2()
-            .modify(|_, w| w.sar2_dig_force().clear_bit());
+        // Switch ADC2 to RTC-controller mode. ESP-IDF's `adc_ll_set_controller` for
+        // ADC2 RTC also clears `sar2_pwdet_force` and sets `SYSCON.saradc_ctrl.sar2_mux`
+        // — without these, ADC2 stays muxed to the power-detect path (especially after
+        // Wi-Fi/BT initialization) and every conversion returns the PWDET output
+        // instead of the requested channel.
+        SENS::regs().sar_read_ctrl2().modify(|_, w| {
+            w.sar2_dig_force().clear_bit();
+            w.sar2_pwdet_force().clear_bit()
+        });
+        APB_CTRL::regs()
+            .apb_saradc_ctrl()
+            .modify(|_, w| w.saradc_sar2_mux().set_bit());
     }
 
     fn set_start_force() {

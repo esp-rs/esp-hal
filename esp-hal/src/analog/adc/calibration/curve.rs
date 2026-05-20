@@ -198,11 +198,11 @@ mod impls {
         ];
 
 
-        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/master/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
             _0dB => [
-                -0.0487166399931449,
+                -0.487166399931449,
                 0.0006436483033201,
                 0.0000030410131806,
             ],

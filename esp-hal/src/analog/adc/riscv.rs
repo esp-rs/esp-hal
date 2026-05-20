@@ -41,11 +41,31 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
     if #[cfg(adc_adc1)] {
+        /// Mask for the 12-bit conversion result returned by the ADC.
         const ADC_VAL_MASK: u16 = 0xfff;
+        /// Number of samples averaged during runtime self-calibration.
         const ADC_CAL_CNT_MAX: u16 = 32;
+        /// Sentinel passed to [`CalibrationAccess::ADC_CAL_CHANNEL`] from the shared
+        /// driver. The RISC-V hardware doesn't use this as a physical channel number;
+        /// instead, calibration writes [`ONETIME_CAL_CHANNEL`] to the `onetime_channel`
+        /// field and the calibration attenuation to channel 0's atten slot.
         const ADC_CAL_CHANNEL: u16 = 15;
     }
 }
+
+// Encoding of the `APB_SARADC.onetime_sample.onetime_channel` field (4 bits):
+//   bit 3   – ADC unit selector (clear = ADC1, set = ADC2)
+//   bits 2:0 – channel index for the selected unit (or 0b111 for the cal mux)
+// See `adc_oneshot_ll_set_channel` / `adc_oneshot_ll_disable_channel` in
+// `components/hal/<chip>/include/hal/adc_ll.h` — both encode `(adc_n << 3) | x`.
+const ONETIME_CHANNEL_MASK: u8 = 0b0111;
+#[cfg(adc_adc2)]
+const ONETIME_UNIT2_BIT: u8 = 0b1000;
+/// Value written to `onetime_channel` when starting a calibration conversion.
+/// Matches ESP-IDF's `adc_oneshot_ll_disable_channel`, which writes
+/// `(adc_n << 3) | 0xF` — the OR collapses to `0xF` regardless of unit because
+/// `0xF` already has bit 3 set. This selects the on-chip calibration mux.
+const ONETIME_CAL_CHANNEL: u8 = 0x0F;
 
 // The number of analog IO pins, and in turn the number of attentuations,
 // depends on which chip is being used
@@ -74,8 +94,10 @@ where
 
         ADCX::enable_vdef(true);
 
-        // Start sampling
-        ADCX::config_onetime_sample(ADC_CAL_CHANNEL as u8, atten as u8);
+        // Route the SAR to the on-chip calibration mux instead of an external pad.
+        // The cal mux internally connects to either GND or Vref depending on the
+        // value programmed by `connect_cal` below.
+        ADCX::config_cal_sample(atten as u8);
 
         // Connect calibration source
         ADCX::connect_cal(source, true);
@@ -113,6 +135,12 @@ pub trait RegisterAccess {
     /// Configure onetime sampling parameters
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
+    /// Configure onetime sampling to read from the on-chip calibration mux
+    /// instead of an external pad. Equivalent to ESP-IDF's
+    /// `adc_oneshot_ll_disable_channel` + `adc_oneshot_ll_set_atten(unit, 0, atten)`
+    /// pair in `cal_setup`.
+    fn config_cal_sample(attenuation: u8);
+
     /// Start onetime sampling
     fn start_onetime_sample();
 
@@ -136,14 +164,39 @@ pub trait RegisterAccess {
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
+            // Make sure only ADC1's onetime-sample bit is set; alternating ADC1/ADC2
+            // reads must not leave both units enabled.
+            #[cfg(adc_adc2)]
+            w.saradc2_onetime_sample().clear_bit();
             w.saradc1_onetime_sample().set_bit();
-            w.onetime_channel().bits(channel);
+            w.onetime_channel()
+                .bits(channel & ONETIME_CHANNEL_MASK);
+            w.onetime_atten().bits(attenuation)
+        });
+    }
+
+    fn config_cal_sample(attenuation: u8) {
+        APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
+            #[cfg(adc_adc2)]
+            w.saradc2_onetime_sample().clear_bit();
+            w.saradc1_onetime_sample().set_bit();
+            w.onetime_channel().bits(ONETIME_CAL_CHANNEL);
             w.onetime_atten().bits(attenuation)
         });
     }
 
     fn start_onetime_sample() {
-        APB_SARADC::regs()
+        // The hardware requires a 0->1 transition of onetime_start that the ADC
+        // digital controller can capture on its (slower) clock. ESP-IDF holds the
+        // bit low for >= 3 ADC controller cycles before the rising edge — see
+        // `adc_hal_onetime_start` in adc_oneshot_hal.c.
+        let saradc = APB_SARADC::regs();
+        saradc
+            .onetime_sample()
+            .modify(|_, w| w.onetime_start().clear_bit());
+        #[cfg(esp32c6)]
+        crate::rom::ets_delay_us(5);
+        saradc
             .onetime_sample()
             .modify(|_, w| w.onetime_start().set_bit());
     }
@@ -158,7 +211,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .read()
             .saradc1_data()
             .bits() as u16
-            & 0xfff
+            & ADC_VAL_MASK
     }
 
     fn reset() {
@@ -231,14 +284,33 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
 impl RegisterAccess for crate::peripherals::ADC2<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
+            // Make sure only ADC2's onetime-sample bit is set; alternating ADC1/ADC2
+            // reads must not leave both units enabled.
+            w.saradc1_onetime_sample().clear_bit();
             w.saradc2_onetime_sample().set_bit();
-            w.onetime_channel().bits(channel);
+            w.onetime_channel()
+                .bits(ONETIME_UNIT2_BIT | (channel & ONETIME_CHANNEL_MASK));
+            w.onetime_atten().bits(attenuation)
+        });
+    }
+
+    fn config_cal_sample(attenuation: u8) {
+        APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
+            w.saradc1_onetime_sample().clear_bit();
+            w.saradc2_onetime_sample().set_bit();
+            w.onetime_channel().bits(ONETIME_CAL_CHANNEL);
             w.onetime_atten().bits(attenuation)
         });
     }
 
     fn start_onetime_sample() {
-        APB_SARADC::regs()
+        let saradc = APB_SARADC::regs();
+        saradc
+            .onetime_sample()
+            .modify(|_, w| w.onetime_start().clear_bit());
+        #[cfg(esp32c6)]
+        crate::rom::ets_delay_us(5);
+        saradc
             .onetime_sample()
             .modify(|_, w| w.onetime_start().set_bit());
     }
@@ -253,7 +325,7 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .read()
             .saradc2_data()
             .bits() as u16
-            & 0xfff
+            & ADC_VAL_MASK
     }
 
     fn reset() {
@@ -399,14 +471,6 @@ where
             let attenuation = self.attenuations[channel as usize].unwrap() as u8;
             ADCX::config_onetime_sample(channel, attenuation);
             ADCX::start_onetime_sample();
-
-            // see https://github.com/espressif/esp-idf/blob/b4268c874a4cf8fcf7c0c4153cffb76ad2ddda4e/components/hal/adc_oneshot_hal.c#L105-L107
-            // the delay might be a bit generous but longer delay seem to not cause problems
-            #[cfg(esp32c6)]
-            {
-                crate::rom::ets_delay_us(40);
-                ADCX::start_onetime_sample();
-            }
         }
 
         // Wait for ADC to finish conversion
