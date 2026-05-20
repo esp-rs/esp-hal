@@ -4347,6 +4347,9 @@ impl Chip {
                     "soc_has_dma_ch0",
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
+                    "soc_has_eth",
+                    "soc_has_emac_dma",
+                    "soc_has_emac_mac",
                     "soc_has_usb_device",
                     "soc_has_sdhost",
                     "soc_has_ledc",
@@ -4371,6 +4374,7 @@ impl Chip {
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
                     "ecc_driver_supported",
+                    "ethernet_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
@@ -4410,6 +4414,7 @@ impl Chip {
                     "ecc_has_curve_p192",
                     "ecc_has_curve_p256",
                     "ecc_has_curve_p384",
+                    "ethernet_mii_via_gpio_matrix",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"62\"",
@@ -4458,6 +4463,8 @@ impl Chip {
                     "soc_has_clock_node_xtal_d2_clk",
                     "soc_has_clock_node_cpu_root_clk",
                     "soc_has_clock_node_cpu_clk",
+                    "soc_has_clock_node_mem_clk",
+                    "soc_has_clock_node_sys_clk",
                     "soc_has_clock_node_apb_clk",
                     "soc_has_clock_node_lp_fast_clk",
                     "soc_has_clock_node_lp_slow_clk",
@@ -4517,6 +4524,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
+                    "cargo:rustc-cfg=soc_has_eth",
+                    "cargo:rustc-cfg=soc_has_emac_dma",
+                    "cargo:rustc-cfg=soc_has_emac_mac",
                     "cargo:rustc-cfg=soc_has_usb_device",
                     "cargo:rustc-cfg=soc_has_sdhost",
                     "cargo:rustc-cfg=soc_has_ledc",
@@ -4541,6 +4551,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=ecc_driver_supported",
+                    "cargo:rustc-cfg=ethernet_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
@@ -4580,6 +4591,7 @@ impl Chip {
                     "cargo:rustc-cfg=ecc_has_curve_p192",
                     "cargo:rustc-cfg=ecc_has_curve_p256",
                     "cargo:rustc-cfg=ecc_has_curve_p384",
+                    "cargo:rustc-cfg=ethernet_mii_via_gpio_matrix",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"62\"",
@@ -4628,6 +4640,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_d2_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_root_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_mem_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_sys_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apb_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
@@ -6718,6 +6732,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
+    println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spll_clk)");
@@ -6726,6 +6741,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f25m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f50m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_root_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mem_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_sys_clk)");
     println!("cargo:rustc-check-cfg=cfg(esp32s2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");

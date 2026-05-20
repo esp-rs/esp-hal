@@ -17,11 +17,16 @@
     reason = "CPU frequency variant names follow the chip-spec MHz convention"
 )]
 
-use crate::peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST};
+use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
+
+use crate::{
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST},
+    time::Rate,
+};
 
 define_clock_tree_types!();
 
-/// CPU clock frequency presets for ESP32-P4X (eco5 / chip revision v3.x).
+/// CPU clock frequency presets for ESP32-P4.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -29,9 +34,6 @@ pub enum CpuClock {
     /// 400 MHz CPU clock (eco5 / v3.x maximum)
     /// CPLL -> CPU_ROOT -> CPU/1, APB divider /4 = 100MHz
     _400MHz = 400,
-
-    /// 360 MHz CPU clock (conservative)
-    _360MHz = 360,
 
     /// 200 MHz CPU clock (low power)
     /// CPLL -> CPU_ROOT -> CPU/2, APB /2 = 100MHz
@@ -48,24 +50,21 @@ impl CpuClock {
     const PRESET_400: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 400 MHz
-        apb_clk: Some(ApbClkConfig::new(3)), // /4 = 100 MHz
+        mem_clk: Some(MemClkConfig::new(1)), // /2 = 200 MHz
+        sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
     };
 
-    const PRESET_360: ClockConfig = ClockConfig {
-        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 360 MHz (CPLL at 360)
-        apb_clk: Some(ApbClkConfig::new(3)), // /4 = 90 MHz
-        lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-        timg_calibration_clock: None,
-    };
+    // TODO: 360 MHz preset
 
     const PRESET_200: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(1)), // /2 = 200 MHz
+        mem_clk: Some(MemClkConfig::new(0)), // /1 = 200 MHz
+        sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
@@ -75,6 +74,8 @@ impl CpuClock {
     const PRESET_100: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(3)), // /4 = 100 MHz
+        mem_clk: Some(MemClkConfig::new(0)), // /1 = 100 MHz
+        sys_clk: Some(SysClkConfig::new(0)), // /1 = 100 MHz
         apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
@@ -86,7 +87,6 @@ impl From<CpuClock> for ClockConfig {
     fn from(value: CpuClock) -> ClockConfig {
         match value {
             CpuClock::_400MHz => CpuClock::PRESET_400,
-            CpuClock::_360MHz => CpuClock::PRESET_360,
             CpuClock::_200MHz => CpuClock::PRESET_200,
             CpuClock::_100MHz => CpuClock::PRESET_100,
         }
@@ -103,7 +103,6 @@ impl ClockConfig {
     pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
         match self {
             v if v == CpuClock::PRESET_400 => Some(CpuClock::_400MHz),
-            v if v == CpuClock::PRESET_360 => Some(CpuClock::_360MHz),
             v if v == CpuClock::PRESET_200 => Some(CpuClock::_200MHz),
             v if v == CpuClock::PRESET_100 => Some(CpuClock::_100MHz),
             _ => None,
@@ -142,18 +141,26 @@ fn configure_cpu_clk_impl(
     _old_config: Option<CpuClkConfig>,
     new_config: CpuClkConfig,
 ) {
-    //      HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num = divider - 1
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-    clkrst.root_clk_ctrl0().modify(|_, w| unsafe {
-        w.cpu_clk_div_num().bits(new_config.divisor as u8);
-        w.cpu_clk_div_numerator().bits(0);
-        w.cpu_clk_div_denominator().bits(0)
-    });
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl0()
+        .modify(|_, w| unsafe {
+            w.cpu_clk_div_num().bits(new_config.divisor as u8);
+            w.cpu_clk_div_numerator().bits(0);
+            w.cpu_clk_div_denominator().bits(0)
+        });
+
     // Trigger divider update
-    clkrst
+    update_divider();
+
+    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
+    ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
+}
+
+fn update_divider() {
+    HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| w.soc_clk_div_update().set_bit());
-    while clkrst
+    while HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .read()
         .soc_clk_div_update()
@@ -163,15 +170,77 @@ fn configure_cpu_clk_impl(
     }
 }
 
-// APB_CLK divider
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+// MEM_CLK
+
+fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mem_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<MemClkConfig>,
+    new_config: MemClkConfig,
+) {
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl1()
+        .modify(|_, w| unsafe {
+            w.mem_clk_div_num().bits(new_config.divisor as u8);
+            w.mem_clk_div_numerator().bits(0);
+            w.mem_clk_div_denominator().bits(0)
+        });
+
+    // Trigger divider update
+    update_divider();
+}
+
+// SYS_CLK
+
+fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_sys_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<SysClkConfig>,
+    new_config: SysClkConfig,
+) {
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl1()
+        .modify(|_, w| unsafe { w.sys_clk_div_num().bits(new_config.divisor as u8) });
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl2()
+        .modify(|_, w| unsafe {
+            w.sys_clk_div_numerator().bits(0);
+            w.sys_clk_div_denominator().bits(0)
+        });
+
+    // Trigger divider update
+    update_divider();
+}
+
+// APB_CLK
+
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<ApbClkConfig>,
-    _new_config: ApbClkConfig,
+    new_config: ApbClkConfig,
 ) {
-    // TODO: APB divider register in HP_SYS_CLKRST
-    // For now, APB freq is derived from CPU freq via divider
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl2()
+        .modify(|_, w| unsafe {
+            w.apb_clk_div_num().bits(new_config.divisor as u8);
+            w.apb_clk_div_numerator().bits(0)
+        });
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl3()
+        .modify(|_, w| unsafe { w.apb_clk_div_denominator().bits(0) });
+
+    // Trigger divider update
+    update_divider();
 }
 
 // LP_FAST_CLK mux
