@@ -45,7 +45,9 @@ const ADC_CAL_CHANNEL: u16 = 15;
 
 /// Attenuation slot the RTC controller falls back to when no channels are
 /// enabled. ESP-IDF's `cal_setup` writes the calibration attenuation here.
-#[cfg(esp32s3)]
+/// Referenced from the generic `adc_calibrate` body, so it has to be in
+/// scope for any `RegisterAccess` impl — not just chips that actually
+/// implement `CalibrationAccess`.
 const CAL_ATTEN_CHANNEL: usize = 0;
 
 impl<ADCX> AdcConfig<ADCX>
