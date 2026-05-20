@@ -11,6 +11,8 @@ use core::{
 #[cfg(feature = "unstable")]
 use embedded_hal::spi::{ErrorType, SpiBus};
 use enumset::EnumSet;
+#[cfg(place_spi_master_driver_in_ram)]
+use procmacros::ram;
 
 use super::*;
 use crate::{
