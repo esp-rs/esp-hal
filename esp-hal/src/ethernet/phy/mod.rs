@@ -63,10 +63,62 @@ pub mod an {
     pub const BASE_100_FULL: u16 = 1 << 8;
 }
 
+// ── MdioBus trait ───────────────────────────────────────────────────────────
+
+/// Generic MDIO bus interface used by [`Phy`] implementations.
+///
+/// PHY drivers are generic over this trait so they can live in external
+/// crates without depending on the concrete [`MdioDriver`] (whose
+/// constructor is sealed inside `esp-hal`). The trait mirrors IEEE 802.3
+/// Clause 22: PHY address 0-31, register address 0-31, 16-bit data.
+///
+/// # Error model
+///
+/// The trait surface is infallible (plain `u16`, no `Result`) because the
+/// Clause-22 protocol itself carries no application-level error response.
+/// Implementations choose how to behave when the bus stalls or the
+/// addressed device does not answer. The built-in [`MdioDriver`] busy-waits
+/// the EMAC's MDIO controller without a timeout — on a healthy bus a
+/// transaction completes in a few microseconds, and reads from a
+/// non-responsive PHY register typically return `0xFFFF` (Synopsys GMAC
+/// behavior, not part of the trait contract). Alternative implementations
+/// may take longer or return any other sentinel; PHY drivers must not rely
+/// on specific values or timing.
+///
+/// External implementations are useful for two cases:
+///
+/// 1. **Host-side mocks** for testing PHY drivers without a real MAC.
+/// 2. **Alternative MDIO controllers** (e.g. SPI-attached MDIO frontends or software bit-banged
+///    buses) feeding the same `Phy` driver code.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use esp_hal::ethernet::phy::MdioBus;
+///
+/// struct MockMdio;
+/// impl MdioBus for MockMdio {
+///     fn read(&self, _phy: u8, _reg: u8) -> u16 {
+///         0
+///     }
+///     fn write(&self, _phy: u8, _reg: u8, _val: u16) {}
+/// }
+/// ```
+pub trait MdioBus {
+    /// Read a 16-bit PHY register (Clause 22).
+    fn read(&self, phy_addr: u8, reg_addr: u8) -> u16;
+
+    /// Write a 16-bit PHY register (Clause 22).
+    fn write(&self, phy_addr: u8, reg_addr: u8, value: u16);
+}
+
 // ── MdioDriver ──────────────────────────────────────────────────────────────
 
 /// Thin wrapper that exposes Clause 22 MDIO read/write over the EMAC MAC's
 /// built-in MDIO controller.
+///
+/// Implements [`MdioBus`], so PHY drivers generic over `MdioBus` can run
+/// directly on top of this MAC without any adapter.
 pub struct MdioDriver<'a> {
     regs: &'a EmacRegs,
 }
@@ -87,6 +139,21 @@ impl<'a> MdioDriver<'a> {
     }
 }
 
+impl<'a> MdioBus for MdioDriver<'a> {
+    fn read(&self, phy_addr: u8, reg_addr: u8) -> u16 {
+        // Delegate to the inherent method — Rust's method resolution picks
+        // the inherent `read` over the trait `read` on `MdioDriver`, so this
+        // does not recurse. Keeping a single source of truth ensures any
+        // future changes to `MdioDriver::read` (timing barriers, instrumentation)
+        // automatically propagate to the trait impl.
+        MdioDriver::read(self, phy_addr, reg_addr)
+    }
+
+    fn write(&self, phy_addr: u8, reg_addr: u8, value: u16) {
+        MdioDriver::write(self, phy_addr, reg_addr, value);
+    }
+}
+
 // ── Phy trait ───────────────────────────────────────────────────────────────
 
 /// PHY error.
@@ -100,12 +167,16 @@ pub enum PhyError {
 }
 
 /// Trait implemented by all PHY drivers.
+///
+/// PHY drivers are generic over the [`MdioBus`] trait rather than tied to
+/// the concrete [`MdioDriver`], so impls can live in external crates and be
+/// tested with host-side mocks.
 pub trait Phy {
     /// One-time hardware initialization.
     ///
     /// Should reset the PHY, configure auto-negotiation, and wait until the
     /// hardware is ready to respond to further MDIO transactions.
-    fn init(&mut self, mdio: &MdioDriver<'_>) -> Result<(), PhyError>;
+    fn init<M: MdioBus>(&mut self, mdio: &M) -> Result<(), PhyError>;
 
     /// Polls the current link state.
     ///
@@ -113,7 +184,7 @@ pub trait Phy {
     /// complete and the link partner is detected. The context can be used
     /// to wake the caller when the link state should be re-polled, if the PHY chip
     /// supports interrupt-driven notifications.
-    fn poll_link(&mut self, mdio: &MdioDriver<'_>, _cx: Option<&mut Context<'_>>) -> LinkState;
+    fn poll_link<M: MdioBus>(&mut self, mdio: &M, _cx: Option<&mut Context<'_>>) -> LinkState;
 
     /// Returns the Clause 22 PHY address on the MDIO bus.
     fn address(&self) -> u8;
