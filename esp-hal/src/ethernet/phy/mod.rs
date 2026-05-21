@@ -138,11 +138,18 @@ impl<'a> MdioDriver<'a> {
 
     /// Reads one PHY register (Clause 22).
     pub fn read(&mut self, phy_addr: u8, reg: u8) -> u16 {
+        // Clause 22 frame fields are 5 bits — out-of-range values are silently
+        // truncated by the PAC writer (`FieldWriter<_, 5>`) and would hit a
+        // different PHY/register without any error. Catch this in debug builds.
+        debug_assert!(phy_addr < 32, "Clause 22 PHY address must be < 32");
+        debug_assert!(reg < 32, "Clause 22 register address must be < 32");
         self.regs.mdio_read(phy_addr, reg)
     }
 
     /// Writes one PHY register (Clause 22).
     pub fn write(&mut self, phy_addr: u8, reg: u8, data: u16) {
+        debug_assert!(phy_addr < 32, "Clause 22 PHY address must be < 32");
+        debug_assert!(reg < 32, "Clause 22 register address must be < 32");
         self.regs.mdio_write(phy_addr, reg, data)
     }
 }
