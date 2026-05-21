@@ -43,7 +43,7 @@ impl GenericPhy {
     ///
     /// The scan is repeated up to 3 times to handle transient bus noise,
     /// matching the esp-idf `esp_eth_phy_802_3_detect_phy_addr` strategy.
-    fn discover<M: MdioBus>(mdio: &M) -> Option<u8> {
+    fn discover<M: MdioBus>(mdio: &mut M) -> Option<u8> {
         for _ in 0..3 {
             for addr in 0..32_u8 {
                 let id = mdio.read(addr, PHYIDR1);
@@ -63,7 +63,7 @@ impl Phy for GenericPhy {
             .expect("GenericPhy address not yet resolved — call init() first")
     }
 
-    fn init<M: MdioBus>(&mut self, mdio: &M) -> Result<(), PhyError> {
+    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError> {
         // Resolve address if auto-discovery was requested.
         if self.addr.is_none() {
             self.addr = Some(Self::discover(mdio).ok_or(PhyError::NotFound)?);
@@ -92,7 +92,7 @@ impl Phy for GenericPhy {
         Err(PhyError::Timeout)
     }
 
-    fn poll_link<M: MdioBus>(&mut self, mdio: &M, cx: Option<&mut Context<'_>>) -> LinkState {
+    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
         const LINK_STATE_DOWN: LinkState = LinkState {
             up: false,
             speed: Speed::_100M,

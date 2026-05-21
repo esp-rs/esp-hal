@@ -72,6 +72,14 @@ pub mod an {
 /// constructor is sealed inside `esp-hal`). The trait mirrors IEEE 802.3
 /// Clause 22: PHY address 0-31, register address 0-31, 16-bit data.
 ///
+/// # Mutability
+///
+/// Methods take `&mut self`. The MDIO bus is a strictly sequential
+/// hardware resource — the Synopsys GMAC's MII Address register has a
+/// BUSY bit that serialises one transaction at a time — and `&mut self`
+/// reflects that exclusivity in the type system, preventing API users
+/// from incorrectly assuming concurrent access is safe.
+///
 /// # Error model
 ///
 /// The trait surface is infallible (plain `u16`, no `Result`) because the
@@ -98,18 +106,18 @@ pub mod an {
 ///
 /// struct MockMdio;
 /// impl MdioBus for MockMdio {
-///     fn read(&self, _phy: u8, _reg: u8) -> u16 {
+///     fn read(&mut self, _phy: u8, _reg: u8) -> u16 {
 ///         0
 ///     }
-///     fn write(&self, _phy: u8, _reg: u8, _val: u16) {}
+///     fn write(&mut self, _phy: u8, _reg: u8, _val: u16) {}
 /// }
 /// ```
 pub trait MdioBus {
     /// Read a 16-bit PHY register (Clause 22).
-    fn read(&self, phy_addr: u8, reg_addr: u8) -> u16;
+    fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16;
 
     /// Write a 16-bit PHY register (Clause 22).
-    fn write(&self, phy_addr: u8, reg_addr: u8, value: u16);
+    fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16);
 }
 
 // ── MdioDriver ──────────────────────────────────────────────────────────────
@@ -129,18 +137,18 @@ impl<'a> MdioDriver<'a> {
     }
 
     /// Reads one PHY register (Clause 22).
-    pub fn read(&self, phy_addr: u8, reg: u8) -> u16 {
+    pub fn read(&mut self, phy_addr: u8, reg: u8) -> u16 {
         self.regs.mdio_read(phy_addr, reg)
     }
 
     /// Writes one PHY register (Clause 22).
-    pub fn write(&self, phy_addr: u8, reg: u8, data: u16) {
+    pub fn write(&mut self, phy_addr: u8, reg: u8, data: u16) {
         self.regs.mdio_write(phy_addr, reg, data)
     }
 }
 
 impl<'a> MdioBus for MdioDriver<'a> {
-    fn read(&self, phy_addr: u8, reg_addr: u8) -> u16 {
+    fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16 {
         // Delegate to the inherent method — Rust's method resolution picks
         // the inherent `read` over the trait `read` on `MdioDriver`, so this
         // does not recurse. Keeping a single source of truth ensures any
@@ -149,7 +157,7 @@ impl<'a> MdioBus for MdioDriver<'a> {
         MdioDriver::read(self, phy_addr, reg_addr)
     }
 
-    fn write(&self, phy_addr: u8, reg_addr: u8, value: u16) {
+    fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16) {
         MdioDriver::write(self, phy_addr, reg_addr, value);
     }
 }
@@ -176,7 +184,7 @@ pub trait Phy {
     ///
     /// Should reset the PHY, configure auto-negotiation, and wait until the
     /// hardware is ready to respond to further MDIO transactions.
-    fn init<M: MdioBus>(&mut self, mdio: &M) -> Result<(), PhyError>;
+    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError>;
 
     /// Polls the current link state.
     ///
@@ -184,7 +192,7 @@ pub trait Phy {
     /// complete and the link partner is detected. The context can be used
     /// to wake the caller when the link state should be re-polled, if the PHY chip
     /// supports interrupt-driven notifications.
-    fn poll_link<M: MdioBus>(&mut self, mdio: &M, _cx: Option<&mut Context<'_>>) -> LinkState;
+    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, _cx: Option<&mut Context<'_>>) -> LinkState;
 
     /// Returns the Clause 22 PHY address on the MDIO bus.
     fn address(&self) -> u8;

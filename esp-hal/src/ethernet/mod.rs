@@ -680,8 +680,8 @@ impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
     /// Async callers are encouraged to pass the context to allow the PHY driver to wake them when
     /// the link state needs to be re-polled.
     pub fn poll_link(&mut self, cx: Option<&mut Context<'_>>) -> LinkState {
-        let mdio = MdioDriver::new(&EmacRegs);
-        self.phy.poll_link(&mdio, cx)
+        let mut mdio = MdioDriver::new(&EmacRegs);
+        self.phy.poll_link(&mut mdio, cx)
     }
 
     /// Returns the MAC address configured during construction.
@@ -796,8 +796,8 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     EmacRegs.dma_soft_reset();
 
     // Init PHY (MDIO requires DMA/MAC clocks to be running after reset).
-    let mdio = MdioDriver::new(&EmacRegs);
-    phy.init(&mdio).map_err(Error::Phy)?;
+    let mut mdio = MdioDriver::new(&EmacRegs);
+    phy.init(&mut mdio).map_err(Error::Phy)?;
 
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);

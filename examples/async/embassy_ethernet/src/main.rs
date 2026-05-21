@@ -105,11 +105,11 @@ impl Phy for ExamplePhy {
         self.phy.address()
     }
 
-    fn init<M: MdioBus>(&mut self, mdio: &M) -> Result<(), PhyError> {
+    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError> {
         self.phy.init(mdio)
     }
 
-    fn poll_link<M: MdioBus>(&mut self, mdio: &M, cx: Option<&mut Context<'_>>) -> LinkState {
+    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
         if let Some(cx) = cx {
             if matches!(self.timer.poll_unpin(cx), Poll::Pending) {
                 return self.cached_link_state;
