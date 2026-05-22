@@ -93,9 +93,6 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
@@ -379,6 +376,10 @@ supports_mem2mem = true
 max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
+channels = [
+    { name = "DMA_CH0", mem2mem = true },
+    { name = "DMA_CH1", mem2mem = true },
+]
 
 [device.ecc]
 support_status = "partial"

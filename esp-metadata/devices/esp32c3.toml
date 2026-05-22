@@ -80,10 +80,6 @@ peripherals = [
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "XTS_AES" },
 
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-    { name = "DMA_CH2", virtual = true },
-
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
@@ -267,6 +263,11 @@ kind = "gdma"
 gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
+channels = [
+    { name = "DMA_CH0", mem2mem = true },
+    { name = "DMA_CH1", mem2mem = true },
+    { name = "DMA_CH2", mem2mem = true },
+]
 
 [device.gpio]
 support_status = "supported"

@@ -99,12 +99,6 @@ peripherals = [
     { name = "WCL" },
     { name = "XTS_AES" },
 
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-    { name = "DMA_CH2", virtual = true },
-    { name = "DMA_CH3", virtual = true },
-    { name = "DMA_CH4", virtual = true },
-
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwble = "RWBLE", bb = "BT_BB" } },
@@ -305,6 +299,13 @@ supports_mem2mem = true
 max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
+channels = [
+    { name = "DMA_CH0", mem2mem = true },
+    { name = "DMA_CH1", mem2mem = true },
+    { name = "DMA_CH2", mem2mem = true },
+    { name = "DMA_CH3", mem2mem = true },
+    { name = "DMA_CH4", mem2mem = true },
+]
 
 [device.gpio]
 support_status = "supported"

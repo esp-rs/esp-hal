@@ -684,6 +684,18 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(dma) = self.device.peri_config.dma.as_ref() {
+            for channel in dma.channels.0.iter() {
+                let ch_name = format_ident!("{}", channel.name);
+                let singleton_doc = format!("{} peripheral singleton", channel.name);
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #ch_name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(quote! { #ch_name (unstable) });
+            }
+        }
+
         for peri in self.peripherals().iter() {
             let hal = format_ident!("{}", peri.name);
             let pac = if peri.is_virtual {
