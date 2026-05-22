@@ -114,11 +114,6 @@ impl<'a> MdioDriver<'a> {
 
 impl<'a> MdioBus for MdioDriver<'a> {
     fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16 {
-        // Delegate to the inherent method — Rust's method resolution picks
-        // the inherent `read` over the trait `read` on `MdioDriver`, so this
-        // does not recurse. Keeping a single source of truth ensures any
-        // future changes to `MdioDriver::read` (timing barriers, instrumentation)
-        // automatically propagate to the trait impl.
         MdioDriver::read(self, phy_addr, reg_addr)
     }
 
@@ -139,11 +134,7 @@ pub enum PhyError {
     NotFound,
 }
 
-/// Trait implemented by all PHY drivers.
-///
-/// PHY drivers are generic over the [`MdioBus`] trait rather than tied to
-/// the concrete [`MdioDriver`], so impls can live in external crates and be
-/// tested with host-side mocks.
+/// Ethernet PHY driver.
 pub trait Phy {
     /// One-time hardware initialization.
     ///
