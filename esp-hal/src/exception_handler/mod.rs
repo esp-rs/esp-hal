@@ -16,6 +16,7 @@ unsafe extern "C" fn __user_exception(
 }
 
 #[cfg(all(xtensa, stack_guard_monitoring))]
+#[inline(always)]
 pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
     let mut dbgcause: u32;
     unsafe {
