@@ -38,11 +38,7 @@ fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &
     block!(digest.finish(output)).unwrap();
 }
 
-fn hash_digest<'a, S: ShaAlgorithm>(
-    sha: &'a mut Sha<'static>,
-    input: &[u8],
-    output: &mut [u8],
-) {
+fn hash_digest<'a, S: ShaAlgorithm>(sha: &'a mut Sha<'static>, input: &[u8], output: &mut [u8]) {
     let mut hasher = ShaDigest::<S, _>::new(sha);
     Update::update(&mut hasher, input);
     output.copy_from_slice(&digest::FixedOutput::finalize_fixed(hasher));
