@@ -381,9 +381,9 @@ separate_in_out_interrupts = true
 max_priority = 5
 engines = [
     { name = "AHB_GDMA", channels = [
-        { name = "DMA_CH0" },
-        { name = "DMA_CH1", mem2mem = false },
-        { name = "DMA_CH2", mem2mem = false },
+        { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
     ] },
 ]
 

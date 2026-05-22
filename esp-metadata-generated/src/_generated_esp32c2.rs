@@ -375,6 +375,16 @@ macro_rules! for_each_dedicated_gpio {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_channel!((DMA_CH0, 0, interrupt = DMA_CH0));
+        _for_each_inner_dma_channel!((shared(DMA_CH0, 0, interrupt = DMA_CH0)));
+        _for_each_inner_dma_channel!((split));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_ecc_working_mode {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
@@ -3217,8 +3227,9 @@ macro_rules! for_each_peripheral {
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO20 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_CH0 peripheral singleton"]
-        DMA_CH0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "APB_CTRL peripheral singleton"] APB_CTRL <= APB_CTRL() (unstable)));
+        DMA_CH0 <= virtual(DMA_CH0 : { bind_dma_interrupt, enable_dma_interrupt,
+        disable_dma_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "APB_CTRL peripheral singleton"] APB_CTRL <= APB_CTRL() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "BB peripheral singleton"] BB <=
@@ -3421,11 +3432,12 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO20 <= virtual()), (@ peri_type #[doc =
-        "DMA_CH0 peripheral singleton"] DMA_CH0 <= virtual() (unstable)), (@ peri_type
-        #[doc = "APB_CTRL peripheral singleton"] APB_CTRL <= APB_CTRL() (unstable)), (@
-        peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC()
-        (unstable)), (@ peri_type #[doc = "BB peripheral singleton"] BB <= BB()
-        (unstable)), (@ peri_type #[doc = "ASSIST_DEBUG peripheral singleton"]
+        "DMA_CH0 peripheral singleton"] DMA_CH0 <= virtual(DMA_CH0 : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)),
+        (@ peri_type #[doc = "APB_CTRL peripheral singleton"] APB_CTRL <= APB_CTRL()
+        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
+        <= APB_SARADC() (unstable)), (@ peri_type #[doc = "BB peripheral singleton"] BB
+        <= BB() (unstable)), (@ peri_type #[doc = "ASSIST_DEBUG peripheral singleton"]
         ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (@ peri_type #[doc =
         "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@ peri_type #[doc =
         "ECC peripheral singleton"] ECC <= ECC() (unstable)), (@ peri_type #[doc =

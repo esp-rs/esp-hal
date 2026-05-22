@@ -468,6 +468,22 @@ macro_rules! for_each_dedicated_gpio {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_channel!((DMA_SPI2, 0, interrupt = SPI2_DMA));
+        _for_each_inner_dma_channel!((DMA_SPI3, 1, interrupt = SPI3_DMA));
+        _for_each_inner_dma_channel!((DMA_I2S0, 0, interrupt = I2S0));
+        _for_each_inner_dma_channel!((DMA_CRYPTO, 0, interrupt = CRYPTO_DMA));
+        _for_each_inner_dma_channel!((DMA_COPY, 0, interrupt = DMA_COPY));
+        _for_each_inner_dma_channel!((shared(DMA_SPI2, 0, interrupt = SPI2_DMA),
+        (DMA_SPI3, 1, interrupt = SPI3_DMA), (DMA_I2S0, 0, interrupt = I2S0),
+        (DMA_CRYPTO, 0, interrupt = CRYPTO_DMA), (DMA_COPY, 0, interrupt = DMA_COPY)));
+        _for_each_inner_dma_channel!((split));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sw_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
@@ -3859,16 +3875,21 @@ macro_rules! for_each_peripheral {
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO46 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_SPI2 peripheral singleton"]
-        DMA_SPI2 <= SPI2() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "DMA_SPI3 peripheral singleton"] DMA_SPI3 <= SPI3() (unstable)));
+        DMA_SPI2 <= SPI2(SPI2_DMA : { bind_dma_interrupt, enable_dma_interrupt,
+        disable_dma_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "DMA_SPI3 peripheral singleton"] DMA_SPI3 <= SPI3(SPI3_DMA : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_I2S0 peripheral singleton"]
-        DMA_I2S0 <= I2S0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "DMA_CRYPTO peripheral singleton"] DMA_CRYPTO <= CRYPTO_DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_COPY peripheral singleton"]
-        DMA_COPY <= COPY_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        DMA_I2S0 <= I2S0(I2S0 : { bind_dma_interrupt, enable_dma_interrupt,
+        disable_dma_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "DMA_CRYPTO peripheral singleton"] DMA_CRYPTO <= CRYPTO_DMA(CRYPTO_DMA :
+        { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DMA_COPY peripheral singleton"] DMA_COPY <= COPY_DMA(DMA_COPY : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
+        <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "DEDICATED_GPIO peripheral singleton"] DEDICATED_GPIO <= DEDICATED_GPIO()
@@ -4206,21 +4227,27 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO46 <= virtual()), (@ peri_type #[doc =
-        "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2() (unstable)), (@ peri_type
-        #[doc = "DMA_SPI3 peripheral singleton"] DMA_SPI3 <= SPI3() (unstable)), (@
-        peri_type #[doc = "DMA_I2S0 peripheral singleton"] DMA_I2S0 <= I2S0()
-        (unstable)), (@ peri_type #[doc = "DMA_CRYPTO peripheral singleton"] DMA_CRYPTO
-        <= CRYPTO_DMA() (unstable)), (@ peri_type #[doc =
-        "DMA_COPY peripheral singleton"] DMA_COPY <= COPY_DMA() (unstable)), (@ peri_type
-        #[doc = "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)), (@
-        peri_type #[doc = "DEDICATED_GPIO peripheral singleton"] DEDICATED_GPIO <=
-        DEDICATED_GPIO() (unstable)), (@ peri_type #[doc = "DS peripheral singleton"] DS
-        <= DS() (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <=
-        EFUSE() (unstable)), (@ peri_type #[doc = "EXTMEM peripheral singleton"] EXTMEM
-        <= EXTMEM() (unstable)), (@ peri_type #[doc = "FE peripheral singleton"] FE <=
-        FE() (unstable)), (@ peri_type #[doc = "FE2 peripheral singleton"] FE2 <= FE2()
+        "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2(SPI2_DMA : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)),
+        (@ peri_type #[doc = "DMA_SPI3 peripheral singleton"] DMA_SPI3 <= SPI3(SPI3_DMA :
+        { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)),
+        (@ peri_type #[doc = "DMA_I2S0 peripheral singleton"] DMA_I2S0 <= I2S0(I2S0 : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)),
+        (@ peri_type #[doc = "DMA_CRYPTO peripheral singleton"] DMA_CRYPTO <=
+        CRYPTO_DMA(CRYPTO_DMA : { bind_dma_interrupt, enable_dma_interrupt,
+        disable_dma_interrupt }) (unstable)), (@ peri_type #[doc =
+        "DMA_COPY peripheral singleton"] DMA_COPY <= COPY_DMA(DMA_COPY : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }) (unstable)),
+        (@ peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
+        <= APB_SARADC() (unstable)), (@ peri_type #[doc =
+        "DEDICATED_GPIO peripheral singleton"] DEDICATED_GPIO <= DEDICATED_GPIO()
+        (unstable)), (@ peri_type #[doc = "DS peripheral singleton"] DS <= DS()
+        (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE()
+        (unstable)), (@ peri_type #[doc = "EXTMEM peripheral singleton"] EXTMEM <=
+        EXTMEM() (unstable)), (@ peri_type #[doc = "FE peripheral singleton"] FE <= FE()
+        (unstable)), (@ peri_type #[doc = "FE2 peripheral singleton"] FE2 <= FE2()
         (unstable)), (@ peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO()
         (unstable)), (@ peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <=
         GPIO_SD() (unstable)), (@ peri_type #[doc = "HMAC peripheral singleton"] HMAC <=

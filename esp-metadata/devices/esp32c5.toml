@@ -305,9 +305,9 @@ can_access_psram = true
 # TODO: weight-based arbitration
 engines = [
     { name = "AHB_GDMA", channels = [
-        { name = "DMA_CH0", mem2mem = true },
-        { name = "DMA_CH1", mem2mem = true },
-        { name = "DMA_CH2", mem2mem = true },
+        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
     ] },
 ]
 

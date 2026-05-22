@@ -301,11 +301,11 @@ can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
     { name = "GDMA", channels = [
-        { name = "DMA_CH0", mem2mem = true },
-        { name = "DMA_CH1", mem2mem = true },
-        { name = "DMA_CH2", mem2mem = true },
-        { name = "DMA_CH3", mem2mem = true },
-        { name = "DMA_CH4", mem2mem = true },
+        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+        { name = "DMA_CH3", mem2mem = true, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+        { name = "DMA_CH4", mem2mem = true, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
     ] },
 ]
 

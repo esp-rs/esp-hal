@@ -77,8 +77,8 @@ peripherals = [
     { name = "SLCHOST" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, dma_peripheral = 2, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, dma_peripheral = 3, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA"  }, dma_peripheral = 2, stable = true },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA"  }, dma_peripheral = 3, stable = true },
     { name = "TIMG0" },
     { name = "TIMG1" },
     { name = "TWAI0" },
@@ -338,12 +338,12 @@ kind = "pdma"
 supports_mem2mem = false
 engines = [
     { name = "SPI_DMA", channels = [
-        { name = "DMA_SPI2", pac = "SPI2" },
-        { name = "DMA_SPI3", pac = "SPI3" },
+        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA" },
+        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA" },
     ] },
     { name = "I2S_DMA", channels = [
-        { name = "DMA_I2S0", pac = "I2S0" },
-        { name = "DMA_I2S1", pac = "I2S1" },
+        { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0" },
+        { name = "DMA_I2S1", pac = "I2S1", interrupt = "I2S1" },
     ] },
 ]
 
