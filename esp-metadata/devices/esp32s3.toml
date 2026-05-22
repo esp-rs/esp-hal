@@ -299,12 +299,14 @@ supports_mem2mem = true
 max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
-channels = [
-    { name = "DMA_CH0", mem2mem = true },
-    { name = "DMA_CH1", mem2mem = true },
-    { name = "DMA_CH2", mem2mem = true },
-    { name = "DMA_CH3", mem2mem = true },
-    { name = "DMA_CH4", mem2mem = true },
+engines = [
+    { name = "GDMA", channels = [
+        { name = "DMA_CH0", mem2mem = true },
+        { name = "DMA_CH1", mem2mem = true },
+        { name = "DMA_CH2", mem2mem = true },
+        { name = "DMA_CH3", mem2mem = true },
+        { name = "DMA_CH4", mem2mem = true },
+    ] },
 ]
 
 [device.gpio]

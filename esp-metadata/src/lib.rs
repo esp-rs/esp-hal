@@ -685,14 +685,20 @@ This pin may be available with certain limitations. Check your hardware to make 
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
-            for channel in dma.channels.0.iter() {
-                let ch_name = format_ident!("{}", channel.name);
-                let singleton_doc = format!("{} peripheral singleton", channel.name);
-                let tokens = quote! {
-                    #[doc = #singleton_doc] #ch_name <= virtual ()
-                };
-                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
-                singleton_peripherals.push(quote! { #ch_name (unstable) });
+            for engine in dma.engines.0.iter() {
+                for channel in engine.channels.iter() {
+                    let ch_name = format_ident!("{}", channel.name);
+                    let singleton_doc = format!("{} peripheral singleton", channel.name);
+                    let pac = match &channel.pac {
+                        Some(pac_name) => format_ident!("{}", pac_name),
+                        None => format_ident!("virtual"),
+                    };
+                    let tokens = quote! {
+                        #[doc = #singleton_doc] #ch_name <= #pac ()
+                    };
+                    all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                    singleton_peripherals.push(quote! { #ch_name (unstable) });
+                }
             }
         }
 

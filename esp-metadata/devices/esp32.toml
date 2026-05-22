@@ -89,11 +89,6 @@ peripherals = [
     { name = "UHCI1", dma_peripheral = 5 },
     { name = "WIFI", interrupts = { mac = "WIFI_MAC" }, stable = true },
 
-    { name = "DMA_SPI2", pac = "SPI2" },
-    { name = "DMA_SPI3", pac = "SPI3" },
-    { name = "DMA_I2S0", pac = "I2S0" },
-    { name = "DMA_I2S1", pac = "I2S1" },
-
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
@@ -341,6 +336,16 @@ instances = [
 support_status = "partial"
 kind = "pdma"
 supports_mem2mem = false
+engines = [
+    { name = "SPI_DMA", channels = [
+        { name = "DMA_SPI2", pac = "SPI2" },
+        { name = "DMA_SPI3", pac = "SPI3" },
+    ] },
+    { name = "I2S_DMA", channels = [
+        { name = "DMA_I2S0", pac = "I2S0" },
+        { name = "DMA_I2S1", pac = "I2S1" },
+    ] },
+]
 
 [device.gpio]
 support_status = "supported"

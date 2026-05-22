@@ -249,10 +249,6 @@ impl Chip {
                     "soc_has_uhci0",
                     "soc_has_uhci1",
                     "soc_has_wifi",
-                    "soc_has_dma_spi2",
-                    "soc_has_dma_spi3",
-                    "soc_has_dma_i2s0",
-                    "soc_has_dma_i2s1",
                     "soc_has_adc1",
                     "soc_has_adc2",
                     "soc_has_bt",
@@ -325,6 +321,10 @@ impl Chip {
                     "aes_endianness_configurable",
                     "bt_controller=\"btdm\"",
                     "dma_kind=\"pdma\"",
+                    "soc_has_dma_spi2",
+                    "soc_has_dma_spi3",
+                    "soc_has_dma_i2s0",
+                    "soc_has_dma_i2s1",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
                     "gpio_constant_0_input=\"48\"",
@@ -463,10 +463,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_uhci0",
                     "cargo:rustc-cfg=soc_has_uhci1",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=soc_has_dma_spi2",
-                    "cargo:rustc-cfg=soc_has_dma_spi3",
-                    "cargo:rustc-cfg=soc_has_dma_i2s0",
-                    "cargo:rustc-cfg=soc_has_dma_i2s1",
                     "cargo:rustc-cfg=soc_has_adc1",
                     "cargo:rustc-cfg=soc_has_adc2",
                     "cargo:rustc-cfg=soc_has_bt",
@@ -539,6 +535,10 @@ impl Chip {
                     "cargo:rustc-cfg=aes_endianness_configurable",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=dma_kind=\"pdma\"",
+                    "cargo:rustc-cfg=soc_has_dma_spi2",
+                    "cargo:rustc-cfg=soc_has_dma_spi3",
+                    "cargo:rustc-cfg=soc_has_dma_i2s0",
+                    "cargo:rustc-cfg=soc_has_dma_i2s1",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"48\"",
@@ -4952,11 +4952,6 @@ impl Chip {
                     "soc_has_usb_wrap",
                     "soc_has_xts_aes",
                     "soc_has_wifi",
-                    "soc_has_dma_spi2",
-                    "soc_has_dma_spi3",
-                    "soc_has_dma_i2s0",
-                    "soc_has_dma_crypto",
-                    "soc_has_dma_copy",
                     "soc_has_adc1",
                     "soc_has_adc2",
                     "soc_has_dac1",
@@ -5039,6 +5034,11 @@ impl Chip {
                     "dma_supports_mem2mem",
                     "dma_can_access_psram",
                     "dma_ext_mem_configurable_block_size",
+                    "soc_has_dma_spi2",
+                    "soc_has_dma_spi3",
+                    "soc_has_dma_i2s0",
+                    "soc_has_dma_crypto",
+                    "soc_has_dma_copy",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -5179,11 +5179,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_usb_wrap",
                     "cargo:rustc-cfg=soc_has_xts_aes",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=soc_has_dma_spi2",
-                    "cargo:rustc-cfg=soc_has_dma_spi3",
-                    "cargo:rustc-cfg=soc_has_dma_i2s0",
-                    "cargo:rustc-cfg=soc_has_dma_crypto",
-                    "cargo:rustc-cfg=soc_has_dma_copy",
                     "cargo:rustc-cfg=soc_has_adc1",
                     "cargo:rustc-cfg=soc_has_adc2",
                     "cargo:rustc-cfg=soc_has_dac1",
@@ -5266,6 +5261,11 @@ impl Chip {
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
+                    "cargo:rustc-cfg=soc_has_dma_spi2",
+                    "cargo:rustc-cfg=soc_has_dma_spi3",
+                    "cargo:rustc-cfg=soc_has_dma_i2s0",
+                    "cargo:rustc-cfg=soc_has_dma_crypto",
+                    "cargo:rustc-cfg=soc_has_dma_copy",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -6382,10 +6382,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_uhci0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_uhci1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_wifi)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_spi2)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_spi3)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_i2s0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_i2s1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_bt)");
@@ -6456,6 +6452,10 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_uart1)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
     println!("cargo:rustc-check-cfg=cfg(aes_endianness_configurable)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_spi2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_spi3)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_i2s0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_i2s1)");
     println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
     println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_separate_filter_config_registers)");
@@ -6747,14 +6747,14 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_syscon)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
     println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");

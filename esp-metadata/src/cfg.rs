@@ -354,7 +354,7 @@ driver_configs![
             #[serde(default)]
             gdma_version: Option<u32>,
             #[serde(default)]
-            channels: DmaChannels,
+            engines: DmaEngines,
         }
     },
     DsProperties {

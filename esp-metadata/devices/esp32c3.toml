@@ -263,10 +263,12 @@ kind = "gdma"
 gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
-channels = [
-    { name = "DMA_CH0", mem2mem = true },
-    { name = "DMA_CH1", mem2mem = true },
-    { name = "DMA_CH2", mem2mem = true },
+engines = [
+    { name = "AHB_GDMA", channels = [
+        { name = "DMA_CH0", mem2mem = true },
+        { name = "DMA_CH1", mem2mem = true },
+        { name = "DMA_CH2", mem2mem = true },
+    ] },
 ]
 
 [device.gpio]
