@@ -446,6 +446,11 @@ mod tests {
             CIPHERTEXT_ECB_256[0..16].try_into().unwrap(),
         );
     }
+}
+
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
+mod work_queue_tests {
+    use super::*;
 
     #[test]
     fn test_aes_work_queue_cpu() {
