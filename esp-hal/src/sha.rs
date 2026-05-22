@@ -1109,6 +1109,7 @@ impl<'t, 'd> ShaWorkQueueDriver<'t, 'd> {
 // if a context already uses the hardware. Also we must not power down the hardware when a
 // context uses it, as it corrupts state.
 #[cfg(esp32)]
+#[expect(clippy::large_enum_variant)]
 enum Esp32Hasher {
     Hardware(GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>),
     Software(SoftwareHasher),
