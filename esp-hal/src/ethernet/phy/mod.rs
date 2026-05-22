@@ -65,58 +65,16 @@ pub mod an {
 
 // ── MdioBus trait ───────────────────────────────────────────────────────────
 
-/// Generic MDIO bus interface used by [`Phy`] implementations.
+/// Generic MDIO bus interface for Clause 22 PHY register access.
 ///
 /// PHY drivers are generic over this trait so they can live in external
-/// crates without depending on the concrete [`MdioDriver`] (whose
-/// constructor is sealed inside `esp-hal`). The trait mirrors IEEE 802.3
-/// Clause 22: PHY address 0-31, register address 0-31, 16-bit data.
-///
-/// # Mutability
-///
-/// Methods take `&mut self`. The MDIO bus is a strictly sequential
-/// hardware resource — the Synopsys GMAC's MII Address register has a
-/// BUSY bit that serialises one transaction at a time — and `&mut self`
-/// reflects that exclusivity in the type system, preventing API users
-/// from incorrectly assuming concurrent access is safe.
-///
-/// # Error model
-///
-/// The trait surface is infallible (plain `u16`, no `Result`) because the
-/// Clause-22 protocol itself carries no application-level error response.
-/// Implementations choose how to behave when the bus stalls or the
-/// addressed device does not answer. The built-in [`MdioDriver`] busy-waits
-/// the EMAC's MDIO controller without a timeout — on a healthy bus a
-/// transaction completes in a few microseconds, and reads from a
-/// non-responsive PHY register typically return `0xFFFF` (Synopsys GMAC
-/// behavior, not part of the trait contract). Alternative implementations
-/// may take longer or return any other sentinel; PHY drivers must not rely
-/// on specific values or timing.
-///
-/// External implementations are useful for two cases:
-///
-/// 1. **Host-side mocks** for testing PHY drivers without a real MAC.
-/// 2. **Alternative MDIO controllers** (e.g. SPI-attached MDIO frontends or software bit-banged
-///    buses) feeding the same `Phy` driver code.
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use esp_hal::ethernet::phy::MdioBus;
-///
-/// struct MockMdio;
-/// impl MdioBus for MockMdio {
-///     fn read(&mut self, _phy: u8, _reg: u8) -> u16 {
-///         0
-///     }
-///     fn write(&mut self, _phy: u8, _reg: u8, _val: u16) {}
-/// }
-/// ```
+/// crates without depending on the concrete [`MdioDriver`]. PHY and
+/// register addresses are 5-bit Clause 22 fields (0-31).
 pub trait MdioBus {
-    /// Read a 16-bit PHY register (Clause 22).
+    /// Read a 16-bit PHY register.
     fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16;
 
-    /// Write a 16-bit PHY register (Clause 22).
+    /// Write a 16-bit PHY register.
     fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16);
 }
 
