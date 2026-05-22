@@ -63,10 +63,28 @@ pub mod an {
     pub const BASE_100_FULL: u16 = 1 << 8;
 }
 
+// ── MdioBus trait ───────────────────────────────────────────────────────────
+
+/// Generic MDIO bus interface for Clause 22 PHY register access.
+///
+/// PHY drivers are generic over this trait so they can live in external
+/// crates without depending on the concrete [`MdioDriver`]. PHY and
+/// register addresses are 5-bit Clause 22 fields (0-31).
+pub trait MdioBus {
+    /// Read a 16-bit PHY register.
+    fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16;
+
+    /// Write a 16-bit PHY register.
+    fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16);
+}
+
 // ── MdioDriver ──────────────────────────────────────────────────────────────
 
 /// Thin wrapper that exposes Clause 22 MDIO read/write over the EMAC MAC's
 /// built-in MDIO controller.
+///
+/// Implements [`MdioBus`], so PHY drivers generic over `MdioBus` can run
+/// directly on top of this MAC without any adapter.
 pub struct MdioDriver<'a> {
     regs: &'a EmacRegs,
 }
@@ -77,13 +95,30 @@ impl<'a> MdioDriver<'a> {
     }
 
     /// Reads one PHY register (Clause 22).
-    pub fn read(&self, phy_addr: u8, reg: u8) -> u16 {
+    pub fn read(&mut self, phy_addr: u8, reg: u8) -> u16 {
+        // Clause 22 frame fields are 5 bits — out-of-range values are silently
+        // truncated by the PAC writer (`FieldWriter<_, 5>`) and would hit a
+        // different PHY/register without any error. Catch this in debug builds.
+        debug_assert!(phy_addr < 32, "Clause 22 PHY address must be < 32");
+        debug_assert!(reg < 32, "Clause 22 register address must be < 32");
         self.regs.mdio_read(phy_addr, reg)
     }
 
     /// Writes one PHY register (Clause 22).
-    pub fn write(&self, phy_addr: u8, reg: u8, data: u16) {
+    pub fn write(&mut self, phy_addr: u8, reg: u8, data: u16) {
+        debug_assert!(phy_addr < 32, "Clause 22 PHY address must be < 32");
+        debug_assert!(reg < 32, "Clause 22 register address must be < 32");
         self.regs.mdio_write(phy_addr, reg, data)
+    }
+}
+
+impl<'a> MdioBus for MdioDriver<'a> {
+    fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16 {
+        MdioDriver::read(self, phy_addr, reg_addr)
+    }
+
+    fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16) {
+        MdioDriver::write(self, phy_addr, reg_addr, value);
     }
 }
 
@@ -99,13 +134,13 @@ pub enum PhyError {
     NotFound,
 }
 
-/// Trait implemented by all PHY drivers.
+/// Ethernet PHY driver.
 pub trait Phy {
     /// One-time hardware initialization.
     ///
     /// Should reset the PHY, configure auto-negotiation, and wait until the
     /// hardware is ready to respond to further MDIO transactions.
-    fn init(&mut self, mdio: &MdioDriver<'_>) -> Result<(), PhyError>;
+    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError>;
 
     /// Polls the current link state.
     ///
@@ -113,7 +148,7 @@ pub trait Phy {
     /// complete and the link partner is detected. The context can be used
     /// to wake the caller when the link state should be re-polled, if the PHY chip
     /// supports interrupt-driven notifications.
-    fn poll_link(&mut self, mdio: &MdioDriver<'_>, _cx: Option<&mut Context<'_>>) -> LinkState;
+    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, _cx: Option<&mut Context<'_>>) -> LinkState;
 
     /// Returns the Clause 22 PHY address on the MDIO bus.
     fn address(&self) -> u8;
