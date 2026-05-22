@@ -1297,7 +1297,9 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> Drop
     for ShaContext<CHUNK_BYTES, DIGEST_WORDS>
 {
     fn drop(&mut self) {
-        ACCELERATOR_IN_USE.store(false, Ordering::Release);
+        if matches!(self.use_software, Esp32Hasher::Hardware(_)) {
+            ACCELERATOR_IN_USE.store(false, Ordering::Release);
+        }
     }
 }
 
