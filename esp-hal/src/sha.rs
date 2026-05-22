@@ -1105,6 +1105,15 @@ impl<'t, 'd> ShaWorkQueueDriver<'t, 'd> {
     }
 }
 
+// ESP32 can't save (or rather, restore) the hash context, so we need to fall back to software
+// if a context already uses the hardware. Also we must not power down the hardware when a
+// context uses it, as it corrupts state.
+#[cfg(esp32)]
+enum Esp32Hasher {
+    Hardware(GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>),
+    Software(SoftwareHasher),
+}
+
 #[cfg(esp32)]
 enum SoftwareHasher {
     Sha1(sha1::Sha1),
@@ -1122,10 +1131,8 @@ struct ShaContext<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> {
     #[cfg(not(esp32))] // Saved H_MEM registers
     state: [u32; 16],
 
-    // ESP32 can't save (or rather, restore) the hash context, so we need to fall back to software
-    // if a context already uses the hardware.
     #[cfg(esp32)]
-    use_software: Option<SoftwareHasher>,
+    use_software: Esp32Hasher,
 }
 
 // ESP32 can't save the context, so it can't support interleaved operation. To support the digest
@@ -1150,9 +1157,9 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
                 ShaAlgorithmKind::Sha384 => SoftwareHasher::Sha384(sha2::Sha384::new()),
                 ShaAlgorithmKind::Sha512 => SoftwareHasher::Sha512(sha2::Sha512::new()),
             };
-            Some(hasher)
+            Esp32Hasher::Software(hasher)
         } else {
-            None
+            Esp32Hasher::Hardware(GenericPeripheralGuard::new())
         };
 
         Self {
@@ -1181,7 +1188,7 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
             data.len()
         );
         #[cfg(esp32)]
-        if let Some(hasher) = self.use_software.as_mut() {
+        if let Esp32Hasher::Software(ref mut hasher) = self.use_software {
             Self::update_using_software(hasher, data);
             return ShaHandle(self.frontend.post_completed(&SHA_WORK_QUEUE));
         }
@@ -1232,7 +1239,7 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
             result.len()
         );
         #[cfg(esp32)]
-        if let Some(hasher) = self.use_software.as_mut() {
+        if let Esp32Hasher::Software(ref mut hasher) = self.use_software {
             Self::finalize_using_software(hasher, result);
             return ShaHandle(self.frontend.post_completed(&SHA_WORK_QUEUE));
         }
