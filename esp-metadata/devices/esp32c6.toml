@@ -765,6 +765,7 @@ clock_configured_by_pcr = true
 
 [device.pcnt]
 [device.sd_slave]
+support_status = "not_supported"
 [device.twai]
 [device.usb_serial_jtag]
 

@@ -896,7 +896,9 @@ max_ws_width = 128
 [device.mcpwm]
 [device.pcnt]
 [device.sd_host]
+support_status = "not_supported"
 [device.sd_slave]
+support_status = "not_supported"
 [device.touch]
 [device.twai]
 
@@ -908,6 +910,7 @@ extmem_origin = 0x3F800000
 [device.lp_timer]
 
 [device.ulp_fsm]
+support_status = "not_supported"
 
 ## Radio
 [device.wifi]

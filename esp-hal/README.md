@@ -98,8 +98,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SDIO host                 | ⚒️   |          |          |          |          |           |          | ❌       |          | ⚒️      |
-| SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      | [❌][5417] [^1] |          | ❌       |          |          |
+| SDIO host                 | ❌    |          |          |          |          |           |          | ❌       |          | ❌       |
+| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          | ❌       |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
@@ -111,7 +111,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ❌       | ⚒️      |
-| ULP (FSM)                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
+| ULP (FSM)                 | ❌    |          |          |          |          |           |          |          | ❌       | ❌       |
 | ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ❌       | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |
