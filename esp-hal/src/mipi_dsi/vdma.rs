@@ -110,6 +110,11 @@ impl VdmaLinkItem {
         }
     }
 
+    /// Return the source address stored in this LLI.
+    pub(super) fn source_addr(&self) -> u32 {
+        unsafe { ptr::read_volatile(&self.sar_lo) }
+    }
+
     /// Re-assert valid+last so the channel can be re-armed.
     pub(super) fn rearm(&mut self) {
         unsafe {

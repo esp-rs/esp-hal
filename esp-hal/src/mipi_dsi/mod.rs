@@ -25,6 +25,7 @@
 //! ```
 
 pub mod dbi;
+pub mod dpi;
 pub(crate) mod vdma;
 
 use crate::{
@@ -297,6 +298,22 @@ impl<'d> MipiDsi<'d> {
     /// Attach a command-mode (DBI) interface for panel init sequences.
     pub fn dbi(&mut self, virtual_channel: u8) -> dbi::DsiDbi<'_, 'd> {
         dbi::DsiDbi::new(self, virtual_channel)
+    }
+
+    /// Enter video-mode (DPI) streaming.
+    ///
+    /// Consumes `self`; the returned [`DsiDpi`] keeps clocks enabled for the
+    /// lifetime of the streaming session.
+    ///
+    /// `framebuffers` must contain 1–3 slices, each of exactly
+    /// `h_active × v_active × bytes_per_pixel` bytes, 64-byte aligned, and
+    /// allocated from PSRAM.
+    pub fn dpi(
+        self,
+        config: dpi::DpiConfig,
+        framebuffers: &[&'d mut [u8]],
+    ) -> Result<dpi::DsiDpi<'d>, ConfigError> {
+        dpi::DsiDpi::new(self, config, framebuffers)
     }
 }
 
