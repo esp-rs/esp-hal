@@ -4444,6 +4444,10 @@ impl Chip {
                     "soc_has_eth",
                     "soc_has_emac_dma",
                     "soc_has_emac_mac",
+                    "soc_has_mipi_dsi",
+                    "soc_has_vdma",
+                    "soc_has_mipi_dsi_host",
+                    "soc_has_mipi_dsi_bridge",
                     "soc_has_usb_device",
                     "soc_has_sdhost",
                     "soc_has_ledc",
@@ -4473,6 +4477,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
+                    "mipi_dsi_driver_supported",
                     "psram_driver_supported",
                     "rng_driver_supported",
                     "soc_driver_supported",
@@ -4641,6 +4646,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_eth",
                     "cargo:rustc-cfg=soc_has_emac_dma",
                     "cargo:rustc-cfg=soc_has_emac_mac",
+                    "cargo:rustc-cfg=soc_has_mipi_dsi",
+                    "cargo:rustc-cfg=soc_has_vdma",
+                    "cargo:rustc-cfg=soc_has_mipi_dsi_host",
+                    "cargo:rustc-cfg=soc_has_mipi_dsi_bridge",
                     "cargo:rustc-cfg=soc_has_usb_device",
                     "cargo:rustc-cfg=soc_has_sdhost",
                     "cargo:rustc-cfg=soc_has_ledc",
@@ -4670,6 +4679,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
+                    "cargo:rustc-cfg=mipi_dsi_driver_supported",
                     "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -6907,11 +6917,16 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_uart4)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_axi_gdma)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mipi_dsi)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_vdma)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mipi_dsi_host)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mipi_dsi_bridge)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_fs)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_hs)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_wrap)");
     println!("cargo:rustc-check-cfg=cfg(spi_octal)");
+    println!("cargo:rustc-check-cfg=cfg(mipi_dsi_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");

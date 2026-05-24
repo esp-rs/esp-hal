@@ -3251,6 +3251,8 @@ macro_rules! implement_peripheral_clocks {
             Mcpwm0,
             /// MCPWM1 peripheral clock signal
             Mcpwm1,
+            /// MIPI_DSI peripheral clock signal
+            MipiDsi,
             /// PARL_IO peripheral clock signal
             ParlIo,
             /// PCNT peripheral clock signal
@@ -3299,6 +3301,8 @@ macro_rules! implement_peripheral_clocks {
             UsbHs,
             /// VDMA peripheral clock signal
             Vdma,
+            /// VDMA peripheral clock signal
+            Vdma,
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
@@ -3329,6 +3333,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ledc,
                 Self::Mcpwm0,
                 Self::Mcpwm1,
+                Self::MipiDsi,
                 Self::ParlIo,
                 Self::Pcnt,
                 Self::Rmt,
@@ -3352,6 +3357,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::UsbDevice,
                 Self::UsbFs,
                 Self::UsbHs,
+                Self::Vdma,
                 Self::Vdma,
             ];
         }
@@ -3447,6 +3453,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl2()
                         .modify(|_, w| w.mcpwm1_apb_clk_en().bit(enable));
+                }
+                Peripheral::MipiDsi => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.dsi_sys_clk_en().bit(enable));
                 }
                 Peripheral::ParlIo => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3598,6 +3609,11 @@ macro_rules! implement_peripheral_clocks {
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
                 }
+                Peripheral::Vdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
+                }
             }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
@@ -3694,6 +3710,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en1()
                         .modify(|_, w| w.rst_en_pwm1().bit(reset));
+                }
+                Peripheral::MipiDsi => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en0()
+                        .modify(|_, w| w.rst_en_dsi_brg().bit(reset));
                 }
                 Peripheral::ParlIo => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3833,6 +3854,11 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::UsbHs => {
                     let _ = reset;
+                }
+                Peripheral::Vdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en0()
+                        .modify(|_, w| w.rst_en_gdma().bit(reset));
                 }
                 Peripheral::Vdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -4247,6 +4273,15 @@ macro_rules! for_each_peripheral {
         "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
         EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
+        VDMA <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <=
+        MIPI_DSI_BRIDGE(DSI_BRIDGE : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
         { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4353,6 +4388,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((AXI_GDMA(unstable)));
         _for_each_inner_peripheral!((ETH(unstable)));
+        _for_each_inner_peripheral!((MIPI_DSI(unstable)));
+        _for_each_inner_peripheral!((VDMA(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((SDHOST(unstable)));
         _for_each_inner_peripheral!((LEDC(unstable)));
@@ -4571,15 +4608,23 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@
         peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA()
         (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
-        EMAC_MAC() (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"]
-        USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        EMAC_MAC() (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
+        MIPI_DSI <= virtual() (unstable)), (@ peri_type #[doc =
+        "VDMA peripheral singleton"] VDMA <= virtual() (unstable)), (@ peri_type #[doc =
+        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "MIPI_DSI_BRIDGE peripheral singleton"]
+        MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE(DSI_BRIDGE : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type
-        #[doc = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(PWM0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1(PWM1 : { bind_peri_interrupt,
+        = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "SDHOST peripheral singleton"] SDHOST <=
+        SDHOST() (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <=
+        LEDC(LEDC : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable)), (@ peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <=
+        MCPWM0(PWM0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1(PWM1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
@@ -4620,11 +4665,11 @@ macro_rules! for_each_peripheral {
         (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI2), (SPI3),
         (I2C0(unstable)), (I2C1(unstable)), (TWAI0(unstable)), (TWAI1(unstable)),
         (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (AXI_GDMA(unstable)),
-        (ETH(unstable)), (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)),
-        (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)),
-        (ADC(unstable)), (AES(unstable)), (SHA(unstable)), (RSA(unstable)),
-        (ECC(unstable)), (USB_FS(unstable)), (USB_HS(unstable)),
-        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        (ETH(unstable)), (MIPI_DSI(unstable)), (VDMA(unstable)), (USB_DEVICE(unstable)),
+        (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
+        (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)), (AES(unstable)),
+        (SHA(unstable)), (RSA(unstable)), (ECC(unstable)), (USB_FS(unstable)),
+        (USB_HS(unstable)), (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
         Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (SHA, Sha, 5,
         AxiGdmaChannel)));

@@ -246,6 +246,10 @@ clocks = { system_clocks = { clock_tree = [
     { name = "ParlIo", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "parlio_sys_clk_en", apb_field = "parlio_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
     # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
     { name = "LcdCam", template_params = { default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_lcdcam" } },
+    # MIPI-DSI -- sys_clk in SOC_CLK_CTRL1; bridge reset in HP_RST_EN0.
+    { name = "MipiDsi", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "dsi_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_dsi_brg" } },
+    # VDMA (DW-GDMA) -- same clock/reset gate as Gdma.
+    { name = "Vdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
 ] } }
 
 # HP L2MEM: 0x4FF0_0000 - 0x4FFC_0000 (768 KB)
@@ -304,6 +308,10 @@ peripherals = [
     { name = "ETH", virtual = true },
     { name = "EMAC_DMA", hidden = true },
     { name = "EMAC_MAC", hidden = true },
+    { name = "MIPI_DSI", virtual = true },
+    { name = "VDMA", virtual = true },
+    { name = "MIPI_DSI_HOST", hidden = true, interrupts = { peri = "DSI" } },
+    { name = "MIPI_DSI_BRIDGE", hidden = true, interrupts = { peri = "DSI_BRIDGE" } },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "SDHOST" },
     { name = "LEDC", interrupts = { peri = "LEDC" } },
@@ -448,6 +456,9 @@ support_status = "not_supported"
 [device.ethernet]
 support_status = "partial"
 mii_via_gpio_matrix = true
+
+[device.mipi_dsi]
+support_status = "partial"
 
 [device.etm]
 support_status = "not_supported"  # Event Task Matrix
