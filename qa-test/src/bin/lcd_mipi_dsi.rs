@@ -45,9 +45,6 @@ const V_ACTIVE: u32 = 600;
 const BYTES_PER_PIXEL: usize = 2; // RGB565
 const FB_SIZE: usize = H_ACTIVE as usize * V_ACTIVE as usize * BYTES_PER_PIXEL;
 
-#[used] // Hack to prevent invalid checksum/hash errors
-static FOO: [u8; FB_SIZE / 10] = [0u8; FB_SIZE / 10];
-
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
@@ -149,10 +146,17 @@ fn main() -> ! {
         dpi.wait_for_vsync();
 
         let back = dpi.framebuffer_mut();
+
+        // Generate color
         let px = hue_to_rgb565(hue);
-        for chunk in back.chunks_exact_mut(2) {
-            chunk.copy_from_slice(&px.to_le_bytes());
+
+        // Fill the framebuffer with the color, 16 bytes at a time.
+        let w = px as u32 | (px as u32) << 16;
+        let c = w as u128 | (w as u128) << 32 | (w as u128) << 64 | (w as u128) << 96;
+        for chunk in back.chunks_exact_mut(16) {
+            chunk.copy_from_slice(&c.to_le_bytes());
         }
+
         // Flush cache and redirect DMA to the new buffer.
         // The DMA never stops; the change appears within one block transfer.
         dpi.commit();
@@ -163,7 +167,7 @@ fn main() -> ! {
 
 // ── Colour wheel ──────────────────────────────────────────────────────────────
 
-/// Convert a hue value (0–359°) to a packed RGB565 big-endian word.
+/// Convert a hue value (0–359°) to a packed RGB565 value.
 fn hue_to_rgb565(hue: u32) -> u16 {
     let region = hue / 60;
     let frac = hue % 60;
