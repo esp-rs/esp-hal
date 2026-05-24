@@ -654,6 +654,9 @@ support_status = { status = "not_supported", issue = 5164 }
 [device.ds]
 support_status = { status = "not_supported", issue = 884 }
 
+[device.sdm]
+support_status = { status = "not_supported", issue = 2370 }
+
 [device.lp_uart]
 support_status = { status = "not_supported", issue = 5155 }
 ram_size = 32

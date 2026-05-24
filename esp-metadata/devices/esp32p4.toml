@@ -453,6 +453,8 @@ support_status = "not_supported"  # RTC Timekeeping
 support_status = "not_supported"  # SDIO host
 [device.sd_slave]
 support_status = "not_supported"
+[device.sdm]
+support_status = { status = "not_supported", issue = 2370 }
 [device.sleep]
 support_status = "not_supported"  # PMU eco5 sleep -- placeholder TODO in esp-hal
 [device.spi_slave]

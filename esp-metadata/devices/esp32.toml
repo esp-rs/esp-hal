@@ -828,6 +828,9 @@ memory_size_bytes = 512
 support_status = "partial"
 algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
+[device.sdm]
+support_status = { status = "not_supported", issue = 2370 }
+
 [device.spi_master]
 version = 1
 fifo_size = 64
