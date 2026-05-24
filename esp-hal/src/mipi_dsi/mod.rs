@@ -129,15 +129,30 @@ pub enum ConfigError {
 
 // ── MipiDsi bus struct ────────────────────────────────────────────────────────
 
+/// Owns the DSI/VDMA peripherals and powers down the D-PHY on drop.
+///
+/// Kept separate from [`MipiDsi`] so it can be moved into [`dpi::DsiDpi`]
+/// without triggering the "cannot move out of a type that implements `Drop`"
+/// restriction on the outer bus struct.
+pub(crate) struct DphyGuard<'d> {
+    pub(crate) _dsi:        MIPI_DSI<'d>,
+    pub(crate) _vdma:       VDMA<'d>,
+    pub(crate) _dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
+    pub(crate) _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
+}
+
+impl Drop for DphyGuard<'_> {
+    fn drop(&mut self) {
+        dphy_power_down();
+    }
+}
+
 /// MIPI DSI bus.
 ///
 /// Holds ownership of both the `MIPI_DSI` and `VDMA` virtual peripherals and
 /// keeps their clocks enabled for as long as this value lives.
 pub struct MipiDsi<'d> {
-    _dsi:        MIPI_DSI<'d>,
-    _vdma:       VDMA<'d>,
-    _dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
-    _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
+    pub(crate) guard: DphyGuard<'d>,
     /// Actual lane bit rate after PLL rounding (MHz).
     #[allow(dead_code)]
     pub(crate) lane_bit_rate_mbps: f32,
@@ -290,10 +305,7 @@ impl<'d> MipiDsi<'d> {
             .modify(|_, w| unsafe { w.phy_stop_wait_time().bits(0x3F) });
 
         Ok(Self {
-            _dsi:  dsi,
-            _vdma: vdma,
-            _dsi_guard:  dsi_guard,
-            _vdma_guard: vdma_guard,
+            guard: DphyGuard { _dsi: dsi, _vdma: vdma, _dsi_guard: dsi_guard, _vdma_guard: vdma_guard },
             lane_bit_rate_mbps: actual_rate,
             num_data_lanes: config.num_data_lanes,
         })
@@ -332,7 +344,7 @@ impl<'d> MipiDsi<'d> {
 /// Without eFuse calibration the nominal output formula gives:
 ///   Vref = 1.0 V  (dref = 9)
 ///   Vout = Vref × (1 + 0.25 × mul) = 2.5 V  (mul = 6)
-fn dphy_ldo_power_on() {
+pub(crate) fn dphy_ldo_power_on() {
     // force_tieh_sel[7]=1 → SW-owned, xpd[8]=1 → enabled.
     // target0/target1 kept at reset values (0x80 / 0x40).
     PMU::regs()
@@ -344,6 +356,25 @@ fn dphy_ldo_power_on() {
         .write(|w| unsafe { w.bits((9u32 << 28) | (6u32 << 23)) });
     // Allow output to settle before the PHY analog circuits start.
     rom::ets_delay_us(500);
+}
+
+/// Shut down the D-PHY and disable its LDO.
+///
+/// Mirrors `dphy_ldo_power_on` in reverse: reset the PHY digital and
+/// analog sections, power off the DSI host, then clear the LDO `xpd` bit
+/// so VDD_MIPI_DPHY is no longer driven.
+pub(crate) fn dphy_power_down() {
+    let host = MIPI_DSI_HOST::regs();
+    host.phy_rstz().modify(|_, w| {
+        w.phy_rstz().clear_bit()
+            .phy_shutdownz().clear_bit()
+            .phy_enableclk().clear_bit()
+    });
+    host.pwr_up().modify(|_, w| w.shutdownz().clear_bit());
+    // Restore LDO to reset state (xpd=0, SW ownership released).
+    PMU::regs()
+        .ext_ldo_p0_0p2a()
+        .write(|w| unsafe { w.bits(0x4020_0000) });
 }
 
 // ── PLL helpers ───────────────────────────────────────────────────────────────

@@ -9,8 +9,7 @@ use crate::{
         vdma::{VdmaChannel, VdmaLinkItem},
         ConfigError, MipiDsi,
     },
-    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
-    system::{GenericPeripheralGuard, Peripheral},
+    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
 };
 
 const MAX_FBS: usize = 3;
@@ -175,22 +174,23 @@ fn dsi_bridge_isr() {
 /// Consumes the [`MipiDsi`] bus and drives the DSI host in video mode,
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
-    _dsi:        MIPI_DSI<'d>,
-    _vdma:       VDMA<'d>,
-    _dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
-    _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
-    dma:         VdmaChannel,
-    fb_ptrs:     [*mut u8; MAX_FBS],
-    fb_size:     usize,
-    num_fbs:     usize,
-    current_fb:  usize,
-    clk_src:     DpiClockSource,
-    _phantom:    PhantomData<&'d mut [u8]>,
+    _guard:   crate::mipi_dsi::DphyGuard<'d>,
+    dma:      VdmaChannel,
+    fb_ptrs:  [*mut u8; MAX_FBS],
+    fb_size:  usize,
+    num_fbs:  usize,
+    current_fb: usize,
+    clk_src:  DpiClockSource,
+    _phantom: PhantomData<&'d mut [u8]>,
 }
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
+        MIPI_DSI_BRIDGE::regs()
+            .dpi_misc_config()
+            .modify(|_, w| w.dpi_en().clear_bit());
         self.clk_src.release();
+        // _guard is dropped next, which calls dphy_power_down().
     }
 }
 
@@ -375,12 +375,9 @@ impl<'d> DsiDpi<'d> {
         // Enable underrun interrupt (for status monitoring).
         bridge.int_ena().modify(|_, w| w.underrun().set_bit());
 
-        let MipiDsi { _dsi, _vdma, _dsi_guard, _vdma_guard, .. } = bus;
+        let MipiDsi { guard, .. } = bus;
         Ok(Self {
-            _dsi,
-            _vdma,
-            _dsi_guard,
-            _vdma_guard,
+            _guard: guard,
             dma,
             fb_ptrs,
             fb_size,
