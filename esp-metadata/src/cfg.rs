@@ -632,6 +632,11 @@ driver_configs![
             algo: ShaAlgoMap,
         }
     },
+    SdmProperties {
+        driver: sdm,
+        name: "SDM",
+        properties: {}
+    },
     SleepProperties {
         driver: sleep,
         name: "Light/deep sleep",

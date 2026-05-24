@@ -689,6 +689,9 @@ support_status = "partial"
 dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
+[device.sdm]
+support_status = { status = "not_supported", issue = 2370 }
+
 [device.spi_master]
 version = 3
 fifo_size = 64
