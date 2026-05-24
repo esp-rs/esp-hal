@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(rustdoc::bare_urls)]
 #![no_std]
 
@@ -151,6 +151,7 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32p4",
         feature = "esp32s3"
     )
 ))]
@@ -181,6 +182,8 @@ mod auto_printer {
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
             #[cfg(feature = "esp32s3")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
+            #[cfg(feature = "esp32p4")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x500D2008 as *const u32;
 
             const SOF_INT_MASK: u32 = 0b10;
 
@@ -213,6 +216,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32p4",
         feature = "esp32s3"
     ))
 ))]
@@ -229,6 +233,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32p4",
         feature = "esp32s3"
     )
 ))]
@@ -262,6 +267,12 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x6003_8000;
     #[cfg(feature = "esp32s3")]
     const SERIAL_JTAG_CONF_REG: usize = 0x6003_8004;
+
+    // ESP32-P4: USB_DEVICE peripheral at 0x500D_2000 per PAC.
+    #[cfg(feature = "esp32p4")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x500D_2000;
+    #[cfg(feature = "esp32p4")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x500D_2004;
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
@@ -409,6 +420,29 @@ mod uart_printer {
     }
 
     struct Device;
+
+    // ESP32-P4: resolve through the linker-provided ROM symbol
+    // (`esp_rom_uart_tx_one_char` -> `uart_tx_one_char2 = 0x4fc0_0058`,
+    // see esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.api.ld) instead of
+    // hardcoding the address. Matches the c5/c6/c61/h2 channel-aware path.
+    #[cfg(feature = "esp32p4")]
+    impl Functions for Device {
+        // Unused -- tx_byte() below resolves through the linker.
+        const TX_ONE_CHAR: usize = 0;
+
+        fn tx_byte(b: u8) {
+            unsafe extern "C" {
+                fn esp_rom_uart_tx_one_char(c: u8) -> i32;
+            }
+            unsafe {
+                esp_rom_uart_tx_one_char(b);
+            }
+        }
+
+        fn flush() {
+            // tx_one_char waits for TX FIFO space
+        }
+    }
 
     #[cfg(feature = "esp32c2")]
     impl Functions for Device {

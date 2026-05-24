@@ -344,8 +344,8 @@ pins = [
     { pin = 23, functions = { 0 = "U0RXD", 2 = "FSPICS1" } },
     { pin = 24, functions = { 0 = "U0TXD", 2 = "FSPICS2" } },
     { pin = 25, functions = {              2 = "FSPICS3" }, limitations = ["strapping"] },
-    { pin = 26, functions = {              2 = "FSPICS4" }, analog = { 0 = "USB_DM" } },
-    { pin = 27, functions = {              2 = "FSPICS5" }, analog = { 0 = "USB_DP" } },
+    { pin = 26, functions = {              2 = "FSPICS4" }, analog = { 0 = "USJ_DM" } },
+    { pin = 27, functions = {              2 = "FSPICS5" }, analog = { 0 = "USJ_DP" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },
@@ -535,6 +535,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.i2c_master]
 support_status = "supported"
+version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
@@ -574,11 +575,9 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
-clock_sources.supported = ["Xtal", "RcFast" ]
-# Power-on value is RcFast!
-clock_sources.default = "Xtal"
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384
@@ -592,6 +591,8 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.spi_master]
+version = 3
+fifo_size = 64
 support_status = "supported"
 supports_dma = true
 has_app_interrupts = true
@@ -599,7 +600,6 @@ has_dma_segmented_transfer = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
-
 [device.spi_slave]
 support_status = "partial"
 supports_dma = true
@@ -622,6 +622,7 @@ instances = [
 ram_size = 128
 version = 2
 peripheral_controls_mem_clk = true
+has_sclk_enable = true
 
 [device.uhci]
 support_status = "partial"
@@ -650,6 +651,12 @@ deep_sleep = true
 
 ## Interfaces
 [device.i2s]
+version = 3
+default_clock_source = 1
+mclk_divider_bit_width = 9
+max_ws_width = 512
+clock_configured_by_pcr = true
+
 [device.ledc]
 [device.mcpwm]
 [device.pcnt]

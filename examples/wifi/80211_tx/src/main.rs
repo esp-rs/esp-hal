@@ -33,7 +33,7 @@ const SSID: &str = "esp-radio 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
 const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -48,14 +48,13 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // We must initialize some kind of interface and start it and start the controller in station
-    // mode.
-    let (_controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    // The sniffer borrows the controller, so we only need the controller here —
+    // no station/AP `Interface` is required for raw 802.11 transmit.
+    let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut sniffer = interfaces.sniffer;
+    let mut sniffer = controller.sniffer();
 
-    // Create a buffer, which can hold the enitre serialized beacon frame.
+    // Create a buffer, which can hold the entire serialized beacon frame.
     let mut beacon = [0u8; 300];
     let length = beacon
         .pwrite(

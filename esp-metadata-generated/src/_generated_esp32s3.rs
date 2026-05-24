@@ -148,6 +148,12 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("i2c_master.version") => {
+        3
+    };
+    ("i2c_master.version", str) => {
+        stringify!(3)
+    };
     ("i2c_master.has_fsm_timeouts") => {
         true
     };
@@ -195,6 +201,33 @@ macro_rules! property {
     };
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
+    };
+    ("i2s.version") => {
+        2
+    };
+    ("i2s.version", str) => {
+        stringify!(2)
+    };
+    ("i2s.default_clock_source") => {
+        2
+    };
+    ("i2s.default_clock_source", str) => {
+        stringify!(2)
+    };
+    ("i2s.mclk_divider_bit_width") => {
+        6
+    };
+    ("i2s.mclk_divider_bit_width", str) => {
+        stringify!(6)
+    };
+    ("i2s.max_ws_width") => {
+        128
+    };
+    ("i2s.max_ws_width", str) => {
+        stringify!(128)
+    };
+    ("i2s.clock_configured_by_pcr") => {
+        false
     };
     ("interrupts.status_registers") => {
         4
@@ -268,6 +301,15 @@ macro_rules! property {
     ("rng.trng_supported") => {
         true
     };
+    ("rng.is_lp_sys") => {
+        false
+    };
+    ("rsa.version") => {
+        2
+    };
+    ("rsa.version", str) => {
+        stringify!(2)
+    };
     ("rsa.size_increment") => {
         32
     };
@@ -319,6 +361,21 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("spi_master.version") => {
+        3
+    };
+    ("spi_master.version", str) => {
+        stringify!(3)
+    };
+    ("spi_master.fifo_size") => {
+        64
+    };
+    ("spi_master.fifo_size", str) => {
+        stringify!(64)
+    };
+    ("spi_master.bit_order_is_bool") => {
+        false
+    };
     ("spi_master.supports_dma") => {
         true
     };
@@ -332,6 +389,9 @@ macro_rules! property {
         true
     };
     ("spi_master.has_clk_pre_div") => {
+        false
+    };
+    ("spi_master.dma_can_access_flash") => {
         false
     };
     ("spi_slave.supports_dma") => {
@@ -361,8 +421,17 @@ macro_rules! property {
     ("uart.has_sclk_divider") => {
         true
     };
+    ("uart.has_sclk_enable") => {
+        true
+    };
     ("uhci.combined_uart_selector_field") => {
         false
+    };
+    ("usb_otg.fifo_depth_words") => {
+        256
+    };
+    ("usb_otg.fifo_depth_words", str) => {
+        stringify!(256)
     };
     ("wifi.has_wifi6") => {
         false
@@ -483,19 +552,6 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3)));
         _for_each_inner_rmt_channel!((rx(4, 0), (5, 1), (6, 2), (7, 3)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rmt_clock_source {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rmt_clock_source { $(($pattern) => $code;)* ($other
-        : tt) => {} } _for_each_inner_rmt_clock_source!((Apb, 1));
-        _for_each_inner_rmt_clock_source!((RcFast, 2));
-        _for_each_inner_rmt_clock_source!((Xtal, 3));
-        _for_each_inner_rmt_clock_source!((Apb));
-        _for_each_inner_rmt_clock_source!((all(Apb, 1), (RcFast, 2), (Xtal, 3)));
-        _for_each_inner_rmt_clock_source!((default(Apb)));
     };
 }
 #[macro_export]
@@ -2788,39 +2844,37 @@ macro_rules! define_clock_tree_types {
             pub timg_calibration_clock: Option<TimgCalibrationClockConfig>,
         }
         impl ClockConfig {
-            fn apply(&self) {
-                ClockTree::with(|clocks| {
-                    if let Some(config) = self.xtal_clk {
-                        configure_xtal_clk(clocks, config);
-                    }
-                    if let Some(config) = self.pll_clk {
-                        configure_pll_clk(clocks, config);
-                    }
-                    if let Some(config) = self.system_pre_div {
-                        configure_system_pre_div(clocks, config);
-                    }
-                    if let Some(config) = self.cpu_pll_div_out {
-                        configure_cpu_pll_div_out(clocks, config);
-                    }
-                    if let Some(config) = self.cpu_clk {
-                        configure_cpu_clk(clocks, config);
-                    }
-                    if let Some(config) = self.rc_fast_clk_div_n {
-                        configure_rc_fast_clk_div_n(clocks, config);
-                    }
-                    if let Some(config) = self.rtc_slow_clk {
-                        configure_rtc_slow_clk(clocks, config);
-                    }
-                    if let Some(config) = self.rtc_fast_clk {
-                        configure_rtc_fast_clk(clocks, config);
-                    }
-                    if let Some(config) = self.low_power_clk {
-                        configure_low_power_clk(clocks, config);
-                    }
-                    if let Some(config) = self.timg_calibration_clock {
-                        configure_timg_calibration_clock(clocks, config);
-                    }
-                });
+            fn apply(&self, clocks: &mut ClockTree) {
+                if let Some(config) = self.xtal_clk {
+                    configure_xtal_clk(clocks, config);
+                }
+                if let Some(config) = self.pll_clk {
+                    configure_pll_clk(clocks, config);
+                }
+                if let Some(config) = self.system_pre_div {
+                    configure_system_pre_div(clocks, config);
+                }
+                if let Some(config) = self.cpu_pll_div_out {
+                    configure_cpu_pll_div_out(clocks, config);
+                }
+                if let Some(config) = self.cpu_clk {
+                    configure_cpu_clk(clocks, config);
+                }
+                if let Some(config) = self.rc_fast_clk_div_n {
+                    configure_rc_fast_clk_div_n(clocks, config);
+                }
+                if let Some(config) = self.rtc_slow_clk {
+                    configure_rtc_slow_clk(clocks, config);
+                }
+                if let Some(config) = self.rtc_fast_clk {
+                    configure_rtc_fast_clk(clocks, config);
+                }
+                if let Some(config) = self.low_power_clk {
+                    configure_low_power_clk(clocks, config);
+                }
+                if let Some(config) = self.timg_calibration_clock {
+                    configure_timg_calibration_clock(clocks, config);
+                }
             }
         }
         fn increment_reference_count(refcount: &mut u32) -> bool {
@@ -3110,10 +3164,10 @@ macro_rules! implement_peripheral_clocks {
             UartMem,
             /// UHCI0 peripheral clock signal
             Uhci0,
-            /// USB peripheral clock signal
-            Usb,
             /// USB_DEVICE peripheral clock signal
             UsbDevice,
+            /// USB_FS peripheral clock signal
+            UsbFs,
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
@@ -3156,8 +3210,8 @@ macro_rules! implement_peripheral_clocks {
                 Self::Uart2,
                 Self::UartMem,
                 Self::Uhci0,
-                Self::Usb,
                 Self::UsbDevice,
+                Self::UsbFs,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -3317,15 +3371,15 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en0()
                         .modify(|_, w| w.uhci0_clk_en().bit(enable));
                 }
-                Peripheral::Usb => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.usb_clk_en().bit(enable));
-                }
                 Peripheral::UsbDevice => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en1()
                         .modify(|_, w| w.usb_device_clk_en().bit(enable));
+                }
+                Peripheral::UsbFs => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en0()
+                        .modify(|_, w| w.usb_clk_en().bit(enable));
                 }
             }
         }
@@ -3486,15 +3540,15 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en0()
                         .modify(|_, w| w.uhci0_rst().bit(reset));
                 }
-                Peripheral::Usb => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.usb_rst().bit(reset));
-                }
                 Peripheral::UsbDevice => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en1()
                         .modify(|_, w| w.usb_device_rst().bit(reset));
+                }
+                Peripheral::UsbFs => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en0()
+                        .modify(|_, w| w.usb_rst().bit(reset));
                 }
             }
         }
@@ -3944,10 +3998,11 @@ macro_rules! for_each_peripheral {
         UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
+        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "WCL peripheral singleton"] WCL
@@ -4048,9 +4103,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UART2));
         _for_each_inner_peripheral!((UHCI0(unstable)));
-        _for_each_inner_peripheral!((USB0(unstable)));
+        _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
-        _for_each_inner_peripheral!((USB_WRAP(unstable)));
         _for_each_inner_peripheral!((WCL(unstable)));
         _for_each_inner_peripheral!((XTS_AES(unstable)));
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
@@ -4314,8 +4368,9 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt })), (@ peri_type #[doc = "UART2 peripheral singleton"]
         UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UHCI0 peripheral singleton"]
-        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB0 peripheral singleton"]
-        USB0 <= USB0() (unstable)), (@ peri_type #[doc =
+        UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "USB_WRAP peripheral singleton"] USB_WRAP <=
@@ -4360,11 +4415,11 @@ macro_rules! for_each_peripheral {
         (SDHOST(unstable)), (SENS(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),
-        (UART0), (UART1), (UART2), (UHCI0(unstable)), (USB0(unstable)),
-        (USB_DEVICE(unstable)), (USB_WRAP(unstable)), (WCL(unstable)),
-        (XTS_AES(unstable)), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (DMA_CH2(unstable)), (DMA_CH3(unstable)), (DMA_CH4(unstable)), (ADC1(unstable)),
-        (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
+        (UART0), (UART1), (UART2), (UHCI0(unstable)), (USB_FS(unstable)),
+        (USB_DEVICE(unstable)), (WCL(unstable)), (XTS_AES(unstable)),
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
+        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)), (WIFI)));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (SPI3, Spi3, 1),
@@ -4564,9 +4619,9 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC2_CH5, GPIO16));
         _for_each_inner_analog_function!((ADC2_CH6, GPIO17));
         _for_each_inner_analog_function!((ADC2_CH7, GPIO18));
-        _for_each_inner_analog_function!((USB_DM, GPIO19));
+        _for_each_inner_analog_function!((USB_FS_DM, GPIO19));
         _for_each_inner_analog_function!((ADC2_CH8, GPIO19));
-        _for_each_inner_analog_function!((USB_DP, GPIO20));
+        _for_each_inner_analog_function!((USB_FS_DP, GPIO20));
         _for_each_inner_analog_function!((ADC2_CH9, GPIO20));
         _for_each_inner_analog_function!(((TOUCH1, TOUCHn, 1), GPIO1));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1));
@@ -4610,8 +4665,8 @@ macro_rules! for_each_analog_function {
         (ADC1_CH9, GPIO10), (TOUCH11, GPIO11), (ADC2_CH0, GPIO11), (TOUCH12, GPIO12),
         (ADC2_CH1, GPIO12), (TOUCH13, GPIO13), (ADC2_CH2, GPIO13), (TOUCH14, GPIO14),
         (ADC2_CH3, GPIO14), (XTAL_32K_P, GPIO15), (ADC2_CH4, GPIO15), (XTAL_32K_N,
-        GPIO16), (ADC2_CH5, GPIO16), (ADC2_CH6, GPIO17), (ADC2_CH7, GPIO18), (USB_DM,
-        GPIO19), (ADC2_CH8, GPIO19), (USB_DP, GPIO20), (ADC2_CH9, GPIO20)));
+        GPIO16), (ADC2_CH5, GPIO16), (ADC2_CH6, GPIO17), (ADC2_CH7, GPIO18), (USB_FS_DM,
+        GPIO19), (ADC2_CH8, GPIO19), (USB_FS_DP, GPIO20), (ADC2_CH9, GPIO20)));
         _for_each_inner_analog_function!((all_expanded((TOUCH1, TOUCHn, 1), GPIO1),
         ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1), ((TOUCH2, TOUCHn, 2), GPIO2), ((ADC1_CH1,
         ADCn_CHm, 1, 1), GPIO2), ((TOUCH3, TOUCHn, 3), GPIO3), ((ADC1_CH2, ADCn_CHm, 1,
@@ -4737,6 +4792,167 @@ macro_rules! for_each_lp_function {
         ((RTC_GPIO21, RTC_GPIOn, 21), GPIO21)));
     };
 }
+/// This macro can be used to generate code for each IOMUX digital function of each GPIO.
+///
+/// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+/// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+/// GPIO matrix (e.g., EMAC, USB).
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the alternate function.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
+///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
+///   group to which the signal belongs.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+/// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+///
+/// Example data:
+/// - `(EMAC_RXD0, GPIO25, _5)`
+/// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_iomux_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_iomux_function!((SUBSPICS1, GPIO8, _3));
+        _for_each_inner_iomux_function!((SUBSPIHD, GPIO9, _3));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO9, _4));
+        _for_each_inner_iomux_function!((FSPIIO4, GPIO10, _2));
+        _for_each_inner_iomux_function!((SUBSPICS0, GPIO10, _3));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO10, _4));
+        _for_each_inner_iomux_function!((FSPIIO5, GPIO11, _2));
+        _for_each_inner_iomux_function!((SUBSPID, GPIO11, _3));
+        _for_each_inner_iomux_function!((FSPID, GPIO11, _4));
+        _for_each_inner_iomux_function!((FSPIIO6, GPIO12, _2));
+        _for_each_inner_iomux_function!((SUBSPICLK, GPIO12, _3));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO12, _4));
+        _for_each_inner_iomux_function!((FSPIIO7, GPIO13, _2));
+        _for_each_inner_iomux_function!((SUBSPIQ, GPIO13, _3));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO13, _4));
+        _for_each_inner_iomux_function!((FSPIDQS, GPIO14, _2));
+        _for_each_inner_iomux_function!((SUBSPIWP, GPIO14, _3));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO14, _4));
+        _for_each_inner_iomux_function!((U0RTS, GPIO15, _2));
+        _for_each_inner_iomux_function!((U0CTS, GPIO16, _2));
+        _for_each_inner_iomux_function!((U1TXD, GPIO17, _2));
+        _for_each_inner_iomux_function!((U1RXD, GPIO18, _2));
+        _for_each_inner_iomux_function!((CLK_OUT3, GPIO18, _3));
+        _for_each_inner_iomux_function!((U1RTS, GPIO19, _2));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO19, _3));
+        _for_each_inner_iomux_function!((U1CTS, GPIO20, _2));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO20, _3));
+        _for_each_inner_iomux_function!((SPICS1, GPIO26, _0));
+        _for_each_inner_iomux_function!((SPIHD, GPIO27, _0));
+        _for_each_inner_iomux_function!((SPIWP, GPIO28, _0));
+        _for_each_inner_iomux_function!((SPICS0, GPIO29, _0));
+        _for_each_inner_iomux_function!((SPICLK, GPIO30, _0));
+        _for_each_inner_iomux_function!((SPIQ, GPIO31, _0));
+        _for_each_inner_iomux_function!((SPID, GPIO32, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO33, _2));
+        _for_each_inner_iomux_function!((SUBSPIHD, GPIO33, _3));
+        _for_each_inner_iomux_function!((SPIIO4, GPIO33, _4));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO34, _2));
+        _for_each_inner_iomux_function!((SUBSPICS0, GPIO34, _3));
+        _for_each_inner_iomux_function!((SPIIO5, GPIO34, _4));
+        _for_each_inner_iomux_function!((FSPID, GPIO35, _2));
+        _for_each_inner_iomux_function!((SUBSPID, GPIO35, _3));
+        _for_each_inner_iomux_function!((SPIIO6, GPIO35, _4));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO36, _2));
+        _for_each_inner_iomux_function!((SUBSPICLK, GPIO36, _3));
+        _for_each_inner_iomux_function!((SPIIO7, GPIO36, _4));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO37, _2));
+        _for_each_inner_iomux_function!((SUBSPIQ, GPIO37, _3));
+        _for_each_inner_iomux_function!((SPIDQS, GPIO37, _4));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO38, _2));
+        _for_each_inner_iomux_function!((SUBSPIWP, GPIO38, _3));
+        _for_each_inner_iomux_function!((MTCK, GPIO39, _0));
+        _for_each_inner_iomux_function!((CLK_OUT3, GPIO39, _2));
+        _for_each_inner_iomux_function!((SUBSPICS1, GPIO39, _3));
+        _for_each_inner_iomux_function!((MTDO, GPIO40, _0));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO40, _2));
+        _for_each_inner_iomux_function!((MTDI, GPIO41, _0));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO41, _2));
+        _for_each_inner_iomux_function!((MTMS, GPIO42, _0));
+        _for_each_inner_iomux_function!((U0TXD, GPIO43, _0));
+        _for_each_inner_iomux_function!((CLK_OUT1, GPIO43, _2));
+        _for_each_inner_iomux_function!((U0RXD, GPIO44, _0));
+        _for_each_inner_iomux_function!((CLK_OUT2, GPIO44, _2));
+        _for_each_inner_iomux_function!((SPICLK_P_DIFF, GPIO47, _0));
+        _for_each_inner_iomux_function!((SUBSPICLK_P_DIFF, GPIO47, _2));
+        _for_each_inner_iomux_function!((SPICLK_N_DIFF, GPIO48, _0));
+        _for_each_inner_iomux_function!((SUBSPICLK_N_DIFF, GPIO48, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS1, SUBSPICSn, 1), GPIO8, _3));
+        _for_each_inner_iomux_function!(((FSPIIO4, FSPIIOn, 4), GPIO10, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS0, SUBSPICSn, 0), GPIO10, _3));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO10, _4));
+        _for_each_inner_iomux_function!(((FSPIIO5, FSPIIOn, 5), GPIO11, _2));
+        _for_each_inner_iomux_function!(((FSPIIO6, FSPIIOn, 6), GPIO12, _2));
+        _for_each_inner_iomux_function!(((FSPIIO7, FSPIIOn, 7), GPIO13, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO18, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO19, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO20, _3));
+        _for_each_inner_iomux_function!(((SPICS1, SPICSn, 1), GPIO26, _0));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO29, _0));
+        _for_each_inner_iomux_function!(((SPIIO4, SPIIOn, 4), GPIO33, _4));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO34, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS0, SUBSPICSn, 0), GPIO34, _3));
+        _for_each_inner_iomux_function!(((SPIIO5, SPIIOn, 5), GPIO34, _4));
+        _for_each_inner_iomux_function!(((SPIIO6, SPIIOn, 6), GPIO35, _4));
+        _for_each_inner_iomux_function!(((SPIIO7, SPIIOn, 7), GPIO36, _4));
+        _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO39, _2));
+        _for_each_inner_iomux_function!(((SUBSPICS1, SUBSPICSn, 1), GPIO39, _3));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO40, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO41, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO43, _2));
+        _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO44, _2));
+        _for_each_inner_iomux_function!((all(SUBSPICS1, GPIO8, _3), (SUBSPIHD, GPIO9,
+        _3), (FSPIHD, GPIO9, _4), (FSPIIO4, GPIO10, _2), (SUBSPICS0, GPIO10, _3),
+        (FSPICS0, GPIO10, _4), (FSPIIO5, GPIO11, _2), (SUBSPID, GPIO11, _3), (FSPID,
+        GPIO11, _4), (FSPIIO6, GPIO12, _2), (SUBSPICLK, GPIO12, _3), (FSPICLK, GPIO12,
+        _4), (FSPIIO7, GPIO13, _2), (SUBSPIQ, GPIO13, _3), (FSPIQ, GPIO13, _4), (FSPIDQS,
+        GPIO14, _2), (SUBSPIWP, GPIO14, _3), (FSPIWP, GPIO14, _4), (U0RTS, GPIO15, _2),
+        (U0CTS, GPIO16, _2), (U1TXD, GPIO17, _2), (U1RXD, GPIO18, _2), (CLK_OUT3, GPIO18,
+        _3), (U1RTS, GPIO19, _2), (CLK_OUT2, GPIO19, _3), (U1CTS, GPIO20, _2), (CLK_OUT1,
+        GPIO20, _3), (SPICS1, GPIO26, _0), (SPIHD, GPIO27, _0), (SPIWP, GPIO28, _0),
+        (SPICS0, GPIO29, _0), (SPICLK, GPIO30, _0), (SPIQ, GPIO31, _0), (SPID, GPIO32,
+        _0), (FSPIHD, GPIO33, _2), (SUBSPIHD, GPIO33, _3), (SPIIO4, GPIO33, _4),
+        (FSPICS0, GPIO34, _2), (SUBSPICS0, GPIO34, _3), (SPIIO5, GPIO34, _4), (FSPID,
+        GPIO35, _2), (SUBSPID, GPIO35, _3), (SPIIO6, GPIO35, _4), (FSPICLK, GPIO36, _2),
+        (SUBSPICLK, GPIO36, _3), (SPIIO7, GPIO36, _4), (FSPIQ, GPIO37, _2), (SUBSPIQ,
+        GPIO37, _3), (SPIDQS, GPIO37, _4), (FSPIWP, GPIO38, _2), (SUBSPIWP, GPIO38, _3),
+        (MTCK, GPIO39, _0), (CLK_OUT3, GPIO39, _2), (SUBSPICS1, GPIO39, _3), (MTDO,
+        GPIO40, _0), (CLK_OUT2, GPIO40, _2), (MTDI, GPIO41, _0), (CLK_OUT1, GPIO41, _2),
+        (MTMS, GPIO42, _0), (U0TXD, GPIO43, _0), (CLK_OUT1, GPIO43, _2), (U0RXD, GPIO44,
+        _0), (CLK_OUT2, GPIO44, _2), (SPICLK_P_DIFF, GPIO47, _0), (SUBSPICLK_P_DIFF,
+        GPIO47, _2), (SPICLK_N_DIFF, GPIO48, _0), (SUBSPICLK_N_DIFF, GPIO48, _2)));
+        _for_each_inner_iomux_function!((all_expanded((SUBSPICS1, SUBSPICSn, 1), GPIO8,
+        _3), ((FSPIIO4, FSPIIOn, 4), GPIO10, _2), ((SUBSPICS0, SUBSPICSn, 0), GPIO10,
+        _3), ((FSPICS0, FSPICSn, 0), GPIO10, _4), ((FSPIIO5, FSPIIOn, 5), GPIO11, _2),
+        ((FSPIIO6, FSPIIOn, 6), GPIO12, _2), ((FSPIIO7, FSPIIOn, 7), GPIO13, _2),
+        ((CLK_OUT3, CLK_OUTn, 3), GPIO18, _3), ((CLK_OUT2, CLK_OUTn, 2), GPIO19, _3),
+        ((CLK_OUT1, CLK_OUTn, 1), GPIO20, _3), ((SPICS1, SPICSn, 1), GPIO26, _0),
+        ((SPICS0, SPICSn, 0), GPIO29, _0), ((SPIIO4, SPIIOn, 4), GPIO33, _4), ((FSPICS0,
+        FSPICSn, 0), GPIO34, _2), ((SUBSPICS0, SUBSPICSn, 0), GPIO34, _3), ((SPIIO5,
+        SPIIOn, 5), GPIO34, _4), ((SPIIO6, SPIIOn, 6), GPIO35, _4), ((SPIIO7, SPIIOn, 7),
+        GPIO36, _4), ((CLK_OUT3, CLK_OUTn, 3), GPIO39, _2), ((SUBSPICS1, SUBSPICSn, 1),
+        GPIO39, _3), ((CLK_OUT2, CLK_OUTn, 2), GPIO40, _2), ((CLK_OUT1, CLK_OUTn, 1),
+        GPIO41, _2), ((CLK_OUT1, CLK_OUTn, 1), GPIO43, _2), ((CLK_OUT2, CLK_OUTn, 2),
+        GPIO44, _2)));
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.
@@ -4802,10 +5018,10 @@ macro_rules! define_io_mux_signals {
             USB_EXTPHY_VP           = 55,
             USB_EXTPHY_VM           = 56,
             USB_EXTPHY_RCV          = 57,
-            USB_OTG_IDDIG           = 58,
-            USB_OTG_AVALID          = 59,
-            USB_SRP_BVALID          = 60,
-            USB_OTG_VBUSVALID       = 61,
+            USB_FS_IDDIG            = 58,
+            USB_FS_AVALID           = 59,
+            USB_FS_SRP_BVALID       = 60,
+            USB_FS_VBUSVALID        = 61,
             USB_SRP_SESSEND         = 62,
             SPI3_CLK                = 66,
             SPI3_Q                  = 67,

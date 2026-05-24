@@ -265,6 +265,17 @@ impl Display for WakeConfigError {
 
 impl core::error::Error for WakeConfigError {}
 
+/// Options for [`Input::wait_for_with_options`] and
+/// [`Flex::wait_for_with_options`].
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
+#[non_exhaustive]
+#[instability::unstable]
+pub struct WaitForOptions {
+    /// Enable waking from light sleep on the configured event.
+    wake_enable: bool,
+}
+
 /// Pull setting for a GPIO.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -371,7 +382,7 @@ pub trait RtcPin: Pin {
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
-    #[cfg(any(xtensa, esp32c6))]
+    #[cfg(any(xtensa, esp32c6, esp32p4))]
     #[doc(hidden)]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -383,7 +394,7 @@ pub trait RtcPin: Pin {
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c3, esp32c2, esp32c6))]
+    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32p4))]
     #[doc(hidden)]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
@@ -688,6 +699,33 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
+}
+
+/// Drive the GPIO async API from a user-installed raw GPIO interrupt handler.
+///
+/// This is the entry point that lets users who bypass esp-hal's GPIO ISR
+/// dispatch (typically by defining their own `#[unsafe(no_mangle)]
+/// unsafe extern "C" fn GPIO()`, or by registering their own handler via
+/// [`crate::interrupt::bind_handler`]) keep the GPIO async API working.
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[instability::unstable]
+pub unsafe fn handle_gpio_interrupt() {
+    unsafe { interrupt::handle_gpio_interrupt_impl() }
+}
+
+/// Complete any in-flight async wait on a single GPIO pin.
+///
+/// Per-pin counterpart of [`handle_gpio_interrupt`].
+///
+/// # Safety
+///
+/// Must be called from a GPIO interrupt context.
+#[instability::unstable]
+pub unsafe fn wake_pin(pin: u8) {
+    unsafe { interrupt::wake_pin_impl(pin) }
 }
 
 for_each_analog_function! {
@@ -1683,17 +1721,44 @@ impl<'lt> AnyPin<'lt> {
                     });
             }
 
-            macro_rules! disable_usb_pads {
+            #[cfg(esp32p4)]
+            fn disable_usb_fs_pads(_gpionum: u8) {
+                crate::peripherals::USB_WRAP::regs()
+                    .otg_conf()
+                    .modify(|_, w| {
+                        w.pad_pull_override().set_bit();
+                        w.dm_pullup().clear_bit();
+                        w.dm_pulldown().clear_bit();
+                        w.dp_pullup().clear_bit();
+                        w.dp_pulldown().clear_bit()
+                    });
+            }
+
+            #[cfg(soc_has_usb_fs)]
+            macro_rules! disable_usb_fs_pads {
                 ($gpio:ident) => {
                     if self.number() == crate::peripherals::$gpio::NUMBER {
+                        #[cfg(esp32p4)]
+                        disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
+                        #[cfg(not(esp32p4))]
                         disable_usb_pads(crate::peripherals::$gpio::NUMBER);
                     }
                 };
             }
 
             for_each_analog_function! {
-                (USB_DM, $gpio:ident) => { disable_usb_pads!($gpio) };
-                (USB_DP, $gpio:ident) => { disable_usb_pads!($gpio) };
+                (USJ_DM, $gpio:ident) => {
+                    if self.number() == crate::peripherals::$gpio::NUMBER {
+                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                    }
+                };
+                (USJ_DP, $gpio:ident) => {
+                    if self.number() == crate::peripherals::$gpio::NUMBER {
+                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                    }
+                };
+                (USB_FS_DM, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
+                (USB_FS_DP, $gpio:ident) => { disable_usb_fs_pads!($gpio) };
             }
         }
     }
@@ -2266,7 +2331,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(xtensa, esp32c6))]
+    #[cfg(any(xtensa, esp32c6, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
@@ -2279,7 +2344,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6))]
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32p4))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
         for_each_rtcio_pin! {
             (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };

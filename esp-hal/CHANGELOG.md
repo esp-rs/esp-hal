@@ -12,23 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5 and C61: Enable RTC timekeeping (#5449)
 - C61: usb-serial-jtag and debug-assist (#5427)
 - C61: dedicated gpio (#5426)
+- Initial ESP32-P4 (chip revision v3.0+) support (#5400, #5523, #5535)
+- P4: Initial peripheral support for GPIO, UART, I2C, SPI, DMA, USB Serial/JTAG, eFuse, SYSTIMER (#5400, #5555, #5559)
+- P4: Enable RNG, ECC (#5525)
+- P4: AP-HEX PSRAM driver stub with configurable HP L2MEM cache/RAM split via `ESP_HAL_CONFIG_L2_CACHE_SIZE` (#5400)
+- P4: enable multi-core support (#5535)
+- C5 and C61: I2S support (#5483)
+- UART: `send_break_async` (#5536)
+- Added support for embassy-usb-host (#5283)
+- `handle_gpio_interrupt` and `wake_pin()` for user-defined GPIO ISRs (#5531)
+- GPIO: `Input::wait_for_with_options()` allows waking from light sleep while waiting for event (#5551)
 
 ### Changed
 - ESP32-S2, ESP32-S3: Renamed `UlpWakeupSource` to `WakeFromUlpCoreWakeupSource`, to differentiate it from `UlpCoreWakeupSource` (#5206)
 
 - The clock frequency accessor functions no longer need to lock the clock tree (#5461)
+- SPI: `SpiDmaBus` has been merged into `SpiDma`. `with_buffers` now returns `SpiDma` directly, and the buffer-taking transfer methods have been renamed to `read_buffer`, `write_buffer`, `transfer_buffers`, `half_duplex_read_buffer` and `half_duplex_write_buffer` to avoid conflicts with the `SpiBus` trait methods. (#5272)
+- SPI: `SpiDma` will now skip copying into the internal buffers unless necessary (#5290)
+- `#[esp_hal::main]` can now serve as the entry point for both `esp-hal` and `esp-rtos` applications (#5541)
+- The embassy-usb device driver has been moved from `esp_hal::otg_fs::asynch` to `esp_hal::otg_fs::embassy_usb_device`. (#5283)
 
 ### Fixed
 
 - RSA: the driver should no longer cause unhandled interrupts to fire (#5443)
-- ESP32: attenuation is now correctly set for ADC2 (#5463)
 - UART: disallow 0 as the RX FIFO full threshold (#5451)
 - UART: prevent returning 0 from `read_async` (#5451)
 - ESP32-S2, ESP32-S3: Fixed a bug where `UlpCore.run()` with `UlpCoreWakeupSource::HpCpu` fails to wake the ULP Core (#5410)
 
 ### Removed
 
-- ESP32: removed unsupported Hall-effect sensor API (#5463)
 - The `Clocks` struct has been removed (#5461)
 
 ## [v1.1.0] - 2026-04-24
@@ -90,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C61: Add SHA and ECC support (#5354)
 - A `PsramMode` option has been introduced for ESP32-S3. The default mode is `Auto` which will try to detect if PSRAM works via Octal or Quad SPI and configure it accordingly. (#5334)
 - Add I2S loopback logic to the peripheral driver. (#5349)
+- SPI master: added `min_async_transfer_size` config option to force small transfers to use blocking/CPU driven mode. (#5350)
 - ESP32-S2, ESP32-S3: Add `wakeup_enable()` method to `LowPowerInput` and `LowPowerOutputOpenDrain`, allowing ULP core to be woken up from GPIO. (#5134)
 
 ### Changed

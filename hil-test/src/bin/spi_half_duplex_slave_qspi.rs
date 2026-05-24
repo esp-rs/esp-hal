@@ -128,7 +128,7 @@ mod read {
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let transfer = spi
-            .half_duplex_read(
+            .half_duplex_read_buffer(
                 DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
@@ -146,7 +146,7 @@ mod read {
         ctx.miso_mirror.set_high();
 
         let transfer = spi
-            .half_duplex_read(
+            .half_duplex_read_buffer(
                 DataMode::SingleTwoDataLines,
                 Command::None,
                 Address::None,
@@ -391,7 +391,7 @@ mod write {
         dma_tx_buf.fill(&[0b0110_1010; DMA_BUFFER_SIZE]);
 
         let transfer = spi
-            .half_duplex_write(
+            .half_duplex_write_buffer(
                 mode,
                 Command::None,
                 Address::None,
@@ -406,7 +406,7 @@ mod write {
         assert_eq!(unit.value(), (3 * DMA_BUFFER_SIZE) as _);
 
         let transfer = spi
-            .half_duplex_write(
+            .half_duplex_write_buffer(
                 mode,
                 Command::None,
                 Address::None,
@@ -690,11 +690,13 @@ mod spi_slave {
 #[embedded_test::tests(default_timeout = 3)]
 #[cfg(spi_master_supports_dma)]
 mod qspi_dma {
+    #[cfg(pcnt_driver_supported)]
+    use esp_hal::gpio::Flex;
     use esp_hal::{
         Blocking,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
-        gpio::{AnyPin, Flex, Input, InputConfig, Level, Output, OutputConfig, Pull},
+        gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
         spi::{
             Mode,
             master::{Address, Command, Config, DataMode, Spi, SpiDma},
@@ -739,7 +741,7 @@ mod qspi_dma {
         command: Command,
     ) -> (SpiUnderTest, DmaRxBuf) {
         let transfer = spi
-            .half_duplex_read(
+            .half_duplex_read_buffer(
                 DataMode::Quad,
                 command,
                 Address::None,
@@ -759,7 +761,7 @@ mod qspi_dma {
         command_data_mode: DataMode,
     ) -> (SpiUnderTest, DmaTxBuf) {
         let transfer = spi
-            .half_duplex_write(
+            .half_duplex_write_buffer(
                 DataMode::Quad,
                 Command::_8Bit(write as u16, command_data_mode),
                 Address::_24Bit(
@@ -775,6 +777,7 @@ mod qspi_dma {
         transfer.wait()
     }
 
+    #[cfg(pcnt_driver_supported)]
     fn transfer_write_cpu<'s>(
         mut spi: Spi<'s, Blocking>,
         tx_buf: &[u8],

@@ -103,6 +103,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
         Self {}
     }
 
+    #[cfg_attr(esp32p4, allow(unused))]
     #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub(crate) fn new() -> Self {
         Self::new_with(|| {})
@@ -364,6 +365,8 @@ pub enum SleepSource {
 /// ```
 #[inline]
 pub fn software_reset() -> ! {
+    #[cfg(esp32p4)]
+    crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
 }
 

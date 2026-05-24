@@ -62,7 +62,7 @@ const UPLOAD_DOWNLOAD_PORT: u16 = 4323;
 static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
 static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -85,14 +85,13 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     println!("Starting wifi");
-    let (mut controller, interfaces) = esp_radio::wifi::new(
+    let wifi_interface = esp_radio::wifi::Interface::station();
+    let mut controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
     println!("Wifi configured and started!");
-
-    let wifi_interface = interfaces.station;
 
     controller
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
@@ -160,7 +159,7 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }
 

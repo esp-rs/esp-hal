@@ -16,8 +16,9 @@
 Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports the following devices:
 
 - ESP32 Series: _ESP32_
-- ESP32-C Series: _ESP32-C2, ESP32-C3, ESP32-C6_
+- ESP32-C Series: _ESP32-C2, ESP32-C3, ESP32-C5, ESP32-C6, ESP32-C61_
 - ESP32-H Series: _ESP32-H2_
+- ESP32-P Series: _ESP32-P4_
 - ESP32-S Series: _ESP32-S2, ESP32-S3_
 
 Additionally provides support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.

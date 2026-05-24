@@ -40,6 +40,14 @@ pub fn minimum_update(
     if !baseline_path_gz.exists() {
         download_baselines(&workspace, vec![package])?;
     }
+    if package.chip_features_matter() && !baseline_path_gz.exists() {
+        log::warn!(
+            "No baseline found for package '{}', chip '{}' — skipping semver check for this chip",
+            package,
+            chip
+        );
+        return Ok(ReleaseType::Patch);
+    }
     let baseline_path =
         temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
     let buffer = Vec::new();

@@ -1,6 +1,6 @@
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    use esp_hal::clock::Clocks;
+    use esp_hal::time::Rate;
 
     #[test]
     fn test_estimated_clock() {
@@ -16,9 +16,9 @@ mod tests {
             40
         };
 
-        let xtal_frequency = Clocks::get().xtal_clock.as_mhz();
+        let xtal_frequency = esp_hal::clock::xtal_clock();
         hil_test::assert!(
-            xtal_frequency == target_frequency,
+            xtal_frequency == Rate::from_mhz(target_frequency),
             "Measured frequency: {}",
             xtal_frequency
         );

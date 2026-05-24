@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use esp_sync::NonReentrantMutex;
 
-use super::RxControlInfo;
+use super::{RxControlInfo, SNIFFER_BIT, release, try_acquire};
 use crate::{
     WifiError,
     sys::include::{
@@ -84,11 +84,16 @@ pub struct Sniffer<'d> {
 
 impl Sniffer<'_> {
     pub(crate) fn new() -> Self {
-        // This shouldn't fail, since the way this is created, means that wifi will
-        // always be initialized.
-        unwrap!(esp_wifi_result!(unsafe {
-            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
-        }));
+        assert!(try_acquire(SNIFFER_BIT), "sniffer already in use");
+
+        // If registering the callback fails we panic, so release the singleton
+        // bit first so the panic doesn't leave the slot permanently occupied.
+        let res =
+            esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb)) });
+        if res.is_err() {
+            release(SNIFFER_BIT);
+            unwrap!(res);
+        }
 
         Self {
             _phantom: PhantomData,
@@ -128,5 +133,28 @@ impl Sniffer<'_> {
     #[instability::unstable]
     pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
+    }
+}
+
+impl Drop for Sniffer<'_> {
+    fn drop(&mut self) {
+        // Clear the user callback first so the C trampoline becomes a no-op even
+        // if it fires during the teardown window below.
+        SNIFFER_CB.with(|callback| *callback = None);
+        // Best-effort cleanup: log on failure but keep going so we still release
+        // the singleton bit, otherwise a future Sniffer could never be created.
+        if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(false) }) {
+            warn!(
+                "Failed to disable promiscuous mode on sniffer drop: {:?}",
+                e
+            );
+        }
+        if let Err(e) = esp_wifi_result!(unsafe { esp_wifi_set_promiscuous_rx_cb(None) }) {
+            warn!(
+                "Failed to unregister promiscuous rx cb on sniffer drop: {:?}",
+                e
+            );
+        }
+        release(SNIFFER_BIT);
     }
 }

@@ -47,7 +47,7 @@ async fn control_led(
     }
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());

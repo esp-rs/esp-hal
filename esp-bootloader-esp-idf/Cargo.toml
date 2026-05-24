@@ -83,6 +83,8 @@ esp32c61   = ["esp-rom-sys/esp32c61", "esp-metadata-generated/esp32c61", "esp-ha
 ##
 esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2"]
 ##
+esp32p4   = ["esp-rom-sys/esp32p4", "esp-metadata-generated/esp32p4", "esp-hal/esp32p4"]
+##
 esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32"]
 ##
 esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2"]

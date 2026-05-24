@@ -122,11 +122,8 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   Make sure you add an entry with your changes to the relevant crate's changelog.
-  * Place your entry in the appropriate section of the upcoming version
-  * Make sure you reference the right pull request at the end of the changelog entry. If you made a change in PR 1234, end your changelog entry with `(#1234)`.
-  * You can amend existing changelog entries, when appropriate. In this case, just append your PR number to that entry's, like `(#789, #1234)`.
-*   If your change requires user code to be changed, make sure you add your changes to the next version's migration guide.
+*   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
+*   If your change requires user code to be updated, add a `# Migration guide` section. Each breaking change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the migration steps.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -137,6 +134,106 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
+
+## Changelog and Migration Guide Entries
+
+Changelog entries are **optional for contributors**. If you don't add them a
+maintainer will either write them or apply the `skip-changelog` label before the
+PR is merged.
+
+If you do want to document your change, add entries directly in the PR description
+using the structured sections in the template. Do **not** edit `CHANGELOG.md` —
+those files are updated automatically at release time from the PR descriptions.
+
+### Format
+
+Use `# Changelog` and `# Migration guide` as top-level headings (H1). Under each
+heading, group entries by crate (and optionally by feature area) using H2 headings:
+
+```markdown
+# Changelog
+
+## esp-hal
+
+- Added: Support for the Foo peripheral.
+- Fixed: A bug in the Bar driver that caused incorrect output.
+
+## esp-hal/SPI driver
+
+- Changed: `SpiDevice::transfer` now accepts a mutable slice.
+
+# Migration guide
+
+## esp-hal/SPI driver
+
+### `SpiDevice::transfer` signature changed
+
+`SpiDevice::transfer` now takes `&mut [u8]` instead of `(&[u8], &mut [u8])`.
+Update your call sites accordingly.
+```
+
+### Entry kinds
+
+Each item in the `# Changelog` section must begin with one of:
+
+| Kind      | When to use                                        |
+| --------- | -------------------------------------------------- |
+| `Added`   | New public API, feature, or peripheral support     |
+| `Changed` | Behaviour or API change (non-breaking preferred)   |
+| `Fixed`   | Bug fixes                                          |
+| `Removed` | Removed API or feature                             |
+
+### Skipping the changelog for a specific crate
+
+If your PR touches a published crate but the change genuinely needs no
+user-visible entry (e.g. a documentation fix, an internal refactor, or a
+build-system tweak), you can exempt that crate by writing the special marker
+as the **sole** item in its `# Changelog` section:
+
+```markdown
+# Changelog
+
+## esp-metadata
+
+- No changelog necessary.
+```
+
+This tells CI that the omission is intentional.  The marker must be the only
+item in the section — combining it with real entries is an error.
+
+When the whole PR needs no changelog at all, a maintainer can apply the
+`skip-changelog` label instead.
+
+### Manually editing `CHANGELOG.md`
+
+In rare cases — such as backports, hotfixes, or curated release notes that
+cannot be expressed through the structured PR description format — a maintainer
+can apply the `manual-changelog` label to a PR.  This label:
+
+- Allows direct edits to `CHANGELOG.md` files (the automated "no direct
+  CHANGELOG.md edits" check is skipped).
+- Skips the per-package coverage check (the PR is not required to have
+  structured entries in the description).
+- Still validates any PR description entries that *are* present, as a
+  safety net against formatting accidents.
+
+Do **not** use `manual-changelog` for routine changes — the structured PR
+description format exists precisely to keep changelog maintenance consistent
+and automatable.
+
+### Validation
+
+You can validate your PR description locally before pushing:
+
+```shell
+# Pipe the body directly:
+echo "# Changelog\n\n## esp-hal\n\n- Added: Something." | cargo xtask check-pr-changelog
+
+# Or validate an open PR by number (requires the `gh` CLI):
+cargo xtask check-pr-changelog --pr 1234
+```
+
+CI will also validate the format automatically on every PR.
 
 ## Your PR is Merged!
 

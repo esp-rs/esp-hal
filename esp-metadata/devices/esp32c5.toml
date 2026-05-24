@@ -265,6 +265,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "Pcnt" },
     { name = "Rmt" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
@@ -350,8 +351,8 @@ pins = [
     { pin =  10, functions = { 0 = "SDIO_CMD",   2 = "FSPICS0" } },
     { pin =  11, functions = { 0 = "U0TXD" } },
     { pin =  12, functions = { 0 = "U0RXD" } },
-    { pin =  13, functions = { 0 = "SDIO_DATA3" },                                           analog = { 0 = "USB_DM" } },
-    { pin =  14, functions = { 0 = "SDIO_DATA2" },                                           analog = { 0 = "USB_DP" } },
+    { pin =  13, functions = { 0 = "SDIO_DATA3" },                                           analog = { 0 = "USJ_DM" } },
+    { pin =  14, functions = { 0 = "SDIO_DATA2" },                                           analog = { 0 = "USJ_DP" } },
     { pin =  15,                                                limitations = ["spi_psram"] }, # CS1
     { pin =  16,                                                limitations = ["spi_flash"] }, # CS0
     { pin =  17,                                                limitations = ["spi_flash", "spi_psram"] }, # SPIQ
@@ -542,6 +543,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.i2c_master]
 support_status = "supported"
+version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
@@ -562,6 +564,7 @@ bus_timeout_is_exponential = true
 support_status = { status = "not_supported", issue = 1909 }
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384
@@ -590,10 +593,11 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
-clock_sources.supported = ["Xtal", "RcFast", "Pll80MHz"]
-clock_sources.default = "Pll80MHz"
 
 [device.spi_master]
+dma_can_access_flash = true
+version = 3
+fifo_size = 64
 support_status = "supported"
 supports_dma = true
 has_app_interrupts = true
@@ -602,7 +606,6 @@ has_clk_pre_div = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
-
 [device.spi_slave]
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
@@ -622,6 +625,7 @@ instances = [
 ram_size = 128
 version = 2
 peripheral_controls_mem_clk = true
+has_sclk_enable = true
 
 [device.uhci]
 support_status = "partial"
@@ -709,7 +713,11 @@ support_status = { status = "not_supported", issue = 5166 }
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.i2s]
-support_status = { status = "not_supported", issue = 5172 }
+version = 3
+default_clock_source = 2
+mclk_divider_bit_width = 9
+max_ws_width = 512
+clock_configured_by_pcr = true
 
 [device.io_mux]
 

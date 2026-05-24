@@ -336,6 +336,13 @@ impl<'a> PartitionTable<'a> {
                 let paddr = unsafe {
                     ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16
                 };
+            } else if #[cfg(feature = "esp32p4")] {
+                // DR_REG_FLASH_SPI0_BASE : 0x5008C000 = DR_REG_HPPERIPH0_BASE + 0x8C000
+                // TODO: verify MSPI register for partition physical address read
+                let paddr = unsafe {
+                    ((0x5008C000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
+                    (((0x5008C000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
+                };
             } else if #[cfg(any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32h2"))] {
                 let paddr = unsafe {
                     ((0x60002000 + 0x380) as *mut u32).write_volatile(0);

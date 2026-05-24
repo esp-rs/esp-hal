@@ -233,7 +233,15 @@ const CHANNEL_COUNT: usize = cfg!(soc_has_dma_ch0) as usize
     + cfg!(soc_has_dma_ch4) as usize;
 
 cfg_if::cfg_if! {
-    if #[cfg(dma_separate_in_out_interrupts)] {
+    // ESP32-P4: AHB_DMA interrupt names are AHB_PDMA_IN_CHn / AHB_PDMA_OUT_CHn
+    if #[cfg(esp32p4)] {
+        #[cfg(soc_has_dma_ch0)]
+        impl_channel!(0, AHB_PDMA_IN_CH0, AHB_PDMA_OUT_CH0);
+        #[cfg(soc_has_dma_ch1)]
+        impl_channel!(1, AHB_PDMA_IN_CH1, AHB_PDMA_OUT_CH1);
+        #[cfg(soc_has_dma_ch2)]
+        impl_channel!(2, AHB_PDMA_IN_CH2, AHB_PDMA_OUT_CH2);
+    } else if #[cfg(dma_separate_in_out_interrupts)] {
         #[cfg(soc_has_dma_ch0)]
         impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
         #[cfg(soc_has_dma_ch1)]

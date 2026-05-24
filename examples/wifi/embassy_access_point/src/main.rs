@@ -49,7 +49,7 @@ macro_rules! mk_static {
 
 const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -66,14 +66,13 @@ async fn main(spawner: Spawner) -> ! {
         Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
 
     println!("Starting wifi");
-    let (controller, interfaces) = esp_radio::wifi::new(
+    let device = esp_radio::wifi::Interface::access_point();
+    let controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(access_point_config),
     )
     .unwrap();
     println!("Wifi started!");
-
-    let device = interfaces.access_point;
 
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
     let gw_ip_addr = Ipv4Addr::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
@@ -258,6 +257,6 @@ async fn connection(controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }

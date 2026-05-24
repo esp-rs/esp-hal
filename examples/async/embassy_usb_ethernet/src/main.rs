@@ -33,7 +33,7 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     otg_fs::{
         Usb,
-        asynch::{Config, Driver as UsbDriver},
+        embassy_usb_device::{Config, Driver as UsbDriver},
     },
     timer::timg::TimerGroup,
 };
@@ -55,7 +55,7 @@ const HTTP_PORT: u16 = 80;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -64,7 +64,7 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new(peripherals.USB0, peripherals.GPIO20, peripherals.GPIO19);
+    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
 
     // Create the USB device driver.
     static EP_OUT_BUFFER: StaticCell<[u8; 1024]> = StaticCell::new();

@@ -4,10 +4,6 @@
 //!
 //! The `SOC` module provides access, functions and structures that are useful
 //! for interacting with various system-related peripherals on `ESP32-S2` chip.
-//!
-//! Also few constants are defined in this module for `ESP32-S2` chip:
-//!    * I2S_SCLK: 160_000_000 - I2S clock frequency
-//!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 
 crate::unstable_module! {
     pub mod clocks;
@@ -19,12 +15,21 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32s2 as pac;
 
+#[cfg(i2s_driver_supported)]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) mod constants {
-    /// System clock frequency for the I2S peripheral, in Hertz.
-    pub const I2S_SCLK: u32 = 160_000_000;
-    /// Default clock source for the I2S peripheral.
-    pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
+pub(crate) fn i2s_sclk_frequency() -> u32 {
+    // I2S uses the 160 MHz PLL tap, derived from either supported PLL frequency.
+    match clocks::pll_clk_frequency() {
+        320_000_000 => 320_000_000 / 2,
+        480_000_000 => 480_000_000 / 3,
+        _ => unreachable!(),
+    }
+}
+
+#[cfg(spi_master_driver_supported)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
+pub(crate) fn spi_master_clock_source_frequency() -> u32 {
+    clocks::apb_clk_frequency()
 }
 
 /// Write back a specific range of data in the cache.

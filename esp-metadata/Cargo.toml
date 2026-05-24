@@ -10,6 +10,7 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 forever-unstable = true
+changelog-exempt = true
 check-configs = [
     { features = [] },
     { features = ["clap"] },

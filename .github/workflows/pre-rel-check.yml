@@ -30,14 +30,14 @@ jobs:
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
 
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src
 
@@ -78,6 +78,9 @@ jobs:
 
           cargo xcheck ci esp32c61 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
+
+          cargo xcheck ci esp32p4 --toolchain stable --steps=lp-examples,examples,qa-test,tests
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
 
           cargo xcheck ci esp32h2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2

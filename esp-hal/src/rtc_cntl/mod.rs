@@ -136,6 +136,7 @@ pub mod sleep;
 #[cfg_attr(esp32c6, path = "rtc/esp32c6.rs")]
 #[cfg_attr(esp32c61, path = "rtc/esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "rtc/esp32h2.rs")]
+#[cfg_attr(esp32p4, path = "rtc/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 pub(crate) mod rtc;
@@ -414,9 +415,14 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        LP_AON::regs()
-            .store4()
-            .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32p4)] {
+                let reg = LP_AON::regs().lp_store4();
+            } else {
+                let reg = LP_AON::regs().store4();
+            }
+        }
+        reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 
     /// Register an interrupt handler for the RTC.
@@ -487,6 +493,10 @@ pub enum RwdtStage {
 pub struct Rwdt(());
 
 /// RTC Watchdog Timer driver.
+///
+/// ESP32-P4 LP_WDT PAC uses different register names (config0 vs wdtconfig0,
+/// lp_wdt vs wdt, etc.). P4-specific implementation is a TODO.
+#[cfg(not(esp32p4))]
 impl Rwdt {
     /// Enable the watchdog timer instance.
     /// Watchdog starts with default settings (`stage 0` resets the system, the
@@ -635,6 +645,141 @@ impl Rwdt {
     }
 }
 
+/// ESP32-P4 LP_WDT implementation.
+/// P4 PAC uses config0/config1/.../feed/wprotect (no "wdt" prefix),
+/// and interrupt field is `lp_wdt` (not `wdt`).
+/// Ref: TRM v0.5 Ch 19 (Watchdog Timers)
+/// Write protection key: 0x50D8_3AA1 (same as other chips)
+#[cfg(esp32p4)]
+impl Rwdt {
+    /// Enable the watchdog timer instance.
+    pub fn enable(&mut self) {
+        self.set_enabled(true);
+    }
+
+    /// Disable the watchdog timer instance.
+    pub fn disable(&mut self) {
+        self.set_enabled(false);
+    }
+
+    /// Listen for interrupts on stage 0.
+    pub fn listen(&mut self) {
+        let rtc_cntl = LP_WDT::regs();
+        self.set_write_protection(false);
+        rtc_cntl
+            .config0()
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
+        // P4 PAC: int_ena().lp_wdt() (not .wdt())
+        rtc_cntl.int_ena().modify(|_, w| w.lp_wdt().set_bit());
+        self.set_write_protection(true);
+    }
+
+    /// Stop listening for interrupts on stage 0.
+    pub fn unlisten(&mut self) {
+        let rtc_cntl = LP_WDT::regs();
+        self.set_write_protection(false);
+        rtc_cntl
+            .config0()
+            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8) });
+        rtc_cntl.int_ena().modify(|_, w| w.lp_wdt().clear_bit());
+        self.set_write_protection(true);
+    }
+
+    /// Clear interrupt.
+    pub fn clear_interrupt(&mut self) {
+        self.set_write_protection(false);
+        LP_WDT::regs()
+            .int_clr()
+            .write(|w| w.lp_wdt().clear_bit_by_one());
+        self.set_write_protection(true);
+    }
+
+    /// Check if the interrupt is set.
+    pub fn is_interrupt_set(&self) -> bool {
+        LP_WDT::regs().int_st().read().lp_wdt().bit_is_set()
+    }
+
+    /// Feed the watchdog timer.
+    pub fn feed(&mut self) {
+        self.set_write_protection(false);
+        // P4 PAC: feed().feed() (not wdtfeed().wdt_feed())
+        LP_WDT::regs().feed().write(|w| w.feed().set_bit());
+        self.set_write_protection(true);
+    }
+
+    fn set_write_protection(&mut self, enable: bool) {
+        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
+        LP_WDT::regs().wprotect().write(|w| unsafe { w.bits(wkey) });
+    }
+
+    fn set_enabled(&mut self, enable: bool) {
+        let rtc_cntl = LP_WDT::regs();
+        self.set_write_protection(false);
+
+        if !enable {
+            rtc_cntl.config0().modify(|_, w| unsafe { w.bits(0) });
+        } else {
+            rtc_cntl
+                .config0()
+                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+            rtc_cntl
+                .config0()
+                .modify(|_, w| w.wdt_en().bit(enable).wdt_pause_in_slp().bit(enable));
+            unsafe {
+                rtc_cntl.config0().modify(|_, w| {
+                    w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8);
+                    w.wdt_cpu_reset_length().bits(7);
+                    w.wdt_sys_reset_length().bits(7);
+                    w.wdt_stg1().bits(RwdtStageAction::Off as u8);
+                    w.wdt_stg2().bits(RwdtStageAction::Off as u8);
+                    w.wdt_stg3().bits(RwdtStageAction::Off as u8);
+                    w.wdt_en().set_bit()
+                });
+            }
+        }
+        self.set_write_protection(true);
+    }
+
+    /// Configure timeout value for the selected stage.
+    pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
+        let rtc_cntl = LP_WDT::regs();
+        let timeout_raw = crate::clock::us_to_rtc_ticks(timeout.as_micros()) as u32;
+        self.set_write_protection(false);
+
+        // P4 PAC: config1().wdt_stg0_hold(), config2().wdt_stg1_hold(), etc.
+        let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
+        match stage {
+            RwdtStage::Stage0 => rtc_cntl
+                .config1()
+                .modify(|_, w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) }),
+            RwdtStage::Stage1 => rtc_cntl
+                .config2()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+            RwdtStage::Stage2 => rtc_cntl
+                .config3()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+            RwdtStage::Stage3 => rtc_cntl
+                .config4()
+                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+        };
+        self.set_write_protection(true);
+    }
+
+    /// Set the action for a specific stage.
+    pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
+        self.set_write_protection(false);
+        LP_WDT::regs().config0().modify(|_, w| unsafe {
+            match stage {
+                RwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
+                RwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
+                RwdtStage::Stage2 => w.wdt_stg2().bits(action as u8),
+                RwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
+            }
+        });
+        self.set_write_protection(true);
+    }
+}
+
 /// Super Watchdog
 #[cfg(swd)]
 pub struct Swd(());
@@ -691,7 +836,8 @@ pub fn wakeup_cause() -> SleepSource {
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(soc_has_intpri)] {
+        } else if #[cfg(soc_has_pmu)] {
+            // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()

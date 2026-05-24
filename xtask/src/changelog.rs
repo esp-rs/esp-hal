@@ -10,6 +10,23 @@ pub(crate) struct Changelog {
 }
 
 impl Changelog {
+    /// Create an empty changelog with a single empty `Unreleased` section.
+    pub fn empty() -> Self {
+        Self {
+            entries: vec![ChangelogForVersion {
+                version: "Unreleased".to_string(),
+                date: None,
+                tag: None,
+                groups: vec![
+                    ChangelogGroup::new("Added"),
+                    ChangelogGroup::new("Changed"),
+                    ChangelogGroup::new("Fixed"),
+                    ChangelogGroup::new("Removed"),
+                ],
+            }],
+        }
+    }
+
     /// Parse the changelog, normalizing it in the process.
     pub fn parse(changelog: &str) -> Result<Self> {
         let mut lines = changelog.lines().peekable();
@@ -43,6 +60,63 @@ impl Changelog {
         }
 
         Ok(this)
+    }
+
+    /// Add a new entry to the `Unreleased` section.
+    ///
+    /// `group` must be one of `"Added"`, `"Changed"`, `"Fixed"`, `"Removed"`.
+    /// If the `Unreleased` section does not yet exist it is created.
+    pub fn add_entry(&mut self, group: &str, text: &str, pr: u64) {
+        let unreleased =
+            if let Some(e) = self.entries.iter_mut().find(|e| e.version == "Unreleased") {
+                e
+            } else {
+                self.entries.insert(
+                    0,
+                    ChangelogForVersion {
+                        version: "Unreleased".to_string(),
+                        date: None,
+                        tag: None,
+                        groups: vec![
+                            ChangelogGroup::new("Added"),
+                            ChangelogGroup::new("Changed"),
+                            ChangelogGroup::new("Fixed"),
+                            ChangelogGroup::new("Removed"),
+                        ],
+                    },
+                );
+                &mut self.entries[0]
+            };
+
+        let target_group = if let Some(g) = unreleased.groups.iter_mut().find(|g| g.name == group) {
+            g
+        } else {
+            let name = match group {
+                "Added" => "Added",
+                "Changed" => "Changed",
+                "Fixed" => "Fixed",
+                "Removed" => "Removed",
+                _ => return,
+            };
+            unreleased.groups.push(ChangelogGroup::new(name));
+            unreleased.groups.last_mut().unwrap()
+        };
+
+        target_group.lines.push(ChangelogLine {
+            indentation: 0,
+            line: text.to_string(),
+            prs: vec![pr as usize],
+        });
+    }
+
+    /// Return the `Unreleased` section formatted as it would appear in the
+    /// changelog, or `None` if there is no `Unreleased` section with content.
+    pub fn format_unreleased(&self) -> Option<String> {
+        let unreleased = self.entries.iter().find(|e| e.version == "Unreleased")?;
+        if unreleased.groups.iter().all(|g| g.lines.is_empty()) {
+            return None;
+        }
+        Some(unreleased.to_string())
     }
 
     /// Finalize the changelog for a new release.

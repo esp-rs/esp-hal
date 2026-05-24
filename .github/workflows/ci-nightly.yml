@@ -12,7 +12,7 @@ env:
   DEFMT_LOG: trace
 
 jobs:
-  esp-hal-nightly:
+  esp-hal-riscv-nightly:
     name: esp-hal | nightly (${{ matrix.device }})
     runs-on: ubuntu-latest
     env:
@@ -33,6 +33,7 @@ jobs:
           "esp32c6",
           "esp32c61",
           "esp32h2",
+          "esp32p4",
         ]
     steps:
       - uses: actions/checkout@v6
@@ -40,7 +41,7 @@ jobs:
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src, clippy, rustfmt
 
@@ -56,6 +57,31 @@ jobs:
       - name: Build and Check
         shell: bash
         run: cargo xtask ci ${{ matrix.device }} --toolchain nightly
+
+  esp-hal-xtensa-clippy:
+    name: esp-hal | xtensa clippy (${{ matrix.device }})
+    runs-on: ubuntu-latest
+    env:
+      CI: 1
+      SSID: SSID
+      PASSWORD: PASSWORD
+      STATIC_IP: 1.1.1.1
+      GATEWAY_IP: 1.1.1.1
+      HOST_IP: 1.1.1.1
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ["esp32", "esp32s2", "esp32s3"]
+    steps:
+      - uses: actions/checkout@v6
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.95.0.0
+
+      - name: Lint esp-hal on Xtensa chip
+        run: cargo xtask lint-packages --chips ${{ matrix.device }} --toolchain esp
 
   check-global-symbols:
     name: Check Global Symbols in esp-hal
@@ -75,7 +101,7 @@ jobs:
   create-issue:
     name: Create GitHub Issue if any job failed
     runs-on: ubuntu-latest
-    needs: [esp-hal-nightly, check-global-symbols]
+    needs: [esp-hal-riscv-nightly, esp-hal-xtensa-clippy, check-global-symbols]
     if: ${{ failure() }}
     steps:
       - uses: actions/checkout@v6

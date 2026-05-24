@@ -20,7 +20,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -110,26 +110,24 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         // Switch CPU to XTAL before reconfiguring PLL. The bootloader may have left the CPU
         // running on PLL, and changing PLL parameters while it is the active clock source would
         // cause instability.
-        ClockTree::with(|clocks| {
-            configure_xtal_clk(clocks, XtalClkConfig::_40);
-            configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
-            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
-        });
+        configure_xtal_clk(clocks, XtalClkConfig::_40);
+        configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
+        configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
         // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to
         // only run when requesting XTAL.
         if self.xtal_clk.is_none() {
-            let xtal = ClockTree::with(detect_xtal_freq);
+            let xtal = detect_xtal_freq(clocks);
             debug!("Auto-detected XTAL frequency: {}", xtal.value());
             self.xtal_clk = Some(xtal);
         }
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 
@@ -749,6 +747,27 @@ impl McpwmInstance {
         _new_config: McpwmFunctionClockConfig,
     ) {
         // Nothing to do.
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        for ch_num in 0..8 {
+            RMT::regs()
+                .chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().bit(new_config == RmtSclkConfig::ApbClk));
+        }
     }
 }
 

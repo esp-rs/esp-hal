@@ -42,6 +42,7 @@ trouble-host = { version = "0.6.0", features = [
     "derive",
     "scan",
 ] }
+log = "0.4"
 
 [features]
 unstable = []
@@ -107,6 +108,13 @@ esp32h2 = [
     "esp-rtos/esp32h2",
     "esp-println/esp32h2",
     "esp-radio?/esp32h2",
+]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+    "esp-rtos/esp32p4",
+    "esp-println/esp32p4",
 ]
 esp32s2 = [
     "esp-backtrace/esp32s2",

@@ -81,7 +81,7 @@ struct BatteryService {
     status: bool,
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -114,14 +114,13 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     println!("Starting wifi");
-    let (mut controller, interfaces) = esp_radio::wifi::new(
+    let wifi_interface = esp_radio::wifi::Interface::station();
+    let mut controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
     println!("Wifi started!");
-
-    let wifi_interface = interfaces.station;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -323,6 +322,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }

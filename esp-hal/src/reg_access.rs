@@ -13,20 +13,6 @@ pub(crate) trait EndianessConverter {
     fn u32_to_bytes(word: u32) -> [u8; 4];
 }
 
-/// Always use native endianess
-#[allow(unused)] // only used in AES driver for now
-pub(crate) struct NativeEndianess;
-
-impl EndianessConverter for NativeEndianess {
-    fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
-        u32::from_ne_bytes(bytes)
-    }
-
-    fn u32_to_bytes(word: u32) -> [u8; 4] {
-        u32::to_ne_bytes(word)
-    }
-}
-
 /// Use BE for ESP32, NE otherwise
 #[derive(Debug, Clone)]
 pub(crate) struct SocDependentEndianess;
@@ -63,14 +49,12 @@ impl EndianessConverter for SocDependentEndianess {
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
 #[derive(Debug, Clone)]
-#[cfg_attr(esp32c5, allow(unused))]
 pub(crate) struct AlignmentHelper<E: EndianessConverter> {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
     phantom: PhantomData<E>,
 }
 
-#[cfg_attr(esp32c5, allow(unused))]
 impl AlignmentHelper<SocDependentEndianess> {
     pub fn default() -> AlignmentHelper<SocDependentEndianess> {
         AlignmentHelper {
@@ -81,7 +65,6 @@ impl AlignmentHelper<SocDependentEndianess> {
     }
 }
 
-#[cfg_attr(esp32c5, allow(unused))]
 impl<E: EndianessConverter> AlignmentHelper<E> {
     pub fn reset(&mut self) {
         self.buf_fill = 0;
@@ -228,7 +211,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
         (remaining, was_bounded)
     }
 
-    #[allow(dead_code)]
+    #[cfg(all(sha_driver_supported, not(esp32)))]
     pub fn volatile_write_regset(&mut self, dst_ptr: *mut u32, src: &[u8], dst_bound: usize) {
         let dst_bound = dst_bound / U32_ALIGN_SIZE;
         assert!(dst_bound > 0);

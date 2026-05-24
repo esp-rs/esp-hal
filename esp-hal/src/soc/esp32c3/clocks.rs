@@ -94,20 +94,18 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         if self.xtal_clk.is_none() {
             // TODO: support multiple crystal frequencies (esp-idf supports 32M).
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
         // Switch CPU to XTAL before reconfiguring PLL.
-        ClockTree::with(|clocks| {
-            configure_xtal_clk(clocks, XtalClkConfig::_40);
-            configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
-            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
-        });
+        configure_xtal_clk(clocks, XtalClkConfig::_40);
+        configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
+        configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 

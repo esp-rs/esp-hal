@@ -13,7 +13,7 @@ embassy-net = { version = "0.8.0", features = [
     "tcp",
     "dns",
 ] }
-embassy-time = "0.5.0"
+embassy-time = "0.5.1"
 embassy-sync = "0.7" # TODO: update once trouble supports 0.8
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
@@ -89,6 +89,10 @@ esp32s3 = [
     "esp-rtos/esp32s3",
     "esp-radio/esp32s3",
 ]
+
+[profile.dev]
+# To fix  rust-lld: error: section '.text' will not fit in region 'IROM': overflowed by 1588 bytes
+opt-level = 2
 
 [profile.release]
 debug            = true

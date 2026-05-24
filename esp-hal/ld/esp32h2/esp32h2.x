@@ -1,5 +1,5 @@
 /* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 and ESP32-H2 have
-   IDs 0-31, so we much define the handler for the one additional interrupt
+   IDs 0-31, so we must define the handler for the one additional interrupt
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
 

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ESP32-P4: Use ROM CRC32 / MD5 functions instead of the software fallback (#5400)
 
 ### Fixed
 

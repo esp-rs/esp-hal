@@ -93,13 +93,11 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         // Switch CPU to XTAL before reconfiguring PLL.
-        ClockTree::with(|clocks| {
-            configure_xtal_clk(clocks, XtalClkConfig::_40);
-            configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
-            configure_cpu_clk(clocks, CpuClkConfig::Xtal);
-        });
+        configure_xtal_clk(clocks, XtalClkConfig::_40);
+        configure_system_pre_div(clocks, SystemPreDivConfig::new(0));
+        configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
         // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to
@@ -108,12 +106,12 @@ impl ClockConfig {
             // While the bootloader stores a crystal frequency in a retention register,
             // that comes from a constant that we should not trust. If the user did not
             // provide a crystal frequency, we should detect it.
-            let xtal = ClockTree::with(detect_xtal_freq);
+            let xtal = detect_xtal_freq(clocks);
             debug!("Auto-detected XTAL frequency: {}", xtal.value());
             self.xtal_clk = Some(xtal);
         }
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 

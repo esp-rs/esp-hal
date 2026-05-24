@@ -25,6 +25,10 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
+pub mod pr_changelog;
+
+/// GitHub repository used for all `gh` CLI calls.
+pub const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 
 // ---------------------------------------------------------------------------
 // MCP tool registration

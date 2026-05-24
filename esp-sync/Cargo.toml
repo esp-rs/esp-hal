@@ -55,6 +55,8 @@ esp32c6 = ["esp-metadata-generated/esp32c6"]
 esp32c61 = ["esp-metadata-generated/esp32c61"]
 ## Target the ESP32-H2.
 esp32h2 = ["esp-metadata-generated/esp32h2"]
+## Target the ESP32-P4.
+esp32p4 = ["esp-metadata-generated/esp32p4"]
 ## Target the ESP32-S2.
 esp32s2 = ["esp-metadata-generated/esp32s2"]
 ## Target the ESP32-S3.

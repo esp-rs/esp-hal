@@ -1013,10 +1013,8 @@ impl SystemClocks {
                     }
 
                     impl ClockConfig {
-                        fn apply(&self) {
-                            ClockTree::with(|clocks| {
-                                #(#system_config_steps)*
-                            });
+                        fn apply(&self, clocks: &mut ClockTree) {
+                            #(#system_config_steps)*
                         }
                     }
 

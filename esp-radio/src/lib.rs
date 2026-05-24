@@ -46,7 +46,7 @@
     wifi_driver_supported,
     doc = r#"
 
-if let Ok((controller, interfaces)) = esp_radio::wifi::new(
+if let Ok(controller) = esp_radio::wifi::new(
     peripherals.WIFI,
     Default::default(),
 ) {}
@@ -122,7 +122,7 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! for this crate:
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_radio_config_table.md"))]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
@@ -241,7 +241,7 @@ const _: () = {
             core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
             core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
             core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
             core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
             core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
             core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);

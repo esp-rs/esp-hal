@@ -45,9 +45,10 @@ peripherals = [
     { name = "DPORT" },
     { name = "SYSTEM", pac = "DPORT" },
     { name = "EFUSE", hidden = true },
-    { name = "EMAC_DMA" },
-    { name = "EMAC_EXT" },
-    { name = "EMAC_MAC" },
+    { name = "ETH", virtual = true },
+    { name = "EMAC_DMA", hidden = true },
+    { name = "EMAC_EXT", hidden = true },
+    { name = "EMAC_MAC", hidden = true },
     { name = "FLASH_ENCRYPTION" },
     { name = "FRC_TIMER" },
     { name = "GPIO" },
@@ -63,7 +64,7 @@ peripherals = [
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
     { name = "PCNT" },
-    { name = "RMT" },
+    { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
@@ -257,6 +258,12 @@ clocks = { system_clocks = { clock_tree = [
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
     ] },
+    { group = "RMT", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "REF_TICK", outputs = "REF_TICK" },
+            { name = "APB_CLK",  outputs = "APB_CLK", default = true },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -275,9 +282,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Rsa", template_params = { reg_group = "peri", peripheral = "crypto_rsa" } },
     { name = "Sha", template_params = { reg_group = "peri", peripheral = "crypto_sha" } },
 
-    #{ name = "Emac", template_params = { reg_group = "wifi_clk" } },
-    #{ name = "SdioHost", template_params = { reg_group = "wifi_clk" } },
-    #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
+    { name = "Emac", template_params = { reg_group = "wifi" } },
+    #{ name = "SdioHost", template_params = { reg_group = "wifi" } },
+    #{ name = "SdioSlave", template_params = { reg_group = "wifi" } },
 
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Uart2" },
@@ -347,7 +354,7 @@ pins = [
     { pin =  1, functions = { 0 = "U0TXD",    1 = "CLK_OUT3",                                 5 = "EMAC_RXD2"    } },
     { pin =  2, functions = {                 1 = "HSPIWP",  3 = "HS2_DATA0", 4 = "SD_DATA0"                     }, analog = { 1 = "ADC2_CH2", 2 = "TOUCH2" }, rtc = { 0 = "RTC_GPIO12", 1 = "SAR_I2C_SCL" }, limitations = ["strapping"] },
     { pin =  3, functions = { 0 = "U0RXD",    1 = "CLK_OUT2"                                                     } },
-    { pin =  4, functions = {                 1 = "HSPIHD",  3 = "HS2_DATA1", 4 = "SD_DATA1", 5 = "EMAC_TX_ER"   }, analog = { 1 = "ADC2_CH0", 2 = "TOUCH0" }, rtc = { 0 = "RTC_GPIO10", 1 = "SAR_I2C_SCL" } },
+    { pin =  4, functions = {                 1 = "HSPIHD",  3 = "HS2_DATA1", 4 = "SD_DATA1", 5 = "EMAC_TXER"    }, analog = { 1 = "ADC2_CH0", 2 = "TOUCH0" }, rtc = { 0 = "RTC_GPIO10", 1 = "SAR_I2C_SCL" } },
     { pin =  5, functions = {                 1 = "VSPICS0", 3 = "HS1_DATA6",                 5 = "EMAC_RX_CLK"  }, limitations = ["strapping"] },
     { pin =  6, functions = { 0 = "SD_CLK",   1 = "SPICLK",  3 = "HS1_CLK",   4 = "U1CTS"                        }, limitations = ["spi_flash", "spi_psram"] },
     { pin =  7, functions = { 0 = "SD_DATA0", 1 = "SPIQ",    3 = "HS1_DATA0", 4 = "U2RTS"                        }, limitations = ["spi_flash", "spi_psram"] },
@@ -356,7 +363,7 @@ pins = [
     { pin = 10, functions = { 0 = "SD_DATA3", 1 = "SPIWP",   3 = "HS1_DATA3", 4 = "U1TXD"                        }, limitations = ["spi_flash", "spi_psram"] },
     { pin = 11, functions = { 0 = "SD_CMD",   1 = "SPICS0",  3 = "HS1_CMD",   4 = "U1RTS"                        }, limitations = ["spi_flash", "spi_psram"] },
     { pin = 12, functions = { 0 = "MTDI",     1 = "HSPIQ",   3 = "HS2_DATA2", 4 = "SD_DATA2", 5 = "EMAC_TXD3"    }, analog = { 1 = "ADC2_CH5", 2 = "TOUCH5" }, rtc = { 0 = "RTC_GPIO15" }, limitations = ["strapping"] },
-    { pin = 13, functions = { 0 = "MTCK",     1 = "HSPID",   3 = "HS2_DATA3", 4 = "SD_DATA3", 5 = "EMAC_RX_ER"   }, analog = { 1 = "ADC2_CH4", 2 = "TOUCH4" }, rtc = { 0 = "RTC_GPIO14" } },
+    { pin = 13, functions = { 0 = "MTCK",     1 = "HSPID",   3 = "HS2_DATA3", 4 = "SD_DATA3", 5 = "EMAC_RXER"    }, analog = { 1 = "ADC2_CH4", 2 = "TOUCH4" }, rtc = { 0 = "RTC_GPIO14" } },
     { pin = 14, functions = { 0 = "MTMS",     1 = "HSPICLK", 3 = "HS2_CLK",   4 = "SD_CLK",   5 = "EMAC_TXD2"    }, analog = { 1 = "ADC2_CH6", 2 = "TOUCH6" }, rtc = { 0 = "RTC_GPIO16" } },
     { pin = 15, functions = { 0 = "MTDO",     1 = "HSPICS0", 3 = "HS2_CMD",   4 = "SD_CMD",   5 = "EMAC_RXD3"    }, analog = { 1 = "ADC2_CH3", 2 = "TOUCH3" }, rtc = { 0 = "RTC_GPIO13", 1 = "SAR_I2C_SDA" }, limitations = ["strapping"] },
     { pin = 16, functions = {                                3 = "HS1_DATA4", 4 = "U2RXD",    5 = "EMAC_CLK_OUT" }, analog = {}, rtc = {}, limitations = ["spi_flash", "spi_psram"] },
@@ -364,12 +371,12 @@ pins = [
     { pin = 18, functions = {                 1 = "VSPICLK", 3 = "HS1_DATA7"                                     }, analog = {}, rtc = {} },
     { pin = 19, functions = {                 1 = "VSPIQ",   3 = "U0CTS",                     5 = "EMAC_TXD0"    }, analog = {}, rtc = {} },
     { pin = 20, limitations = ["esp32_pico_v3"] },
-    { pin = 21, functions = { 1 = "VSPIHD",              5 = "EMAC_TX_EN" } },
+    { pin = 21, functions = { 1 = "VSPIHD",              5 = "EMAC_TXEN"  } },
     { pin = 22, functions = { 1 = "VSPIWP", 3 = "U0RTS", 5 = "EMAC_TXD1"  } },
     { pin = 23, functions = { 1 = "VSPID",  3 = "HS1_STROBE"              } },
     { pin = 25, functions = {                            5 = "EMAC_RXD0"  }, analog = { 0 = "DAC1",       1 = "ADC2_CH8"               }, rtc = { 0 = "RTC_GPIO6" } },
     { pin = 26, functions = {                            5 = "EMAC_RXD1"  }, analog = { 0 = "DAC2",       1 = "ADC2_CH9"               }, rtc = { 0 = "RTC_GPIO7" } },
-    { pin = 27, functions = {                            5 = "EMAC_RX_DV" }, analog = {                   1 = "ADC2_CH7", 2 = "TOUCH7" }, rtc = { 0 = "RTC_GPIO17" } },
+    { pin = 27, functions = {                            5 = "EMAC_RXDV" },  analog = {                   1 = "ADC2_CH7", 2 = "TOUCH7" }, rtc = { 0 = "RTC_GPIO17" } },
     { pin = 32,                                                              analog = { 0 = "XTAL_32K_P", 1 = "ADC1_CH4", 2 = "TOUCH9" }, rtc = { 0 = "RTC_GPIO9" } },
     { pin = 33,                                                              analog = { 0 = "XTAL_32K_N", 1 = "ADC1_CH5", 2 = "TOUCH8" }, rtc = { 0 = "RTC_GPIO8" } },
     { pin = 34, limitations = ["input_only"],                                analog = {                   1 = "ADC1_CH6"               }, rtc = { 0 = "RTC_GPIO4" } },
@@ -554,13 +561,13 @@ input_signals = [
 
     { name = "EMAC_TX_CLK" },
     { name = "EMAC_RXD2" },
-    { name = "EMAC_TX_ER" },
+    { name = "EMAC_TXER" },
     { name = "EMAC_RX_CLK" },
-    { name = "EMAC_RX_ER" },
+    { name = "EMAC_RXER" },
     { name = "EMAC_RXD3" },
     { name = "EMAC_RXD0" },
     { name = "EMAC_RXD1" },
-    { name = "EMAC_RX_DV" },
+    { name = "EMAC_RXDV" },
 
     { name = "MTDI" },
     { name = "MTCK" },
@@ -768,14 +775,14 @@ output_signals = [
     { name = "HS2_DATA3" },
 
     { name = "EMAC_TX_CLK" },
-    { name = "EMAC_TX_ER" },
+    { name = "EMAC_TXER" },
     { name = "EMAC_TXD3" },
-    { name = "EMAC_RX_ER" },
+    { name = "EMAC_RXER" },
     { name = "EMAC_TXD2" },
     { name = "EMAC_CLK_OUT" },
     { name = "EMAC_CLK_180" },
     { name = "EMAC_TXD0" },
-    { name = "EMAC_TX_EN" },
+    { name = "EMAC_TXEN" },
     { name = "EMAC_TXD1" },
 
     { name = "MTDO" },
@@ -783,6 +790,7 @@ output_signals = [
 
 [device.i2c_master]
 support_status = "supported"
+version = 1
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
@@ -809,11 +817,9 @@ ram_start = 0x3ff56800
 channel_ram_size = 64
 channels = ["RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx"]
 has_per_channel_clock = true
-clock_sources.supported = [ "RefTick", "Apb" ]
-# Power-on value is RefTick!
-clock_sources.default = "Apb"
 
 [device.rsa]
+version = 1
 support_status = "partial"
 size_increment = 512
 memory_size_bytes = 512
@@ -823,13 +829,15 @@ support_status = "partial"
 algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
 [device.spi_master]
+version = 1
+fifo_size = 64
+bit_order_is_bool = true
 support_status = "supported"
 supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"], cs = ["HSPICS0", "HSPICS1", "HSPICS2"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"], cs = ["VSPICS0", "VSPICS1", "VSPICS2"] },
 ]
-
 [device.spi_slave]
 support_status = "partial"
 supports_dma = true
@@ -858,7 +866,7 @@ version = 1
 support_status = "not_supported"
 
 [device.ethernet]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.camera]
 support_status = "not_supported"
@@ -879,6 +887,11 @@ deep_sleep = true
 
 ## Interfaces
 [device.i2s]
+version = 1
+default_clock_source = 2
+mclk_divider_bit_width = 6
+max_ws_width = 128
+
 [device.ledc]
 [device.mcpwm]
 [device.pcnt]

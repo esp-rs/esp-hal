@@ -53,7 +53,7 @@ cfg_if::cfg_if! {
         use crate::peripherals::DPORT as INTERRUPT_CORE1;
     } else {
         use crate::peripherals::INTERRUPT_CORE0;
-        #[cfg(esp32s3)]
+        #[cfg(multi_core)]
         use crate::peripherals::INTERRUPT_CORE1;
     }
 }
@@ -198,6 +198,11 @@ impl InterruptStatus {
         match Cpu::current() {
             Cpu::ProCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
+                    #[cfg(esp32p4)]
+                    if idx == 4 {
+                        // Discontiguous, cannot be part of the standard status array
+                        return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                    }
                     INTERRUPT_CORE0::regs()
                         .core_0_intr_status(idx)
                         .read()
@@ -207,6 +212,11 @@ impl InterruptStatus {
             #[cfg(multi_core)]
             Cpu::AppCpu => InterruptStatus {
                 status: core::array::from_fn(|idx| {
+                    #[cfg(esp32p4)]
+                    if idx == 4 {
+                        // Discontiguous, cannot be part of the standard status array
+                        return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                    }
                     INTERRUPT_CORE1::regs()
                         .core_1_intr_status(idx)
                         .read()

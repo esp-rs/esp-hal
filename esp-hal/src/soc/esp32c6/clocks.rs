@@ -99,7 +99,7 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         if self.xtal_clk.is_none() {
             self.xtal_clk = Some(XtalClkConfig::_40);
         }
@@ -108,11 +108,9 @@ impl ClockConfig {
         // before calibration. Therefore, before switching SOC_ROOT_CLK to HS, we need to set
         // MSPI source clock HS divider to make it run at 80MHz after the switch.
         // PLL = 480MHz, so divider is 6.
-        ClockTree::with(|clocks| {
-            configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::new(MspiFastHsClkDivisor::_5))
-        });
+        configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::new(MspiFastHsClkDivisor::_5));
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 

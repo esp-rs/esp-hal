@@ -487,11 +487,11 @@ dependencies = [
 
 [[package]]
 name = "embassy-usb-driver"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17119855ccc2d1f7470a39756b12068454ae27a3eabb037d940b5c03d9c77b7a"
+checksum = "6a189cbf1d8ab3c591f88632f85c1df892b6ab04116037cbee39dc37cbdcd79f"
 dependencies = [
- "embedded-io-async 0.6.1",
+ "embedded-io-async 0.7.0",
 ]
 
 [[package]]
@@ -517,13 +517,15 @@ dependencies = [
 
 [[package]]
 name = "embassy-usb-synopsys-otg"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbe46f4083109c7ea12a03ca61095d1e87c76fec52c7ca9ee06a42935606dacb"
+checksum = "fb205e26d59e483e8c48f91f637ec217ec7e2cfb0b61d50482301b991b4ff431"
 dependencies = [
  "critical-section",
  "embassy-sync 0.8.0",
+ "embassy-time",
  "embassy-usb-driver",
+ "portable-atomic",
 ]
 
 [[package]]
@@ -653,7 +655,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "esp-backtrace"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -668,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "esp-bootloader-esp-idf"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -683,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "esp-config"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "document-features",
  "esp-metadata-generated",
@@ -694,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "esp-hal"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "bitfield",
  "bitflags 2.11.0",
@@ -737,6 +739,7 @@ dependencies = [
  "nb 1.1.0",
  "paste",
  "portable-atomic",
+ "rand_core 0.10.1",
  "rand_core 0.6.4",
  "rand_core 0.9.5",
  "riscv",
@@ -748,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-procmacros"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "document-features",
  "object",
@@ -761,11 +764,11 @@ dependencies = [
 
 [[package]]
 name = "esp-metadata-generated"
-version = "0.3.0"
+version = "0.4.0"
 
 [[package]]
 name = "esp-println"
-version = "0.16.1"
+version = "0.17.0"
 dependencies = [
  "document-features",
  "esp-metadata-generated",
@@ -776,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "esp-riscv-rt"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "document-features",
  "riscv",
@@ -785,16 +788,18 @@ dependencies = [
 
 [[package]]
 name = "esp-rom-sys"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "cfg-if",
  "document-features",
  "esp-metadata-generated",
+ "esp32s2",
+ "esp32s3",
 ]
 
 [[package]]
 name = "esp-rtos"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -816,7 +821,7 @@ dependencies = [
 
 [[package]]
 name = "esp-sync"
-version = "0.1.1"
+version = "0.2.1"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -843,64 +848,64 @@ dependencies = [
 
 [[package]]
 name = "esp32"
-version = "0.39.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.40.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5726e07689249d1a2cb7c492077bc424837fb68a64f7eb5d46569325352e9428"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32c2"
-version = "0.28.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.29.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ef0b623533bbaa37e348c18b6b41cfd5b47c3cb64a4b9e44f0295941d62aa2e"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32c3"
-version = "0.31.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.32.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21e89ed62cf6c043a6d29c520b02a13b359ec8a75d67b65d4330ed717d15fe97"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32c6"
-version = "0.22.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c58f34ff2633968c12125efc7f4f8f101078d5d34c7cb60eab82268db20986f9"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32h2"
-version = "0.18.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5bab026020ed4606ce113b6fde598dbc48f7eefcc46e9469ece77cc2b1aa4be"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32s2"
-version = "0.30.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.31.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0ad6f21cdf6ec7b06b7f7e0fbe51f0d975fd6a5fa67c3f8a5a910d3981af531"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
 [[package]]
 name = "esp32s3"
-version = "0.34.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=405f40e#405f40edcb665ce5dc9e99428ea23670e004ebc8"
+version = "0.35.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4b8c4e4d9f187553ecdb7173edec7b2deb2beea106eedefecdb1654b8ee25a"
 dependencies = [
- "critical-section",
  "vcell",
 ]
 
@@ -1341,6 +1346,12 @@ name = "rand_core"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
+
+[[package]]
+name = "rand_core"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
 name = "regex-automata"
@@ -1825,7 +1836,7 @@ dependencies = [
 
 [[package]]
 name = "xtensa-lx-rt"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "document-features",
  "xtensa-lx",

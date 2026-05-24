@@ -1,5 +1,5 @@
 //! Low-level access to Xtensa LX processors and peripherals.
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(asm_sub_register)]
 #![feature(asm_experimental_arch)]
 #![no_std]

@@ -11,7 +11,7 @@
 //! - WS   =>  GPIO4
 //! - DIN  =>  GPIO5
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -29,7 +29,7 @@ use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());

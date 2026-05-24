@@ -104,7 +104,7 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
         // FIXME: we ignore user XTAL configuration, but we shouldn't offer it in the first place.
         // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
         self.xtal_clk = if PCR::regs().sysclk_conf().read().clk_xtal_freq().bits() == 40 {
@@ -113,7 +113,7 @@ impl ClockConfig {
             Some(XtalClkConfig::_48)
         };
 
-        self.apply();
+        self.apply(clocks);
     }
 }
 

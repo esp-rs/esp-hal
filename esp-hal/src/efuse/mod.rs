@@ -17,21 +17,25 @@
 //!
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
-//!
-//! ## Examples
-//!
-//! ### Reading interface MAC addresses
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::efuse::{self, InterfaceMacAddress};
-//!
-//! # {interface_mac}
-//! println!("MAC: {mac}");
-//! println!("MAC bytes: {:02x?}", mac.as_bytes());
-//! # {after_snippet}
-//! ```
+#![cfg_attr(
+    any(soc_has_wifi, soc_has_bt),
+    doc = r#"
 
+## Examples
+
+### Reading interface MAC addresses
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::efuse::{self, InterfaceMacAddress};
+
+# {interface_mac}
+println!("MAC: {mac}");
+println!("MAC bytes: {:02x?}", mac.as_bytes());
+# {after_snippet}
+```
+"#
+)]
 use core::{cmp, mem, slice, sync::atomic::Ordering};
 
 use bytemuck::AnyBitPattern;
@@ -44,6 +48,7 @@ use portable_atomic::AtomicU8;
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
+#[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
 pub(crate) mod implem;

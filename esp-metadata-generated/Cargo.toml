@@ -9,6 +9,7 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+changelog-exempt = true
 check-configs = [
     { features = [] },
     { features = ["build-script"] },
@@ -27,5 +28,6 @@ esp32c5 = ["_device-selected"]
 esp32c6 = ["_device-selected"]
 esp32c61 = ["_device-selected"]
 esp32h2 = ["_device-selected"]
+esp32p4 = ["_device-selected"]
 esp32s2 = ["_device-selected"]
 esp32s3 = ["_device-selected"]

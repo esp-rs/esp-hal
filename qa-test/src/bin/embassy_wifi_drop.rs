@@ -23,7 +23,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -45,13 +45,12 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
 
-        let (mut controller, interfaces) = esp_radio::wifi::new(
+        let mut wifi_interface = esp_radio::wifi::Interface::station();
+        let mut controller = esp_radio::wifi::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )
         .unwrap();
-
-        let mut wifi_interface = interfaces.station;
 
         let token = wifi_interface.transmit();
         assert!(matches!(token, None));
@@ -82,14 +81,13 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
 
-        let (mut controller, interfaces) = esp_radio::wifi::new(
+        let mut wifi_interface = esp_radio::wifi::Interface::station();
+        let mut controller = esp_radio::wifi::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )
         .unwrap();
         controller.connect_async().await.unwrap();
-
-        let mut wifi_interface = interfaces.station;
 
         let token = wifi_interface.transmit();
 

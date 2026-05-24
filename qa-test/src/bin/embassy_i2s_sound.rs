@@ -25,7 +25,7 @@
 //! | DEMP  | Gnd             |
 //! | XSMT  | +3V3            |
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -51,7 +51,7 @@ const SINE: [i16; 64] = [
     -28897, -27244, -25329, -23169, -20787, -18204, -15446, -12539, -9511, -6392, -3211,
 ];
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());

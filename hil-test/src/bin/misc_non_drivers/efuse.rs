@@ -2,6 +2,7 @@
 
 #[embedded_test::tests(default_timeout = 2)]
 mod tests {
+    #[cfg(any(soc_has_wifi, soc_has_bt))]
     use esp_hal::efuse::{self, InterfaceMacAddress, MacAddress};
     use hil_test as _;
 

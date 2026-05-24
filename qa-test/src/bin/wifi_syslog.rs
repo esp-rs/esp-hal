@@ -25,7 +25,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -46,7 +46,7 @@ async fn main(_spawner: Spawner) {
 
     println!("Creating wifi controller with print-logs-from-driver enabled");
 
-    let (mut controller, _interfaces) = esp_radio::wifi::new(
+    let mut controller = esp_radio::wifi::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )

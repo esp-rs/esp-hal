@@ -47,6 +47,10 @@ enum Cli {
     SemverCheck(SemverCheckArgs),
     /// Check the changelog for packages.
     CheckChangelog(CheckChangelogArgs),
+    /// Validate the changelog format of a PR description.
+    ///
+    /// Reads the body from stdin by default. Pass `--pr` to fetch from GitHub.
+    CheckPrChangelog(CheckPrChangelogArgs),
     /// Re-generate metadata and the chip support table in the esp-hal README.
     UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
@@ -65,6 +69,15 @@ enum Cli {
     /// Start the MCP server (stdio transport, for use with Claude Code).
     #[cfg(feature = "mcp")]
     Mcp,
+}
+
+#[derive(Debug, Args)]
+struct CheckPrChangelogArgs {
+    /// GitHub pull-request number to fetch and validate.
+    ///
+    /// When omitted, the PR body is read from stdin.
+    #[arg(long)]
+    pr: Option<u64>,
 }
 
 #[derive(Debug, Args)]
@@ -132,6 +145,7 @@ fn main() -> Result<()> {
 
         // Release-related subcommands:
         Cli::Release(release) => match release {
+            Release::ChangelogPreview(args) => changelog_preview(&workspace, args),
             Release::BumpVersion(args) => bump_version(&workspace, args),
             Release::TagReleases(args) => tag_releases(&workspace, args),
             Release::Publish(args) => publish(&workspace, args),
@@ -154,6 +168,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
+        Cli::CheckPrChangelog(args) => check_pr_changelog(&workspace, args.pr),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),

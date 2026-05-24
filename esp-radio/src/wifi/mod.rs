@@ -63,7 +63,7 @@ use esp_hal::system::Cpu;
 use esp_hal::time::{Duration, Instant};
 use esp_sync::NonReentrantMutex;
 use event::EVENT_CHANNEL;
-use portable_atomic::{AtomicUsize, Ordering};
+use portable_atomic::{AtomicU8, AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 
 pub(crate) use self::os_adapter::*;
@@ -1067,6 +1067,20 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
 
 fn wifi_deinit() -> Result<(), crate::WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
+
+    // Drain RX queues before deinit so that any stale PacketBuffers are freed
+    // while the driver is still alive. Without this, an Interface that outlives
+    // the controller could hold PacketBuffers with dangling `eb` pointers.
+    //
+    // PacketBuffer::drop must run outside the queue's critical section because it
+    // calls `esp_wifi_internal_free_rx_buffer`, which takes an internal mutex.
+    while let Some(packet) = DATA_QUEUE_RX_STA.with(|q| q.pop_front()) {
+        drop(packet);
+    }
+    while let Some(packet) = DATA_QUEUE_RX_AP.with(|q| q.pop_front()) {
+        drop(packet);
+    }
+
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
     Ok(())
@@ -1351,20 +1365,85 @@ impl InterfaceType {
     }
 }
 
+static SINGLETONS: AtomicU8 = AtomicU8::new(0);
+
+const STA_BIT: u8 = 1 << 0;
+const AP_BIT: u8 = 1 << 1;
+#[cfg(feature = "sniffer")]
+pub(super) const SNIFFER_BIT: u8 = 1 << 2;
+
+pub(super) fn try_acquire(bit: u8) -> bool {
+    SINGLETONS.fetch_or(bit, Ordering::AcqRel) & bit == 0
+}
+
+pub(super) fn release(bit: u8) {
+    SINGLETONS.fetch_and(!bit, Ordering::Release);
+}
+
 /// Wi-Fi interface.
 ///
 /// This implements the `embassy-net-driver` trait for up to three latest versions of that crate.
 /// While that crate isn't stable we make an exception here from the [API Guidelines](https://rust-lang.github.io/api-guidelines/necessities.html#c-stable)
 /// in exposing unstable dependencies.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+///
+/// Each interface mode (station, access point) is a singleton — only one
+/// instance of each can exist at a time. Create interfaces via
+/// [`Interface::station()`] or [`Interface::access_point()`] before or after
+/// calling [`new()`]. Dropping the interface releases the singleton so it can
+/// be created again.
+#[derive(Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct Interface<'d> {
-    _phantom: PhantomData<&'d ()>,
+pub struct Interface {
     mode: InterfaceType,
 }
 
-impl Interface<'_> {
+impl Interface {
+    /// Creates the station-mode interface.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a station interface already exists. Use [`try_station()`](Self::try_station)
+    /// for a non-panicking alternative.
+    pub fn station() -> Self {
+        Self::try_station().expect("station interface already taken")
+    }
+
+    /// Tries to create the station-mode interface.
+    ///
+    /// Returns `None` if a station interface already exists.
+    pub fn try_station() -> Option<Self> {
+        if try_acquire(STA_BIT) {
+            Some(Self {
+                mode: InterfaceType::Station,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Creates the access-point-mode interface.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an access-point interface already exists.
+    /// Use [`try_access_point()`](Self::try_access_point) for a non-panicking alternative.
+    pub fn access_point() -> Self {
+        Self::try_access_point().expect("access point interface already taken")
+    }
+
+    /// Tries to create the access-point-mode interface.
+    ///
+    /// Returns `None` if an access-point interface already exists.
+    pub fn try_access_point() -> Option<Self> {
+        if try_acquire(AP_BIT) {
+            Some(Self {
+                mode: InterfaceType::AccessPoint,
+            })
+        } else {
+            None
+        }
+    }
+
     #[procmacros::doc_replace]
     /// Retrieves the MAC address of the Wi-Fi device.
     ///
@@ -1372,9 +1451,9 @@ impl Interface<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// let (_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// let _controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     ///
-    /// let station = interfaces.station;
+    /// let station = esp_radio::wifi::Interface::station();
     /// let mac = station.mac_address();
     ///
     /// println!("Station MAC: {:02x?}", mac);
@@ -1394,6 +1473,16 @@ impl Interface<'_> {
     /// Transmits data through the Wi-Fi device.
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
+    }
+}
+
+impl Drop for Interface {
+    fn drop(&mut self) {
+        let bit = match self.mode {
+            InterfaceType::Station => STA_BIT,
+            InterfaceType::AccessPoint => AP_BIT,
+        };
+        release(bit);
     }
 }
 
@@ -1875,7 +1964,7 @@ pub(crate) mod embassy_02 {
         }
     }
 
-    impl Driver for Interface<'_> {
+    impl Driver for Interface {
         type RxToken<'a>
             = WifiRxToken
         where
@@ -1954,25 +2043,6 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
         })
     })?;
     Ok(())
-}
-
-/// Represents the Wi-Fi controller and its associated interfaces.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct Interfaces<'d> {
-    /// Station mode Wi-Fi device.
-    pub station: Interface<'d>,
-    /// Access Point mode Wi-Fi device.
-    pub access_point: Interface<'d>,
-    /// ESP-NOW interface.
-    #[cfg(all(feature = "esp-now", feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub esp_now: crate::esp_now::EspNow<'d>,
-    /// Wi-Fi sniffer interface.
-    #[cfg(all(feature = "sniffer", feature = "unstable"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub sniffer: Sniffer<'d>,
 }
 
 /// Wi-Fi operating class.
@@ -2244,10 +2314,15 @@ impl ControllerConfig {
 }
 
 #[procmacros::doc_replace]
-/// Create a Wi-Fi controller and it's associated interfaces. The default initial configuration is
+/// Create a Wi-Fi controller. The default initial configuration is
 /// [Config::Station(StationConfig::default())].
 ///
 /// Dropping the controller will deinitialize / stop Wi-Fi.
+///
+/// Create [`Interface`]s separately via [`Interface::station()`] /
+/// [`Interface::access_point()`]. ESP-NOW and sniffer instances are
+/// available through the controller's [`WifiController::esp_now()`] and
+/// [`WifiController::sniffer()`] methods.
 ///
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
@@ -2256,13 +2331,14 @@ impl ControllerConfig {
 ///
 /// ```rust,no_run
 /// # {before_snippet}
-/// let (controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+/// let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+/// let sta = esp_radio::wifi::Interface::station();
 /// # {after_snippet}
 /// ```
 pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
     config: ControllerConfig,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+) -> Result<WifiController<'d>, WifiError> {
     let _guard = RadioRefGuard::new();
 
     config.validate();
@@ -2340,23 +2416,7 @@ pub fn new<'d>(
 
     controller.set_config(&config.initial_config)?;
 
-    Ok((
-        controller,
-        Interfaces {
-            station: Interface {
-                _phantom: Default::default(),
-                mode: InterfaceType::Station,
-            },
-            access_point: Interface {
-                _phantom: Default::default(),
-                mode: InterfaceType::AccessPoint,
-            },
-            #[cfg(all(feature = "esp-now", feature = "unstable"))]
-            esp_now: crate::esp_now::EspNow::new_internal(),
-            #[cfg(all(feature = "sniffer", feature = "unstable"))]
-            sniffer: Sniffer::new(),
-        },
-    ))
+    Ok(controller)
 }
 
 /// Wi-Fi controller.
@@ -2367,7 +2427,6 @@ pub fn new<'d>(
 /// deinitialized and Wi-Fi is stopped.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,
@@ -2376,12 +2435,12 @@ pub struct WifiController<'d> {
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
         state::locked(|| {
+            set_access_point_state(WifiAccessPointState::Uninitialized);
+            set_station_state(WifiStationState::Uninitialized);
+
             if let Err(e) = crate::wifi::wifi_deinit() {
                 warn!("Failed to cleanly deinit wifi: {:?}", e);
             }
-
-            set_access_point_state(WifiAccessPointState::Uninitialized);
-            set_station_state(WifiStationState::Uninitialized);
 
             #[cfg(all(rng_trng_supported, feature = "unstable"))]
             esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
@@ -2392,6 +2451,28 @@ impl Drop for WifiController<'_> {
 }
 
 impl WifiController<'_> {
+    /// Returns an ESP-NOW instance tied to this controller's lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an ESP-NOW instance already exists.
+    #[cfg(all(feature = "esp-now", feature = "unstable"))]
+    #[instability::unstable]
+    pub fn esp_now(&self) -> crate::esp_now::EspNow<'_> {
+        crate::esp_now::EspNow::new_internal()
+    }
+
+    /// Returns a sniffer instance tied to this controller's lifetime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a sniffer instance already exists.
+    #[cfg(all(feature = "sniffer", feature = "unstable"))]
+    #[instability::unstable]
+    pub fn sniffer(&self) -> Sniffer<'_> {
+        Sniffer::new()
+    }
+
     /// Set CSI configuration and register the receiving callback.
     #[cfg(all(feature = "csi", feature = "unstable"))]
     #[instability::unstable]
@@ -2426,8 +2507,7 @@ impl WifiController<'_> {
     /// let controller_config = ControllerConfig::default().with_initial_config(Config::AccessPoint(
     ///     AccessPointConfig::default().with_ssid("esp-radio"),
     /// ));
-    /// let (mut wifi_controller, _interfaces) =
-    ///     esp_radio::wifi::new(peripherals.WIFI, controller_config)?;
+    /// let mut wifi_controller = esp_radio::wifi::new(peripherals.WIFI, controller_config)?;
     ///
     /// wifi_controller.set_protocols(Protocols::default());
     /// # {after_snippet}
@@ -2466,7 +2546,7 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::PowerSaveMode;
-    /// let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// let mut controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// controller.set_power_saving(PowerSaveMode::Maximum)?;
     /// # {after_snippet}
     /// ```
@@ -2497,7 +2577,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// // Assume the station has already been started and connected
     /// match controller.rssi() {
     ///     Ok(rssi) => {
@@ -2538,7 +2618,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// // Assume the station has already been started and connected
     /// match controller.ap_info() {
     ///     Ok(info) => {
@@ -2586,7 +2666,7 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
-    /// # let (mut controller, _interfaces) =
+    /// # let mut controller =
     /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// let station_config = Config::Station(
     ///     StationConfig::default()
@@ -2815,7 +2895,7 @@ ignored."
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::WifiError;
-    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// if controller.is_connected() {
     ///     println!("Station is connected");
     /// } else {
@@ -2845,13 +2925,10 @@ ignored."
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::{WifiController, scan::ScanConfig};
-    /// # let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let mut controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// // Create a scan configuration (e.g., scan up to 10 APs)
     /// let scan_config = ScanConfig::default().with_max(10);
-    /// let result = controller
-    ///     .scan_async(&scan_config)
-    ///     .await
-    ///     .unwrap();
+    /// let result = controller.scan_async(&scan_config).await.unwrap();
     /// for ap in result {
     ///     println!("{:?}", ap);
     /// }
@@ -2904,7 +2981,7 @@ ignored."
     /// # {before_snippet}
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
     ///
-    /// # let (mut controller, _interfaces) =
+    /// # let mut controller =
     /// #   esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     ///
     /// match controller.connect_async().await {
@@ -2978,7 +3055,7 @@ ignored."
     /// # {before_snippet}
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
     ///
-    /// # let (mut controller, _interfaces) =
+    /// # let mut controller =
     /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// match controller.disconnect_async().await {
     ///     Ok(info) => {

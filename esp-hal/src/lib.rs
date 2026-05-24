@@ -194,10 +194,14 @@ fn main() -> ! {
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
+// TODO(esp32p4): fill `[device.clock_tree]` doc strings in esp32p4.toml,
+// then promote back to `deny`. Until then, downgrade to warn for P4 only.
+#![cfg_attr(not(esp32p4), deny(missing_docs))]
+#![cfg_attr(esp32p4, warn(missing_docs))]
+#![deny(rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 // Don't trip up on broken/private links when running semver-checks
@@ -274,7 +278,6 @@ metadata!(
 #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
-use esp_sync::RawMutex;
 pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
 #[cfg(all(xtensa, feature = "rt"))]
@@ -291,10 +294,7 @@ pub mod gpio;
 #[cfg(i2c_master_driver_supported)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(
-    feature = "unstable",
-    any(ecc_driver_supported, hmac_driver_supported, sha_driver_supported)
-))]
+#[cfg(all(feature = "unstable", any(hmac_driver_supported, sha_driver_supported)))]
 mod reg_access;
 #[cfg(rng_driver_supported)]
 pub mod rng;
@@ -308,13 +308,13 @@ pub mod uart;
 
 mod macros;
 
-#[cfg(feature = "rt")]
-pub use procmacros::blocking_main as main;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
 #[cfg(any(lp_core, ulp_riscv_core))]
 pub use procmacros::load_lp_code;
+#[cfg(feature = "rt")]
+pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]
@@ -399,6 +399,8 @@ unstable_driver! {
     pub mod twai;
     #[cfg(usb_serial_jtag_driver_supported)]
     pub mod usb_serial_jtag;
+    #[cfg(ethernet_driver_supported)]
+    pub mod ethernet;
 }
 
 /// State of the CPU saved when entering exception or interrupt
@@ -616,7 +618,8 @@ use crate::clock::{ClockConfig, CpuClock};
 use crate::peripherals::Peripherals;
 
 /// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
-pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
+#[cfg(feature = "rt")]
+pub(crate) static ESP_HAL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 #[procmacros::doc_replace]
 /// System configuration.
@@ -719,18 +722,7 @@ pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
     #[cfg(soc_cpu_has_branch_predictor)]
-    {
-        // Enable branch predictor
-        // Note that the branch predictor will start cache requests and needs to be disabled when
-        // the cache is disabled.
-        // MHCR: CSR 0x7c1
-        const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-        const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-        const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
-        unsafe {
-            core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-        }
-    }
+    crate::soc::enable_branch_predictor();
 
     crate::soc::ensure_stack_pointer_in_range();
     #[cfg(stack_guard_monitoring)]

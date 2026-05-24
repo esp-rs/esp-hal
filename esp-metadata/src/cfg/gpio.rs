@@ -148,7 +148,7 @@ impl PinConfig {
         // Resolve implicit limitations - based on pin alternate functions
         let implicit: &[(&[&str], PinLimitation)] = &[
             (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
-            (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
+            (&["USJ_DP", "USJ_DM"], PinLimitation::UsbJtag),
             (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
         ];
 
@@ -366,6 +366,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let mut expanded_lp_functions = vec![];
     let mut analog_functions = vec![];
     let mut expanded_analog_functions = vec![];
+    let mut iomux_functions = vec![];
+    let mut expanded_iomux_functions = vec![];
 
     let pin_afs = gpio
         .pins_and_signals
@@ -420,6 +422,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 branches: &mut Vec<TokenStream>,
                 pin_peri: &Ident,
                 signal: &str,
+                af: Option<&TokenStream>,
             ) {
                 // Split "NAMEnumber" format fragments into the NAME and the number. The function
                 // returns `None` if the input string is not in this format. The NAME part can be
@@ -474,8 +477,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 };
 
                 if let Some(full_signal) = full_signal {
-                    branches.push(quote! {
-                        #full_signal, #pin_peri
+                    branches.push(if let Some(af) = af {
+                        quote! { #full_signal, #pin_peri, #af }
+                    } else {
+                        quote! { #full_signal, #pin_peri }
                     });
                 }
             }
@@ -484,7 +489,12 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 if let Some(signal) = pin.analog.get(af) {
                     let signal_name = TokenStream::from_str(signal).unwrap();
                     analog_functions.push(quote! { #signal_name, #pin_peri });
-                    create_matchers_for_signal(&mut expanded_analog_functions, &pin_peri, signal);
+                    create_matchers_for_signal(
+                        &mut expanded_analog_functions,
+                        &pin_peri,
+                        signal,
+                        None,
+                    );
                 }
             }
 
@@ -492,7 +502,22 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 if let Some(signal) = pin.lp.get(af) {
                     let signal_name = TokenStream::from_str(signal).unwrap();
                     lp_functions.push(quote! { #signal_name, #pin_peri });
-                    create_matchers_for_signal(&mut expanded_lp_functions, &pin_peri, signal);
+                    create_matchers_for_signal(&mut expanded_lp_functions, &pin_peri, signal, None);
+                }
+            }
+
+            for af in 0..FunctionMap::COUNT {
+                if let Some(signal) = pin.functions.get(af) {
+                    let signal_name = TokenStream::from_str(signal).unwrap();
+                    let af_variant = format_ident!("_{af}");
+                    let af_tokens = quote! { #af_variant };
+                    iomux_functions.push(quote! { #signal_name, #pin_peri, #af_variant });
+                    create_matchers_for_signal(
+                        &mut expanded_iomux_functions,
+                        &pin_peri,
+                        signal,
+                        Some(&af_tokens),
+                    );
                 }
             }
 
@@ -553,6 +578,13 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         &[
             ("all", &lp_functions),
             ("all_expanded", &expanded_lp_functions),
+        ],
+    );
+    let for_each_iomux = generate_for_each_macro(
+        "iomux_function",
+        &[
+            ("all", &iomux_functions),
+            ("all_expanded", &expanded_iomux_functions),
         ],
     );
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
@@ -628,6 +660,35 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
+
+        /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
+        ///
+        /// IOMUX functions are the alternate digital functions configured via the IO_MUX registers.
+        /// Use this to implement signal-specific traits for peripherals whose pins must bypass the
+        /// GPIO matrix (e.g., EMAC, USB).
+        ///
+        /// For an explanation on the general syntax, as well as usage of individual/repeated
+        /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+        ///
+        /// This macro has two options for its "Individual matcher" case:
+        ///
+        /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need identifiers, and maybe the alternate function.
+        /// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs.
+        ///
+        /// Macro fragments:
+        ///
+        /// - `$signal`: the name of the signal.
+        /// - `$group`: the name of the signal, with numbers replaced by placeholders.
+        /// - `$number`: the numbers extracted from `$signal`.
+        /// - `$gpio`: the name of the GPIO.
+        /// - `$af`: the alternate function number, as an identifier (e.g. `_5`).
+        ///
+        /// Example data:
+        /// - `(EMAC_RXD0, GPIO25, _5)`
+        /// - `((EMAC_RXDn, EMAC_RXDn, 0), GPIO25, _5)`
+        ///
+        /// The expanded syntax is only available when the signal has at least one numbered component.
+        #for_each_iomux
 
         /// Defines the `InputSignal` and `OutputSignal` enums.
         ///

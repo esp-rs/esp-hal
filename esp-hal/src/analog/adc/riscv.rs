@@ -183,6 +183,17 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
         regi2c::ADC_SAR1_DREF.write_field(1);
     }
 
+    // ESP32-P4 uses DREF value 4 (same as S2/S3) not 1.
+    //      REGI2C_SAR_I2C (0x69) reg 2, bits [6:4] = DREF
+    #[cfg(esp32p4)]
+    fn calibration_init() {
+        use crate::soc::regi2c;
+        // REG2 bits [6:4] = ADC_SAR1_DREF; clear then set to 4
+        let val = regi2c::regi2c_read(regi2c::REGI2C_SAR_I2C, 0, 2);
+        let new_val = (val & !(0x7 << 4)) | (4 << 4);
+        regi2c::regi2c_write(regi2c::REGI2C_SAR_I2C, 0, 2, new_val);
+    }
+
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
@@ -258,6 +269,16 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     fn calibration_init() {
         regi2c::ADC_SAR2_DREF.write_field(1);
+    }
+
+    // ESP32-P4 uses DREF value 4 for ADC2 as well.
+    // REG5 bits [6:4] = ADC_SAR2_DREF
+    #[cfg(esp32p4)]
+    fn calibration_init() {
+        use crate::soc::regi2c;
+        let val = regi2c::regi2c_read(regi2c::REGI2C_SAR_I2C, 0, 5);
+        let new_val = (val & !(0x7 << 4)) | (4 << 4);
+        regi2c::regi2c_write(regi2c::REGI2C_SAR_I2C, 0, 5, new_val);
     }
 
     fn set_init_code(data: u16) {

@@ -2,205 +2,35 @@ name: Changelog check
 
 on:
   pull_request:
-    # We will not track changes for the following packages/directories.
-    paths-ignore:
-      - "/examples/"
-      - "/extras/"
-      - "/hil-tests/"
-      - "/resources/"
-      - "/xtask/"
     # Run on labeled/unlabeled in addition to defaults to detect
-    # adding/removing skip-changelog labels.
+    # adding/removing the skip-changelog or manual-changelog labels.
     types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   get-labels:
     uses: ./.github/workflows/get-labels.yml
+
   changelog:
     needs: get-labels
-    if: ${{ github.event_name != 'pull_request' ||
-      (!contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') &&
-      !github.event.pull_request.draft) }} # don't bother checking the changelog for draft PRs
+    # Skip draft PRs and PRs that already carry the skip-changelog label —
+    # the label check inside xtask is authoritative, but skipping here avoids
+    # a full Rust compile when it isn't needed.
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(needs.get-labels.outputs.labels, 'skip-changelog')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
 
-      - name: Check which package is modified
-        uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            esp-alloc:
-              - 'esp-alloc/**'
-            esp-backtrace:
-              - 'esp-backtrace/**'
-            esp-bootloader-esp-idf:
-              - 'esp-bootloader-esp-idf/**'
-            esp-config:
-              - 'esp-config/**'
-            esp-hal:
-              - 'esp-hal/**'
-            esp-hal-procmacros:
-              - 'esp-hal-procmacros/**'
-            esp-lp-hal:
-              - 'esp-lp-hal/**'
-            esp-phy:
-              - 'esp-phy/**'
-            esp-rtos:
-              - 'esp-rtos/**'
-            esp-println:
-              - 'esp-println/**'
-            esp-riscv-rt:
-              - 'esp-riscv-rt/**'
-            esp-storage:
-              - 'esp-storage/**'
-            esp-radio:
-              - 'esp-radio/**'
-            esp-radio-rtos-driver:
-              - 'esp-radio-rtos-driver/**'
-            esp-sync:
-              - 'esp-sync/**'
-            xtensa-lx:
-              - 'xtensa-lx/**'
-            xtensa-lx-rt:
-              - 'xtensa-lx-rt/**'
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Check that changelog updated (esp-alloc)
-        if: steps.changes.outputs.esp-alloc == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-alloc/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-alloc/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-backtrace)
-        if: steps.changes.outputs.esp-backtrace == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-backtrace/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-backtrace/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-bootloader-esp-idf)
-        if: steps.changes.outputs.esp-bootloader-esp-idf == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-bootloader-esp-idf/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-bootloader-esp-idf/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-config)
-        if: steps.changes.outputs.esp-config == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-config/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-config/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-hal)
-        if: steps.changes.outputs.esp-hal == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-hal/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-hal-procmacros)
-        if: steps.changes.outputs.esp-hal-procmacros == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-hal-procmacros/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-procmacros/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-lp-hal)
-        if: steps.changes.outputs.esp-lp-hal == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-lp-hal/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-lp-hal/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-phy)
-        if: steps.changes.outputs.esp-phy == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-phy/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-phy/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-rtos)
-        if: steps.changes.outputs.esp-rtos == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-rtos/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-rtos/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-println)
-        if: steps.changes.outputs.esp-println == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-println/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-println/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-riscv-rt)
-        if: steps.changes.outputs.esp-riscv-rt == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-riscv-rt/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-riscv-rt/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-storage)
-        if: steps.changes.outputs.esp-storage == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-storage/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-storage/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-radio)
-        if: steps.changes.outputs.esp-radio == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-radio/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-radio-rtos-driver)
-        if: steps.changes.outputs.esp-radio-rtos-driver == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-radio-rtos-driver/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio-rtos-driver/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-sync)
-        if: steps.changes.outputs.esp-sync == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-sync/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-sync/CHANGELOG.md file."
-
-      - name: Check that changelog updated (xtensa-lx)
-        if: steps.changes.outputs.xtensa-lx == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: xtensa-lx/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the xtensa-lx/CHANGELOG.md file."
-
-      - name: Check that changelog updated (xtensa-lx-rt)
-        if: steps.changes.outputs.xtensa-lx-rt == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: xtensa-lx-rt/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the xtensa-lx-rt/CHANGELOG.md file."
-
-      - name: Changelog format check
-        run: cargo xtask check-changelog
+      - name: Check PR changelog
+        run: cargo xtask check-pr-changelog --pr ${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

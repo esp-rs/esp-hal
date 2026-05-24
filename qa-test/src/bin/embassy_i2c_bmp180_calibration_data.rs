@@ -28,7 +28,7 @@ use esp_hal::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);

@@ -22,7 +22,7 @@ async fn run() {
     }
 }
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

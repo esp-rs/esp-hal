@@ -292,8 +292,8 @@ pins = [
     { pin = 15, functions = { 0 = "SPICLK" }, limitations = ["spi_flash"] },
     { pin = 16, functions = { 0 = "SPID" },   limitations = ["spi_flash"] },
     { pin = 17, functions = { 0 = "SPIQ" },   limitations = ["spi_flash"] },
-    { pin = 18,                          analog = { 0 = "USB_DM" } },
-    { pin = 19,                          analog = { 0 = "USB_DP" } },
+    { pin = 18,                          analog = { 0 = "USJ_DM" } },
+    { pin = 19,                          analog = { 0 = "USJ_DP" } },
     { pin = 20, functions = { 0 = "U0RXD" } },
     { pin = 21, functions = { 0 = "U0TXD" } },
 ]
@@ -435,6 +435,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.i2c_master]
 support_status = "supported"
+version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
@@ -470,10 +471,9 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
-clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
-clock_sources.default = "Apb"
 
 [device.rsa]
+version = 3
 support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384
@@ -484,6 +484,9 @@ dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
+version = 3
+fifo_size = 64
+bit_order_is_bool = true
 support_status = "supported"
 supports_dma = true
 has_app_interrupts = true
@@ -491,7 +494,6 @@ has_dma_segmented_transfer = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
-
 [device.spi_slave]
 support_status = "partial"
 supports_dma = true
@@ -513,6 +515,7 @@ instances = [
 ram_size = 128
 version = 1
 has_sclk_divider = true
+has_sclk_enable = true
 
 [device.uhci]
 support_status = "partial"
@@ -537,6 +540,11 @@ deep_sleep = true
 
 ## Interfaces
 [device.i2s]
+version = 2
+default_clock_source = 2
+mclk_divider_bit_width = 9
+max_ws_width = 128
+
 [device.ledc]
 [device.twai]
 [device.usb_serial_jtag]

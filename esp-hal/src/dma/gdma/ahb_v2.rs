@@ -1,14 +1,26 @@
 use super::*;
 use crate::RegisterToggle;
 
+// P4 has two DMA controllers: `ahb_dma` (GDMA-AHB, GDMA v2 layout, used here) and
+// `axi_dma` (GDMA-AXI, different register layout). The PAC's `dma` module maps to
+// a separate block that is not GDMA-AHB, so alias `ahb_dma` as `gdma_pac` on P4.
+// Other chips: PAC `dma` module is the GDMA v2 module directly.
+cfg_if::cfg_if! {
+    if #[cfg(esp32p4)] {
+        use pac::ahb_dma as gdma_pac;
+    } else {
+        use pac::dma as gdma_pac;
+    }
+}
+
 impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
-    pub(super) fn ch(&self) -> &pac::dma::ch::CH {
+    pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.channel as usize)
     }
 
     #[inline(always)]
-    pub(super) fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
+    pub(super) fn int(&self) -> &gdma_pac::out_int_ch::OUT_INT_CH {
         DMA::regs().out_int_ch(self.channel as usize)
     }
 }
@@ -217,12 +229,12 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
 
 impl AnyGdmaRxChannel<'_> {
     #[inline(always)]
-    fn ch(&self) -> &pac::dma::ch::CH {
+    fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.channel as usize)
     }
 
     #[inline(always)]
-    fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
+    fn int(&self) -> &gdma_pac::in_int_ch::IN_INT_CH {
         DMA::regs().in_int_ch(self.channel as usize)
     }
 }

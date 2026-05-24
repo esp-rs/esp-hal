@@ -61,7 +61,7 @@ use enumset::{EnumSet, EnumSetType};
 pub use self::buffers::*;
 #[cfg(dma_kind = "gdma")]
 pub use self::gdma::*;
-#[cfg(any(dma_kind = "gdma", esp32s2))] // TODO
+#[cfg(all(any(dma_kind = "gdma", esp32s2), dma_supports_mem2mem))]
 pub use self::m2m::*;
 #[cfg(dma_kind = "pdma")]
 pub use self::pdma::*;
@@ -2553,7 +2553,7 @@ where
     I: dma_private::DmaSupportTx,
 {
     fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, false);
+        self.instance.peripheral_wait_dma(false, true);
     }
 }
 
@@ -2825,7 +2825,7 @@ pub(crate) mod asynch {
         const FAILURE_INTERRUPTS: EnumSet<DmaTxInterrupt> =
             enum_set!(DmaTxInterrupt::DescriptorError);
 
-        #[cfg_attr(any(esp32c2, esp32c61), expect(dead_code))]
+        #[cfg_attr(esp32c2, expect(dead_code))]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx }
         }

@@ -38,6 +38,8 @@ esp32c61 = { version = "0.3", features = ["critical-section"], optional = true }
 esp32h2 = { version = "0.19", features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.31", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.35", features = ["critical-section"], optional = true }
+# ESP32-P4 PAC: git rev fc3e6d4 (see note in esp-hal/Cargo.toml).
+esp32p4 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fc3e6d4" }
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
@@ -62,6 +64,8 @@ esp32c6 = [ "dep:esp32c6" ]
 esp32c61 = [ "dep:esp32c61" ]
 ##
 esp32h2 = [ "dep:esp32h2" ]
+##
+esp32p4 = [ "dep:esp32p4" ]
 ##
 esp32s2 = [ "dep:esp32s2" ]
 ##

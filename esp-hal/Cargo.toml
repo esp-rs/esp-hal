@@ -21,7 +21,7 @@ check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
-    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
+    { features = ["unstable", "rt", "__usb_otg"],   if = 'chip_has("usb_otg_driver_supported")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
@@ -73,9 +73,9 @@ procmacros               = { version = "0.22.0", package = "esp-hal-procmacros",
 # They are needed when using the `unstable` feature.
 digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
 embassy-usb-driver       = { version = "0.2", optional = true }
-embassy-usb-synopsys-otg = { version = "0.3", optional = true }
+embassy-usb-synopsys-otg = { version = "0.3.3", optional = true, features = ["host"] }
+embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
-esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
@@ -102,15 +102,16 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.40", features = ["critical-section", "rt"], optional = true }
+esp32   = { version = "0.40", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
 esp32c2 = { version = "0.29", features = ["critical-section", "rt"], optional = true }
 esp32c3 = { version = "0.32", features = ["critical-section", "rt"], optional = true }
 esp32c5 = { version = "0.2",  features = ["critical-section", "rt"], optional = true }
 esp32c6 = { version = "0.23", features = ["critical-section", "rt"], optional = true }
 esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = true }
 esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -137,9 +138,6 @@ __bluetooth = []
 __usb_otg = [
     "dep:embassy-usb-driver",
     "dep:embassy-usb-synopsys-otg",
-    "dep:esp-synopsys-usb-otg",
-    "esp-synopsys-usb-otg/esp32sx",
-    "esp-synopsys-usb-otg/fs",
 ]
 
 #! ### Runtime support
@@ -154,6 +152,7 @@ rt = [
     "esp32c2?/rt",
     "esp32c3?/rt",
     "esp32c6?/rt",
+    "esp32p4?/rt",
     "esp32h2?/rt",
     "esp32s2?/rt",
     "esp32s3?/rt",
@@ -188,7 +187,8 @@ esp32   = [
     "esp-sync/esp32",
     "esp-metadata-generated/esp32",
     "dep:sha1",
-    "dep:sha2"
+    "dep:sha2",
+    "dep:embassy-net-driver-02",
 ]
 ##
 esp32c2 = [
@@ -230,6 +230,19 @@ esp32c6 = [
     "esp-rom-sys/esp32c6",
     "esp-sync/esp32c6",
     "esp-metadata-generated/esp32c6",
+]
+## ESP32-P4 (chip revision >= v3.x)
+esp32p4 = [
+    "dep:esp32p4",
+    "__usb_otg",
+    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt/clic-48",
+    "procmacros/rtc-fast",
+    "procmacros/has-lp-core",
+    "esp-rom-sys/esp32p4",
+    "esp-sync/esp32p4",
+    "esp-metadata-generated/esp32p4",
+    "dep:embassy-net-driver-02",
 ]
 ##
 esp32c61 = [

@@ -324,7 +324,7 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
         if int_ena.in_dscr_err().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorError;
         }
-        if int_ena.in_dscr_err().bit_is_set() {
+        if int_ena.in_dscr_empty().bit_is_set() {
             result |= DmaRxInterrupt::DescriptorEmpty;
         }
         if int_ena.in_suc_eof().bit_is_set() {

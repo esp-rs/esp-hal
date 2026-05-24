@@ -27,7 +27,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
 
-#[esp_rtos::main]
+#[esp_hal::main]
 async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -39,11 +39,11 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // We must initialize some kind of interface and start it.
-    let (_controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    // The sniffer borrows the controller, so we only need the controller here —
+    // no station/AP `Interface` is required for promiscuous capture.
+    let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut sniffer = interfaces.sniffer;
+    let mut sniffer = controller.sniffer();
     sniffer.set_promiscuous_mode(true).unwrap();
     sniffer.set_receive_cb(|packet| {
         let _ = match_frames! {
