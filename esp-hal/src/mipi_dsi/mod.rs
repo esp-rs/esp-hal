@@ -29,7 +29,8 @@ pub mod dpi;
 pub(crate) mod vdma;
 
 use crate::{
-    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU, VDMA},
+    rom,
     system::{GenericPeripheralGuard, Peripheral},
 };
 
@@ -147,8 +148,9 @@ pub struct MipiDsi<'d> {
 impl<'d> MipiDsi<'d> {
     /// Initialise the MIPI DSI bus.
     ///
-    /// Enables APB clock, resets the bridge, configures D-PHY PLL, and polls
-    /// for PLL lock + lane-stopped status before returning.
+    /// Enables APB clock, resets the bridge, powers up the D-PHY LDO,
+    /// configures D-PHY PLL, and polls for PLL lock + lane-stopped status
+    /// before returning.
     pub fn new(
         dsi:    MIPI_DSI<'d>,
         vdma:   VDMA<'d>,
@@ -157,6 +159,8 @@ impl<'d> MipiDsi<'d> {
         if config.lane_bit_rate_mbps < 80.0 || config.lane_bit_rate_mbps > 1500.0 {
             return Err(ConfigError::InvalidLaneBitRate);
         }
+
+        dphy_ldo_power_on();
 
         // Enable APB clock and reset bridge (via GenericPeripheralGuard).
         let dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }> =
@@ -315,6 +319,31 @@ impl<'d> MipiDsi<'d> {
     ) -> Result<dpi::DsiDpi<'d>, ConfigError> {
         dpi::DsiDpi::new(self, config, framebuffers)
     }
+}
+
+// ── D-PHY power ───────────────────────────────────────────────────────────────
+
+/// Power up the internal LDO that supplies VDD_MIPI_DPHY at 2.5 V.
+///
+/// On ESP32-P4 the DPHY power rail (VDD_MIPI_DPHY) is driven by PMU
+/// internal LDO channel 3 (VO3), which maps to the `ext_ldo_p0_0p2a`
+/// register pair.
+///
+/// Without eFuse calibration the nominal output formula gives:
+///   Vref = 1.0 V  (dref = 9)
+///   Vout = Vref × (1 + 0.25 × mul) = 2.5 V  (mul = 6)
+fn dphy_ldo_power_on() {
+    // force_tieh_sel[7]=1 → SW-owned, xpd[8]=1 → enabled.
+    // target0/target1 kept at reset values (0x80 / 0x40).
+    PMU::regs()
+        .ext_ldo_p0_0p2a()
+        .write(|w| unsafe { w.bits(0x4020_0180) });
+    // dref[31:28]=9, mul[25:23]=6 → 2.5 V.
+    PMU::regs()
+        .ext_ldo_p0_0p2a_ana()
+        .write(|w| unsafe { w.bits((9u32 << 28) | (6u32 << 23)) });
+    // Allow output to settle before the PHY analog circuits start.
+    rom::ets_delay_us(500);
 }
 
 // ── PLL helpers ───────────────────────────────────────────────────────────────

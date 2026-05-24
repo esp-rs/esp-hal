@@ -6,7 +6,7 @@
 //! - LCD RST     => GPIO27
 //! - LCD BL PWM  => GPIO26  (driven high = backlight on)
 //! - MIPI-DSI    => internal (no GPIO mux)
-//! - LDO3 (VO3) supplies VDD_MIPI_DPHY at 2.5 V via the internal PMU
+//! - VDD_MIPI_DPHY powered by the driver via PMU LDO3
 
 //% CHIP_FILTER: mipi_dsi_driver_supported
 
@@ -27,9 +27,8 @@ use esp_hal::{
         Config, DataLanes, MipiDsi, PhyPllClockSource,
         dpi::{ColorFormat, DpiClockSource, DpiConfig, FrameTiming},
     },
-    peripherals::{PMU, Peripherals},
+    peripherals::Peripherals,
     psram,
-    rom,
 };
 use esp_println::println;
 
@@ -41,19 +40,6 @@ const H_ACTIVE: u32 = 1024;
 const V_ACTIVE: u32 = 600;
 const BYTES_PER_PIXEL: usize = 2; // RGB565
 const FB_SIZE: usize = H_ACTIVE as usize * V_ACTIVE as usize * BYTES_PER_PIXEL;
-
-// ── DPHY LDO constants ────────────────────────────────────────────────────────
-// LDO channel 3 (VO3) powers VDD_MIPI_DPHY at 2.5 V.
-// Mapping: chan_id=3 → ldo_unit=2 → PMU.ext_ldo[1] → p0_0p2a registers.
-//
-// Without eFuse calibration (K=1, Vos=0, C=1):
-//   Vref = 1.0 V  (dref=9 → Vref=1+(9-9)*0.1=1.0)
-//   Vout = Vref*(1+0.25*mul) = 1.0*(1+1.5) = 2.5 V  (mul=6)
-//
-// ctrl  bits: force_tieh_sel=1[7], xpd=1[8], target0=0x80[30:23], target1=0x40[22:15]
-// ana   bits: dref=9[31:28], mul=6[25:23]
-const DPHY_LDO_CTRL: u32 = 0x4020_0180; // enable + SW-owned
-const DPHY_LDO_ANA: u32 = (9u32 << 28) | (6u32 << 23); // 2.5 V
 
 #[main]
 fn main() -> ! {
@@ -67,7 +53,6 @@ fn main() -> ! {
 
     println!("PSRAM ready");
 
-    enable_dphy_ldo();
     let delay = Delay::new();
 
     // ── LCD reset (GPIO27, active-low) ──────────────────────────────────────
@@ -157,19 +142,6 @@ fn main() -> ! {
 
         hue = (hue + 1) % 360;
     }
-}
-
-// ── LDO helpers ───────────────────────────────────────────────────────────────
-
-fn enable_dphy_ldo() {
-    PMU::regs()
-        .ext_ldo_p0_0p2a()
-        .write(|w| unsafe { w.bits(DPHY_LDO_CTRL) });
-    PMU::regs()
-        .ext_ldo_p0_0p2a_ana()
-        .write(|w| unsafe { w.bits(DPHY_LDO_ANA) });
-    // Allow LDO output to settle.
-    rom::ets_delay_us(500);
 }
 
 // ── Colour wheel ──────────────────────────────────────────────────────────────
