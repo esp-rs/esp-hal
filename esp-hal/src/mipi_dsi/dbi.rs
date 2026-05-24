@@ -3,10 +3,10 @@
 use crate::{mipi_dsi::MipiDsi, peripherals::MIPI_DSI_HOST};
 
 // DCS data type identifiers (MIPI DSI spec Table 7-1).
-const DT_DCS_SHORT_WRITE_0:  u8 = 0x05;
-const DT_DCS_SHORT_WRITE_1:  u8 = 0x15;
-const DT_DCS_LONG_WRITE:     u8 = 0x39;
-const DT_DCS_READ_0:         u8 = 0x06;
+const DT_DCS_SHORT_WRITE_0: u8 = 0x05;
+const DT_DCS_SHORT_WRITE_1: u8 = 0x15;
+const DT_DCS_LONG_WRITE: u8 = 0x39;
+const DT_DCS_READ_0: u8 = 0x06;
 const DT_SET_MAX_RETURN_PKT: u8 = 0x37;
 
 /// Error returned by DBI operations.
@@ -32,23 +32,26 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
 
         // All TX paths use LP mode; disable TE ack; enable cmd ack.
         h.cmd_mode_cfg().modify(|_, w| {
-            w.tear_fx_en().clear_bit()
-                .ack_rqst_en().set_bit()
-                .gen_sw_0p_tx().set_bit()
-                .gen_sw_1p_tx().set_bit()
-                .gen_sw_2p_tx().set_bit()
-                .gen_sr_0p_tx().set_bit()
-                .gen_sr_1p_tx().set_bit()
-                .gen_sr_2p_tx().set_bit()
-                .gen_lw_tx().set_bit()
-                .dcs_sw_0p_tx().set_bit()
-                .dcs_sw_1p_tx().set_bit()
-                .dcs_sr_0p_tx().set_bit()
-                .dcs_lw_tx().set_bit()
-                .max_rd_pkt_size().set_bit()
+            w.tear_fx_en().clear_bit();
+            w.ack_rqst_en().set_bit();
+            w.gen_sw_0p_tx().set_bit();
+            w.gen_sw_1p_tx().set_bit();
+            w.gen_sw_2p_tx().set_bit();
+            w.gen_sr_0p_tx().set_bit();
+            w.gen_sr_1p_tx().set_bit();
+            w.gen_sr_2p_tx().set_bit();
+            w.gen_lw_tx().set_bit();
+            w.dcs_sw_0p_tx().set_bit();
+            w.dcs_sw_1p_tx().set_bit();
+            w.dcs_sr_0p_tx().set_bit();
+            w.dcs_lw_tx().set_bit();
+            w.max_rd_pkt_size().set_bit()
         });
 
-        Self { _bus: bus, virtual_channel }
+        Self {
+            _bus: bus,
+            virtual_channel,
+        }
     }
 
     /// Returns the virtual channel ID this interface was configured with.
@@ -96,28 +99,28 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
             let wc = payload_size as u16;
             while h.cmd_pkt_status().read().gen_cmd_full().bit_is_set() {}
             h.gen_hdr().write(|w| unsafe {
-                w.gen_vc().bits(vc)
-                    .gen_dt().bits(DT_DCS_LONG_WRITE)
-                    .gen_wc_lsbyte().bits((wc & 0xFF) as u8)
-                    .gen_wc_msbyte().bits((wc >> 8) as u8)
+                w.gen_vc().bits(vc);
+                w.gen_dt().bits(DT_DCS_LONG_WRITE);
+                w.gen_wc_lsbyte().bits((wc & 0xFF) as u8);
+                w.gen_wc_msbyte().bits((wc >> 8) as u8)
             });
         } else if payload_size == 2 {
             // Short write with 1 param.
             while h.cmd_pkt_status().read().gen_cmd_full().bit_is_set() {}
             h.gen_hdr().write(|w| unsafe {
-                w.gen_vc().bits(vc)
-                    .gen_dt().bits(DT_DCS_SHORT_WRITE_1)
-                    .gen_wc_lsbyte().bits(cmd)
-                    .gen_wc_msbyte().bits(params[0])
+                w.gen_vc().bits(vc);
+                w.gen_dt().bits(DT_DCS_SHORT_WRITE_1);
+                w.gen_wc_lsbyte().bits(cmd);
+                w.gen_wc_msbyte().bits(params[0])
             });
         } else {
             // Short write with 0 params.
             while h.cmd_pkt_status().read().gen_cmd_full().bit_is_set() {}
             h.gen_hdr().write(|w| unsafe {
-                w.gen_vc().bits(vc)
-                    .gen_dt().bits(DT_DCS_SHORT_WRITE_0)
-                    .gen_wc_lsbyte().bits(cmd)
-                    .gen_wc_msbyte().bits(0)
+                w.gen_vc().bits(vc);
+                w.gen_dt().bits(DT_DCS_SHORT_WRITE_0);
+                w.gen_wc_lsbyte().bits(cmd);
+                w.gen_wc_msbyte().bits(0)
             });
         }
 
@@ -135,10 +138,10 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
         let max_ret = out.len() as u16;
         while h.cmd_pkt_status().read().gen_cmd_full().bit_is_set() {}
         h.gen_hdr().write(|w| unsafe {
-            w.gen_vc().bits(vc)
-                .gen_dt().bits(DT_SET_MAX_RETURN_PKT)
-                .gen_wc_lsbyte().bits((max_ret & 0xFF) as u8)
-                .gen_wc_msbyte().bits((max_ret >> 8) as u8)
+            w.gen_vc().bits(vc);
+            w.gen_dt().bits(DT_SET_MAX_RETURN_PKT);
+            w.gen_wc_lsbyte().bits((max_ret & 0xFF) as u8);
+            w.gen_wc_msbyte().bits((max_ret >> 8) as u8)
         });
 
         // Ensure command mode is active.
@@ -151,10 +154,10 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
         // Send DCS READ_0.
         while h.cmd_pkt_status().read().gen_cmd_full().bit_is_set() {}
         h.gen_hdr().write(|w| unsafe {
-            w.gen_vc().bits(vc)
-                .gen_dt().bits(DT_DCS_READ_0)
-                .gen_wc_lsbyte().bits(cmd)
-                .gen_wc_msbyte().bits(0)
+            w.gen_vc().bits(vc);
+            w.gen_dt().bits(DT_DCS_READ_0);
+            w.gen_wc_lsbyte().bits(cmd);
+            w.gen_wc_msbyte().bits(0)
         });
 
         // Wait for BTA read to complete.

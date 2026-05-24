@@ -20,15 +20,20 @@ use core::alloc::Layout;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
+    clock::CpuClock,
     delay::Delay,
     gpio::{Level, Output, OutputConfig},
     main,
     mipi_dsi::{
-        Config, DataLanes, MipiDsi, PhyPllClockSource,
+        Config,
+        DataLanes,
+        MipiDsi,
+        PhyPllClockSource,
         dpi::{ColorFormat, DpiClockSource, DpiConfig, FrameTiming},
     },
     peripherals::Peripherals,
     psram,
+    time::Instant,
 };
 use esp_println::println;
 
@@ -41,9 +46,14 @@ const V_ACTIVE: u32 = 600;
 const BYTES_PER_PIXEL: usize = 2; // RGB565
 const FB_SIZE: usize = H_ACTIVE as usize * V_ACTIVE as usize * BYTES_PER_PIXEL;
 
+#[used] // Hack to prevent invalid checksum/hash errors
+static FOO: [u8; FB_SIZE / 10] = [0u8; FB_SIZE / 10];
+
 #[main]
 fn main() -> ! {
-    let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_println::logger::init_logger_from_env();
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals: Peripherals = esp_hal::init(config);
 
     esp_alloc::psram_allocator!(
         peripherals.PSRAM,
@@ -69,9 +79,9 @@ fn main() -> ! {
         peripherals.MIPI_DSI,
         peripherals.VDMA,
         Config {
-            num_data_lanes:    DataLanes::_2,
+            num_data_lanes: DataLanes::_2,
             lane_bit_rate_mbps: 1000.0,
-            phy_clk_src:       PhyPllClockSource::Xtal,
+            phy_clk_src: PhyPllClockSource::Xtal,
             force_clock_lane_hs: false,
         },
     )
@@ -99,31 +109,33 @@ fn main() -> ! {
     let layout = Layout::from_size_align(FB_SIZE, 64).unwrap();
     let fb_ptr = unsafe { alloc::alloc::alloc_zeroed(layout) };
     assert!(!fb_ptr.is_null(), "PSRAM alloc failed");
-    let fb: &'static mut [u8] = unsafe { core::slice::from_raw_parts_mut(fb_ptr, FB_SIZE) };
+    let fb1: &'static mut [u8] = unsafe { core::slice::from_raw_parts_mut(fb_ptr, FB_SIZE) };
+
+    let fb_ptr = unsafe { alloc::alloc::alloc_zeroed(layout) };
+    assert!(!fb_ptr.is_null(), "PSRAM alloc failed");
+    let fb2: &'static mut [u8] = unsafe { core::slice::from_raw_parts_mut(fb_ptr, FB_SIZE) };
+    let fbs: [&mut [u8]; 2] = [fb1, fb2];
 
     // ── Enter video mode (DPI) ──────────────────────────────────────────────
     let dpi_cfg = DpiConfig {
-        virtual_channel:  0,
-        pixel_clock_mhz:  48.0,
-        dpi_clk_src:      DpiClockSource::PllF240m,
-        in_color_format:  ColorFormat::Rgb565,
+        virtual_channel: 0,
+        pixel_clock_mhz: 48.0,
+        dpi_clk_src: DpiClockSource::PllF240m,
+        in_color_format: ColorFormat::Rgb565,
         out_color_format: ColorFormat::Rgb565,
         timing: FrameTiming {
             h_active: H_ACTIVE,
-            hsw:      10,
-            hbp:      120,
-            hfp:      120,
+            hsw: 10,
+            hbp: 120,
+            hfp: 120,
             v_active: V_ACTIVE,
-            vsw:      1,
-            vbp:      20,
-            vfp:      10,
+            vsw: 1,
+            vbp: 20,
+            vfp: 20,
         },
     };
 
-    let fbs: [&mut [u8]; 1] = [fb];
-    let mut dpi = bus
-        .dpi(dpi_cfg, &fbs)
-        .expect("DPI init failed");
+    let mut dpi = bus.dpi(dpi_cfg, &fbs).expect("DPI init failed");
 
     println!("Streaming");
 
@@ -131,13 +143,19 @@ fn main() -> ! {
     let mut hue: u32 = 0;
 
     loop {
+        // Pace to the display refresh rate.  The DMA streams the front buffer
+        // continuously; this just waits for the blanking pulse so we know the
+        // frame we are about to render will be displayed for exactly one vsync
+        // period.
         dpi.wait_for_vsync();
 
         let back = dpi.framebuffer_mut();
-        let rgb565 = hue_to_rgb565(hue);
+        let px = hue_to_rgb565(hue);
         for chunk in back.chunks_exact_mut(2) {
-            chunk.copy_from_slice(&rgb565.to_be_bytes());
+            chunk.copy_from_slice(&px.to_le_bytes());
         }
+        // Flush cache and redirect DMA to the new buffer.
+        // The DMA never stops; the change appears within one block transfer.
         dpi.commit();
 
         hue = (hue + 1) % 360;
@@ -149,14 +167,14 @@ fn main() -> ! {
 /// Convert a hue value (0–359°) to a packed RGB565 big-endian word.
 fn hue_to_rgb565(hue: u32) -> u16 {
     let region = hue / 60;
-    let frac   = hue % 60;
+    let frac = hue % 60;
     let (r, g, b) = match region {
-        0 => (255,              (frac * 255 / 60) as u8, 0),
+        0 => (255, (frac * 255 / 60) as u8, 0),
         1 => ((255 - frac * 255 / 60) as u8, 255, 0),
-        2 => (0, 255,          (frac * 255 / 60) as u8),
+        2 => (0, 255, (frac * 255 / 60) as u8),
         3 => (0, (255 - frac * 255 / 60) as u8, 255),
         4 => ((frac * 255 / 60) as u8, 0, 255),
-        _ => (255, 0,          (255 - frac * 255 / 60) as u8),
+        _ => (255, 0, (255 - frac * 255 / 60) as u8),
     };
     let r5 = (r as u16) >> 3;
     let g6 = (g as u16) >> 2;
@@ -167,6 +185,7 @@ fn hue_to_rgb565(hue: u32) -> u16 {
 // ── EK79007 vendor init sequence ─────────────────────────────────────────────
 
 static EK79007_INIT: &[(u8, &[u8])] = &[
+    (0xB2, &[0x10]), // Pad control - two lanes
     (0x80, &[0x8B]),
     (0x81, &[0x78]),
     (0x82, &[0x84]),

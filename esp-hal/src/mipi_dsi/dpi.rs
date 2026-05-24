@@ -6,13 +6,19 @@ use crate::{
     asynch::AtomicWaker,
     interrupt,
     mipi_dsi::{
+        ConfigError,
+        MipiDsi,
         vdma::{VdmaChannel, VdmaLinkItem},
-        ConfigError, MipiDsi,
     },
-    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST},
+    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    system::Cpu,
 };
 
 const MAX_FBS: usize = 3;
+/// LLIs in the circular DMA ring.  The ISR re-arms each one immediately after
+/// the DMA consumes it, so the ring never suspends regardless of ring depth.
+/// Two is sufficient; keeping it small reduces ISR overhead.
+const NUM_LLIS: usize = 2;
 const DMA_BURST_LEN: u32 = 256;
 const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
 
@@ -23,7 +29,7 @@ const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DpiClockSource {
     /// Crystal oscillator (40 MHz on ESP32-P4).
-    Xtal = 0,
+    Xtal     = 0,
     /// 240 MHz PLL (derived from SPLL).
     PllF240m = 1,
     /// 160 MHz PLL (derived from SPLL).
@@ -36,7 +42,7 @@ impl DpiClockSource {
     pub(crate) fn freq_hz(self) -> u32 {
         use crate::soc::clocks;
         match self {
-            Self::Xtal     => clocks::xtal_clk_frequency(),
+            Self::Xtal => clocks::xtal_clk_frequency(),
             Self::PllF240m => clocks::pll_f240m_frequency(),
             Self::PllF160m => clocks::pll_f160m_frequency(),
         }
@@ -110,48 +116,72 @@ pub struct FrameTiming {
     /// Active pixels per line.
     pub h_active: u32,
     /// Horizontal sync pulse width (pixels).
-    pub hsw:      u32,
+    pub hsw: u32,
     /// Horizontal back porch (pixels).
-    pub hbp:      u32,
+    pub hbp: u32,
     /// Horizontal front porch (pixels).
-    pub hfp:      u32,
+    pub hfp: u32,
     /// Active lines per frame.
     pub v_active: u32,
     /// Vertical sync pulse width (lines).
-    pub vsw:      u32,
+    pub vsw: u32,
     /// Vertical back porch (lines).
-    pub vbp:      u32,
+    pub vbp: u32,
     /// Vertical front porch (lines).
-    pub vfp:      u32,
+    pub vfp: u32,
 }
 
 /// DPI video-mode configuration.
 #[derive(Clone, Copy, Debug)]
 pub struct DpiConfig {
     /// DSI virtual channel (0–3).
-    pub virtual_channel:  u8,
+    pub virtual_channel: u8,
     /// Desired pixel clock in MHz.
-    pub pixel_clock_mhz:  f32,
+    pub pixel_clock_mhz: f32,
     /// DPI clock source.
-    pub dpi_clk_src:      DpiClockSource,
+    pub dpi_clk_src: DpiClockSource,
     /// Input pixel format (from frame buffer).
-    pub in_color_format:  ColorFormat,
+    pub in_color_format: ColorFormat,
     /// Output pixel format (sent over DSI lanes).
     pub out_color_format: ColorFormat,
     /// Frame timing parameters.
-    pub timing:           FrameTiming,
+    pub timing: FrameTiming,
 }
 
 // ── Static link-list storage ──────────────────────────────────────────────────
 
-#[repr(align(64))]
-struct AlignedLlis([VdmaLinkItem; MAX_FBS]);
+struct AlignedLlis([VdmaLinkItem; NUM_LLIS]);
 
-static mut LLI_STORAGE: AlignedLlis = AlignedLlis([
-    VdmaLinkItem::zeroed(),
-    VdmaLinkItem::zeroed(),
-    VdmaLinkItem::zeroed(),
-]);
+static mut LLI_STORAGE: AlignedLlis = AlignedLlis([const { VdmaLinkItem::zeroed() }; NUM_LLIS]);
+
+// ── VDMA block-done ISR ───────────────────────────────────────────────────────
+
+/// Fired by the DW-GDMA at the end of every frame block transfer.
+///
+/// Re-arms the LLI that the DMA just consumed (sets `LLI_VALID = 1` and
+/// flushes the cache line to SRAM) so the DMA can use it again when the ring
+/// comes back around.  This keeps the channel running indefinitely without
+/// software ever needing to restart it.
+#[crate::ram]
+#[crate::handler]
+fn vdma_block_done_isr() {
+    let ch = VDMA::regs().ch(0);
+    ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
+
+    let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
+
+    for lli in llis.iter_mut() {
+        lli.rearm();
+    }
+
+    // Flush LLIs from CPU cache → SRAM.
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            llis.as_ptr() as u32,
+            core::mem::size_of::<VdmaLinkItem>() as u32 * NUM_LLIS as u32,
+        );
+    }
+}
 
 // ── Async waker ───────────────────────────────────────────────────────────────
 
@@ -174,18 +204,25 @@ fn dsi_bridge_isr() {
 /// Consumes the [`MipiDsi`] bus and drives the DSI host in video mode,
 /// continuously streaming frame buffers via VDMA.
 pub struct DsiDpi<'d> {
-    _guard:   crate::mipi_dsi::DphyGuard<'d>,
-    dma:      VdmaChannel,
-    fb_ptrs:  [*mut u8; MAX_FBS],
-    fb_size:  usize,
-    num_fbs:  usize,
+    _guard: crate::mipi_dsi::DphyGuard<'d>,
+    fb_ptrs: [*mut u8; MAX_FBS],
+    fb_size: usize,
+    num_fbs: usize,
     current_fb: usize,
-    clk_src:  DpiClockSource,
+    clk_src: DpiClockSource,
     _phantom: PhantomData<&'d mut [u8]>,
 }
 
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
+        // Disable the block-done interrupt before shutting down.
+        let ch = VDMA::regs().ch(0);
+        unsafe {
+            ch.intsignal_enable0().write_with_zero(|w| w);
+            ch.intstatus_enable0().write_with_zero(|w| w);
+        }
+        interrupt::disable(Cpu::current(), Interrupt::DMA);
+
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
             .modify(|_, w| w.dpi_en().clear_bit());
@@ -196,8 +233,8 @@ impl Drop for DsiDpi<'_> {
 
 impl<'d> DsiDpi<'d> {
     pub(crate) fn new(
-        bus:          MipiDsi<'d>,
-        config:       DpiConfig,
+        bus: MipiDsi<'d>,
+        config: DpiConfig,
         framebuffers: &[&'d mut [u8]],
     ) -> Result<Self, ConfigError> {
         let num_fbs = framebuffers.len();
@@ -211,16 +248,15 @@ impl<'d> DsiDpi<'d> {
         let div = div.max(1);
         let real_dpi_mhz = src_mhz / div as f32;
 
-        HP_SYS_CLKRST::regs().peri_clk_ctrl03().modify(|_, w| unsafe {
-            w.mipi_dsi_dpiclk_src_sel()
-                .bits(config.dpi_clk_src as u8)
-                .mipi_dsi_dpiclk_div_num()
-                .bits((div - 1) as u8)
-                .mipi_dsi_dpiclk_en()
-                .set_bit()
-        });
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| unsafe {
+                w.mipi_dsi_dpiclk_src_sel().bits(config.dpi_clk_src as u8);
+                w.mipi_dsi_dpiclk_div_num().bits((div - 1) as u8);
+                w.mipi_dsi_dpiclk_en().set_bit()
+            });
 
-        let host   = MIPI_DSI_HOST::regs();
+        let host = MIPI_DSI_HOST::regs();
         let bridge = MIPI_DSI_BRIDGE::regs();
 
         // ── Host: virtual channel & color coding ───────────────────────────
@@ -234,17 +270,19 @@ impl<'d> DsiDpi<'d> {
         // All DPI signals active-high (no inversion).
         host.dpi_cfg_pol().write(|w| unsafe { w.bits(0) });
 
-        // LP transitions allowed in all blank periods + commands in LP.
+        // Burst mode with sync pulses.  LP transitions are allowed only in
+        // blanking intervals; lp_vact_en and frame_bta_ack_en are left clear:
+        // - lp_vact_en: going LP during the active pixel burst corrupts video.
+        // - frame_bta_ack_en: requesting a per-frame BTA stalls the host if the panel does not
+        //   respond, freezing the video stream.
         host.vid_mode_cfg().modify(|_, w| unsafe {
-            w.vid_mode_type().bits(2) // burst with sync pulses
-                .lp_vsa_en().set_bit()
-                .lp_vbp_en().set_bit()
-                .lp_vfp_en().set_bit()
-                .lp_vact_en().set_bit()
-                .lp_hbp_en().set_bit()
-                .lp_hfp_en().set_bit()
-                .lp_cmd_en().set_bit()
-                .frame_bta_ack_en().set_bit()
+            w.vid_mode_type().bits(2); // burst with sync pulses
+            w.lp_vsa_en().set_bit();
+            w.lp_vbp_en().set_bit();
+            w.lp_vfp_en().set_bit();
+            w.lp_hbp_en().set_bit();
+            w.lp_hfp_en().set_bit();
+            w.lp_cmd_en().set_bit()
         });
 
         let t = &config.timing;
@@ -259,13 +297,12 @@ impl<'d> DsiDpi<'d> {
         let ratio = bus.lane_bit_rate_mbps / config.pixel_clock_mhz / 8.0;
         let htotal = t.hsw + t.hbp + t.h_active + t.hfp;
 
-        let host_hsw    = fround_u32(t.hsw     as f32 * ratio);
-        let host_hbp    = fround_u32(t.hbp     as f32 * ratio);
-        let host_act    = fround_u32(t.h_active as f32 * ratio);
-        let host_hfp    = fround_u32(t.hfp     as f32 * ratio);
-        let host_htotal = fround_u32(htotal     as f32 * ratio);
-        let comp = host_htotal as i32
-            - (host_hsw + host_hbp + host_act + host_hfp) as i32;
+        let host_hsw = fround_u32(t.hsw as f32 * ratio);
+        let host_hbp = fround_u32(t.hbp as f32 * ratio);
+        let host_act = fround_u32(t.h_active as f32 * ratio);
+        let host_hfp = fround_u32(t.hfp as f32 * ratio);
+        let host_htotal = fround_u32(htotal as f32 * ratio);
+        let comp = host_htotal as i32 - (host_hsw + host_hbp + host_act + host_hfp) as i32;
         let host_act = (host_act as i32 + comp).max(0) as u32;
 
         host.vid_hsa_time()
@@ -295,81 +332,112 @@ impl<'d> DsiDpi<'d> {
         };
         bridge.dpi_h_cfg0().modify(|_, w| unsafe {
             w.htotal()
-                .bits((t.hsw + t.hbp + t.h_active + brg_hfp) as u16)
-                .hdisp()
-                .bits(t.h_active as u16)
+                .bits((t.hsw + t.hbp + t.h_active + brg_hfp) as u16);
+            w.hdisp().bits(t.h_active as u16)
         });
-        bridge.dpi_h_cfg1().modify(|_, w| unsafe {
-            w.hsync().bits(t.hsw as u16).hbank().bits(t.hbp as u16)
-        });
+        bridge
+            .dpi_h_cfg1()
+            .modify(|_, w| unsafe { w.hsync().bits(t.hsw as u16).hbank().bits(t.hbp as u16) });
         bridge.dpi_v_cfg0().modify(|_, w| unsafe {
-            w.vtotal()
-                .bits((t.vsw + t.vbp + t.v_active + t.vfp) as u16)
-                .vdisp()
-                .bits(t.v_active as u16)
+            w.vtotal().bits((t.vsw + t.vbp + t.v_active + t.vfp) as u16);
+            w.vdisp().bits(t.v_active as u16)
         });
-        bridge.dpi_v_cfg1().modify(|_, w| unsafe {
-            w.vsync().bits(t.vsw as u16).vbank().bits(t.vbp as u16)
-        });
+        bridge
+            .dpi_v_cfg1()
+            .modify(|_, w| unsafe { w.vsync().bits(t.vsw as u16).vbank().bits(t.vbp as u16) });
 
         // ── Bridge: pixel format & DMA ─────────────────────────────────────
-        let total_bits =
-            t.h_active * t.v_active * config.in_color_format.bits_per_pixel();
+        let total_bits = t.h_active * t.v_active * config.in_color_format.bits_per_pixel();
         bridge.raw_num_cfg().modify(|_, w| unsafe {
-            w.raw_num_total()
-                .bits((total_bits + 63) / 64)
-                .unalign_64bit_en()
-                .bit(total_bits % 64 != 0)
-                .raw_num_total_set()
-                .set_bit()
+            w.raw_num_total().bits((total_bits + 63) / 64);
+            w.unalign_64bit_en().bit(total_bits % 64 != 0);
+            w.raw_num_total_set().set_bit()
         });
-        bridge.dpi_misc_config().modify(|_, w| unsafe {
-            w.fifo_underrun_discard_vcnt().bits(t.h_active as u16)
-        });
+        bridge
+            .dpi_misc_config()
+            .modify(|_, w| unsafe { w.fifo_underrun_discard_vcnt().bits(t.h_active as u16) });
         bridge.pixel_type().modify(|_, w| unsafe {
-            w.raw_type()
-                .bits(config.in_color_format.raw_type())
-                .dpi_type()
-                .bits(config.out_color_format.dpi_type())
-                .data_in_type()
-                .clear_bit()
+            w.raw_type().bits(config.in_color_format.raw_type());
+            w.dpi_type().bits(config.out_color_format.dpi_type());
+            w.data_in_type().clear_bit()
         });
         bridge.dma_flow_ctrl().modify(|_, w| unsafe {
-            w.dsi_dma_flow_controller()
-                .clear_bit()
-                .dma_flow_multiblk_num()
-                .bits(1)
+            w.dsi_dma_flow_controller().clear_bit();
+            w.dma_flow_multiblk_num().bits(1)
         });
-        bridge.dma_frame_interval().modify(|_, w| {
-            w.dma_multiblk_en().clear_bit()
-        });
-        bridge.dma_req_cfg().modify(|_, w| unsafe {
-            w.dma_burst_len().bits(DMA_BURST_LEN as u16)
-        });
+        bridge
+            .dma_frame_interval()
+            .modify(|_, w| w.dma_multiblk_en().clear_bit());
+        bridge
+            .dma_req_cfg()
+            .modify(|_, w| unsafe { w.dma_burst_len().bits(DMA_BURST_LEN as u16) });
         bridge.raw_buf_almost_empty_thrd().modify(|_, w| unsafe {
-            w.dsi_raw_buf_almost_empty_thrd().bits(FIFO_EMPTY_THRESHOLD as u16)
+            w.dsi_raw_buf_almost_empty_thrd()
+                .bits(FIFO_EMPTY_THRESHOLD as u16)
         });
 
         bridge.en().modify(|_, w| w.dsi_en().set_bit());
-        bridge.dpi_config_update()
+        bridge
+            .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
 
-        // ── VDMA: build LLIs and start from framebuffer 0 ─────────────────
-        let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
+        // ── VDMA: build a NUM_LLIS-deep circular ring and start ───────────
+        //
+        // More LLIs = more time before the DMA loops back to a consumed
+        // descriptor.  All LLIs start pointing at fb[0].  commit() updates
+        // sar_lo in every LLI and re-arms them (LLI_VALID = 1) so the DMA
+        // will not suspend as long as commit() is called within
+        // NUM_LLIS × (one frame transfer time) of the last commit.
         let mut fb_ptrs = [core::ptr::null_mut::<u8>(); MAX_FBS];
         for i in 0..num_fbs {
-            let ptr = framebuffers[i].as_ptr() as *mut u8;
-            fb_ptrs[i] = ptr;
-            llis[i].configure(ptr as u32, fb_size);
+            fb_ptrs[i] = framebuffers[i].as_ptr() as *mut u8;
         }
 
-        let mut dma = VdmaChannel::new(0);
-        dma.start(&llis[0]);
+        // Flush all frame buffers from CPU cache → PSRAM.
+        for i in 0..num_fbs {
+            unsafe {
+                crate::soc::cache_writeback_addr(fb_ptrs[i] as u32, fb_size as u32);
+            }
+        }
+
+        // Build ring: LLI[i] → LLI[(i+1) % NUM_LLIS].
+        {
+            let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
+            for i in 0..NUM_LLIS {
+                let next = &mut llis[(i + 1) % NUM_LLIS] as *mut VdmaLinkItem;
+                llis[i].configure(fb_ptrs[0] as u32, fb_size, next);
+            }
+        }
+
+        // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
+        let llis = unsafe { &*(&raw const LLI_STORAGE.0) };
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                llis.as_ptr() as u32,
+                (core::mem::size_of::<VdmaLinkItem>() * NUM_LLIS) as u32,
+            );
+        }
+
+        VdmaChannel::new(0).start(&llis[0]);
+
+        // ── VDMA block-done interrupt ──────────────────────────────────────
+        // Enable the block-transfer-done signal for channel 0 so the ISR
+        // fires after every frame block and re-arms the consumed LLI.
+        {
+            let ch = VDMA::regs().ch(0);
+            ch.intstatus_enable0()
+                .write(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
+            ch.intsignal_enable0()
+                .write(|w| w.ch1_enable_block_tfr_done_intsignal().set_bit());
+        }
+        interrupt::bind_handler(Interrupt::DMA, vdma_block_done_isr);
 
         // ── Enable video mode ──────────────────────────────────────────────
-        host.mode_cfg().modify(|_, w| w.cmd_video_mode().clear_bit());
+        host.mode_cfg()
+            .modify(|_, w| w.cmd_video_mode().clear_bit());
         bridge.dpi_misc_config().modify(|_, w| w.dpi_en().set_bit());
-        bridge.dpi_config_update()
+        bridge
+            .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
 
         // Enable underrun interrupt (for status monitoring).
@@ -378,7 +446,6 @@ impl<'d> DsiDpi<'d> {
         let MipiDsi { guard, .. } = bus;
         Ok(Self {
             _guard: guard,
-            dma,
             fb_ptrs,
             fb_size,
             num_fbs,
@@ -397,20 +464,44 @@ impl<'d> DsiDpi<'d> {
         unsafe { core::slice::from_raw_parts_mut(self.fb_ptrs[back], self.fb_size) }
     }
 
-    /// Make the back buffer (returned by [`framebuffer_mut`]) the new display
-    /// buffer and re-arm the VDMA channel.
+    /// Flip the back buffer to the display.
+    ///
+    /// Flushes the rendered back buffer from CPU cache to PSRAM, then updates
+    /// the source address in every LLI so the DMA switches to the new pixels
+    /// on its next block boundary.
+    ///
+    /// `LLI_VALID` re-arming is handled entirely by the `vdma_block_done_isr`
+    /// interrupt handler, which fires after every frame block and keeps the
+    /// DMA channel running indefinitely without software restarts.
     pub fn commit(&mut self) {
         let back = (self.current_fb + 1) % self.num_fbs;
+
+        // Flush back buffer: CPU cache → PSRAM.
+        unsafe {
+            crate::soc::cache_writeback_addr(self.fb_ptrs[back] as u32, self.fb_size as u32);
+        }
+
+        // Update sar_lo in every LLI to point at the new front buffer.
+        // The DMA latches sar_lo at the start of each block, so an in-progress
+        // block is unaffected; the new pixels appear on the next block boundary.
+        let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
+        let src = self.fb_ptrs[back] as u32;
+        for lli in llis.iter_mut() {
+            lli.set_source(src);
+        }
+
+        // The ISR will flush the cache, no need to do it here.
+
         self.current_fb = back;
-        let lli = unsafe { &mut (*(&raw mut LLI_STORAGE.0))[back] };
-        self.dma.restart(lli);
     }
 
-    /// Block until the bridge signals the start of the next vertical blank
-    /// (vsync).
+    /// Block until the DSI bridge signals the start of the next vertical blank.
+    ///
+    /// Use this to pace rendering to the display refresh rate.  Any vsync event
+    /// that is already pending (i.e. fired while the CPU was busy rendering)
+    /// will be returned immediately.
     pub fn wait_for_vsync(&mut self) {
         let bridge = MIPI_DSI_BRIDGE::regs();
-        bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
         while !bridge.int_raw().read().vsync().bit_is_set() {}
         bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
     }

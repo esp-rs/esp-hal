@@ -87,7 +87,7 @@ pub enum PhyCfgClockSource {
     /// 20 MHz from PLL.
     PllF20m = 0,
     /// Fast RC oscillator (~17.5 MHz).
-    RcFast = 1,
+    RcFast  = 1,
     /// 25 MHz from PLL.
     PllF25m = 2,
 }
@@ -135,9 +135,9 @@ pub enum ConfigError {
 /// without triggering the "cannot move out of a type that implements `Drop`"
 /// restriction on the outer bus struct.
 pub(crate) struct DphyGuard<'d> {
-    pub(crate) _dsi:        MIPI_DSI<'d>,
-    pub(crate) _vdma:       VDMA<'d>,
-    pub(crate) _dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
+    pub(crate) _dsi: MIPI_DSI<'d>,
+    pub(crate) _vdma: VDMA<'d>,
+    pub(crate) _dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
     pub(crate) _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
 }
 
@@ -166,11 +166,7 @@ impl<'d> MipiDsi<'d> {
     /// Enables APB clock, resets the bridge, powers up the D-PHY LDO,
     /// configures D-PHY PLL, and polls for PLL lock + lane-stopped status
     /// before returning.
-    pub fn new(
-        dsi:    MIPI_DSI<'d>,
-        vdma:   VDMA<'d>,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
+    pub fn new(dsi: MIPI_DSI<'d>, vdma: VDMA<'d>, config: Config) -> Result<Self, ConfigError> {
         if config.lane_bit_rate_mbps < 80.0 || config.lane_bit_rate_mbps > 1500.0 {
             return Err(ConfigError::InvalidLaneBitRate);
         }
@@ -178,7 +174,7 @@ impl<'d> MipiDsi<'d> {
         dphy_ldo_power_on();
 
         // Enable APB clock and reset bridge (via GenericPeripheralGuard).
-        let dsi_guard:  GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }> =
+        let dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }> =
             GenericPeripheralGuard::new();
         let vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }> =
             GenericPeripheralGuard::new();
@@ -192,22 +188,23 @@ impl<'d> MipiDsi<'d> {
             .modify(|_, w| w.mipi_dsi_dphy_cfg_clk_en().set_bit());
 
         // PHY PLL reference clock.
-        HP_SYS_CLKRST::regs().peri_clk_ctrl03().modify(|_, w| unsafe {
-            w.mipi_dsi_dphy_pll_refclk_src_sel()
-                .bits(config.phy_clk_src as u8)
-                .mipi_dsi_dphy_pll_refclk_div_num()
-                .bits(0) // div=1 → reg = div-1 = 0
-                .mipi_dsi_dphy_pll_refclk_en()
-                .set_bit()
-        });
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| unsafe {
+                w.mipi_dsi_dphy_pll_refclk_src_sel()
+                    .bits(config.phy_clk_src as u8);
+                w   .mipi_dsi_dphy_pll_refclk_div_num()
+                    .bits(0) // div=1 → reg = div-1 = 0
+                ;
+                w.mipi_dsi_dphy_pll_refclk_en().set_bit()
+            });
 
         let host = MIPI_DSI_HOST::regs();
         let bridge = MIPI_DSI_BRIDGE::regs();
 
         // Set data lane count.
-        host.phy_if_cfg().modify(|_, w| unsafe {
-            w.n_lanes().bits(config.num_data_lanes as u8 - 1)
-        });
+        host.phy_if_cfg()
+            .modify(|_, w| unsafe { w.n_lanes().bits(config.num_data_lanes as u8 - 1) });
 
         // Power on host and PHY.
         host.pwr_up().modify(|_, w| w.shutdownz().set_bit());
@@ -243,8 +240,12 @@ impl<'d> MipiDsi<'d> {
         // Poll lane-stopped.
         let lane_mask: u32 = {
             let mut m = 1 << 2; // clock lane
-            if config.num_data_lanes as u8 >= 1 { m |= 1 << 4; }
-            if config.num_data_lanes as u8 >= 2 { m |= 1 << 7; }
+            if config.num_data_lanes as u8 >= 1 {
+                m |= 1 << 4;
+            }
+            if config.num_data_lanes as u8 >= 2 {
+                m |= 1 << 7;
+            }
             m
         };
         while (host.phy_status().read().bits() & lane_mask) != lane_mask {}
@@ -255,48 +256,51 @@ impl<'d> MipiDsi<'d> {
         // Clock lane state.
         if config.force_clock_lane_hs {
             host.lpclk_ctrl().modify(|_, w| {
-                w.auto_clklane_ctrl().clear_bit().phy_txrequestclkhs().set_bit()
+                w.auto_clklane_ctrl().clear_bit();
+                w.phy_txrequestclkhs().set_bit()
             });
         } else {
             host.lpclk_ctrl().modify(|_, w| {
-                w.auto_clklane_ctrl().set_bit().phy_txrequestclkhs().set_bit()
+                w.auto_clklane_ctrl().set_bit();
+                w.phy_txrequestclkhs().set_bit()
             });
         }
 
         // HS↔LP switch timings (conservative IDF defaults).
         host.phy_tmr_cfg().modify(|_, w| unsafe {
-            w.phy_hs2lp_time().bits(50).phy_lp2hs_time().bits(104)
+            w.phy_hs2lp_time().bits(50);
+            w.phy_lp2hs_time().bits(104)
         });
         host.phy_tmr_lpclk_cfg().modify(|_, w| unsafe {
-            w.phy_clkhs2lp_time().bits(46).phy_clklp2hs_time().bits(128)
+            w.phy_clkhs2lp_time().bits(46);
+            w.phy_clklp2hs_time().bits(128)
         });
 
         // CRC, ECC, EoTp.
         host.pckhdl_cfg().modify(|_, w| {
-            w.crc_rx_en().set_bit().ecc_rx_en().set_bit().eotp_tx_en().set_bit()
+            w.crc_rx_en().set_bit();
+            w.ecc_rx_en().set_bit();
+            w.eotp_tx_en().set_bit()
         });
 
         // Timeout / escape clock divisors (from byte clock = lane_bit_rate / 8).
         let byte_clock_mhz = actual_rate / 8.0;
-        let to_div  = fround_u8(byte_clock_mhz / TIMEOUT_CLOCK_FREQ_MHZ);
+        let to_div = fround_u8(byte_clock_mhz / TIMEOUT_CLOCK_FREQ_MHZ);
         let esc_div = fround_u8(byte_clock_mhz / ESCAPE_CLOCK_FREQ_MHZ);
         host.clkmgr_cfg().modify(|_, w| unsafe {
-            w.to_clk_division().bits(to_div).tx_esc_clk_division().bits(esc_div)
+            w.to_clk_division()
+                .bits(to_div)
+                .tx_esc_clk_division()
+                .bits(esc_div)
         });
 
         // Disable all timeouts (set to 0).
-        host.to_cnt_cfg()
-            .write(|w| unsafe { w.bits(0) });
-        host.hs_rd_to_cnt()
-            .write(|w| unsafe { w.bits(0) });
-        host.lp_rd_to_cnt()
-            .write(|w| unsafe { w.bits(0) });
-        host.hs_wr_to_cnt()
-            .write(|w| unsafe { w.bits(0) });
-        host.lp_wr_to_cnt()
-            .write(|w| unsafe { w.bits(0) });
-        host.bta_to_cnt()
-            .write(|w| unsafe { w.bits(0) });
+        host.to_cnt_cfg().write(|w| unsafe { w.bits(0) });
+        host.hs_rd_to_cnt().write(|w| unsafe { w.bits(0) });
+        host.lp_rd_to_cnt().write(|w| unsafe { w.bits(0) });
+        host.hs_wr_to_cnt().write(|w| unsafe { w.bits(0) });
+        host.lp_wr_to_cnt().write(|w| unsafe { w.bits(0) });
+        host.bta_to_cnt().write(|w| unsafe { w.bits(0) });
 
         // Max read time and stop-wait time.
         host.phy_tmr_rd_cfg()
@@ -305,7 +309,12 @@ impl<'d> MipiDsi<'d> {
             .modify(|_, w| unsafe { w.phy_stop_wait_time().bits(0x3F) });
 
         Ok(Self {
-            guard: DphyGuard { _dsi: dsi, _vdma: vdma, _dsi_guard: dsi_guard, _vdma_guard: vdma_guard },
+            guard: DphyGuard {
+                _dsi: dsi,
+                _vdma: vdma,
+                _dsi_guard: dsi_guard,
+                _vdma_guard: vdma_guard,
+            },
             lane_bit_rate_mbps: actual_rate,
             num_data_lanes: config.num_data_lanes,
         })
@@ -366,9 +375,9 @@ pub(crate) fn dphy_ldo_power_on() {
 pub(crate) fn dphy_power_down() {
     let host = MIPI_DSI_HOST::regs();
     host.phy_rstz().modify(|_, w| {
-        w.phy_rstz().clear_bit()
-            .phy_shutdownz().clear_bit()
-            .phy_enableclk().clear_bit()
+        w.phy_rstz().clear_bit();
+        w.phy_shutdownz().clear_bit();
+        w.phy_enableclk().clear_bit()
     });
     host.pwr_up().modify(|_, w| w.shutdownz().clear_bit());
     // Restore LDO to reset state (xpd=0, SW ownership released).
@@ -381,16 +390,45 @@ pub(crate) fn dphy_power_down() {
 
 /// PLL frequency range table: half-open Mbps range → `hs_freq_range_sel`.
 const PHY_PLL_RANGES: &[(core::ops::Range<u16>, u8)] = &[
-    (80..90,    0x00), (90..100,   0x10), (100..110,  0x20), (110..130,  0x01),
-    (130..140,  0x11), (140..150,  0x21), (150..170,  0x02), (170..180,  0x12),
-    (180..200,  0x22), (200..220,  0x03), (220..240,  0x13), (240..250,  0x23),
-    (250..270,  0x04), (270..300,  0x14), (300..330,  0x05), (330..360,  0x15),
-    (360..400,  0x25), (400..450,  0x06), (450..500,  0x16), (500..550,  0x07),
-    (550..600,  0x17), (600..650,  0x08), (650..700,  0x18), (700..750,  0x09),
-    (750..800,  0x19), (800..850,  0x29), (850..900,  0x39), (900..950,  0x0A),
-    (950..1000, 0x1A), (1000..1050, 0x2A), (1050..1100, 0x3A), (1100..1150, 0x0B),
-    (1150..1200, 0x1B), (1200..1250, 0x2B), (1250..1300, 0x3B), (1300..1350, 0x0C),
-    (1350..1400, 0x1C), (1400..1450, 0x2C), (1450..1501, 0x3C),
+    (80..90, 0x00),
+    (90..100, 0x10),
+    (100..110, 0x20),
+    (110..130, 0x01),
+    (130..140, 0x11),
+    (140..150, 0x21),
+    (150..170, 0x02),
+    (170..180, 0x12),
+    (180..200, 0x22),
+    (200..220, 0x03),
+    (220..240, 0x13),
+    (240..250, 0x23),
+    (250..270, 0x04),
+    (270..300, 0x14),
+    (300..330, 0x05),
+    (330..360, 0x15),
+    (360..400, 0x25),
+    (400..450, 0x06),
+    (450..500, 0x16),
+    (500..550, 0x07),
+    (550..600, 0x17),
+    (600..650, 0x08),
+    (650..700, 0x18),
+    (700..750, 0x09),
+    (750..800, 0x19),
+    (800..850, 0x29),
+    (850..900, 0x39),
+    (900..950, 0x0A),
+    (950..1000, 0x1A),
+    (1000..1050, 0x2A),
+    (1050..1100, 0x3A),
+    (1100..1150, 0x0B),
+    (1150..1200, 0x1B),
+    (1200..1250, 0x2B),
+    (1250..1300, 0x3B),
+    (1300..1350, 0x0C),
+    (1350..1400, 0x1C),
+    (1400..1450, 0x2C),
+    (1450..1501, 0x3C),
 ];
 
 fn hs_freq_range(lane_mbps: f32) -> u8 {
@@ -416,18 +454,24 @@ fn compute_pll(ref_freq_mhz: f32, target_mbps: f32) -> Option<(u16, u8, f32)> {
         let m_raw = (target_mbps * n as f32 / ref_freq_mhz) as u16;
         // M must be even; try m_raw rounded down to even.
         let m = m_raw & !1;
-        if m == 0 { continue; }
+        if m == 0 {
+            continue;
+        }
         let actual = ref_freq_mhz * m as f32 / n as f32;
         let delta = (target_mbps - actual).abs();
         if delta < best_delta {
             best_delta = delta;
             best_m = m;
             best_n = n;
-            if best_delta < 0.01 { break; }
+            if best_delta < 0.01 {
+                break;
+            }
         }
     }
 
-    if best_m == 0 || best_n == 0 { return None; }
+    if best_m == 0 || best_n == 0 {
+        return None;
+    }
     let actual = ref_freq_mhz * best_m as f32 / best_n as f32;
     Some((best_m, best_n, actual))
 }
@@ -444,20 +488,34 @@ fn fround_u8(x: f32) -> u8 {
 
 fn phy_write(addr: u8, val: u8) {
     let h = MIPI_DSI_HOST::regs();
-    h.phy_tst_ctrl0()
-        .write(|w| w.phy_testclk().clear_bit().phy_testclr().clear_bit());
+    h.phy_tst_ctrl0().write(|w| {
+        w.phy_testclk().clear_bit();
+        w.phy_testclr().clear_bit()
+    });
     // Write address with TESTEN=1.
-    h.phy_tst_ctrl1()
-        .write(|w| unsafe { w.phy_testen().set_bit().phy_testdin().bits(addr) });
-    h.phy_tst_ctrl0()
-        .write(|w| w.phy_testclk().set_bit().phy_testclr().clear_bit());
-    h.phy_tst_ctrl0()
-        .write(|w| w.phy_testclk().clear_bit().phy_testclr().clear_bit());
+    h.phy_tst_ctrl1().write(|w| unsafe {
+        w.phy_testen().set_bit();
+        w.phy_testdin().bits(addr)
+    });
+    h.phy_tst_ctrl0().write(|w| {
+        w.phy_testclk().set_bit();
+        w.phy_testclr().clear_bit()
+    });
+    h.phy_tst_ctrl0().write(|w| {
+        w.phy_testclk().clear_bit();
+        w.phy_testclr().clear_bit()
+    });
     // Write value with TESTEN=0.
-    h.phy_tst_ctrl1()
-        .write(|w| unsafe { w.phy_testen().clear_bit().phy_testdin().bits(val) });
-    h.phy_tst_ctrl0()
-        .write(|w| w.phy_testclk().set_bit().phy_testclr().clear_bit());
-    h.phy_tst_ctrl0()
-        .write(|w| w.phy_testclk().clear_bit().phy_testclr().clear_bit());
+    h.phy_tst_ctrl1().write(|w| unsafe {
+        w.phy_testen().clear_bit();
+        w.phy_testdin().bits(val)
+    });
+    h.phy_tst_ctrl0().write(|w| {
+        w.phy_testclk().set_bit();
+        w.phy_testclr().clear_bit()
+    });
+    h.phy_tst_ctrl0().write(|w| {
+        w.phy_testclk().clear_bit();
+        w.phy_testclr().clear_bit()
+    });
 }

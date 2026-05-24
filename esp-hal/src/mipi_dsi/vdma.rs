@@ -26,7 +26,6 @@ const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
 /// CTL1 base: arlen_en=1, arlen=16, awlen_en=1, awlen=16.
 const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
 
-const LLI_LAST: u32 = 1 << 30;
 const LLI_VALID: u32 = 1 << 31;
 
 /// One VDMA link-list item (LLI), 64 bytes, 64-byte aligned.
@@ -83,13 +82,16 @@ impl VdmaLinkItem {
         }
     }
 
-    /// Populate this LLI for a complete frame-buffer transfer.
+    /// Populate this LLI for a circular frame-buffer transfer.
     ///
-    /// `fb_size` is in bytes and must be a multiple of 8 (64-bit width).
-    pub(super) fn configure(&mut self, src_addr: u32, fb_size: usize) {
+    /// `next` must point to the next 64-byte-aligned LLI in the chain.
+    /// `LLI_LAST` is deliberately **not** set; the DMA always follows the LLP
+    /// pointer to continue the linked-list ring.
+    pub(super) fn configure(&mut self, src_addr: u32, fb_size: usize, next: *mut VdmaLinkItem) {
         debug_assert_eq!(fb_size % 8, 0, "fb_size must be a multiple of 8");
+        debug_assert_eq!(next as usize & 0x3F, 0, "next LLI must be 64-byte aligned");
         let block_ts = (fb_size / 8) as u32 - 1;
-        let ctrl_hi = CTRL_HI_BASE | LLI_LAST | LLI_VALID;
+        let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
         unsafe {
             ptr::write_volatile(&mut self.sar_lo, src_addr);
             ptr::write_volatile(&mut self.sar_hi, 0);
@@ -97,7 +99,9 @@ impl VdmaLinkItem {
             ptr::write_volatile(&mut self.dar_hi, 0);
             ptr::write_volatile(&mut self.block_ts, block_ts);
             ptr::write_volatile(&mut self._res1, 0);
-            ptr::write_volatile(&mut self.llp_lo, PORT_MEMORY); // lms=1, loc0=0
+            // llp_lo: bits[31:6] = next_addr >> 6, bit[0] = lms (PORT_MEMORY).
+            // next is 64-byte aligned so bottom 6 bits are zero.
+            ptr::write_volatile(&mut self.llp_lo, next as u32 | PORT_MEMORY);
             ptr::write_volatile(&mut self.llp_hi, 0);
             ptr::write_volatile(&mut self.ctrl_lo, CTRL_LO);
             ptr::write_volatile(&mut self.ctrl_hi, ctrl_hi);
@@ -110,17 +114,24 @@ impl VdmaLinkItem {
         }
     }
 
-    /// Return the source address stored in this LLI.
-    pub(super) fn source_addr(&self) -> u32 {
-        unsafe { ptr::read_volatile(&self.sar_lo) }
+    /// Update the source address in this LLI.
+    ///
+    /// Safe to call while the DMA is running: the controller latches `sar_lo`
+    /// at the **start** of each block, so an in-flight block is unaffected and
+    /// the new address takes effect for the next block.
+    pub(super) fn set_source(&mut self, src_addr: u32) {
+        unsafe { ptr::write_volatile(&mut self.sar_lo, src_addr) }
     }
 
-    /// Re-assert valid+last so the channel can be re-armed.
+    /// Re-arm this LLI so the DMA can use it again.
+    ///
+    /// The DW-GDMA clears `LLI_VALID` in the LLI memory after consuming a
+    /// block.  Writing the complete `ctrl_hi` value (including `LLI_VALID`)
+    /// lets the DMA resume when it next fetches this LLI.  Call this on the
+    /// **just-consumed** LLI from the ping-pong pair while the DMA is busy
+    /// with the other one.
     pub(super) fn rearm(&mut self) {
-        unsafe {
-            let v = ptr::read_volatile(&self.ctrl_hi);
-            ptr::write_volatile(&mut self.ctrl_hi, v | LLI_LAST | LLI_VALID);
-        }
+        unsafe { ptr::write_volatile(&mut self.ctrl_hi, CTRL_HI_BASE | LLI_VALID) }
     }
 }
 
@@ -178,39 +189,6 @@ impl VdmaChannel {
         unsafe { ch.llp1().write_with_zero(|w| w) };
 
         self.ch_enable(true);
-    }
-
-    /// Re-arm `item` (mark as valid/last) then restart the channel.
-    /// Intended to be called from the DMA done ISR.
-    pub(super) fn restart(&mut self, item: &mut VdmaLinkItem) {
-        item.rearm();
-        self.start(item);
-    }
-
-    /// Enable `DMA_TFR_DONE` interrupt generation and CPU signal propagation.
-    pub(super) fn enable_done_interrupt(&mut self) {
-        let ch = VDMA::regs().ch(self.channel_id as usize);
-        ch.intstatus_enable0()
-            .modify(|_, w| w.ch1_enable_dma_tfr_done_intstat().set_bit());
-        ch.intsignal_enable0()
-            .modify(|_, w| w.ch1_enable_dma_tfr_done_intsignal().set_bit());
-    }
-
-    /// Clear the `DMA_TFR_DONE` interrupt status for this channel.
-    pub(super) fn clear_done_interrupt(&mut self) {
-        VDMA::regs()
-            .ch(self.channel_id as usize)
-            .intclear0()
-            .write(|w| w.ch1_clear_dma_tfr_done_intstat().set_bit());
-    }
-
-    /// Return the raw interrupt-status word for this channel.
-    pub(super) fn interrupt_status(&self) -> u32 {
-        VDMA::regs()
-            .ch(self.channel_id as usize)
-            .intstatus0()
-            .read()
-            .bits()
     }
 
     fn ch_enable(&self, en: bool) {
