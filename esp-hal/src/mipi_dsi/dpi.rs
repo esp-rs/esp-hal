@@ -23,22 +23,42 @@ const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
 pub enum DpiClockSource {
     /// Crystal oscillator (40 MHz on ESP32-P4).
     Xtal = 0,
-    /// 240 MHz PLL.
+    /// 240 MHz PLL (derived from SPLL).
     PllF240m = 1,
-    /// 160 MHz PLL.
+    /// 160 MHz PLL (derived from SPLL).
     PllF160m = 2,
-    /// Audio PLL (variable; treated as 40 MHz reference).
-    Apll = 3,
+    // TODO: add APLL support when the clock tree gains an APLL node for ESP32-P4.
 }
 
 impl DpiClockSource {
-    fn freq_mhz(self) -> f32 {
+    /// Returns the source clock frequency in Hz from the clock tree.
+    pub(crate) fn freq_hz(self) -> u32 {
+        use crate::soc::clocks;
         match self {
-            Self::Xtal     => 40.0,
-            Self::PllF240m => 240.0,
-            Self::PllF160m => 160.0,
-            Self::Apll     => 40.0,
+            Self::Xtal     => clocks::xtal_clk_frequency(),
+            Self::PllF240m => clocks::pll_f240m_frequency(),
+            Self::PllF160m => clocks::pll_f160m_frequency(),
         }
+    }
+
+    /// Increment the reference count for this clock source.
+    fn request(self) {
+        use crate::soc::clocks;
+        clocks::ClockTree::with(|clocks| match self {
+            Self::PllF240m => clocks::request_pll_f240m(clocks),
+            Self::PllF160m => clocks::request_pll_f160m(clocks),
+            Self::Xtal => {}
+        });
+    }
+
+    /// Decrement the reference count, potentially disabling the PLL.
+    fn release(self) {
+        use crate::soc::clocks;
+        clocks::ClockTree::with(|clocks| match self {
+            Self::PllF240m => clocks::release_pll_f240m(clocks),
+            Self::PllF160m => clocks::release_pll_f160m(clocks),
+            Self::Xtal => {}
+        });
     }
 }
 
@@ -148,7 +168,14 @@ pub struct DsiDpi<'d> {
     fb_size:     usize,
     num_fbs:     usize,
     current_fb:  usize,
+    clk_src:     DpiClockSource,
     _phantom:    PhantomData<&'d mut [u8]>,
+}
+
+impl Drop for DsiDpi<'_> {
+    fn drop(&mut self) {
+        self.clk_src.release();
+    }
 }
 
 impl<'d> DsiDpi<'d> {
@@ -162,7 +189,8 @@ impl<'d> DsiDpi<'d> {
         let fb_size = framebuffers[0].len();
 
         // ── DPI clock ──────────────────────────────────────────────────────
-        let src_mhz = config.dpi_clk_src.freq_mhz();
+        config.dpi_clk_src.request();
+        let src_mhz = config.dpi_clk_src.freq_hz() as f32 / 1_000_000.0;
         let div = ((src_mhz / config.pixel_clock_mhz) + 0.5) as u32;
         let div = div.max(1);
         let real_dpi_mhz = src_mhz / div as f32;
@@ -342,6 +370,7 @@ impl<'d> DsiDpi<'d> {
             fb_size,
             num_fbs,
             current_fb: 0,
+            clk_src: config.dpi_clk_src,
             _phantom: PhantomData,
         })
     }
