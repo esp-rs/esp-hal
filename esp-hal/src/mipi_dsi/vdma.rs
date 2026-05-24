@@ -1,8 +1,6 @@
 //! Minimal VDMA abstraction for MIPI-DSI video streaming.
 
-use core::ptr;
-
-use crate::peripherals::VDMA;
+use crate::{peripherals::VDMA, reg_access::VolatileCell};
 
 /// Fixed write destination for all DSI DMA transfers (DSI bridge pixel FIFO).
 pub(super) const DSI_BRG_MEM_BASE: u32 = 0x5010_5000;
@@ -30,27 +28,29 @@ const LLI_VALID: u32 = 1 << 31;
 
 /// One VDMA link-list item (LLI), 64 bytes, 64-byte aligned.
 ///
-/// Layout matches `dw_gdma_link_list_item_t` from the IDF.
-/// All writes use `ptr::write_volatile`; the caller must additionally ensure
-/// cache coherency before arming the DMA channel.
+/// Layout matches `dw_gdma_link_list_item_t` from the IDF.  Fields use
+/// [`VolatileCell`] so that the struct can live in a shared `static` (no
+/// `static mut`) and all CPU writes go straight to memory without being
+/// coalesced or reordered by the compiler.  The caller is still responsible
+/// for cache-line flushes before arming the DMA channel.
 #[repr(C, align(64))]
 pub(super) struct VdmaLinkItem {
-    sar_lo: u32,    // 0x00 – source address (low 32 bits)
-    sar_hi: u32,    // 0x04 – source address (high 32 bits, always 0)
-    dar_lo: u32,    // 0x08 – destination address (DSI_BRG_MEM_BASE)
-    dar_hi: u32,    // 0x0C
-    block_ts: u32,  // 0x10 – transfer size in 64-bit units, minus 1
-    _res1: u32,     // 0x14
-    llp_lo: u32,    // 0x18 – next LLI pointer low (0 = end of list) | LMS
-    llp_hi: u32,    // 0x1C
-    ctrl_lo: u32,   // 0x20 – CTL0
-    ctrl_hi: u32,   // 0x24 – CTL1
-    sstat: u32,     // 0x28
-    dstat: u32,     // 0x2C
-    status_lo: u32, // 0x30
-    status_hi: u32, // 0x34
-    _res2: u32,     // 0x38
-    _res3: u32,     // 0x3C
+    sar_lo: VolatileCell<u32>,    // 0x00 – source address (low 32 bits)
+    sar_hi: VolatileCell<u32>,    // 0x04 – source address (high 32 bits, always 0)
+    dar_lo: VolatileCell<u32>,    // 0x08 – destination address (DSI_BRG_MEM_BASE)
+    dar_hi: VolatileCell<u32>,    // 0x0C
+    block_ts: VolatileCell<u32>,  // 0x10 – transfer size in 64-bit units, minus 1
+    _res1: VolatileCell<u32>,     // 0x14
+    llp_lo: VolatileCell<u32>,    // 0x18 – next LLI pointer low | LMS
+    llp_hi: VolatileCell<u32>,    // 0x1C
+    ctrl_lo: VolatileCell<u32>,   // 0x20 – CTL0
+    ctrl_hi: VolatileCell<u32>,   // 0x24 – CTL1
+    sstat: VolatileCell<u32>,     // 0x28
+    dstat: VolatileCell<u32>,     // 0x2C
+    status_lo: VolatileCell<u32>, // 0x30
+    status_hi: VolatileCell<u32>, // 0x34
+    _res2: VolatileCell<u32>,     // 0x38
+    _res3: VolatileCell<u32>,     // 0x3C
 }
 
 const _: () = {
@@ -63,22 +63,22 @@ const _: () = {
 impl VdmaLinkItem {
     pub(super) const fn zeroed() -> Self {
         Self {
-            sar_lo: 0,
-            sar_hi: 0,
-            dar_lo: 0,
-            dar_hi: 0,
-            block_ts: 0,
-            _res1: 0,
-            llp_lo: 0,
-            llp_hi: 0,
-            ctrl_lo: 0,
-            ctrl_hi: 0,
-            sstat: 0,
-            dstat: 0,
-            status_lo: 0,
-            status_hi: 0,
-            _res2: 0,
-            _res3: 0,
+            sar_lo: VolatileCell::new(0),
+            sar_hi: VolatileCell::new(0),
+            dar_lo: VolatileCell::new(0),
+            dar_hi: VolatileCell::new(0),
+            block_ts: VolatileCell::new(0),
+            _res1: VolatileCell::new(0),
+            llp_lo: VolatileCell::new(0),
+            llp_hi: VolatileCell::new(0),
+            ctrl_lo: VolatileCell::new(0),
+            ctrl_hi: VolatileCell::new(0),
+            sstat: VolatileCell::new(0),
+            dstat: VolatileCell::new(0),
+            status_lo: VolatileCell::new(0),
+            status_hi: VolatileCell::new(0),
+            _res2: VolatileCell::new(0),
+            _res3: VolatileCell::new(0),
         }
     }
 
@@ -87,31 +87,29 @@ impl VdmaLinkItem {
     /// `next` must point to the next 64-byte-aligned LLI in the chain.
     /// `LLI_LAST` is deliberately **not** set; the DMA always follows the LLP
     /// pointer to continue the linked-list ring.
-    pub(super) fn configure(&mut self, src_addr: u32, fb_size: usize, next: *mut VdmaLinkItem) {
+    pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
         debug_assert_eq!(fb_size % 8, 0, "fb_size must be a multiple of 8");
         debug_assert_eq!(next as usize & 0x3F, 0, "next LLI must be 64-byte aligned");
         let block_ts = (fb_size / 8) as u32 - 1;
         let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
-        unsafe {
-            ptr::write_volatile(&mut self.sar_lo, src_addr);
-            ptr::write_volatile(&mut self.sar_hi, 0);
-            ptr::write_volatile(&mut self.dar_lo, DSI_BRG_MEM_BASE);
-            ptr::write_volatile(&mut self.dar_hi, 0);
-            ptr::write_volatile(&mut self.block_ts, block_ts);
-            ptr::write_volatile(&mut self._res1, 0);
-            // llp_lo: bits[31:6] = next_addr >> 6, bit[0] = lms (PORT_MEMORY).
-            // next is 64-byte aligned so bottom 6 bits are zero.
-            ptr::write_volatile(&mut self.llp_lo, next as u32 | PORT_MEMORY);
-            ptr::write_volatile(&mut self.llp_hi, 0);
-            ptr::write_volatile(&mut self.ctrl_lo, CTRL_LO);
-            ptr::write_volatile(&mut self.ctrl_hi, ctrl_hi);
-            ptr::write_volatile(&mut self.sstat, 0);
-            ptr::write_volatile(&mut self.dstat, 0);
-            ptr::write_volatile(&mut self.status_lo, 0);
-            ptr::write_volatile(&mut self.status_hi, 0);
-            ptr::write_volatile(&mut self._res2, 0);
-            ptr::write_volatile(&mut self._res3, 0);
-        }
+        self.sar_lo.set(src_addr);
+        self.sar_hi.set(0);
+        self.dar_lo.set(DSI_BRG_MEM_BASE);
+        self.dar_hi.set(0);
+        self.block_ts.set(block_ts);
+        self._res1.set(0);
+        // llp_lo: bits[31:6] = next_addr >> 6, bit[0] = lms (PORT_MEMORY).
+        // next is 64-byte aligned so bottom 6 bits are zero.
+        self.llp_lo.set(next as u32 | PORT_MEMORY);
+        self.llp_hi.set(0);
+        self.ctrl_lo.set(CTRL_LO);
+        self.ctrl_hi.set(ctrl_hi);
+        self.sstat.set(0);
+        self.dstat.set(0);
+        self.status_lo.set(0);
+        self.status_hi.set(0);
+        self._res2.set(0);
+        self._res3.set(0);
     }
 
     /// Update the source address in this LLI.
@@ -119,8 +117,8 @@ impl VdmaLinkItem {
     /// Safe to call while the DMA is running: the controller latches `sar_lo`
     /// at the **start** of each block, so an in-flight block is unaffected and
     /// the new address takes effect for the next block.
-    pub(super) fn set_source(&mut self, src_addr: u32) {
-        unsafe { ptr::write_volatile(&mut self.sar_lo, src_addr) }
+    pub(super) fn set_source(&self, src_addr: u32) {
+        self.sar_lo.set(src_addr);
     }
 
     /// Re-arm this LLI so the DMA can use it again.
@@ -130,8 +128,8 @@ impl VdmaLinkItem {
     /// lets the DMA resume when it next fetches this LLI.  Call this on the
     /// **just-consumed** LLI from the ping-pong pair while the DMA is busy
     /// with the other one.
-    pub(super) fn rearm(&mut self) {
-        unsafe { ptr::write_volatile(&mut self.ctrl_hi, CTRL_HI_BASE | LLI_VALID) }
+    pub(super) fn rearm(&self) {
+        self.ctrl_hi.set(CTRL_HI_BASE | LLI_VALID);
     }
 }
 

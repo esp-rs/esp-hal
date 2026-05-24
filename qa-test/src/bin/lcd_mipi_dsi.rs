@@ -33,7 +33,6 @@ use esp_hal::{
     },
     peripherals::Peripherals,
     psram,
-    time::Instant,
 };
 use esp_println::println;
 

@@ -28,6 +28,8 @@ pub mod dbi;
 pub mod dpi;
 pub(crate) mod vdma;
 
+use dpi::DsiDpi;
+
 use crate::{
     peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU, VDMA},
     rom,
@@ -130,10 +132,6 @@ pub enum ConfigError {
 // ── MipiDsi bus struct ────────────────────────────────────────────────────────
 
 /// Owns the DSI/VDMA peripherals and powers down the D-PHY on drop.
-///
-/// Kept separate from [`MipiDsi`] so it can be moved into [`dpi::DsiDpi`]
-/// without triggering the "cannot move out of a type that implements `Drop`"
-/// restriction on the outer bus struct.
 pub(crate) struct DphyGuard<'d> {
     pub(crate) _dsi: MIPI_DSI<'d>,
     pub(crate) _vdma: VDMA<'d>,
@@ -337,8 +335,8 @@ impl<'d> MipiDsi<'d> {
         self,
         config: dpi::DpiConfig,
         framebuffers: &[&'d mut [u8]],
-    ) -> Result<dpi::DsiDpi<'d>, ConfigError> {
-        dpi::DsiDpi::new(self, config, framebuffers)
+    ) -> Result<DsiDpi<'d>, ConfigError> {
+        DsiDpi::new(self, config, framebuffers)
     }
 }
 

@@ -1,6 +1,10 @@
 //! MIPI DSI video-mode (DPI) driver.
 
-use core::{marker::PhantomData, task::Poll};
+use core::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{
     asynch::AtomicWaker,
@@ -150,9 +154,7 @@ pub struct DpiConfig {
 
 // ── Static link-list storage ──────────────────────────────────────────────────
 
-struct AlignedLlis([VdmaLinkItem; NUM_LLIS]);
-
-static mut LLI_STORAGE: AlignedLlis = AlignedLlis([const { VdmaLinkItem::zeroed() }; NUM_LLIS]);
+static LLI_STORAGE: [VdmaLinkItem; NUM_LLIS] = [const { VdmaLinkItem::zeroed() }; NUM_LLIS];
 
 // ── VDMA block-done ISR ───────────────────────────────────────────────────────
 
@@ -168,16 +170,14 @@ fn vdma_block_done_isr() {
     let ch = VDMA::regs().ch(0);
     ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
 
-    let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
-
-    for lli in llis.iter_mut() {
+    for lli in LLI_STORAGE.iter() {
         lli.rearm();
     }
 
     // Flush LLIs from CPU cache → SRAM.
     unsafe {
         crate::soc::cache_writeback_addr(
-            llis.as_ptr() as u32,
+            LLI_STORAGE.as_ptr() as u32,
             core::mem::size_of::<VdmaLinkItem>() as u32 * NUM_LLIS as u32,
         );
     }
@@ -191,8 +191,8 @@ static VSYNC_WAKER: AtomicWaker = AtomicWaker::new();
 fn dsi_bridge_isr() {
     let bridge = MIPI_DSI_BRIDGE::regs();
     let st = bridge.int_st().read();
-    unsafe { bridge.int_clr().write(|w| w.bits(st.bits())) };
     if st.vsync().bit_is_set() {
+        bridge.int_ena().modify(|_, w| w.vsync().clear_bit());
         VSYNC_WAKER.wake();
     }
 }
@@ -381,6 +381,8 @@ impl<'d> DsiDpi<'d> {
             .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
 
+        interrupt::bind_handler(Interrupt::DSI_BRIDGE, dsi_bridge_isr);
+
         // ── VDMA: build a NUM_LLIS-deep circular ring and start ───────────
         //
         // More LLIs = more time before the DMA loops back to a consumed
@@ -401,24 +403,20 @@ impl<'d> DsiDpi<'d> {
         }
 
         // Build ring: LLI[i] → LLI[(i+1) % NUM_LLIS].
-        {
-            let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
-            for i in 0..NUM_LLIS {
-                let next = &mut llis[(i + 1) % NUM_LLIS] as *mut VdmaLinkItem;
-                llis[i].configure(fb_ptrs[0] as u32, fb_size, next);
-            }
+        for i in 0..NUM_LLIS {
+            let next = &LLI_STORAGE[(i + 1) % NUM_LLIS] as *const VdmaLinkItem;
+            LLI_STORAGE[i].configure(fb_ptrs[0] as u32, fb_size, next);
         }
 
         // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
-        let llis = unsafe { &*(&raw const LLI_STORAGE.0) };
         unsafe {
             crate::soc::cache_writeback_addr(
-                llis.as_ptr() as u32,
+                LLI_STORAGE.as_ptr() as u32,
                 (core::mem::size_of::<VdmaLinkItem>() * NUM_LLIS) as u32,
             );
         }
 
-        VdmaChannel::new(0).start(&llis[0]);
+        VdmaChannel::new(0).start(&LLI_STORAGE[0]);
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
         // Enable the block-transfer-done signal for channel 0 so the ISR
@@ -484,9 +482,8 @@ impl<'d> DsiDpi<'d> {
         // Update sar_lo in every LLI to point at the new front buffer.
         // The DMA latches sar_lo at the start of each block, so an in-progress
         // block is unaffected; the new pixels appear on the next block boundary.
-        let llis = unsafe { &mut *(&raw mut LLI_STORAGE.0) };
         let src = self.fb_ptrs[back] as u32;
-        for lli in llis.iter_mut() {
+        for lli in LLI_STORAGE.iter() {
             lli.set_source(src);
         }
 
@@ -507,23 +504,32 @@ impl<'d> DsiDpi<'d> {
     }
 
     /// Async: yield until the next vsync event.
-    pub async fn wait_for_vsync_async(&mut self) {
+    pub fn wait_for_vsync_async(&mut self) -> impl Future<Output = ()> {
+        VsyncFuture(PhantomData)
+    }
+}
+
+struct VsyncFuture<'a>(PhantomData<&'a mut ()>);
+
+impl Future for VsyncFuture<'_> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let bridge = MIPI_DSI_BRIDGE::regs();
-
-        bridge.int_ena().modify(|_, w| w.vsync().set_bit());
-        interrupt::bind_handler(Interrupt::DSI_BRIDGE, dsi_bridge_isr);
-
-        core::future::poll_fn(|cx| {
+        if bridge.int_raw().read().vsync().bit_is_set() {
+            bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
+            Poll::Ready(())
+        } else {
             VSYNC_WAKER.register(cx.waker());
-            if bridge.int_raw().read().vsync().bit_is_set() {
-                bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        })
-        .await;
+            bridge.int_ena().modify(|_, w| w.vsync().set_bit());
+            Poll::Pending
+        }
+    }
+}
 
+impl Drop for VsyncFuture<'_> {
+    fn drop(&mut self) {
+        let bridge = MIPI_DSI_BRIDGE::regs();
         bridge.int_ena().modify(|_, w| w.vsync().clear_bit());
     }
 }

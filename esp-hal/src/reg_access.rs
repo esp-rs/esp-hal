@@ -4,10 +4,48 @@
 //!
 //! Collection of struct which helps you write to registers.
 
+use core::cell::UnsafeCell;
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 use core::marker::PhantomData;
 
+// ── VolatileCell ─────────────────────────────────────────────────────────────
+
+/// An interior-mutable cell that always performs volatile reads and writes.
+///
+/// This ensures that the compiler never caches descriptor field values in
+/// registers, which is necessary because both the CPU and the DMA engine
+/// may update descriptor words concurrently.
+#[repr(transparent)]
+pub(crate) struct VolatileCell<T: Copy>(UnsafeCell<T>);
+
+impl<T: Copy> VolatileCell<T> {
+    /// Creates a new `VolatileCell` with the given initial value.
+    pub(crate) const fn new(v: T) -> Self {
+        Self(UnsafeCell::new(v))
+    }
+
+    /// Reads the cell value using a volatile load.
+    #[inline]
+    pub(crate) fn get(&self) -> T {
+        unsafe { self.0.get().read_volatile() }
+    }
+
+    /// Writes `v` to the cell using a volatile store.
+    #[inline]
+    pub(crate) fn set(&self, v: T) {
+        unsafe { self.0.get().write_volatile(v) }
+    }
+}
+
+// SAFETY: Descriptor rings and LLI arrays are only ever accessed from one
+// execution context at a time (guarded at the driver level).
+unsafe impl<T: Copy + Send> Send for VolatileCell<T> {}
+unsafe impl<T: Copy + Sync> Sync for VolatileCell<T> {}
+
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 const U32_ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 pub(crate) trait EndianessConverter {
     fn u32_from_bytes(bytes: [u8; 4]) -> u32;
     fn u32_to_bytes(word: u32) -> [u8; 4];
@@ -15,9 +53,11 @@ pub(crate) trait EndianessConverter {
 
 /// Use BE for ESP32, NE otherwise
 #[derive(Debug, Clone)]
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 pub(crate) struct SocDependentEndianess;
 
 #[cfg(not(esp32))]
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 impl EndianessConverter for SocDependentEndianess {
     fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
         u32::from_ne_bytes(bytes)
@@ -29,6 +69,7 @@ impl EndianessConverter for SocDependentEndianess {
 }
 
 #[cfg(esp32)]
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 impl EndianessConverter for SocDependentEndianess {
     fn u32_from_bytes(bytes: [u8; 4]) -> u32 {
         u32::from_be_bytes(bytes)
@@ -49,12 +90,14 @@ impl EndianessConverter for SocDependentEndianess {
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
 #[derive(Debug, Clone)]
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 pub(crate) struct AlignmentHelper<E: EndianessConverter> {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
     phantom: PhantomData<E>,
 }
 
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 impl AlignmentHelper<SocDependentEndianess> {
     pub fn default() -> AlignmentHelper<SocDependentEndianess> {
         AlignmentHelper {
@@ -65,6 +108,7 @@ impl AlignmentHelper<SocDependentEndianess> {
     }
 }
 
+#[cfg(any(hmac_driver_supported, sha_driver_supported))]
 impl<E: EndianessConverter> AlignmentHelper<E> {
     pub fn reset(&mut self) {
         self.buf_fill = 0;
