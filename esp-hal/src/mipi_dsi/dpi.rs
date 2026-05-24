@@ -1,13 +1,15 @@
 //! MIPI DSI video-mode (DPI) driver.
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, task::Poll};
 
 use crate::{
+    asynch::AtomicWaker,
+    interrupt,
     mipi_dsi::{
         vdma::{VdmaChannel, VdmaLinkItem},
         ConfigError, MipiDsi,
     },
-    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
     system::{GenericPeripheralGuard, Peripheral},
 };
 
@@ -151,6 +153,20 @@ static mut LLI_STORAGE: AlignedLlis = AlignedLlis([
     VdmaLinkItem::zeroed(),
     VdmaLinkItem::zeroed(),
 ]);
+
+// ── Async waker ───────────────────────────────────────────────────────────────
+
+static VSYNC_WAKER: AtomicWaker = AtomicWaker::new();
+
+#[crate::handler]
+fn dsi_bridge_isr() {
+    let bridge = MIPI_DSI_BRIDGE::regs();
+    let st = bridge.int_st().read();
+    unsafe { bridge.int_clr().write(|w| w.bits(st.bits())) };
+    if st.vsync().bit_is_set() {
+        VSYNC_WAKER.wake();
+    }
+}
 
 // ── DsiDpi ────────────────────────────────────────────────────────────────────
 
@@ -400,6 +416,27 @@ impl<'d> DsiDpi<'d> {
         bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
         while !bridge.int_raw().read().vsync().bit_is_set() {}
         bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
+    }
+
+    /// Async: yield until the next vsync event.
+    pub async fn wait_for_vsync_async(&mut self) {
+        let bridge = MIPI_DSI_BRIDGE::regs();
+
+        bridge.int_ena().modify(|_, w| w.vsync().set_bit());
+        interrupt::bind_handler(Interrupt::DSI_BRIDGE, dsi_bridge_isr);
+
+        core::future::poll_fn(|cx| {
+            VSYNC_WAKER.register(cx.waker());
+            if bridge.int_raw().read().vsync().bit_is_set() {
+                bridge.int_clr().write(|w| w.vsync().clear_bit_by_one());
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+
+        bridge.int_ena().modify(|_, w| w.vsync().clear_bit());
     }
 }
 
