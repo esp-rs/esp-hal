@@ -309,7 +309,7 @@ peripherals = [
     { name = "EMAC_DMA", hidden = true },
     { name = "EMAC_MAC", hidden = true },
     { name = "MIPI_DSI", virtual = true },
-    { name = "VDMA", virtual = true },
+    { name = "VDMA", pac = "DMA" },
     { name = "MIPI_DSI_HOST", hidden = true, interrupts = { peri = "DSI" } },
     { name = "MIPI_DSI_BRIDGE", hidden = true, interrupts = { peri = "DSI_BRIDGE" } },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },

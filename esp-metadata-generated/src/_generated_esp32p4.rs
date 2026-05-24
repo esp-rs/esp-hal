@@ -4275,7 +4275,7 @@ macro_rules! for_each_peripheral {
         EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
-        VDMA <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        VDMA <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4610,7 +4610,7 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
         EMAC_MAC() (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
         MIPI_DSI <= virtual() (unstable)), (@ peri_type #[doc =
-        "VDMA peripheral singleton"] VDMA <= virtual() (unstable)), (@ peri_type #[doc =
+        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)), (@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "MIPI_DSI_BRIDGE peripheral singleton"]

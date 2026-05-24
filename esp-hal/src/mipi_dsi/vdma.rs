@@ -1,0 +1,220 @@
+//! Minimal VDMA abstraction for MIPI-DSI video streaming.
+
+use core::ptr;
+
+use crate::peripherals::VDMA;
+
+/// Fixed write destination for all DSI DMA transfers (DSI bridge pixel FIFO).
+pub(super) const DSI_BRG_MEM_BASE: u32 = 0x5010_5000;
+
+const PORT_MEMORY: u32 = 1;
+const PORT_DSI: u32 = 0;
+
+/// CTL0 value for mem → DSI transfers (constant across all frame buffers):
+///   sms=1 (MEMORY), dms=0 (DSI), sinc=0 (increment), dinc=1 (fixed),
+///   src/dst transfer width = 64-bit (3),
+///   src_msize = 512 items (8), dst_msize = 256 items (7).
+const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
+    | (PORT_DSI  << 2)                  // bit  2: dms
+    | (0         << 4)                  // bit  4: sinc = INCREMENT
+    | (1         << 6)                  // bit  6: dinc = FIXED
+    | (3         << 8)                  // bits 10:8  src_tr_width  (64-bit)
+    | (3         << 11)                 // bits 13:11 dst_tr_width  (64-bit)
+    | (8         << 14)                 // bits 17:14 src_msize     (512)
+    | (7         << 18); // bits 21:18 dst_msize     (256)
+
+/// CTL1 base: arlen_en=1, arlen=16, awlen_en=1, awlen=16.
+const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
+
+const LLI_LAST: u32 = 1 << 30;
+const LLI_VALID: u32 = 1 << 31;
+
+/// One VDMA link-list item (LLI), 64 bytes, 64-byte aligned.
+///
+/// Layout matches `dw_gdma_link_list_item_t` from the IDF.
+/// All writes use `ptr::write_volatile`; the caller must additionally ensure
+/// cache coherency before arming the DMA channel.
+#[repr(C, align(64))]
+pub(super) struct VdmaLinkItem {
+    sar_lo: u32,    // 0x00 – source address (low 32 bits)
+    sar_hi: u32,    // 0x04 – source address (high 32 bits, always 0)
+    dar_lo: u32,    // 0x08 – destination address (DSI_BRG_MEM_BASE)
+    dar_hi: u32,    // 0x0C
+    block_ts: u32,  // 0x10 – transfer size in 64-bit units, minus 1
+    _res1: u32,     // 0x14
+    llp_lo: u32,    // 0x18 – next LLI pointer low (0 = end of list) | LMS
+    llp_hi: u32,    // 0x1C
+    ctrl_lo: u32,   // 0x20 – CTL0
+    ctrl_hi: u32,   // 0x24 – CTL1
+    sstat: u32,     // 0x28
+    dstat: u32,     // 0x2C
+    status_lo: u32, // 0x30
+    status_hi: u32, // 0x34
+    _res2: u32,     // 0x38
+    _res3: u32,     // 0x3C
+}
+
+const _: () = {
+    assert!(
+        core::mem::size_of::<VdmaLinkItem>() == 64,
+        "VdmaLinkItem must be 64 bytes"
+    );
+};
+
+impl VdmaLinkItem {
+    pub(super) const fn zeroed() -> Self {
+        Self {
+            sar_lo: 0,
+            sar_hi: 0,
+            dar_lo: 0,
+            dar_hi: 0,
+            block_ts: 0,
+            _res1: 0,
+            llp_lo: 0,
+            llp_hi: 0,
+            ctrl_lo: 0,
+            ctrl_hi: 0,
+            sstat: 0,
+            dstat: 0,
+            status_lo: 0,
+            status_hi: 0,
+            _res2: 0,
+            _res3: 0,
+        }
+    }
+
+    /// Populate this LLI for a complete frame-buffer transfer.
+    ///
+    /// `fb_size` is in bytes and must be a multiple of 8 (64-bit width).
+    pub(super) fn configure(&mut self, src_addr: u32, fb_size: usize) {
+        debug_assert_eq!(fb_size % 8, 0, "fb_size must be a multiple of 8");
+        let block_ts = (fb_size / 8) as u32 - 1;
+        let ctrl_hi = CTRL_HI_BASE | LLI_LAST | LLI_VALID;
+        unsafe {
+            ptr::write_volatile(&mut self.sar_lo, src_addr);
+            ptr::write_volatile(&mut self.sar_hi, 0);
+            ptr::write_volatile(&mut self.dar_lo, DSI_BRG_MEM_BASE);
+            ptr::write_volatile(&mut self.dar_hi, 0);
+            ptr::write_volatile(&mut self.block_ts, block_ts);
+            ptr::write_volatile(&mut self._res1, 0);
+            ptr::write_volatile(&mut self.llp_lo, PORT_MEMORY); // lms=1, loc0=0
+            ptr::write_volatile(&mut self.llp_hi, 0);
+            ptr::write_volatile(&mut self.ctrl_lo, CTRL_LO);
+            ptr::write_volatile(&mut self.ctrl_hi, ctrl_hi);
+            ptr::write_volatile(&mut self.sstat, 0);
+            ptr::write_volatile(&mut self.dstat, 0);
+            ptr::write_volatile(&mut self.status_lo, 0);
+            ptr::write_volatile(&mut self.status_hi, 0);
+            ptr::write_volatile(&mut self._res2, 0);
+            ptr::write_volatile(&mut self._res3, 0);
+        }
+    }
+
+    /// Re-assert valid+last so the channel can be re-armed.
+    pub(super) fn rearm(&mut self) {
+        unsafe {
+            let v = ptr::read_volatile(&self.ctrl_hi);
+            ptr::write_volatile(&mut self.ctrl_hi, v | LLI_LAST | LLI_VALID);
+        }
+    }
+}
+
+/// Handle for a single VDMA channel dedicated to the DSI bridge.
+pub(super) struct VdmaChannel {
+    channel_id: u8,
+}
+
+impl VdmaChannel {
+    /// Initialise the VDMA controller and configure channel `channel_id`
+    /// (0-indexed, 0–3) for mem→DSI linked-list transfers.
+    ///
+    /// The caller must hold the `Vdma` peripheral guard before calling this.
+    pub(super) fn new(channel_id: u8) -> Self {
+        VDMA::regs().reset0().write(|w| w.dmac_rst().set_bit());
+        while VDMA::regs().reset0().read().dmac_rst().bit_is_set() {}
+        VDMA::regs()
+            .cfg0()
+            .modify(|_, w| w.dmac_en().set_bit().int_en().set_bit());
+
+        let ch = VDMA::regs().ch(channel_id as usize);
+
+        // linked-list multi-block for both source and destination
+        ch.cfg0().write(|w| unsafe {
+            w.ch1_src_multblk_type().bits(3);
+            w.ch1_dst_multblk_type().bits(3)
+        });
+
+        // M→P, DMA as flow controller (tt_fc = 1 = DW_GDMA_LL_FLOW_M2P_DMAC)
+        // HW handshake on both ends; dst handshake peripheral = DSI (0)
+        // channel priority = 1; outstanding: src = 5 (4+1), dst = 2 (1+1)
+        ch.cfg1().write(|w| unsafe {
+            w.ch1_tt_fc().bits(1);
+            w.ch1_hs_sel_src().clear_bit();
+            w.ch1_hs_sel_dst().clear_bit();
+            w.ch1_dst_per().bits(0);
+            w.ch1_ch_prior().bits(1);
+            w.ch1_src_osr_lmt().bits(4);
+            w.ch1_dst_osr_lmt().bits(1)
+        });
+
+        Self { channel_id }
+    }
+
+    /// Point the channel's LLP at `item` and enable the channel.
+    pub(super) fn start(&mut self, item: &VdmaLinkItem) {
+        let addr = item as *const VdmaLinkItem as u32;
+        debug_assert_eq!(addr & 0x3F, 0, "LLI must be 64-byte aligned");
+        let dma = VDMA::regs();
+        let ch = dma.ch(self.channel_id as usize);
+
+        // LLP0: lms = MEMORY, loc0 = addr >> 6
+        ch.llp0()
+            .write(|w| unsafe { w.ch1_lms().bit(PORT_MEMORY != 0).ch1_loc0().bits(addr >> 6) });
+        unsafe { ch.llp1().write_with_zero(|w| w) };
+
+        self.ch_enable(true);
+    }
+
+    /// Re-arm `item` (mark as valid/last) then restart the channel.
+    /// Intended to be called from the DMA done ISR.
+    pub(super) fn restart(&mut self, item: &mut VdmaLinkItem) {
+        item.rearm();
+        self.start(item);
+    }
+
+    /// Enable `DMA_TFR_DONE` interrupt generation and CPU signal propagation.
+    pub(super) fn enable_done_interrupt(&mut self) {
+        let ch = VDMA::regs().ch(self.channel_id as usize);
+        ch.intstatus_enable0()
+            .modify(|_, w| w.ch1_enable_dma_tfr_done_intstat().set_bit());
+        ch.intsignal_enable0()
+            .modify(|_, w| w.ch1_enable_dma_tfr_done_intsignal().set_bit());
+    }
+
+    /// Clear the `DMA_TFR_DONE` interrupt status for this channel.
+    pub(super) fn clear_done_interrupt(&mut self) {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .intclear0()
+            .write(|w| w.ch1_clear_dma_tfr_done_intstat().set_bit());
+    }
+
+    /// Return the raw interrupt-status word for this channel.
+    pub(super) fn interrupt_status(&self) -> u32 {
+        VDMA::regs()
+            .ch(self.channel_id as usize)
+            .intstatus0()
+            .read()
+            .bits()
+    }
+
+    fn ch_enable(&self, en: bool) {
+        let shift = self.channel_id;
+        let val: u32 = if en {
+            0x0101 << shift // ch_en bit + ch_en_we bit
+        } else {
+            0x0100 << shift // ch_en_we only (clears ch_en)
+        };
+        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
+    }
+}
