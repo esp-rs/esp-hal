@@ -685,6 +685,7 @@ extmem_origin = 0x3f500000
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]
+support_status = "not_supported"
 [device.ulp_riscv]
 [device.lp_timer]
 

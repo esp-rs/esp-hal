@@ -285,8 +285,6 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
-                    "sd_host_driver_supported",
-                    "sd_slave_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -297,7 +295,6 @@ impl Chip {
                     "touch_driver_supported",
                     "twai_driver_supported",
                     "uart_driver_supported",
-                    "ulp_fsm_driver_supported",
                     "wifi_driver_supported",
                     "adc_adc1",
                     "adc_adc2",
@@ -484,8 +481,6 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
-                    "cargo:rustc-cfg=sd_host_driver_supported",
-                    "cargo:rustc-cfg=sd_slave_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -496,7 +491,6 @@ impl Chip {
                     "cargo:rustc-cfg=touch_driver_supported",
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
-                    "cargo:rustc-cfg=ulp_fsm_driver_supported",
                     "cargo:rustc-cfg=wifi_driver_supported",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
@@ -2425,7 +2419,6 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
-                    "sd_slave_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -2700,7 +2693,6 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
-                    "cargo:rustc-cfg=sd_slave_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -4176,7 +4168,6 @@ impl Chip {
                     "timergroup_driver_supported",
                     "twai_driver_supported",
                     "uart_driver_supported",
-                    "ulp_fsm_driver_supported",
                     "ulp_riscv_driver_supported",
                     "usb_otg_driver_supported",
                     "wifi_driver_supported",
@@ -4389,7 +4380,6 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
-                    "cargo:rustc-cfg=ulp_fsm_driver_supported",
                     "cargo:rustc-cfg=ulp_riscv_driver_supported",
                     "cargo:rustc-cfg=usb_otg_driver_supported",
                     "cargo:rustc-cfg=wifi_driver_supported",
@@ -4802,7 +4792,6 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
-                    "sd_host_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -4814,7 +4803,6 @@ impl Chip {
                     "twai_driver_supported",
                     "uart_driver_supported",
                     "uhci_driver_supported",
-                    "ulp_fsm_driver_supported",
                     "ulp_riscv_driver_supported",
                     "usb_otg_driver_supported",
                     "usb_serial_jtag_driver_supported",
@@ -5052,7 +5040,6 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
-                    "cargo:rustc-cfg=sd_host_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -5064,7 +5051,6 @@ impl Chip {
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
                     "cargo:rustc-cfg=uhci_driver_supported",
-                    "cargo:rustc-cfg=ulp_fsm_driver_supported",
                     "cargo:rustc-cfg=ulp_riscv_driver_supported",
                     "cargo:rustc-cfg=usb_otg_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
@@ -5544,8 +5530,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rng_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(rsa_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_timer_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(sd_host_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(sd_slave_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sha_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sleep_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_driver_supported)");
@@ -5556,7 +5540,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(touch_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(twai_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(ulp_fsm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(wifi_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(adc_adc1)");
     println!("cargo:rustc-check-cfg=cfg(adc_adc2)");
