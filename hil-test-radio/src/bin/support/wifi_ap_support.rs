@@ -62,7 +62,8 @@ async fn main(spawner: Spawner) -> ! {
             .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
     );
 
-    let (controller, interfaces) = esp_radio::wifi::new(
+    let device = esp_radio::wifi::Interface::access_point();
+    let controller = esp_radio::wifi::new(
         p.WIFI,
         ControllerConfig::default().with_initial_config(access_point_config),
     )
@@ -81,7 +82,7 @@ async fn main(spawner: Spawner) -> ! {
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     let (stack, runner) = embassy_net::new(
-        interfaces.access_point,
+        device,
         net_config,
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
@@ -146,7 +147,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }
 

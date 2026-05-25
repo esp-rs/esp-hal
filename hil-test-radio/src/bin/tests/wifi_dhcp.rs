@@ -38,7 +38,7 @@ mod tests {
     }
 
     #[embassy_executor::task]
-    async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+    async fn net_task(mut runner: Runner<'static, Interface>) {
         defmt::debug!("[STA] Starting network task");
         runner.run().await
     }
@@ -81,15 +81,14 @@ mod tests {
                 .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
         );
 
-        let (mut controller, interfaces) = esp_radio::wifi::new(
+        let wifi_interface = esp_radio::wifi::Interface::station();
+        let mut controller = esp_radio::wifi::new(
             p.WIFI,
             ControllerConfig::default().with_initial_config(station_config),
         )
         .unwrap();
 
         defmt::debug!("[STA] Wifi configured and started!");
-
-        let wifi_interface = interfaces.station;
 
         let net_config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -179,13 +178,12 @@ mod tests {
                     .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
             );
 
-            let (mut controller, interfaces) = esp_radio::wifi::new(
+            let mut wifi_interface = esp_radio::wifi::Interface::station();
+            let mut controller = esp_radio::wifi::new(
                 wifi.reborrow(),
                 ControllerConfig::default().with_initial_config(station_config),
             )
             .unwrap();
-
-            let mut wifi_interface = interfaces.station;
 
             let token = wifi_interface.transmit();
             assert!(matches!(token, None));
@@ -222,7 +220,8 @@ mod tests {
                     .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
             );
 
-            let (mut controller, interfaces) = esp_radio::wifi::new(
+            let mut wifi_interface = esp_radio::wifi::Interface::station();
+            let mut controller = esp_radio::wifi::new(
                 wifi.reborrow(),
                 ControllerConfig::default().with_initial_config(station_config),
             )
@@ -235,8 +234,6 @@ mod tests {
                     controller.connect_async().await.unwrap();
                 }
             }
-
-            let mut wifi_interface = interfaces.station;
 
             let token = wifi_interface.transmit();
 
