@@ -4,25 +4,25 @@ use crate::RegisterToggle;
 impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.channel as usize)
+        DMA::regs().ch(self.info.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     pub(super) fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.channel as usize)
+        DMA::regs().int_ch(self.info.channel as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     pub(super) fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
-        DMA::regs().out_int_ch(self.channel as usize)
+        DMA::regs().out_int_ch(self.info.channel as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
     pub(super) fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
-        DMA::regs().ch(self.channel as usize).out_int()
+        DMA::regs().ch(self.info.channel as usize).out_int()
     }
 }
 
@@ -124,35 +124,11 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        match self.channel {
-            #[cfg(soc_has_dma_ch0)]
-            0 => DMA_CH0::handler_out(),
-            #[cfg(soc_has_dma_ch1)]
-            1 => DMA_CH1::handler_out(),
-            #[cfg(soc_has_dma_ch2)]
-            2 => DMA_CH2::handler_out(),
-            #[cfg(soc_has_dma_ch3)]
-            3 => DMA_CH3::handler_out(),
-            #[cfg(soc_has_dma_ch4)]
-            4 => DMA_CH4::handler_out(),
-            _ => unreachable!(),
-        }
+        self.info.handler_out
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        match self.channel {
-            #[cfg(soc_has_dma_ch0)]
-            0 => DMA_CH0::isr_out(),
-            #[cfg(soc_has_dma_ch1)]
-            1 => DMA_CH1::isr_out(),
-            #[cfg(soc_has_dma_ch2)]
-            2 => DMA_CH2::isr_out(),
-            #[cfg(soc_has_dma_ch3)]
-            3 => DMA_CH3::isr_out(),
-            #[cfg(soc_has_dma_ch4)]
-            4 => DMA_CH4::isr_out(),
-            _ => unreachable!(),
-        }
+        self.info.isr_out
     }
 }
 
@@ -226,13 +202,13 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &TX_WAKERS[self.channel as usize]
+        &self.state.tx_waker
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
+                self.state.tx_is_async.load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -242,7 +218,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
+                self.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }
@@ -251,25 +227,25 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
 impl AnyGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.channel as usize)
+        DMA::regs().ch(self.info.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.channel as usize)
+        DMA::regs().int_ch(self.info.channel as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
-        DMA::regs().in_int_ch(self.channel as usize)
+        DMA::regs().in_int_ch(self.info.channel as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
     fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
-        DMA::regs().ch(self.channel as usize).in_int()
+        DMA::regs().ch(self.info.channel as usize).in_int()
     }
 }
 
@@ -351,35 +327,11 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        match self.channel {
-            #[cfg(soc_has_dma_ch0)]
-            0 => DMA_CH0::handler_in(),
-            #[cfg(soc_has_dma_ch1)]
-            1 => DMA_CH1::handler_in(),
-            #[cfg(soc_has_dma_ch2)]
-            2 => DMA_CH2::handler_in(),
-            #[cfg(soc_has_dma_ch3)]
-            3 => DMA_CH3::handler_in(),
-            #[cfg(soc_has_dma_ch4)]
-            4 => DMA_CH4::handler_in(),
-            _ => unreachable!(),
-        }
+        self.info.handler_in
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        match self.channel {
-            #[cfg(soc_has_dma_ch0)]
-            0 => DMA_CH0::isr_in(),
-            #[cfg(soc_has_dma_ch1)]
-            1 => DMA_CH1::isr_in(),
-            #[cfg(soc_has_dma_ch2)]
-            2 => DMA_CH2::isr_in(),
-            #[cfg(soc_has_dma_ch3)]
-            3 => DMA_CH3::isr_in(),
-            #[cfg(soc_has_dma_ch4)]
-            4 => DMA_CH4::isr_in(),
-            _ => unreachable!(),
-        }
+        self.info.isr_in
     }
 }
 
@@ -461,13 +413,13 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &RX_WAKERS[self.channel as usize]
+        &self.state.rx_waker
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
+                self.state.rx_is_async.load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -477,7 +429,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
+                self.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }

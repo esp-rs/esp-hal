@@ -118,10 +118,6 @@ peripherals = [
     { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-    { name = "DMA_CH2", virtual = true },
-
     { name = "ADC1", virtual = true },
 
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
@@ -307,6 +303,13 @@ max_priority = 5
 can_access_psram = true
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
+engines = [
+    { name = "AHB_GDMA", channels = [
+        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+    ] },
+]
 
 [device.ecc]
 support_status = "partial"

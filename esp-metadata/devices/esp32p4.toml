@@ -285,9 +285,6 @@ peripherals = [
     # DMA: P4 has three DMA blocks; see [device.dma] below for the table.
     # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-    { name = "DMA_CH2", virtual = true },
 
     { name = "ETH", virtual = true },
     { name = "EMAC_DMA", hidden = true },
@@ -382,6 +379,13 @@ kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 max_priority = 5
+engines = [
+    { name = "AHB_GDMA", channels = [
+        { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
+    ] },
+]
 
 # TODO: Check later with PAC and TRM both
 [device.twai]

@@ -684,6 +684,45 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(dma) = self.device.peri_config.dma.as_ref() {
+            for engine in dma.engines.0.iter() {
+                for channel in engine.channels.iter() {
+                    let ch_name = format_ident!("{}", channel.name);
+                    let singleton_doc = format!("{} peripheral singleton", channel.name);
+                    let pac = match &channel.pac {
+                        Some(pac_name) => format_ident!("{}", pac_name),
+                        None => format_ident!("virtual"),
+                    };
+                    let interrupts: Vec<TokenStream> = match (
+                        &channel.interrupt,
+                        &channel.interrupt_in,
+                        &channel.interrupt_out,
+                    ) {
+                        (Some(interrupt), None, None) => {
+                            let interrupt = format_ident!("{}", interrupt);
+                            vec![quote! {
+                                #interrupt: { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }
+                            }]
+                        }
+                        (None, Some(interrupt_in), Some(interrupt_out)) => {
+                            let interrupt_in = format_ident!("{}", interrupt_in);
+                            let interrupt_out = format_ident!("{}", interrupt_out);
+                            vec![
+                                quote! { #interrupt_in: { bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt } },
+                                quote! { #interrupt_out: { bind_dma_out_interrupt, enable_dma_out_interrupt, disable_dma_out_interrupt } },
+                            ]
+                        }
+                        _ => vec![],
+                    };
+                    let tokens = quote! {
+                        #[doc = #singleton_doc] #ch_name <= #pac ( #(#interrupts),* )
+                    };
+                    all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                    singleton_peripherals.push(quote! { #ch_name (unstable) });
+                }
+            }
+        }
+
         for peri in self.peripherals().iter() {
             let hal = format_ident!("{}", peri.name);
             let pac = if peri.is_virtual {
