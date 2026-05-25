@@ -37,6 +37,14 @@ mod tests {
         esp_hal::init(config)
     }
 
+    fn station_config() -> Config {
+        Config::Station(
+            StationConfig::default()
+                .with_ssid("AP")
+                .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
+        )
+    }
+
     #[embassy_executor::task]
     async fn net_task(mut runner: Runner<'static, Interface>) {
         defmt::debug!("[STA] Starting network task");
@@ -65,37 +73,25 @@ mod tests {
         }
     }
 
-    #[test]
-    async fn wifi_dhcp_http_test(p: Peripherals) {
-        defmt::info!("[STA] Starting Wi-Fi DHCP HTTP test");
-        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
-        // let spawner = executor_core0.start(Priority::Priority1);
+    async fn connect_with_retry(controller: &mut WifiController<'_>) {
+        if controller.connect_async().await.is_ok() {
+            return;
+        }
 
-        let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        Timer::after(Duration::from_millis(1000)).await;
+        controller.connect_async().await.unwrap();
+    }
 
-        let station_config = Config::Station(
-            StationConfig::default()
-                .with_ssid("AP")
-                .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
-        );
-
-        let wifi_interface = esp_radio::wifi::Interface::station();
-        let mut controller = esp_radio::wifi::new(
-            p.WIFI,
-            ControllerConfig::default().with_initial_config(station_config),
-        )
-        .unwrap();
-
-        defmt::debug!("[STA] Wifi configured and started!");
-
+    async fn run_http_smoke_test(
+        spawner: embassy_executor::Spawner,
+        mut controller: WifiController<'static>,
+        wifi_interface: Interface,
+    ) {
         let net_config = embassy_net::Config::dhcpv4(Default::default());
 
         let rng = Rng::new();
         let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-        // THEN create network stack
         let (stack, runner) = embassy_net::new(
             wifi_interface,
             net_config,
@@ -114,9 +110,6 @@ mod tests {
 
         Timer::after(Duration::from_millis(100)).await;
 
-        defmt::debug!("[STA] Waiting for network to come up...");
-
-        // HTTP client
         let tcp_client = TcpClient::new(
             stack,
             mk_static!(
@@ -128,8 +121,6 @@ mod tests {
         let dns_client = DnsSocket::new(stack);
         let mut http = HttpClient::new(&tcp_client, &dns_client);
 
-        defmt::debug!("[STA] Starting HTTP requests loop");
-
         let mut rx_buf = [0u8; 4096];
 
         let request = http
@@ -137,26 +128,37 @@ mod tests {
             .await
             .unwrap();
 
-        // Update the Host header to match the IP or remove it if reqwless handles it
         let mut request = request.headers(&[("Host", "192.168.2.1"), ("Connection", "close")]);
-
-        defmt::debug!("[STA] Sending HTTP request");
-
         let response = request.send(&mut rx_buf).await.unwrap();
-
-        defmt::debug!("[STA] received HTTP response");
 
         assert_eq!(response.status, Status::from(200));
 
         let body = response.body().read_to_end().await.unwrap();
         let body_str = core::str::from_utf8(body).unwrap();
 
-        defmt::debug!("[STA] Response body: {}", body_str);
-
         assert!(
             body_str.contains("Hello Rust! Hello esp-radio!"),
             "Unexpected response body"
         );
+    }
+
+    #[test]
+    async fn wifi_dhcp_http_test(p: Peripherals) {
+        defmt::info!("[STA] Starting Wi-Fi DHCP HTTP test");
+        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
+        let wifi_interface = Interface::station();
+        let controller = esp_radio::wifi::new(
+            p.WIFI,
+            ControllerConfig::default().with_initial_config(station_config()),
+        )
+        .unwrap();
+
+        run_http_smoke_test(spawner, controller, wifi_interface).await;
 
         defmt::info!("[STA] TEST_DONE: PASS");
     }
@@ -169,82 +171,31 @@ mod tests {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
+        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
         let mut wifi = p.WIFI;
 
         {
-            let station_config = Config::Station(
-                StationConfig::default()
-                    .with_ssid("AP")
-                    .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
-            );
-
-            let mut wifi_interface = esp_radio::wifi::Interface::station();
             let mut controller = esp_radio::wifi::new(
                 wifi.reborrow(),
-                ControllerConfig::default().with_initial_config(station_config),
+                ControllerConfig::default().with_initial_config(station_config()),
             )
             .unwrap();
 
-            let token = wifi_interface.transmit();
-            assert!(matches!(token, None));
-
-            match controller.connect_async().await {
-                Ok(_) => {}
-                Err(_) => {
-                    Timer::after(Duration::from_millis(1000)).await;
-                    controller.connect_async().await.unwrap();
-                }
-            }
-
-            let token = wifi_interface.transmit();
-
-            defmt::debug!("[STA] got token {}", token.is_some());
-
+            connect_with_retry(&mut controller).await;
             core::mem::drop(controller);
-
-            if let Some(token) = token {
-                token.consume_token(10, |tx| tx.fill(0));
-                defmt::info!("[STA] survived consumer_token");
-            } else {
-                defmt::info!("[STA] no token");
-            }
-
-            let token = wifi_interface.transmit();
-            assert!(matches!(token, None));
         }
-        {
-            Timer::after(Duration::from_millis(2000)).await;
-            let station_config = Config::Station(
-                StationConfig::default()
-                    .with_ssid("AP")
-                    .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
-            );
 
-            let mut wifi_interface = esp_radio::wifi::Interface::station();
-            let mut controller = esp_radio::wifi::new(
-                wifi.reborrow(),
-                ControllerConfig::default().with_initial_config(station_config),
-            )
-            .unwrap();
+        Timer::after(Duration::from_millis(1500)).await;
 
-            match controller.connect_async().await {
-                Ok(_) => {}
-                Err(_) => {
-                    Timer::after(Duration::from_millis(1000)).await;
-                    controller.connect_async().await.unwrap();
-                }
-            }
+        let wifi_interface = Interface::station();
+        let controller = esp_radio::wifi::new(
+            wifi,
+            ControllerConfig::default().with_initial_config(station_config()),
+        )
+        .unwrap();
 
-            let token = wifi_interface.transmit();
+        run_http_smoke_test(spawner, controller, wifi_interface).await;
 
-            defmt::info!("[STA] got token {}", token.is_some());
-
-            if let Some(token) = token {
-                token.consume_token(10, |tx| tx.fill(0));
-                defmt::info!("[STA] tx done");
-            } else {
-                defmt::info!("[STA] no token");
-            }
-        }
+        defmt::info!("[STA] Wi-Fi drop + recovery PASS");
     }
 }

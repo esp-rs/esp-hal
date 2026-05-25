@@ -1,8 +1,14 @@
+//! Wi-Fi HIL tests.
+//!
+//! Each radio domain gets its own binary under `src/bin/` (for example `wifi`,
+//! future `ble`, and `esp_radio` for mixed/coex tests). Test modules live in
+//! a subdirectory named after the binary.
+
 //% CHIPS(has_wifi_ble): esp32c6
 //% HARNESS-FIRMWARE(has_wifi_ble): wifi_ap_support
 
 //% FEATURES: unstable esp-alloc embassy
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio-unstable
 //% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 
 // Even if the defaults change, keep this at a low-ish value for
@@ -34,5 +40,5 @@ fn init_heap() {
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 #[cfg(soc_has_wifi)]
-#[path = "tests/wifi_dhcp.rs"]
+#[path = "wifi/dhcp.rs"]
 mod wifi_dhcp;

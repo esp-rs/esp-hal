@@ -8,7 +8,7 @@ publish = false
 name = "hil_test"
 
 [[bin]]
-name              = "esp_radio"
+name              = "wifi"
 harness           = false
 required-features = ["esp-alloc"]
 
@@ -29,13 +29,14 @@ embedded-io-async  = "0.7.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
+esp-metadata-generated = { path = "../esp-metadata-generated" }
 esp-rtos           = { path = "../esp-rtos", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 static_cell        = { version = "2.1.0" }
-semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
-embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
+semihosting        = { version = "0.1", features = ["stdio", "panic-handler"] }
+embedded-test      = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 
 # radio HIL deps
 embassy-net = { version = "0.8.0", features = [
@@ -56,14 +57,15 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos/defmt", "esp-radio/defmt"]
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
+esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
 
 esp32c6 = [
     "esp-hal/esp32c6",
-    "esp-alloc/esp32c6",
+    "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",

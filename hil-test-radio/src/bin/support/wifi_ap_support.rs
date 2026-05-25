@@ -1,6 +1,6 @@
 //% CHIPS(has_wifi_ble): esp32c6
 //% FEATURES: unstable esp-alloc embassy
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio/unstable
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio-unstable
 //% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 
