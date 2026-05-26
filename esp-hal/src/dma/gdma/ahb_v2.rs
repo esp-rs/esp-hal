@@ -16,12 +16,12 @@ cfg_if::cfg_if! {
 impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
+        DMA::regs().ch(self.0.info.channel as usize)
     }
 
     #[inline(always)]
     pub(super) fn int(&self) -> &gdma_pac::out_int_ch::OUT_INT_CH {
-        DMA::regs().out_int_ch(self.info.channel as usize)
+        DMA::regs().out_int_ch(self.0.info.channel as usize)
     }
 }
 
@@ -57,7 +57,7 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn set_link_addr(&self, address: u32) {
         trace!("Setting out-link address to 0x{:08X}", address);
         DMA::regs()
-            .out_link_addr_ch(self.info.channel as usize)
+            .out_link_addr_ch(self.0.info.channel as usize)
             .write(|w| unsafe { w.outlink_addr().bits(address) });
     }
 
@@ -115,11 +115,11 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_out
+        self.0.info.handler_out
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_out
+        self.0.info.isr_out
     }
 }
 
@@ -193,7 +193,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.tx_waker
+        &self.0.state.tx_waker
     }
 
     fn is_async(&self) -> bool {
@@ -206,12 +206,12 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
 impl AnyGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &gdma_pac::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
+        DMA::regs().ch(self.0.info.channel as usize)
     }
 
     #[inline(always)]
     fn int(&self) -> &gdma_pac::in_int_ch::IN_INT_CH {
-        DMA::regs().in_int_ch(self.info.channel as usize)
+        DMA::regs().in_int_ch(self.0.info.channel as usize)
     }
 }
 
@@ -247,7 +247,7 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn set_link_addr(&self, address: u32) {
         trace!("Setting in-link address to 0x{:08X}", address);
         DMA::regs()
-            .in_link_addr_ch(self.info.channel as usize)
+            .in_link_addr_ch(self.0.info.channel as usize)
             .write(|w| unsafe { w.inlink_addr().bits(address) });
     }
 
@@ -287,11 +287,11 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_in
+        self.0.info.handler_in
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_in
+        self.0.info.isr_in
     }
 }
 
@@ -373,7 +373,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.rx_waker
+        &self.0.state.rx_waker
     }
 
     fn is_async(&self) -> bool {

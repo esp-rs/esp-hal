@@ -60,32 +60,11 @@ pub struct ChannelState {
 macro_rules! impl_pdma_channel {
     ($peri:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
         paste::paste! {
-            use $crate::peripherals::[< $instance >];
-            impl<'d> crate::dma::DmaChannel for $instance<'d> {
-                type Rx = [<$peri DmaRxChannel>]<'d>;
-                type Tx = [<$peri DmaTxChannel>]<'d>;
-
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) { unsafe {
-                    (
-                        [<$peri DmaRxChannel>](Self::steal().into()),
-                        [<$peri DmaTxChannel>](Self::steal().into()),
-                    )
-                }}
-            }
-
-            impl crate::dma::DmaChannelExt for $instance<'_> {
-                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri DmaRxChannel>](unsafe { Self::steal() }.into())
-                }
-                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri DmaTxChannel>](unsafe { Self::steal() }.into())
-                }
-            }
-
-            impl<'d> $instance<'d> {
+            use $crate::peripherals::$instance;
+            impl $instance<'_> {
                 pub(super) fn info(&self) -> &'static ChannelInfo {
                     #[crate::handler(priority = crate::interrupt::Priority::max())]
-                    pub(crate) fn interrupt_handler() {
+                    fn interrupt_handler() {
                         crate::dma::asynch::handle_in_interrupt::<$instance<'static>>();
                         crate::dma::asynch::handle_out_interrupt::<$instance<'static>>();
                     }
@@ -96,6 +75,7 @@ macro_rules! impl_pdma_channel {
                     };
                     &INFO
                 }
+
                 pub(super) fn state(&self) -> &'static ChannelState {
                     static STATE: ChannelState = ChannelState {
                         tx_waker: crate::asynch::AtomicWaker::new(),
@@ -107,21 +87,44 @@ macro_rules! impl_pdma_channel {
                 }
             }
 
-            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
+            impl<'d> crate::dma::DmaChannel for $instance<'d> {
+                type Rx = [<$peri DmaRxChannel>]<'d>;
+                type Tx = [<$peri DmaTxChannel>]<'d>;
+
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
+                    unsafe {
+                        (
+                            [<$peri DmaRxChannel>](Self::steal().degrade()),
+                            [<$peri DmaTxChannel>](Self::steal().degrade()),
+                        )
+                    }
+                }
+            }
+
+            impl crate::dma::DmaChannelExt for $instance<'_> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                    [<$peri DmaRxChannel>](unsafe { Self::steal() }.degrade())
+                }
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                    [<$peri DmaTxChannel>](unsafe { Self::steal() }.degrade())
+                }
+            }
+
+            impl<'d> DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaChannel>]<'d> {
                     self.into()
                 }
             }
 
-            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
+            impl<'d> DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaRxChannel>]<'d> {
-                    [<$peri DmaRxChannel>](self.into())
+                    [<$peri DmaRxChannel>](self.degrade())
                 }
             }
 
-            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
+            impl<'d> DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaTxChannel>]<'d> {
-                    [<$peri DmaTxChannel>](self.into())
+                    [<$peri DmaTxChannel>](self.degrade())
                 }
             }
         }
