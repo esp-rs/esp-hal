@@ -238,7 +238,7 @@ impl<'d> DsiDpi<'d> {
         framebuffers: &[&'d mut [u8]],
     ) -> Result<Self, ConfigError> {
         let num_fbs = framebuffers.len();
-        debug_assert!(num_fbs >= 1 && num_fbs <= MAX_FBS);
+        debug_assert!((1..=MAX_FBS).contains(&num_fbs));
         let fb_size = framebuffers[0].len();
 
         // ── DPI clock ──────────────────────────────────────────────────────
@@ -349,8 +349,8 @@ impl<'d> DsiDpi<'d> {
         // ── Bridge: pixel format & DMA ─────────────────────────────────────
         let total_bits = t.h_active * t.v_active * config.in_color_format.bits_per_pixel();
         bridge.raw_num_cfg().modify(|_, w| unsafe {
-            w.raw_num_total().bits((total_bits + 63) / 64);
-            w.unalign_64bit_en().bit(total_bits % 64 != 0);
+            w.raw_num_total().bits(total_bits.div_ceil(64));
+            w.unalign_64bit_en().bit(!total_bits.is_multiple_of(64));
             w.raw_num_total_set().set_bit()
         });
         bridge
@@ -383,26 +383,22 @@ impl<'d> DsiDpi<'d> {
 
         interrupt::bind_handler(Interrupt::DSI_BRIDGE, dsi_bridge_isr);
 
-        // ── VDMA: build a NUM_LLIS-deep circular ring and start ───────────
-        //
-        // More LLIs = more time before the DMA loops back to a consumed
-        // descriptor.  All LLIs start pointing at fb[0].  commit() updates
-        // sar_lo in every LLI and re-arms them (LLI_VALID = 1) so the DMA
-        // will not suspend as long as commit() is called within
-        // NUM_LLIS × (one frame transfer time) of the last commit.
-        let mut fb_ptrs = [core::ptr::null_mut::<u8>(); MAX_FBS];
-        for i in 0..num_fbs {
-            fb_ptrs[i] = framebuffers[i].as_ptr() as *mut u8;
-        }
-
         // Flush all frame buffers from CPU cache → PSRAM.
-        for i in 0..num_fbs {
+        for fb in framebuffers.iter() {
             unsafe {
-                crate::soc::cache_writeback_addr(fb_ptrs[i] as u32, fb_size as u32);
+                crate::soc::cache_writeback_addr(fb.as_ptr() as u32, fb_size as u32);
             }
         }
 
         // Build ring: LLI[i] → LLI[(i+1) % NUM_LLIS].
+        let fb_ptrs = core::array::from_fn::<_, MAX_FBS, _>(|i| {
+            if i < num_fbs {
+                framebuffers[i].as_ptr() as *mut u8
+            } else {
+                core::ptr::null_mut::<u8>()
+            }
+        });
+
         for i in 0..NUM_LLIS {
             let next = &LLI_STORAGE[(i + 1) % NUM_LLIS] as *const VdmaLinkItem;
             LLI_STORAGE[i].configure(fb_ptrs[0] as u32, fb_size, next);

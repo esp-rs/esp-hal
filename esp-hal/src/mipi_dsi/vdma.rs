@@ -14,7 +14,7 @@ const PORT_DSI: u32 = 0;
 ///   src_msize = 512 items (8), dst_msize = 256 items (7).
 const CTRL_LO: u32 = PORT_MEMORY        // bit  0: sms
     | (PORT_DSI  << 2)                  // bit  2: dms
-    | (0         << 4)                  // bit  4: sinc = INCREMENT
+    // | (0      << 4)                  // bit  4: sinc = INCREMENT
     | (1         << 6)                  // bit  6: dinc = FIXED
     | (3         << 8)                  // bits 10:8  src_tr_width  (64-bit)
     | (3         << 11)                 // bits 13:11 dst_tr_width  (64-bit)
@@ -54,7 +54,7 @@ pub(super) struct VdmaLinkItem {
 }
 
 const _: () = {
-    assert!(
+    core::assert!(
         core::mem::size_of::<VdmaLinkItem>() == 64,
         "VdmaLinkItem must be 64 bytes"
     );
