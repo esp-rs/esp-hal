@@ -563,6 +563,25 @@ enum Ack {
     Nack = 1,
 }
 
+/// Clock source for the I2C peripheral.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum ClockSource {
+    /// APB clock.
+    #[cfg(not(i2c_master_version = "3"))]
+    #[default]
+    Apb,
+    /// Crystal oscillator (XTAL).
+    #[cfg(i2c_master_version = "3")]
+    #[default]
+    Xtal,
+    /// RC fast oscillator.
+    #[cfg(i2c_master_version = "3")]
+    RcFast,
+}
+
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -599,6 +618,12 @@ pub struct Config {
     #[cfg(i2c_master_has_fsm_timeouts)]
     #[builder_lite(unstable)]
     scl_main_st_timeout: FsmTimeout,
+
+    /// The clock source for the I2C peripheral.
+    ///
+    /// Default value: [`ClockSource::default()`].
+    #[builder_lite(unstable)]
+    clock_source: ClockSource,
 }
 
 impl Default for Config {
@@ -617,6 +642,8 @@ impl Default for Config {
             scl_st_timeout: Default::default(),
             #[cfg(i2c_master_has_fsm_timeouts)]
             scl_main_st_timeout: Default::default(),
+
+            clock_source: Default::default(),
         }
     }
 }

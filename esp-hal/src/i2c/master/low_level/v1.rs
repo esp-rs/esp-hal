@@ -59,6 +59,7 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
 
     configure_clock(
         driver.info,
+        clock_config.clock_source,
         0,
         scl_low_period,
         scl_high_period,

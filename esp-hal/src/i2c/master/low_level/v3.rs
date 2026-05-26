@@ -1,4 +1,4 @@
-use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
+use super::{ClockSource, Config, ConfigError, Driver, RegisterBlock, configure_clock};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
@@ -6,7 +6,10 @@ use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
 
-    let source_clk = crate::soc::clocks::xtal_clk_frequency();
+    let source_clk = match clock_config.clock_source {
+        ClockSource::Xtal => crate::soc::clocks::xtal_clk_frequency(),
+        ClockSource::RcFast => crate::soc::clocks::rc_fast_clk_frequency(),
+    };
 
     let bus_freq = clock_config.frequency.as_hz();
 
@@ -52,6 +55,7 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
 
     configure_clock(
         driver.info,
+        clock_config.clock_source,
         clkm_div,
         scl_low_period,
         scl_high_period,
