@@ -161,7 +161,7 @@ impl defmt::Format for StationConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct ConnectedStationInfo {
+pub struct ConnectedInfo {
     /// The SSID of the connected station.
     pub ssid: Ssid,
     /// The BSSID of the connected station.
@@ -178,7 +178,7 @@ pub struct ConnectedStationInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct DisconnectedStationInfo {
+pub struct DisconnectedInfo {
     /// The SSID of the disconnected station.
     pub ssid: Ssid,
     /// The BSSID of the disconnected station.

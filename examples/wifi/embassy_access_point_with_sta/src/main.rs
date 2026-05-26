@@ -346,21 +346,11 @@ async fn connection(mut controller: WifiController<'static>) {
                         Either::Second(event) => {
                             if let Ok(event) = event {
                                 match event {
-                                    esp_radio::wifi::ap::AccessPointStationEventInfo::Connected(
-                                        access_point_station_connected_info,
-                                    ) => {
-                                        println!(
-                                            "Station connected: {:?}",
-                                            access_point_station_connected_info
-                                        );
+                                    esp_radio::wifi::ap::EventInfo::Connected(info) => {
+                                        println!("Station connected: {:?}", info);
                                     }
-                                    esp_radio::wifi::ap::AccessPointStationEventInfo::Disconnected(
-                                        access_point_station_disconnected_info,
-                                    ) => {
-                                        println!(
-                                            "Station disconnected: {:?}",
-                                            access_point_station_disconnected_info
-                                        );
+                                    esp_radio::wifi::ap::EventInfo::Disconnected(info) => {
+                                        println!("Station disconnected: {:?}", info);
                                     }
                                 }
                             }

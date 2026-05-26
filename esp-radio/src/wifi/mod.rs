@@ -65,17 +65,10 @@ use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
 use self::{
-    ap::{
-        AccessPointConfig,
-        AccessPointInfo,
-        AccessPointStationConnectedInfo,
-        AccessPointStationDisconnectedInfo,
-        AccessPointStationEventInfo,
-        convert_ap_info,
-    },
+    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
-    sta::{ConnectedStationInfo, DisconnectedStationInfo, StationConfig},
+    sta::StationConfig,
     state::*,
 };
 use crate::{
@@ -879,7 +872,7 @@ static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
 #[non_exhaustive]
 pub enum WifiError {
     /// The device disconnected from the network or failed to connect to it.
-    Disconnected(DisconnectedStationInfo),
+    Disconnected(sta::DisconnectedInfo),
 
     /// Unsupported operation or mode.
     Unsupported,
@@ -2924,7 +2917,7 @@ ignored."
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn connect_async(&mut self) -> Result<ConnectedStationInfo, WifiError> {
+    pub async fn connect_async(&mut self) -> Result<sta::ConnectedInfo, WifiError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
             .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
@@ -2953,7 +2946,7 @@ ignored."
                 channel,
                 authmode,
                 aid,
-            } => Ok(ConnectedStationInfo {
+            } => Ok(sta::ConnectedInfo {
                 ssid,
                 bssid,
                 channel,
@@ -2965,7 +2958,7 @@ ignored."
                 bssid,
                 reason,
                 rssi,
-            } => Err(WifiError::Disconnected(DisconnectedStationInfo {
+            } => Err(WifiError::Disconnected(sta::DisconnectedInfo {
                 ssid,
                 bssid,
                 reason: DisconnectReason::from_raw(reason),
@@ -2997,7 +2990,7 @@ ignored."
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn disconnect_async(&mut self) -> Result<DisconnectedStationInfo, WifiError> {
+    pub async fn disconnect_async(&mut self) -> Result<sta::DisconnectedInfo, WifiError> {
         // If not connected it would wait forever for a `StationDisconnected` event that will never
         // happen. Return early instead of hanging.
         if !self.is_connected() {
@@ -3020,7 +3013,7 @@ ignored."
                 rssi,
             } = event
             {
-                break Ok(DisconnectedStationInfo {
+                break Ok(sta::DisconnectedInfo {
                     ssid,
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
@@ -3031,7 +3024,7 @@ ignored."
     }
 
     /// Wait until the station gets disconnected from the AP.
-    pub async fn wait_for_disconnect_async(&self) -> Result<DisconnectedStationInfo, WifiError> {
+    pub async fn wait_for_disconnect_async(&self) -> Result<sta::DisconnectedInfo, WifiError> {
         // If not connected it would wait forever for a `StationDisconnected` event that will never
         // happen. Return early instead of hanging.
         if !self.is_connected() {
@@ -3052,7 +3045,7 @@ ignored."
                 rssi,
             } = event
             {
-                break Ok(DisconnectedStationInfo {
+                break Ok(sta::DisconnectedInfo {
                     ssid,
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
@@ -3065,7 +3058,7 @@ ignored."
     /// Wait for connected / disconnected events.
     pub async fn wait_for_access_point_connected_event_async(
         &self,
-    ) -> Result<AccessPointStationEventInfo, WifiError> {
+    ) -> Result<ap::EventInfo, WifiError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
             .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
@@ -3079,13 +3072,11 @@ ignored."
                     aid,
                     is_mesh_child,
                 } => {
-                    break Ok(AccessPointStationEventInfo::Connected(
-                        AccessPointStationConnectedInfo {
-                            mac,
-                            aid,
-                            is_mesh_child,
-                        },
-                    ));
+                    break Ok(ap::EventInfo::Connected(ap::ConnectedInfo {
+                        mac,
+                        aid,
+                        is_mesh_child,
+                    }));
                 }
                 event::EventInfo::AccessPointStationDisconnected {
                     mac,
@@ -3093,14 +3084,12 @@ ignored."
                     is_mesh_child,
                     reason,
                 } => {
-                    break Ok(AccessPointStationEventInfo::Disconnected(
-                        AccessPointStationDisconnectedInfo {
-                            mac,
-                            aid: aid as u16,
-                            is_mesh_child,
-                            reason: DisconnectReason::from_raw(reason),
-                        },
-                    ));
+                    break Ok(ap::EventInfo::Disconnected(ap::DisconnectedInfo {
+                        mac,
+                        aid: aid as u16,
+                        is_mesh_child,
+                        reason: DisconnectReason::from_raw(reason),
+                    }));
                 }
                 _ => (),
             }

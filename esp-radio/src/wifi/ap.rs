@@ -155,7 +155,7 @@ impl defmt::Format for AccessPointConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct AccessPointStationConnectedInfo {
+pub struct ConnectedInfo {
     /// The MAC address.
     pub mac: [u8; 6],
     /// The Association ID (AID) of the connected station.
@@ -168,7 +168,7 @@ pub struct AccessPointStationConnectedInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct AccessPointStationDisconnectedInfo {
+pub struct DisconnectedInfo {
     /// The MAC address.
     pub mac: [u8; 6],
     /// The Association ID (AID) of the connected station.
@@ -179,14 +179,14 @@ pub struct AccessPointStationDisconnectedInfo {
     pub reason: DisconnectReason,
 }
 
-/// Either the [AccessPointStationConnectedInfo] or [AccessPointStationDisconnectedInfo].
+/// Either the [ConnectedInfo] or [DisconnectedInfo].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum AccessPointStationEventInfo {
+pub enum EventInfo {
     /// Information about a station connected to the access point.
-    Connected(AccessPointStationConnectedInfo),
+    Connected(ConnectedInfo),
     /// Information about a station disconnected from the access point.
-    Disconnected(AccessPointStationDisconnectedInfo),
+    Disconnected(DisconnectedInfo),
 }
 
 #[allow(non_upper_case_globals)]

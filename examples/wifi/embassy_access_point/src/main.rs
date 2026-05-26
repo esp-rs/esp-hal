@@ -234,21 +234,11 @@ async fn connection(controller: WifiController<'static>) {
             .wait_for_access_point_connected_event_async()
             .await;
         match ev {
-            Ok(esp_radio::wifi::ap::AccessPointStationEventInfo::Connected(
-                access_point_station_connected_info,
-            )) => {
-                println!(
-                    "Station connected: {:?}",
-                    access_point_station_connected_info
-                );
+            Ok(esp_radio::wifi::ap::EventInfo::Connected(info)) => {
+                println!("Station connected: {:?}", info);
             }
-            Ok(esp_radio::wifi::ap::AccessPointStationEventInfo::Disconnected(
-                access_point_station_disconnected_info,
-            )) => {
-                println!(
-                    "Station disconnected: {:?}",
-                    access_point_station_disconnected_info
-                );
+            Ok(esp_radio::wifi::ap::EventInfo::Disconnected(info)) => {
+                println!("Station disconnected: {:?}", info);
             }
             _ => (),
         }
