@@ -573,6 +573,9 @@ pub enum ClockSource {
     #[cfg(not(i2c_master_version = "3"))]
     #[default]
     Apb,
+    /// REF_TICK (1 MHz reference clock).
+    #[cfg(i2c_master_version = "2")]
+    RefTick,
     /// Crystal oscillator (XTAL).
     #[cfg(i2c_master_version = "3")]
     #[default]

@@ -208,6 +208,11 @@ fn configure_clock(
                     w.sclk_sel().bit(matches!(clock_source, ClockSource::RcFast));
                     w.sclk_div_num().bits((sclk_div - 1) as u8)
                 });
+            } else if #[cfg(i2c_master_version = "2")] {
+                // ref_always_on: 1 = APB, 0 = REF_TICK
+                info.regs().ctr().modify(|_, w| {
+                    w.ref_always_on().bit(!matches!(clock_source, ClockSource::RefTick))
+                });
             }
         }
 
