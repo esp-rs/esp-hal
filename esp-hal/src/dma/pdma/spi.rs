@@ -1,6 +1,7 @@
 use enumset::EnumSet;
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::Ordering;
 
+use super::{ChannelInfo, ChannelState};
 use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
@@ -13,7 +14,6 @@ use crate::{
         DmaTxChannel,
         DmaTxInterrupt,
         InterruptAccess,
-        PdmaChannel,
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
@@ -118,7 +118,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
     }
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.is_compatible_with(peripheral)
+        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -237,15 +237,18 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        self.0.tx_waker()
+        &self.0.state().tx_waker
     }
 
     fn is_async(&self) -> bool {
-        self.0.tx_async_flag().load(Ordering::Acquire)
+        self.0.state().tx_async_flag.load(Ordering::Acquire)
     }
 
     fn set_async(&self, is_async: bool) {
-        self.0.tx_async_flag().store(is_async, Ordering::Release);
+        self.0
+            .state()
+            .tx_async_flag
+            .store(is_async, Ordering::Release);
     }
 }
 
@@ -310,7 +313,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
     }
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.is_compatible_with(peripheral)
+        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -328,11 +331,11 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
 
 impl RxRegisterAccess for AnySpiDmaRxChannel<'_> {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        Some(self.0.peripheral_interrupt())
+        Some(self.0.info().peripheral_interrupt)
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        Some(self.0.async_handler())
+        Some(self.0.info().async_handler)
     }
 }
 
@@ -414,15 +417,18 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        self.0.rx_waker()
+        &self.0.state().rx_waker
     }
 
     fn is_async(&self) -> bool {
-        self.0.rx_async_flag().load(Ordering::Relaxed)
+        self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
     fn set_async(&self, _is_async: bool) {
-        self.0.rx_async_flag().store(_is_async, Ordering::Relaxed);
+        self.0
+            .state()
+            .rx_async_flag
+            .store(_is_async, Ordering::Relaxed);
     }
 }
 
@@ -446,22 +452,15 @@ impl<'d> DmaChannel for AnySpiDmaChannel<'d> {
     }
 }
 
-impl PdmaChannel for AnySpiDmaChannel<'_> {
-    type RegisterBlock = SpiRegisterBlock;
-
+impl AnySpiDmaChannel<'_> {
     delegate::delegate! {
         to match &self.0 {
             any::Inner::Spi2(channel) => channel,
             any::Inner::Spi3(channel) => channel,
         } {
             fn register_block(&self) -> &SpiRegisterBlock;
-            fn tx_waker(&self) -> &'static AtomicWaker;
-            fn rx_waker(&self) -> &'static AtomicWaker;
-            fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
-            fn peripheral_interrupt(&self) -> Interrupt;
-            fn async_handler(&self) -> InterruptHandler;
-            fn rx_async_flag(&self) -> &'static AtomicBool;
-            fn tx_async_flag(&self) -> &'static AtomicBool;
+            fn info(&self) -> &'static ChannelInfo;
+            fn state(&self) -> &'static ChannelState;
         }
     }
 }
