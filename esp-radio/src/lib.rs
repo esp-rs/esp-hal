@@ -109,6 +109,15 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! performance. To disable them, use the `log` crate's compile-time
 //! [filters](https://docs.rs/log/latest/log/#compile-time-filters) and set
 //! `release_max_level_off`.
+//!
+//! [documentation]: https://docs.espressif.com/projects/rust/esp-radio/latest/
+//! [esp-hal]: https://docs.espressif.com/projects/rust/esp-hal/latest/
+//! [`esp-alloc`]: https://docs.espressif.com/projects/rust/esp-alloc/latest/
+//! [`esp-rtos`]: https://docs.espressif.com/projects/rust/esp-rtos/latest/
+//! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
+//! [xtask]: https://github.com/matklad/cargo-xtask
+//! [book]: https://docs.espressif.com/projects/rust/book/
+//! [training]: https://docs.espressif.com/projects/rust/no_std-training/
 #![cfg_attr(
     multi_core,
     doc = concat!(
@@ -143,14 +152,6 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! for this crate:
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_radio_config_table.md"))]
-//! [documentation]: https://docs.espressif.com/projects/rust/esp-radio/latest/
-//! [esp-hal]: https://docs.espressif.com/projects/rust/esp-hal/latest/
-//! [`esp-alloc`]: https://docs.espressif.com/projects/rust/esp-alloc/latest/
-//! [`esp-rtos`]: https://docs.espressif.com/projects/rust/esp-rtos/latest/
-//! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
-//! [xtask]: https://github.com/matklad/cargo-xtask
-//! [book]: https://docs.espressif.com/projects/rust/book/
-//! [training]: https://docs.espressif.com/projects/rust/no_std-training/
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]

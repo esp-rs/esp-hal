@@ -157,31 +157,31 @@ impl defmt::Format for StationConfig {
     }
 }
 
-/// Information about a connected station.
+/// Information about the access point the station connected to.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct ConnectedInfo {
-    /// The SSID of the connected station.
+    /// The SSID of the access point.
     pub ssid: Ssid,
-    /// The BSSID of the connected station.
+    /// The BSSID of the access point.
     pub bssid: [u8; 6],
-    /// The channel of the connected station.
+    /// The channel of the access point.
     pub channel: u8,
-    /// The authmode of the connected station.
+    /// The authentication method used.
     pub authmode: AuthenticationMethod,
-    /// The Association ID (AID) of the connected station.
+    /// The Association ID (AID) assigned by the access point.
     pub aid: u16,
 }
 
-/// Information about a disconnected station.
+/// Information about the access point the station disconnected from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct DisconnectedInfo {
-    /// The SSID of the disconnected station.
+    /// The SSID of the access point.
     pub ssid: Ssid,
-    /// The BSSID of the disconnected station.
+    /// The BSSID of the access point.
     pub bssid: [u8; 6],
     /// The disconnect reason.
     pub reason: DisconnectReason,
