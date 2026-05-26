@@ -508,7 +508,7 @@ where
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .prepare_transfer(DmaPeripheral::LcdCam.0, &mut buf)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {

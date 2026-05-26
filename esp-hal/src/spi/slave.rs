@@ -478,7 +478,7 @@ pub mod dma {
                 unsafe {
                     channel
                         .rx
-                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                        .prepare_transfer(self.dma_peripheral.0, rx_buffer)?;
                 }
             }
 
@@ -486,7 +486,7 @@ pub mod dma {
                 unsafe {
                     channel
                         .tx
-                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                        .prepare_transfer(self.dma_peripheral.0, tx_buffer)?;
                 }
             }
 

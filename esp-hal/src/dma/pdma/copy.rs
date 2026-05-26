@@ -71,14 +71,14 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
-
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -103,10 +103,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -246,14 +242,14 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
-
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -278,10 +274,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -420,7 +412,7 @@ impl DMA_COPY<'_> {
         static INFO: ChannelInfo = ChannelInfo {
             peripheral_interrupt: Interrupt::DMA_COPY,
             async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
+            compatible_peripherals: &[],
         };
         &INFO
     }

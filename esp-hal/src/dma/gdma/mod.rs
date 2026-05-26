@@ -123,13 +123,6 @@ impl DmaTxChannel for AnyGdmaTxChannel<'_> {}
 impl crate::private::Sealed for AnyGdmaRxChannel<'_> {}
 impl DmaRxChannel for AnyGdmaRxChannel<'_> {}
 
-impl<CH: DmaChannel, Dm: DriverMode> Channel<Dm, CH> {
-    /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &P) {
-        // No runtime checks; GDMA channels are compatible with any peripheral
-    }
-}
-
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.
     ($ch:ident, $num:literal, $interrupt_in:ident) => {
@@ -232,6 +225,18 @@ for_each_dma_channel! {
 
 for_each_peripheral! {
     (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
+        /// DMA-eligible peripheral selector values; values match the GDMA peripheral-select register.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub struct DmaPeripheral(pub u8);
+        impl DmaPeripheral {
+            $(
+                #[doc = concat!("DMA accesses ", stringify!($name))]
+                pub const $name: Self = Self($id);
+            )*
+        }
+
         crate::dma::impl_dma_eligible! {
             AnyGdmaChannel {
                 $($peri => $name,)*

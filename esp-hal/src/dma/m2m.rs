@@ -158,7 +158,7 @@ where
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral, &mut buf)
+                .prepare_transfer(self.peripheral.0, &mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 
@@ -283,7 +283,7 @@ impl<'d, Dm: DriverMode> Mem2MemTx<'d, Dm> {
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral, &mut buf)
+                .prepare_transfer(self.peripheral.0, &mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 

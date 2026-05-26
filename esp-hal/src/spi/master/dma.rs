@@ -1685,7 +1685,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .prepare_transfer(self.dma_peripheral.0, rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1707,7 +1707,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .prepare_transfer(self.dma_peripheral.0, tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }

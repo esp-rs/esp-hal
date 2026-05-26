@@ -1278,7 +1278,7 @@ where
         self.i2s.reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral().0, &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1349,7 +1349,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral().0, &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {

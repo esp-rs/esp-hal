@@ -84,14 +84,14 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
-
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .dma_out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -116,10 +116,6 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("SPI DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -279,14 +275,14 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
-
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .dma_in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -311,10 +307,6 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("SPI DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]

@@ -85,20 +85,24 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
 
     fn set_peripheral(&self, peripheral: u8) {
         use esp32s2::crypto_dma::aes_sha_select::SELECT;
-        let peripheral = match peripheral {
-            p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
+        let sel = match peripheral {
+            p if p == DmaPeripheral::Aes.0 => SELECT::Aes,
+            p if p == DmaPeripheral::Sha.0 => SELECT::Sha,
             _ => unreachable!(),
         };
         self.regs()
             .aes_sha_select()
-            .modify(|_, w| w.select().variant(peripheral));
+            .modify(|_, w| w.select().variant(sel));
     }
 
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -123,10 +127,6 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Crypto DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -278,20 +278,24 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
 
     fn set_peripheral(&self, peripheral: u8) {
         use esp32s2::crypto_dma::aes_sha_select::SELECT;
-        let peripheral = match peripheral {
-            p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
+        let sel = match peripheral {
+            p if p == DmaPeripheral::Aes.0 => SELECT::Aes,
+            p if p == DmaPeripheral::Sha.0 => SELECT::Sha,
             _ => unreachable!(),
         };
         self.regs()
             .aes_sha_select()
-            .modify(|_, w| w.select().variant(peripheral));
+            .modify(|_, w| w.select().variant(sel));
     }
 
     fn set_link_addr(&self, address: u32) {
         self.regs()
             .in_link()
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+    }
+
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -316,10 +320,6 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Crypto DMA does not support checking descriptor ownership");
         }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -468,7 +468,7 @@ impl DMA_CRYPTO<'_> {
         static INFO: ChannelInfo = ChannelInfo {
             peripheral_interrupt: Interrupt::CRYPTO_DMA,
             async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
+            compatible_peripherals: &[DmaPeripheral::Aes.0, DmaPeripheral::Sha.0],
         };
         &INFO
     }

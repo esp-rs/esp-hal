@@ -456,7 +456,7 @@ where
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
-                .prepare_transfer(self.uhci_per.dma_peripheral(), &mut tx_buffer)
+                .prepare_transfer(self.uhci_per.dma_peripheral().0, &mut tx_buffer)
         };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
@@ -502,7 +502,7 @@ where
         {
             let res = unsafe {
                 self.channel_rx
-                    .prepare_transfer(self.uhci_per.dma_peripheral(), &mut rx_buffer)
+                    .prepare_transfer(self.uhci_per.dma_peripheral().0, &mut rx_buffer)
             };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));

@@ -13,12 +13,23 @@
 
 use portable_atomic::AtomicBool;
 
-use crate::{
-    DriverMode,
-    asynch::AtomicWaker,
-    dma::{Channel, DmaChannel, DmaEligible, DmaPeripheral, InterruptHandler, RegisterAccess},
-    peripherals::Interrupt,
-};
+use crate::{asynch::AtomicWaker, dma::InterruptHandler, peripherals::Interrupt};
+
+for_each_peripheral! {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
+        /// DMA-eligible peripheral selector values; values are engine-local (matching hardware where applicable).
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub struct DmaPeripheral(pub u8);
+        impl DmaPeripheral {
+            $(
+                #[doc = concat!("DMA accesses ", stringify!($name))]
+                pub const $name: Self = Self($id);
+            )*
+        }
+    };
+}
 
 #[cfg(soc_has_dma_copy)]
 mod copy;
@@ -39,12 +50,13 @@ pub use spi::{AnySpiDmaChannel, AnySpiDmaRxChannel, AnySpiDmaTxChannel};
 pub struct ChannelInfo {
     pub(crate) peripheral_interrupt: Interrupt,
     pub(crate) async_handler: InterruptHandler,
-    pub(crate) compatible_peripherals: &'static [DmaPeripheral],
+    /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
+    pub(crate) compatible_peripherals: &'static [u8],
 }
 
 impl ChannelInfo {
     pub(crate) fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.compatible_peripherals.contains(&peripheral)
+        self.compatible_peripherals.contains(&peripheral.0)
     }
 }
 
@@ -71,7 +83,7 @@ macro_rules! impl_pdma_channel {
                     static INFO: ChannelInfo = ChannelInfo {
                         peripheral_interrupt: crate::peripherals::Interrupt::$int,
                         async_handler: interrupt_handler,
-                        compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible),*],
+                        compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
                     };
                     &INFO
                 }
@@ -113,23 +125,5 @@ pub(super) fn init_dma_racey() {
             w.spi2_dma_chan_sel().bits(1);
             w.spi3_dma_chan_sel().bits(2)
         });
-    }
-}
-
-impl<CH, Dm> Channel<Dm, CH>
-where
-    CH: DmaChannel,
-    Dm: DriverMode,
-{
-    /// Asserts that the channel is compatible with the given peripheral.
-    #[instability::unstable]
-    pub fn runtime_ensure_compatible(&self, peripheral: &impl DmaEligible) {
-        assert!(
-            self.tx
-                .tx_impl
-                .is_compatible_with(peripheral.dma_peripheral()),
-            "This DMA channel is not compatible with {:?}",
-            peripheral.dma_peripheral()
-        );
     }
 }

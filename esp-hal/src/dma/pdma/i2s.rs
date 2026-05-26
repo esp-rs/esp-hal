@@ -81,8 +81,8 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
     }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -107,10 +107,6 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
         self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -268,8 +264,8 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
+    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -294,10 +290,6 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
         self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]

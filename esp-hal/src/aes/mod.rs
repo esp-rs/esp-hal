@@ -366,7 +366,6 @@ pub mod dma {
             DmaChannelFor,
             DmaDescriptor,
             DmaError,
-            DmaPeripheral,
             DmaRxBuffer,
             DmaTxBuffer,
             NoBuffer,
@@ -528,8 +527,8 @@ pub mod dma {
             PeripheralClockControl::reset(Peripheral::Aes);
         }
 
-        fn dma_peripheral(&self) -> DmaPeripheral {
-            DmaPeripheral::Aes
+        fn dma_peripheral(&self) -> u8 {
+            crate::dma::DmaPeripheral::Aes.0
         }
 
         fn enable_dma(&self, enable: bool) {

@@ -901,22 +901,6 @@ pub enum DmaPriority {
     Priority9 = 9,
 }
 
-for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
-        /// DMA capable peripherals
-        /// The values need to match the TRM
-        #[derive(Debug, Clone, Copy, PartialEq)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub enum DmaPeripheral {
-            $(
-                #[doc = concat!("DMA accesses ", stringify!($name))]
-                $name = $id,
-            )*
-        }
-    };
-}
-
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
@@ -1461,11 +1445,7 @@ where
         self.rx_impl.set_priority(priority);
     }
 
-    fn do_prepare(
-        &mut self,
-        preparation: Preparation,
-        peri: DmaPeripheral,
-    ) -> Result<(), DmaError> {
+    fn do_prepare(&mut self, preparation: Preparation, peri: u8) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
         debug!("Preparing RX transfer {:?}", preparation);
@@ -1488,7 +1468,7 @@ where
         self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(preparation.start as u32);
-        self.rx_impl.set_peripheral(peri as u8);
+        self.rx_impl.set_peripheral(peri);
 
         Ok(())
     }
@@ -1509,7 +1489,7 @@ where
 {
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
-        peri: DmaPeripheral,
+        peri: u8,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
@@ -1675,11 +1655,7 @@ where
         self.tx_impl.set_priority(priority);
     }
 
-    fn do_prepare(
-        &mut self,
-        preparation: Preparation,
-        peri: DmaPeripheral,
-    ) -> Result<(), DmaError> {
+    fn do_prepare(&mut self, preparation: Preparation, peri: u8) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
 
         debug!("Preparing TX transfer {:?}", preparation);
@@ -1704,7 +1680,7 @@ where
         self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(preparation.start as u32);
-        self.tx_impl.set_peripheral(peri as u8);
+        self.tx_impl.set_peripheral(peri);
 
         Ok(())
     }
@@ -1725,7 +1701,7 @@ where
 {
     pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
-        peri: DmaPeripheral,
+        peri: u8,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
@@ -1816,7 +1792,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     fn set_priority(&self, priority: DmaPriority);
 
     /// Select a peripheral for the channel.
-    fn set_peripheral(&self, peripheral: u8);
+    fn set_peripheral(&self, _peripheral: u8) {}
 
     /// Set the address of the first descriptor.
     fn set_link_addr(&self, address: u32);
@@ -1837,8 +1813,9 @@ pub trait RegisterAccess: crate::private::Sealed {
     #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
-    #[cfg(dma_kind = "pdma")]
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
+    fn is_compatible_with(&self, _peripheral: DmaPeripheral) -> bool {
+        true
+    }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
@@ -1982,6 +1959,25 @@ where
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
         }
+    }
+}
+
+impl<CH, Dm> Channel<Dm, CH>
+where
+    CH: DmaChannel,
+    Dm: DriverMode,
+{
+    /// Asserts that the channel is compatible with the given peripheral.
+    #[instability::unstable]
+    pub fn runtime_ensure_compatible(&self, peripheral: &impl DmaEligible) {
+        let id = peripheral.dma_peripheral().0;
+        assert!(
+            self.tx
+                .tx_impl
+                .is_compatible_with(peripheral.dma_peripheral()),
+            "This DMA channel is not compatible with peripheral id {}",
+            id
+        );
     }
 }
 

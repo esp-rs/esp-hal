@@ -414,7 +414,7 @@ impl<'d> Camera<'d> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .prepare_transfer(DmaPeripheral::LcdCam.0, &mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 
