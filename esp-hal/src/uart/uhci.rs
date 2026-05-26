@@ -84,6 +84,15 @@
 //! ```
 // TODO add support for PDMA and multiple UHCI for 32/S2 support
 
+/// DMA channel trait for UHCI (UART DMA) peripherals.
+///
+/// Implemented for every channel type capable of serving UHCI.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with UHCI",
+    label = "This DMA channel"
+)]
+pub trait UhciDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},

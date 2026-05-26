@@ -160,6 +160,14 @@ pub enum I2sInterrupt {
     TxDone,
 }
 
+/// DMA channel trait for I2S master peripherals.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this I2S peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the I2S instance."
+)]
+pub trait I2sMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
 pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = property!("i2s.mclk_divider_bit_width");
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;

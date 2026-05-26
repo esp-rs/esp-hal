@@ -83,6 +83,15 @@ use crate::{
     system::PeripheralGuard,
 };
 
+/// DMA channel trait for SPI slave peripherals.
+#[cfg(any(spi_master_supports_dma, spi_slave_supports_dma))]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this SPI peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the SPI instance."
+)]
+pub trait SpiSlaveDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
 /// SPI peripheral driver.
 ///
 /// See the [module-level documentation][self] for more details.
@@ -626,6 +635,10 @@ pub struct Info {
     /// System peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
+    /// The DMA peripheral identifier for this instance.
+    #[cfg(spi_slave_supports_dma)]
+    pub dma_peripheral: crate::dma::DmaPeripheral,
+
     /// SCLK signal.
     pub sclk: InputSignal,
 
@@ -816,6 +829,8 @@ for_each_spi_slave! {
                 static INFO: Info = Info {
                     register_block: crate::peripherals::$peri::regs(),
                     peripheral: crate::system::Peripheral::$sys,
+                    #[cfg(spi_slave_supports_dma)]
+                    dma_peripheral: crate::dma::DmaPeripheral::$sys,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,
                     miso: OutputSignal::$miso,

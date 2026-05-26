@@ -1194,10 +1194,22 @@ pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
 pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
 
 #[instability::unstable]
-pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {}
+pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {
+    /// The engine-erased type this RX half degrades to.
+    type Erased: DmaRxChannel;
+
+    /// Erase the concrete channel type, returning the engine-erased form.
+    fn into_erased(self) -> Self::Erased;
+}
 
 #[instability::unstable]
-pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
+pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {
+    /// The engine-erased type this TX half degrades to.
+    type Erased: DmaTxChannel;
+
+    /// Erase the concrete channel type, returning the engine-erased form.
+    fn into_erased(self) -> Self::Erased;
+}
 
 /// A description of a DMA Channel.
 pub trait DmaChannel: Sized {
@@ -1206,6 +1218,12 @@ pub trait DmaChannel: Sized {
 
     /// A description of the TX half of a DMA Channel.
     type Tx: DmaTxChannel;
+
+    /// The engine-erased type this channel degrades to.
+    type Erased: DmaChannel;
+
+    /// Erase the concrete channel type, returning the engine-erased form.
+    fn into_erased(self) -> Self::Erased;
 
     /// Splits the DMA channel into its RX and TX halves.
     #[cfg(any(esp32c5, esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
@@ -2219,6 +2237,11 @@ macro_rules! impl_channel_common {
             impl<'d> DmaChannel for $instance<'d> {
                 type Rx = [<$peri RxChannel>]<'d>;
                 type Tx = [<$peri TxChannel>]<'d>;
+                type Erased = [<$peri Channel>]<'d>;
+
+                fn into_erased(self) -> Self::Erased {
+                    DmaChannelConvert::degrade(self)
+                }
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
                     unsafe {

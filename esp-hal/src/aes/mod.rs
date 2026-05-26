@@ -333,6 +333,16 @@ pub enum Endianness {
     LittleEndian = 0,
 }
 
+/// DMA channel trait for the AES peripheral.
+///
+/// Implemented for every channel type capable of serving AES.
+#[cfg(aes_dma)]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with the AES peripheral",
+    label = "This DMA channel"
+)]
+pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+
 /// Provides DMA (Direct Memory Access) support for AES operations.
 ///
 /// This module enhances the AES capabilities by utilizing DMA to handle data

@@ -42,7 +42,13 @@ impl CopyDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaRxChannel<'_> {}
-impl DmaRxChannel for CopyDmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {
+    type Erased = CopyDmaRxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
@@ -56,7 +62,13 @@ impl CopyDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
-impl DmaTxChannel for CopyDmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {
+    type Erased = CopyDmaTxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
@@ -387,6 +399,12 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
 impl<'d> DmaChannel for DMA_COPY<'d> {
     type Rx = CopyDmaRxChannel<'d>;
     type Tx = CopyDmaTxChannel<'d>;
+    type Erased = DMA_COPY<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
             CopyDmaRxChannel(unsafe { Self::steal() }),

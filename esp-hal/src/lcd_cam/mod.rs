@@ -8,6 +8,24 @@
 pub mod cam;
 pub mod lcd;
 
+/// DMA TX channel trait for LCD (I8080, DPI) peripherals.
+///
+/// Implemented for every TX-capable channel type that can serve the LCD module.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used as a TX channel for LCD",
+    label = "This DMA channel"
+)]
+pub trait LcdDmaTxChannel: crate::dma::DmaTxChannel + crate::private::Sealed {}
+
+/// DMA RX channel trait for the Camera peripheral.
+///
+/// Implemented for every RX-capable channel type that can serve the Camera module.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used as an RX channel for Camera",
+    label = "This DMA channel"
+)]
+pub trait CamDmaRxChannel: crate::dma::DmaRxChannel + crate::private::Sealed {}
+
 use core::marker::PhantomData;
 
 use crate::{

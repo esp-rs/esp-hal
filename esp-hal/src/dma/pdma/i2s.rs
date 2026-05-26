@@ -38,7 +38,13 @@ impl AnyI2sDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for AnyI2sDmaRxChannel<'_> {}
-impl DmaRxChannel for AnyI2sDmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for AnyI2sDmaRxChannel<'d> {
+    type Erased = AnyI2sDmaRxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 /// The TX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
@@ -52,7 +58,13 @@ impl AnyI2sDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for AnyI2sDmaTxChannel<'_> {}
-impl DmaTxChannel for AnyI2sDmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for AnyI2sDmaTxChannel<'d> {
+    type Erased = AnyI2sDmaTxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
@@ -421,6 +433,11 @@ crate::any_peripheral! {
 impl<'d> DmaChannel for AnyI2sDmaChannel<'d> {
     type Rx = AnyI2sDmaRxChannel<'d>;
     type Tx = AnyI2sDmaTxChannel<'d>;
+    type Erased = AnyI2sDmaChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (

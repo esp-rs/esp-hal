@@ -14,6 +14,18 @@ use enumset::EnumSet;
 #[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
+/// DMA channel trait for SPI peripherals.
+///
+/// Implemented for each channel type that can serve a particular SPI instance `S`.
+#[cfg(spi_master_supports_dma)]
+#[instability::unstable]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this SPI peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the SPI instance."
+)]
+pub trait SpiMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
 use super::*;
 use crate::{
     RegisterToggle,

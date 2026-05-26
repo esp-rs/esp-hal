@@ -86,6 +86,11 @@ impl crate::private::Sealed for AnyGdmaChannel<'_> {}
 impl<'d> DmaChannel for AnyGdmaChannel<'d> {
     type Rx = AnyGdmaRxChannel<'d>;
     type Tx = AnyGdmaTxChannel<'d>;
+    type Erased = AnyGdmaChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
@@ -118,10 +123,22 @@ impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for AnyGdmaTxChannel<'d> {
 }
 
 impl crate::private::Sealed for AnyGdmaTxChannel<'_> {}
-impl DmaTxChannel for AnyGdmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for AnyGdmaTxChannel<'d> {
+    type Erased = AnyGdmaTxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 impl crate::private::Sealed for AnyGdmaRxChannel<'_> {}
-impl DmaRxChannel for AnyGdmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for AnyGdmaRxChannel<'d> {
+    type Erased = AnyGdmaRxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.

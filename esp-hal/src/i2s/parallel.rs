@@ -122,6 +122,14 @@ use crate::{
     time::Rate,
 };
 
+/// DMA channel trait for I2S peripherals.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this I2S peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the I2S instance."
+)]
+pub trait I2sParallelDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
 #[doc(hidden)]
 pub trait TxPins<'d> {
     fn bus_width(&self) -> u8;

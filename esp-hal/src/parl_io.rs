@@ -123,6 +123,15 @@ use core::{
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
+/// DMA channel trait for the PARL_IO peripheral.
+///
+/// Implemented for every channel type capable of serving PARL_IO.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with PARL_IO",
+    label = "This DMA channel"
+)]
+pub trait ParlIoDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+
 use crate::{
     Async,
     Blocking,
@@ -1195,7 +1204,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .prepare_transfer(DmaPeripheral::ParlIo.0, &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1357,7 +1366,7 @@ where
 
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .prepare_transfer(DmaPeripheral::ParlIo.0, &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = result {

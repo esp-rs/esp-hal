@@ -42,7 +42,13 @@ impl CryptoDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
-impl DmaRxChannel for CryptoDmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {
+    type Erased = CryptoDmaRxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 /// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
@@ -56,7 +62,13 @@ impl CryptoDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
-impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {
+    type Erased = CryptoDmaTxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
@@ -443,6 +455,12 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
 impl<'d> DmaChannel for DMA_CRYPTO<'d> {
     type Rx = CryptoDmaRxChannel<'d>;
     type Tx = CryptoDmaTxChannel<'d>;
+    type Erased = DMA_CRYPTO<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
             CryptoDmaRxChannel(unsafe { Self::steal() }),

@@ -38,7 +38,13 @@ impl AnySpiDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for AnySpiDmaRxChannel<'_> {}
-impl DmaRxChannel for AnySpiDmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for AnySpiDmaRxChannel<'d> {
+    type Erased = AnySpiDmaRxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 /// The TX half of an arbitrary SPI DMA channel.
 #[derive(Debug)]
@@ -52,7 +58,13 @@ impl AnySpiDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for AnySpiDmaTxChannel<'_> {}
-impl DmaTxChannel for AnySpiDmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for AnySpiDmaTxChannel<'d> {
+    type Erased = AnySpiDmaTxChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
+}
 
 impl RegisterAccess for AnySpiDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
@@ -436,6 +448,11 @@ crate::any_peripheral! {
 impl<'d> DmaChannel for AnySpiDmaChannel<'d> {
     type Rx = AnySpiDmaRxChannel<'d>;
     type Tx = AnySpiDmaTxChannel<'d>;
+    type Erased = AnySpiDmaChannel<'d>;
+
+    fn into_erased(self) -> Self::Erased {
+        self
+    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
