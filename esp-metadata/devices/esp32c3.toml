@@ -552,6 +552,8 @@ mclk_divider_bit_width = 9
 max_ws_width = 128
 
 [device.ledc]
+version = 2
+channel_count = 6
 [device.twai]
 [device.usb_serial_jtag]
 
