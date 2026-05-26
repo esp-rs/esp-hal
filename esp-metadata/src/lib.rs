@@ -297,6 +297,10 @@ pub struct PeripheralDef {
     /// If the peripheral is DMA eligible, this defines the peripheral selector value.
     #[serde(default)]
     dma_peripheral: Option<u32>,
+    /// Driver-domain engine family for DMA-eligible peripherals ("spi", "i2s", "aes", …).
+    /// Used by code generation to emit the right per-peripheral DMA channel trait impls.
+    #[serde(default)]
+    dma_engine: Option<String>,
     /// Set to true to hide a peripheral from the Peripherals struct.
     #[serde(default)]
     hidden: bool,
@@ -391,6 +395,26 @@ impl Config {
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );
+        }
+
+        let known_engines: Vec<&str> = self
+            .device
+            .peri_config
+            .dma
+            .as_ref()
+            .map(|dma| dma.engines.0.iter().map(|e| e.name.as_str()).collect())
+            .unwrap_or_default();
+
+        for peri in self.peripherals() {
+            if let Some(engine) = &peri.dma_engine {
+                ensure!(
+                    known_engines.contains(&engine.as_str()),
+                    "Peripheral '{}' has dma_engine = \"{engine}\" but no such engine is defined for '{}' (known: [{}])",
+                    peri.name,
+                    self.device.name,
+                    known_engines.join(", ")
+                );
+            }
         }
 
         Ok(())
@@ -638,7 +662,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
-        let mut dma_peripherals = vec![];
+        let mut dma_peripherals: Vec<(&str, u32, Option<&str>)> = vec![];
 
         let mut stable_peris = vec![];
 
@@ -760,15 +784,15 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
 
             if let Some(dma_peripheral) = peri.dma_peripheral {
-                dma_peripherals.push((peri.name.as_str(), dma_peripheral));
+                dma_peripherals.push((peri.name.as_str(), dma_peripheral, peri.dma_engine.as_deref()));
             }
         }
 
-        dma_peripherals.sort_by_key(|(_, dma_peripheral)| *dma_peripheral);
+        dma_peripherals.sort_by_key(|(_, dma_peripheral, _)| *dma_peripheral);
 
         let dma_peripherals = dma_peripherals
             .into_iter()
-            .map(|(name, dma_peripheral)| {
+            .map(|(name, dma_peripheral, engine)| {
                 use convert_case::{Boundary, Case, Casing, pattern};
 
                 let peri = format_ident!("{}", name);
@@ -782,7 +806,8 @@ This pin may be available with certain limitations. Check your hardware to make 
                     })
                     .to_case(Case::Pascal)
                 );
-                quote! { #peri, #variant_name, #dma_peripheral }
+                let engine = engine.unwrap_or("");
+                quote! { #peri, #variant_name, #dma_peripheral, #engine }
             })
             .collect::<Vec<_>>();
 

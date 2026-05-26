@@ -16,6 +16,11 @@ pub struct DmaChannelDef {
     /// When present the singleton maps to the given PAC type (PDMA channels).
     #[serde(default)]
     pub pac: Option<String>,
+    /// PDMA only: peripheral names this channel is wired to.
+    /// Non-empty means the channel is restricted to those peripherals.
+    /// Empty (the default, and always the case for GDMA) means compatible with all.
+    #[serde(default)]
+    pub compatible_with: Vec<String>,
     /// Shared interrupt name (set when the channel has one interrupt for both directions).
     #[serde(default)]
     pub interrupt: Option<String>,

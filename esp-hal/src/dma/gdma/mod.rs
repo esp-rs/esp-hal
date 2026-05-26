@@ -231,7 +231,7 @@ for_each_dma_channel! {
 }
 
 for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
         crate::dma::impl_dma_eligible! {
             AnyGdmaChannel {
                 $($peri => $name,)*

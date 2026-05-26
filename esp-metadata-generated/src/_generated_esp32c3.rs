@@ -3992,11 +3992,12 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((TSENS(unstable)));
-        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2,
-        0)); _for_each_inner_peripheral!((UHCI0, Uhci0, 2));
-        _for_each_inner_peripheral!((I2S0, I2s0, 3)); _for_each_inner_peripheral!((AES,
-        Aes, 6)); _for_each_inner_peripheral!((SHA, Sha, 7));
-        _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8));
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2, 0,
+        "AHB_GDMA")); _for_each_inner_peripheral!((UHCI0, Uhci0, 2, "AHB_GDMA"));
+        _for_each_inner_peripheral!((I2S0, I2s0, 3, "AHB_GDMA"));
+        _for_each_inner_peripheral!((AES, Aes, 6, "AHB_GDMA"));
+        _for_each_inner_peripheral!((SHA, Sha, 7, "AHB_GDMA"));
+        _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8, "AHB_GDMA"));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
@@ -4198,9 +4199,9 @@ macro_rules! for_each_peripheral {
         (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)), (XTS_AES(unstable)),
         (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (TSENS(unstable)),
-        (WIFI))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (UHCI0,
-        Uhci0, 2), (I2S0, I2s0, 3), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc,
-        8)));
+        (WIFI))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, "AHB_GDMA"),
+        (UHCI0, Uhci0, 2, "AHB_GDMA"), (I2S0, I2s0, 3, "AHB_GDMA"), (AES, Aes, 6,
+        "AHB_GDMA"), (SHA, Sha, 7, "AHB_GDMA"), (APB_SARADC, ApbSaradc, 8, "AHB_GDMA")));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

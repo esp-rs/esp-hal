@@ -4334,16 +4334,19 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((ULP_RISCV_CORE(unstable)));
-        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2,
-        0)); _for_each_inner_peripheral!((SPI3, Spi3, 1));
-        _for_each_inner_peripheral!((UHCI0, Uhci0, 2));
-        _for_each_inner_peripheral!((I2S0, I2s0, 3)); _for_each_inner_peripheral!((I2S1,
-        I2s1, 4)); _for_each_inner_peripheral!((LCD_CAM, LcdCam, 5));
-        _for_each_inner_peripheral!((AES, Aes, 6)); _for_each_inner_peripheral!((SHA,
-        Sha, 7)); _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8));
-        _for_each_inner_peripheral!((RMT, Rmt, 9)); _for_each_inner_peripheral!((all(@
-        peri_type #[doc = "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""]
-        #[doc = "<section class=\"warning\">"] #[doc =
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2, 0,
+        "AHB_GDMA")); _for_each_inner_peripheral!((SPI3, Spi3, 1, "AHB_GDMA"));
+        _for_each_inner_peripheral!((UHCI0, Uhci0, 2, "AHB_GDMA"));
+        _for_each_inner_peripheral!((I2S0, I2s0, 3, "AHB_GDMA"));
+        _for_each_inner_peripheral!((I2S1, I2s1, 4, "AHB_GDMA"));
+        _for_each_inner_peripheral!((LCD_CAM, LcdCam, 5, "AHB_GDMA"));
+        _for_each_inner_peripheral!((AES, Aes, 6, "AHB_GDMA"));
+        _for_each_inner_peripheral!((SHA, Sha, 7, "AHB_GDMA"));
+        _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8, "AHB_GDMA"));
+        _for_each_inner_peripheral!((RMT, Rmt, 9, "AHB_GDMA"));
+        _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
@@ -4649,9 +4652,11 @@ macro_rules! for_each_peripheral {
         (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)), (WIFI)));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (SPI3, Spi3, 1),
-        (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (I2S1, I2s1, 4), (LCD_CAM, LcdCam, 5), (AES,
-        Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (RMT, Rmt, 9)));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, "AHB_GDMA"), (SPI3,
+        Spi3, 1, "AHB_GDMA"), (UHCI0, Uhci0, 2, "AHB_GDMA"), (I2S0, I2s0, 3, "AHB_GDMA"),
+        (I2S1, I2s1, 4, "AHB_GDMA"), (LCD_CAM, LcdCam, 5, "AHB_GDMA"), (AES, Aes, 6,
+        "AHB_GDMA"), (SHA, Sha, 7, "AHB_GDMA"), (APB_SARADC, ApbSaradc, 8, "AHB_GDMA"),
+        (RMT, Rmt, 9, "AHB_GDMA")));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
