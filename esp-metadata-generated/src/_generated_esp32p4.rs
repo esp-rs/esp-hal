@@ -4273,17 +4273,18 @@ macro_rules! for_each_peripheral {
         "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
         EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
-        VDMA <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual(DSI_BRIDGE : {
+        bind_bridge_interrupt, enable_bridge_interrupt, disable_bridge_interrupt }, DSI :
+        { bind_dsi_interrupt, enable_dsi_interrupt, disable_dsi_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <=
-        MIPI_DSI_BRIDGE(DSI_BRIDGE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
-        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LEDC peripheral singleton"]
@@ -4609,14 +4610,14 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA()
         (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
         EMAC_MAC() (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
-        MIPI_DSI <= virtual() (unstable)), (@ peri_type #[doc =
+        MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
+        enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
+        enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)), (@ peri_type #[doc =
         "VDMA peripheral singleton"] VDMA <= DMA() (unstable)), (@ peri_type #[doc =
-        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST(DSI : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
         (unstable)), (@ peri_type #[doc = "MIPI_DSI_BRIDGE peripheral singleton"]
-        MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE(DSI_BRIDGE : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE() (unstable)), (@ peri_type #[doc =
+        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SDHOST peripheral singleton"] SDHOST <=
         SDHOST() (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <=
