@@ -460,7 +460,7 @@ impl DmaChannelExt for DMA_CRYPTO<'_> {
 }
 impl DMA_CRYPTO<'_> {
     pub(super) fn info(&self) -> &'static super::ChannelInfo {
-        #[crate::handler]
+        #[crate::handler(priority = crate::interrupt::Priority::max())]
         fn interrupt_handler() {
             asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
             asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
@@ -494,3 +494,6 @@ impl<'d> DmaChannelConvert<CryptoDmaTxChannel<'d>> for DMA_CRYPTO<'d> {
         CryptoDmaTxChannel(self)
     }
 }
+
+crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
+crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);

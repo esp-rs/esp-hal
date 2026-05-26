@@ -435,8 +435,8 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel<'_> {
 crate::any_peripheral! {
     /// An SPI-compatible type-erased DMA channel.
     pub peripheral AnySpiDmaChannel<'d> {
-        Spi2(crate::peripherals::DMA_SPI2<'d>),
-        Spi3(crate::peripherals::DMA_SPI3<'d>),
+        Spi2(DMA_SPI2<'d>),
+        Spi3(DMA_SPI3<'d>),
     }
 }
 
@@ -464,3 +464,11 @@ impl AnySpiDmaChannel<'_> {
         }
     }
 }
+
+super::impl_pdma_channel!(AnySpi, DMA_SPI2, SPI2_DMA, [Spi2]);
+super::impl_pdma_channel!(AnySpi, DMA_SPI3, SPI3_DMA, [Spi3]);
+
+#[cfg(soc_has_spi2)]
+crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);
+#[cfg(soc_has_spi3)]
+crate::dma::impl_dma_eligible!([DMA_SPI3] SPI3 => Spi3);

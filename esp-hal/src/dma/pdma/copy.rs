@@ -412,7 +412,7 @@ impl DmaChannelExt for DMA_COPY<'_> {
 }
 impl DMA_COPY<'_> {
     pub(super) fn info(&self) -> &'static super::ChannelInfo {
-        #[crate::handler]
+        #[crate::handler(priority = crate::interrupt::Priority::max())]
         fn interrupt_handler() {
             asynch::handle_in_interrupt::<DMA_COPY<'static>>();
             asynch::handle_out_interrupt::<DMA_COPY<'static>>();

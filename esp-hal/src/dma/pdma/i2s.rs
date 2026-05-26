@@ -419,9 +419,9 @@ crate::any_peripheral! {
     /// An I2S-compatible type-erased DMA channel.
     pub peripheral AnyI2sDmaChannel<'d> {
         #[cfg(soc_has_i2s0)]
-        I2s0(crate::peripherals::DMA_I2S0<'d>),
+        I2s0(DMA_I2S0<'d>),
         #[cfg(soc_has_i2s1)]
-        I2s1(crate::peripherals::DMA_I2S1<'d>),
+        I2s1(DMA_I2S1<'d>),
     }
 }
 
@@ -451,3 +451,13 @@ impl AnyI2sDmaChannel<'_> {
         }
     }
 }
+
+#[cfg(soc_has_i2s0)]
+super::impl_pdma_channel!(AnyI2s, DMA_I2S0, I2S0, [I2s0]);
+#[cfg(soc_has_i2s1)]
+super::impl_pdma_channel!(AnyI2s, DMA_I2S1, I2S1, [I2s1]);
+
+#[cfg(soc_has_i2s0)]
+crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);
+#[cfg(soc_has_i2s1)]
+crate::dma::impl_dma_eligible!([DMA_I2S1] I2S1 => I2s1);
