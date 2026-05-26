@@ -6,6 +6,8 @@ use crate::{
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
+        ChannelInfo,
+        ChannelState,
         DmaChannel,
         DmaChannelConvert,
         DmaChannelExt,
@@ -16,13 +18,12 @@ use crate::{
         DmaTxChannel,
         DmaTxInterrupt,
         InterruptAccess,
-        PdmaChannel,
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
         asynch,
     },
-    interrupt::{InterruptHandler, Priority},
+    interrupt::InterruptHandler,
     peripherals::{DMA_COPY, Interrupt},
     system::Peripheral,
 };
@@ -105,7 +106,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
     }
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.is_compatible_with(peripheral)
+        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -217,15 +218,18 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        self.0.tx_waker()
+        &self.0.state().tx_waker
     }
 
     fn is_async(&self) -> bool {
-        self.0.tx_async_flag().load(Ordering::Acquire)
+        self.0.state().tx_async_flag.load(Ordering::Acquire)
     }
 
     fn set_async(&self, is_async: bool) {
-        self.0.tx_async_flag().store(is_async, Ordering::Release);
+        self.0
+            .state()
+            .tx_async_flag
+            .store(is_async, Ordering::Release);
     }
 }
 
@@ -277,7 +281,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
     }
 
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.is_compatible_with(peripheral)
+        self.0.info().is_compatible_with(peripheral)
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
@@ -373,15 +377,18 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        self.0.rx_waker()
+        &self.0.state().rx_waker
     }
 
     fn is_async(&self) -> bool {
-        self.0.rx_async_flag().load(Ordering::Relaxed)
+        self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
     fn set_async(&self, _is_async: bool) {
-        self.0.rx_async_flag().store(_is_async, Ordering::Relaxed);
+        self.0
+            .state()
+            .rx_async_flag
+            .store(_is_async, Ordering::Relaxed);
     }
 }
 
@@ -403,44 +410,31 @@ impl DmaChannelExt for DMA_COPY<'_> {
         CopyDmaTxChannel(unsafe { Self::steal() })
     }
 }
-impl PdmaChannel for DMA_COPY<'_> {
-    type RegisterBlock = CopyRegisterBlock;
-    fn register_block(&self) -> &Self::RegisterBlock {
-        DMA_COPY::regs()
-    }
-    fn tx_waker(&self) -> &'static AtomicWaker {
-        static WAKER: AtomicWaker = AtomicWaker::new();
-        &WAKER
-    }
-    fn rx_waker(&self) -> &'static AtomicWaker {
-        static WAKER: AtomicWaker = AtomicWaker::new();
-        &WAKER
-    }
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        let compatible_peripherals = [DmaPeripheral::Aes, DmaPeripheral::Sha];
-        compatible_peripherals.contains(&peripheral)
-    }
-    fn peripheral_interrupt(&self) -> Interrupt {
-        Interrupt::DMA_COPY
-    }
-    fn async_handler(&self) -> InterruptHandler {
-        pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {
+impl DMA_COPY<'_> {
+    pub(super) fn info(&self) -> &'static super::ChannelInfo {
+        #[crate::handler(priority = crate::interrupt::Priority::max())]
+        fn interrupt_handler() {
             asynch::handle_in_interrupt::<DMA_COPY<'static>>();
             asynch::handle_out_interrupt::<DMA_COPY<'static>>();
         }
-        pub(crate) static INTERRUPT_HANDLER: InterruptHandler =
-            InterruptHandler::new(__esp_hal_internal_interrupt_handler, Priority::max());
-        INTERRUPT_HANDLER
+        static INFO: ChannelInfo = ChannelInfo {
+            peripheral_interrupt: Interrupt::DMA_COPY,
+            async_handler: interrupt_handler,
+            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
+        };
+        &INFO
     }
-    fn rx_async_flag(&self) -> &'static AtomicBool {
-        static FLAG: AtomicBool = AtomicBool::new(false);
-        &FLAG
-    }
-    fn tx_async_flag(&self) -> &'static AtomicBool {
-        static FLAG: AtomicBool = AtomicBool::new(false);
-        &FLAG
+    pub(super) fn state(&self) -> &'static super::ChannelState {
+        static STATE: ChannelState = ChannelState {
+            tx_waker: AtomicWaker::new(),
+            rx_waker: AtomicWaker::new(),
+            tx_async_flag: AtomicBool::new(false),
+            rx_async_flag: AtomicBool::new(false),
+        };
+        &STATE
     }
 }
+
 impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for DMA_COPY<'d> {
     fn degrade(self) -> CopyDmaRxChannel<'d> {
         CopyDmaRxChannel(self)
