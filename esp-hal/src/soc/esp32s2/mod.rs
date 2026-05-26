@@ -56,16 +56,6 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
 }
 
-/// Get the size of a cache line in the DCache.
-#[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
-pub unsafe fn cache_get_dcache_line_size() -> u32 {
-    unsafe extern "C" {
-        fn Cache_Get_DCache_Line_Size() -> u32;
-    }
-    unsafe { Cache_Get_DCache_Line_Size() }
-}
-
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {
     // Set up caches. Doesn't work when put in `configure_cpu_caches`.
