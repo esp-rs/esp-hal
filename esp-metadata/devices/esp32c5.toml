@@ -542,7 +542,7 @@ output_signals = [
 ]
 
 [device.dedicated_gpio]
-version = 3
+version = "riscv_v1"
 support_status = "partial"
 channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 

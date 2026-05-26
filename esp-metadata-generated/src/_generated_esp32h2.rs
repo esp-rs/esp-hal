@@ -71,10 +71,7 @@ macro_rules! property {
         "npl"
     };
     ("dedicated_gpio.version") => {
-        3
-    };
-    ("dedicated_gpio.version", str) => {
-        stringify!(3)
+        "riscv_v1"
     };
     ("dedicated_gpio.needs_initialization") => {
         false

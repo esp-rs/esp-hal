@@ -332,7 +332,7 @@ driver_configs![
         name: "Dedicated GPIO",
         properties: {
             /// Low-level access generation derived from CPU instruction/CSR support.
-            version: u32,
+            version: String,
             #[serde(default)]
             needs_initialization: bool,
             #[serde(flatten)]

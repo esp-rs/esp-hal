@@ -62,10 +62,7 @@ macro_rules! property {
         true
     };
     ("dedicated_gpio.version") => {
-        1
-    };
-    ("dedicated_gpio.version", str) => {
-        stringify!(1)
+        "esp32s2"
     };
     ("dedicated_gpio.needs_initialization") => {
         true

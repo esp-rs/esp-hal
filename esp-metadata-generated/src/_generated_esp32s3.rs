@@ -71,10 +71,7 @@ macro_rules! property {
         "btdm"
     };
     ("dedicated_gpio.version") => {
-        2
-    };
-    ("dedicated_gpio.version", str) => {
-        stringify!(2)
+        "esp32s3"
     };
     ("dedicated_gpio.needs_initialization") => {
         true

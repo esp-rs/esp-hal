@@ -561,7 +561,7 @@ output_signals = [
 ]
 
 [device.dedicated_gpio]
-version = 1
+version = "esp32s2"
 support_status = "partial"
 channels = [["PRO_ALONEGPIO0", "PRO_ALONEGPIO1", "PRO_ALONEGPIO2", "PRO_ALONEGPIO3", "PRO_ALONEGPIO4", "PRO_ALONEGPIO5", "PRO_ALONEGPIO6", "PRO_ALONEGPIO7"]]
 needs_initialization = true
