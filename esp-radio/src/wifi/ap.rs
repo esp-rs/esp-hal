@@ -53,8 +53,10 @@ pub struct AccessPointConfig {
     #[builder_lite(reference)]
     pub(crate) password: String,
     /// The maximum number of connections allowed on the access point.
+    #[builder_lite(unstable)]
     pub(crate) max_connections: u16,
     /// Dtim period of the access point (Range: 1 ~ 10).
+    #[builder_lite(unstable)]
     pub(crate) dtim_period: u8,
     /// Time to force deauth the station if the Soft-AccessPoint doesn't receive any data.
     #[builder_lite(unstable)]
