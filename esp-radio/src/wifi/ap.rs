@@ -7,7 +7,7 @@ use procmacros::BuilderLite;
 
 #[cfg(feature = "unstable")]
 use super::CountryInfo;
-use super::{AuthenticationMethod, Protocols, SecondaryChannel, Ssid};
+use super::{AuthenticationMethod, DisconnectReason, Protocols, SecondaryChannel, Ssid};
 use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
@@ -149,6 +149,44 @@ impl defmt::Format for AccessPointConfig {
             self.beacon_timeout
         );
     }
+}
+
+/// Information about a station connected to the access point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AccessPointStationConnectedInfo {
+    /// The MAC address.
+    pub mac: [u8; 6],
+    /// The Association ID (AID) of the connected station.
+    pub aid: u16,
+    /// If this is a mesh child.
+    pub is_mesh_child: bool,
+}
+
+/// Information about a station disconnected from the access point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AccessPointStationDisconnectedInfo {
+    /// The MAC address.
+    pub mac: [u8; 6],
+    /// The Association ID (AID) of the connected station.
+    pub aid: u16,
+    /// If this is a mesh child.
+    pub is_mesh_child: bool,
+    /// The disconnect reason.
+    pub reason: DisconnectReason,
+}
+
+/// Either the [AccessPointStationConnectedInfo] or [AccessPointStationDisconnectedInfo].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum AccessPointStationEventInfo {
+    /// Information about a station connected to the access point.
+    Connected(AccessPointStationConnectedInfo),
+    /// Information about a station disconnected from the access point.
+    Disconnected(AccessPointStationDisconnectedInfo),
 }
 
 #[allow(non_upper_case_globals)]

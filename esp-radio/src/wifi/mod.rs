@@ -65,10 +65,17 @@ use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
 use self::{
-    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
+    ap::{
+        AccessPointConfig,
+        AccessPointInfo,
+        AccessPointStationConnectedInfo,
+        AccessPointStationDisconnectedInfo,
+        AccessPointStationEventInfo,
+        convert_ap_info,
+    },
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
-    sta::StationConfig,
+    sta::{ConnectedStationInfo, DisconnectedStationInfo, StationConfig},
     state::*,
 };
 use crate::{
@@ -797,77 +804,6 @@ impl From<&[u8]> for Ssid {
     fn from(ssid: &[u8]) -> Self {
         Self::from_raw(ssid, ssid.len() as u8)
     }
-}
-
-/// Information about a connected station.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct ConnectedStationInfo {
-    /// The SSID of the connected station.
-    pub ssid: Ssid,
-    /// The BSSID of the connected station.
-    pub bssid: [u8; 6],
-    /// The channel of the connected station.
-    pub channel: u8,
-    /// The authmode of the connected station.
-    pub authmode: AuthenticationMethod,
-    /// The Association ID (AID) of the connected station.
-    pub aid: u16,
-}
-
-/// Information about a disconnected station.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct DisconnectedStationInfo {
-    /// The SSID of the disconnected station.
-    pub ssid: Ssid,
-    /// The BSSID of the disconnected station.
-    pub bssid: [u8; 6],
-    /// The disconnect reason.
-    // should we introduce an enum?
-    pub reason: DisconnectReason,
-    /// The RSSI.
-    pub rssi: i8,
-}
-
-/// Information about a station connected to the access point.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AccessPointStationConnectedInfo {
-    /// The MAC address.
-    pub mac: [u8; 6],
-    /// The Association ID (AID) of the connected station.
-    pub aid: u16,
-    /// If this is a mesh child.
-    pub is_mesh_child: bool,
-}
-
-/// Information about a station disconnected from the access point.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AccessPointStationDisconnectedInfo {
-    /// The MAC address.
-    pub mac: [u8; 6],
-    /// The Association ID (AID) of the connected station.
-    pub aid: u16,
-    /// If this is a mesh child.
-    pub is_mesh_child: bool,
-    /// The disconnect reason.
-    pub reason: DisconnectReason,
-}
-
-/// Either the [AccessPointStationConnectedInfo] or [AccessPointStationDisconnectedInfo].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum AccessPointStationEventInfo {
-    /// Information about a station connected to the access point.
-    Connected(AccessPointStationConnectedInfo),
-    /// Information about a station disconnected from the access point.
-    Disconnected(AccessPointStationDisconnectedInfo),
 }
 
 static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);

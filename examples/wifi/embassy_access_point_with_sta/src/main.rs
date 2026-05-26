@@ -346,7 +346,7 @@ async fn connection(mut controller: WifiController<'static>) {
                         Either::Second(event) => {
                             if let Ok(event) = event {
                                 match event {
-                                    esp_radio::wifi::AccessPointStationEventInfo::Connected(
+                                    esp_radio::wifi::ap::AccessPointStationEventInfo::Connected(
                                         access_point_station_connected_info,
                                     ) => {
                                         println!(
@@ -354,7 +354,7 @@ async fn connection(mut controller: WifiController<'static>) {
                                             access_point_station_connected_info
                                         );
                                     }
-                                    esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
+                                    esp_radio::wifi::ap::AccessPointStationEventInfo::Disconnected(
                                         access_point_station_disconnected_info,
                                     ) => {
                                         println!(
