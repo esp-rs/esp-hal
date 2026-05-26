@@ -97,7 +97,7 @@ async fn main(spawner: Spawner) -> ! {
     println!("Starting wifi");
     let wifi_ap_device = esp_radio::wifi::Interface::access_point();
     let wifi_sta_device = esp_radio::wifi::Interface::station();
-    let controller = esp_radio::wifi::new(
+    let controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(access_point_station_config),
     )

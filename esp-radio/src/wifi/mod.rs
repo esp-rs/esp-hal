@@ -1317,7 +1317,7 @@ pub(super) fn release(bit: u8) {
 /// Each interface mode (station, access point) is a singleton — only one
 /// instance of each can exist at a time. Create interfaces via
 /// [`Interface::station()`] or [`Interface::access_point()`] before or after
-/// calling [`new()`]. Dropping the interface releases the singleton so it can
+/// calling [`WifiController::new()`]. Dropping the interface releases the singleton so it can
 /// be created again.
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1379,7 +1379,7 @@ impl Interface {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// let _controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// let _controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     ///
     /// let station = esp_radio::wifi::Interface::station();
     /// let mac = station.mac_address();
@@ -2241,115 +2241,7 @@ impl ControllerConfig {
     }
 }
 
-#[procmacros::doc_replace]
-/// Create a Wi-Fi controller. The default initial configuration is
-/// [Config::Station(StationConfig::default())].
-///
-/// Dropping the controller will deinitialize / stop Wi-Fi.
-///
-/// Create [`Interface`]s separately via [`Interface::station()`] /
-/// [`Interface::access_point()`]. ESP-NOW and sniffer instances are
-/// available through the controller's [`WifiController::esp_now()`] and
-/// [`WifiController::sniffer()`] methods.
-///
-/// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
-/// currently in use.
-///
-/// ## Example
-///
-/// ```rust,no_run
-/// # {before_snippet}
-/// let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-/// let sta = esp_radio::wifi::Interface::station();
-/// # {after_snippet}
-/// ```
-pub fn new<'d>(
-    device: crate::hal::peripherals::WIFI<'d>,
-    config: ControllerConfig,
-) -> Result<WifiController<'d>, WifiError> {
-    let _guard = RadioRefGuard::new();
-
-    config.validate();
-
-    event::enable_wifi_events(
-        WifiEvent::StationStart
-            | WifiEvent::StationStop
-            | WifiEvent::StationConnected
-            | WifiEvent::StationDisconnected
-            | WifiEvent::AccessPointStart
-            | WifiEvent::AccessPointStop
-            | WifiEvent::AccessPointStationConnected
-            | WifiEvent::AccessPointStationDisconnected
-            | WifiEvent::ScanDone,
-    );
-
-    unsafe {
-        internal::G_CONFIG = wifi_init_config_t {
-            osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
-
-            wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-            static_rx_buf_num: config.static_rx_buf_num as _,
-            dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
-            tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-            static_tx_buf_num: config.static_tx_buf_num as _,
-            dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
-            rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
-            rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
-            cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-            csi_enable: cfg!(feature = "csi") as i32,
-            ampdu_rx_enable: config.ampdu_rx_enable as _,
-            ampdu_tx_enable: config.ampdu_tx_enable as _,
-            amsdu_tx_enable: config.amsdu_tx_enable as _,
-            nvs_enable: 0,
-            nano_enable: 0,
-            rx_ba_win: config.rx_ba_win as _,
-            wifi_task_core_id: Cpu::current() as _,
-            beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-            mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
-            feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
-            sta_disconnected_pm: false,
-            espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
-                as i32,
-
-            tx_hetb_queue_num: 3,
-            dump_hesigb_enable: false,
-
-            magic: WIFI_INIT_CONFIG_MAGIC as i32,
-        };
-    }
-
-    DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-    DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-
-    TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-
-    crate::wifi::wifi_init(device)?;
-
-    // At some point the "High-speed ADC" entropy source became available.
-    #[cfg(all(rng_trng_supported, feature = "unstable"))]
-    unsafe {
-        esp_hal::rng::TrngSource::increase_entropy_source_counter()
-    };
-
-    // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
-    // function will cause panic because WifiController::drop tries to disable the TRNG.
-    let mut controller = WifiController {
-        _guard,
-        _phantom: Default::default(),
-    };
-
-    controller.set_country_info(&config.country_info)?;
-    // Set a sane default power saving mode. The blob default is not the best for bandwidth.
-    controller.set_power_saving(PowerSaveMode::default())?;
-
-    controller.set_config(&config.initial_config)?;
-
-    Ok(controller)
-}
-
 /// Wi-Fi controller.
-///
-/// Calling [new] starts the controller.
 ///
 /// When the controller is dropped, the Wi-Fi driver is
 /// deinitialized and Wi-Fi is stopped.
@@ -2375,6 +2267,115 @@ impl Drop for WifiController<'_> {
                 esp_hal::Internal::conjure()
             });
         })
+    }
+}
+
+impl<'d> WifiController<'d> {
+    #[procmacros::doc_replace]
+    /// Create a Wi-Fi controller. The default initial configuration is
+    /// [`Config::Station`]`(`[`StationConfig::default()`]`)`.
+    ///
+    /// Dropping the controller will deinitialize / stop Wi-Fi.
+    ///
+    /// Create [`Interface`]s separately via [`Interface::station()`] /
+    /// [`Interface::access_point()`]. ESP-NOW and sniffer instances are
+    /// available through the controller's [`WifiController::esp_now()`] and
+    /// [`WifiController::sniffer()`] methods.
+    ///
+    /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
+    /// currently in use.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// let sta = esp_radio::wifi::Interface::station();
+    /// # {after_snippet}
+    /// ```
+    pub fn new(
+        device: crate::hal::peripherals::WIFI<'d>,
+        config: ControllerConfig,
+    ) -> Result<Self, WifiError> {
+        let _guard = RadioRefGuard::new();
+
+        config.validate();
+
+        event::enable_wifi_events(
+            WifiEvent::StationStart
+                | WifiEvent::StationStop
+                | WifiEvent::StationConnected
+                | WifiEvent::StationDisconnected
+                | WifiEvent::AccessPointStart
+                | WifiEvent::AccessPointStop
+                | WifiEvent::AccessPointStationConnected
+                | WifiEvent::AccessPointStationDisconnected
+                | WifiEvent::ScanDone,
+        );
+
+        unsafe {
+            internal::G_CONFIG = wifi_init_config_t {
+                osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+                wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+                static_rx_buf_num: config.static_rx_buf_num as _,
+                dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
+                tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+                static_tx_buf_num: config.static_tx_buf_num as _,
+                dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
+                rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
+                rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
+                cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+                csi_enable: cfg!(feature = "csi") as i32,
+                ampdu_rx_enable: config.ampdu_rx_enable as _,
+                ampdu_tx_enable: config.ampdu_tx_enable as _,
+                amsdu_tx_enable: config.amsdu_tx_enable as _,
+                nvs_enable: 0,
+                nano_enable: 0,
+                rx_ba_win: config.rx_ba_win as _,
+                wifi_task_core_id: Cpu::current() as _,
+                beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+                mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
+                feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+                sta_disconnected_pm: false,
+                espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
+                    as i32,
+
+                tx_hetb_queue_num: 3,
+                dump_hesigb_enable: false,
+
+                magic: WIFI_INIT_CONFIG_MAGIC as i32,
+            };
+        }
+
+        DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+        DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
+
+        crate::wifi::wifi_init(device)?;
+
+        // At some point the "High-speed ADC" entropy source became available.
+        #[cfg(all(rng_trng_supported, feature = "unstable"))]
+        unsafe {
+            esp_hal::rng::TrngSource::increase_entropy_source_counter()
+        };
+
+        // Only create WifiController after we've enabled TRNG - otherwise returning an
+        // error from this function will cause panic because WifiController::drop tries
+        // to disable the TRNG.
+        let mut controller = WifiController {
+            _guard,
+            _phantom: Default::default(),
+        };
+
+        controller.set_country_info(&config.country_info)?;
+        // Set a sane default power saving mode. The blob default is not the best for bandwidth.
+        controller.set_power_saving(PowerSaveMode::default())?;
+
+        controller.set_config(&config.initial_config)?;
+
+        Ok(controller)
     }
 }
 
@@ -2435,7 +2436,8 @@ impl WifiController<'_> {
     /// let controller_config = ControllerConfig::default().with_initial_config(Config::AccessPoint(
     ///     AccessPointConfig::default().with_ssid("esp-radio"),
     /// ));
-    /// let mut wifi_controller = esp_radio::wifi::new(peripherals.WIFI, controller_config)?;
+    /// let mut wifi_controller =
+    ///     esp_radio::wifi::WifiController::new(peripherals.WIFI, controller_config)?;
     ///
     /// wifi_controller.set_protocols(Protocols::default());
     /// # {after_snippet}
@@ -2474,7 +2476,8 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::PowerSaveMode;
-    /// let mut controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// let mut controller =
+    ///     esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// controller.set_power_saving(PowerSaveMode::Maximum)?;
     /// # {after_snippet}
     /// ```
@@ -2505,7 +2508,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// // Assume the station has already been started and connected
     /// match controller.rssi() {
     ///     Ok(rssi) => {
@@ -2546,7 +2549,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// // Assume the station has already been started and connected
     /// match controller.ap_info() {
     ///     Ok(info) => {
@@ -2595,7 +2598,7 @@ impl WifiController<'_> {
     /// # {before_snippet}
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
     /// # let mut controller =
-    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// #    esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// let station_config = Config::Station(
     ///     StationConfig::default()
     ///         .with_ssid("SSID")
@@ -2823,7 +2826,7 @@ ignored."
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::WifiError;
-    /// # let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// if controller.is_connected() {
     ///     println!("Station is connected");
     /// } else {
@@ -2853,7 +2856,7 @@ ignored."
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::{WifiController, scan::ScanConfig};
-    /// # let mut controller = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// # let mut controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// // Create a scan configuration (e.g., scan up to 10 APs)
     /// let scan_config = ScanConfig::default().with_max(10);
     /// let result = controller.scan_async(&scan_config).await.unwrap();
@@ -2910,7 +2913,7 @@ ignored."
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
     ///
     /// # let mut controller =
-    /// #   esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     ///
     /// match controller.connect_async().await {
     ///     Ok(_) => {
@@ -2984,7 +2987,7 @@ ignored."
     /// # use esp_radio::wifi::{Config, sta::StationConfig};
     ///
     /// # let mut controller =
-    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// #    esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// match controller.disconnect_async().await {
     ///     Ok(info) => {
     ///         println!("Station disconnected successfully. {info:?}");
