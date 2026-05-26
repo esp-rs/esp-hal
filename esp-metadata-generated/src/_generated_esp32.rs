@@ -473,6 +473,19 @@ macro_rules! for_each_dma_channel {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_pdma_channel_peri_pair {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_pdma_channel_peri_pair { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_pdma_channel_peri_pair!((DMA_SPI2, SPI2));
+        _for_each_inner_pdma_channel_peri_pair!((DMA_SPI3, SPI3));
+        _for_each_inner_pdma_channel_peri_pair!((DMA_I2S0, I2S0));
+        _for_each_inner_pdma_channel_peri_pair!((DMA_I2S1, I2S1));
+        _for_each_inner_pdma_channel_peri_pair!((all(DMA_SPI2, SPI2), (DMA_SPI3, SPI3),
+        (DMA_I2S0, I2S0), (DMA_I2S1, I2S1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sw_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
@@ -4099,11 +4112,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((TOUCH(unstable)));
         _for_each_inner_peripheral!((I2S0, I2s0, 0, "I2S_DMA"));
+        _for_each_inner_peripheral!((SPI2, Spi2, 0, "SPI_DMA"));
+        _for_each_inner_peripheral!((UHCI0, Uhci0, 0, ""));
         _for_each_inner_peripheral!((I2S1, I2s1, 1, "I2S_DMA"));
-        _for_each_inner_peripheral!((SPI2, Spi2, 2, "SPI_DMA"));
-        _for_each_inner_peripheral!((SPI3, Spi3, 3, "SPI_DMA"));
-        _for_each_inner_peripheral!((UHCI0, Uhci0, 4, ""));
-        _for_each_inner_peripheral!((UHCI1, Uhci1, 5, ""));
+        _for_each_inner_peripheral!((SPI3, Spi3, 1, "SPI_DMA"));
+        _for_each_inner_peripheral!((UHCI1, Uhci1, 1, ""));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -4371,8 +4384,9 @@ macro_rules! for_each_peripheral {
         (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (DAC1(unstable)),
         (DAC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (TOUCH(unstable)))); _for_each_inner_peripheral!((dma_eligible(I2S0, I2s0, 0,
-        "I2S_DMA"), (I2S1, I2s1, 1, "I2S_DMA"), (SPI2, Spi2, 2, "SPI_DMA"), (SPI3, Spi3,
-        3, "SPI_DMA"), (UHCI0, Uhci0, 4, ""), (UHCI1, Uhci1, 5, "")));
+        "I2S_DMA"), (SPI2, Spi2, 0, "SPI_DMA"), (UHCI0, Uhci0, 0, ""), (I2S1, I2s1, 1,
+        "I2S_DMA"), (SPI3, Spi3, 1, "SPI_DMA"), (UHCI1, Uhci1, 1, "")));
+        _for_each_inner_peripheral!((gdma_dma_eligible));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

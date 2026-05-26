@@ -61,6 +61,9 @@ impl GenericProperty for DmaEngines {
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let mut shared = vec![];
         let mut split = vec![];
+        // One entry per (channel, peripheral) pair from PDMA `compatible_with` lists.
+        // Empty on GDMA chips (all channels have empty `compatible_with`).
+        let mut pdma_pairs = vec![];
 
         for engine in self.0.iter() {
             for (idx, channel) in engine.channels.iter().enumerate() {
@@ -94,16 +97,34 @@ impl GenericProperty for DmaEngines {
                         );
                     }
                 }
+
+                for peri_name in &channel.compatible_with {
+                    let ch_ident = quote::format_ident!("{}", channel.name);
+                    let peri_ident = quote::format_ident!("{}", peri_name);
+                    pdma_pairs.push(quote! { #ch_ident, #peri_ident });
+                }
             }
         }
 
-        if shared.is_empty() && split.is_empty() {
-            return None;
-        }
+        let dma_channel_macro = if !shared.is_empty() || !split.is_empty() {
+            Some(generate_for_each_macro(
+                "dma_channel",
+                &[("shared", &shared), ("split", &split)],
+            ))
+        } else {
+            None
+        };
 
-        Some(generate_for_each_macro(
-            "dma_channel",
-            &[("shared", &shared), ("split", &split)],
-        ))
+        // Always emit for_each_pdma_channel_peri_pair! so drivers can call it
+        // unconditionally. On GDMA chips it expands to nothing.
+        let pdma_pairs_macro = generate_for_each_macro(
+            "pdma_channel_peri_pair",
+            &[("all", &pdma_pairs)],
+        );
+
+        Some(quote::quote! {
+            #dma_channel_macro
+            #pdma_pairs_macro
+        })
     }
 }

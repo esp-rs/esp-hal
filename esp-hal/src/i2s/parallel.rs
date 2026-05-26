@@ -789,3 +789,20 @@ impl Instance for I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
+
+// Categories 1, 2, 3a: parallel I2S exists only on ESP32 (PDMA), so only
+// for_each_pdma_channel_peri_pair! is needed (no GDMA category 4).
+for_each_pdma_channel_peri_pair! {
+    ($ch:ident, I2S0) => {
+        impl I2sParallelDmaChannel<I2S0<'_>> for crate::peripherals::$ch<'_> {}
+        impl I2sParallelDmaChannel<I2S0<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+    };
+    ($ch:ident, I2S1) => {
+        impl I2sParallelDmaChannel<I2S1<'_>> for crate::peripherals::$ch<'_> {}
+        impl I2sParallelDmaChannel<I2S1<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+    };
+}
+// Category 3b: erased instance + erased PDMA channel.
+impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}

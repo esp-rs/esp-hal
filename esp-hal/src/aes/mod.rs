@@ -1669,6 +1669,18 @@ fn read_words(slice: &[u8]) -> impl Iterator<Item = u32> {
     bytes::<4>(slice).map(u32::from_le_bytes)
 }
 
+// AesDmaChannel: PDMA pair from metadata; GDMA uses AnyGdmaChannel.
+for_each_pdma_channel_peri_pair! {
+    ($ch:ident, AES) => {
+        impl AesDmaChannel for crate::peripherals::$ch<'_> {}
+    };
+}
+for_each_peripheral! {
+    (gdma_dma_eligible AES, $name:ident, $id:literal) => {
+        impl AesDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}
+
 fn write_words(slice: &mut [u8], next: impl Fn(usize) -> u32) {
     for (i, chunk) in slice.chunks_mut(4).enumerate() {
         let bytes = next(i).to_le_bytes();

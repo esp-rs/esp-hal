@@ -790,33 +790,47 @@ This pin may be available with certain limitations. Check your hardware to make 
 
         dma_peripherals.sort_by_key(|(_, dma_peripheral, _)| *dma_peripheral);
 
-        let dma_peripherals = dma_peripherals
-            .into_iter()
-            .map(|(name, dma_peripheral, engine)| {
-                use convert_case::{Boundary, Case, Casing, pattern};
+        // Determine if this chip uses GDMA (channels with empty compatible_with).
+        let is_gdma = self
+            .device
+            .peri_config
+            .dma
+            .as_ref()
+            .map(|dma| dma.kind == "gdma")
+            .unwrap_or(false);
 
-                let peri = format_ident!("{}", name);
-                let dma_peripheral = number(dma_peripheral);
-                let variant_name = format_ident!(
-                    "{}",
-                    name.from_case(Case::Custom {
-                        boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
-                        pattern: pattern::capital,
-                        delim: "",
-                    })
-                    .to_case(Case::Pascal)
-                );
-                let engine = engine.unwrap_or("");
-                quote! { #peri, #variant_name, #dma_peripheral, #engine }
-            })
-            .collect::<Vec<_>>();
+        let mut dma_eligible = vec![];
+        let mut gdma_dma_eligible = vec![];
+        for (name, dma_peripheral, engine) in dma_peripherals {
+            use convert_case::{Boundary, Case, Casing, pattern};
+
+            let peri = format_ident!("{}", name);
+            let dma_peripheral_num = number(dma_peripheral);
+            let variant_name = format_ident!(
+                "{}",
+                name.from_case(Case::Custom {
+                    boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
+                    pattern: pattern::capital,
+                    delim: "",
+                })
+                .to_case(Case::Pascal)
+            );
+            let engine_str = engine.unwrap_or("");
+            dma_eligible.push(quote! { #peri, #variant_name, #dma_peripheral_num, #engine_str });
+
+            if is_gdma {
+                gdma_dma_eligible
+                    .push(quote! { #peri, #variant_name, #dma_peripheral_num });
+            }
+        }
 
         generate_for_each_macro(
             "peripheral",
             &[
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
-                ("dma_eligible", &dma_peripherals),
+                ("dma_eligible", &dma_eligible),
+                ("gdma_dma_eligible", &gdma_dma_eligible),
             ],
         )
     }

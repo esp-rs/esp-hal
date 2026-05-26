@@ -858,3 +858,31 @@ impl Instance for AnySpi<'_> {
         any::delegate!(self, spi => { spi.info() })
     }
 }
+
+// Categories 1, 2, 3a: generated from PDMA channel-peripheral pairs in the metadata.
+for_each_pdma_channel_peri_pair! {
+    ($ch:ident, SPI2) => {
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI2<'_>> for crate::peripherals::$ch<'_> {}
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+        impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+    };
+    ($ch:ident, SPI3) => {
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI3<'_>> for crate::peripherals::$ch<'_> {}
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+        impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+    };
+}
+// Category 3b: erased instance + erased channel.
+#[cfg(dma_kind = "pdma")]
+impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+#[cfg(dma_kind = "gdma")]
+impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+// Category 4: GDMA — generated from metadata.
+for_each_peripheral! {
+    (gdma_dma_eligible SPI2, $name:ident, $id:literal) => {
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+    (gdma_dma_eligible SPI3, $name:ident, $id:literal) => {
+        impl SpiSlaveDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}

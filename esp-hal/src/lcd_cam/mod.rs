@@ -8,6 +8,13 @@
 pub mod cam;
 pub mod lcd;
 
+for_each_peripheral! {
+    (gdma_dma_eligible LCD_CAM, $name:ident, $id:literal) => {
+        impl LcdDmaTxChannel for crate::dma::AnyGdmaTxChannel<'_> {}
+        impl CamDmaRxChannel for crate::dma::AnyGdmaRxChannel<'_> {}
+    };
+}
+
 /// DMA TX channel trait for LCD (I8080, DPI) peripherals.
 ///
 /// Implemented for every TX-capable channel type that can serve the LCD module.

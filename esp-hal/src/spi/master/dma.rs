@@ -1896,3 +1896,33 @@ impl SpiWrapper<'_> {
         self.spi.dma_peripheral()
     }
 }
+
+// Categories 1, 2, 3a: generated from PDMA channel-peripheral pairs in the metadata.
+// Each `(DMA_SPIn, SPIn)` pair produces three impls: concrete×concrete (cat 1),
+// erased-channel×concrete (cat 2), and concrete-channel×erased-instance (cat 3a).
+for_each_pdma_channel_peri_pair! {
+    ($ch:ident, SPI2) => {
+        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::peripherals::$ch<'_> {}
+        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+    };
+    ($ch:ident, SPI3) => {
+        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::peripherals::$ch<'_> {}
+        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+    };
+}
+// Category 3b: erased instance + erased channel (both sides type-erased, runtime-checked).
+#[cfg(dma_kind = "pdma")]
+impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
+#[cfg(dma_kind = "gdma")]
+impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+// Category 4: GDMA — any channel can serve any SPI instance, generated from metadata.
+for_each_peripheral! {
+    (gdma_dma_eligible SPI2, $name:ident, $id:literal) => {
+        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+    (gdma_dma_eligible SPI3, $name:ident, $id:literal) => {
+        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}

@@ -409,6 +409,14 @@ macro_rules! for_each_dma_channel {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_pdma_channel_peri_pair {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_pdma_channel_peri_pair { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_pdma_channel_peri_pair!((all));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_ecc_working_mode {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
@@ -3510,7 +3518,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2, 0,
         "AHB_GDMA")); _for_each_inner_peripheral!((SHA, Sha, 7, "AHB_GDMA"));
-        _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        _for_each_inner_peripheral!((SPI2, Spi2, 0)); _for_each_inner_peripheral!((SHA,
+        Sha, 7)); _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton"] GPIO2 <= virtual()), (@ peri_type #[doc =
@@ -3669,7 +3678,8 @@ macro_rules! for_each_peripheral {
         (UART1), (XTS_AES(unstable)), (ADC1(unstable)), (BT(unstable)),
         (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)),
         (WIFI))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, "AHB_GDMA"),
-        (SHA, Sha, 7, "AHB_GDMA")));
+        (SHA, Sha, 7, "AHB_GDMA"))); _for_each_inner_peripheral!((gdma_dma_eligible(SPI2,
+        Spi2, 0), (SHA, Sha, 7)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

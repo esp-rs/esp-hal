@@ -446,6 +446,14 @@ macro_rules! for_each_dma_channel {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_pdma_channel_peri_pair {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_pdma_channel_peri_pair { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_pdma_channel_peri_pair!((all));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_ecc_working_mode {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
@@ -4018,9 +4026,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SPI3, Spi3, 2, "AHB_GDMA"));
         _for_each_inner_peripheral!((AES, Aes, 4, "AHB_GDMA"));
         _for_each_inner_peripheral!((SHA, Sha, 5, "AHB_GDMA"));
-        _for_each_inner_peripheral!((all(@ peri_type #[doc =
-        "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
-        "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
+        _for_each_inner_peripheral!((SPI2, Spi2, 1)); _for_each_inner_peripheral!((SPI3,
+        Spi3, 2)); _for_each_inner_peripheral!((AES, Aes, 4));
+        _for_each_inner_peripheral!((SHA, Sha, 5)); _for_each_inner_peripheral!((all(@
+        peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
+        #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -4257,6 +4267,8 @@ macro_rules! for_each_peripheral {
         (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, "AHB_GDMA"), (SPI3,
         Spi3, 2, "AHB_GDMA"), (AES, Aes, 4, "AHB_GDMA"), (SHA, Sha, 5, "AHB_GDMA")));
+        _for_each_inner_peripheral!((gdma_dma_eligible(SPI2, Spi2, 1), (SPI3, Spi3, 2),
+        (AES, Aes, 4), (SHA, Sha, 5)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

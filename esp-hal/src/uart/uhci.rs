@@ -818,3 +818,9 @@ where
         self.apply_config(config)
     }
 }
+
+for_each_peripheral! {
+    (gdma_dma_eligible UHCI0, $name:ident, $id:literal) => {
+        impl UhciDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}

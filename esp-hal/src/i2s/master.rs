@@ -1394,6 +1394,34 @@ impl Instance for crate::peripherals::I2S0<'_> {}
 impl Instance for crate::peripherals::I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
+// Categories 1, 2, 3a: generated from PDMA channel-peripheral pairs in the metadata.
+for_each_pdma_channel_peri_pair! {
+    ($ch:ident, I2S0) => {
+        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::peripherals::$ch<'_> {}
+        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+    };
+    ($ch:ident, I2S1) => {
+        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::peripherals::$ch<'_> {}
+        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+    };
+}
+// Category 3b: erased instance + erased channel.
+#[cfg(dma_kind = "pdma")]
+impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+#[cfg(dma_kind = "gdma")]
+impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+// Category 4: GDMA — generated from metadata.
+for_each_peripheral! {
+    (gdma_dma_eligible I2S0, $name:ident, $id:literal) => {
+        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+    (gdma_dma_eligible I2S1, $name:ident, $id:literal) => {
+        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}
+
 mod private {
     use enumset::EnumSet;
 

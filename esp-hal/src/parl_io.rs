@@ -2127,3 +2127,9 @@ impl Drop for ParlIoRxGuard {
         ClockTree::with(|clocks| ParlIoInstance::ParlIo.release_rx_clock(clocks));
     }
 }
+
+for_each_peripheral! {
+    (gdma_dma_eligible PARL_IO, $name:ident, $id:literal) => {
+        impl ParlIoDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
+    };
+}
