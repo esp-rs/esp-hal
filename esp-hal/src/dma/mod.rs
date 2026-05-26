@@ -2123,6 +2123,7 @@ pub(crate) mod asynch {
             }
         }
 
+        #[cfg_attr(not(any(i2s_driver_supported)), expect(unused))]
         pub fn new_with_config(
             rx: &'a mut ChannelRx<Async, CH>,
             success_interrupts: EnumSet<DmaRxInterrupt>,
