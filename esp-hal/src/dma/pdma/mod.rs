@@ -87,47 +87,14 @@ macro_rules! impl_pdma_channel {
                 }
             }
 
-            impl<'d> crate::dma::DmaChannel for $instance<'d> {
-                type Rx = [<$peri DmaRxChannel>]<'d>;
-                type Tx = [<$peri DmaTxChannel>]<'d>;
-
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    unsafe {
-                        (
-                            [<$peri DmaRxChannel>](Self::steal().degrade()),
-                            [<$peri DmaTxChannel>](Self::steal().degrade()),
-                        )
-                    }
-                }
-            }
-
-            impl crate::dma::DmaChannelExt for $instance<'_> {
-                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri DmaRxChannel>](unsafe { Self::steal() }.degrade())
-                }
-                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri DmaTxChannel>](unsafe { Self::steal() }.degrade())
-                }
-            }
-
-            impl<'d> DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri DmaChannel>]<'d> {
+            impl<'d> DmaChannelConvert<[<$peri Channel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri Channel>]<'d> {
                     self.into()
                 }
             }
-
-            impl<'d> DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri DmaRxChannel>]<'d> {
-                    [<$peri DmaRxChannel>](self.degrade())
-                }
-            }
-
-            impl<'d> DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri DmaTxChannel>]<'d> {
-                    [<$peri DmaTxChannel>](self.degrade())
-                }
-            }
         }
+
+        crate::dma::impl_channel_common!($peri, $instance);
     };
 }
 pub(crate) use impl_pdma_channel;

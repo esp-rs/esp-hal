@@ -466,8 +466,8 @@ impl AnySpiDmaChannel<'_> {
     }
 }
 
-super::impl_pdma_channel!(AnySpi, DMA_SPI2, SPI2_DMA, [Spi2]);
-super::impl_pdma_channel!(AnySpi, DMA_SPI3, SPI3_DMA, [Spi3]);
+super::impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [Spi2]);
+super::impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [Spi3]);
 
 #[cfg(soc_has_spi2)]
 crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);

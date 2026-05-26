@@ -161,7 +161,17 @@ macro_rules! impl_channel {
                 &STATE
             }
         }
-        impl_channel_common!($ch);
+
+        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
+            fn degrade(self) -> AnyGdmaChannel<'d> {
+                AnyGdmaChannel {
+                    info: Self::info(),
+                    state: Self::state(),
+                    _lifetime: core::marker::PhantomData,
+                }
+            }
+        }
+        crate::dma::impl_channel_common!(AnyGdma, $ch);
     };
 
     // Split interrupts: separate handlers for the in and out paths.
@@ -197,27 +207,6 @@ macro_rules! impl_channel {
                 &STATE
             }
         }
-        impl_channel_common!($ch);
-    };
-}
-
-/// Generates the `state()` accessor and all trait impls that are identical
-/// regardless of whether the channel uses split or shared interrupts.
-macro_rules! impl_channel_common {
-    ($ch:ident) => {
-        impl<'d> DmaChannel for $ch<'d> {
-            type Rx = AnyGdmaRxChannel<'d>;
-            type Tx = AnyGdmaTxChannel<'d>;
-
-            unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                unsafe {
-                    (
-                        AnyGdmaRxChannel(Self::steal().degrade()),
-                        AnyGdmaTxChannel(Self::steal().degrade()),
-                    )
-                }
-            }
-        }
 
         impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
             fn degrade(self) -> AnyGdmaChannel<'d> {
@@ -228,28 +217,7 @@ macro_rules! impl_channel_common {
                 }
             }
         }
-
-        impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaRxChannel<'d> {
-                AnyGdmaRxChannel(self.degrade())
-            }
-        }
-
-        impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaTxChannel<'d> {
-                AnyGdmaTxChannel(self.degrade())
-            }
-        }
-
-        impl DmaChannelExt for $ch<'_> {
-            fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                AnyGdmaRxChannel(unsafe { Self::steal() }.degrade())
-            }
-
-            fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                AnyGdmaTxChannel(unsafe { Self::steal() }.degrade())
-            }
-        }
+        crate::dma::impl_channel_common!(AnyGdma, $ch);
     };
 }
 
