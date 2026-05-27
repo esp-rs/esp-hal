@@ -4,7 +4,7 @@
 //! with loopback mode enabled).
 
 //% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable defmt
+//% FEATURES: unstable
 // FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
@@ -12,6 +12,7 @@
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use esp_hal::dma::DmaTxBuf;
     #[cfg_attr(esp32, expect(unused))]
     use esp_hal::{
         Async,
@@ -429,6 +430,63 @@ mod tests {
         for chunk in tmp[..l].chunks(4) {
             assert_eq!(chunk, [1, 0, 254, 255]);
         }
+    }
+
+    // We don't actually check the output but just make sure the write completes.
+    #[test]
+    fn test_i2s_write_one_shot(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap();
+
+        let i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(ctx.dout)
+            .build();
+
+        let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+        let (_, _done_tx) = tx_transfer.wait().unwrap();
+    }
+
+    // We don't actually check the output but just make sure the write completes.
+    #[test]
+    async fn test_i2s_write_one_shot_async(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap()
+        .into_async();
+
+        let i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(ctx.dout)
+            .build();
+
+        let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+        let (_, _done_tx) = tx_transfer.wait_async().await.unwrap();
     }
 }
 

@@ -1286,6 +1286,9 @@ where
 {
     /// Perform a DMA read.
     ///
+    /// The number of read bytes might be less than the capacity of the provided buffer since the
+    /// peripheral might not completely fill each descriptor's buffer.
+    ///
     /// This will return a [I2sRxDmaTransfer]
     pub fn read<BUF>(
         mut self,
