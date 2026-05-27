@@ -298,6 +298,12 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
+    ("soc.cpu_csr_prv_mode") => {
+        2064
+    };
+    ("soc.cpu_csr_prv_mode", str) => {
+        stringify!(2064)
+    };
     ("soc.rc_fast_clk_default") => {
         17500000
     };

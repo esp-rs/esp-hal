@@ -138,6 +138,7 @@ macro_rules! driver_configs {
         }
     ) => {
         #[derive(Debug, Clone, serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
         pub(crate) struct $struct {
             #[serde(default)]
             #[serde(deserialize_with = "crate::support_status::string_or_struct")]
