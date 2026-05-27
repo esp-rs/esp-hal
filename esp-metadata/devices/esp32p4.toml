@@ -531,7 +531,6 @@ supports_enhanced_security = true
 [device.gpio]
 support_status = "partial"
 has_bank_1 = true
-separate_in_out_interrupts = true
 gpio_function = 1
 constant_0_input = 0x3E
 constant_1_input = 0x3F
