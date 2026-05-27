@@ -1137,6 +1137,9 @@ impl DmaRxStreamBufView {
         let mut remaining = buf;
         loop {
             let available = self.peek();
+            if available.is_empty() {
+                break;
+            }
             if available.len() >= remaining.len() {
                 remaining.copy_from_slice(&available[0..remaining.len()]);
                 self.consume(remaining.len());
@@ -1497,12 +1500,15 @@ impl DmaTxStreamBufView {
         let total_len = data.len();
         let mut remaining = data;
 
-        while self.available_bytes() >= remaining.len() && !remaining.is_empty() {
+        while !remaining.is_empty() && self.available_bytes() > 0 {
             let written = self.push_with(|buffer| {
                 let len = usize::min(buffer.len(), remaining.len());
                 buffer[..len].copy_from_slice(&remaining[..len]);
                 len
             });
+            if written == 0 {
+                break;
+            }
             remaining = &remaining[written..];
         }
 
