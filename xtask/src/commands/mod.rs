@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -7,6 +7,7 @@ use anyhow::{Context, Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 use inquire::Select;
+use serde::Serialize;
 use strum::IntoEnumIterator;
 
 pub use self::{build::*, check_changelog::*, check_pr_changelog::*, release::*, run::*};
@@ -447,6 +448,10 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let bins_root = package_path.join("src").join("bin");
     let mut all_tests = crate::firmware::load(&bins_root)?;
     if package_name == "hil-test-radio" {
+        let tests_root = bins_root.join("tests");
+        if tests_root.exists() {
+            all_tests.extend(crate::firmware::load(&tests_root)?);
+        }
         let support_root = bins_root.join("support");
         if support_root.exists() {
             all_tests.extend(crate::firmware::load(&support_root)?);
@@ -461,12 +466,6 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Radio tests reuse the normal HIL flow; the only difference is a pre-step
     // that builds and flashes the support firmware on a secondary probe.
     let is_radio_package = package_name == "hil-test-radio";
-    let referenced_harnesses = if is_radio_package {
-        collect_referenced_harnesses(&all_tests, args.chip)
-    } else {
-        HashSet::new()
-    };
-
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
         let tmp_dir = out_dir.join("tmp");
@@ -591,7 +590,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let mut harness_for_artifact = HashMap::<String, firmware::Metadata>::new();
     if is_radio_package {
         for test in artifact_meta.values() {
-            if is_support_firmware(test, &referenced_harnesses) {
+            if is_support_firmware(test) {
                 continue;
             }
             let Some(harness_name) = test.harness_firmware() else {
@@ -621,6 +620,10 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
     let mut failed = Vec::new();
     let built_commands = commands.build(false);
+    let built_artifacts = built_commands
+        .iter()
+        .map(|command| command.artifact_name.clone())
+        .collect::<Vec<_>>();
 
     let mut built_harness = HashMap::<String, PathBuf>::new();
 
@@ -635,9 +638,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
         // Support firmware never runs as a DUT; it's used only as a pre-step
         // for whichever DUT requests it via `HARNESS-FIRMWARE`.
-        if matches!(action, CargoAction::Run)
-            && radio_meta.is_some_and(|m| is_support_firmware(m, &referenced_harnesses))
-        {
+        if matches!(action, CargoAction::Run) && radio_meta.is_some_and(is_support_firmware) {
             log::info!("Skipping support firmware '{}' as DUT", c.artifact_name);
             continue;
         }
@@ -700,6 +701,59 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         bail!("Failed tests: {:#?}", failed);
     }
 
+    if is_radio_package && let CargoAction::Build(Some(out_dir)) = &action {
+        write_radio_elf_manifest(
+            out_dir,
+            args.chip,
+            &built_artifacts,
+            &artifact_meta,
+            &harness_for_artifact,
+        )?;
+    }
+
+    Ok(())
+}
+
+const RADIO_ELF_MANIFEST_FILENAME: &str = "radio-elfs.json";
+
+#[derive(Debug, Serialize)]
+struct RadioElfManifestEntry {
+    artifact: String,
+    harness: Option<String>,
+    support_firmware: bool,
+}
+
+fn write_radio_elf_manifest(
+    out_dir: &Path,
+    chip: Chip,
+    built_artifacts: &[String],
+    artifact_meta: &HashMap<String, firmware::Metadata>,
+    harness_for_artifact: &HashMap<String, firmware::Metadata>,
+) -> Result<()> {
+    let mut entries = Vec::new();
+    for artifact in built_artifacts {
+        let Some(meta) = artifact_meta.get(artifact) else {
+            continue;
+        };
+        entries.push(RadioElfManifestEntry {
+            artifact: artifact.clone(),
+            harness: harness_for_artifact
+                .get(artifact)
+                .map(firmware::Metadata::output_file_name),
+            support_firmware: is_support_firmware(meta),
+        });
+    }
+
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let manifest_path = out_dir
+        .join(chip.to_string())
+        .join(RADIO_ELF_MANIFEST_FILENAME);
+    let payload = serde_json::to_string_pretty(&entries)?;
+    std::fs::write(&manifest_path, payload)
+        .with_context(|| format!("Failed to write {}", manifest_path.display()))?;
     Ok(())
 }
 
@@ -773,32 +827,8 @@ fn resolve_radio_module_alias(
         .cloned()
 }
 
-fn collect_referenced_harnesses(all_tests: &[firmware::Metadata], chip: Chip) -> HashSet<String> {
-    let mut harnesses = HashSet::new();
-    for test in all_tests {
-        if !test.supports_chip(chip) {
-            continue;
-        }
-        if let Some(harness) = test.harness_firmware() {
-            harnesses.insert(harness.to_string());
-            if let Some(basename) = harness.rsplit('/').next() {
-                harnesses.insert(basename.to_string());
-            }
-        }
-    }
-    harnesses
-}
-
-fn is_support_firmware(meta: &firmware::Metadata, referenced_harnesses: &HashSet<String>) -> bool {
-    let binary = meta.binary_name();
-    let output = meta.output_file_name();
-
-    referenced_harnesses.contains(binary.as_str())
-        || referenced_harnesses.contains(output.as_str())
-        || meta
-            .example_path()
-            .to_string_lossy()
-            .contains("/src/bin/support/")
+fn is_support_firmware(meta: &firmware::Metadata) -> bool {
+    meta.is_support_firmware()
 }
 
 fn move_artifacts(chip: Chip, action: &CargoAction) {

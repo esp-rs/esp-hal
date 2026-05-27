@@ -1,8 +1,8 @@
 //! Wi-Fi HIL tests.
 //!
-//! Each radio domain gets its own binary under `src/bin/` (for example `wifi`,
-//! future `ble`, and `esp_radio` for mixed/coex tests). Test modules live in
-//! a subdirectory named after the binary.
+//! Each radio domain gets its own entry binary under `src/bin/tests/`
+//! (`wifi`, future `ble`, and `esp_radio` for mixed/coex tests), so domains
+//! stay independent instead of everything being folded into a single binary.
 
 //% CHIPS(has_wifi_ble): esp32c6
 //% HARNESS-FIRMWARE(has_wifi_ble): wifi_ap_support

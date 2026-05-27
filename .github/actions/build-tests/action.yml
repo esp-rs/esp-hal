@@ -89,11 +89,15 @@ runs:
             cargo xtask build tests ${{ inputs.soc }} $pkg
           fi
 
-          # Move built files into a subdirectory named after the package
-          local src="${{ github.workspace }}/target/tests/${{ inputs.soc }}"
-          local dst="${src}/${pkg}"
-          mkdir -p "$dst"
-          find "$src" -maxdepth 1 -type f -exec mv {} "$dst/" \;
+          # For full package builds, separate artifacts by package.
+          # For selected tests, keep ELFs at top-level because `xtask run elfs`
+          # scans the given directory non-recursively.
+          if [ -z "${{ inputs.tests }}" ]; then
+            local src="${{ github.workspace }}/target/tests/${{ inputs.soc }}"
+            local dst="${src}/${pkg}"
+            mkdir -p "$dst"
+            find "$src" -maxdepth 1 -type f -exec mv {} "$dst/" \;
+          fi
         }
 
         if [ "${{ inputs.package }}" = "all" ]; then
@@ -112,7 +116,7 @@ runs:
         overwrite: true
 
     - uses: actions/upload-artifact@v6
-      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' && (inputs.package == 'all' || inputs.package == 'hil-test-radio') }}
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests == '' && (inputs.package == 'all' || inputs.package == 'hil-test-radio') && hashFiles(format('{0}/target/tests/{1}/hil-test-radio/**', github.workspace, inputs.soc)) != '' }}
       with:
         name: tests-${{ inputs.soc }}-hil-test-radio
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test-radio
@@ -120,9 +124,17 @@ runs:
         overwrite: true
 
     - uses: actions/upload-artifact@v6
-      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests != '' }}
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests != '' && (inputs.package == 'all' || inputs.package == 'hil-test') }}
       with:
-        name: tests-${{ inputs.soc }}
-        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}
+        name: tests-${{ inputs.soc }}-hil-test
+        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test
+        if-no-files-found: ignore
+        overwrite: true
+
+    - uses: actions/upload-artifact@v6
+      if: ${{ steps.chip.outputs.supported == 'true' && inputs.tests != '' && (inputs.package == 'all' || inputs.package == 'hil-test-radio') }}
+      with:
+        name: tests-${{ inputs.soc }}-hil-test-radio
+        path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}/hil-test-radio
         if-no-files-found: ignore
         overwrite: true

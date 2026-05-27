@@ -11,6 +11,7 @@ name = "hil_test"
 name              = "wifi"
 harness           = false
 required-features = ["esp-alloc"]
+path              = "src/bin/tests/wifi.rs"
 
 [[bin]]
 name              = "wifi_ap_support"

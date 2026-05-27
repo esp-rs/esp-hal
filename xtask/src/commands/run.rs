@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -7,6 +8,7 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
+use serde::Deserialize;
 
 use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
@@ -154,6 +156,12 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         if !path.is_file() {
             continue;
         }
+        if path
+            .file_name()
+            .is_some_and(|name| name == std::ffi::OsStr::new(RADIO_ELF_MANIFEST_FILENAME))
+        {
+            continue;
+        }
 
         let elf_name = path
             .with_extension("")
@@ -164,7 +172,12 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         elfs.push((elf_name, path));
     }
 
-    let radio_tests = load_radio_tests_for_chip(args.chip)?;
+    let radio_manifest = load_radio_test_manifest(&args.path)?;
+    let radio_tests = if radio_manifest.is_some() {
+        Vec::new()
+    } else {
+        load_radio_tests_for_chip(args.chip)?
+    };
 
     for (elf_name, elf_path) in &elfs {
         let elf_name = elf_name.clone();
@@ -181,6 +194,36 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         }
 
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
+
+        if let Some(entry) = radio_manifest.as_ref().and_then(|m| m.get(&elf_name)) {
+            if entry.support_firmware {
+                log::info!("Skipping support firmware '{}'", elf_name);
+                continue;
+            }
+
+            let harness_path = entry
+                .harness
+                .as_deref()
+                .and_then(|name| resolve_harness_binary_path(&elfs, name));
+
+            if entry.harness.is_some() && harness_path.is_none() {
+                failed.push(elf_name.clone());
+                log::error!(
+                    "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
+                    elf_name,
+                    entry.harness.as_deref().unwrap_or_default(),
+                );
+                continue;
+            }
+
+            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
+                failed.push(elf_name.clone());
+                log::error!("Radio test '{}' failed: {}", elf_name, e);
+            } else {
+                log::info!("'{}' passed", elf_name);
+            }
+            continue;
+        }
 
         if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
             let is_support_firmware = radio_tests.iter().any(|candidate| {
@@ -245,11 +288,46 @@ fn load_radio_tests_for_chip(chip: Chip) -> Result<Vec<Metadata>> {
         return Ok(Vec::new());
     }
 
-    let tests = firmware::load(radio_path)?
+    let mut tests = firmware::load(radio_path)?;
+    for subdir in ["tests", "support"] {
+        let path = radio_path.join(subdir);
+        if path.exists() {
+            tests.extend(firmware::load(&path)?);
+        }
+    }
+
+    let tests = tests
         .into_iter()
         .filter(|test| test.supports_chip(chip))
         .collect();
     Ok(tests)
+}
+
+const RADIO_ELF_MANIFEST_FILENAME: &str = "radio-elfs.json";
+
+#[derive(Debug, Deserialize)]
+struct RadioElfManifestEntry {
+    artifact: String,
+    harness: Option<String>,
+    support_firmware: bool,
+}
+
+fn load_radio_test_manifest(path: &Path) -> Result<Option<HashMap<String, RadioElfManifestEntry>>> {
+    let manifest_path = path.join(RADIO_ELF_MANIFEST_FILENAME);
+    if !manifest_path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let entries: Vec<RadioElfManifestEntry> = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+
+    let by_artifact = entries
+        .into_iter()
+        .map(|entry| (entry.artifact.clone(), entry))
+        .collect::<HashMap<_, _>>();
+    Ok(Some(by_artifact))
 }
 
 fn resolve_harness_binary_path(elfs: &[(String, PathBuf)], harness_name: &str) -> Option<PathBuf> {
