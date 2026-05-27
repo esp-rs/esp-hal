@@ -278,6 +278,9 @@ pub struct Info {
 
     /// SDA input signal.
     pub sda_input: InputSignal,
+
+    /// I2C clock group instance.
+    pub clock_instance: crate::soc::clocks::I2cInstance,
 }
 
 impl Info {
@@ -338,15 +341,6 @@ impl Info {
             w
         });
     }
-
-    pub(super) fn clock_instance(&self) -> crate::soc::clocks::I2cInstance {
-        use crate::soc::clocks::I2cInstance;
-        #[cfg(soc_has_i2c1)]
-        if self.id == 1 {
-            return I2cInstance::I2c1;
-        }
-        I2cInstance::I2c0
-    }
 }
 
 impl PartialEq for Info {
@@ -365,7 +359,7 @@ pub(super) struct I2cClockGuard<'t> {
 impl<'t> I2cClockGuard<'t> {
     pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
         ClockTree::with(|clocks| {
-            let clock = i2c.info().clock_instance();
+            let clock = i2c.info().clock_instance;
             cfg_if::cfg_if! {
                 if #[cfg(i2c_master_version = "3")] {
                     let config = I2cFunctionClockConfig::new(Default::default(), 0);
@@ -385,7 +379,7 @@ impl Drop for I2cClockGuard<'_> {
         ClockTree::with(|clocks| {
             self.i2c
                 .info()
-                .clock_instance()
+                .clock_instance
                 .release_function_clock(clocks);
         });
     }
@@ -1867,6 +1861,18 @@ for_each_i2c_master!(
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
                     sda_input: InputSignal::$sda,
+                    clock_instance: {
+                        cfg_if::cfg_if! {
+                            if #[cfg(soc_has_i2c1)] {
+                                match $id {
+                                    0 => crate::soc::clocks::I2cInstance::I2c0,
+                                    _ => crate::soc::clocks::I2cInstance::I2c1,
+                                }
+                            } else {
+                                crate::soc::clocks::I2cInstance::I2c0
+                            }
+                        }
+                    },
                 };
                 (&PERIPHERAL, &STATE)
             }

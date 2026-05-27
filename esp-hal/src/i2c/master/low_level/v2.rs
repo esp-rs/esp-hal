@@ -8,7 +8,7 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     let timeout = clock_config.timeout;
     let bus_freq = clock_config.frequency.as_hz();
     let sclk = clock_config.clock_source;
-    let clock = driver.info.clock_instance();
+    let clock = driver.info.clock_instance;
 
     ClockTree::with(|clocks| -> Result<(), ConfigError> {
         let source_clk =
