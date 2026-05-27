@@ -1,4 +1,5 @@
 use super::*;
+use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -172,11 +173,11 @@ fn set_filter(
 
 #[expect(clippy::too_many_arguments)]
 #[allow(unused)]
-/// Configures the clock and timing parameters for the I2C peripheral.
+/// Configures the timing parameters for the I2C peripheral.
+///
+/// Clock source selection is handled separately via the clock tree.
 fn configure_clock(
     info: &Info,
-    clock_source: ClockSource,
-    sclk_div: u32,
     scl_low_period: u32,
     scl_high_period: u32,
     scl_wait_high_period: u32,
@@ -189,33 +190,6 @@ fn configure_clock(
     timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
-        cfg_if::cfg_if! {
-            // sclk_sel: 0 = XTAL, 1 = RcFast
-            if #[cfg(all(soc_has_pcr, soc_has_i2c1))] {
-                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
-                    w.i2c_sclk_sel().bit(matches!(clock_source, ClockSource::RcFast));
-                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
-                    w.i2c_sclk_en().set_bit()
-                });
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
-                    w.i2c_sclk_sel().bit(matches!(clock_source, ClockSource::RcFast));
-                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
-                    w.i2c_sclk_en().set_bit()
-                });
-            } else if #[cfg(i2c_master_version = "3")] {
-                info.regs().clk_conf().modify(|_, w| {
-                    w.sclk_sel().bit(matches!(clock_source, ClockSource::RcFast));
-                    w.sclk_div_num().bits((sclk_div - 1) as u8)
-                });
-            } else if #[cfg(i2c_master_version = "2")] {
-                // ref_always_on: 1 = APB, 0 = REF_TICK
-                info.regs().ctr().modify(|_, w| {
-                    w.ref_always_on().bit(!matches!(clock_source, ClockSource::RefTick))
-                });
-            }
-        }
-
         // scl period
         info.regs()
             .scl_low_period()
@@ -364,6 +338,15 @@ impl Info {
             w
         });
     }
+
+    pub(super) fn clock_instance(&self) -> crate::soc::clocks::I2cInstance {
+        use crate::soc::clocks::I2cInstance;
+        #[cfg(soc_has_i2c1)]
+        if self.id == 1 {
+            return I2cInstance::I2c1;
+        }
+        I2cInstance::I2c0
+    }
 }
 
 impl PartialEq for Info {
@@ -373,6 +356,40 @@ impl PartialEq for Info {
 }
 
 unsafe impl Sync for Info {}
+
+#[derive(Debug)]
+pub(super) struct I2cClockGuard<'t> {
+    i2c: AnyI2c<'t>,
+}
+
+impl<'t> I2cClockGuard<'t> {
+    pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
+        ClockTree::with(|clocks| {
+            let clock = i2c.info().clock_instance();
+            cfg_if::cfg_if! {
+                if #[cfg(i2c_master_version = "3")] {
+                    let config = I2cFunctionClockConfig::new(Default::default(), 0);
+                } else {
+                    let config = I2cFunctionClockConfig::new(Default::default());
+                }
+            }
+            clock.configure_function_clock(clocks, config);
+            clock.request_function_clock(clocks);
+        });
+        Self { i2c }
+    }
+}
+
+impl Drop for I2cClockGuard<'_> {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| {
+            self.i2c
+                .info()
+                .clock_instance()
+                .release_function_clock(clocks);
+        });
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Deadline {

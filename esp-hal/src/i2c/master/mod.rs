@@ -148,8 +148,8 @@ use crate::{
 mod eh;
 mod low_level;
 
-use low_level::Driver;
 pub use low_level::{AnyI2c, Instance};
+use low_level::{Driver, I2cClockGuard};
 
 const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
@@ -656,6 +656,7 @@ pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
+    clock_guard: I2cClockGuard<'d>,
     config: DriverConfig,
 }
 
@@ -692,10 +693,14 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
+        let i2c_any = i2c.degrade();
+        let clock_guard = I2cClockGuard::new(unsafe { i2c_any.clone_unchecked() });
+
         let i2c = I2c {
-            i2c: i2c.degrade(),
+            i2c: i2c_any,
             phantom: PhantomData,
             guard,
+            clock_guard,
             config: DriverConfig {
                 config,
                 sda_pin,
@@ -723,6 +728,7 @@ impl<'d> I2c<'d, Blocking> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            clock_guard: self.clock_guard,
             config: self.config,
         }
     }
@@ -815,6 +821,7 @@ impl<'d> I2c<'d, Async> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            clock_guard: self.clock_guard,
             config: self.config,
         }
     }
