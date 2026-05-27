@@ -2885,7 +2885,8 @@ ignored."
 
         guard.defuse();
 
-        Ok(ScanResults::new(self)?.collect::<Vec<_>>())
+        let limit = config.max.unwrap_or(usize::MAX);
+        Ok(ScanResults::new(self)?.take(limit).collect::<Vec<_>>())
     }
 
     #[procmacros::doc_replace]
