@@ -148,7 +148,9 @@ those files are updated automatically at release time from the PR descriptions.
 ### Format
 
 Use `# Changelog` and `# Migration guide` as top-level headings (H1). Under each
-heading, group entries by crate (and optionally by feature area) using H2 headings:
+heading, group entries using H2 headings. Changelog H2 headings may use just the
+crate name (e.g. `## esp-hal`), while migration guide H2 headings _must_ include
+an area (e.g. `## esp-hal/SPI driver`).
 
 ```markdown
 # Changelog
