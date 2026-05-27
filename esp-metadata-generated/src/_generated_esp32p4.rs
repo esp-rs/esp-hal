@@ -274,6 +274,15 @@ macro_rules! property {
     ("sha.dma") => {
         true
     };
+    ("sdm.channel_count") => {
+        8
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(8)
+    };
+    ("sdm.default_clock_source") => {
+        "pll_f80m"
+    };
     ("sleep.light_sleep") => {
         false
     };
@@ -827,6 +836,22 @@ macro_rules! for_each_sha_algorithm {
         "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
         (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
         2)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((4, GPIO_SD4)); _for_each_inner_sdm_channel!((5,
+        GPIO_SD5)); _for_each_inner_sdm_channel!((6, GPIO_SD6));
+        _for_each_inner_sdm_channel!((7, GPIO_SD7));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3), (4, GPIO_SD4), (5, GPIO_SD5), (6, GPIO_SD6), (7,
+        GPIO_SD7)));
     };
 }
 #[macro_export]
@@ -2689,6 +2714,8 @@ macro_rules! implement_peripheral_clocks {
             Emac,
             /// GDMA peripheral clock signal
             Gdma,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// HMAC peripheral clock signal
             Hmac,
             /// I2C0 peripheral clock signal
@@ -2778,6 +2805,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecdsa,
                 Self::Emac,
                 Self::Gdma,
+                Self::GpioSd,
                 Self::Hmac,
                 Self::I2c0,
                 Self::I2c1,
@@ -2865,6 +2893,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    crate::peripherals::GPIO_SD::regs()
+                        .clock_gate()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                    crate::peripherals::GPIO_SD::regs()
+                        .sigmadelta_misc()
+                        .modify(|_, w| w.function_clk_en().bit(enable));
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3113,6 +3149,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en0()
                         .modify(|_, w| w.rst_en_gdma().bit(reset));
+                }
+                Peripheral::GpioSd => {
+                    let _ = reset;
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3616,10 +3655,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
         EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
-        SYSTEM <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
+        GPIO_SD <= GPIO_SD() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
+        HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "RNG peripheral singleton"] RNG <= LP_SYS() (unstable)));
@@ -3758,6 +3798,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO51)); _for_each_inner_peripheral!((GPIO52));
         _for_each_inner_peripheral!((GPIO53)); _for_each_inner_peripheral!((GPIO54));
         _for_each_inner_peripheral!((GPIO(unstable)));
+        _for_each_inner_peripheral!((GPIO_SD(unstable)));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((HP_SYS_CLKRST(unstable)));
@@ -3934,19 +3975,21 @@ macro_rules! for_each_peripheral {
         "GPIO54 peripheral singleton"] GPIO54 <= virtual()), (@ peri_type #[doc =
         "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc =
         "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
-        "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)), (@ peri_type #[doc
-        = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)), (@ peri_type
-        #[doc = "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
-        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= LP_SYS()
-        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
-        INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
-        "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
-        (unstable)), (@ peri_type #[doc = "LP_I2C_ANA_MST peripheral singleton"]
-        LP_I2C_ANA_MST <= LP_I2C_ANA_MST() (unstable)), (@ peri_type #[doc =
-        "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@ peri_type #[doc =
-        "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type #[doc
-        = "LP_AON peripheral singleton"] LP_AON <= LP_SYS() (unstable)), (@ peri_type
-        #[doc = "LP_AON_CLKRST peripheral singleton"] LP_AON_CLKRST <= LP_AON_CLKRST()
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD() (unstable)), (@ peri_type
+        #[doc = "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)), (@
+        peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)),
+        (@ peri_type #[doc = "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <=
+        HP_SYS_CLKRST() (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG
+        <= LP_SYS() (unstable)), (@ peri_type #[doc =
+        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
+        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE1 peripheral singleton"]
+        INTERRUPT_CORE1 <= INTERRUPT_CORE1() (unstable)), (@ peri_type #[doc =
+        "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
+        (unstable)), (@ peri_type #[doc = "CLIC peripheral singleton"] CLIC <= CLIC()
+        (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX <=
+        IO_MUX() (unstable)), (@ peri_type #[doc = "LP_AON peripheral singleton"] LP_AON
+        <= LP_SYS() (unstable)), (@ peri_type #[doc =
+        "LP_AON_CLKRST peripheral singleton"] LP_AON_CLKRST <= LP_AON_CLKRST()
         (unstable)), (@ peri_type #[doc = "LP_SYS peripheral singleton"] LP_SYS <=
         LP_SYS() (unstable)), (@ peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT
         <= LP_WDT() (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR
@@ -4025,9 +4068,9 @@ macro_rules! for_each_peripheral {
         (GPIO27), (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34),
         (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42),
         (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50),
-        (GPIO51), (GPIO52), (GPIO53), (GPIO54), (GPIO(unstable)), (SYSTEM(unstable)),
-        (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (RNG(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (GPIO51), (GPIO52), (GPIO53), (GPIO54), (GPIO(unstable)), (GPIO_SD(unstable)),
+        (SYSTEM(unstable)), (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)),
+        (RNG(unstable)), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
         (LP_I2C_ANA_MST(unstable)), (CLIC(unstable)), (IO_MUX(unstable)),
         (LP_AON(unstable)), (LP_AON_CLKRST(unstable)), (LP_SYS(unstable)),
         (LP_WDT(unstable)), (LPWR(unstable)), (PMU(unstable)), (SYSTIMER(unstable)),
