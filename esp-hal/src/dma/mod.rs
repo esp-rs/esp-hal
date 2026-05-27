@@ -2031,7 +2031,10 @@ pub(crate) mod asynch {
     where
         CH: DmaTxChannel,
     {
-        #[cfg_attr(esp32c2, expect(dead_code))]
+        #[cfg_attr(
+            not(any(i2s_driver_supported, uhci_driver_supported)),
+            expect(dead_code)
+        )]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self {
                 tx,
@@ -2040,7 +2043,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[cfg_attr(any(esp32c2, esp32c61), expect(dead_code))]
+        #[cfg_attr(not(i2s_driver_supported), expect(dead_code))]
         pub fn new_with_config(
             tx: &'a mut ChannelTx<Async, CH>,
             success_interrupts: EnumSet<DmaTxInterrupt>,
@@ -2123,7 +2126,7 @@ pub(crate) mod asynch {
             }
         }
 
-        #[cfg_attr(not(any(i2s_driver_supported)), expect(unused))]
+        #[cfg_attr(not(i2s_driver_supported), expect(unused))]
         pub fn new_with_config(
             rx: &'a mut ChannelRx<Async, CH>,
             success_interrupts: EnumSet<DmaRxInterrupt>,

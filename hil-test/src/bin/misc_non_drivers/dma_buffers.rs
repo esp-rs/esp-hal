@@ -7,13 +7,20 @@ mod tests {
     // using defmt's non-const assert. Doing so would result in a compile error.
     #[allow(unused_imports)]
     use defmt::*;
-
     use esp_hal::{
         dma::{
-            DmaBufError, DmaDescriptor, DmaRxBuffer, DmaRxStreamBuf, DmaRxStreamBufView,
-            DmaTxBuffer, DmaTxStreamBuf, DmaTxStreamBufView, Owner,
+            DmaBufError,
+            DmaDescriptor,
+            DmaRxBuffer,
+            DmaRxStreamBuf,
+            DmaRxStreamBufView,
+            DmaTxBuffer,
+            DmaTxStreamBuf,
+            DmaTxStreamBufView,
+            Owner,
         },
-        dma_rx_stream_buffer, dma_tx_stream_buffer,
+        dma_rx_stream_buffer,
+        dma_tx_stream_buffer,
     };
 
     fn chunk_size(descriptors: &[DmaDescriptor]) -> usize {
@@ -138,10 +145,7 @@ mod tests {
 
         let (_, buffer) = tx_buf.split();
         core::assert_eq!(&buffer[..first.len()], &first);
-        core::assert_eq!(
-            &buffer[first.len()..first.len() + second.len()],
-            &second
-        );
+        core::assert_eq!(&buffer[first.len()..first.len() + second.len()], &second);
     }
 
     #[test]
@@ -182,10 +186,7 @@ mod tests {
             let data = b"hello, dma tx stream";
             let pushed = view.push(data);
             core::assert_eq!(pushed, data.len());
-            core::assert_eq!(
-                view.available_bytes(),
-                BUFFER_SIZE - data.len()
-            );
+            core::assert_eq!(view.available_bytes(), BUFFER_SIZE - data.len());
 
             let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
             let (_, buffer) = buf.split();
