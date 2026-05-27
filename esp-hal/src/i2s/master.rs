@@ -161,12 +161,38 @@ pub enum I2sInterrupt {
 }
 
 /// DMA channel trait for I2S master peripherals.
+#[cfg(i2s_master_supports_dma)]
 #[diagnostic::on_unimplemented(
     message = "The DMA channel cannot be used with this I2S peripheral",
     label = "This DMA channel",
     note = "Use a channel that matches the I2S instance."
 )]
 pub trait I2sMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
+#[cfg(i2s_master_supports_dma)]
+for_each_i2s_master_dma_engine! {
+    ($engine:literal, $any_channel:ident) => {
+        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
+
+        for_each_dma_channel! {
+            ($engine, $ch:ident) => {
+                impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+            };
+        }
+
+        for_each_i2s_master! {
+            ($peri:ident) => {
+                impl I2sMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+
+                for_each_dma_channel_peri_pair! {
+                    ($engine, $ch:ident, $peri) => {
+                        impl I2sMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
+                    };
+                }
+            };
+        }
+    };
+}
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = property!("i2s.mclk_divider_bit_width");
 
@@ -1393,34 +1419,6 @@ impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
 impl Instance for crate::peripherals::I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
-
-// Categories 1, 2, 3a: generated from PDMA channel-peripheral pairs in the metadata.
-for_each_pdma_channel_peri_pair! {
-    ($ch:ident, I2S0) => {
-        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::peripherals::$ch<'_> {}
-        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
-        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
-    };
-    ($ch:ident, I2S1) => {
-        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::peripherals::$ch<'_> {}
-        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
-        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
-    };
-}
-// Category 3b: erased instance + erased channel.
-#[cfg(dma_kind = "pdma")]
-impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
-#[cfg(dma_kind = "gdma")]
-impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyGdmaChannel<'_> {}
-// Category 4: GDMA — generated from metadata.
-for_each_peripheral! {
-    (gdma_dma_eligible I2S0, $name:ident, $id:literal) => {
-        impl I2sMasterDmaChannel<crate::peripherals::I2S0<'_>> for crate::dma::AnyGdmaChannel<'_> {}
-    };
-    (gdma_dma_eligible I2S1, $name:ident, $id:literal) => {
-        impl I2sMasterDmaChannel<crate::peripherals::I2S1<'_>> for crate::dma::AnyGdmaChannel<'_> {}
-    };
-}
 
 mod private {
     use enumset::EnumSet;

@@ -14,18 +14,6 @@ use enumset::EnumSet;
 #[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
-/// DMA channel trait for SPI peripherals.
-///
-/// Implemented for each channel type that can serve a particular SPI instance `S`.
-#[cfg(spi_master_supports_dma)]
-#[instability::unstable]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with this SPI peripheral",
-    label = "This DMA channel",
-    note = "Use a channel that matches the SPI instance."
-)]
-pub trait SpiMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
-
 use super::*;
 use crate::{
     RegisterToggle,
@@ -1792,7 +1780,7 @@ impl DmaDriver {
 
 impl<'d> DmaEligible for AnySpi<'d> {
     #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
+    type Dma = crate::dma::AnyAhbGdmaChannel<'d>;
     #[cfg(dma_kind = "pdma")]
     type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
@@ -1897,32 +1885,39 @@ impl SpiWrapper<'_> {
     }
 }
 
-// Categories 1, 2, 3a: generated from PDMA channel-peripheral pairs in the metadata.
-// Each `(DMA_SPIn, SPIn)` pair produces three impls: concrete×concrete (cat 1),
-// erased-channel×concrete (cat 2), and concrete-channel×erased-instance (cat 3a).
-for_each_pdma_channel_peri_pair! {
-    ($ch:ident, SPI2) => {
-        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::peripherals::$ch<'_> {}
-        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
-        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
-    };
-    ($ch:ident, SPI3) => {
-        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::peripherals::$ch<'_> {}
-        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
-        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
-    };
-}
-// Category 3b: erased instance + erased channel (both sides type-erased, runtime-checked).
-#[cfg(dma_kind = "pdma")]
-impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::AnySpiDmaChannel<'_> {}
-#[cfg(dma_kind = "gdma")]
-impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::AnyGdmaChannel<'_> {}
-// Category 4: GDMA — any channel can serve any SPI instance, generated from metadata.
-for_each_peripheral! {
-    (gdma_dma_eligible SPI2, $name:ident, $id:literal) => {
-        impl SpiMasterDmaChannel<crate::peripherals::SPI2<'_>> for crate::dma::AnyGdmaChannel<'_> {}
-    };
-    (gdma_dma_eligible SPI3, $name:ident, $id:literal) => {
-        impl SpiMasterDmaChannel<crate::peripherals::SPI3<'_>> for crate::dma::AnyGdmaChannel<'_> {}
+/// DMA channel trait for SPI peripherals.
+///
+/// Implemented for each channel type that can serve a particular SPI instance `S`.
+#[cfg(spi_master_supports_dma)]
+#[instability::unstable]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this SPI peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the SPI instance."
+)]
+pub trait SpiMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
+#[cfg(spi_master_supports_dma)]
+for_each_spi_master_dma_engine! {
+    ($engine:literal, $any_channel:ident) => {
+        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::$any_channel<'_> {}
+
+        for_each_dma_channel! {
+            ($engine, $ch:ident) => {
+                impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+            };
+        }
+
+        for_each_spi_master! {
+            ($peri:ident) => {
+                impl SpiMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+
+                for_each_dma_channel_peri_pair! {
+                    ($engine, $ch:ident, $peri) => {
+                        impl SpiMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
+                    };
+                }
+            };
+        }
     };
 }

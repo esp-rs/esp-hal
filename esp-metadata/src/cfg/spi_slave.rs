@@ -19,6 +19,15 @@ pub(crate) struct SpiSlaveInstanceConfig {
 /// slave Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.spi_slave.instances[X]] instance.
 pub(crate) fn generate_spi_slave_peripherals(spi_slave: &SpiSlaveProperties) -> TokenStream {
+    let names = spi_slave
+        .instances
+        .iter()
+        .map(|instance| {
+            let instance = format_ident!("{}", instance.name.to_uppercase());
+            quote! { #instance }
+        })
+        .collect::<Vec<_>>();
+
     let instance_cfgs = spi_slave
         .instances
         .iter()
@@ -41,7 +50,8 @@ pub(crate) fn generate_spi_slave_peripherals(spi_slave: &SpiSlaveProperties) -> 
         })
         .collect::<Vec<_>>();
 
-    let for_each = generate_for_each_macro("spi_slave", &[("all", &instance_cfgs)]);
+    let for_each =
+        generate_for_each_macro("spi_slave", &[("names", &names), ("all", &instance_cfgs)]);
     quote! {
         /// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
         ///

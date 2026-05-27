@@ -4,7 +4,7 @@ use core::{
 };
 
 #[cfg(not(esp32s2))]
-use crate::dma::{AnyGdmaChannel, AnyGdmaRxChannel, AnyGdmaTxChannel, DmaEligible};
+use crate::dma::{AnyAhbGdmaChannel, AnyAhbGdmaRxChannel, AnyAhbGdmaTxChannel, DmaEligible};
 use crate::{
     Async,
     Blocking,
@@ -38,9 +38,9 @@ cfg_if::cfg_if! {
         type Mem2MemRxChannel<'d> = CopyDmaRxChannel<'d>;
         type Mem2MemTxChannel<'d> = CopyDmaTxChannel<'d>;
     } else {
-        type Mem2MemChannel<'d> = AnyGdmaChannel<'d>;
-        type Mem2MemRxChannel<'d> = AnyGdmaRxChannel<'d>;
-        type Mem2MemTxChannel<'d> = AnyGdmaTxChannel<'d>;
+        type Mem2MemChannel<'d> = AnyAhbGdmaChannel<'d>;
+        type Mem2MemRxChannel<'d> = AnyAhbGdmaRxChannel<'d>;
+        type Mem2MemTxChannel<'d> = AnyAhbGdmaTxChannel<'d>;
     }
 }
 

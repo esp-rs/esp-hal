@@ -297,10 +297,6 @@ pub struct PeripheralDef {
     /// If the peripheral is DMA eligible, this defines the peripheral selector value.
     #[serde(default)]
     dma_peripheral: Option<u32>,
-    /// Driver-domain engine family for DMA-eligible peripherals ("spi", "i2s", "aes", …).
-    /// Used by code generation to emit the right per-peripheral DMA channel trait impls.
-    #[serde(default)]
-    dma_engine: Option<String>,
     /// Set to true to hide a peripheral from the Peripherals struct.
     #[serde(default)]
     hidden: bool,
@@ -395,26 +391,6 @@ impl Config {
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );
-        }
-
-        let known_engines: Vec<&str> = self
-            .device
-            .peri_config
-            .dma
-            .as_ref()
-            .map(|dma| dma.engines.0.iter().map(|e| e.name.as_str()).collect())
-            .unwrap_or_default();
-
-        for peri in self.peripherals() {
-            if let Some(engine) = &peri.dma_engine {
-                ensure!(
-                    known_engines.contains(&engine.as_str()),
-                    "Peripheral '{}' has dma_engine = \"{engine}\" but no such engine is defined for '{}' (known: [{}])",
-                    peri.name,
-                    self.device.name,
-                    known_engines.join(", ")
-                );
-            }
         }
 
         Ok(())
@@ -662,7 +638,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
-        let mut dma_peripherals: Vec<(&str, u32, Option<&str>)> = vec![];
+        let mut dma_peripherals: Vec<(String, u32)> = vec![];
 
         let mut stable_peris = vec![];
 
@@ -783,29 +759,24 @@ This pin may be available with certain limitations. Check your hardware to make 
                 }
             }
 
-            if let Some(dma_peripheral) = peri.dma_peripheral {
-                dma_peripherals.push((peri.name.as_str(), dma_peripheral, peri.dma_engine.as_deref()));
+        }
+
+        if let Some(dma) = self.device.peri_config.dma.as_ref() {
+            for engine in dma.engines.0.iter() {
+                for instance in &engine.peripheral_instances {
+                    dma_peripherals.push((instance.name.clone(), instance.dma_id));
+                }
             }
         }
 
-        dma_peripherals.sort_by_key(|(_, dma_peripheral, _)| *dma_peripheral);
-
-        // Determine if this chip uses GDMA (channels with empty compatible_with).
-        let is_gdma = self
-            .device
-            .peri_config
-            .dma
-            .as_ref()
-            .map(|dma| dma.kind == "gdma")
-            .unwrap_or(false);
+        dma_peripherals.sort_by_key(|(_, dma_id)| *dma_id);
 
         let mut dma_eligible = vec![];
-        let mut gdma_dma_eligible = vec![];
-        for (name, dma_peripheral, engine) in dma_peripherals {
+        for (name, dma_id) in dma_peripherals {
             use convert_case::{Boundary, Case, Casing, pattern};
 
             let peri = format_ident!("{}", name);
-            let dma_peripheral_num = number(dma_peripheral);
+            let dma_id_num = number(dma_id);
             let variant_name = format_ident!(
                 "{}",
                 name.from_case(Case::Custom {
@@ -815,13 +786,7 @@ This pin may be available with certain limitations. Check your hardware to make 
                 })
                 .to_case(Case::Pascal)
             );
-            let engine_str = engine.unwrap_or("");
-            dma_eligible.push(quote! { #peri, #variant_name, #dma_peripheral_num, #engine_str });
-
-            if is_gdma {
-                gdma_dma_eligible
-                    .push(quote! { #peri, #variant_name, #dma_peripheral_num });
-            }
+            dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num });
         }
 
         generate_for_each_macro(
@@ -830,7 +795,6 @@ This pin may be available with certain limitations. Check your hardware to make 
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
                 ("dma_eligible", &dma_eligible),
-                ("gdma_dma_eligible", &gdma_dma_eligible),
             ],
         )
     }

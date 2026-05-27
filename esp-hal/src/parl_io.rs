@@ -2129,7 +2129,7 @@ impl Drop for ParlIoRxGuard {
 }
 
 for_each_peripheral! {
-    (gdma_dma_eligible PARL_IO, $name:ident, $id:literal) => {
-        impl ParlIoDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
+    (dma_eligible PARL_IO, $name:ident, $id:literal, "AHB_GDMA") => {
+        impl ParlIoDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
     };
 }

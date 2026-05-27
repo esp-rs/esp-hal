@@ -156,7 +156,7 @@ crate::any_peripheral! {
 
 impl<'d> DmaEligible for AnyUhci<'d> {
     #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
+    type Dma = crate::dma::AnyAhbGdmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
@@ -820,7 +820,7 @@ where
 }
 
 for_each_peripheral! {
-    (gdma_dma_eligible UHCI0, $name:ident, $id:literal) => {
-        impl UhciDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
+    (dma_eligible UHCI0, $name:ident, $id:literal, "AHB_GDMA") => {
+        impl UhciDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
     };
 }

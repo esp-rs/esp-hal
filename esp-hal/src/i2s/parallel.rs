@@ -122,14 +122,6 @@ use crate::{
     time::Rate,
 };
 
-/// DMA channel trait for I2S peripherals.
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with this I2S peripheral",
-    label = "This DMA channel",
-    note = "Use a channel that matches the I2S instance."
-)]
-pub trait I2sParallelDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
-
 #[doc(hidden)]
 pub trait TxPins<'d> {
     fn bus_width(&self) -> u8;
@@ -790,19 +782,36 @@ impl Instance for I2S0<'_> {}
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
-// Categories 1, 2, 3a: parallel I2S exists only on ESP32 (PDMA), so only
-// for_each_pdma_channel_peri_pair! is needed (no GDMA category 4).
-for_each_pdma_channel_peri_pair! {
-    ($ch:ident, I2S0) => {
-        impl I2sParallelDmaChannel<I2S0<'_>> for crate::peripherals::$ch<'_> {}
-        impl I2sParallelDmaChannel<I2S0<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
-        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
-    };
-    ($ch:ident, I2S1) => {
-        impl I2sParallelDmaChannel<I2S1<'_>> for crate::peripherals::$ch<'_> {}
-        impl I2sParallelDmaChannel<I2S1<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
-        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+/// DMA channel trait for I2S peripherals.
+#[cfg(i2s_parallel_supports_dma)]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this I2S peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the I2S instance."
+)]
+pub trait I2sParallelDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+
+#[cfg(i2s_parallel_supports_dma)]
+for_each_i2s_parallel_dma_engine! {
+    ($engine:literal, $any_channel:ident) => {
+        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
+
+        for_each_dma_channel! {
+            ($engine, $ch:ident) => {
+                impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+            };
+        }
+
+        for_each_i2s_parallel! {
+            ($peri:ident) => {
+                impl I2sParallelDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+
+                for_each_dma_channel_peri_pair! {
+                    ($engine, $ch:ident, $peri) => {
+                        impl I2sParallelDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
+                    };
+                }
+            };
+        }
     };
 }
-// Category 3b: erased instance + erased PDMA channel.
-impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}

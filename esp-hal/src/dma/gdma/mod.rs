@@ -51,28 +51,32 @@ pub(crate) struct ChannelInfo {
 }
 
 /// An arbitrary GDMA channel
-pub struct AnyGdmaChannel<'d> {
+pub struct AnyAhbGdmaChannel<'d> {
     info: &'static ChannelInfo,
     state: &'static ChannelState,
     _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl core::fmt::Debug for AnyGdmaChannel<'_> {
+impl core::fmt::Debug for AnyAhbGdmaChannel<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AnyGdmaChannel")
+        f.debug_struct("AnyAhbGdmaChannel")
             .field("channel", &self.info.channel)
             .finish()
     }
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for AnyGdmaChannel<'_> {
+impl defmt::Format for AnyAhbGdmaChannel<'_> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "AnyGdmaChannel {{ channel: {} }}", self.info.channel)
+        defmt::write!(
+            fmt,
+            "AnyAhbGdmaChannel {{ channel: {} }}",
+            self.info.channel
+        )
     }
 }
 
-impl AnyGdmaChannel<'_> {
+impl AnyAhbGdmaChannel<'_> {
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             info: self.info,
@@ -82,11 +86,11 @@ impl AnyGdmaChannel<'_> {
     }
 }
 
-impl crate::private::Sealed for AnyGdmaChannel<'_> {}
-impl<'d> DmaChannel for AnyGdmaChannel<'d> {
-    type Rx = AnyGdmaRxChannel<'d>;
-    type Tx = AnyGdmaTxChannel<'d>;
-    type Erased = AnyGdmaChannel<'d>;
+impl crate::private::Sealed for AnyAhbGdmaChannel<'_> {}
+impl<'d> DmaChannel for AnyAhbGdmaChannel<'d> {
+    type Rx = AnyAhbGdmaRxChannel<'d>;
+    type Tx = AnyAhbGdmaTxChannel<'d>;
+    type Erased = AnyAhbGdmaChannel<'d>;
 
     fn into_erased(self) -> Self::Erased {
         self
@@ -94,8 +98,8 @@ impl<'d> DmaChannel for AnyGdmaChannel<'d> {
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
-            AnyGdmaRxChannel(unsafe { self.clone_unchecked() }),
-            AnyGdmaTxChannel(self),
+            AnyAhbGdmaRxChannel(unsafe { self.clone_unchecked() }),
+            AnyAhbGdmaTxChannel(self),
         )
     }
 }
@@ -103,10 +107,10 @@ impl<'d> DmaChannel for AnyGdmaChannel<'d> {
 /// An arbitrary GDMA RX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaRxChannel<'d>(AnyGdmaChannel<'d>);
+pub struct AnyAhbGdmaRxChannel<'d>(AnyAhbGdmaChannel<'d>);
 
-impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
-    fn degrade(self) -> AnyGdmaRxChannel<'d> {
+impl<'d> DmaChannelConvert<AnyAhbGdmaRxChannel<'d>> for AnyAhbGdmaRxChannel<'d> {
+    fn degrade(self) -> AnyAhbGdmaRxChannel<'d> {
         self
     }
 }
@@ -114,26 +118,26 @@ impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
 /// An arbitrary GDMA TX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaTxChannel<'d>(AnyGdmaChannel<'d>);
+pub struct AnyAhbGdmaTxChannel<'d>(AnyAhbGdmaChannel<'d>);
 
-impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for AnyGdmaTxChannel<'d> {
-    fn degrade(self) -> AnyGdmaTxChannel<'d> {
+impl<'d> DmaChannelConvert<AnyAhbGdmaTxChannel<'d>> for AnyAhbGdmaTxChannel<'d> {
+    fn degrade(self) -> AnyAhbGdmaTxChannel<'d> {
         self
     }
 }
 
-impl crate::private::Sealed for AnyGdmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for AnyGdmaTxChannel<'d> {
-    type Erased = AnyGdmaTxChannel<'d>;
+impl crate::private::Sealed for AnyAhbGdmaTxChannel<'_> {}
+impl<'d> DmaTxChannel for AnyAhbGdmaTxChannel<'d> {
+    type Erased = AnyAhbGdmaTxChannel<'d>;
 
     fn into_erased(self) -> Self::Erased {
         self
     }
 }
 
-impl crate::private::Sealed for AnyGdmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for AnyGdmaRxChannel<'d> {
-    type Erased = AnyGdmaRxChannel<'d>;
+impl crate::private::Sealed for AnyAhbGdmaRxChannel<'_> {}
+impl<'d> DmaRxChannel for AnyAhbGdmaRxChannel<'d> {
+    type Erased = AnyAhbGdmaRxChannel<'d>;
 
     fn into_erased(self) -> Self::Erased {
         self
@@ -172,16 +176,16 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaChannel<'d> {
-                AnyGdmaChannel {
+        impl<'d> DmaChannelConvert<AnyAhbGdmaChannel<'d>> for $ch<'d> {
+            fn degrade(self) -> AnyAhbGdmaChannel<'d> {
+                AnyAhbGdmaChannel {
                     info: Self::info(),
                     state: Self::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
         }
-        crate::dma::impl_channel_common!(AnyGdma, $ch);
+        crate::dma::impl_channel_common!(AnyAhbGdma, $ch);
     };
 
     // Split interrupts: separate handlers for the in and out paths.
@@ -218,16 +222,16 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaChannel<'d> {
-                AnyGdmaChannel {
+        impl<'d> DmaChannelConvert<AnyAhbGdmaChannel<'d>> for $ch<'d> {
+            fn degrade(self) -> AnyAhbGdmaChannel<'d> {
+                AnyAhbGdmaChannel {
                     info: Self::info(),
                     state: Self::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
         }
-        crate::dma::impl_channel_common!(AnyGdma, $ch);
+        crate::dma::impl_channel_common!(AnyAhbGdma, $ch);
     };
 }
 
@@ -255,7 +259,7 @@ for_each_peripheral! {
         }
 
         crate::dma::impl_dma_eligible! {
-            AnyGdmaChannel {
+            AnyAhbGdmaChannel {
                 $($peri => $name,)*
             }
         }

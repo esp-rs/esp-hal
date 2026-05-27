@@ -156,10 +156,10 @@ impl<'d> Aes<'d> {
     pub fn new(aes: AES<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        #[cfg_attr(not(aes_dma), expect(unused_mut))]
+        #[cfg_attr(not(aes_supports_dma), expect(unused_mut))]
         let mut this = Self { aes, _guard: guard };
 
-        #[cfg(aes_dma)]
+        #[cfg(aes_supports_dma)]
         this.write_dma(false);
 
         this
@@ -242,7 +242,7 @@ impl<'d> Aes<'d> {
         self.regs().mode().write(|w| unsafe { w.bits(mode as _) });
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     fn write_dma(&mut self, enable_dma: bool) {
         self.regs()
             .dma_enable()
@@ -333,23 +333,13 @@ pub enum Endianness {
     LittleEndian = 0,
 }
 
-/// DMA channel trait for the AES peripheral.
-///
-/// Implemented for every channel type capable of serving AES.
-#[cfg(aes_dma)]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with the AES peripheral",
-    label = "This DMA channel"
-)]
-pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
-
 /// Provides DMA (Direct Memory Access) support for AES operations.
 ///
 /// This module enhances the AES capabilities by utilizing DMA to handle data
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
 /// CTR, CFB8, and CFB128.
-#[cfg(aes_dma)]
+#[cfg(aes_supports_dma)]
 pub mod dma {
     use core::{mem::ManuallyDrop, ptr::NonNull};
 
@@ -1669,21 +1659,32 @@ fn read_words(slice: &[u8]) -> impl Iterator<Item = u32> {
     bytes::<4>(slice).map(u32::from_le_bytes)
 }
 
-// AesDmaChannel: PDMA pair from metadata; GDMA uses AnyGdmaChannel.
-for_each_pdma_channel_peri_pair! {
-    ($ch:ident, AES) => {
-        impl AesDmaChannel for crate::peripherals::$ch<'_> {}
-    };
-}
-for_each_peripheral! {
-    (gdma_dma_eligible AES, $name:ident, $id:literal) => {
-        impl AesDmaChannel for crate::dma::AnyGdmaChannel<'_> {}
-    };
-}
-
 fn write_words(slice: &mut [u8], next: impl Fn(usize) -> u32) {
     for (i, chunk) in slice.chunks_mut(4).enumerate() {
         let bytes = next(i).to_le_bytes();
         chunk.copy_from_slice(&bytes[0..chunk.len()]);
     }
+}
+
+/// DMA channel trait for the AES peripheral.
+///
+/// Implemented for every channel type capable of serving AES.
+#[cfg(aes_supports_dma)]
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with the AES peripheral",
+    label = "This DMA channel"
+)]
+pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+
+#[cfg(aes_supports_dma)]
+for_each_aes_dma_engine! {
+    ($engine:literal, $any_channel:ident) => {
+        impl AesDmaChannel for crate::dma::$any_channel<'_> {}
+
+        for_each_dma_channel_peri_pair! {
+            ($engine, $ch:ident, AES) => {
+                impl AesDmaChannel for crate::peripherals::$ch<'_> {}
+            };
+        }
+    };
 }

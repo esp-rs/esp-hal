@@ -13,7 +13,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl AnyGdmaTxChannel<'_> {
+impl AnyAhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -25,7 +25,7 @@ impl AnyGdmaTxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyGdmaTxChannel<'_> {
+impl RegisterAccess for AnyAhbGdmaTxChannel<'_> {
     fn reset(&self) {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
@@ -91,7 +91,7 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
     }
 }
 
-impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
+impl TxRegisterAccess for AnyAhbGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         self.ch()
             .outfifo_status()
@@ -123,7 +123,7 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for AnyAhbGdmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -203,7 +203,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     fn set_async(&self, _is_async: bool) {}
 }
 
-impl AnyGdmaRxChannel<'_> {
+impl AnyAhbGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -215,7 +215,7 @@ impl AnyGdmaRxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyGdmaRxChannel<'_> {
+impl RegisterAccess for AnyAhbGdmaRxChannel<'_> {
     fn reset(&self) {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
@@ -279,7 +279,7 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
     }
 }
 
-impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
+impl RxRegisterAccess for AnyAhbGdmaRxChannel<'_> {
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()
@@ -295,7 +295,7 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for AnyAhbGdmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {

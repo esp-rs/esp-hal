@@ -1,4 +1,7 @@
-use quote::quote;
+use std::collections::BTreeMap;
+
+use convert_case::{Case, Casing};
+use quote::{format_ident, quote};
 
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
@@ -32,12 +35,27 @@ pub struct DmaChannelDef {
     pub interrupt_out: Option<String>,
 }
 
+/// A peripheral instance that can use a DMA engine.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct DmaPeripheralInstance {
+    /// The peripheral singleton name (e.g. `"SPI2"`, `"AES"`).
+    pub name: String,
+    /// The DMA peripheral selector ID (the old `dma_peripheral` value).
+    pub dma_id: u32,
+}
+
 /// A single DMA engine with its channels.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct DmaEngineDef {
-    /// The name of the engine (e.g. `"GDMA"`, `"SPI2"`, `"I2S0"`).
-    #[expect(unused)]
+    /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
+    /// Driver config names whose peripherals can use this engine
+    /// (e.g. `"aes"`, `"sha"`, `"spi_master"`, `"spi_slave"`, `"rmt"`).
+    #[serde(default)]
+    pub drivers: Vec<String>,
+    /// DMA-capable peripheral instances for this engine, with their selector IDs.
+    #[serde(default)]
+    pub peripheral_instances: Vec<DmaPeripheralInstance>,
     /// The channels belonging to this engine.
     pub channels: Vec<DmaChannelDef>,
 }
@@ -49,41 +67,69 @@ pub struct DmaEngines(pub Vec<DmaEngineDef>);
 
 impl GenericProperty for DmaEngines {
     fn cfgs(&self) -> Option<Vec<String>> {
-        let cfgs = self
+        let mut cfgs: Vec<String> = self
             .0
             .iter()
             .flat_map(|e| e.channels.iter())
             .map(|ch| format!("soc_has_{}", ch.name.to_lowercase()))
             .collect();
+
+        // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
+        let mut seen = std::collections::HashSet::new();
+        for engine in &self.0 {
+            for driver in &engine.drivers {
+                if seen.insert(driver.clone()) {
+                    cfgs.push(format!("{}.supports_dma", driver));
+                }
+            }
+        }
+
         Some(cfgs)
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let mut shared = vec![];
         let mut split = vec![];
-        // One entry per (channel, peripheral) pair from PDMA `compatible_with` lists.
-        // Empty on GDMA chips (all channels have empty `compatible_with`).
-        let mut pdma_pairs = vec![];
+        let mut names = vec![];
+        // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
+        // If the list is empty (GDMA), this contains nothing.
+        let mut dma_pairs = vec![];
+        // Accumulates engine name tokens per driver, in engine declaration order.
+        let mut driver_engines: BTreeMap<String, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
         for engine in self.0.iter() {
+            let engine_name = engine.name.as_str();
+
+            for driver in &engine.drivers {
+                // Convention
+                let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
+                let any_channel = format_ident!("Any{channel}Channel");
+                driver_engines
+                    .entry(driver.clone())
+                    .or_default()
+                    .push(quote! { #engine_name, #any_channel });
+            }
+
             for (idx, channel) in engine.channels.iter().enumerate() {
                 let idx = number(idx);
+                let ch = quote::format_ident!("{}", channel.name);
+
+                names.push(quote! { #engine_name, #ch });
+
                 match (
                     &channel.interrupt,
                     &channel.interrupt_in,
                     &channel.interrupt_out,
                 ) {
                     (Some(interrupt), None, None) => {
-                        let ch = quote::format_ident!("{}", channel.name);
                         let interrupt = quote::format_ident!("{}", interrupt);
-                        shared.push(quote! { #ch, #idx, interrupt = #interrupt });
+                        shared.push(quote! { #engine_name, #ch, #idx, interrupt = #interrupt });
                     }
                     (None, Some(interrupt_in), Some(interrupt_out)) => {
-                        let ch = quote::format_ident!("{}", channel.name);
                         let interrupt_in = quote::format_ident!("{}", interrupt_in);
                         let interrupt_out = quote::format_ident!("{}", interrupt_out);
                         split.push(
-                            quote! { #ch, #idx, interrupt_in = #interrupt_in, interrupt_out = #interrupt_out },
+                            quote! { #engine_name, #ch, #idx, interrupt_in = #interrupt_in, interrupt_out = #interrupt_out },
                         );
                     }
                     (None, None, None) => {
@@ -98,10 +144,19 @@ impl GenericProperty for DmaEngines {
                     }
                 }
 
-                for peri_name in &channel.compatible_with {
+                let compatible_peris = if channel.compatible_with.is_empty() {
+                    engine
+                        .peripheral_instances
+                        .iter()
+                        .map(|p| p.name.clone())
+                        .collect::<Vec<_>>()
+                } else {
+                    channel.compatible_with.clone()
+                };
+                for peri_name in compatible_peris {
                     let ch_ident = quote::format_ident!("{}", channel.name);
                     let peri_ident = quote::format_ident!("{}", peri_name);
-                    pdma_pairs.push(quote! { #ch_ident, #peri_ident });
+                    dma_pairs.push(quote! { #engine_name, #ch_ident, #peri_ident });
                 }
             }
         }
@@ -109,22 +164,29 @@ impl GenericProperty for DmaEngines {
         let dma_channel_macro = if !shared.is_empty() || !split.is_empty() {
             Some(generate_for_each_macro(
                 "dma_channel",
-                &[("shared", &shared), ("split", &split)],
+                &[("names", &names), ("shared", &shared), ("split", &split)],
             ))
         } else {
             None
         };
 
-        // Always emit for_each_pdma_channel_peri_pair! so drivers can call it
+        // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.
-        let pdma_pairs_macro = generate_for_each_macro(
-            "pdma_channel_peri_pair",
-            &[("all", &pdma_pairs)],
-        );
+        let dma_pairs_macro =
+            generate_for_each_macro("dma_channel_peri_pair", &[("all", &dma_pairs)]);
+
+        // One for_each_{driver}_dma_engine! macro per driver that has DMA support.
+        let driver_engine_macros: Vec<_> = driver_engines
+            .iter()
+            .map(|(driver, engines)| {
+                generate_for_each_macro(&format!("{}_dma_engine", driver), &[("all", engines)])
+            })
+            .collect();
 
         Some(quote::quote! {
             #dma_channel_macro
-            #pdma_pairs_macro
+            #dma_pairs_macro
+            #(#driver_engine_macros)*
         })
     }
 }

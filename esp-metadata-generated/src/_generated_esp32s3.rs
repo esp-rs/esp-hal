@@ -52,9 +52,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
     };
-    ("aes.dma") => {
-        true
-    };
     ("aes.has_split_text_registers") => {
         true
     };
@@ -307,9 +304,6 @@ macro_rules! property {
     ("rmt.has_rx_demodulation") => {
         true
     };
-    ("rmt.has_dma") => {
-        true
-    };
     ("rmt.has_per_channel_clock") => {
         false
     };
@@ -342,9 +336,6 @@ macro_rules! property {
     };
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
-    };
-    ("sha.dma") => {
-        true
     };
     ("sleep.light_sleep") => {
         true
@@ -400,9 +391,6 @@ macro_rules! property {
     ("spi_master.bit_order_is_bool") => {
         false
     };
-    ("spi_master.supports_dma") => {
-        true
-    };
     ("spi_master.has_octal") => {
         true
     };
@@ -417,9 +405,6 @@ macro_rules! property {
     };
     ("spi_master.dma_can_access_flash") => {
         false
-    };
-    ("spi_slave.supports_dma") => {
-        true
     };
     ("timergroup.timg_has_timer1") => {
         true
@@ -524,28 +509,151 @@ macro_rules! for_each_dedicated_gpio {
 macro_rules! for_each_dma_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_dma_channel!((DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
-        interrupt_out = DMA_OUT_CH0)); _for_each_inner_dma_channel!((DMA_CH1, 1,
-        interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1));
-        _for_each_inner_dma_channel!((DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
-        interrupt_out = DMA_OUT_CH2)); _for_each_inner_dma_channel!((DMA_CH3, 3,
-        interrupt_in = DMA_IN_CH3, interrupt_out = DMA_OUT_CH3));
-        _for_each_inner_dma_channel!((DMA_CH4, 4, interrupt_in = DMA_IN_CH4,
-        interrupt_out = DMA_OUT_CH4)); _for_each_inner_dma_channel!((shared));
-        _for_each_inner_dma_channel!((split(DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
-        interrupt_out = DMA_OUT_CH0), (DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
-        interrupt_out = DMA_OUT_CH1), (DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
-        interrupt_out = DMA_OUT_CH2), (DMA_CH3, 3, interrupt_in = DMA_IN_CH3,
-        interrupt_out = DMA_OUT_CH3), (DMA_CH4, 4, interrupt_in = DMA_IN_CH4,
-        interrupt_out = DMA_OUT_CH4)));
+        => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
+        interrupt_out = DMA_OUT_CH0)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1,
+        1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
+        interrupt_out = DMA_OUT_CH2)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3,
+        3, interrupt_in = DMA_IN_CH3, interrupt_out = DMA_OUT_CH3));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, 4, interrupt_in = DMA_IN_CH4,
+        interrupt_out = DMA_OUT_CH4)); _for_each_inner_dma_channel!((names("AHB_GDMA",
+        DMA_CH0), ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3),
+        ("AHB_GDMA", DMA_CH4))); _for_each_inner_dma_channel!((shared));
+        _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
+        DMA_IN_CH0, interrupt_out = DMA_OUT_CH0), ("AHB_GDMA", DMA_CH1, 1, interrupt_in =
+        DMA_IN_CH1, interrupt_out = DMA_OUT_CH1), ("AHB_GDMA", DMA_CH2, 2, interrupt_in =
+        DMA_IN_CH2, interrupt_out = DMA_OUT_CH2), ("AHB_GDMA", DMA_CH3, 3, interrupt_in =
+        DMA_IN_CH3, interrupt_out = DMA_OUT_CH3), ("AHB_GDMA", DMA_CH4, 4, interrupt_in =
+        DMA_IN_CH4, interrupt_out = DMA_OUT_CH4)));
     };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_pdma_channel_peri_pair {
+macro_rules! for_each_dma_channel_peri_pair {
     ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_pdma_channel_peri_pair { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_pdma_channel_peri_pair!((all));
+        macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        DMA_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
+        SPI3)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, RMT));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, RMT));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, RMT));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, RMT));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, RMT));
+        _for_each_inner_dma_channel_peri_pair!((all("AHB_GDMA", DMA_CH0, SPI2),
+        ("AHB_GDMA", DMA_CH0, SPI3), ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA", DMA_CH0,
+        I2S0), ("AHB_GDMA", DMA_CH0, I2S1), ("AHB_GDMA", DMA_CH0, LCD_CAM), ("AHB_GDMA",
+        DMA_CH0, AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0, APB_SARADC),
+        ("AHB_GDMA", DMA_CH0, RMT), ("AHB_GDMA", DMA_CH1, SPI2), ("AHB_GDMA", DMA_CH1,
+        SPI3), ("AHB_GDMA", DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0), ("AHB_GDMA",
+        DMA_CH1, I2S1), ("AHB_GDMA", DMA_CH1, LCD_CAM), ("AHB_GDMA", DMA_CH1, AES),
+        ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH1, APB_SARADC), ("AHB_GDMA",
+        DMA_CH1, RMT), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2, SPI3),
+        ("AHB_GDMA", DMA_CH2, UHCI0), ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2,
+        I2S1), ("AHB_GDMA", DMA_CH2, LCD_CAM), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA",
+        DMA_CH2, SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC), ("AHB_GDMA", DMA_CH2, RMT),
+        ("AHB_GDMA", DMA_CH3, SPI2), ("AHB_GDMA", DMA_CH3, SPI3), ("AHB_GDMA", DMA_CH3,
+        UHCI0), ("AHB_GDMA", DMA_CH3, I2S0), ("AHB_GDMA", DMA_CH3, I2S1), ("AHB_GDMA",
+        DMA_CH3, LCD_CAM), ("AHB_GDMA", DMA_CH3, AES), ("AHB_GDMA", DMA_CH3, SHA),
+        ("AHB_GDMA", DMA_CH3, APB_SARADC), ("AHB_GDMA", DMA_CH3, RMT), ("AHB_GDMA",
+        DMA_CH4, SPI2), ("AHB_GDMA", DMA_CH4, SPI3), ("AHB_GDMA", DMA_CH4, UHCI0),
+        ("AHB_GDMA", DMA_CH4, I2S0), ("AHB_GDMA", DMA_CH4, I2S1), ("AHB_GDMA", DMA_CH4,
+        LCD_CAM), ("AHB_GDMA", DMA_CH4, AES), ("AHB_GDMA", DMA_CH4, SHA), ("AHB_GDMA",
+        DMA_CH4, APB_SARADC), ("AHB_GDMA", DMA_CH4, RMT)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_aes_dma_engine { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_aes_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        _for_each_inner_aes_dma_engine!((all("AHB_GDMA", AnyAhbGdmaChannel)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_dma_engine { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_rmt_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        _for_each_inner_rmt_dma_engine!((all("AHB_GDMA", AnyAhbGdmaChannel)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_dma_engine { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        _for_each_inner_sha_dma_engine!((all("AHB_GDMA", AnyAhbGdmaChannel)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_master_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_master_dma_engine { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_spi_master_dma_engine!(("AHB_GDMA",
+        AnyAhbGdmaChannel)); _for_each_inner_spi_master_dma_engine!((all("AHB_GDMA",
+        AnyAhbGdmaChannel)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_slave_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_slave_dma_engine { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_spi_slave_dma_engine!(("AHB_GDMA",
+        AnyAhbGdmaChannel)); _for_each_inner_spi_slave_dma_engine!((all("AHB_GDMA",
+        AnyAhbGdmaChannel)));
     };
 }
 #[macro_export]
@@ -3870,14 +3978,16 @@ macro_rules! for_each_uart {
 macro_rules! for_each_spi_master {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_spi_master { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_spi_master!((SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1,
-        FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4,
-        FSPIIO5, FSPIIO6, FSPIIO7], true)); _for_each_inner_spi_master!((SPI3, Spi3,
+        => {} } _for_each_inner_spi_master!((SPI2)); _for_each_inner_spi_master!((SPI3));
+        _for_each_inner_spi_master!((SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1, FSPICS2,
+        FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4, FSPIIO5,
+        FSPIIO6, FSPIIO7], true)); _for_each_inner_spi_master!((SPI3, Spi3,
         SPI3_CLK[SPI3_CS0, SPI3_CS1, SPI3_CS2] [SPI3_D, SPI3_Q, SPI3_WP, SPI3_HD],
-        true)); _for_each_inner_spi_master!((all(SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1,
-        FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4,
-        FSPIIO5, FSPIIO6, FSPIIO7], true), (SPI3, Spi3, SPI3_CLK[SPI3_CS0, SPI3_CS1,
-        SPI3_CS2] [SPI3_D, SPI3_Q, SPI3_WP, SPI3_HD], true)));
+        true)); _for_each_inner_spi_master!((names(SPI2), (SPI3)));
+        _for_each_inner_spi_master!((all(SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1, FSPICS2,
+        FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4, FSPIIO5,
+        FSPIIO6, FSPIIO7], true), (SPI3, Spi3, SPI3_CLK[SPI3_CS0, SPI3_CS1, SPI3_CS2]
+        [SPI3_D, SPI3_Q, SPI3_WP, SPI3_HD], true)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
@@ -3901,8 +4011,10 @@ macro_rules! for_each_spi_master {
 macro_rules! for_each_spi_slave {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_spi_slave { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_spi_slave!((SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0));
+        => {} } _for_each_inner_spi_slave!((SPI2)); _for_each_inner_spi_slave!((SPI3));
+        _for_each_inner_spi_slave!((SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0));
         _for_each_inner_spi_slave!((SPI3, Spi3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0));
+        _for_each_inner_spi_slave!((names(SPI2), (SPI3)));
         _for_each_inner_spi_slave!((all(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0),
         (SPI3, Spi3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0)));
     };
@@ -4342,18 +4454,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((ULP_RISCV_CORE(unstable)));
-        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2, 0,
-        "AHB_GDMA")); _for_each_inner_peripheral!((SPI3, Spi3, 1, "AHB_GDMA"));
-        _for_each_inner_peripheral!((UHCI0, Uhci0, 2, "AHB_GDMA"));
-        _for_each_inner_peripheral!((I2S0, I2s0, 3, "AHB_GDMA"));
-        _for_each_inner_peripheral!((I2S1, I2s1, 4, "AHB_GDMA"));
-        _for_each_inner_peripheral!((LCD_CAM, LcdCam, 5, "AHB_GDMA"));
-        _for_each_inner_peripheral!((AES, Aes, 6, "AHB_GDMA"));
-        _for_each_inner_peripheral!((SHA, Sha, 7, "AHB_GDMA"));
-        _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8, "AHB_GDMA"));
-        _for_each_inner_peripheral!((RMT, Rmt, 9, "AHB_GDMA"));
-        _for_each_inner_peripheral!((SPI2, Spi2, 0)); _for_each_inner_peripheral!((SPI3,
-        Spi3, 1)); _for_each_inner_peripheral!((UHCI0, Uhci0, 2));
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2,
+        0)); _for_each_inner_peripheral!((SPI3, Spi3, 1));
+        _for_each_inner_peripheral!((UHCI0, Uhci0, 2));
         _for_each_inner_peripheral!((I2S0, I2s0, 3)); _for_each_inner_peripheral!((I2S1,
         I2s1, 4)); _for_each_inner_peripheral!((LCD_CAM, LcdCam, 5));
         _for_each_inner_peripheral!((AES, Aes, 6)); _for_each_inner_peripheral!((SHA,
@@ -4666,14 +4769,9 @@ macro_rules! for_each_peripheral {
         (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)), (WIFI)));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, "AHB_GDMA"), (SPI3,
-        Spi3, 1, "AHB_GDMA"), (UHCI0, Uhci0, 2, "AHB_GDMA"), (I2S0, I2s0, 3, "AHB_GDMA"),
-        (I2S1, I2s1, 4, "AHB_GDMA"), (LCD_CAM, LcdCam, 5, "AHB_GDMA"), (AES, Aes, 6,
-        "AHB_GDMA"), (SHA, Sha, 7, "AHB_GDMA"), (APB_SARADC, ApbSaradc, 8, "AHB_GDMA"),
-        (RMT, Rmt, 9, "AHB_GDMA"))); _for_each_inner_peripheral!((gdma_dma_eligible(SPI2,
-        Spi2, 0), (SPI3, Spi3, 1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (I2S1, I2s1, 4),
-        (LCD_CAM, LcdCam, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8),
-        (RMT, Rmt, 9)));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (SPI3, Spi3, 1),
+        (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (I2S1, I2s1, 4), (LCD_CAM, LcdCam, 5), (AES,
+        Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (RMT, Rmt, 9)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
