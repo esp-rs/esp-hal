@@ -16,21 +16,7 @@ use portable_atomic::AtomicBool;
 use crate::{
     DriverMode,
     asynch::AtomicWaker,
-    dma::{
-        Channel,
-        DmaChannel,
-        DmaChannelConvert,
-        DmaChannelExt,
-        DmaEligible,
-        DmaPeripheral,
-        DmaRxInterrupt,
-        DmaTxInterrupt,
-        InterruptAccess,
-        InterruptHandler,
-        RegisterAccess,
-    },
-    handler,
-    interrupt::Priority,
+    dma::{Channel, DmaChannel, DmaEligible, DmaPeripheral, InterruptHandler, RegisterAccess},
     peripherals::Interrupt,
 };
 
@@ -45,31 +31,37 @@ mod spi;
 pub use copy::{CopyDmaRxChannel, CopyDmaTxChannel};
 #[cfg(soc_has_dma_crypto)]
 pub use crypto::{CryptoDmaRxChannel, CryptoDmaTxChannel};
-use i2s::I2sRegisterBlock;
 pub use i2s::{AnyI2sDmaChannel, AnyI2sDmaRxChannel, AnyI2sDmaTxChannel};
-use spi::SpiRegisterBlock;
 pub use spi::{AnySpiDmaChannel, AnySpiDmaRxChannel, AnySpiDmaTxChannel};
 
+/// Immutable per-channel metadata.
 #[doc(hidden)]
-pub trait PdmaChannel: crate::private::Sealed {
-    type RegisterBlock;
+pub struct ChannelInfo {
+    pub(crate) peripheral_interrupt: Interrupt,
+    pub(crate) async_handler: InterruptHandler,
+    pub(crate) compatible_peripherals: &'static [DmaPeripheral],
+}
 
-    fn register_block(&self) -> &Self::RegisterBlock;
-    fn tx_waker(&self) -> &'static AtomicWaker;
-    fn rx_waker(&self) -> &'static AtomicWaker;
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
+impl ChannelInfo {
+    pub(crate) fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
+        self.compatible_peripherals.contains(&peripheral)
+    }
+}
 
-    fn peripheral_interrupt(&self) -> Interrupt;
-    fn async_handler(&self) -> InterruptHandler;
-    fn rx_async_flag(&self) -> &'static AtomicBool;
-    fn tx_async_flag(&self) -> &'static AtomicBool;
+/// Mutable per-channel runtime state.
+#[doc(hidden)]
+pub struct ChannelState {
+    pub(crate) tx_waker: AtomicWaker,
+    pub(crate) rx_waker: AtomicWaker,
+    pub(crate) tx_async_flag: AtomicBool,
+    pub(crate) rx_async_flag: AtomicBool,
 }
 
 macro_rules! impl_pdma_channel {
-    ($peri:ident, $register_block:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
+    ($peri:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
         paste::paste! {
             use $crate::peripherals::[< $instance >];
-            impl<'d> DmaChannel for $instance<'d> {
+            impl<'d> crate::dma::DmaChannel for $instance<'d> {
                 type Rx = [<$peri DmaRxChannel>]<'d>;
                 type Tx = [<$peri DmaTxChannel>]<'d>;
 
@@ -81,7 +73,7 @@ macro_rules! impl_pdma_channel {
                 }}
             }
 
-            impl DmaChannelExt for $instance<'_> {
+            impl crate::dma::DmaChannelExt for $instance<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     [<$peri DmaRxChannel>](unsafe { Self::steal() }.into())
                 }
@@ -90,61 +82,44 @@ macro_rules! impl_pdma_channel {
                 }
             }
 
-            impl PdmaChannel for $instance<'_> {
-                type RegisterBlock = $register_block;
-
-                fn register_block(&self) -> &Self::RegisterBlock {
-                    $crate::peripherals::[< $instance >]::regs()
-                }
-                fn tx_waker(&self) -> &'static AtomicWaker {
-                    static WAKER: AtomicWaker = AtomicWaker::new();
-                    &WAKER
-                }
-                fn rx_waker(&self) -> &'static AtomicWaker {
-                    static WAKER: AtomicWaker = AtomicWaker::new();
-                    &WAKER
-                }
-                fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-                    let compatible_peripherals = [$(DmaPeripheral::$compatible),*];
-                    compatible_peripherals.contains(&peripheral)
-                }
-
-                fn peripheral_interrupt(&self) -> Interrupt {
-                    Interrupt::$int
-                }
-
-                fn async_handler(&self) -> InterruptHandler {
-                    #[handler(priority = Priority::max())]
+            impl<'d> $instance<'d> {
+                pub(super) fn info(&self) -> &'static ChannelInfo {
+                    #[crate::handler(priority = crate::interrupt::Priority::max())]
                     pub(crate) fn interrupt_handler() {
-                        super::asynch::handle_in_interrupt::<$instance<'static>>();
-                        super::asynch::handle_out_interrupt::<$instance<'static>>();
+                        crate::dma::asynch::handle_in_interrupt::<$instance<'static>>();
+                        crate::dma::asynch::handle_out_interrupt::<$instance<'static>>();
                     }
-
-                    interrupt_handler
+                    static INFO: ChannelInfo = ChannelInfo {
+                        peripheral_interrupt: crate::peripherals::Interrupt::$int,
+                        async_handler: interrupt_handler,
+                        compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible),*],
+                    };
+                    &INFO
                 }
-                fn rx_async_flag(&self) -> &'static AtomicBool {
-                    static FLAG: AtomicBool = AtomicBool::new(false);
-                    &FLAG
-                }
-                fn tx_async_flag(&self) -> &'static AtomicBool {
-                    static FLAG: AtomicBool = AtomicBool::new(false);
-                    &FLAG
+                pub(super) fn state(&self) -> &'static ChannelState {
+                    static STATE: ChannelState = ChannelState {
+                        tx_waker: crate::asynch::AtomicWaker::new(),
+                        rx_waker: crate::asynch::AtomicWaker::new(),
+                        tx_async_flag: portable_atomic::AtomicBool::new(false),
+                        rx_async_flag: portable_atomic::AtomicBool::new(false),
+                    };
+                    &STATE
                 }
             }
 
-            impl<'d> DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
+            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaChannel>]<'d> {
                     self.into()
                 }
             }
 
-            impl<'d> DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
+            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaRxChannel>]<'d> {
                     [<$peri DmaRxChannel>](self.into())
                 }
             }
 
-            impl<'d> DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
+            impl<'d> crate::dma::DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
                 fn degrade(self) -> [<$peri DmaTxChannel>]<'d> {
                     [<$peri DmaTxChannel>](self.into())
                 }
@@ -152,32 +127,7 @@ macro_rules! impl_pdma_channel {
         }
     };
 }
-
-impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI2, SPI2_DMA, [Spi2]);
-impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI3, SPI3_DMA, [Spi3]);
-
-#[cfg(soc_has_i2s0)]
-impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S0, I2S0, [I2s0]);
-#[cfg(soc_has_i2s1)]
-impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S1, I2S1, [I2s1]);
-
-// Specific peripherals use specific channels. Note that this may be overly
-// restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
-// peripherals), but for the current set of restrictions this is sufficient.
-#[cfg(soc_has_spi2)]
-crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);
-#[cfg(soc_has_spi3)]
-crate::dma::impl_dma_eligible!([DMA_SPI3] SPI3 => Spi3);
-#[cfg(soc_has_i2s0)]
-crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);
-#[cfg(soc_has_i2s1)]
-crate::dma::impl_dma_eligible!([DMA_I2S1] I2S1 => I2s1);
-#[cfg(esp32s2)]
-use crate::peripherals::DMA_CRYPTO;
-#[cfg(esp32s2)]
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
-#[cfg(esp32s2)]
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);
+pub(crate) use impl_pdma_channel;
 
 pub(super) fn init_dma_racey() {
     #[cfg(esp32)]

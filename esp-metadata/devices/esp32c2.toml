@@ -68,8 +68,6 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "XTS_AES" },
 
-    { name = "DMA_CH0", virtual = true },
-
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
@@ -226,6 +224,11 @@ kind = "gdma"
 gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
+engines = [
+    { name = "AHB_GDMA", channels = [
+        { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
+    ] },
+]
 
 [device.ecc]
 support_status = "partial"
@@ -461,6 +464,8 @@ deep_sleep = true
 
 ## Interfaces
 [device.ledc]
+version = 2
+channel_count = 6
 
 ## Miscellaneous
 [device.io_mux]

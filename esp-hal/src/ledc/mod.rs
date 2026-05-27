@@ -79,6 +79,7 @@ use crate::{
 };
 
 pub mod channel;
+mod low_level;
 pub mod timer;
 
 /// Global slow clock source
@@ -94,7 +95,7 @@ pub struct Ledc<'d> {
     ledc: &'d pac::ledc::RegisterBlock,
 }
 
-#[cfg(esp32)]
+#[cfg(ledc_version = "1")]
 #[derive(Clone, Copy)]
 /// Used to specify HighSpeed Timer/Channel
 pub struct HighSpeed {}
@@ -109,7 +110,7 @@ pub trait Speed {
     const IS_HS: bool;
 }
 
-#[cfg(esp32)]
+#[cfg(ledc_version = "1")]
 impl Speed for HighSpeed {
     const IS_HS: bool = true;
 }
@@ -134,42 +135,8 @@ impl<'d> Ledc<'d> {
     }
 
     /// Set global slow clock source
-    #[cfg(esp32)]
-    pub fn set_global_slow_clock(&mut self, _clock_source: LSGlobalClkSource) {
-        self.ledc.conf().write(|w| w.apb_clk_sel().set_bit());
-        self.ledc
-            .lstimer(0)
-            .conf()
-            .modify(|_, w| w.para_up().set_bit());
-    }
-
-    #[cfg(not(esp32))]
-    /// Set global slow clock source
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
-        #[cfg(any(esp32c6, esp32h2))]
-        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-
-        #[cfg(any(esp32c6, esp32h2))]
-        pcr.ledc_sclk_conf().write(|w| w.ledc_sclk_en().set_bit());
-
-        match clock_source {
-            LSGlobalClkSource::APBClk => {
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                self.ledc
-                    .conf()
-                    .write(|w| unsafe { w.apb_clk_sel().bits(1) });
-                #[cfg(esp32c6)]
-                pcr.ledc_sclk_conf()
-                    .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
-                #[cfg(esp32h2)]
-                pcr.ledc_sclk_conf()
-                    .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
-            }
-        }
-        self.ledc
-            .timer(0)
-            .conf()
-            .modify(|_, w| w.para_up().set_bit());
+        low_level::set_global_slow_clock(self.ledc, clock_source);
     }
 
     /// Return a new timer

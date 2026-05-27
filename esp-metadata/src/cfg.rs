@@ -1,4 +1,5 @@
 pub(crate) mod aes;
+pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
@@ -14,6 +15,7 @@ pub(crate) mod timergroup;
 pub(crate) mod uart;
 
 pub(crate) use aes::*;
+pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
@@ -353,6 +355,8 @@ driver_configs![
             max_priority: Option<u32>,
             #[serde(default)]
             gdma_version: Option<u32>,
+            #[serde(default)]
+            engines: DmaEngines,
         }
     },
     DsProperties {
@@ -501,7 +505,11 @@ driver_configs![
     LedcProperties {
         driver: ledc,
         name: "LEDC",
-        properties: {}
+        properties: {
+            /// Register-layout generation derived from the chip SVD.
+            version: u32,
+            channel_count: u32,
+        }
     },
     LpI2cMasterProperties {
         driver: lp_i2c_master,

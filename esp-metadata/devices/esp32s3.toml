@@ -99,12 +99,6 @@ peripherals = [
     { name = "WCL" },
     { name = "XTS_AES" },
 
-    { name = "DMA_CH0", virtual = true },
-    { name = "DMA_CH1", virtual = true },
-    { name = "DMA_CH2", virtual = true },
-    { name = "DMA_CH3", virtual = true },
-    { name = "DMA_CH4", virtual = true },
-
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwble = "RWBLE", bb = "BT_BB" } },
@@ -306,6 +300,15 @@ supports_mem2mem = true
 max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
+engines = [
+    { name = "GDMA", channels = [
+        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+        { name = "DMA_CH3", mem2mem = true, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+        { name = "DMA_CH4", mem2mem = true, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+    ] },
+]
 
 [device.gpio]
 support_status = "supported"
@@ -883,6 +886,8 @@ max_ws_width = 128
 [device.camera]
 [device.rgb_display]
 [device.ledc]
+version = 2
+channel_count = 8
 [device.mcpwm]
 [device.pcnt]
 [device.sd_host]
