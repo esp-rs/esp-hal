@@ -1024,17 +1024,9 @@ impl DmaRxStreamBuf {
         }
 
         // Evenly distribute the buffer between the descriptors.
-        let chunk_size = buffer.len() / descriptors.len();
-
-        if chunk_size > 4095 {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-
-        // Check that the last descriptor can hold the excess
-        let excess = buffer.len() % descriptors.len();
-        if chunk_size + excess > 4095 {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
+        let chunk_size = Some(buffer.len() / descriptors.len())
+            .filter(|x| *x <= 4095)
+            .ok_or(DmaBufError::InsufficientDescriptors)?;
 
         let mut chunks = buffer.chunks_exact_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
@@ -1043,12 +1035,15 @@ impl DmaRxStreamBuf {
         }
 
         let remainder = chunks.into_remainder();
-        debug_assert_eq!(remainder.len(), excess);
 
         if !remainder.is_empty() {
             // Append any excess to the last descriptor.
             let last_descriptor = descriptors.last_mut().unwrap();
-            last_descriptor.set_size(last_descriptor.size() + remainder.len());
+            let size = last_descriptor.size() + remainder.len();
+            if size > 4095 {
+                return Err(DmaBufError::InsufficientDescriptors);
+            }
+            last_descriptor.set_size(size);
         }
 
         Ok(Self {
