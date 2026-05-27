@@ -348,6 +348,7 @@ engines = [
 ]
 
 [device.gpio]
+version = 1
 support_status = "supported"
 has_bank_1 = true
 gpio_function = 2

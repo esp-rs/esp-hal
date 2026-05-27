@@ -43,11 +43,11 @@
 //! - [`write_ll`]: write output levels for a selected set of channels in one operation
 //! - [`read_all_ll`]: read the current input levels of all channels
 #![cfg_attr(
-    not(esp32s3),
+    not(dedicated_gpio_version = "esp32s3"),
     doc = r#"- [`output_levels_ll`]: read the current output levels of all channels"#
 )]
 #![cfg_attr(
-    esp32s3,
+    dedicated_gpio_version = "esp32s3",
     doc = r#"- `output_levels_ll`: read the current output levels of all channels (not available on ESP32-S3 due to an LLVM bug, see <https://github.com/espressif/llvm-project/issues/120>)"#
 )]
 //! These functions operate purely on channel bitmasks (bit 0 -> channel 0, bit 1 -> channel 1, ...)
@@ -129,6 +129,11 @@ use core::{convert::Infallible, marker::PhantomData};
 use procmacros::doc_replace;
 use strum::EnumCount as _;
 
+#[cfg_attr(dedicated_gpio_version = "esp32s2", path = "low_level/esp32s2.rs")]
+#[cfg_attr(dedicated_gpio_version = "esp32s3", path = "low_level/esp32s3.rs")]
+#[cfg_attr(dedicated_gpio_version = "riscv_v1", path = "low_level/riscv_v1.rs")]
+mod low_level;
+
 use crate::{
     gpio::{
         AnyPin,
@@ -186,13 +191,7 @@ impl DedicatedGpio<'_> {
             PeripheralClockControl::disable(Peripheral::DedicatedGpio);
         }
 
-        #[cfg(esp32s2)]
-        {
-            // Allow instruction access, which has better performance than register access.
-            let regs = unsafe { esp32s2::DEDICATED_GPIO::steal() };
-            regs.out_cpu()
-                .write(|w| unsafe { w.bits((1 << property!("dedicated_gpio.channel_count")) - 1) });
-        }
+        low_level::initialize();
     }
 }
 
@@ -549,7 +548,7 @@ impl<'lt> DedicatedGpioInput<'lt> {
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        let bits = ll::read_in();
+        let bits = low_level::read_in();
         Level::from(bits & self.mask != 0)
     }
 }
@@ -577,7 +576,7 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
 /// create a driver, you can use the [`DedicatedGpioOutput::new`] method, then
 /// [`DedicatedGpioOutput::with_pin`] to add output drivers.
 #[cfg_attr(
-    esp32s3,
+    dedicated_gpio_version = "esp32s3",
     doc = r#"
 
 <section class="warning">
@@ -640,7 +639,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     where
         CH: OutputChannel + 'lt,
     {
-        ll::set_output_enabled(channel.mask(), true);
+        low_level::set_output_enabled(channel.mask(), true);
         Self {
             mask: channel.mask(),
             signal: channel.output_signal(),
@@ -677,16 +676,16 @@ impl<'lt> DedicatedGpioOutput<'lt> {
         );
 
         if level == Level::High {
-            ll::write(self.mask, self.mask);
+            low_level::write(self.mask, self.mask);
         } else {
-            ll::write(self.mask, 0);
+            low_level::write(self.mask, 0);
         }
     }
 
     /// Returns the current output state of the GPIO pins.
     ///
     /// Returns [`Level::High`] if any of the GPIO pins are set high, otherwise [`Level::Low`].
-    #[cfg(not(esp32s3))]
+    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -696,7 +695,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        Level::from(ll::read_out() & self.mask != 0)
+        Level::from(low_level::read_out() & self.mask != 0)
     }
 }
 
@@ -813,7 +812,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     }
 
     /// Enables or disables the output buffer of the GPIO pin.
-    #[cfg(riscv)] // Xtensas always have the output enabled.
+    #[cfg(dedicated_gpio_version = "riscv_v1")] // Xtensas always have the output enabled.
     pub fn set_output_enabled(&mut self, enabled: bool) {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
@@ -822,7 +821,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::set_output_enabled(self.mask, enabled);
+        low_level::set_output_enabled(self.mask, enabled);
     }
 
     /// Change the current state of the GPIO pin.
@@ -836,14 +835,14 @@ impl<'lt> DedicatedGpioFlex<'lt> {
         );
 
         if level == Level::High {
-            ll::write(self.mask, self.mask);
+            low_level::write(self.mask, self.mask);
         } else {
-            ll::write(self.mask, 0);
+            low_level::write(self.mask, 0);
         }
     }
 
     /// Returns the current output state of the GPIO pin.
-    #[cfg(not(esp32s3))]
+    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -853,7 +852,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        Level::from(ll::read_out() & self.mask != 0)
+        Level::from(low_level::read_out() & self.mask != 0)
     }
 
     /// Read the current state of the GPIO pins.
@@ -866,7 +865,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        let bits = ll::read_in();
+        let bits = low_level::read_in();
         Level::from(bits & self.mask != 0)
     }
 }
@@ -942,7 +941,7 @@ Only channels configured on the current CPU core can be used.
 )]
 #[inline(always)]
 pub fn write_ll(mask: u32, value: u32) {
-    ll::write(mask, value);
+    low_level::write(mask, value);
 }
 
 /// Low-level function to read the current state of all dedicated input channels.
@@ -951,17 +950,17 @@ pub fn write_ll(mask: u32, value: u32) {
 /// channel. Bit 0 represents channel 0, bit 1 represents channel 1, etc.
 #[inline(always)]
 pub fn read_all_ll() -> u32 {
-    ll::read_in()
+    low_level::read_in()
 }
 
 /// Low-level function to read the current output levels of all dedicated GPIO channels.
 ///
 /// The returned value is a bitmask where each bit represents the output level of a channel:
 /// bit 0 -> channel 0, bit 1 -> channel 1, etc. A bit value of 1 means the channel output is high.
-#[cfg(not(esp32s3))]
+#[cfg(not(dedicated_gpio_version = "esp32s3"))]
 #[inline(always)]
 pub fn output_levels_ll() -> u32 {
-    ll::read_out()
+    low_level::read_out()
 }
 
 #[doc_replace]
@@ -982,7 +981,7 @@ pub fn output_levels_ll() -> u32 {
 /// individual pins: writing channel bits affects every pin connected to that
 /// channel.
 #[cfg_attr(
-    esp32s3,
+    dedicated_gpio_version = "esp32s3",
     doc = r#"
 
 <section class="warning">
@@ -1214,7 +1213,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             (bits & !self.mask) == 0,
             "Trying to set bits outside of the bundle mask"
         );
-        ll::write(bits, bits); // or ll::write(self.mask, bits);
+        low_level::write(bits, bits); // or low_level::write(self.mask, bits);
     }
 
     /// Sets selected channels **low**.
@@ -1249,8 +1248,8 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             (bits & !self.mask) == 0,
             "Trying to clear bits outside of the bundle mask"
         );
-        ll::write(bits, 0);
-        // or ll::write(bits & self.mask, 0);
+        low_level::write(bits, 0);
+        // or low_level::write(bits & self.mask, 0);
         // the latter is safer (preventing writing to channels outside of the bundle) but slower
     }
 
@@ -1286,7 +1285,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::write(self.mask, bits);
+        low_level::write(self.mask, bits);
     }
 
     /// Returns the current output levels of the channels included by this bundle.
@@ -1298,7 +1297,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
     /// state of other channels.
-    #[cfg(not(esp32s3))]
+    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
@@ -1307,7 +1306,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             Cpu::current(),
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
-        ll::read_out() & self.mask
+        low_level::read_out() & self.mask
     }
 }
 
@@ -1526,7 +1525,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::read_in() & self.mask
+        low_level::read_in() & self.mask
     }
 
     /// Returns `true` if all channels in this bundle are currently high.
@@ -1539,7 +1538,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        (ll::read_in() & self.mask) == self.mask
+        (low_level::read_in() & self.mask) == self.mask
     }
 
     /// Returns `true` if all channels in this bundle are currently low.
@@ -1552,7 +1551,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        (ll::read_in() & self.mask) == 0
+        (low_level::read_in() & self.mask) == 0
     }
 }
 
@@ -1579,7 +1578,7 @@ impl<'lt> Default for DedicatedGpioInputBundle<'lt> {
 /// input and output. The bundle operates on *channels*, not pins: writing channel bits
 /// affects the pins currently connected to those channels.
 #[cfg_attr(
-    esp32s3,
+    dedicated_gpio_version = "esp32s3",
     doc = r#"
 
 <section class="warning">
@@ -1796,7 +1795,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             (bits & !self.mask) == 0,
             "Trying to set bits outside of the bundle mask"
         );
-        ll::write(bits, bits); // or ll::write(self.mask, bits);
+        low_level::write(bits, bits); // or low_level::write(self.mask, bits);
     }
 
     /// Sets selected channels **low**.
@@ -1832,7 +1831,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             (bits & !self.mask) == 0,
             "Trying to clear bits outside of the bundle mask"
         );
-        ll::write(bits, 0); // or ll::write(bits & self.mask, 0); the latter is safer but slower
+        low_level::write(bits, 0); // or low_level::write(bits & self.mask, 0); the latter is safer but slower
     }
 
     /// Writes output levels for **all channels included by this bundle**.
@@ -1866,7 +1865,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             Cpu::current(),
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
-        ll::write(self.mask, bits);
+        low_level::write(self.mask, bits);
     }
 
     /// Returns the current output levels of the channels included by this bundle.
@@ -1878,7 +1877,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
     /// state of other channels.
-    #[cfg(not(esp32s3))]
+    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
@@ -1887,7 +1886,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             Cpu::current(),
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
-        ll::read_out() & self.mask
+        low_level::read_out() & self.mask
     }
 
     /// Reads the current state of the channels included by this bundle.
@@ -1908,7 +1907,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::read_in() & self.mask
+        low_level::read_in() & self.mask
     }
 
     /// Returns `true` if all channels in this bundle are currently high.
@@ -1921,7 +1920,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        (ll::read_in() & self.mask) == self.mask
+        (low_level::read_in() & self.mask) == self.mask
     }
 
     /// Returns `true` if all channels in this bundle are currently low.
@@ -1934,112 +1933,12 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        (ll::read_in() & self.mask) == 0
+        (low_level::read_in() & self.mask) == 0
     }
 }
 
 impl<'lt> Default for DedicatedGpioFlexBundle<'lt> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(esp32s2)]
-mod ll {
-    #[inline(always)]
-    pub(super) fn set_output_enabled(_mask: u32, _en: bool) {
-        // nothing to do
-    }
-
-    #[inline(always)]
-    pub(super) fn read_in() -> u32 {
-        let val;
-        unsafe { core::arch::asm!("get_gpio_in {0}", out(reg) val) };
-        val
-    }
-
-    #[inline(always)]
-    pub(super) fn read_out() -> u32 {
-        let val;
-        unsafe { core::arch::asm!("rur.gpio_out {0}", out(reg) val) };
-        val
-    }
-
-    #[inline(always)]
-    pub(super) fn write(mask: u32, value: u32) {
-        unsafe { core::arch::asm!("wr_mask_gpio_out {0}, {1}", in(reg) mask, in(reg) value) }
-    }
-}
-
-#[cfg(esp32s3)]
-mod ll {
-    #[inline(always)]
-    pub(super) fn set_output_enabled(_mask: u32, _en: bool) {
-        // nothing to do
-    }
-
-    #[inline(always)]
-    pub(super) fn read_in() -> u32 {
-        let val;
-        unsafe { core::arch::asm!("ee.get_gpio_in {0}", out(reg) val) };
-        val
-    }
-
-    #[cfg(not(esp32s3))]
-    #[inline(always)]
-    pub(super) fn read_out() -> u32 {
-        // currently unavailable due to an LLVM bug, see https://github.com/espressif/llvm-project/issues/120
-        let val;
-        unsafe { core::arch::asm!("rur.gpio_out {0}", out(reg) val) };
-        val
-    }
-
-    #[inline(always)]
-    pub(super) fn write(mask: u32, value: u32) {
-        unsafe { core::arch::asm!("ee.wr_mask_gpio_out {0}, {1}", in(reg) mask, in(reg) value) }
-    }
-}
-
-#[cfg(riscv)]
-mod ll {
-    // CSR_GPIO_OEN_USER   0x803
-    // CSR_GPIO_IN_USER    0x804
-    // CSR_GPIO_OUT_USER   0x805
-
-    #[inline(always)]
-    pub(super) fn set_output_enabled(mask: u32, en: bool) {
-        riscv::read_csr!(0x803);
-        riscv::write_csr!(0x803);
-
-        unsafe {
-            let bits = _read();
-            if en {
-                _write(bits | mask as usize)
-            } else {
-                _write(bits & !mask as usize)
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub(super) fn read_in() -> u32 {
-        riscv::read_csr!(0x804);
-        unsafe { _read() as u32 }
-    }
-
-    #[inline(always)]
-    pub(super) fn read_out() -> u32 {
-        riscv::read_csr!(0x805);
-        unsafe { _read() as u32 }
-    }
-
-    #[inline(always)]
-    pub(super) fn write(mask: u32, value: u32) {
-        riscv::set!(0x805);
-        riscv::clear!(0x805);
-        unsafe {
-            _set((mask & value) as usize);
-            _clear((mask & !value) as usize);
-        }
     }
 }

@@ -61,6 +61,9 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         true
     };
+    ("dedicated_gpio.version") => {
+        "esp32s2"
+    };
     ("dedicated_gpio.needs_initialization") => {
         true
     };
@@ -84,6 +87,12 @@ macro_rules! property {
     };
     ("dma.separate_in_out_interrupts") => {
         false
+    };
+    ("gpio.version") => {
+        2
+    };
+    ("gpio.version", str) => {
+        stringify!(2)
     };
     ("gpio.has_bank_1") => {
         true

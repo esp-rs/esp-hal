@@ -112,6 +112,12 @@ macro_rules! property {
     ("ethernet.mii_via_gpio_matrix") => {
         true
     };
+    ("gpio.version") => {
+        3
+    };
+    ("gpio.version", str) => {
+        stringify!(3)
+    };
     ("gpio.has_bank_1") => {
         true
     };
