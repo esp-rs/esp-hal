@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
+    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
     soc::regi2c,
     time::Rate,
 };
@@ -920,5 +920,36 @@ impl UartInstance {
         _new_config: UartMemClockConfig,
     ) {
         // Nothing to do.
+    }
+}
+
+impl I2cInstance {
+    // I2C_FUNCTION_CLOCK
+    // Note: on ESP32-S3 both I2C0 and I2C1 share the same sclk_sel hardware bit (HW errata).
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let regs = match self {
+            I2cInstance::I2c0 => I2C0::regs(),
+            I2cInstance::I2c1 => I2C1::regs(),
+        };
+        regs.clk_conf().modify(|_, w| w.sclk_active().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2cFunctionClockConfig>,
+        new_config: I2cFunctionClockConfig,
+    ) {
+        let regs = match self {
+            I2cInstance::I2c0 => I2C0::regs(),
+            I2cInstance::I2c1 => I2C1::regs(),
+        };
+        // sclk_sel: 0 = XTAL, 1 = RC_FAST
+        regs.clk_conf().modify(|_, w| unsafe {
+            w.sclk_sel()
+                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
+            w.sclk_div_num().bits(new_config.div_num as _)
+        });
     }
 }

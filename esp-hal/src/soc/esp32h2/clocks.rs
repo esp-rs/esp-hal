@@ -614,3 +614,35 @@ impl UartInstance {
         });
     }
 }
+
+impl I2cInstance {
+    // I2C_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let i2c = match self {
+            I2cInstance::I2c0 => 0,
+            I2cInstance::I2c1 => 1,
+        };
+        PCR::regs()
+            .i2c_sclk_conf(i2c)
+            .modify(|_, w| w.i2c_sclk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2cFunctionClockConfig>,
+        new_config: I2cFunctionClockConfig,
+    ) {
+        let i2c = match self {
+            I2cInstance::I2c0 => 0,
+            I2cInstance::I2c1 => 1,
+        };
+        // sclk_sel: 0 = XTAL, 1 = RC_FAST
+        PCR::regs().i2c_sclk_conf(i2c).modify(|_, w| unsafe {
+            w.i2c_sclk_sel()
+                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
+            w.i2c_sclk_div_num().bits(new_config.div_num as _)
+        });
+    }
+}

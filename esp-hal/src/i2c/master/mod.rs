@@ -564,26 +564,8 @@ enum Ack {
 }
 
 /// Clock source for the I2C peripheral.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-#[non_exhaustive]
-pub enum ClockSource {
-    /// APB clock.
-    #[cfg(not(i2c_master_version = "3"))]
-    #[default]
-    Apb,
-    /// REF_TICK (1 MHz reference clock).
-    #[cfg(i2c_master_version = "2")]
-    RefTick,
-    /// Crystal oscillator (XTAL).
-    #[cfg(i2c_master_version = "3")]
-    #[default]
-    Xtal,
-    /// RC fast oscillator.
-    #[cfg(i2c_master_version = "3")]
-    RcFast,
-}
+pub use crate::soc::clocks::I2cFunctionClockSclk as ClockSource;
 
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]

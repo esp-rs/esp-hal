@@ -52,8 +52,8 @@ peripherals = [
     { name = "GPIO_SD" },
     { name = "HMAC" },
     { name = "I2C_ANA_MST" },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
     { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 0 },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
@@ -196,6 +196,12 @@ clocks = { system_clocks = { clock_tree = [
             { name = "REF_TICK", outputs = "REF_TICK" },
             { name = "APB_CLK",  outputs = "APB_CLK", default = true },
         ] },
+    ] },
+    { group = "I2C", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+            { name = "APB",      outputs = "APB_CLK", default = true },
+            { name = "REF_TICK", outputs = "REF_TICK" },
+        ] } },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates
