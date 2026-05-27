@@ -488,7 +488,7 @@ dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
-support_status = "supported"
+support_status = "partial"
 channel_count = 4
 clock_sources = ["apb"]
 default_clock_source = "apb"
