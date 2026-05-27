@@ -446,80 +446,34 @@ mod tests {
             CIPHERTEXT_ECB_256[0..16].try_into().unwrap(),
         );
     }
+}
+
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
+mod work_queue_tests {
+    use super::*;
+
+    struct Context {
+        aes: AesBackend<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        Context {
+            aes: AesBackend::new(p.AES),
+        }
+    }
 
     #[test]
-    fn test_aes_work_queue_cpu() {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
+    fn test_aes_work_queue_cpu(mut ctx: Context) {
+        let _backend = ctx.aes.start();
 
         let mut buffer = [0; PLAINTEXT_BUF_SIZE];
         run_cipher_tests(&mut buffer);
     }
 
     #[test]
-    #[cfg(aes_dma)]
-    fn test_aes_dma_work_queue() {
-        use allocator_api2::vec::Vec;
-
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
-        esp_alloc::heap_allocator!(size: 32 * 1024);
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
-            } else {
-                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
-            }
-        }
-        let _backend = aes.start();
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut internal_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
-        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in internal memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
-    }
-
-    #[test]
-    #[cfg(all(aes_dma, soc_has_psram))]
-    fn test_aes_dma_work_queue_psram() {
-        use allocator_api2::vec::Vec;
-
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
-            } else {
-                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
-            }
-        }
-        let _backend = aes.start();
-
-        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
-        fill_with_plaintext(&mut plaintext);
-
-        const MAX_SHIFT: usize = 15;
-
-        let mut external_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
-        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
-
-        // Different alignments in external memory
-        run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
-    }
-
-    #[test]
-    fn test_aes_work_queue_work_posted_before_queue_started() {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
+    fn test_aes_work_queue_work_posted_before_queue_started(mut ctx: Context) {
         let mut output = [0; PLAINTEXT_BUF_SIZE];
 
         let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
@@ -528,8 +482,7 @@ mod tests {
         let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
         let handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
 
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
+        let _backend = ctx.aes.start();
 
         handle.wait_blocking();
 
@@ -537,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    async fn test_aes_work_queue_work_posted_before_queue_started_async() {
+    async fn test_aes_work_queue_work_posted_before_queue_started_async(mut ctx: Context) {
         #[embassy_executor::task]
         async fn aes_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
             let mut output = [0; PLAINTEXT_BUF_SIZE];
@@ -559,8 +512,6 @@ mod tests {
             signal.signal(());
         }
 
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         // Start task before we'd start the AES operation
@@ -569,24 +520,20 @@ mod tests {
 
         signal.wait().await;
 
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
+        let _backend = ctx.aes.start();
 
         signal.wait().await;
     }
 
     #[test]
-    fn test_aes_work_queue_in_place() {
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
+    fn test_aes_work_queue_in_place(mut ctx: Context) {
         let mut buffer = [0; PLAINTEXT_BUF_SIZE];
         fill_with_plaintext(&mut buffer);
 
         let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
         let handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
 
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
+        let _backend = ctx.aes.start();
 
         handle.wait_blocking();
 
@@ -594,15 +541,13 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_cancelling_work() {
+    fn test_aes_cancelling_work(mut ctx: Context) {
         // In this test, we post two work items, and cancel the first one before starting the
         // backend. We will assert that, when the second item has finished correctly, the first did
         // not modify its output buffer.
         // Note that this result is not guaranteed. The cancellation can come later than the work
         // item has finished processing. We can only reliably test it because we start the backend
         // after cancelling the operation.
-        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
-
         let mut buffer1 = [0; PLAINTEXT_BUF_SIZE];
         fill_with_plaintext(&mut buffer1);
         let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
@@ -620,8 +565,7 @@ mod tests {
 
         core::mem::drop(handle1);
 
-        let mut aes = AesBackend::new(p.AES);
-        let _backend = aes.start();
+        let _backend = ctx.aes.start();
 
         handle3.wait_blocking();
         handle2.wait_blocking();
@@ -629,5 +573,68 @@ mod tests {
         hil_test::assert_eq!(&buffer1[..PLAINTEXT.len()], PLAINTEXT);
         hil_test::assert_eq!(buffer2, CIPHERTEXT_ECB_256);
         hil_test::assert_eq!(buffer3, CIPHERTEXT_ECB_128);
+    }
+}
+
+#[cfg(aes_dma)]
+#[embedded_test::tests(default_timeout = 10)]
+mod work_queue_dma_tests {
+    use allocator_api2::vec::Vec;
+
+    use super::*;
+
+    struct Context {
+        aes: AesDmaBackend<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        esp_alloc::heap_allocator!(size: 32 * 1024);
+
+        #[cfg(soc_has_psram)]
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma = p.DMA_CRYPTO;
+            } else {
+                let dma = p.DMA_CH0;
+            }
+        }
+
+        Context {
+            aes: AesDmaBackend::new(p.AES, dma),
+        }
+    }
+
+    #[test]
+    fn test_aes_dma_work_queue(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        const MAX_SHIFT: usize = 15;
+
+        let mut internal_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
+        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        // Different alignments in internal memory
+        run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
+    }
+
+    #[test]
+    #[cfg(soc_has_psram)]
+    fn test_aes_dma_work_queue_psram(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        const MAX_SHIFT: usize = 15;
+
+        let mut external_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
+        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        // Different alignments in external memory
+        run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
     }
 }
