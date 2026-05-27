@@ -19,8 +19,6 @@
 //!     uart::{RxConfig, Uart, uhci::Uhci},
 //! };
 //!
-//! esp_bootloader_esp_idf::esp_app_desc!();
-//!
 //! #[main]
 //! fn main() -> ! {
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
