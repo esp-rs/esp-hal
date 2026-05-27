@@ -8,6 +8,7 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
+        DmaChannelConvert,
         DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
@@ -453,9 +454,9 @@ impl AnyI2sDmaChannel<'_> {
 }
 
 #[cfg(soc_has_i2s0)]
-super::impl_pdma_channel!(AnyI2s, DMA_I2S0, I2S0, [I2s0]);
+super::impl_pdma_channel!(AnyI2sDma, DMA_I2S0, I2S0, [I2s0]);
 #[cfg(soc_has_i2s1)]
-super::impl_pdma_channel!(AnyI2s, DMA_I2S1, I2S1, [I2s1]);
+super::impl_pdma_channel!(AnyI2sDma, DMA_I2S1, I2S1, [I2s1]);
 
 #[cfg(soc_has_i2s0)]
 crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);

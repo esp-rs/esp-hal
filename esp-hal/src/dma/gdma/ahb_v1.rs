@@ -4,25 +4,25 @@ use crate::RegisterToggle;
 impl AnyGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
+        DMA::regs().ch(self.0.info.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     pub(super) fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.info.channel as usize)
+        DMA::regs().int_ch(self.0.info.channel as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     pub(super) fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
-        DMA::regs().out_int_ch(self.info.channel as usize)
+        DMA::regs().out_int_ch(self.0.info.channel as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
     pub(super) fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
-        DMA::regs().ch(self.info.channel as usize).out_int()
+        DMA::regs().ch(self.0.info.channel as usize).out_int()
     }
 }
 
@@ -124,11 +124,11 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_out
+        self.0.info.handler_out
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_out
+        self.0.info.isr_out
     }
 }
 
@@ -202,13 +202,13 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.tx_waker
+        &self.0.state.tx_waker
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.tx_is_async.load(portable_atomic::Ordering::Acquire)
+                self.0.state.tx_is_async.load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -218,7 +218,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
+                self.0.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }
@@ -227,25 +227,25 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
 impl AnyGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
+        DMA::regs().ch(self.0.info.channel as usize)
     }
 
     #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
     fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.info.channel as usize)
+        DMA::regs().int_ch(self.0.info.channel as usize)
     }
 
     #[inline(always)]
     #[cfg(any(esp32c6, esp32h2))]
     fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
-        DMA::regs().in_int_ch(self.info.channel as usize)
+        DMA::regs().in_int_ch(self.0.info.channel as usize)
     }
 
     #[cfg(esp32s3)]
     #[inline(always)]
     fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
-        DMA::regs().ch(self.info.channel as usize).in_int()
+        DMA::regs().ch(self.0.info.channel as usize).in_int()
     }
 }
 
@@ -327,11 +327,11 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_in
+        self.0.info.handler_in
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_in
+        self.0.info.isr_in
     }
 }
 
@@ -413,13 +413,13 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.rx_waker
+        &self.0.state.rx_waker
     }
 
     fn is_async(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.rx_is_async.load(portable_atomic::Ordering::Acquire)
+                self.0.state.rx_is_async.load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
@@ -429,7 +429,7 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     fn set_async(&self, _is_async: bool) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
+                self.0.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
         }
     }

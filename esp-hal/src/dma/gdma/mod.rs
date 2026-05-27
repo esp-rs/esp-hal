@@ -73,7 +73,6 @@ impl defmt::Format for AnyGdmaChannel<'_> {
 }
 
 impl AnyGdmaChannel<'_> {
-    #[cfg_attr(any(esp32c2, esp32c61), expect(unused))]
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             info: self.info,
@@ -90,41 +89,16 @@ impl<'d> DmaChannel for AnyGdmaChannel<'d> {
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
-            AnyGdmaRxChannel {
-                info: self.info,
-                state: self.state,
-                _lifetime: PhantomData,
-            },
-            AnyGdmaTxChannel {
-                info: self.info,
-                state: self.state,
-                _lifetime: PhantomData,
-            },
+            AnyGdmaRxChannel(unsafe { self.clone_unchecked() }),
+            AnyGdmaTxChannel(self),
         )
     }
 }
 
 /// An arbitrary GDMA RX channel
-pub struct AnyGdmaRxChannel<'d> {
-    info: &'static ChannelInfo,
-    state: &'static ChannelState,
-    _lifetime: PhantomData<&'d mut ()>,
-}
-
-impl core::fmt::Debug for AnyGdmaRxChannel<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AnyGdmaRxChannel")
-            .field("channel", &self.info.channel)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AnyGdmaRxChannel<'_> {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "AnyGdmaRxChannel {{ channel: {} }}", self.info.channel)
-    }
-}
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct AnyGdmaRxChannel<'d>(AnyGdmaChannel<'d>);
 
 impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
     fn degrade(self) -> AnyGdmaRxChannel<'d> {
@@ -133,26 +107,9 @@ impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
 }
 
 /// An arbitrary GDMA TX channel
-pub struct AnyGdmaTxChannel<'d> {
-    info: &'static ChannelInfo,
-    state: &'static ChannelState,
-    _lifetime: PhantomData<&'d mut ()>,
-}
-
-impl core::fmt::Debug for AnyGdmaTxChannel<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AnyGdmaTxChannel")
-            .field("channel", &self.info.channel)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AnyGdmaTxChannel<'_> {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "AnyGdmaTxChannel {{ channel: {} }}", self.info.channel)
-    }
-}
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct AnyGdmaTxChannel<'d>(AnyGdmaChannel<'d>);
 
 impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for AnyGdmaTxChannel<'d> {
     fn degrade(self) -> AnyGdmaTxChannel<'d> {
@@ -204,7 +161,17 @@ macro_rules! impl_channel {
                 &STATE
             }
         }
-        impl_channel_common!($ch, $num);
+
+        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
+            fn degrade(self) -> AnyGdmaChannel<'d> {
+                AnyGdmaChannel {
+                    info: Self::info(),
+                    state: Self::state(),
+                    _lifetime: core::marker::PhantomData,
+                }
+            }
+        }
+        crate::dma::impl_channel_common!(AnyGdma, $ch);
     };
 
     // Split interrupts: separate handlers for the in and out paths.
@@ -240,33 +207,6 @@ macro_rules! impl_channel {
                 &STATE
             }
         }
-        impl_channel_common!($ch, $num);
-    };
-}
-
-/// Generates the `state()` accessor and all trait impls that are identical
-/// regardless of whether the channel uses split or shared interrupts.
-macro_rules! impl_channel_common {
-    ($ch:ident, $num:literal) => {
-        impl<'d> DmaChannel for $ch<'d> {
-            type Rx = AnyGdmaRxChannel<'d>;
-            type Tx = AnyGdmaTxChannel<'d>;
-
-            unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                (
-                    AnyGdmaRxChannel {
-                        info: Self::info(),
-                        state: Self::state(),
-                        _lifetime: core::marker::PhantomData,
-                    },
-                    AnyGdmaTxChannel {
-                        info: Self::info(),
-                        state: Self::state(),
-                        _lifetime: core::marker::PhantomData,
-                    },
-                )
-            }
-        }
 
         impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
             fn degrade(self) -> AnyGdmaChannel<'d> {
@@ -277,44 +217,7 @@ macro_rules! impl_channel_common {
                 }
             }
         }
-
-        impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaRxChannel<'d> {
-                AnyGdmaRxChannel {
-                    info: Self::info(),
-                    state: Self::state(),
-                    _lifetime: core::marker::PhantomData,
-                }
-            }
-        }
-
-        impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaTxChannel<'d> {
-                AnyGdmaTxChannel {
-                    info: Self::info(),
-                    state: Self::state(),
-                    _lifetime: core::marker::PhantomData,
-                }
-            }
-        }
-
-        impl DmaChannelExt for $ch<'_> {
-            fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                AnyGdmaRxChannel {
-                    info: Self::info(),
-                    state: Self::state(),
-                    _lifetime: core::marker::PhantomData,
-                }
-            }
-
-            fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                AnyGdmaTxChannel {
-                    info: Self::info(),
-                    state: Self::state(),
-                    _lifetime: core::marker::PhantomData,
-                }
-            }
-        }
+        crate::dma::impl_channel_common!(AnyGdma, $ch);
     };
 }
 

@@ -3112,3 +3112,46 @@ pub(crate) mod asynch {
         }
     }
 }
+
+macro_rules! impl_channel_common {
+    ($peri:ident, $instance:ident) => {
+        paste::paste! {
+            impl<'d> DmaChannel for $instance<'d> {
+                type Rx = [<$peri RxChannel>]<'d>;
+                type Tx = [<$peri TxChannel>]<'d>;
+
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
+                    unsafe {
+                        (
+                            [<$peri RxChannel>](Self::steal().degrade()),
+                            [<$peri TxChannel>](Self::steal().degrade()),
+                        )
+                    }
+                }
+            }
+
+            impl<'d> DmaChannelConvert<[<$peri RxChannel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri RxChannel>]<'d> {
+                    [<$peri RxChannel>](self.degrade())
+                }
+            }
+
+            impl<'d> DmaChannelConvert<[<$peri TxChannel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri TxChannel>]<'d> {
+                    [<$peri TxChannel>](self.degrade())
+                }
+            }
+
+            impl crate::dma::DmaChannelExt for $instance<'_> {
+                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
+                    [<$peri RxChannel>](unsafe { Self::steal() }.degrade())
+                }
+
+                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
+                    [<$peri TxChannel>](unsafe { Self::steal() }.degrade())
+                }
+            }
+        }
+    };
+}
+pub(crate) use impl_channel_common;
