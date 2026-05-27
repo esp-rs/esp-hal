@@ -1249,103 +1249,6 @@ pub trait DmaChannelExt: DmaChannel {
     fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 }
 
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel isn't suitable for this peripheral",
-    label = "This DMA channel",
-    note = "Not all channels are useable with all peripherals"
-)]
-#[doc(hidden)]
-pub trait DmaChannelConvert<DEG> {
-    fn degrade(self) -> DEG;
-}
-
-impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
-    fn degrade(self) -> DEG {
-        self
-    }
-}
-
-#[procmacros::doc_replace(
-    "dma_channel" => {
-        cfg(dma_kind = "pdma") => "DMA_SPI2",
-        cfg(dma_kind = "gdma") => "DMA_CH0"
-    },
-    "note" => {
-        cfg(dma_kind = "pdma") => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
-        _ => ""
-    }
-)]
-/// Trait implemented for DMA channels that are compatible with a particular
-/// peripheral.
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaChannel` implementation.
-/// # {note}
-/// ## Example
-///
-/// The following example demonstrates how this trait can be used to only accept
-/// types compatible with a specific peripheral.
-///
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::{
-///     Blocking,
-///     dma::DmaChannelFor,
-///     spi::master::{AnySpi, Config, Instance as SpiInstance, Spi, SpiDma},
-/// };
-///
-/// fn configures_spi_dma<'d>(
-///     spi: Spi<'d, Blocking>,
-///     channel: impl DmaChannelFor<AnySpi<'d>>,
-/// ) -> SpiDma<'d, Blocking> {
-///     spi.with_dma(channel)
-/// }
-///
-/// let spi = Spi::new(peripherals.SPI2, Config::default())?;
-///
-/// let spi_dma = configures_spi_dma(spi, peripherals.__dma_channel__);
-/// # {after_snippet}
-/// ```
-pub trait DmaChannelFor<P: DmaEligible>:
-    DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
-{
-}
-impl<P, CH> DmaChannelFor<P> for CH
-where
-    P: DmaEligible,
-    CH: DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>,
-{
-}
-
-/// Trait implemented for the RX half of split DMA channels that are compatible
-/// with a particular peripheral. Accepts complete DMA channels or split halves.
-///
-/// This trait is similar in use to [`DmaChannelFor`].
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaRxChannel` implementation.
-pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
-impl<P, RX> RxChannelFor<P> for RX
-where
-    P: DmaEligible,
-    RX: DmaChannelConvert<PeripheralRxChannel<P>>,
-{
-}
-
-/// Trait implemented for the TX half of split DMA channels that are compatible
-/// with a particular peripheral. Accepts complete DMA channels or split halves.
-///
-/// This trait is similar in use to [`DmaChannelFor`].
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaTxChannel` implementation.
-pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
-impl<P, TX> TxChannelFor<P> for TX
-where
-    P: DmaEligible,
-    TX: DmaChannelConvert<PeripheralTxChannel<P>>,
-{
-}
 
 // NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
 // `GenericPeripheralGuard`.
@@ -2240,38 +2143,26 @@ macro_rules! impl_channel_common {
                 type Erased = [<$peri Channel>]<'d>;
 
                 fn into_erased(self) -> Self::Erased {
-                    DmaChannelConvert::degrade(self)
+                    self.into()
                 }
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
                     unsafe {
                         (
-                            [<$peri RxChannel>](Self::steal().degrade()),
-                            [<$peri TxChannel>](Self::steal().degrade()),
+                            [<$peri RxChannel>](Self::steal().into_erased()),
+                            [<$peri TxChannel>](Self::steal().into_erased()),
                         )
                     }
                 }
             }
 
-            impl<'d> DmaChannelConvert<[<$peri RxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri RxChannel>]<'d> {
-                    [<$peri RxChannel>](self.degrade())
-                }
-            }
-
-            impl<'d> DmaChannelConvert<[<$peri TxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri TxChannel>]<'d> {
-                    [<$peri TxChannel>](self.degrade())
-                }
-            }
-
             impl crate::dma::DmaChannelExt for $instance<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri RxChannel>](unsafe { Self::steal() }.degrade())
+                    [<$peri RxChannel>](unsafe { Self::steal() }.into_erased())
                 }
 
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri TxChannel>](unsafe { Self::steal() }.degrade())
+                    [<$peri TxChannel>](unsafe { Self::steal() }.into_erased())
                 }
             }
         }

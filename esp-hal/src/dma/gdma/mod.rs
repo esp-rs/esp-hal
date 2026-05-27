@@ -109,22 +109,11 @@ impl<'d> DmaChannel for AnyAhbGdmaChannel<'d> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyAhbGdmaRxChannel<'d>(AnyAhbGdmaChannel<'d>);
 
-impl<'d> DmaChannelConvert<AnyAhbGdmaRxChannel<'d>> for AnyAhbGdmaRxChannel<'d> {
-    fn degrade(self) -> AnyAhbGdmaRxChannel<'d> {
-        self
-    }
-}
 
 /// An arbitrary GDMA TX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyAhbGdmaTxChannel<'d>(AnyAhbGdmaChannel<'d>);
-
-impl<'d> DmaChannelConvert<AnyAhbGdmaTxChannel<'d>> for AnyAhbGdmaTxChannel<'d> {
-    fn degrade(self) -> AnyAhbGdmaTxChannel<'d> {
-        self
-    }
-}
 
 impl crate::private::Sealed for AnyAhbGdmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for AnyAhbGdmaTxChannel<'d> {
@@ -176,11 +165,11 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyAhbGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyAhbGdmaChannel<'d> {
+        impl<'d> From<$ch<'d>> for AnyAhbGdmaChannel<'d> {
+            fn from(ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
                 AnyAhbGdmaChannel {
-                    info: Self::info(),
-                    state: Self::state(),
+                    info: $ch::info(),
+                    state: $ch::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
@@ -222,11 +211,11 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyAhbGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyAhbGdmaChannel<'d> {
+        impl<'d> From<$ch<'d>> for AnyAhbGdmaChannel<'d> {
+            fn from(ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
                 AnyAhbGdmaChannel {
-                    info: Self::info(),
-                    state: Self::state(),
+                    info: $ch::info(),
+                    state: $ch::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }

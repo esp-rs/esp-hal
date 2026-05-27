@@ -9,7 +9,6 @@ use crate::{
         ChannelInfo,
         ChannelState,
         DmaChannel,
-        DmaChannelConvert,
         DmaChannelExt,
         DmaExtMemBKSize,
         DmaPeripheral,
@@ -499,17 +498,6 @@ impl DMA_CRYPTO<'_> {
             rx_async_flag: AtomicBool::new(false),
         };
         &STATE
-    }
-}
-
-impl<'d> DmaChannelConvert<CryptoDmaRxChannel<'d>> for DMA_CRYPTO<'d> {
-    fn degrade(self) -> CryptoDmaRxChannel<'d> {
-        CryptoDmaRxChannel(self)
-    }
-}
-impl<'d> DmaChannelConvert<CryptoDmaTxChannel<'d>> for DMA_CRYPTO<'d> {
-    fn degrade(self) -> CryptoDmaTxChannel<'d> {
-        CryptoDmaTxChannel(self)
     }
 }
 

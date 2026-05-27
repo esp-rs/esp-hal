@@ -99,11 +99,6 @@ macro_rules! impl_pdma_channel {
                 }
             }
 
-            impl<'d> DmaChannelConvert<[<$peri Channel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri Channel>]<'d> {
-                    self.into()
-                }
-            }
         }
 
         crate::dma::impl_channel_common!($peri, $instance);

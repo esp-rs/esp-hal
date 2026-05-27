@@ -103,7 +103,7 @@ use crate::{
     dma::{
         Channel,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannel,
         DmaEligible,
         DmaError,
         DmaTxBuffer,
@@ -826,9 +826,9 @@ with_i2s_parallel_dma_engine! {
             ) -> Self
             where
                 CH: I2sParallelDmaChannel<AnyI2s<'d>>,
-                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
             {
-                Self::new_internal(i2s, channel.degrade(), frequency, pins, clock_pin)
+                Self::new_internal(i2s, channel.into_erased(), frequency, pins, clock_pin)
             }
         }
     };

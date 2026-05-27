@@ -126,7 +126,6 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelConvert,
         DmaEligible,
         DmaError,
         DmaRxBuffer,
@@ -202,9 +201,9 @@ with_i2s_master_dma_engine! {
             ) -> Result<Self, ConfigError>
             where
                 CH: I2sMasterDmaChannel<AnyI2s<'d>>,
-                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
             {
-                Self::new_internal(i2s, channel.degrade(), config)
+                Self::new_internal(i2s, channel.into_erased(), config)
             }
         }
     };

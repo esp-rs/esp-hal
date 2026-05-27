@@ -169,7 +169,7 @@ pub mod dma {
         DriverMode,
         dma::{
             Channel,
-            DmaChannelConvert,
+            DmaChannel,
             DmaEligible,
             DmaRxBuffer,
             DmaRxInterrupt,
@@ -881,10 +881,10 @@ with_spi_slave_dma_engine! {
             pub fn with_dma<CH>(self, channel: CH) -> SpiDma<'d, crate::Blocking>
             where
                 CH: SpiSlaveDmaChannel<AnySpi<'d>>,
-                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
             {
                 self.spi.info().set_data_mode(self.data_mode, true);
-                SpiDma::new(self.spi, channel.degrade())
+                SpiDma::new(self.spi, channel.into_erased())
             }
         }
     };

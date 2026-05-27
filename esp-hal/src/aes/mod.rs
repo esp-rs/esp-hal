@@ -363,7 +363,7 @@ pub mod dma {
         },
         dma::{
             Channel,
-            DmaChannelConvert,
+            DmaChannel,
             DmaDescriptor,
             DmaError,
             DmaRxBuffer,
@@ -420,9 +420,9 @@ pub mod dma {
         pub fn with_dma<CH>(self, channel: CH) -> AesDma<'d>
         where
             CH: super::AesDmaChannel,
-            CH: crate::dma::DmaChannelConvert<crate::dma::PeripheralDmaChannel<AES<'d>>>,
+            CH: crate::dma::DmaChannel<Erased = crate::dma::PeripheralDmaChannel<AES<'d>>>,
         {
-            let channel = Channel::new(channel.degrade());
+            let channel = Channel::new(channel.into_erased());
             channel.runtime_ensure_compatible(&self.aes);
             AesDma { aes: self, channel }
         }
@@ -789,11 +789,11 @@ pub mod dma {
         pub fn new<CH>(aes: AES<'d>, dma: CH) -> Self
         where
             CH: super::AesDmaChannel,
-            CH: crate::dma::DmaChannelConvert<PeripheralDmaChannel<AES<'d>>>,
+            CH: crate::dma::DmaChannel<Erased = PeripheralDmaChannel<AES<'d>>>,
         {
             Self {
                 peri: aes,
-                dma: dma.degrade(),
+                dma: dma.into_erased(),
                 state: DriverState::None,
 
                 #[cfg(dma_can_access_psram)]

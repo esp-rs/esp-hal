@@ -20,7 +20,7 @@ use crate::{
     dma::{
         CHUNK_SIZE,
         Channel,
-        DmaChannelConvert,
+        DmaChannel,
         DmaDescriptor,
         DmaEligible,
         DmaRxBuf,
@@ -1918,9 +1918,9 @@ with_spi_master_dma_engine! {
             pub fn with_dma<CH>(self, channel: CH) -> SpiDma<'d, crate::Blocking>
             where
                 CH: SpiMasterDmaChannel<AnySpi<'d>>,
-                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
             {
-                SpiDma::new_from_spi(self, channel.degrade())
+                SpiDma::new_from_spi(self, channel.into_erased())
             }
         }
     };

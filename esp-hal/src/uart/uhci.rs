@@ -108,7 +108,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannel,
         DmaEligible,
         DmaError,
         DmaRxBuffer,
@@ -403,11 +403,11 @@ impl<'d> Uhci<'d, Blocking> {
     ) -> Self
     where
         CH: UhciDmaChannel,
-        CH: DmaChannelConvert<PeripheralDmaChannel<AnyUhci<'d>>>,
+        CH: DmaChannel<Erased = PeripheralDmaChannel<AnyUhci<'d>>>,
     {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.into_erased());
         channel.runtime_ensure_compatible(&uhci);
 
         let uhci = Uhci {

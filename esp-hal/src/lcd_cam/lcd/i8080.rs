@@ -54,7 +54,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel},
+    dma::{ChannelTx, DmaTxChannel, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -100,9 +100,9 @@ where
     ) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::LcdDmaTxChannel,
-        CH: DmaChannelConvert<PeripheralTxChannel<LCD_CAM<'d>>>,
+        CH: DmaTxChannel<Erased = PeripheralTxChannel<LCD_CAM<'d>>>,
     {
-        let tx_channel = ChannelTx::new(channel.degrade());
+        let tx_channel = ChannelTx::new(channel.into_erased());
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,

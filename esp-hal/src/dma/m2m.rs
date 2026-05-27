@@ -14,7 +14,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -62,7 +62,7 @@ where
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
     pub fn new(
-        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
+        channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: impl DmaEligible,
     ) -> Self {
         unsafe {
@@ -81,10 +81,10 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// You must ensure that you're not using DMA for the same peripheral and
     /// that you're the only one using the DmaPeripheral.
     pub unsafe fn new_unsafe(
-        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
+        channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.into_erased());
 
         cfg_if::cfg_if! {
             if #[cfg(dma_kind = "gdma")] {

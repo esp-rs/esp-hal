@@ -140,7 +140,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannel,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
@@ -1090,11 +1090,11 @@ impl<'d> ParlIo<'d, Blocking> {
     ) -> Result<Self, Error>
     where
         CH: ParlIoDmaChannel,
-        CH: DmaChannelConvert<PeripheralDmaChannel<PARL_IO<'d>>>,
+        CH: DmaChannel<Erased = PeripheralDmaChannel<PARL_IO<'d>>>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.degrade());
+        let dma_channel = Channel::new(dma_channel.into_erased());
 
         Ok(Self {
             tx: TxCreator {

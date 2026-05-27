@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{ChannelRx, DmaChannelConvert, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel},
+    dma::{ChannelRx, DmaRxChannel, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel},
     gpio::{
         InputConfig,
         InputSignal,
@@ -155,9 +155,9 @@ impl<'d> Camera<'d> {
     ) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::CamDmaRxChannel,
-        CH: DmaChannelConvert<PeripheralRxChannel<LCD_CAM<'d>>>,
+        CH: DmaRxChannel<Erased = PeripheralRxChannel<LCD_CAM<'d>>>,
     {
-        let rx_channel = ChannelRx::new(channel.degrade());
+        let rx_channel = ChannelRx::new(channel.into_erased());
 
         let mut this = Self {
             lcd_cam: cam.lcd_cam,

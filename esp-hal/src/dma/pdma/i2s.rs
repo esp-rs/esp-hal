@@ -8,7 +8,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
-        DmaChannelConvert,
         DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,

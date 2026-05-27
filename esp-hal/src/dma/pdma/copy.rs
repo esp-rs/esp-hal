@@ -9,7 +9,6 @@ use crate::{
         ChannelInfo,
         ChannelState,
         DmaChannel,
-        DmaChannelConvert,
         DmaChannelExt,
         DmaExtMemBKSize,
         DmaPeripheral,
@@ -445,13 +444,4 @@ impl DMA_COPY<'_> {
     }
 }
 
-impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaRxChannel<'d> {
-        CopyDmaRxChannel(self)
-    }
-}
-impl<'d> DmaChannelConvert<CopyDmaTxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaTxChannel<'d> {
-        CopyDmaTxChannel(self)
-    }
-}
+
