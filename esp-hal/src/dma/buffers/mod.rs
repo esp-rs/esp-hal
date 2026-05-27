@@ -1304,6 +1304,8 @@ pub struct DmaTxStreamBuf {
     buffer: &'static mut [u8],
     burst: BurstConfig,
     pre_filled: Option<usize>,
+    view_descriptor_idx: usize,
+    view_descriptor_offset: usize,
 }
 
 impl DmaTxStreamBuf {
@@ -1352,6 +1354,8 @@ impl DmaTxStreamBuf {
             buffer,
             burst: Default::default(),
             pre_filled: None,
+            view_descriptor_idx: 0,
+            view_descriptor_offset: 0,
         })
     }
 
@@ -1381,6 +1385,96 @@ impl DmaTxStreamBuf {
         self.pre_filled = Some(start + bytes_pushed);
         bytes_pushed
     }
+
+    fn setup_view_state(&mut self) {
+        self.view_descriptor_idx = 0;
+        self.view_descriptor_offset = 0;
+        let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
+        mark_tx_stream_descriptors_ready(
+            self.descriptors,
+            &mut self.view_descriptor_idx,
+            &mut self.view_descriptor_offset,
+            pre_filled,
+        );
+    }
+}
+
+/// Marks descriptors containing data that should be transmitted when the DMA
+/// channel starts. Unlike [advance_tx_stream_descriptors], this does not modify
+/// the `next` pointers because the linked list must remain intact until the
+/// transfer is running.
+fn mark_tx_stream_descriptors_ready(
+    descriptors: &mut [DmaDescriptor],
+    descriptor_idx: &mut usize,
+    descriptor_offset: &mut usize,
+    bytes_pushed: usize,
+) {
+    if bytes_pushed == 0 {
+        return;
+    }
+
+    let mut bytes_filled = 0;
+    let num_descriptors = descriptors.len();
+
+    for i in 0..num_descriptors {
+        let d = (*descriptor_idx + i) % num_descriptors;
+        let desc = &mut descriptors[d];
+        let bytes_in_d = desc.size() - *descriptor_offset;
+
+        if bytes_in_d + bytes_filled > bytes_pushed {
+            *descriptor_idx = d;
+            *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
+            desc.set_owner(Owner::Dma);
+            desc.set_length(*descriptor_offset);
+            desc.set_suc_eof(true);
+            return;
+        }
+
+        bytes_filled += bytes_in_d;
+        *descriptor_offset = 0;
+
+        desc.set_owner(Owner::Dma);
+        desc.set_length(desc.size());
+        desc.set_suc_eof(true);
+    }
+}
+
+fn advance_tx_stream_descriptors(
+    descriptors: &mut [DmaDescriptor],
+    descriptor_idx: &mut usize,
+    descriptor_offset: &mut usize,
+    bytes_pushed: usize,
+) {
+    if bytes_pushed == 0 {
+        return;
+    }
+
+    let mut bytes_filled = 0;
+    let num_descriptors = descriptors.len();
+
+    for i in 0..num_descriptors {
+        let d = (*descriptor_idx + i) % num_descriptors;
+        let desc = &mut descriptors[d];
+        let bytes_in_d = desc.size() - *descriptor_offset;
+        if bytes_in_d + bytes_filled > bytes_pushed {
+            *descriptor_idx = d;
+            *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
+            return;
+        }
+        bytes_filled += bytes_in_d;
+        *descriptor_offset = 0;
+
+        // Put the current descriptor at the end of the list
+        desc.set_owner(Owner::Dma);
+        desc.set_length(desc.size());
+        desc.set_suc_eof(true);
+        let p = d.checked_sub(1).unwrap_or(num_descriptors - 1);
+        if p != d {
+            let [prev, desc] = descriptors.get_disjoint_mut([p, d]).unwrap();
+            desc.next = null_mut();
+            prev.next = desc;
+        }
+    }
 }
 
 unsafe impl DmaTxBuffer for DmaTxStreamBuf {
@@ -1394,8 +1488,12 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             desc.next = next;
             next = desc;
 
-            desc.reset_for_tx(true);
+            desc.set_owner(Owner::Cpu);
+            desc.set_length(0);
+            desc.set_suc_eof(false);
         }
+
+        self.setup_view_state();
 
         Preparation {
             start: self.descriptors.as_mut_ptr(),
@@ -1414,15 +1512,11 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
     }
 
     fn into_view(self) -> Self::View {
-        // If the buffer is not pre-filled, treat it as fully filled
-        let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
-        let mut view = DmaTxStreamBufView {
+        DmaTxStreamBufView {
+            descriptor_idx: self.view_descriptor_idx,
+            descriptor_offset: self.view_descriptor_offset,
             buf: self,
-            descriptor_idx: 0,
-            descriptor_offset: 0,
-        };
-        view.advance(pre_filled);
-        view
+        }
     }
 
     fn from_view(view: Self::View) -> Self {
@@ -1463,36 +1557,12 @@ impl DmaTxStreamBufView {
 
     /// Advances the first `n` bytes from the available data
     pub fn advance(&mut self, bytes_pushed: usize) {
-        if bytes_pushed == 0 {
-            return;
-        }
-
-        let mut bytes_filled = 0;
-        let num_descriptors = self.buf.descriptors.len();
-
-        for i in 0..num_descriptors {
-            let d = (self.descriptor_idx + i) % num_descriptors;
-            let desc = &mut self.buf.descriptors[d];
-            let bytes_in_d = desc.size() - self.descriptor_offset;
-            if bytes_in_d + bytes_filled > bytes_pushed {
-                self.descriptor_idx = d;
-                self.descriptor_offset = self.descriptor_offset + bytes_pushed - bytes_filled;
-                return;
-            }
-            bytes_filled += bytes_in_d;
-            self.descriptor_offset = 0;
-
-            // Put the current descriptor at the end of the list
-            desc.set_owner(Owner::Dma);
-            desc.set_length(desc.size());
-            desc.set_suc_eof(true);
-            let p = d.checked_sub(1).unwrap_or(num_descriptors - 1);
-            if p != d {
-                let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
-                desc.next = null_mut();
-                prev.next = desc;
-            }
-        }
+        advance_tx_stream_descriptors(
+            self.buf.descriptors,
+            &mut self.descriptor_idx,
+            &mut self.descriptor_offset,
+            bytes_pushed,
+        );
     }
 
     /// Pushes a buffer into the stream buffer.
