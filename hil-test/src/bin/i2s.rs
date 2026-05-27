@@ -4,19 +4,19 @@
 //! with loopback mode enabled).
 
 //% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% FEATURES: unstable defmt
 // FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
 #![no_main]
 
-#[cfg(not(esp32))] // FIXME
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    #[cfg_attr(esp32, expect(unused))]
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::DmaTxStreamBuf,
+        dma::{DmaDescriptor, DmaRxBuf, DmaTxStreamBuf},
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
@@ -33,13 +33,16 @@ mod tests {
         }
     }
 
+    #[cfg_attr(esp32, expect(unused))]
     const BUFFER_SIZE: usize = 2000;
 
+    #[cfg_attr(esp32, expect(unused))]
     #[derive(Clone)]
     struct SampleSource {
         i: u8,
     }
 
+    #[cfg(not(esp32))]
     impl SampleSource {
         // choose values which DON'T restart on every descriptor buffer's start
         const ADD: u8 = 5;
@@ -50,6 +53,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(esp32))]
     impl Iterator for SampleSource {
         type Item = u8;
 
@@ -60,6 +64,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(esp32))]
     #[embassy_executor::task]
     async fn writer(mut tx_buffer: DmaTxStreamBuf, i2s_tx: I2sTx<'static, Async>) {
         let mut samples = SampleSource::new();
@@ -115,6 +120,11 @@ mod tests {
         }
     }
 
+    // FIXME - in loopback mode, the ESP32's I2S RX seems to randomly miss the first sample, causing
+    // this test to fail spuriously. Re-enable when this is fixed.
+    // While this is usually not a problem for audio applications, it does make testing more
+    // difficult.
+    #[cfg(not(esp32))]
     #[test]
     async fn test_i2s_loopback_async(ctx: Context) {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
@@ -172,6 +182,11 @@ mod tests {
         }
     }
 
+    // FIXME - in loopback mode, the ESP32's I2S RX seems to randomly miss the first sample, causing
+    // this test to fail spuriously. Re-enable when this is fixed.
+    // While this is usually not a problem for audio applications, it does make testing more
+    // difficult.
+    #[cfg(not(esp32))]
     #[test]
     fn test_i2s_loopback(ctx: Context) {
         let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE * 4, 1000);
@@ -280,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32s2))]
+    #[cfg(not(any(esp32, esp32s2)))]
     fn test_i2s_rx_half_sample_bits_regression(ctx: Context) {
         // Regression test for rx_half_sample_bits configuration bug.
         // Validates that TX and RX half_sample_bits registers are configured identically.
@@ -321,6 +336,99 @@ mod tests {
             "16-bit Stereo: RX half_sample_bits={}, expected {}",
             rx_half_sample_bits, expected_value
         );
+    }
+
+    #[test]
+    fn test_i2s_read_one_shot(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap();
+
+        // reading WS as input will generate a certain bit pattern on the data line which we can
+        // check was received correctly
+        let (din, ws) = unsafe { ctx.dout.split() };
+
+        let i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(ws)
+            .with_din(din)
+            .build();
+
+        let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+        let (_, done_rx) = rx_transfer.wait().unwrap();
+
+        assert!(done_rx.number_of_received_bytes() != 0);
+
+        let mut tmp = [0u8; 8000];
+        let read = done_rx.read_received_data(&mut tmp);
+
+        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
+        // less than the buffer size, but it should never be zero if the transfer completed
+        // successfully.
+        assert!(read != 0);
+
+        let l = read - read % 4;
+        for chunk in tmp[..l].chunks(4) {
+            assert_eq!(chunk, [1, 0, 254, 255]);
+        }
+    }
+
+    #[test]
+    async fn test_i2s_read_one_shot_async(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap()
+        .into_async();
+
+        // reading WS as input will generate a certain bit pattern on the data line which we can
+        // check was received correctly
+        let (din, ws) = unsafe { ctx.dout.split() };
+
+        let i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(ws)
+            .with_din(din)
+            .build();
+
+        let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+        let (_, done_rx) = rx_transfer.wait_async().await.unwrap();
+
+        assert!(done_rx.number_of_received_bytes() != 0);
+
+        let mut tmp = [0u8; 8000];
+        let read = done_rx.read_received_data(&mut tmp);
+
+        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
+        // less than the buffer size, but it should never be zero if the transfer completed
+        // successfully.
+        assert!(read != 0);
+
+        let l = read - read % 4;
+        for chunk in tmp[..l].chunks(4) {
+            assert_eq!(chunk, [1, 0, 254, 255]);
+        }
     }
 }
 
