@@ -169,7 +169,7 @@ pub mod dma {
         DriverMode,
         dma::{
             Channel,
-            DmaChannelFor,
+            DmaChannelConvert,
             DmaEligible,
             DmaRxBuffer,
             DmaRxInterrupt,
@@ -182,16 +182,7 @@ pub mod dma {
 
     const MAX_DMA_SIZE: usize = 32768 - 32;
 
-    impl<'d> Spi<'d, Blocking> {
-        /// Configures the SPI peripheral with the provided DMA channel and
-        /// descriptors.
-        #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-        #[instability::unstable]
-        pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-            self.spi.info().set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel.degrade())
-        }
-    }
+    impl<'d> Spi<'d, Blocking> {}
 
     /// A structure representing a DMA transfer for SPI.
     #[instability::unstable]
@@ -860,7 +851,7 @@ impl Instance for AnySpi<'_> {
 pub trait SpiSlaveDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
 
 #[cfg(spi_slave_supports_dma)]
-for_each_spi_slave_dma_engine! {
+with_spi_slave_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
         impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::dma::$any_channel<'_> {}
 
@@ -880,6 +871,21 @@ for_each_spi_slave_dma_engine! {
                     };
                 }
             };
+        }
+
+        impl<'d> Spi<'d, crate::Blocking> {
+            /// Configures the SPI peripheral with the provided DMA channel and
+            /// descriptors.
+            #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
+            #[instability::unstable]
+            pub fn with_dma<CH>(self, channel: CH) -> SpiDma<'d, crate::Blocking>
+            where
+                CH: SpiSlaveDmaChannel<AnySpi<'d>>,
+                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+            {
+                self.spi.info().set_data_mode(self.data_mode, true);
+                SpiDma::new(self.spi, channel.degrade())
+            }
         }
     };
 }

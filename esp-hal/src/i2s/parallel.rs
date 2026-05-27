@@ -103,10 +103,11 @@ use crate::{
     dma::{
         Channel,
         ChannelTx,
-        DmaChannelFor,
+        DmaChannelConvert,
         DmaEligible,
         DmaError,
         DmaTxBuffer,
+        PeripheralDmaChannel,
         PeripheralTxChannel,
         asynch::DmaTxFuture,
     },
@@ -253,15 +254,15 @@ where
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
-    /// Create a new I2S Parallel Interface
-    pub fn new(
+    #[cfg(i2s_parallel_supports_dma)]
+    fn new_internal(
         i2s: impl Instance + 'd,
-        channel: impl DmaChannelFor<AnyI2s<'d>>,
+        channel: PeripheralDmaChannel<AnyI2s<'d>>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(&i2s);
 
         let i2s = i2s.degrade();
@@ -792,7 +793,7 @@ impl Instance for AnyI2s<'_> {}
 pub trait I2sParallelDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
 
 #[cfg(i2s_parallel_supports_dma)]
-for_each_i2s_parallel_dma_engine! {
+with_i2s_parallel_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
         impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
 
@@ -812,6 +813,23 @@ for_each_i2s_parallel_dma_engine! {
                     };
                 }
             };
+        }
+
+        impl<'d> I2sParallel<'d, crate::Blocking> {
+            /// Create a new I2S Parallel Interface
+            pub fn new<CH>(
+                i2s: impl Instance + 'd,
+                channel: CH,
+                frequency: Rate,
+                pins: impl TxPins<'d>,
+                clock_pin: impl PeripheralOutput<'d>,
+            ) -> Self
+            where
+                CH: I2sParallelDmaChannel<AnyI2s<'d>>,
+                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+            {
+                Self::new_internal(i2s, channel.degrade(), frequency, pins, clock_pin)
+            }
         }
     };
 }

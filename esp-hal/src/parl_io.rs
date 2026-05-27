@@ -140,11 +140,12 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelFor,
+        DmaChannelConvert,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
         DmaTxBuffer,
+        PeripheralDmaChannel,
         PeripheralRxChannel,
         PeripheralTxChannel,
     },
@@ -1083,10 +1084,14 @@ where
 
 impl<'d> ParlIo<'d, Blocking> {
     /// Create a new instance of [ParlIo]
-    pub fn new(
+    pub fn new<CH>(
         _parl_io: PARL_IO<'d>,
-        dma_channel: impl DmaChannelFor<PARL_IO<'d>>,
-    ) -> Result<Self, Error> {
+        dma_channel: CH,
+    ) -> Result<Self, Error>
+    where
+        CH: ParlIoDmaChannel,
+        CH: DmaChannelConvert<PeripheralDmaChannel<PARL_IO<'d>>>,
+    {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
         let dma_channel = Channel::new(dma_channel.degrade());
@@ -2131,5 +2136,11 @@ impl Drop for ParlIoRxGuard {
 for_each_peripheral! {
     (dma_eligible PARL_IO, $name:ident, $id:literal, "AHB_GDMA") => {
         impl ParlIoDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
+
+        for_each_dma_channel! {
+            ("AHB_GDMA", $ch:ident) => {
+                impl ParlIoDmaChannel for crate::peripherals::$ch<'_> {}
+            };
+        }
     };
 }

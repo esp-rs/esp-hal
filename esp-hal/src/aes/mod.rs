@@ -363,7 +363,7 @@ pub mod dma {
         },
         dma::{
             Channel,
-            DmaChannelFor,
+            DmaChannelConvert,
             DmaDescriptor,
             DmaError,
             DmaRxBuffer,
@@ -417,7 +417,11 @@ pub mod dma {
 
     impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        pub fn with_dma(self, channel: impl DmaChannelFor<AES<'d>>) -> AesDma<'d> {
+        pub fn with_dma<CH>(self, channel: CH) -> AesDma<'d>
+        where
+            CH: super::AesDmaChannel,
+            CH: crate::dma::DmaChannelConvert<crate::dma::PeripheralDmaChannel<AES<'d>>>,
+        {
             let channel = Channel::new(channel.degrade());
             channel.runtime_ensure_compatible(&self.aes);
             AesDma { aes: self, channel }
@@ -782,7 +786,11 @@ pub mod dma {
         /// let mut aes = AesDmaBackend::new(peripherals.AES, peripherals.__dma_channel__);
         /// # {after_snippet}
         /// ```
-        pub fn new(aes: AES<'d>, dma: impl DmaChannelFor<AES<'d>>) -> Self {
+        pub fn new<CH>(aes: AES<'d>, dma: CH) -> Self
+        where
+            CH: super::AesDmaChannel,
+            CH: crate::dma::DmaChannelConvert<PeripheralDmaChannel<AES<'d>>>,
+        {
             Self {
                 peri: aes,
                 dma: dma.degrade(),
@@ -1677,7 +1685,7 @@ fn write_words(slice: &mut [u8], next: impl Fn(usize) -> u32) {
 pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
 
 #[cfg(aes_supports_dma)]
-for_each_aes_dma_engine! {
+with_aes_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
         impl AesDmaChannel for crate::dma::$any_channel<'_> {}
 

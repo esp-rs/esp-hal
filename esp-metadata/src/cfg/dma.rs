@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use convert_case::{Case, Casing};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
@@ -175,11 +176,18 @@ impl GenericProperty for DmaEngines {
         let dma_pairs_macro =
             generate_for_each_macro("dma_channel_peri_pair", &[("all", &dma_pairs)]);
 
-        // One for_each_{driver}_dma_engine! macro per driver that has DMA support.
+        // One with_{driver}_dma_engine! macro per driver that has DMA support.
+        // Each driver uses exactly one engine; assert that invariant here.
         let driver_engine_macros: Vec<_> = driver_engines
             .iter()
             .map(|(driver, engines)| {
-                generate_for_each_macro(&format!("{}_dma_engine", driver), &[("all", engines)])
+                assert!(
+                    engines.len() == 1,
+                    "driver '{}' is associated with {} DMA engines but exactly 1 is required",
+                    driver,
+                    engines.len()
+                );
+                generate_with_macro(&format!("{driver}_dma_engine"), &engines[0])
             })
             .collect();
 
@@ -188,5 +196,30 @@ impl GenericProperty for DmaEngines {
             #dma_pairs_macro
             #(#driver_engine_macros)*
         })
+    }
+}
+
+/// Generates a `with_{name}!` macro that provides a single fixed token set.
+///
+/// Unlike `generate_for_each_macro`, this asserts that exactly one set of tokens
+/// was provided (panicking at code-generation time otherwise), then emits a macro
+/// that calls its body exactly once with those tokens.
+fn generate_with_macro(name: &str, tokens: &TokenStream) -> TokenStream {
+    let macro_name = format_ident!("with_{name}");
+    let inner = format_ident!("_with_inner_{name}");
+
+    quote! {
+        #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+        macro_rules! #macro_name {
+            (
+                $pattern:tt => $code:tt $(;)?
+            ) => {
+                macro_rules! #inner {
+                    ($pattern) => $code;
+                }
+                #inner!(( #tokens ));
+            };
+        }
     }
 }

@@ -108,7 +108,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelFor,
+        DmaChannelConvert,
         DmaEligible,
         DmaError,
         DmaRxBuffer,
@@ -396,11 +396,15 @@ where
 
 impl<'d> Uhci<'d, Blocking> {
     /// Creates a new instance of UHCI
-    pub fn new(
+    pub fn new<CH>(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
-        channel: impl DmaChannelFor<AnyUhci<'d>>,
-    ) -> Self {
+        channel: CH,
+    ) -> Self
+    where
+        CH: UhciDmaChannel,
+        CH: DmaChannelConvert<PeripheralDmaChannel<AnyUhci<'d>>>,
+    {
         let guard = GenericPeripheralGuard::new();
 
         let channel = Channel::new(channel.degrade());
@@ -822,5 +826,11 @@ where
 for_each_peripheral! {
     (dma_eligible UHCI0, $name:ident, $id:literal, "AHB_GDMA") => {
         impl UhciDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
+
+        for_each_dma_channel! {
+            ("AHB_GDMA", $ch:ident) => {
+                impl UhciDmaChannel for crate::peripherals::$ch<'_> {}
+            };
+        }
     };
 }

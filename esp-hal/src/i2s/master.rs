@@ -126,13 +126,14 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelFor,
+        DmaChannelConvert,
         DmaEligible,
         DmaError,
         DmaRxBuffer,
         DmaRxInterrupt,
         DmaTxBuffer,
         DmaTxInterrupt,
+        PeripheralDmaChannel,
         PeripheralRxChannel,
         PeripheralTxChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
@@ -170,7 +171,7 @@ pub enum I2sInterrupt {
 pub trait I2sMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
 
 #[cfg(i2s_master_supports_dma)]
-for_each_i2s_master_dma_engine! {
+with_i2s_master_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
         impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
 
@@ -190,6 +191,21 @@ for_each_i2s_master_dma_engine! {
                     };
                 }
             };
+        }
+
+        impl<'d> I2s<'d, crate::Blocking> {
+            /// Construct a new I2s instance.
+            pub fn new<CH>(
+                i2s: impl Instance + 'd,
+                channel: CH,
+                config: Config,
+            ) -> Result<Self, ConfigError>
+            where
+                CH: I2sMasterDmaChannel<AnyI2s<'d>>,
+                CH: crate::dma::DmaChannelConvert<crate::dma::$any_channel<'d>>,
+            {
+                Self::new_internal(i2s, channel.degrade(), config)
+            }
         }
     };
 }
@@ -1121,13 +1137,13 @@ where
 }
 
 impl<'d> I2s<'d, Blocking> {
-    /// Construct a new I2s instance.
-    pub fn new(
+    #[cfg(i2s_master_supports_dma)]
+    fn new_internal(
         i2s: impl Instance + 'd,
-        channel: impl DmaChannelFor<AnyI2s<'d>>,
+        channel: PeripheralDmaChannel<AnyI2s<'d>>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(&i2s);
 
         let i2s = i2s.degrade();

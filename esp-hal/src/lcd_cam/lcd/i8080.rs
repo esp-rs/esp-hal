@@ -54,7 +54,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
+    dma::{ChannelTx, DmaChannelConvert, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -93,11 +93,15 @@ where
     Dm: DriverMode,
 {
     /// Creates a new instance of the I8080 LCD interface.
-    pub fn new(
+    pub fn new<CH>(
         lcd: Lcd<'d, Dm>,
-        channel: impl TxChannelFor<LCD_CAM<'d>>,
+        channel: CH,
         config: Config,
-    ) -> Result<Self, ConfigError> {
+    ) -> Result<Self, ConfigError>
+    where
+        CH: crate::lcd_cam::LcdDmaTxChannel,
+        CH: DmaChannelConvert<PeripheralTxChannel<LCD_CAM<'d>>>,
+    {
         let tx_channel = ChannelTx::new(channel.degrade());
 
         let mut this = Self {

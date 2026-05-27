@@ -758,7 +758,6 @@ This pin may be available with certain limitations. Check your hardware to make 
                     singleton_peripherals.push(quote! { #hal (unstable) });
                 }
             }
-
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
