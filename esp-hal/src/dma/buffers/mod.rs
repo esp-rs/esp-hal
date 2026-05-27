@@ -1468,15 +1468,21 @@ impl DmaTxStreamBufView {
 
     /// Advances the first `n` bytes from the available data
     pub fn advance(&mut self, bytes_pushed: usize) {
+        if bytes_pushed == 0 {
+            return;
+        }
+
         let mut bytes_filled = 0;
-        for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
+        let num_descriptors = self.buf.descriptors.len();
+
+        for i in 0..num_descriptors {
+            let d = (self.descriptor_idx + i) % num_descriptors;
             let desc = &mut self.buf.descriptors[d];
             let bytes_in_d = desc.size() - self.descriptor_offset;
-            // There is at least one byte left in `desc`.
             if bytes_in_d + bytes_filled > bytes_pushed {
                 self.descriptor_idx = d;
                 self.descriptor_offset = self.descriptor_offset + bytes_pushed - bytes_filled;
-                break;
+                return;
             }
             bytes_filled += bytes_in_d;
             self.descriptor_offset = 0;
@@ -1485,7 +1491,7 @@ impl DmaTxStreamBufView {
             desc.set_owner(Owner::Dma);
             desc.set_length(desc.size());
             desc.set_suc_eof(true);
-            let p = d.checked_sub(1).unwrap_or(self.buf.descriptors.len() - 1);
+            let p = d.checked_sub(1).unwrap_or(num_descriptors - 1);
             if p != d {
                 let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
                 desc.next = null_mut();
