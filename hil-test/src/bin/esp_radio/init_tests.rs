@@ -28,7 +28,7 @@ mod init_tests {
         signal: &'static Signal<CriticalSectionRawMutex, Option<WifiError>>,
         wifi_peripheral: WIFI<'static>,
     ) {
-        match esp_radio::wifi::new(wifi_peripheral, Default::default()) {
+        match esp_radio::wifi::WifiController::new(wifi_peripheral, Default::default()) {
             Ok(_) => signal.signal(None),
             Err(err) => signal.signal(Some(err)),
         }
@@ -50,7 +50,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     fn test_init_fails_without_scheduler(p: Peripherals) {
         // esp-rtos must be initialized before esp-radio.
-        let _ = esp_radio::wifi::new(p.WIFI, Default::default());
+        let _ = esp_radio::wifi::WifiController::new(p.WIFI, Default::default());
     }
 
     #[test]
@@ -61,7 +61,9 @@ mod init_tests {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let _ = critical_section::with(|_| esp_radio::wifi::new(p.WIFI, Default::default()));
+        let _ = critical_section::with(|_| {
+            esp_radio::wifi::WifiController::new(p.WIFI, Default::default())
+        });
     }
 
     #[test]
@@ -72,7 +74,7 @@ mod init_tests {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let _ = interrupt_free(|| esp_radio::wifi::new(p.WIFI, Default::default()));
+        let _ = interrupt_free(|| esp_radio::wifi::WifiController::new(p.WIFI, Default::default()));
     }
 
     #[test]
@@ -105,11 +107,13 @@ mod init_tests {
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         // Initialize, then de-initialize wifi
-        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi =
+            esp_radio::wifi::WifiController::new(p.WIFI.reborrow(), Default::default()).unwrap();
         drop(wifi);
 
         // Now, can we do it again?
-        let _wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let _wifi =
+            esp_radio::wifi::WifiController::new(p.WIFI.reborrow(), Default::default()).unwrap();
     }
 
     #[test]
@@ -122,7 +126,8 @@ mod init_tests {
 
         // Initialize BLE and WiFi then drop BLE
         let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
-        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi =
+            esp_radio::wifi::WifiController::new(p.WIFI.reborrow(), Default::default()).unwrap();
         drop(connector);
 
         // Re-initialize BLE and drop WiFi and BLE
@@ -140,14 +145,16 @@ mod init_tests {
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         // Initialize WiFi and BLE then drop BLE and WiFi
-        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi =
+            esp_radio::wifi::WifiController::new(p.WIFI.reborrow(), Default::default()).unwrap();
         let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
 
         drop(connector);
         drop(wifi);
 
         // Re-initialize WiFi and BLE then drop WiFi
-        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi =
+            esp_radio::wifi::WifiController::new(p.WIFI.reborrow(), Default::default()).unwrap();
         let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
 
         drop(wifi);

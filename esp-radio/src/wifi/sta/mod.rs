@@ -5,7 +5,7 @@ use core::fmt;
 
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Protocols, Ssid};
+use super::{AuthenticationMethod, DisconnectReason, Protocols, Ssid};
 use crate::WifiError;
 
 unstable_module!(
@@ -155,4 +155,36 @@ impl defmt::Format for StationConfig {
             self.scan_method
         )
     }
+}
+
+/// Information about the access point the station connected to.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct ConnectedInfo {
+    /// The SSID of the access point.
+    pub ssid: Ssid,
+    /// The BSSID of the access point.
+    pub bssid: [u8; 6],
+    /// The channel of the access point.
+    pub channel: u8,
+    /// The authentication method used.
+    pub authmode: AuthenticationMethod,
+    /// The Association ID (AID) assigned by the access point.
+    pub aid: u16,
+}
+
+/// Information about the access point the station disconnected from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct DisconnectedInfo {
+    /// The SSID of the access point.
+    pub ssid: Ssid,
+    /// The BSSID of the access point.
+    pub bssid: [u8; 6],
+    /// The disconnect reason.
+    pub reason: DisconnectReason,
+    /// The RSSI.
+    pub rssi: i8,
 }
