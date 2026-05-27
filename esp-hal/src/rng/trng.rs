@@ -6,9 +6,9 @@ static TRNG_ENABLED: AtomicUsize = AtomicUsize::new(0);
 static TRNG_USERS: AtomicUsize = AtomicUsize::new(0);
 
 use super::Rng;
-use crate::peripherals::{ADC1, RNG};
 #[cfg(not(esp32))]
-use crate::system::{GenericPeripheralGuard, Peripheral};
+use crate::analog::adc::SarAdcGuard;
+use crate::peripherals::{ADC1, RNG};
 
 /// Ensures random numbers are cryptographically secure.
 #[instability::unstable]
@@ -16,7 +16,7 @@ pub struct TrngSource<'d> {
     _rng: RNG<'d>,
     _adc: ADC1<'d>,
     #[cfg(not(esp32))]
-    _apb_saradc_guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _apb_saradc_guard: SarAdcGuard,
 }
 
 impl<'d> TrngSource<'d> {
@@ -25,7 +25,7 @@ impl<'d> TrngSource<'d> {
     #[instability::unstable]
     pub fn new(rng: RNG<'d>, adc: ADC1<'d>) -> Self {
         #[cfg(not(esp32))]
-        let apb_saradc_guard = GenericPeripheralGuard::new();
+        let apb_saradc_guard = SarAdcGuard::new();
 
         crate::soc::trng::ensure_randomness();
         unsafe { Self::increase_entropy_source_counter() }

@@ -66,8 +66,8 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
-#[cfg(all(feature = "unstable", not(esp32)))]
-pub(crate) fn on_apb_saradc_clock_release() {
+#[cfg(not(esp32))]
+fn on_apb_saradc_clock_release() {
     #[cfg(any(esp32s2, esp32s3))]
     {
         let sensors = crate::peripherals::SENS::regs();
@@ -93,6 +93,37 @@ pub(crate) fn on_apb_saradc_clock_release() {
         crate::peripherals::APB_SARADC::regs()
             .ctrl()
             .modify(|_, w| unsafe { w.xpd_sar_force().bits(0) });
+    }
+}
+
+/// A guard that tracks SAR ADC usage and powers down the SAR analog domain
+/// when the last user is dropped.
+// Without this, leaving the ADC "enabled" before entering deep sleep keeps the SAR analog block
+// powered and significantly increases sleep-time current consumption — see <https://github.com/esp-rs/esp-hal/issues/2740>.
+#[cfg(not(esp32))]
+pub(crate) struct SarAdcGuard {
+    _inner: crate::system::GenericPeripheralGuard<{ crate::system::Peripheral::ApbSarAdc as u8 }>,
+}
+
+#[cfg(not(esp32))]
+static SAR_ADC_USERS: portable_atomic::AtomicUsize = portable_atomic::AtomicUsize::new(0);
+
+#[cfg(not(esp32))]
+impl SarAdcGuard {
+    pub(crate) fn new() -> Self {
+        SAR_ADC_USERS.fetch_add(1, portable_atomic::Ordering::AcqRel);
+        Self {
+            _inner: crate::system::GenericPeripheralGuard::new(),
+        }
+    }
+}
+
+#[cfg(not(esp32))]
+impl Drop for SarAdcGuard {
+    fn drop(&mut self) {
+        if SAR_ADC_USERS.fetch_sub(1, portable_atomic::Ordering::AcqRel) == 1 {
+            on_apb_saradc_clock_release();
+        }
     }
 }
 
