@@ -224,6 +224,7 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_async(mut self) -> Result<(I2sTx<'d, Async>, Buf::Final), DmaError> {
         DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await?;
+        while !self.is_done() {}
 
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
@@ -264,6 +265,7 @@ impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::DerefMut for I2sTxDmaTransfer<
 
 impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for I2sTxDmaTransfer<'_, Dm, BUF> {
     fn drop(&mut self) {
+        self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
 
         // SAFETY: This is Drop, we know that the parts are no longer used
@@ -303,8 +305,8 @@ where
     pub fn wait(mut self) -> Result<(I2sRx<'d, Dm>, Buf::Final), DmaError> {
         while !self.is_done() {}
 
-        self.i2s_rx.rx_channel.stop_transfer();
         self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.rx_channel.stop_transfer();
 
         let (i2s_rx, buf) = self.release();
 
@@ -342,8 +344,8 @@ where
         )
         .await?;
 
-        self.i2s_rx.rx_channel.stop_transfer();
         self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.rx_channel.stop_transfer();
 
         let (i2s_rx, buf) = self.release();
 
@@ -385,6 +387,7 @@ impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::DerefMut for I2sRxDmaTransfer<
 
 impl<Dm: DriverMode, BUF: DmaRxBuffer> Drop for I2sRxDmaTransfer<'_, Dm, BUF> {
     fn drop(&mut self) {
+        self.i2s_rx.rx_channel.stop_transfer();
         self.i2s_rx.i2s.rx_stop();
 
         // SAFETY: This is Drop, we know that the parts are no longer used
