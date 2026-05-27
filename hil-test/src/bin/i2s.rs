@@ -413,7 +413,9 @@ mod tests {
             .with_din(din)
             .build();
 
-        let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+        let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+        rx_transfer.wait_for_done_async().await.unwrap();
+        assert_eq!(rx_transfer.is_done(), true);
         let (_, done_rx) = rx_transfer.wait_async().await.unwrap();
 
         assert!(done_rx.number_of_received_bytes() != 0);
@@ -433,6 +435,7 @@ mod tests {
     }
 
     // We don't actually check the output but just make sure the write completes.
+    // On supported chips we could use PCNT to verify at least the expected clock edges or similar.
     #[test]
     fn test_i2s_write_one_shot(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
@@ -461,6 +464,7 @@ mod tests {
     }
 
     // We don't actually check the output but just make sure the write completes.
+    // On supported chips we could use PCNT to verify at least the expected clock edges or similar.
     #[test]
     async fn test_i2s_write_one_shot_async(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
@@ -485,7 +489,9 @@ mod tests {
             .with_dout(ctx.dout)
             .build();
 
-        let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+        let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+        tx_transfer.wait_for_done_async().await.unwrap();
+        assert_eq!(tx_transfer.is_done(), true);
         let (_, _done_tx) = tx_transfer.wait_async().await.unwrap();
     }
 }

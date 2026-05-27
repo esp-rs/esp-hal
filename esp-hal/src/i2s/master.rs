@@ -176,6 +176,7 @@ where
 {
     i2s_tx: ManuallyDrop<I2sTx<'d, Dm>>,
     buffer_view: ManuallyDrop<Buf::View>,
+    completed: bool,
 }
 
 impl<'d, Dm, Buf> I2sTxDmaTransfer<'d, Dm, Buf>
@@ -185,12 +186,13 @@ where
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.i2s_tx.i2s.is_tx_done()
+        self.completed || self.i2s_tx.i2s.is_tx_done()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub fn wait(mut self) -> Result<(I2sTx<'d, Dm>, Buf::Final), DmaError> {
         while !self.is_done() {}
+        self.completed = true;
 
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
@@ -223,8 +225,11 @@ where
 {
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_async(mut self) -> Result<(I2sTx<'d, Async>, Buf::Final), DmaError> {
-        DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await?;
-        while !self.is_done() {}
+        if !self.completed {
+            DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await?;
+            while !self.is_done() {}
+            self.completed = true;
+        }
 
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
@@ -236,6 +241,16 @@ where
         } else {
             Ok((i2s_tx, Buf::from_view(buf)))
         }
+    }
+
+    /// Waits for the transfer to finish.
+    pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
+        if !self.completed {
+            DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await?;
+            while !self.is_done() {}
+            self.completed = true;
+        }
+        Ok(())
     }
 
     /// Waits for a condition that might indicate more data is available.
@@ -289,6 +304,7 @@ where
 {
     i2s_rx: ManuallyDrop<I2sRx<'d, Dm>>,
     buffer_view: ManuallyDrop<Buf::View>,
+    completed: bool,
 }
 
 impl<'d, Dm, Buf> I2sRxDmaTransfer<'d, Dm, Buf>
@@ -298,7 +314,7 @@ where
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.i2s_rx.i2s.is_rx_done()
+        self.completed || self.i2s_rx.i2s.is_rx_done()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
@@ -336,13 +352,16 @@ where
 {
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub async fn wait_async(mut self) -> Result<(I2sRx<'d, Async>, Buf::Final), DmaError> {
-        // we treat DescriptorEmpty as rx transfer is done
-        DmaRxFuture::new_with_config(
-            &mut self.i2s_rx.rx_channel,
-            enum_set!(DmaRxInterrupt::DescriptorEmpty),
-            enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
-        )
-        .await?;
+        if !self.completed {
+            // we treat DescriptorEmpty as rx transfer is done
+            DmaRxFuture::new_with_config(
+                &mut self.i2s_rx.rx_channel,
+                enum_set!(DmaRxInterrupt::DescriptorEmpty),
+                enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
+            )
+            .await?;
+            self.completed = true;
+        }
 
         self.i2s_rx.i2s.rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
@@ -354,6 +373,21 @@ where
         } else {
             Ok((i2s_rx, Buf::from_view(buf)))
         }
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
+        if !self.completed {
+            // we treat DescriptorEmpty as rx transfer is done
+            DmaRxFuture::new_with_config(
+                &mut self.i2s_rx.rx_channel,
+                enum_set!(DmaRxInterrupt::DescriptorEmpty),
+                enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
+            )
+            .await?;
+            self.completed = true;
+        }
+        Ok(())
     }
 
     /// Waits for a condition that might indicate more data is available.
@@ -1244,6 +1278,7 @@ where
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
             buffer_view: ManuallyDrop::new(buffer.into_view()),
+            completed: false,
         })
     }
 
@@ -1315,6 +1350,7 @@ where
         Ok(I2sRxDmaTransfer {
             i2s_rx: ManuallyDrop::new(self),
             buffer_view: ManuallyDrop::new(buffer.into_view()),
+            completed: false,
         })
     }
 
