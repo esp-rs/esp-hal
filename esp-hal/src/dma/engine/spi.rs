@@ -504,44 +504,40 @@ impl AnySpiDmaChannel<'_> {
     }
 }
 
-macro_rules! impl_pdma_channel {
-    ($peri:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
-        paste::paste! {
-            use $crate::peripherals::$instance;
-            impl $instance<'_> {
-                pub(super) fn info(&self) -> &'static ChannelInfo {
-                    #[crate::handler(priority = crate::interrupt::Priority::max())]
-                    fn interrupt_handler() {
-                        crate::dma::asynch::handle_in_interrupt::<$instance<'static>>();
-                        crate::dma::asynch::handle_out_interrupt::<$instance<'static>>();
-                    }
-                    static INFO: ChannelInfo = ChannelInfo {
-                        peripheral_interrupt: crate::peripherals::Interrupt::$int,
-                        async_handler: interrupt_handler,
-                        compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
-                    };
-                    &INFO
+for_each_dma_channel_peri_pair! {
+    ("SPI_DMA", $dma_peri:ident, $peri:ident) => {
+        use $crate::peripherals::$dma_peri;
+        impl $dma_peri<'_> {
+            pub(super) fn info(&self) -> &'static ChannelInfo {
+                #[crate::handler(priority = crate::interrupt::Priority::max())]
+                fn interrupt_handler() {
+                    crate::dma::asynch::handle_in_interrupt::<$dma_peri<'static>>();
+                    crate::dma::asynch::handle_out_interrupt::<$dma_peri<'static>>();
                 }
 
-                pub(super) fn state(&self) -> &'static ChannelState {
-                    static STATE: ChannelState = ChannelState {
-                        tx_waker: crate::asynch::AtomicWaker::new(),
-                        rx_waker: crate::asynch::AtomicWaker::new(),
-                        tx_is_async: portable_atomic::AtomicBool::new(false),
-                        rx_is_async: portable_atomic::AtomicBool::new(false),
-                    };
-                    &STATE
-                }
+                static INFO: ChannelInfo = ChannelInfo {
+                    peripheral_interrupt: paste::paste! { Interrupt::[<$peri _DMA>] },
+                    async_handler: interrupt_handler,
+                    compatible_peripherals: &[crate::dma::DmaPeripheral::$peri.0],
+                };
+
+                &INFO
             }
 
+            pub(super) fn state(&self) -> &'static ChannelState {
+                static STATE: ChannelState = ChannelState {
+                    tx_waker: AtomicWaker::new(),
+                    rx_waker: AtomicWaker::new(),
+                    tx_is_async: portable_atomic::AtomicBool::new(false),
+                    rx_is_async: portable_atomic::AtomicBool::new(false),
+                };
+                &STATE
+            }
         }
 
-        crate::dma::impl_channel_common!($peri, $instance);
+        crate::dma::impl_channel_common!(AnySpiDma, $dma_peri);
     };
 }
-
-impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [SPI2]);
-impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [SPI3]);
 
 pub(super) fn enable_spi_dma() {
     #[cfg(esp32)]
