@@ -146,7 +146,7 @@ where
         CH: DmaTxChannel<Erased = AnyAhbGdmaTxChannel<'d>>,
     {
         let tx_channel = ChannelTx::new(channel.degrade());
-        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM.0);
+        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,

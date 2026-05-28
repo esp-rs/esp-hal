@@ -154,7 +154,7 @@ impl<'d> Camera<'d> {
         CH: DmaRxChannel<Erased = AnyAhbGdmaRxChannel<'d>>,
     {
         let rx_channel = ChannelRx::new(channel.degrade());
-        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM.0);
+        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {
             lcd_cam: cam.lcd_cam,
