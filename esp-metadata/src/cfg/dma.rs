@@ -117,6 +117,25 @@ impl GenericProperty for DmaEngines {
 
                 names.push(quote! { #engine_name, #ch });
 
+                let compatible_peris = if channel.compatible_with.is_empty() {
+                    engine
+                        .peripheral_instances
+                        .iter()
+                        .map(|p| format_ident!("{}", p.name))
+                        .collect::<Vec<_>>()
+                } else {
+                    channel
+                        .compatible_with
+                        .iter()
+                        .map(|p| format_ident!("{p}"))
+                        .collect::<Vec<_>>()
+                };
+
+                for peri_ident in compatible_peris.iter() {
+                    let ch_ident = quote::format_ident!("{}", channel.name);
+                    dma_pairs.push(quote! { #engine_name, #ch_ident, #peri_ident });
+                }
+
                 match (
                     &channel.interrupt,
                     &channel.interrupt_in,
@@ -124,13 +143,13 @@ impl GenericProperty for DmaEngines {
                 ) {
                     (Some(interrupt), None, None) => {
                         let interrupt = quote::format_ident!("{}", interrupt);
-                        shared.push(quote! { #engine_name, #ch, #idx, interrupt = #interrupt });
+                        shared.push(quote! { #engine_name, #ch, #idx, interrupt = #interrupt, compatible = [#(#compatible_peris),*] });
                     }
                     (None, Some(interrupt_in), Some(interrupt_out)) => {
                         let interrupt_in = quote::format_ident!("{}", interrupt_in);
                         let interrupt_out = quote::format_ident!("{}", interrupt_out);
                         split.push(
-                            quote! { #engine_name, #ch, #idx, interrupt_in = #interrupt_in, interrupt_out = #interrupt_out },
+                            quote! { #engine_name, #ch, #idx, interrupt_in = #interrupt_in, interrupt_out = #interrupt_out, compatible = [#(#compatible_peris),*] },
                         );
                     }
                     (None, None, None) => {
@@ -143,21 +162,6 @@ impl GenericProperty for DmaEngines {
                             channel.name
                         );
                     }
-                }
-
-                let compatible_peris = if channel.compatible_with.is_empty() {
-                    engine
-                        .peripheral_instances
-                        .iter()
-                        .map(|p| p.name.clone())
-                        .collect::<Vec<_>>()
-                } else {
-                    channel.compatible_with.clone()
-                };
-                for peri_name in compatible_peris {
-                    let ch_ident = quote::format_ident!("{}", channel.name);
-                    let peri_ident = quote::format_ident!("{}", peri_name);
-                    dma_pairs.push(quote! { #engine_name, #ch_ident, #peri_ident });
                 }
             }
         }

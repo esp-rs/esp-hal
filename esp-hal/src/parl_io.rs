@@ -137,13 +137,13 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
+        AnyAhbGdmaChannel,
+        AnyAhbGdmaRxChannel,
+        AnyAhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
         DmaChannel,
-        AnyAhbGdmaChannel,
-        AnyAhbGdmaRxChannel,
-        AnyAhbGdmaTxChannel,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
@@ -1084,10 +1084,7 @@ where
 
 impl<'d> ParlIo<'d, Blocking> {
     /// Create a new instance of [ParlIo]
-    pub fn new<CH>(
-        _parl_io: PARL_IO<'d>,
-        dma_channel: CH,
-    ) -> Result<Self, Error>
+    pub fn new<CH>(_parl_io: PARL_IO<'d>, dma_channel: CH) -> Result<Self, Error>
     where
         CH: ParlIoDmaChannel,
         CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
@@ -1095,6 +1092,7 @@ impl<'d> ParlIo<'d, Blocking> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
         let dma_channel = Channel::new(dma_channel.degrade());
+        dma_channel.runtime_ensure_compatible(DmaPeripheral::PARL_IO);
 
         Ok(Self {
             tx: TxCreator {
@@ -1209,7 +1207,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo.0, &mut buffer)
+                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1371,7 +1369,7 @@ where
 
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo.0, &mut buffer)
+                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = result {

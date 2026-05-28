@@ -415,12 +415,9 @@ pub mod dma {
 
     impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        pub fn with_dma<CH>(self, channel: CH) -> AesDma<'d>
-        where
-            CH: AesDmaChannel,
-            CH: crate::dma::DmaChannel<Erased = AesErased<'d>>,
-        {
+        pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
             let channel = Channel::new(channel.degrade());
+            channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::AES);
             AesDma { aes: self, channel }
         }
     }
@@ -463,7 +460,7 @@ pub mod dma {
             TXBUF: DmaTxBuffer,
             RXBUF: DmaRxBuffer,
         {
-            let peri = self.dma_peripheral();
+            let peri = crate::dma::DmaPeripheral::AES;
 
             if let Err(error) = unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
                 .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })
@@ -526,10 +523,6 @@ pub mod dma {
 
         fn reset_aes(&self) {
             PeripheralClockControl::reset(Peripheral::Aes);
-        }
-
-        fn dma_peripheral(&self) -> u8 {
-            crate::dma::DmaPeripheral::Aes.0
         }
 
         fn enable_dma(&self, enable: bool) {
@@ -783,11 +776,7 @@ pub mod dma {
         /// let mut aes = AesDmaBackend::new(peripherals.AES, peripherals.__dma_channel__);
         /// # {after_snippet}
         /// ```
-        pub fn new<CH>(aes: AES<'d>, dma: CH) -> Self
-        where
-            CH: AesDmaChannel,
-            CH: crate::dma::DmaChannel<Erased = AesErased<'d>>,
-        {
+        pub fn new(aes: AES<'d>, dma: impl AesDmaChannel<'d>) -> Self {
             Self {
                 peri: aes,
                 dma: dma.degrade(),
@@ -1204,7 +1193,10 @@ pub mod dma {
         message = "The DMA channel cannot be used with the AES peripheral",
         label = "This DMA channel"
     )]
-    pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+    pub trait AesDmaChannel<'d>:
+        crate::dma::DmaChannel<Erased = AesErased<'d>> + crate::private::Sealed
+    {
+    }
 
     // TODO: replace by an AnyCryptoDma type
     with_aes_dma_engine! {
@@ -1218,11 +1210,11 @@ pub mod dma {
 
     with_aes_dma_engine! {
         ($engine:literal, $any_channel:ident) => {
-            impl AesDmaChannel for AesErased<'_> {}
+            impl<'d> AesDmaChannel<'d> for AesErased<'d> {}
 
             for_each_dma_channel_peri_pair! {
                 ($engine, $ch:ident, AES) => {
-                    impl AesDmaChannel for crate::peripherals::$ch<'_> {}
+                    impl<'d> AesDmaChannel<'d> for crate::peripherals::$ch<'d> {}
                 };
             }
         };

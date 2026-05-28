@@ -153,7 +153,6 @@ crate::any_peripheral! {
     }
 }
 
-
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
     fn register_block(&self) -> &uhci0::RegisterBlock {
@@ -385,11 +384,7 @@ where
 
 impl<'d> Uhci<'d, Blocking> {
     /// Creates a new instance of UHCI
-    pub fn new<CH>(
-        uart: Uart<'d, Blocking>,
-        uhci: peripherals::UHCI0<'static>,
-        channel: CH,
-    ) -> Self
+    pub fn new<CH>(uart: Uart<'d, Blocking>, uhci: peripherals::UHCI0<'static>, channel: CH) -> Self
     where
         CH: UhciDmaChannel,
         CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
@@ -397,6 +392,7 @@ impl<'d> Uhci<'d, Blocking> {
         let guard = GenericPeripheralGuard::new();
 
         let channel = Channel::new(channel.degrade());
+        channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::UHCI0);
 
         let uhci = Uhci {
             uart,
@@ -457,7 +453,7 @@ where
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
-                .prepare_transfer(crate::dma::DmaPeripheral::Uhci0.0, &mut tx_buffer)
+                .prepare_transfer(crate::dma::DmaPeripheral::UHCI0, &mut tx_buffer)
         };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
@@ -503,7 +499,7 @@ where
         {
             let res = unsafe {
                 self.channel_rx
-                    .prepare_transfer(crate::dma::DmaPeripheral::Uhci0.0, &mut rx_buffer)
+                    .prepare_transfer(crate::dma::DmaPeripheral::UHCI0, &mut rx_buffer)
             };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));

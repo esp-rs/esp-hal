@@ -16,12 +16,12 @@ crate::any_peripheral! {
 }
 
 impl AnyI2s<'_> {
-    pub(crate) fn dma_peripheral_num(&self) -> u8 {
+    pub(crate) fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(soc_has_i2s0)]
-            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2s0.0,
+            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2S0,
             #[cfg(soc_has_i2s1)]
-            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2s1.0,
+            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2S1,
         }
     }
 }

@@ -97,8 +97,8 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         use esp32s2::crypto_dma::aes_sha_select::SELECT;
         let sel = match peripheral {
-            p if p == DmaPeripheral::Aes.0 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha.0 => SELECT::Sha,
+            p if p == DmaPeripheral::AES.0 => SELECT::Aes,
+            p if p == DmaPeripheral::SHA.0 => SELECT::Sha,
             _ => unreachable!(),
         };
         self.regs()
@@ -146,6 +146,10 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
@@ -286,8 +290,8 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         use esp32s2::crypto_dma::aes_sha_select::SELECT;
         let sel = match peripheral {
-            p if p == DmaPeripheral::Aes.0 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha.0 => SELECT::Sha,
+            p if p == DmaPeripheral::AES.0 => SELECT::Aes,
+            p if p == DmaPeripheral::SHA.0 => SELECT::Sha,
             _ => unreachable!(),
         };
         self.regs()
@@ -335,6 +339,10 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
@@ -477,7 +485,7 @@ impl DMA_CRYPTO<'_> {
         static INFO: ChannelInfo = ChannelInfo {
             peripheral_interrupt: Interrupt::CRYPTO_DMA,
             async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes.0, DmaPeripheral::Sha.0],
+            compatible_peripherals: &[DmaPeripheral::AES.0, DmaPeripheral::SHA.0],
         };
         &INFO
     }
@@ -492,4 +500,3 @@ impl DMA_CRYPTO<'_> {
         &STATE
     }
 }
-

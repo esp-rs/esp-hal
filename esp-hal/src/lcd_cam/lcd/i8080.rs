@@ -54,7 +54,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AnyAhbGdmaTxChannel, ChannelTx, DmaTxChannel, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{AnyAhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxChannel},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -93,16 +93,13 @@ where
     Dm: DriverMode,
 {
     /// Creates a new instance of the I8080 LCD interface.
-    pub fn new<CH>(
-        lcd: Lcd<'d, Dm>,
-        channel: CH,
-        config: Config,
-    ) -> Result<Self, ConfigError>
+    pub fn new<CH>(lcd: Lcd<'d, Dm>, channel: CH, config: Config) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::LcdDmaTxChannel,
         CH: DmaTxChannel<Erased = AnyAhbGdmaTxChannel<'d>>,
     {
         let tx_channel = ChannelTx::new(channel.degrade());
+        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM.0);
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -462,7 +459,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam.0, &mut data)
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut data)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {

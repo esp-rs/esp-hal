@@ -25,7 +25,7 @@ for_each_peripheral! {
         impl DmaPeripheral {
             $(
                 #[doc = concat!("DMA accesses ", stringify!($name))]
-                pub const $name: Self = Self($id);
+                pub const $peri: Self = Self($id);
             )*
         }
     };

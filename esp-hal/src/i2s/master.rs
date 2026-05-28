@@ -162,36 +162,38 @@ pub enum I2sInterrupt {
     label = "This DMA channel",
     note = "Use a channel that matches the I2S instance."
 )]
-pub trait I2sMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
+pub trait I2sMasterDmaChannel<'d, S>:
+    crate::dma::DmaChannel<Erased = I2sMasterErased<'d>> + crate::private::Sealed
+{
+}
 
-#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+#[cfg(dma_kind = "gdma")]
 type I2sMasterErased<'d> = crate::dma::AnyAhbGdmaChannel<'d>;
-#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+#[cfg(dma_kind = "gdma")]
 type I2sMasterTxErased<'d> = crate::dma::AnyAhbGdmaTxChannel<'d>;
-#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+#[cfg(dma_kind = "gdma")]
 type I2sMasterRxErased<'d> = crate::dma::AnyAhbGdmaRxChannel<'d>;
 
-#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+#[cfg(dma_kind = "pdma")]
 type I2sMasterErased<'d> = crate::dma::AnyI2sDmaChannel<'d>;
-#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+#[cfg(dma_kind = "pdma")]
 type I2sMasterTxErased<'d> = crate::dma::AnyI2sDmaTxChannel<'d>;
-#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+#[cfg(dma_kind = "pdma")]
 type I2sMasterRxErased<'d> = crate::dma::AnyI2sDmaRxChannel<'d>;
 
-#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
-impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyAhbGdmaChannel<'_> {}
+#[cfg(dma_kind = "gdma")]
+impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AnyAhbGdmaChannel<'d> {}
 
-#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+#[cfg(dma_kind = "gdma")]
 for_each_dma_channel! {
     ("AHB_GDMA", $ch:ident) => {
-        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
+        impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::peripherals::$ch<'d> {}
     };
 }
 
-#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
-impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+#[cfg(dma_kind = "pdma")]
+impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AnyI2sDmaChannel<'d> {}
 
-#[cfg(i2s_driver_supported)]
 impl<'d> I2s<'d, crate::Blocking> {
     /// Construct a new I2s instance.
     pub fn new<CH>(
@@ -200,8 +202,7 @@ impl<'d> I2s<'d, crate::Blocking> {
         config: Config,
     ) -> Result<Self, ConfigError>
     where
-        CH: I2sMasterDmaChannel<AnyI2s<'d>>,
-        CH: crate::dma::DmaChannel<Erased = I2sMasterErased<'d>>,
+        CH: I2sMasterDmaChannel<'d, AnyI2s<'d>>,
     {
         Self::new_internal(i2s, channel.degrade(), config)
     }
@@ -1142,7 +1143,7 @@ impl<'d> I2s<'d, Blocking> {
     ) -> Result<Self, ConfigError> {
         let channel = Channel::new(channel);
         let i2s = i2s.degrade();
-        channel.runtime_ensure_compatible(i2s.dma_peripheral_num());
+        channel.runtime_ensure_compatible(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1324,7 +1325,7 @@ where
         self.i2s.reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral_num(), &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1395,7 +1396,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral_num(), &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {

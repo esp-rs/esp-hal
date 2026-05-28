@@ -135,6 +135,10 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
+    }
 }
 
 impl TxRegisterAccess for AnySpiDmaTxChannel<'_> {
@@ -322,6 +326,10 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
+    }
 }
 
 impl RxRegisterAccess for AnySpiDmaRxChannel<'_> {
@@ -331,14 +339,6 @@ impl RxRegisterAccess for AnySpiDmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         Some(self.0.info().async_handler)
-    }
-
-    fn runtime_ensure_compatible(&self, peripheral_num: u8) {
-        assert!(
-            self.0.info().compatible_peripherals.contains(&peripheral_num),
-            "This DMA channel is not compatible with peripheral id {}",
-            peripheral_num
-        );
     }
 }
 
@@ -473,6 +473,5 @@ impl AnySpiDmaChannel<'_> {
     }
 }
 
-super::impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [Spi2]);
-super::impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [Spi3]);
-
+super::impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [SPI2]);
+super::impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [SPI3]);

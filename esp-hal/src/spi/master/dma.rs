@@ -217,7 +217,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
     fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(spi.dma_peripheral_num());
+        channel.runtime_ensure_compatible(spi.info().dma_peripheral);
 
         for_each_spi_master!((all $($inst:tt),*) => {
             const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
@@ -792,7 +792,6 @@ where
     fn dma_driver(&self) -> DmaDriver {
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi().dma_peripheral_num(),
             state: self.spi().dma_state(),
         }
     }
@@ -1583,7 +1582,6 @@ where
 
 pub(super) struct DmaDriver {
     driver: Driver,
-    dma_peripheral: u8,
     state: &'static DmaState,
 }
 
@@ -1651,7 +1649,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .prepare_transfer(self.driver.info.dma_peripheral, rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1673,7 +1671,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .prepare_transfer(self.driver.info.dma_peripheral, tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }
@@ -1813,45 +1811,39 @@ impl SpiWrapper<'_> {
     fn dma_state(&self) -> &'static DmaState {
         self.spi.dma_state()
     }
-
-    #[inline(always)]
-    fn dma_peripheral_num(&self) -> u8 {
-        self.spi.dma_peripheral_num()
-    }
 }
 
-/// DMA channel trait for SPI peripherals.
-///
-/// Implemented for each channel type that can serve a particular SPI instance `S`.
-#[cfg(spi_master_supports_dma)]
-#[instability::unstable]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with this SPI peripheral",
-    label = "This DMA channel",
-    note = "Use a channel that matches the SPI instance."
-)]
-pub trait SpiMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
-
-#[cfg(spi_master_supports_dma)]
 with_spi_master_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
+
+        /// DMA channel trait for SPI peripherals.
+        ///
+        /// Implemented for each channel type that can serve a particular SPI instance `S`.
+        #[instability::unstable]
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with this SPI peripheral",
+            label = "This DMA channel",
+            note = "Use a channel that matches the SPI instance."
+        )]
+        pub trait SpiMasterDmaChannel<'d, S>: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>> + crate::private::Sealed {}
+
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
 
-        impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::$any_channel<'_> {}
+        impl<'d> SpiMasterDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
 
         for_each_dma_channel! {
             ($engine, $ch:ident) => {
-                impl SpiMasterDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
+                impl<'d> SpiMasterDmaChannel<'d, AnySpi<'d>> for crate::peripherals::$ch<'d> {}
             };
         }
 
         for_each_spi_master! {
             ($peri:ident) => {
-                impl SpiMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+                impl<'d> SpiMasterDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::dma::$any_channel<'d> {}
 
                 for_each_dma_channel_peri_pair! {
                     ($engine, $ch:ident, $peri) => {
-                        impl SpiMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
+                        impl<'d> SpiMasterDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::peripherals::$ch<'d> {}
                     };
                 }
             };
@@ -1883,10 +1875,7 @@ with_spi_master_dma_engine! {
             /// # {after_snippet}
             /// ```
             #[instability::unstable]
-            pub fn with_dma<CH>(self, channel: CH) -> SpiDma<'d, crate::Blocking>
-            where
-                CH: SpiMasterDmaChannel<AnySpi<'d>>,
-                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
+            pub fn with_dma(self, channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>) -> SpiDma<'d, crate::Blocking>
             {
                 SpiDma::new_from_spi(self, channel.degrade())
             }

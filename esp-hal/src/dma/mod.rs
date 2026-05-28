@@ -1323,7 +1323,11 @@ where
         self.rx_impl.set_priority(priority);
     }
 
-    fn do_prepare(&mut self, preparation: Preparation, peri: u8) -> Result<(), DmaError> {
+    fn do_prepare(
+        &mut self,
+        preparation: Preparation,
+        peri: DmaPeripheral,
+    ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
         debug!("Preparing RX transfer {:?}", preparation);
@@ -1346,7 +1350,7 @@ where
         self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(preparation.start as u32);
-        self.rx_impl.set_peripheral(peri);
+        self.rx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1367,7 +1371,7 @@ where
 {
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
-        peri: u8,
+        peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
@@ -1533,7 +1537,11 @@ where
         self.tx_impl.set_priority(priority);
     }
 
-    fn do_prepare(&mut self, preparation: Preparation, peri: u8) -> Result<(), DmaError> {
+    fn do_prepare(
+        &mut self,
+        preparation: Preparation,
+        peri: DmaPeripheral,
+    ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
 
         debug!("Preparing TX transfer {:?}", preparation);
@@ -1558,7 +1566,7 @@ where
         self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(preparation.start as u32);
-        self.tx_impl.set_peripheral(peri);
+        self.tx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1579,7 +1587,7 @@ where
 {
     pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,
-        peri: u8,
+        peri: DmaPeripheral,
         buffer: &mut BUF,
     ) -> Result<(), DmaError> {
         let preparation = buffer.prepare();
@@ -1693,6 +1701,17 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
+
+    fn compatible_peripherals(&self) -> &[u8];
+
+    fn runtime_ensure_compatible(&self, peripheral_num: u8) {
+        let peripherals = self.compatible_peripherals();
+        assert!(
+            peripherals.contains(&peripheral_num),
+            "This DMA channel is not compatible with peripheral id {}",
+            peripheral_num
+        );
+    }
 }
 
 #[doc(hidden)]
@@ -1702,8 +1721,6 @@ pub trait RxRegisterAccess: RegisterAccess {
 
     fn peripheral_interrupt(&self) -> Option<Interrupt>;
     fn async_handler(&self) -> Option<InterruptHandler>;
-
-    fn runtime_ensure_compatible(&self, _peripheral_num: u8) {}
 }
 
 #[doc(hidden)]
@@ -1845,8 +1862,8 @@ where
 {
     /// Asserts that the channel is compatible with the given peripheral.
     #[instability::unstable]
-    pub fn runtime_ensure_compatible(&self, peripheral_num: u8) {
-        self.rx.rx_impl.runtime_ensure_compatible(peripheral_num);
+    pub fn runtime_ensure_compatible(&self, peripheral_num: DmaPeripheral) {
+        self.rx.rx_impl.runtime_ensure_compatible(peripheral_num.0);
     }
 }
 

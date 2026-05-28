@@ -441,13 +441,21 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
-        interrupt_out = DMA_OUT_CH0)); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1,
-        1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1));
+        interrupt_out = DMA_OUT_CH0, compatible = [MEM2MEM0, SPI2, MEM2MEM1, I2S0,
+        MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5, MEM2MEM6, MEM2MEM7, MEM2MEM8,
+        MEM2MEM9, MEM2MEM10, MEM2MEM11])); _for_each_inner_dma_channel!(("AHB_GDMA",
+        DMA_CH1, 1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1, compatible =
+        [MEM2MEM0, SPI2, MEM2MEM1, I2S0, MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5,
+        MEM2MEM6, MEM2MEM7, MEM2MEM8, MEM2MEM9, MEM2MEM10, MEM2MEM11]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
         DMA_CH1))); _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        DMA_IN_CH0, interrupt_out = DMA_OUT_CH0), ("AHB_GDMA", DMA_CH1, 1, interrupt_in =
-        DMA_IN_CH1, interrupt_out = DMA_OUT_CH1)));
+        DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [MEM2MEM0, SPI2, MEM2MEM1,
+        I2S0, MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5, MEM2MEM6, MEM2MEM7, MEM2MEM8,
+        MEM2MEM9, MEM2MEM10, MEM2MEM11]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in =
+        DMA_IN_CH1, interrupt_out = DMA_OUT_CH1, compatible = [MEM2MEM0, SPI2, MEM2MEM1,
+        I2S0, MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5, MEM2MEM6, MEM2MEM7, MEM2MEM8,
+        MEM2MEM9, MEM2MEM10, MEM2MEM11])));
     };
 }
 #[macro_export]

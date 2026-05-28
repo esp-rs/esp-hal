@@ -89,6 +89,10 @@ impl RegisterAccess for AnyAhbGdmaTxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         true
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
+    }
 }
 
 impl TxRegisterAccess for AnyAhbGdmaTxChannel<'_> {
@@ -276,6 +280,10 @@ impl RegisterAccess for AnyAhbGdmaRxChannel<'_> {
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
     }
 }
 

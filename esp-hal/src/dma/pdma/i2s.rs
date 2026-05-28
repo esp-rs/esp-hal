@@ -126,6 +126,10 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
+    }
 }
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel<'_> {
@@ -305,6 +309,10 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
+    }
 }
 
 impl RxRegisterAccess for AnyI2sDmaRxChannel<'_> {
@@ -314,14 +322,6 @@ impl RxRegisterAccess for AnyI2sDmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         Some(self.0.info().async_handler)
-    }
-
-    fn runtime_ensure_compatible(&self, peripheral_num: u8) {
-        assert!(
-            self.0.info().compatible_peripherals.contains(&peripheral_num),
-            "This DMA channel is not compatible with peripheral id {}",
-            peripheral_num
-        );
     }
 }
 
@@ -461,7 +461,6 @@ impl AnyI2sDmaChannel<'_> {
 }
 
 #[cfg(soc_has_i2s0)]
-super::impl_pdma_channel!(AnyI2sDma, DMA_I2S0, I2S0, [I2s0]);
+super::impl_pdma_channel!(AnyI2sDma, DMA_I2S0, I2S0, [I2S0]);
 #[cfg(soc_has_i2s1)]
-super::impl_pdma_channel!(AnyI2sDma, DMA_I2S1, I2S1, [I2s1]);
-
+super::impl_pdma_channel!(AnyI2sDma, DMA_I2S1, I2S1, [I2S1]);

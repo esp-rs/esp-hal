@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{AnyAhbGdmaRxChannel, ChannelRx, DmaRxChannel, DmaError, DmaPeripheral, DmaRxBuffer},
+    dma::{AnyAhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxChannel},
     gpio::{
         InputConfig,
         InputSignal,
@@ -148,16 +148,13 @@ pub struct Camera<'d> {
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<CH>(
-        cam: Cam<'d>,
-        channel: CH,
-        config: Config,
-    ) -> Result<Self, ConfigError>
+    pub fn new<CH>(cam: Cam<'d>, channel: CH, config: Config) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::CamDmaRxChannel,
         CH: DmaRxChannel<Erased = AnyAhbGdmaRxChannel<'d>>,
     {
         let rx_channel = ChannelRx::new(channel.degrade());
+        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM.0);
 
         let mut this = Self {
             lcd_cam: cam.lcd_cam,
@@ -418,7 +415,7 @@ impl<'d> Camera<'d> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam.0, &mut buf)
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 

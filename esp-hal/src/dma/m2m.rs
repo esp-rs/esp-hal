@@ -93,7 +93,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
             } else {
                 // The S2's COPY DMA channel doesn't care about this. Once support for other
                 // channels are added, this will need updating.
-                let peripheral = DmaPeripheral::Spi2;
+                let peripheral = DmaPeripheral::SPI2;
             }
         }
 
@@ -158,7 +158,7 @@ where
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral.0, &mut buf)
+                .prepare_transfer(self.peripheral, &mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 
@@ -283,7 +283,7 @@ impl<'d, Dm: DriverMode> Mem2MemTx<'d, Dm> {
     {
         let result = unsafe {
             self.channel
-                .prepare_transfer(self.peripheral.0, &mut buf)
+                .prepare_transfer(self.peripheral, &mut buf)
                 .and_then(|_| self.channel.start_transfer())
         };
 

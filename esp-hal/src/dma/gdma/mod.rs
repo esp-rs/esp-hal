@@ -48,6 +48,8 @@ pub(crate) struct ChannelInfo {
     pub(crate) isr_in: Option<Interrupt>,
     /// Peripheral interrupt for the TX (out) direction.
     pub(crate) isr_out: Option<Interrupt>,
+    /// List of compatible peripheral IDs for this channel.
+    pub(crate) compatible_peripherals: &'static [u8],
 }
 
 /// An arbitrary GDMA channel
@@ -134,7 +136,7 @@ impl<'d> DmaRxChannel for AnyAhbGdmaRxChannel<'d> {
 
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.
-    ($ch:ident, $num:literal, $interrupt_in:ident) => {
+    ($ch:ident, $num:literal, $interrupt_in:ident, compatible = [$($compatible:ident),*]) => {
         use $crate::peripherals::$ch;
         impl $ch<'_> {
             pub(super) fn info() -> &'static ChannelInfo {
@@ -149,6 +151,7 @@ macro_rules! impl_channel {
                     handler_out: None,
                     isr_in: Some(Interrupt::$interrupt_in),
                     isr_out: None,
+                    compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
                 };
                 &INFO
             }
@@ -165,7 +168,7 @@ macro_rules! impl_channel {
         }
 
         impl<'d> From<$ch<'d>> for AnyAhbGdmaChannel<'d> {
-            fn from(ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
+            fn from(_ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
                 AnyAhbGdmaChannel {
                     info: $ch::info(),
                     state: $ch::state(),
@@ -177,7 +180,7 @@ macro_rules! impl_channel {
     };
 
     // Split interrupts: separate handlers for the in and out paths.
-    ($ch:ident, $num:literal, $interrupt_in:ident, $interrupt_out:ident) => {
+    ($ch:ident, $num:literal, $interrupt_in:ident, $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
         use $crate::peripherals::$ch;
         impl $ch<'_> {
             pub(super) fn info() -> &'static ChannelInfo {
@@ -197,6 +200,7 @@ macro_rules! impl_channel {
                     handler_out: Some(interrupt_handler_out),
                     isr_in: Some(Interrupt::$interrupt_in),
                     isr_out: Some(Interrupt::$interrupt_out),
+                    compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
                 };
                 &INFO
             }
@@ -224,11 +228,11 @@ macro_rules! impl_channel {
 }
 
 for_each_dma_channel! {
-    ($engine:literal, $ch:ident, $num:literal, interrupt = $interrupt:ident) => {
-        impl_channel!($ch, $num, $interrupt);
+    ("AHB_GDMA", $ch:ident, $num:literal, interrupt = $interrupt:ident, compatible = [$($compatible:ident),*]) => {
+        impl_channel!($ch, $num, $interrupt, compatible = [$($compatible),*]);
     };
-    ($engine:literal, $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident) => {
-        impl_channel!($ch, $num, $interrupt_in, $interrupt_out);
+    ("AHB_GDMA", $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
+        impl_channel!($ch, $num, $interrupt_in, $interrupt_out, compatible = [$($compatible),*]);
     };
 }
 
@@ -243,7 +247,7 @@ for_each_peripheral! {
             $(
                 #[doc = concat!("DMA accesses ", stringify!($name))]
                 #[allow(non_upper_case_globals)]
-                pub const $name: Self = Self($id);
+                pub const $peri: Self = Self($id);
             )*
         }
     };

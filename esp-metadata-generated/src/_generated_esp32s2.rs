@@ -482,18 +482,21 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0));
         _for_each_inner_dma_channel!(("CRYPTO_DMA", DMA_CRYPTO));
         _for_each_inner_dma_channel!(("COPY_DMA", DMA_COPY));
-        _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI2, 0, interrupt = SPI2_DMA));
-        _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI3, 1, interrupt = SPI3_DMA));
-        _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0));
-        _for_each_inner_dma_channel!(("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt =
-        CRYPTO_DMA)); _for_each_inner_dma_channel!(("COPY_DMA", DMA_COPY, 0, interrupt =
-        DMA_COPY)); _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2), ("SPI_DMA",
-        DMA_SPI3), ("I2S_DMA", DMA_I2S0), ("CRYPTO_DMA", DMA_CRYPTO), ("COPY_DMA",
-        DMA_COPY))); _for_each_inner_dma_channel!((shared("SPI_DMA", DMA_SPI2, 0,
-        interrupt = SPI2_DMA), ("SPI_DMA", DMA_SPI3, 1, interrupt = SPI3_DMA),
-        ("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0), ("CRYPTO_DMA", DMA_CRYPTO, 0,
-        interrupt = CRYPTO_DMA), ("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY)));
-        _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI2, 0, interrupt = SPI2_DMA,
+        compatible = [SPI2])); _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI3, 1,
+        interrupt = SPI3_DMA, compatible = [SPI3]));
+        _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0,
+        compatible = [I2S0])); _for_each_inner_dma_channel!(("CRYPTO_DMA", DMA_CRYPTO, 0,
+        interrupt = CRYPTO_DMA, compatible = [AES, SHA]));
+        _for_each_inner_dma_channel!(("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
+        compatible = [])); _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2),
+        ("SPI_DMA", DMA_SPI3), ("I2S_DMA", DMA_I2S0), ("CRYPTO_DMA", DMA_CRYPTO),
+        ("COPY_DMA", DMA_COPY))); _for_each_inner_dma_channel!((shared("SPI_DMA",
+        DMA_SPI2, 0, interrupt = SPI2_DMA, compatible = [SPI2]), ("SPI_DMA", DMA_SPI3, 1,
+        interrupt = SPI3_DMA, compatible = [SPI3]), ("I2S_DMA", DMA_I2S0, 0, interrupt =
+        I2S0, compatible = [I2S0]), ("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt = CRYPTO_DMA,
+        compatible = [AES, SHA]), ("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
+        compatible = []))); _for_each_inner_dma_channel!((split));
     };
 }
 #[macro_export]

@@ -489,13 +489,18 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
+        compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1,
+        compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2,
+        compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA", DMA_CH1),
         ("AHB_GDMA", DMA_CH2))); _for_each_inner_dma_channel!((shared("AHB_GDMA",
-        DMA_CH0, 0, interrupt = DMA_CH0), ("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1),
-        ("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2)));
+        DMA_CH0, 0, interrupt = DMA_CH0, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
+        APB_SARADC]), ("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1, compatible = [SPI2,
+        UHCI0, I2S0, AES, SHA, APB_SARADC]), ("AHB_GDMA", DMA_CH2, 2, interrupt =
+        DMA_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC])));
         _for_each_inner_dma_channel!((split));
     };
 }

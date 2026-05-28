@@ -394,10 +394,11 @@ macro_rules! for_each_dma_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0));
-        _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0)));
-        _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0, interrupt =
-        DMA_CH0))); _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
+        compatible = [SPI2, SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA",
+        DMA_CH0))); _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0,
+        interrupt = DMA_CH0, compatible = [SPI2, SHA])));
+        _for_each_inner_dma_channel!((split));
     };
 }
 #[macro_export]

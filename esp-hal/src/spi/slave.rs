@@ -160,7 +160,6 @@ impl<'d> Spi<'d, Blocking> {
 #[instability::unstable]
 #[cfg(spi_slave_supports_dma)]
 pub mod dma {
-    use super::SpiSlaveErased;
     use core::mem::ManuallyDrop;
 
     use enumset::enum_set;
@@ -168,13 +167,7 @@ pub mod dma {
     use super::*;
     use crate::{
         DriverMode,
-        dma::{
-            Channel,
-            DmaRxBuffer,
-            DmaRxInterrupt,
-            DmaTxBuffer,
-            EmptyBuf,
-        },
+        dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
         spi::Error,
     };
 
@@ -205,7 +198,7 @@ pub mod dma {
     impl<'d> SpiDma<'d, Blocking> {
         pub(super) fn new(spi: AnySpi<'d>, channel: SpiSlaveErased<'d>) -> Self {
             let channel = Channel::new(channel);
-            channel.runtime_ensure_compatible(spi.dma_peripheral_num());
+            channel.runtime_ensure_compatible(spi.info().dma_peripheral);
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
@@ -223,7 +216,7 @@ pub mod dma {
         fn driver(&self) -> DmaDriver {
             DmaDriver {
                 info: self.spi.info(),
-                dma_peripheral: self.spi.dma_peripheral_num(),
+                dma_peripheral: self.spi.info().dma_peripheral,
             }
         }
 
@@ -443,7 +436,7 @@ pub mod dma {
 
     struct DmaDriver {
         info: &'static Info,
-        dma_peripheral: u8,
+        dma_peripheral: crate::dma::DmaPeripheral,
     }
 
     impl DmaDriver {
@@ -578,6 +571,51 @@ pub mod dma {
     impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
     impl InstanceDma for AnySpi<'_> {}
+
+    with_spi_slave_dma_engine! {
+        ($engine:literal, $any_channel:ident) => {
+            /// DMA channel trait for SPI slave peripherals.
+            #[diagnostic::on_unimplemented(
+                message = "The DMA channel cannot be used with this SPI peripheral",
+                label = "This DMA channel",
+                note = "Use a channel that matches the SPI instance."
+            )]
+            pub trait SpiSlaveDmaChannel<'d, S>: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>> {}
+
+            type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+
+            impl<'d> SpiSlaveDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
+
+            for_each_dma_channel! {
+                ($engine, $ch:ident) => {
+                    impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$ch<'d>> for crate::peripherals::$ch<'d> {}
+                };
+            }
+
+            for_each_spi_slave! {
+                ($peri:ident) => {
+                    impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::dma::$any_channel<'d> {}
+
+                    for_each_dma_channel_peri_pair! {
+                        ($engine, $ch:ident, $peri) => {
+                            impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::peripherals::$ch<'d> {}
+                        };
+                    }
+                };
+            }
+
+            impl<'d> Spi<'d, Blocking> {
+                /// Configures the SPI peripheral with the provided DMA channel and
+                /// descriptors.
+                #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
+                #[instability::unstable]
+                pub fn with_dma<CH>(self, channel: impl SpiSlaveDmaChannel<'d, AnySpi<'d>>) -> dma::SpiDma<'d, Blocking> {
+                    self.spi.info().set_data_mode(self.data_mode, true);
+                    dma::SpiDma::new(self.spi, channel.degrade())
+                }
+            }
+        };
+    }
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
@@ -794,7 +832,7 @@ for_each_spi_slave! {
                     register_block: crate::peripherals::$peri::regs(),
                     peripheral: crate::system::Peripheral::$sys,
                     #[cfg(spi_slave_supports_dma)]
-                    dma_peripheral: crate::dma::DmaPeripheral::$sys,
+                    dma_peripheral: crate::dma::DmaPeripheral::$peri,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,
                     miso: OutputSignal::$miso,
@@ -821,67 +859,4 @@ impl Instance for AnySpi<'_> {
     fn info(&self) -> &'static Info {
         any::delegate!(self, spi => { spi.info() })
     }
-}
-
-#[cfg(spi_slave_supports_dma)]
-impl AnySpi<'_> {
-    pub(crate) fn dma_peripheral_num(&self) -> u8 {
-        match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2.0,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3.0,
-        }
-    }
-}
-
-/// DMA channel trait for SPI slave peripherals.
-#[cfg(spi_slave_supports_dma)]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with this SPI peripheral",
-    label = "This DMA channel",
-    note = "Use a channel that matches the SPI instance."
-)]
-pub trait SpiSlaveDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
-
-#[cfg(spi_slave_supports_dma)]
-with_spi_slave_dma_engine! {
-    ($engine:literal, $any_channel:ident) => {
-        type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
-
-        impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::dma::$any_channel<'_> {}
-
-        for_each_dma_channel! {
-            ($engine, $ch:ident) => {
-                impl SpiSlaveDmaChannel<AnySpi<'_>> for crate::peripherals::$ch<'_> {}
-            };
-        }
-
-        for_each_spi_slave! {
-            ($peri:ident) => {
-                impl SpiSlaveDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
-
-                for_each_dma_channel_peri_pair! {
-                    ($engine, $ch:ident, $peri) => {
-                        impl SpiSlaveDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
-                    };
-                }
-            };
-        }
-
-        impl<'d> Spi<'d, crate::Blocking> {
-            /// Configures the SPI peripheral with the provided DMA channel and
-            /// descriptors.
-            #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
-            #[instability::unstable]
-            pub fn with_dma<CH>(self, channel: CH) -> dma::SpiDma<'d, crate::Blocking>
-            where
-                CH: SpiSlaveDmaChannel<AnySpi<'d>>,
-                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
-            {
-                self.spi.info().set_data_mode(self.data_mode, true);
-                dma::SpiDma::new(self.spi, channel.degrade())
-            }
-        }
-    };
 }
