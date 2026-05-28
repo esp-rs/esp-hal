@@ -187,6 +187,26 @@ jobs:
         shell: bash
         run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4
 
+      - name: Run Xtensa doc tests
+        if: matrix.group == 'xtensa'
+        shell: bash
+        run: |
+          cargo xtask run doc-tests esp32
+          cargo xtask run doc-tests esp32s2
+          cargo xtask run doc-tests esp32s3
+
+      - name: Run RISC-V doc tests
+        if: matrix.group == 'riscv'
+        shell: bash
+        run: |
+          cargo xtask run doc-tests esp32c2
+          cargo xtask run doc-tests esp32c3
+          cargo xtask run doc-tests esp32c5
+          cargo xtask run doc-tests esp32c6
+          cargo xtask run doc-tests esp32c61
+          cargo xtask run doc-tests esp32h2
+          cargo xtask run doc-tests esp32p4
+
   # --------------------------------------------------------------------------
   # MSRV
 
