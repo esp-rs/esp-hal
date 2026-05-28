@@ -54,7 +54,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxChannel},
+    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -63,6 +63,7 @@ use crate::{
         Instance,
         LCD_DONE_WAKER,
         Lcd,
+        LcdDmaTxChannel,
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Phase, Polarity},
     },
@@ -93,12 +94,12 @@ where
     Dm: DriverMode,
 {
     /// Creates a new instance of the I8080 LCD interface.
-    pub fn new<CH>(lcd: Lcd<'d, Dm>, channel: CH, config: Config) -> Result<Self, ConfigError>
-    where
-        CH: crate::lcd_cam::LcdDmaTxChannel,
-        CH: DmaTxChannel<Erased = AhbGdmaTxChannel<'d>>,
-    {
-        let tx_channel = ChannelTx::new(channel.degrade());
+    pub fn new(
+        lcd: Lcd<'d, Dm>,
+        channel: impl LcdDmaTxChannel<'d>,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        let tx_channel = ChannelTx::new(channel.into());
         tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {

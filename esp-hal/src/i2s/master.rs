@@ -162,10 +162,7 @@ pub enum I2sInterrupt {
     label = "This DMA channel",
     note = "Use a channel that matches the I2S instance."
 )]
-pub trait I2sMasterDmaChannel<'d, S>:
-    crate::dma::DmaChannel<Erased = I2sMasterErased<'d>> + crate::private::Sealed
-{
-}
+pub trait I2sMasterDmaChannel<'d, S>: Into<I2sMasterErased<'d>> + crate::private::Sealed {}
 
 #[cfg(dma_kind = "gdma")]
 type I2sMasterErased<'d> = crate::dma::AhbGdmaChannel<'d>;
@@ -196,15 +193,12 @@ impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {
 
 impl<'d> I2s<'d, crate::Blocking> {
     /// Construct a new I2s instance.
-    pub fn new<CH>(
-        i2s: impl Instance + 'd,
-        channel: CH,
+    pub fn new<I: Instance + 'd>(
+        i2s: I,
+        channel: impl I2sMasterDmaChannel<'d, I>,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    where
-        CH: I2sMasterDmaChannel<'d, AnyI2s<'d>>,
-    {
-        Self::new_internal(i2s, channel.degrade(), config)
+    ) -> Result<Self, ConfigError> {
+        Self::new_internal(i2s, channel.into(), config)
     }
 }
 

@@ -91,7 +91,7 @@
     message = "The DMA channel cannot be used with UHCI",
     label = "This DMA channel"
 )]
-pub trait UhciDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+pub trait UhciDmaChannel<'d>: DmaChannel + Into<AhbGdmaChannel<'d>> {}
 
 use core::{
     mem::ManuallyDrop,
@@ -384,14 +384,14 @@ where
 
 impl<'d> Uhci<'d, Blocking> {
     /// Creates a new instance of UHCI
-    pub fn new<CH>(uart: Uart<'d, Blocking>, uhci: peripherals::UHCI0<'static>, channel: CH) -> Self
-    where
-        CH: UhciDmaChannel,
-        CH: DmaChannel<Erased = AhbGdmaChannel<'d>>,
-    {
+    pub fn new(
+        uart: Uart<'d, Blocking>,
+        uhci: peripherals::UHCI0<'static>,
+        channel: impl UhciDmaChannel<'d>,
+    ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.into());
         channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::UHCI0);
 
         let uhci = Uhci {

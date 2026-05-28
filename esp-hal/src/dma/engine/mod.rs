@@ -156,36 +156,18 @@ pub trait InterruptAccess<T: EnumSetType>: Sealed {
 }
 
 #[instability::unstable]
-pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {
-    /// The engine-erased type this RX half degrades to.
-    type Erased: DmaRxChannel;
-
-    /// Erase the concrete channel type, returning the engine-erased form.
-    fn degrade(self) -> Self::Erased;
-}
+pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {}
 
 #[instability::unstable]
-pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {
-    /// The engine-erased type this TX half degrades to.
-    type Erased: DmaTxChannel;
-
-    /// Erase the concrete channel type, returning the engine-erased form.
-    fn degrade(self) -> Self::Erased;
-}
+pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
 
 /// A description of a DMA Channel.
-pub trait DmaChannel: Sized {
+pub trait DmaChannel: Sized + crate::private::Sealed {
     /// A description of the RX half of a DMA Channel.
     type Rx: DmaRxChannel + From<Self>;
 
     /// A description of the TX half of a DMA Channel.
     type Tx: DmaTxChannel + From<Self>;
-
-    /// The engine-erased type this channel degrades to.
-    type Erased: DmaChannel + From<Self>;
-
-    /// Erase the concrete channel type, returning the engine-erased form.
-    fn degrade(self) -> Self::Erased;
 
     /// Splits the DMA channel into its RX and TX halves.
     #[cfg(any(esp32c5, esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
@@ -217,17 +199,12 @@ macro_rules! impl_channel_common {
             impl<'d> DmaChannel for $instance<'d> {
                 type Rx = [<$peri RxChannel>]<'d>;
                 type Tx = [<$peri TxChannel>]<'d>;
-                type Erased = [<$peri Channel>]<'d>;
-
-                fn degrade(self) -> Self::Erased {
-                    [<$peri Channel>]::from(self)
-                }
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
                     unsafe {
                         (
-                            [<$peri RxChannel>](Self::steal().degrade()),
-                            [<$peri TxChannel>](Self::steal().degrade()),
+                            [<$peri RxChannel>](Self::steal().into()),
+                            [<$peri TxChannel>](Self::steal().into()),
                         )
                     }
                 }

@@ -100,7 +100,7 @@ use crate::{
     Blocking,
     DriverMode,
     RegisterToggle,
-    dma::{Channel, ChannelTx, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
+    dma::{ChannelTx, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
     gpio::{
         OutputConfig,
         OutputSignal,
@@ -246,12 +246,12 @@ where
 impl<'d> I2sParallel<'d, Blocking> {
     fn new_internal(
         i2s: impl Instance + 'd,
-        channel: I2sParallelErased<'d>,
+        channel: I2sParallelTxErased<'d>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
-        let channel = Channel::new(channel);
+        let channel = ChannelTx::new(channel);
         let i2s = i2s.degrade();
         channel.runtime_ensure_compatible(i2s.dma_peripheral());
 
@@ -270,7 +270,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         pins.configure(&i2s);
         Self {
             instance: i2s,
-            tx_channel: channel.tx,
+            tx_channel: channel,
             _guard: guard,
         }
     }
@@ -790,14 +790,14 @@ impl Instance for AnyI2s<'_> {}
     note = "Use a channel that matches the I2S instance."
 )]
 pub trait I2sParallelDmaChannel<'d, S>:
-    crate::dma::DmaChannel<Erased = I2sParallelErased<'d>> + crate::private::Sealed
+    Into<I2sParallelTxErased<'d>> + crate::private::Sealed
 {
 }
 
-type I2sParallelErased<'d> = crate::dma::I2sDmaChannel<'d>;
 type I2sParallelTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
 
 impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {}
+impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaTxChannel<'d> {}
 
 #[cfg(soc_has_i2s0)]
 impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S0<'d>> for crate::dma::I2sDmaChannel<'d> {}
@@ -813,6 +813,6 @@ impl<'d> I2sParallel<'d, crate::Blocking> {
         pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
-        Self::new_internal(i2s, channel.degrade(), frequency, pins, clock_pin)
+        Self::new_internal(i2s, channel.into(), frequency, pins, clock_pin)
     }
 }

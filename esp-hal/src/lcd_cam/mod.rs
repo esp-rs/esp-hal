@@ -15,7 +15,10 @@ pub mod lcd;
     message = "The DMA channel cannot be used as a TX channel for LCD",
     label = "This DMA channel"
 )]
-pub trait LcdDmaTxChannel: crate::dma::DmaTxChannel + crate::private::Sealed {}
+pub trait LcdDmaTxChannel<'d>:
+    Into<crate::dma::AhbGdmaTxChannel<'d>> + crate::private::Sealed
+{
+}
 
 /// DMA RX channel trait for the Camera peripheral.
 ///
@@ -24,12 +27,15 @@ pub trait LcdDmaTxChannel: crate::dma::DmaTxChannel + crate::private::Sealed {}
     message = "The DMA channel cannot be used as an RX channel for Camera",
     label = "This DMA channel"
 )]
-pub trait CamDmaRxChannel: crate::dma::DmaRxChannel + crate::private::Sealed {}
+pub trait CamDmaRxChannel<'d>:
+    Into<crate::dma::AhbGdmaRxChannel<'d>> + crate::private::Sealed
+{
+}
 
 for_each_peripheral! {
     (dma_eligible LCD_CAM, $name:ident, $id:literal, "AHB_GDMA") => {
-        impl LcdDmaTxChannel for crate::dma::AhbGdmaTxChannel<'_> {}
-        impl CamDmaRxChannel for crate::dma::AhbGdmaRxChannel<'_> {}
+        impl<'d> LcdDmaTxChannel<'d> for crate::dma::AhbGdmaTxChannel<'d> {}
+        impl<'d> CamDmaRxChannel<'d> for crate::dma::AhbGdmaRxChannel<'d> {}
     };
 }
 

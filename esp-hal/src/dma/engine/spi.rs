@@ -61,13 +61,7 @@ impl SpiDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for SpiDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for SpiDmaRxChannel<'d> {
-    type Erased = SpiDmaRxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaRxChannel for SpiDmaRxChannel<'d> {}
 
 /// The TX half of an arbitrary SPI DMA channel.
 #[derive(Debug)]
@@ -81,13 +75,7 @@ impl SpiDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for SpiDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for SpiDmaTxChannel<'d> {
-    type Erased = SpiDmaTxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaTxChannel for SpiDmaTxChannel<'d> {}
 
 impl RegisterAccess for SpiDmaTxChannel<'_> {
     #[allow(private_interfaces)]
@@ -477,11 +465,6 @@ crate::any_peripheral! {
 impl<'d> DmaChannel for SpiDmaChannel<'d> {
     type Rx = SpiDmaRxChannel<'d>;
     type Tx = SpiDmaTxChannel<'d>;
-    type Erased = SpiDmaChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (

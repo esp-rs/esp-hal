@@ -573,22 +573,20 @@ pub mod dma {
     impl InstanceDma for AnySpi<'_> {}
 
     with_spi_slave_dma_engine! {
-        ($engine:literal, $any_channel:ident) => {
+        ($engine:tt, $any_channel:ident) => {
             /// DMA channel trait for SPI slave peripherals.
             #[diagnostic::on_unimplemented(
                 message = "The DMA channel cannot be used with this SPI peripheral",
                 label = "This DMA channel",
                 note = "Use a channel that matches the SPI instance."
             )]
-            pub trait SpiSlaveDmaChannel<'d, S>: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>> {}
-
-            type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+            pub trait SpiSlaveDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
 
             impl<'d> SpiSlaveDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
 
             for_each_dma_channel! {
                 ($engine, $ch:ident) => {
-                    impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$ch<'d>> for crate::peripherals::$ch<'d> {}
+                    impl<'d> SpiSlaveDmaChannel<'d, AnySpi<'d>> for crate::peripherals::$ch<'d> {}
                 };
             }
 
@@ -604,6 +602,8 @@ pub mod dma {
                 };
             }
 
+            type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+
             impl<'d> Spi<'d, Blocking> {
                 /// Configures the SPI peripheral with the provided DMA channel and
                 /// descriptors.
@@ -611,7 +611,7 @@ pub mod dma {
                 #[instability::unstable]
                 pub fn with_dma<CH>(self, channel: impl SpiSlaveDmaChannel<'d, AnySpi<'d>>) -> dma::SpiDma<'d, Blocking> {
                     self.spi.info().set_data_mode(self.data_mode, true);
-                    dma::SpiDma::new(self.spi, channel.degrade())
+                    dma::SpiDma::new(self.spi, channel.into())
                 }
             }
         };

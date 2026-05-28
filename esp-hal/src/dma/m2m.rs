@@ -5,6 +5,8 @@ use core::{
 
 #[cfg(not(esp32s2))]
 use crate::dma::{AhbGdmaChannel, AhbGdmaRxChannel, AhbGdmaTxChannel};
+#[cfg(esp32s2)]
+use crate::dma::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
 use crate::{
     Async,
     Blocking,
@@ -26,15 +28,10 @@ use crate::{
         DmaTxInterrupt,
     },
 };
-#[cfg(esp32s2)]
-use crate::{
-    dma::{CopyDmaRxChannel, CopyDmaTxChannel},
-    peripherals::DMA_COPY,
-};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32s2)] {
-        type Mem2MemChannel<'d> = DMA_COPY<'d>;
+        type Mem2MemChannel<'d> = CopyDmaChannel<'d>;
         type Mem2MemRxChannel<'d> = CopyDmaRxChannel<'d>;
         type Mem2MemTxChannel<'d> = CopyDmaTxChannel<'d>;
     } else {
@@ -62,7 +59,7 @@ where
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
     pub fn new(
-        channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
+        channel: impl DmaChannel + Into<Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
         unsafe {
@@ -81,10 +78,10 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// You must ensure that you're not using DMA for the same peripheral and
     /// that you're the only one using the DmaPeripheral.
     pub unsafe fn new_unsafe(
-        channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
+        channel: impl DmaChannel + Into<Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.into());
 
         cfg_if::cfg_if! {
             if #[cfg(dma_kind = "gdma")] {

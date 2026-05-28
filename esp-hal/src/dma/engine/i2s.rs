@@ -61,13 +61,7 @@ impl I2sDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for I2sDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for I2sDmaRxChannel<'d> {
-    type Erased = I2sDmaRxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaRxChannel for I2sDmaRxChannel<'d> {}
 
 /// The TX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
@@ -81,13 +75,7 @@ impl I2sDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for I2sDmaTxChannel<'d> {
-    type Erased = I2sDmaTxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaTxChannel for I2sDmaTxChannel<'d> {}
 
 impl RegisterAccess for I2sDmaTxChannel<'_> {
     #[allow(private_interfaces)]
@@ -458,11 +446,6 @@ crate::any_peripheral! {
 impl<'d> DmaChannel for I2sDmaChannel<'d> {
     type Rx = I2sDmaRxChannel<'d>;
     type Tx = I2sDmaTxChannel<'d>;
-    type Erased = I2sDmaChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (

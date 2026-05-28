@@ -104,12 +104,13 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxChannel},
+    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        LcdDmaTxChannel,
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
     },
@@ -140,12 +141,12 @@ where
     Dm: DriverMode,
 {
     /// Create a new instance of the RGB/DPI driver.
-    pub fn new<CH>(lcd: Lcd<'d, Dm>, channel: CH, config: Config) -> Result<Self, ConfigError>
-    where
-        CH: crate::lcd_cam::LcdDmaTxChannel,
-        CH: DmaTxChannel<Erased = AhbGdmaTxChannel<'d>>,
-    {
-        let tx_channel = ChannelTx::new(channel.degrade());
+    pub fn new(
+        lcd: Lcd<'d, Dm>,
+        channel: impl LcdDmaTxChannel<'d>,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        let tx_channel = ChannelTx::new(channel.into());
         tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {

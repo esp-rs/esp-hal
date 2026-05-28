@@ -1814,8 +1814,7 @@ impl SpiWrapper<'_> {
 }
 
 with_spi_master_dma_engine! {
-    ($engine:literal, $any_channel:ident) => {
-
+    ($engine:tt, $any_channel:ident) => {
         /// DMA channel trait for SPI peripherals.
         ///
         /// Implemented for each channel type that can serve a particular SPI instance `S`.
@@ -1825,9 +1824,7 @@ with_spi_master_dma_engine! {
             label = "This DMA channel",
             note = "Use a channel that matches the SPI instance."
         )]
-        pub trait SpiMasterDmaChannel<'d, S>: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>> + crate::private::Sealed {}
-
-        type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+        pub trait SpiMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
 
         impl<'d> SpiMasterDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
 
@@ -1848,6 +1845,8 @@ with_spi_master_dma_engine! {
                 }
             };
         }
+
+        type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
 
         impl<'d> Spi<'d, crate::Blocking> {
             #[doc_replace(
@@ -1877,7 +1876,7 @@ with_spi_master_dma_engine! {
             #[instability::unstable]
             pub fn with_dma(self, channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>) -> SpiDma<'d, crate::Blocking>
             {
-                SpiDma::new_from_spi(self, channel.degrade())
+                SpiDma::new_from_spi(self, channel.into())
             }
         }
     };

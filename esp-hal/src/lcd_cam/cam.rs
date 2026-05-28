@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{AhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxChannel},
+    dma::{AhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer},
     gpio::{
         InputConfig,
         InputSignal,
@@ -64,7 +64,7 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, ClockError, calculate_clkm},
+    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -148,12 +148,12 @@ pub struct Camera<'d> {
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<CH>(cam: Cam<'d>, channel: CH, config: Config) -> Result<Self, ConfigError>
-    where
-        CH: crate::lcd_cam::CamDmaRxChannel,
-        CH: DmaRxChannel<Erased = AhbGdmaRxChannel<'d>>,
-    {
-        let rx_channel = ChannelRx::new(channel.degrade());
+    pub fn new(
+        cam: Cam<'d>,
+        channel: impl CamDmaRxChannel<'d>,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        let rx_channel = ChannelRx::new(channel.into());
         rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {

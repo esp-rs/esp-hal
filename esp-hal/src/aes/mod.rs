@@ -416,7 +416,7 @@ pub mod dma {
     impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
-            let channel = Channel::new(channel.degrade());
+            let channel = Channel::new(channel.into());
             channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::AES);
             AesDma { aes: self, channel }
         }
@@ -779,7 +779,7 @@ pub mod dma {
         pub fn new(aes: AES<'d>, dma: impl AesDmaChannel<'d>) -> Self {
             Self {
                 peri: aes,
-                dma: dma.degrade(),
+                dma: dma.into(),
                 state: DriverState::None,
 
                 #[cfg(dma_can_access_psram)]
@@ -1193,16 +1193,11 @@ pub mod dma {
         message = "The DMA channel cannot be used with the AES peripheral",
         label = "This DMA channel"
     )]
-    pub trait AesDmaChannel<'d>:
-        crate::dma::DmaChannel<Erased = AesErased<'d>> + crate::private::Sealed
-    {
-    }
+    pub trait AesDmaChannel<'d>: crate::private::Sealed + Into<AesErased<'d>> {}
 
     with_aes_dma_engine! {
-        ($engine:literal, $any_channel:ident) => {
+        ($engine:tt, $any_channel:ident) => {
             type AesErased<'d> = crate::dma::$any_channel<'d>;
-
-            impl<'d> AesDmaChannel<'d> for AesErased<'d> {}
 
             for_each_dma_channel_peri_pair! {
                 ($engine, $ch:ident, AES) => {

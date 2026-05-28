@@ -92,11 +92,6 @@ impl crate::private::Sealed for AhbGdmaChannel<'_> {}
 impl<'d> DmaChannel for AhbGdmaChannel<'d> {
     type Rx = AhbGdmaRxChannel<'d>;
     type Tx = AhbGdmaTxChannel<'d>;
-    type Erased = AhbGdmaChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
@@ -117,22 +112,10 @@ pub struct AhbGdmaRxChannel<'d>(AhbGdmaChannel<'d>);
 pub struct AhbGdmaTxChannel<'d>(AhbGdmaChannel<'d>);
 
 impl crate::private::Sealed for AhbGdmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for AhbGdmaTxChannel<'d> {
-    type Erased = AhbGdmaTxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaTxChannel for AhbGdmaTxChannel<'d> {}
 
 impl crate::private::Sealed for AhbGdmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for AhbGdmaRxChannel<'d> {
-    type Erased = AhbGdmaRxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaRxChannel for AhbGdmaRxChannel<'d> {}
 
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.

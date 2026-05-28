@@ -130,7 +130,7 @@ use private::*;
     message = "The DMA channel cannot be used with PARL_IO",
     label = "This DMA channel"
 )]
-pub trait ParlIoDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+pub trait ParlIoDmaChannel<'d>: DmaChannel + Into<AhbGdmaChannel<'d>> {}
 
 use crate::{
     Async,
@@ -1084,14 +1084,13 @@ where
 
 impl<'d> ParlIo<'d, Blocking> {
     /// Create a new instance of [ParlIo]
-    pub fn new<CH>(_parl_io: PARL_IO<'d>, dma_channel: CH) -> Result<Self, Error>
-    where
-        CH: ParlIoDmaChannel,
-        CH: DmaChannel<Erased = AhbGdmaChannel<'d>>,
-    {
+    pub fn new(
+        _parl_io: PARL_IO<'d>,
+        dma_channel: impl ParlIoDmaChannel<'d>,
+    ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.degrade());
+        let dma_channel = Channel::new(dma_channel.into());
         dma_channel.runtime_ensure_compatible(DmaPeripheral::PARL_IO);
 
         Ok(Self {

@@ -65,13 +65,7 @@ impl CopyDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {
-    type Erased = CopyDmaRxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {}
 
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
@@ -85,13 +79,7 @@ impl CopyDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {
-    type Erased = CopyDmaTxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
     #[allow(private_interfaces)]

@@ -66,13 +66,7 @@ impl CryptoDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {
-    type Erased = CryptoDmaRxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {}
 
 /// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
@@ -86,13 +80,7 @@ impl CryptoDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {
-    type Erased = CryptoDmaTxChannel<'d>;
-
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-}
+impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
     #[allow(private_interfaces)]
