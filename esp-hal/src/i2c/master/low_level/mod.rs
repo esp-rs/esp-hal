@@ -360,13 +360,11 @@ impl<'t> I2cClockGuard<'t> {
     pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
         ClockTree::with(|clocks| {
             let clock = i2c.info().clock_instance;
-            cfg_if::cfg_if! {
-                if #[cfg(i2c_master_version = "3")] {
-                    let config = I2cFunctionClockConfig::new(Default::default(), 0);
-                } else {
-                    let config = I2cFunctionClockConfig::new(Default::default());
-                }
-            }
+            let config = I2cFunctionClockConfig::new(
+                Default::default(),
+                #[cfg(i2c_master_version = "3")]
+                0,
+            );
             clock.configure_function_clock(clocks, config);
             clock.request_function_clock(clocks);
         });
