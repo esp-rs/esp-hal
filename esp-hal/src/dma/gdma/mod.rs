@@ -92,7 +92,7 @@ impl<'d> DmaChannel for AnyAhbGdmaChannel<'d> {
     type Tx = AnyAhbGdmaTxChannel<'d>;
     type Erased = AnyAhbGdmaChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 
@@ -109,7 +109,6 @@ impl<'d> DmaChannel for AnyAhbGdmaChannel<'d> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AnyAhbGdmaRxChannel<'d>(AnyAhbGdmaChannel<'d>);
 
-
 /// An arbitrary GDMA TX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -119,7 +118,7 @@ impl crate::private::Sealed for AnyAhbGdmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for AnyAhbGdmaTxChannel<'d> {
     type Erased = AnyAhbGdmaTxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -128,7 +127,7 @@ impl crate::private::Sealed for AnyAhbGdmaRxChannel<'_> {}
 impl<'d> DmaRxChannel for AnyAhbGdmaRxChannel<'d> {
     type Erased = AnyAhbGdmaRxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -212,7 +211,7 @@ macro_rules! impl_channel {
         }
 
         impl<'d> From<$ch<'d>> for AnyAhbGdmaChannel<'d> {
-            fn from(ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
+            fn from(_ch: $ch<'d>) -> AnyAhbGdmaChannel<'d> {
                 AnyAhbGdmaChannel {
                     info: $ch::info(),
                     state: $ch::state(),
@@ -225,16 +224,16 @@ macro_rules! impl_channel {
 }
 
 for_each_dma_channel! {
-    ($ch:ident, $num:literal, interrupt = $interrupt:ident) => {
+    ($engine:literal, $ch:ident, $num:literal, interrupt = $interrupt:ident) => {
         impl_channel!($ch, $num, $interrupt);
     };
-    ($ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident) => {
+    ($engine:literal, $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident) => {
         impl_channel!($ch, $num, $interrupt_in, $interrupt_out);
     };
 }
 
 for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
         /// DMA-eligible peripheral selector values; values match the GDMA peripheral-select register.
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -243,14 +242,9 @@ for_each_peripheral! {
         impl DmaPeripheral {
             $(
                 #[doc = concat!("DMA accesses ", stringify!($name))]
+                #[allow(non_upper_case_globals)]
                 pub const $name: Self = Self($id);
             )*
-        }
-
-        crate::dma::impl_dma_eligible! {
-            AnyAhbGdmaChannel {
-                $($peri => $name,)*
-            }
         }
     };
 }

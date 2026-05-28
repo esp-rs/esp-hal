@@ -213,10 +213,11 @@ fn generate_with_macro(name: &str, tokens: &TokenStream) -> TokenStream {
         #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
         macro_rules! #macro_name {
             (
-                $pattern:tt => $code:tt $(;)?
+                $($pattern:tt => $code:tt;)*
             ) => {
                 macro_rules! #inner {
-                    ($pattern) => $code;
+                    $(($pattern) => $code;)*
+                    ($other:tt) => {}
                 }
                 #inner!(( #tokens ));
             };

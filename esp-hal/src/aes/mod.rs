@@ -363,13 +363,11 @@ pub mod dma {
         },
         dma::{
             Channel,
-            DmaChannel,
             DmaDescriptor,
             DmaError,
             DmaRxBuffer,
             DmaTxBuffer,
             NoBuffer,
-            PeripheralDmaChannel,
             prepare_for_rx,
             prepare_for_tx,
         },
@@ -412,18 +410,17 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<Blocking, PeripheralDmaChannel<AES<'d>>>,
+        channel: Channel<Blocking, AesErased<'d>>,
     }
 
     impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma<CH>(self, channel: CH) -> AesDma<'d>
         where
-            CH: super::AesDmaChannel,
-            CH: crate::dma::DmaChannel<Erased = crate::dma::PeripheralDmaChannel<AES<'d>>>,
+            CH: AesDmaChannel,
+            CH: crate::dma::DmaChannel<Erased = AesErased<'d>>,
         {
-            let channel = Channel::new(channel.into_erased());
-            channel.runtime_ensure_compatible(&self.aes);
+            let channel = Channel::new(channel.degrade());
             AesDma { aes: self, channel }
         }
     }
@@ -749,7 +746,7 @@ pub mod dma {
     /// ```
     pub struct AesDmaBackend<'d> {
         peri: AES<'d>,
-        dma: PeripheralDmaChannel<AES<'d>>,
+        dma: AesErased<'d>,
         state: DriverState<'d>,
 
         #[cfg(dma_can_access_psram)]
@@ -788,12 +785,12 @@ pub mod dma {
         /// ```
         pub fn new<CH>(aes: AES<'d>, dma: CH) -> Self
         where
-            CH: super::AesDmaChannel,
-            CH: crate::dma::DmaChannel<Erased = PeripheralDmaChannel<AES<'d>>>,
+            CH: AesDmaChannel,
+            CH: crate::dma::DmaChannel<Erased = AesErased<'d>>,
         {
             Self {
                 peri: aes,
-                dma: dma.into_erased(),
+                dma: dma.degrade(),
                 state: DriverState::None,
 
                 #[cfg(dma_can_access_psram)]
@@ -1198,6 +1195,37 @@ pub mod dma {
                 CipherState::Cfb128(cfb128) => aes.read_iv(&mut cfb128.iv),
             }
         }
+    }
+
+    /// DMA channel trait for the AES peripheral.
+    ///
+    /// Implemented for every channel type capable of serving AES.
+    #[diagnostic::on_unimplemented(
+        message = "The DMA channel cannot be used with the AES peripheral",
+        label = "This DMA channel"
+    )]
+    pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
+
+    // TODO: replace by an AnyCryptoDma type
+    with_aes_dma_engine! {
+        ("AHB_GDMA", $any_channel:ident) => {
+            type AesErased<'d> = crate::dma::$any_channel<'d>;
+        };
+        ("CRYPTO_DMA", $any_channel:ident) => {
+            type AesErased<'d> = crate::peripherals::DMA_CRYPTO<'d>;
+        };
+    }
+
+    with_aes_dma_engine! {
+        ($engine:literal, $any_channel:ident) => {
+            impl AesDmaChannel for AesErased<'_> {}
+
+            for_each_dma_channel_peri_pair! {
+                ($engine, $ch:ident, AES) => {
+                    impl AesDmaChannel for crate::peripherals::$ch<'_> {}
+                };
+            }
+        };
     }
 }
 
@@ -1672,27 +1700,4 @@ fn write_words(slice: &mut [u8], next: impl Fn(usize) -> u32) {
         let bytes = next(i).to_le_bytes();
         chunk.copy_from_slice(&bytes[0..chunk.len()]);
     }
-}
-
-/// DMA channel trait for the AES peripheral.
-///
-/// Implemented for every channel type capable of serving AES.
-#[cfg(aes_supports_dma)]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with the AES peripheral",
-    label = "This DMA channel"
-)]
-pub trait AesDmaChannel: crate::dma::DmaChannel + crate::private::Sealed {}
-
-#[cfg(aes_supports_dma)]
-with_aes_dma_engine! {
-    ($engine:literal, $any_channel:ident) => {
-        impl AesDmaChannel for crate::dma::$any_channel<'_> {}
-
-        for_each_dma_channel_peri_pair! {
-            ($engine, $ch:ident, AES) => {
-                impl AesDmaChannel for crate::peripherals::$ch<'_> {}
-            };
-        }
-    };
 }

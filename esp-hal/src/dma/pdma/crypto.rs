@@ -44,7 +44,7 @@ impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
 impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {
     type Erased = CryptoDmaRxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -64,7 +64,7 @@ impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {
     type Erased = CryptoDmaTxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -110,10 +110,6 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
         self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -305,10 +301,6 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     fn start(&self) {
         self.regs()
             .in_link()
@@ -456,7 +448,7 @@ impl<'d> DmaChannel for DMA_CRYPTO<'d> {
     type Tx = CryptoDmaTxChannel<'d>;
     type Erased = DMA_CRYPTO<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 
@@ -501,5 +493,3 @@ impl DMA_CRYPTO<'_> {
     }
 }
 
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);

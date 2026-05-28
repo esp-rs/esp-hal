@@ -126,16 +126,11 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaEligible,
+        DescriptorChain,
         DmaError,
-        DmaRxBuffer,
-        DmaRxInterrupt,
-        DmaTxBuffer,
-        DmaTxInterrupt,
-        PeripheralDmaChannel,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
-        asynch::{DmaRxFuture, DmaTxFuture},
+        ReadBuffer,
+        WriteBuffer,
+        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
     },
     gpio::{OutputConfig, interconnect::PeripheralOutput},
     i2s::AnyI2s,
@@ -161,7 +156,7 @@ pub enum I2sInterrupt {
 }
 
 /// DMA channel trait for I2S master peripherals.
-#[cfg(i2s_master_supports_dma)]
+#[cfg(i2s_driver_supported)]
 #[diagnostic::on_unimplemented(
     message = "The DMA channel cannot be used with this I2S peripheral",
     label = "This DMA channel",
@@ -169,44 +164,47 @@ pub enum I2sInterrupt {
 )]
 pub trait I2sMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
 
-#[cfg(i2s_master_supports_dma)]
-with_i2s_master_dma_engine! {
-    ($engine:literal, $any_channel:ident) => {
-        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
+#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+type I2sMasterErased<'d> = crate::dma::AnyAhbGdmaChannel<'d>;
+#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+type I2sMasterTxErased<'d> = crate::dma::AnyAhbGdmaTxChannel<'d>;
+#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+type I2sMasterRxErased<'d> = crate::dma::AnyAhbGdmaRxChannel<'d>;
 
-        for_each_dma_channel! {
-            ($engine, $ch:ident) => {
-                impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
-            };
-        }
+#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+type I2sMasterErased<'d> = crate::dma::AnyI2sDmaChannel<'d>;
+#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+type I2sMasterTxErased<'d> = crate::dma::AnyI2sDmaTxChannel<'d>;
+#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+type I2sMasterRxErased<'d> = crate::dma::AnyI2sDmaRxChannel<'d>;
 
-        for_each_i2s_master! {
-            ($peri:ident) => {
-                impl I2sMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyAhbGdmaChannel<'_> {}
 
-                for_each_dma_channel_peri_pair! {
-                    ($engine, $ch:ident, $peri) => {
-                        impl I2sMasterDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
-                    };
-                }
-            };
-        }
-
-        impl<'d> I2s<'d, crate::Blocking> {
-            /// Construct a new I2s instance.
-            pub fn new<CH>(
-                i2s: impl Instance + 'd,
-                channel: CH,
-                config: Config,
-            ) -> Result<Self, ConfigError>
-            where
-                CH: I2sMasterDmaChannel<AnyI2s<'d>>,
-                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
-            {
-                Self::new_internal(i2s, channel.into_erased(), config)
-            }
-        }
+#[cfg(all(i2s_driver_supported, dma_kind = "gdma"))]
+for_each_dma_channel! {
+    ("AHB_GDMA", $ch:ident) => {
+        impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
     };
+}
+
+#[cfg(all(i2s_driver_supported, dma_kind = "pdma"))]
+impl I2sMasterDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+
+#[cfg(i2s_driver_supported)]
+impl<'d> I2s<'d, crate::Blocking> {
+    /// Construct a new I2s instance.
+    pub fn new<CH>(
+        i2s: impl Instance + 'd,
+        channel: CH,
+        config: Config,
+    ) -> Result<Self, ConfigError>
+    where
+        CH: I2sMasterDmaChannel<AnyI2s<'d>>,
+        CH: crate::dma::DmaChannel<Erased = I2sMasterErased<'d>>,
+    {
+        Self::new_internal(i2s, channel.degrade(), config)
+    }
 }
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = property!("i2s.mclk_divider_bit_width");
@@ -1136,16 +1134,15 @@ where
 }
 
 impl<'d> I2s<'d, Blocking> {
-    #[cfg(i2s_master_supports_dma)]
+    #[cfg(i2s_driver_supported)]
     fn new_internal(
         i2s: impl Instance + 'd,
-        channel: PeripheralDmaChannel<AnyI2s<'d>>,
+        channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&i2s);
-
         let i2s = i2s.degrade();
+        channel.runtime_ensure_compatible(i2s.dma_peripheral_num());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -1298,7 +1295,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+    tx_channel: ChannelTx<Dm, I2sMasterTxErased<'d>>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -1327,7 +1324,7 @@ where
         self.i2s.reset_tx();
         let res = unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral().0, &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral_num(), &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1361,7 +1358,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
+    rx_channel: ChannelRx<Dm, I2sMasterRxErased<'d>>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -1398,7 +1395,7 @@ where
 
         let res = unsafe {
             self.rx_channel
-                .prepare_transfer(self.i2s.dma_peripheral().0, &mut buffer)
+                .prepare_transfer(self.i2s.dma_peripheral_num(), &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = res {
@@ -1443,7 +1440,7 @@ mod private {
     use crate::pac::i2s0::RegisterBlock;
     use crate::{
         DriverMode,
-        dma::{ChannelRx, ChannelTx, DmaEligible},
+        dma::{ChannelRx, ChannelTx},
         gpio::{
             InputConfig,
             InputSignal,
@@ -1465,7 +1462,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+        pub tx_channel: ChannelTx<Dm, I2sMasterTxErased<'d>>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
@@ -1525,7 +1522,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
+        pub rx_channel: ChannelRx<Dm, I2sMasterRxErased<'d>>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
@@ -1580,8 +1577,7 @@ mod private {
         }
     }
 
-    #[allow(private_bounds)]
-    pub trait RegBlock: DmaEligible {
+    pub trait RegBlock: crate::private::Sealed {
         fn regs(&self) -> &RegisterBlock;
         fn peripheral(&self) -> crate::system::Peripheral;
     }

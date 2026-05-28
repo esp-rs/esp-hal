@@ -1507,4 +1507,14 @@ impl AnySpi<'_> {
         self.disable_peri_interrupt_on_all_cores();
         self.bind_peri_interrupt(handler);
     }
+
+    #[cfg(spi_master_supports_dma)]
+    pub(crate) fn dma_peripheral_num(&self) -> u8 {
+        match &self.0 {
+            #[cfg(spi_master_spi2)]
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2.0,
+            #[cfg(spi_master_spi3)]
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3.0,
+        }
+    }
 }

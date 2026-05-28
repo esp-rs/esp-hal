@@ -20,15 +20,12 @@ use crate::{
     dma::{
         CHUNK_SIZE,
         Channel,
-        DmaChannel,
         DmaDescriptor,
-        DmaEligible,
         DmaRxBuf,
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
         NoBuffer,
-        PeripheralDmaChannel,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
@@ -109,7 +106,7 @@ where
     Dm: DriverMode,
 {
     spi: SpiWrapper<'d>,
-    pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+    pub(crate) channel: Channel<Dm, SpiMasterErased<'d>>,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -218,9 +215,9 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
-    fn new_inner(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+    fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi.spi);
+        channel.runtime_ensure_compatible(spi.dma_peripheral_num());
 
         for_each_spi_master!((all $($inst:tt),*) => {
             const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
@@ -262,7 +259,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
     pub(super) fn new_from_spi(
         spi_driver: Spi<'d, Blocking>,
-        channel: PeripheralDmaChannel<AnySpi<'d>>,
+        channel: SpiMasterErased<'d>,
     ) -> Self {
         let spi = spi_driver.spi;
 
@@ -795,7 +792,7 @@ where
     fn dma_driver(&self) -> DmaDriver {
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi().dma_peripheral(),
+            dma_peripheral: self.spi().dma_peripheral_num(),
             state: self.spi().dma_state(),
         }
     }
@@ -1586,7 +1583,7 @@ where
 
 pub(super) struct DmaDriver {
     driver: Driver,
-    dma_peripheral: crate::dma::DmaPeripheral,
+    dma_peripheral: u8,
     state: &'static DmaState,
 }
 
@@ -1632,7 +1629,7 @@ impl DmaDriver {
         tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
-        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+        channel: &mut Channel<Dm, SpiMasterErased<'_>>,
     ) -> Result<(), Error> {
         #[cfg(spi_master_version = "2")]
         {
@@ -1654,7 +1651,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.dma_peripheral.0, rx_buffer)
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1676,7 +1673,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.dma_peripheral.0, tx_buffer)
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }
@@ -1747,21 +1744,6 @@ impl DmaDriver {
     }
 }
 
-impl<'d> DmaEligible for AnySpi<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyAhbGdmaChannel<'d>;
-    #[cfg(dma_kind = "pdma")]
-    type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        let (info, _state) = self.dma_parts();
-        info.dma_peripheral
-    }
-}
-
-struct DmaInfo {
-    dma_peripheral: crate::dma::DmaPeripheral,
-}
 struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
@@ -1806,14 +1788,10 @@ for_each_spi_master!(
     (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
         impl AnySpi<'_> {
             #[inline(always)]
-            fn dma_parts(&self) -> (&'static DmaInfo, &'static DmaState) {
+            fn dma_state(&self) -> &'static DmaState {
                 match &self.0 {
                     $(
                         super::any::Inner::$sys(_spi) => {
-                            static DMA_INFO: DmaInfo = DmaInfo {
-                                dma_peripheral: crate::dma::DmaPeripheral::$sys,
-                            };
-
                             static DMA_STATE: DmaState = DmaState {
                                 tx_transfer_in_progress: Cell::new(false),
                                 rx_transfer_in_progress: Cell::new(false),
@@ -1822,22 +1800,10 @@ for_each_spi_master!(
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                             };
 
-                            (&DMA_INFO, &DMA_STATE)
+                            &DMA_STATE
                         }
                     )*
                 }
-            }
-
-            #[inline(always)]
-            fn dma_state(&self) -> &'static DmaState {
-                let (_, state) = self.dma_parts();
-                state
-            }
-
-            #[inline(always)]
-            fn dma_info(&self) -> &'static DmaInfo {
-                let (info, _) = self.dma_parts();
-                info
             }
         }
     };
@@ -1849,8 +1815,8 @@ impl SpiWrapper<'_> {
     }
 
     #[inline(always)]
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        self.spi.dma_peripheral()
+    fn dma_peripheral_num(&self) -> u8 {
+        self.spi.dma_peripheral_num()
     }
 }
 
@@ -1869,6 +1835,8 @@ pub trait SpiMasterDmaChannel<S>: crate::dma::DmaChannel + crate::private::Seale
 #[cfg(spi_master_supports_dma)]
 with_spi_master_dma_engine! {
     ($engine:literal, $any_channel:ident) => {
+        type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+
         impl SpiMasterDmaChannel<AnySpi<'_>> for crate::dma::$any_channel<'_> {}
 
         for_each_dma_channel! {
@@ -1920,7 +1888,7 @@ with_spi_master_dma_engine! {
                 CH: SpiMasterDmaChannel<AnySpi<'d>>,
                 CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
             {
-                SpiDma::new_from_spi(self, channel.into_erased())
+                SpiDma::new_from_spi(self, channel.degrade())
             }
         }
     };

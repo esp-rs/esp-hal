@@ -480,17 +480,17 @@ macro_rules! for_each_dma_channel_peri_pair {
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! with_spi_master_dma_engine {
-    ($pattern:tt => $code:tt $(;)?) => {
-        macro_rules! _with_inner_spi_master_dma_engine { ($pattern) => $code; }
-        _with_inner_spi_master_dma_engine!(("SPI_DMA", AnySpiDmaChannel));
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_master_dma_engine!(("SPI_DMA", AnySpiDmaChannel));
     };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! with_spi_slave_dma_engine {
-    ($pattern:tt => $code:tt $(;)?) => {
-        macro_rules! _with_inner_spi_slave_dma_engine { ($pattern) => $code; }
-        _with_inner_spi_slave_dma_engine!(("SPI_DMA", AnySpiDmaChannel));
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_slave_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_slave_dma_engine!(("SPI_DMA", AnySpiDmaChannel));
     };
 }
 #[macro_export]

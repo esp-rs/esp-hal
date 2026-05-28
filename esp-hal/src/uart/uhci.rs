@@ -105,17 +105,16 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
+        AnyAhbGdmaChannel,
+        AnyAhbGdmaRxChannel,
+        AnyAhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
         DmaChannel,
-        DmaEligible,
         DmaError,
         DmaRxBuffer,
         DmaTxBuffer,
-        PeripheralDmaChannel,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     pac::uhci0,
@@ -154,16 +153,6 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnyUhci<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyAhbGdmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            any::Inner::Uhci0(_) => crate::dma::DmaPeripheral::Uhci0,
-        }
-    }
-}
 
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
@@ -276,7 +265,7 @@ where
     uart: Uart<'d, Dm>,
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     uhci_per: AnyUhci<'static>,
-    channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
+    channel: Channel<Dm, AnyAhbGdmaChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -403,12 +392,11 @@ impl<'d> Uhci<'d, Blocking> {
     ) -> Self
     where
         CH: UhciDmaChannel,
-        CH: DmaChannel<Erased = PeripheralDmaChannel<AnyUhci<'d>>>,
+        CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
     {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.into_erased());
-        channel.runtime_ensure_compatible(&uhci);
+        let channel = Channel::new(channel.degrade());
 
         let uhci = Uhci {
             uart,
@@ -453,7 +441,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, PeripheralTxChannel<AnyUhci<'d>>>,
+    channel_tx: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -469,7 +457,7 @@ where
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
-                .prepare_transfer(self.uhci_per.dma_peripheral().0, &mut tx_buffer)
+                .prepare_transfer(crate::dma::DmaPeripheral::Uhci0.0, &mut tx_buffer)
         };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
@@ -499,7 +487,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, PeripheralRxChannel<AnyUhci<'d>>>,
+    channel_rx: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
@@ -515,7 +503,7 @@ where
         {
             let res = unsafe {
                 self.channel_rx
-                    .prepare_transfer(self.uhci_per.dma_peripheral().0, &mut rx_buffer)
+                    .prepare_transfer(crate::dma::DmaPeripheral::Uhci0.0, &mut rx_buffer)
             };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));

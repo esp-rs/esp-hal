@@ -54,7 +54,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaTxChannel, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel},
+    dma::{AnyAhbGdmaTxChannel, ChannelTx, DmaTxChannel, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -83,7 +83,7 @@ pub enum ConfigError {
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
+    tx_channel: ChannelTx<Blocking, AnyAhbGdmaTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -100,9 +100,9 @@ where
     ) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::LcdDmaTxChannel,
-        CH: DmaTxChannel<Erased = PeripheralTxChannel<LCD_CAM<'d>>>,
+        CH: DmaTxChannel<Erased = AnyAhbGdmaTxChannel<'d>>,
     {
-        let tx_channel = ChannelTx::new(channel.into_erased());
+        let tx_channel = ChannelTx::new(channel.degrade());
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,

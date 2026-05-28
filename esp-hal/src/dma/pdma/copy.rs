@@ -11,7 +11,6 @@ use crate::{
         DmaChannel,
         DmaChannelExt,
         DmaExtMemBKSize,
-        DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -44,7 +43,7 @@ impl crate::private::Sealed for CopyDmaRxChannel<'_> {}
 impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {
     type Erased = CopyDmaRxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -64,7 +63,7 @@ impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {
     type Erased = CopyDmaTxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -86,10 +85,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -259,10 +254,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     fn start(&self) {
         self.regs()
             .in_link()
@@ -400,7 +391,7 @@ impl<'d> DmaChannel for DMA_COPY<'d> {
     type Tx = CopyDmaTxChannel<'d>;
     type Erased = DMA_COPY<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 

@@ -103,12 +103,8 @@ use crate::{
     dma::{
         Channel,
         ChannelTx,
-        DmaChannel,
-        DmaEligible,
         DmaError,
         DmaTxBuffer,
-        PeripheralDmaChannel,
-        PeripheralTxChannel,
         asynch::DmaTxFuture,
     },
     gpio::{
@@ -249,23 +245,21 @@ where
     Dm: DriverMode,
 {
     instance: AnyI2s<'d>,
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+    tx_channel: ChannelTx<Dm, I2sParallelTxErased<'d>>,
     _guard: PeripheralGuard,
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
-    #[cfg(i2s_parallel_supports_dma)]
     fn new_internal(
         i2s: impl Instance + 'd,
-        channel: PeripheralDmaChannel<AnyI2s<'d>>,
+        channel: I2sParallelErased<'d>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&i2s);
-
         let i2s = i2s.degrade();
+        channel.runtime_ensure_compatible(i2s.dma_peripheral_num());
 
         let guard = PeripheralGuard::new(i2s.peripheral());
 
@@ -321,7 +315,7 @@ where
         self.instance.tx_fifo_reset();
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(self.instance.dma_peripheral().0, &mut data)
+                .prepare_transfer(self.instance.dma_peripheral_num(), &mut data)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {
@@ -489,10 +483,10 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
     }
 }
 #[doc(hidden)]
-#[allow(private_bounds)]
-pub trait PrivateInstance: DmaEligible {
+pub trait PrivateInstance: crate::private::Sealed {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
+    fn dma_peripheral_num(&self) -> u8;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
@@ -667,6 +661,10 @@ impl PrivateInstance for I2S0<'_> {
         crate::system::Peripheral::I2s0
     }
 
+    fn dma_peripheral_num(&self) -> u8 {
+        crate::dma::DmaPeripheral::I2s0.0
+    }
+
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
@@ -718,6 +716,10 @@ impl PrivateInstance for I2S1<'_> {
         crate::system::Peripheral::I2s1
     }
 
+    fn dma_peripheral_num(&self) -> u8 {
+        crate::dma::DmaPeripheral::I2s1.0
+    }
+
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S1O_WS
     }
@@ -762,6 +764,10 @@ impl PrivateInstance for I2S1<'_> {
 }
 
 impl PrivateInstance for AnyI2s<'_> {
+    fn dma_peripheral_num(&self) -> u8 {
+        super::AnyI2s::dma_peripheral_num(self)
+    }
+
     delegate::delegate! {
         to match &self.0 {
             super::any::Inner::I2s0(i2s) => i2s,
@@ -784,7 +790,6 @@ impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
 /// DMA channel trait for I2S peripherals.
-#[cfg(i2s_parallel_supports_dma)]
 #[diagnostic::on_unimplemented(
     message = "The DMA channel cannot be used with this I2S peripheral",
     label = "This DMA channel",
@@ -792,44 +797,30 @@ impl Instance for AnyI2s<'_> {}
 )]
 pub trait I2sParallelDmaChannel<S>: crate::dma::DmaChannel + crate::private::Sealed {}
 
-#[cfg(i2s_parallel_supports_dma)]
-with_i2s_parallel_dma_engine! {
-    ($engine:literal, $any_channel:ident) => {
-        impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::$any_channel<'_> {}
+// esp32 (PDMA): I2S parallel uses AnyI2sDmaChannel
+type I2sParallelErased<'d> = crate::dma::AnyI2sDmaChannel<'d>;
+type I2sParallelTxErased<'d> = crate::dma::AnyI2sDmaTxChannel<'d>;
 
-        for_each_dma_channel! {
-            ($engine, $ch:ident) => {
-                impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::peripherals::$ch<'_> {}
-            };
-        }
+impl I2sParallelDmaChannel<AnyI2s<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
 
-        for_each_i2s_parallel! {
-            ($peri:ident) => {
-                impl I2sParallelDmaChannel<crate::peripherals::$peri<'_>> for crate::dma::$any_channel<'_> {}
+#[cfg(soc_has_i2s0)]
+impl I2sParallelDmaChannel<crate::peripherals::I2S0<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
+#[cfg(soc_has_i2s1)]
+impl I2sParallelDmaChannel<crate::peripherals::I2S1<'_>> for crate::dma::AnyI2sDmaChannel<'_> {}
 
-                for_each_dma_channel_peri_pair! {
-                    ($engine, $ch:ident, $peri) => {
-                        impl I2sParallelDmaChannel<crate::peripherals::$peri<'_>> for crate::peripherals::$ch<'_> {}
-                    };
-                }
-            };
-        }
-
-        impl<'d> I2sParallel<'d, crate::Blocking> {
-            /// Create a new I2S Parallel Interface
-            pub fn new<CH>(
-                i2s: impl Instance + 'd,
-                channel: CH,
-                frequency: Rate,
-                pins: impl TxPins<'d>,
-                clock_pin: impl PeripheralOutput<'d>,
-            ) -> Self
-            where
-                CH: I2sParallelDmaChannel<AnyI2s<'d>>,
-                CH: crate::dma::DmaChannel<Erased = crate::dma::$any_channel<'d>>,
-            {
-                Self::new_internal(i2s, channel.into_erased(), frequency, pins, clock_pin)
-            }
-        }
-    };
+impl<'d> I2sParallel<'d, crate::Blocking> {
+    /// Create a new I2S Parallel Interface
+    pub fn new<CH>(
+        i2s: impl Instance + 'd,
+        channel: CH,
+        frequency: Rate,
+        pins: impl TxPins<'d>,
+        clock_pin: impl PeripheralOutput<'d>,
+    ) -> Self
+    where
+        CH: I2sParallelDmaChannel<AnyI2s<'d>>,
+        CH: crate::dma::DmaChannel<Erased = I2sParallelErased<'d>>,
+    {
+        Self::new_internal(i2s, channel.degrade(), frequency, pins, clock_pin)
+    }
 }

@@ -1,7 +1,5 @@
 //! # Inter-IC Sound (I2S)
 
-use crate::dma::DmaEligible;
-
 pub mod master;
 
 #[cfg(esp32)]
@@ -17,18 +15,13 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnyI2s<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyAhbGdmaChannel<'d>;
-    #[cfg(dma_kind = "pdma")]
-    type Dma = crate::dma::AnyI2sDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+impl AnyI2s<'_> {
+    pub(crate) fn dma_peripheral_num(&self) -> u8 {
         match &self.0 {
             #[cfg(soc_has_i2s0)]
-            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
+            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2s0.0,
             #[cfg(soc_has_i2s1)]
-            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
+            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2s1.0,
         }
     }
 }

@@ -16,7 +16,7 @@ use portable_atomic::AtomicBool;
 use crate::{asynch::AtomicWaker, dma::InterruptHandler, peripherals::Interrupt};
 
 for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal, $engine:literal )),*) => {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
         /// DMA-eligible peripheral selector values; values are engine-local (matching hardware where applicable).
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -52,12 +52,6 @@ pub struct ChannelInfo {
     pub(crate) async_handler: InterruptHandler,
     /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
     pub(crate) compatible_peripherals: &'static [u8],
-}
-
-impl ChannelInfo {
-    pub(crate) fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.compatible_peripherals.contains(&peripheral.0)
-    }
 }
 
 /// Mutable per-channel runtime state.

@@ -8,7 +8,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
-        DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -40,7 +39,7 @@ impl crate::private::Sealed for AnyI2sDmaRxChannel<'_> {}
 impl<'d> DmaRxChannel for AnyI2sDmaRxChannel<'d> {
     type Erased = AnyI2sDmaRxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -60,7 +59,7 @@ impl crate::private::Sealed for AnyI2sDmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for AnyI2sDmaTxChannel<'d> {
     type Erased = AnyI2sDmaTxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -90,10 +89,6 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
         self.regs()
             .out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -275,10 +270,6 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     fn start(&self) {
         self.regs()
             .in_link()
@@ -323,6 +314,14 @@ impl RxRegisterAccess for AnyI2sDmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         Some(self.0.info().async_handler)
+    }
+
+    fn runtime_ensure_compatible(&self, peripheral_num: u8) {
+        assert!(
+            self.0.info().compatible_peripherals.contains(&peripheral_num),
+            "This DMA channel is not compatible with peripheral id {}",
+            peripheral_num
+        );
     }
 }
 
@@ -434,7 +433,7 @@ impl<'d> DmaChannel for AnyI2sDmaChannel<'d> {
     type Tx = AnyI2sDmaTxChannel<'d>;
     type Erased = AnyI2sDmaChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 
@@ -466,7 +465,3 @@ super::impl_pdma_channel!(AnyI2sDma, DMA_I2S0, I2S0, [I2s0]);
 #[cfg(soc_has_i2s1)]
 super::impl_pdma_channel!(AnyI2sDma, DMA_I2S1, I2S1, [I2s1]);
 
-#[cfg(soc_has_i2s0)]
-crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);
-#[cfg(soc_has_i2s1)]
-crate::dma::impl_dma_eligible!([DMA_I2S1] I2S1 => I2s1);

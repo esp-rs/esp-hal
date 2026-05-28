@@ -8,7 +8,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
-        DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -40,7 +39,7 @@ impl crate::private::Sealed for AnySpiDmaRxChannel<'_> {}
 impl<'d> DmaRxChannel for AnySpiDmaRxChannel<'d> {
     type Erased = AnySpiDmaRxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -60,7 +59,7 @@ impl crate::private::Sealed for AnySpiDmaTxChannel<'_> {}
 impl<'d> DmaTxChannel for AnySpiDmaTxChannel<'d> {
     type Erased = AnySpiDmaTxChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 }
@@ -99,10 +98,6 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
         self.regs()
             .dma_out_link()
             .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
     }
 
     fn start(&self) {
@@ -292,10 +287,6 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
             .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     fn start(&self) {
         self.regs()
             .dma_in_link()
@@ -340,6 +331,14 @@ impl RxRegisterAccess for AnySpiDmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         Some(self.0.info().async_handler)
+    }
+
+    fn runtime_ensure_compatible(&self, peripheral_num: u8) {
+        assert!(
+            self.0.info().compatible_peripherals.contains(&peripheral_num),
+            "This DMA channel is not compatible with peripheral id {}",
+            peripheral_num
+        );
     }
 }
 
@@ -449,7 +448,7 @@ impl<'d> DmaChannel for AnySpiDmaChannel<'d> {
     type Tx = AnySpiDmaTxChannel<'d>;
     type Erased = AnySpiDmaChannel<'d>;
 
-    fn into_erased(self) -> Self::Erased {
+    fn degrade(self) -> Self::Erased {
         self
     }
 
@@ -477,7 +476,3 @@ impl AnySpiDmaChannel<'_> {
 super::impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [Spi2]);
 super::impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [Spi3]);
 
-#[cfg(soc_has_spi2)]
-crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);
-#[cfg(soc_has_spi3)]
-crate::dma::impl_dma_eligible!([DMA_SPI3] SPI3 => Spi3);

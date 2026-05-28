@@ -141,13 +141,13 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        AnyAhbGdmaChannel,
+        AnyAhbGdmaRxChannel,
+        AnyAhbGdmaTxChannel,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
         DmaTxBuffer,
-        PeripheralDmaChannel,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
     },
     gpio::{
         self,
@@ -942,7 +942,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
     _guard: ParlIoTxGuard,
 }
 
@@ -992,7 +992,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
     _guard: ParlIoRxGuard,
 }
 
@@ -1090,11 +1090,11 @@ impl<'d> ParlIo<'d, Blocking> {
     ) -> Result<Self, Error>
     where
         CH: ParlIoDmaChannel,
-        CH: DmaChannel<Erased = PeripheralDmaChannel<PARL_IO<'d>>>,
+        CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.into_erased());
+        let dma_channel = Channel::new(dma_channel.degrade());
 
         Ok(Self {
             tx: TxCreator {
@@ -1504,7 +1504,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -1513,7 +1513,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 

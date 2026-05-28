@@ -4,7 +4,7 @@ use core::{
 };
 
 #[cfg(not(esp32s2))]
-use crate::dma::{AnyAhbGdmaChannel, AnyAhbGdmaRxChannel, AnyAhbGdmaTxChannel, DmaEligible};
+use crate::dma::{AnyAhbGdmaChannel, AnyAhbGdmaRxChannel, AnyAhbGdmaTxChannel};
 use crate::{
     Async,
     Blocking,
@@ -63,13 +63,13 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
     pub fn new(
         channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
-        #[cfg(dma_kind = "gdma")] peripheral: impl DmaEligible,
+        #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
         unsafe {
             Self::new_unsafe(
                 channel,
                 #[cfg(dma_kind = "gdma")]
-                peripheral.dma_peripheral(),
+                peripheral,
             )
         }
     }
@@ -84,7 +84,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         channel: impl DmaChannel<Erased = Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
-        let channel = Channel::new(channel.into_erased());
+        let channel = Channel::new(channel.degrade());
 
         cfg_if::cfg_if! {
             if #[cfg(dma_kind = "gdma")] {
