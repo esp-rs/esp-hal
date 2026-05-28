@@ -236,23 +236,6 @@ for_each_dma_channel! {
     };
 }
 
-for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
-        /// DMA-eligible peripheral selector values; values match the GDMA peripheral-select register.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub struct DmaPeripheral(pub u8);
-        impl DmaPeripheral {
-            $(
-                #[doc = concat!("DMA accesses ", stringify!($name))]
-                #[allow(non_upper_case_globals)]
-                pub const $peri: Self = Self($id);
-            )*
-        }
-    };
-}
-
 pub(super) fn init_dma_racey() {
     DMA::regs()
         .misc_conf()

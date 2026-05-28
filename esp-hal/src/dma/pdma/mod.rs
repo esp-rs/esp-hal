@@ -15,22 +15,6 @@ use portable_atomic::AtomicBool;
 
 use crate::{asynch::AtomicWaker, dma::InterruptHandler, peripherals::Interrupt};
 
-for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
-        /// DMA-eligible peripheral selector values; values are engine-local (matching hardware where applicable).
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub struct DmaPeripheral(pub u8);
-        impl DmaPeripheral {
-            $(
-                #[doc = concat!("DMA accesses ", stringify!($name))]
-                pub const $peri: Self = Self($id);
-            )*
-        }
-    };
-}
-
 #[cfg(soc_has_dma_copy)]
 mod copy;
 #[cfg(soc_has_dma_crypto)]
