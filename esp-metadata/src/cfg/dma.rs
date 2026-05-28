@@ -91,7 +91,8 @@ impl GenericProperty for DmaEngines {
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let mut shared = vec![];
         let mut split = vec![];
-        let mut names = vec![];
+        let mut engines = vec![];
+        let mut engine_channels = vec![];
         // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
         // If the list is empty (GDMA), this contains nothing.
         let mut dma_pairs = vec![];
@@ -100,6 +101,7 @@ impl GenericProperty for DmaEngines {
 
         for engine in self.0.iter() {
             let engine_name = engine.name.as_str();
+            engines.push(quote! { #engine_name });
 
             for driver in &engine.drivers {
                 // Convention
@@ -115,7 +117,7 @@ impl GenericProperty for DmaEngines {
                 let idx = number(idx);
                 let ch = quote::format_ident!("{}", channel.name);
 
-                names.push(quote! { #engine_name, #ch });
+                engine_channels.push(quote! { #engine_name, #ch });
 
                 let compatible_peris = if channel.compatible_with.is_empty() {
                     engine
@@ -169,11 +171,17 @@ impl GenericProperty for DmaEngines {
         let dma_channel_macro = if !shared.is_empty() || !split.is_empty() {
             Some(generate_for_each_macro(
                 "dma_channel",
-                &[("names", &names), ("shared", &shared), ("split", &split)],
+                &[
+                    ("names", &engine_channels),
+                    ("shared", &shared),
+                    ("split", &split),
+                ],
             ))
         } else {
             None
         };
+
+        let dma_engines_macro = generate_for_each_macro("dma_engine", &[("all", &engines)]);
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.
@@ -196,6 +204,7 @@ impl GenericProperty for DmaEngines {
             .collect();
 
         Some(quote::quote! {
+            #dma_engines_macro
             #dma_channel_macro
             #dma_pairs_macro
             #(#driver_engine_macros)*

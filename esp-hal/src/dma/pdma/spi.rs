@@ -1,7 +1,6 @@
 use enumset::EnumSet;
 use portable_atomic::Ordering;
 
-use super::{ChannelInfo, ChannelState};
 use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
@@ -21,6 +20,32 @@ use crate::{
     peripherals::Interrupt,
     system::Peripheral,
 };
+
+/// Immutable per-channel metadata.
+#[doc(hidden)]
+pub struct ChannelInfo {
+    pub(crate) peripheral_interrupt: Interrupt,
+
+    pub(crate) async_handler: InterruptHandler,
+
+    /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
+    pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode.
+    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode.
+    pub(crate) rx_is_async: portable_atomic::AtomicBool,
+}
 
 pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
 
@@ -248,13 +273,13 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().tx_async_flag.load(Ordering::Acquire)
+        self.0.state().tx_is_async.load(Ordering::Acquire)
     }
 
     fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .tx_async_flag
+            .tx_is_async
             .store(is_async, Ordering::Release);
     }
 }
@@ -424,13 +449,13 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().rx_async_flag.load(Ordering::Relaxed)
+        self.0.state().rx_is_async.load(Ordering::Relaxed)
     }
 
     fn set_async(&self, _is_async: bool) {
         self.0
             .state()
-            .rx_async_flag
+            .rx_is_async
             .store(_is_async, Ordering::Relaxed);
     }
 }
@@ -473,5 +498,41 @@ impl AnySpiDmaChannel<'_> {
     }
 }
 
-super::impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [SPI2]);
-super::impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [SPI3]);
+macro_rules! impl_pdma_channel {
+    ($peri:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
+        paste::paste! {
+            use $crate::peripherals::$instance;
+            impl $instance<'_> {
+                pub(super) fn info(&self) -> &'static ChannelInfo {
+                    #[crate::handler(priority = crate::interrupt::Priority::max())]
+                    fn interrupt_handler() {
+                        crate::dma::asynch::handle_in_interrupt::<$instance<'static>>();
+                        crate::dma::asynch::handle_out_interrupt::<$instance<'static>>();
+                    }
+                    static INFO: ChannelInfo = ChannelInfo {
+                        peripheral_interrupt: crate::peripherals::Interrupt::$int,
+                        async_handler: interrupt_handler,
+                        compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
+                    };
+                    &INFO
+                }
+
+                pub(super) fn state(&self) -> &'static ChannelState {
+                    static STATE: ChannelState = ChannelState {
+                        tx_waker: crate::asynch::AtomicWaker::new(),
+                        rx_waker: crate::asynch::AtomicWaker::new(),
+                        tx_is_async: portable_atomic::AtomicBool::new(false),
+                        rx_is_async: portable_atomic::AtomicBool::new(false),
+                    };
+                    &STATE
+                }
+            }
+
+        }
+
+        crate::dma::impl_channel_common!($peri, $instance);
+    };
+}
+
+impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [SPI2]);
+impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [SPI3]);

@@ -22,20 +22,6 @@ use crate::{
 #[cfg_attr(dma_gdma_version = "2", path = "ahb_v2.rs")]
 mod implementation;
 
-/// Mutable per-channel runtime state (wakers and async-mode flags).
-pub(crate) struct ChannelState {
-    /// Async waker for the TX (out) half of this channel.
-    pub(crate) tx_waker: AtomicWaker,
-    /// Async waker for the RX (in) half of this channel.
-    pub(crate) rx_waker: AtomicWaker,
-    /// Whether the TX half is currently in async mode (shared-interrupt chips only).
-    #[cfg(not(dma_separate_in_out_interrupts))]
-    pub(crate) tx_is_async: portable_atomic::AtomicBool,
-    /// Whether the RX half is currently in async mode (shared-interrupt chips only).
-    #[cfg(not(dma_separate_in_out_interrupts))]
-    pub(crate) rx_is_async: portable_atomic::AtomicBool,
-}
-
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     /// Hardware channel index used to select the register bank.
@@ -50,6 +36,23 @@ pub(crate) struct ChannelInfo {
     pub(crate) isr_out: Option<Interrupt>,
     /// List of compatible peripheral IDs for this channel.
     pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode (shared-interrupt chips only).
+    #[cfg(not(dma_separate_in_out_interrupts))]
+    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode (shared-interrupt chips only).
+    #[cfg(not(dma_separate_in_out_interrupts))]
+    pub(crate) rx_is_async: portable_atomic::AtomicBool,
 }
 
 /// An arbitrary GDMA channel

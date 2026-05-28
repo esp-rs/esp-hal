@@ -324,6 +324,7 @@ impl Chip {
                     "soc_has_dma_i2s1",
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
+                    "i2s_supports_dma",
                     "gpio_version=\"1\"",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
@@ -539,6 +540,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_i2s1",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
                     "cargo:rustc-cfg=gpio_version=\"1\"",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
@@ -6545,6 +6547,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_i2s1)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(spi_slave_supports_dma)");
+    println!("cargo:rustc-check-cfg=cfg(i2s_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
     println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_separate_filter_config_registers)");

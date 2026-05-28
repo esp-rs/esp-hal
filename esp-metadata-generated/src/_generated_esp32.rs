@@ -444,6 +444,16 @@ macro_rules! for_each_aes_key_length {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
+        _for_each_inner_dma_engine!(("I2S_DMA"));
+        _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA")));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_dma_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
@@ -478,6 +488,14 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!((all("SPI_DMA", DMA_SPI2, SPI2),
         ("SPI_DMA", DMA_SPI3, SPI3), ("I2S_DMA", DMA_I2S0, I2S0), ("I2S_DMA", DMA_I2S1,
         I2S1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_i2s_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_i2s_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_i2s_dma_engine!(("I2S_DMA", AnyI2sDmaChannel));
     };
 }
 #[macro_export]

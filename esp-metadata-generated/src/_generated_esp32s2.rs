@@ -474,6 +474,19 @@ macro_rules! for_each_dedicated_gpio {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
+        _for_each_inner_dma_engine!(("I2S_DMA"));
+        _for_each_inner_dma_engine!(("CRYPTO_DMA"));
+        _for_each_inner_dma_engine!(("COPY_DMA"));
+        _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA"), ("CRYPTO_DMA"),
+        ("COPY_DMA")));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_dma_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)

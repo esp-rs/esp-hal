@@ -501,6 +501,15 @@ macro_rules! for_each_dedicated_gpio {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
+        _for_each_inner_dma_engine!((all("AHB_GDMA")));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_dma_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
