@@ -1861,18 +1861,7 @@ for_each_i2c_master!(
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
                     sda_input: InputSignal::$sda,
-                    clock_instance: {
-                        cfg_if::cfg_if! {
-                            if #[cfg(soc_has_i2c1)] {
-                                match $id {
-                                    0 => crate::soc::clocks::I2cInstance::I2c0,
-                                    _ => crate::soc::clocks::I2cInstance::I2c1,
-                                }
-                            } else {
-                                crate::soc::clocks::I2cInstance::I2c0
-                            }
-                        }
-                    },
+                    clock_instance: paste::paste! { crate::soc::clocks::I2cInstance::[<I2c $id>] },
                 };
                 (&PERIPHERAL, &STATE)
             }
