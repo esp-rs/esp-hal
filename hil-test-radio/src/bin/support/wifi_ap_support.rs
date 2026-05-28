@@ -64,7 +64,7 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     let device = esp_radio::wifi::Interface::access_point();
-    let controller = esp_radio::wifi::new(
+    let controller = esp_radio::wifi::WifiController::new(
         p.WIFI,
         ControllerConfig::default().with_initial_config(access_point_config),
     )

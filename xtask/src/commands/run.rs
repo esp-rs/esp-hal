@@ -226,14 +226,8 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         }
 
         if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
-            let is_support_firmware = radio_tests.iter().any(|candidate| {
-                candidate.supports_chip(args.chip)
-                    && candidate.harness_firmware().is_some_and(|name| {
-                        name == meta.binary_name() || name == meta.output_file_name()
-                    })
-            });
-            if is_support_firmware {
-                log::info!("Skipping support firmware '{}'", elf_name);
+            if meta.is_support_firmware() {
+                log::info!("Skipping support firmware '{}' (metadata)", elf_name);
                 continue;
             }
 

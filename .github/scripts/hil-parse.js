@@ -19,7 +19,7 @@ function parsePackage(body) {
   if (text.includes("hil-test")) {
     return "hil-test";
   }
-  return "all"; 
+  return "all";
 }
 
 function parseTests(body) {

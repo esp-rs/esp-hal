@@ -89,15 +89,12 @@ runs:
             cargo xtask build tests ${{ inputs.soc }} $pkg
           fi
 
-          # For full package builds, separate artifacts by package.
-          # For selected tests, keep ELFs at top-level because `xtask run elfs`
-          # scans the given directory non-recursively.
-          if [ -z "${{ inputs.tests }}" ]; then
-            local src="${{ github.workspace }}/target/tests/${{ inputs.soc }}"
-            local dst="${src}/${pkg}"
-            mkdir -p "$dst"
-            find "$src" -maxdepth 1 -type f -exec mv {} "$dst/" \;
-          fi
+          # Always separate artifacts by package so upload paths are consistent
+          # for full and selected-test builds.
+          local src="${{ github.workspace }}/target/tests/${{ inputs.soc }}"
+          local dst="${src}/${pkg}"
+          mkdir -p "$dst"
+          find "$src" -maxdepth 1 -type f -exec mv {} "$dst/" \;
         }
 
         if [ "${{ inputs.package }}" = "all" ]; then

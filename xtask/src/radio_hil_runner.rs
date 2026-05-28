@@ -223,11 +223,11 @@ fn runner_env_key(target: &str) -> String {
 
 fn spawn_probe_run(name: &str, binary_path: &Path, probe: &str) -> Result<Child> {
     log::info!(
-        "[{name}] probe-rs run --probe {probe} {}",
+        "[{name}] probe-rs run --preverify --probe {probe} {}",
         binary_path.display()
     );
     Command::new("probe-rs")
-        .args(["run", "--probe", probe])
+        .args(["run", "--preverify", "--probe", probe])
         .arg(binary_path)
         .env("DEFMT_LOG", "info")
         .spawn()

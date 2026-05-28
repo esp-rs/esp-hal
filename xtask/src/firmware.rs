@@ -130,7 +130,7 @@ pub struct Configuration {
     esp_config: HashMap<String, String>,
     tag: Option<String>,
     harness_firmware: Option<String>,
-    support_firmware: bool,
+    support_firmware: Option<bool>,
 }
 
 struct ConfigurationCollector<'a> {
@@ -298,7 +298,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     let support = parse_bool(&meta_line.value).with_context(|| {
                         format!("{} metadata must be true/false", meta_line.key.as_str())
                     })?;
-                    relevant_metadata.apply(|meta| meta.support_firmware = support);
+                    relevant_metadata.apply(|meta| meta.support_firmware = Some(support));
                 }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
@@ -322,7 +322,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             }
 
             // Support firmware marker inherits if not explicitly set.
-            if !meta.support_firmware {
+            if meta.support_firmware.is_none() {
                 meta.support_firmware = all_configuration.support_firmware;
             }
 
@@ -357,7 +357,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
                     harness_firmware: configuration.harness_firmware.clone(),
-                    support_firmware: configuration.support_firmware,
+                    support_firmware: configuration.support_firmware.unwrap_or(false),
                     env_vars: configuration.esp_config.clone(),
                     cargo_config: configuration.cargo_config.clone(),
                 })

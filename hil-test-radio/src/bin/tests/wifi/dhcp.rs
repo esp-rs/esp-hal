@@ -152,7 +152,7 @@ mod tests {
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         let wifi_interface = Interface::station();
-        let controller = esp_radio::wifi::new(
+        let controller = esp_radio::wifi::WifiController::new(
             p.WIFI,
             ControllerConfig::default().with_initial_config(station_config()),
         )
@@ -175,7 +175,7 @@ mod tests {
         let mut wifi = p.WIFI;
 
         {
-            let mut controller = esp_radio::wifi::new(
+            let mut controller = esp_radio::wifi::WifiController::new(
                 wifi.reborrow(),
                 ControllerConfig::default().with_initial_config(station_config()),
             )
@@ -188,7 +188,7 @@ mod tests {
         Timer::after(Duration::from_millis(1500)).await;
 
         let wifi_interface = Interface::station();
-        let controller = esp_radio::wifi::new(
+        let controller = esp_radio::wifi::WifiController::new(
             wifi,
             ControllerConfig::default().with_initial_config(station_config()),
         )
