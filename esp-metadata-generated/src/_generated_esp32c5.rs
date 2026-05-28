@@ -421,6 +421,9 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("clock_tree.i2c.function_clock.div_num") => {
+        (0, 255)
+    };
     ("spi_master.version") => {
         3
     };
@@ -1232,6 +1235,22 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
+/// impl I2cInstance {
+///     // I2C_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<I2cFunctionClockConfig>,
+///         _new_config: I2cFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl ParlIoInstance {
 ///     // PARL_IO_RX_CLOCK
 ///
@@ -1344,6 +1363,11 @@ macro_rules! for_each_sha_algorithm {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2cInstance {
+            I2c0 = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ParlIoInstance {
@@ -1520,6 +1544,45 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2cFunctionClockSclk {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+        }
+        /// Configures the `I2C0_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = sclk / (div_num + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct I2cFunctionClockConfig {
+            sclk: I2cFunctionClockSclk,
+            div_num: u32,
+        }
+        impl I2cFunctionClockConfig {
+            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(sclk: I2cFunctionClockSclk, div_num: u32) -> Self {
+                ::core::assert!(
+                    div_num <= 255,
+                    "`I2C0_FUNCTION_CLOCK` div_num must be between 0 and 255 (inclusive)."
+                );
+                Self { sclk, div_num }
+            }
+            fn sclk(self) -> I2cFunctionClockSclk {
+                self.sclk
+            }
+            fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
+        }
         /// The list of clock signals that the `PARL_IO_RX_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1673,6 +1736,7 @@ macro_rules! define_clock_tree_types {
             lp_slow_clk: Option<LpSlowClkConfig>,
             crypto_clk: Option<CryptoClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             parl_io_rx_clock: [Option<ParlIoRxClockConfig>; 1],
             parl_io_tx_clock: [Option<ParlIoTxClockConfig>; 1],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
@@ -1700,6 +1764,7 @@ macro_rules! define_clock_tree_types {
             lp_slow_clk_refcount: u32,
             crypto_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            i2c_function_clock_refcount: [u32; 1],
             parl_io_rx_clock_refcount: [u32; 1],
             parl_io_tx_clock_refcount: [u32; 1],
             rmt_sclk_refcount: [u32; 1],
@@ -1748,6 +1813,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
+            }
+            /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
+            pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
+                self.i2c_function_clock[I2cInstance::I2c0 as usize]
             }
             /// Returns the current configuration of the PARL_IO_RX_CLOCK clock tree node
             pub fn parl_io_rx_clock(&self) -> Option<ParlIoRxClockConfig> {
@@ -1805,6 +1874,7 @@ macro_rules! define_clock_tree_types {
                 lp_slow_clk: None,
                 crypto_clk: None,
                 timg_calibration_clock: None,
+                i2c_function_clock: [None; 1],
                 parl_io_rx_clock: [None; 1],
                 parl_io_tx_clock: [None; 1],
                 rmt_sclk: [None; 1],
@@ -1832,6 +1902,7 @@ macro_rules! define_clock_tree_types {
                 lp_slow_clk_refcount: 0,
                 crypto_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                i2c_function_clock_refcount: [0; 1],
                 parl_io_rx_clock_refcount: [0; 1],
                 parl_io_tx_clock_refcount: [0; 1],
                 rmt_sclk_refcount: [0; 1],
@@ -1858,6 +1929,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static PARL_IO_RX_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static PARL_IO_TX_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
@@ -2569,6 +2642,76 @@ macro_rules! define_clock_tree_types {
         pub fn timg_calibration_clock_frequency() -> u32 {
             TIMG_CALIBRATION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
+        impl I2cInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                config: I2cFunctionClockConfig,
+            ) {
+                let old_config = clocks.i2c_function_clock[self as usize].replace(config);
+                refresh_i2c_function_clock_downstream(clocks, self);
+                if clocks.i2c_function_clock_refcount[self as usize] > 0 {
+                    match config.sclk {
+                        I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_config, config);
+                    if let Some(old_config) = old_config {
+                        match old_config.sclk {
+                            I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+                            I2cFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_config, config);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<I2cFunctionClockConfig> {
+                clocks.i2c_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
+                        I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
+                        I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: I2cFunctionClockConfig,
+            ) -> u32 {
+                (match config.sclk {
+                    I2cFunctionClockSclk::Xtal => xtal_clk_frequency(),
+                    I2cFunctionClockSclk::RcFast => rc_fast_clk_frequency(),
+                } / (config.div_num() + 1))
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                I2C_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+        }
         impl ParlIoInstance {
             pub fn configure_rx_clock(
                 self,
@@ -3123,6 +3266,9 @@ macro_rules! define_clock_tree_types {
             refresh_hp_root_clk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             refresh_crypto_clk_downstream(clocks);
+            for child_instance in [I2cInstance::I2c0] {
+                refresh_i2c_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [ParlIoInstance::ParlIo] {
                 refresh_parl_io_rx_clock_downstream(clocks, child_instance);
                 refresh_parl_io_tx_clock_downstream(clocks, child_instance);
@@ -3201,6 +3347,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.timg_calibration_clock {
                 TIMG_CALIBRATION_CLOCK_FREQ_CACHE.store(
                     timg_calibration_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
+            if let Some(config) = clocks.i2c_function_clock[instance as usize] {
+                I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }

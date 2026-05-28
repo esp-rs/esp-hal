@@ -1,4 +1,5 @@
 use super::*;
+use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -172,10 +173,11 @@ fn set_filter(
 
 #[expect(clippy::too_many_arguments)]
 #[allow(unused)]
-/// Configures the clock and timing parameters for the I2C peripheral.
+/// Configures the timing parameters for the I2C peripheral.
+///
+/// Clock source selection is handled separately via the clock tree.
 fn configure_clock(
     info: &Info,
-    sclk_div: u32,
     scl_low_period: u32,
     scl_high_period: u32,
     scl_wait_high_period: u32,
@@ -188,27 +190,6 @@ fn configure_clock(
     timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
-        cfg_if::cfg_if! {
-            if #[cfg(all(soc_has_pcr, soc_has_i2c1))] {
-                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
-                    w.i2c_sclk_sel().clear_bit();
-                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
-                    w.i2c_sclk_en().set_bit()
-                });
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
-                    w.i2c_sclk_sel().clear_bit();
-                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
-                    w.i2c_sclk_en().set_bit()
-                });
-            } else if #[cfg(i2c_master_version = "3")] {
-                info.regs().clk_conf().modify(|_, w| {
-                    w.sclk_sel().clear_bit();
-                    w.sclk_div_num().bits((sclk_div - 1) as u8)
-                });
-            }
-        }
-
         // scl period
         info.regs()
             .scl_low_period()
@@ -297,6 +278,9 @@ pub struct Info {
 
     /// SDA input signal.
     pub sda_input: InputSignal,
+
+    /// I2C clock group instance.
+    pub clock_instance: crate::soc::clocks::I2cInstance,
 }
 
 impl Info {
@@ -366,6 +350,38 @@ impl PartialEq for Info {
 }
 
 unsafe impl Sync for Info {}
+
+#[derive(Debug)]
+pub(super) struct I2cClockGuard<'t> {
+    i2c: AnyI2c<'t>,
+}
+
+impl<'t> I2cClockGuard<'t> {
+    pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
+        ClockTree::with(|clocks| {
+            let clock = i2c.info().clock_instance;
+            let config = I2cFunctionClockConfig::new(
+                Default::default(),
+                #[cfg(i2c_master_version = "3")]
+                0,
+            );
+            clock.configure_function_clock(clocks, config);
+            clock.request_function_clock(clocks);
+        });
+        Self { i2c }
+    }
+}
+
+impl Drop for I2cClockGuard<'_> {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| {
+            self.i2c
+                .info()
+                .clock_instance
+                .release_function_clock(clocks);
+        });
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Deadline {
@@ -1843,6 +1859,7 @@ for_each_i2c_master!(
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
                     sda_input: InputSignal::$sda,
+                    clock_instance: paste::paste! { crate::soc::clocks::I2cInstance::[<I2c $id>] },
                 };
                 (&PERIPHERAL, &STATE)
             }

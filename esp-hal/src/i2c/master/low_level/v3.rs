@@ -1,71 +1,75 @@
 use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
+use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
 /// i2c_ll_set_bus_timing in ESP-IDF
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
-
-    let source_clk = crate::soc::clocks::xtal_clk_frequency();
-
     let bus_freq = clock_config.frequency.as_hz();
+    let sclk = clock_config.clock_source;
+    let clock = driver.info.clock_instance;
 
-    let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
-    let sclk_freq: u32 = source_clk / clkm_div;
-    let half_cycle: u32 = sclk_freq / bus_freq / 2;
-    // SCL
-    let scl_low = half_cycle;
-    // default, scl_wait_high < scl_high
-    // Make 80KHz as a boundary here, because when working at lower frequency, too
-    // much scl_wait_high will faster the frequency according to some
-    // hardware behaviors.
-    let scl_wait_high = if bus_freq >= 80 * 1000 {
-        half_cycle / 2 - 2
-    } else {
-        half_cycle / 4
-    };
-    let scl_high = half_cycle - scl_wait_high;
-    let sda_hold = half_cycle / 4;
-    let sda_sample = half_cycle / 2;
-    let setup = half_cycle;
-    let hold = half_cycle;
+    ClockTree::with(|clocks| -> Result<(), ConfigError> {
+        let source_clk =
+            clock.function_clock_config_frequency(clocks, I2cFunctionClockConfig::new(sclk, 0));
 
-    // According to the Technical Reference Manual, the following timings must be
-    // subtracted by 1. However, according to the practical measurement and
-    // some hardware behaviour, if wait_high_period and scl_high minus one.
-    // The SCL frequency would be a little higher than expected. Therefore, the
-    // solution here is not to minus scl_high as well as scl_wait high, and
-    // the frequency will be absolutely accurate to all frequency
-    // to some extent.
-    let scl_low_period = scl_low - 1;
-    let scl_high_period = scl_high;
-    let scl_wait_high_period = scl_wait_high;
-    // sda sample
-    let sda_hold_time = sda_hold - 1;
-    let sda_sample_time = sda_sample - 1;
-    // setup
-    let scl_rstart_setup_time = setup - 1;
-    let scl_stop_setup_time = setup - 1;
-    // hold
-    let scl_start_hold_time = hold - 1;
-    let scl_stop_hold_time = hold - 1;
+        let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
+        let sclk_freq: u32 = source_clk / clkm_div;
+        let half_cycle: u32 = sclk_freq / bus_freq / 2;
+        // SCL
+        let scl_low = half_cycle;
+        // default, scl_wait_high < scl_high
+        // Make 80KHz as a boundary here, because when working at lower frequency, too
+        // much scl_wait_high will faster the frequency according to some
+        // hardware behaviors.
+        let scl_wait_high = if bus_freq >= 80 * 1000 {
+            half_cycle / 2 - 2
+        } else {
+            half_cycle / 4
+        };
+        let scl_high = half_cycle - scl_wait_high;
+        let sda_hold = half_cycle / 4;
+        let sda_sample = half_cycle / 2;
+        let setup = half_cycle;
+        let hold = half_cycle;
 
-    configure_clock(
-        driver.info,
-        clkm_div,
-        scl_low_period,
-        scl_high_period,
-        scl_wait_high_period,
-        sda_hold_time,
-        sda_sample_time,
-        scl_rstart_setup_time,
-        scl_stop_setup_time,
-        scl_start_hold_time,
-        scl_stop_hold_time,
-        timeout.apb_cycles(half_cycle)?,
-    )?;
+        // According to the Technical Reference Manual, the following timings must be
+        // subtracted by 1. However, according to the practical measurement and
+        // some hardware behaviour, if wait_high_period and scl_high minus one.
+        // The SCL frequency would be a little higher than expected. Therefore, the
+        // solution here is not to minus scl_high as well as scl_wait high, and
+        // the frequency will be absolutely accurate to all frequency
+        // to some extent.
+        let scl_low_period = scl_low - 1;
+        let scl_high_period = scl_high;
+        let scl_wait_high_period = scl_wait_high;
+        // sda sample
+        let sda_hold_time = sda_hold - 1;
+        let sda_sample_time = sda_sample - 1;
+        // setup
+        let scl_rstart_setup_time = setup - 1;
+        let scl_stop_setup_time = setup - 1;
+        // hold
+        let scl_start_hold_time = hold - 1;
+        let scl_stop_hold_time = hold - 1;
 
-    Ok(())
+        clock.configure_function_clock(clocks, I2cFunctionClockConfig::new(sclk, clkm_div - 1));
+
+        configure_clock(
+            driver.info,
+            scl_low_period,
+            scl_high_period,
+            scl_wait_high_period,
+            sda_hold_time,
+            sda_sample_time,
+            scl_rstart_setup_time,
+            scl_stop_setup_time,
+            scl_start_hold_time,
+            scl_stop_hold_time,
+            timeout.apb_cycles(half_cycle)?,
+        )
+    })
 }
 
 /// Resets the transmit and receive FIFO buffers.
