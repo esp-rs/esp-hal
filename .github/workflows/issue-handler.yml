@@ -109,5 +109,5 @@ jobs:
     steps:
       - uses: actions/add-to-project@v0.5.0
         with:
-          project-url: https://github.com/users/Parsaabasi/projects/1
+          project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/2
       
