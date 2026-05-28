@@ -327,4 +327,31 @@ mod tests {
             core::assert_eq!(descriptors.len(), BUFFER_SIZE / CHUNK_SIZE);
         });
     }
+
+    #[test]
+    fn test_dma_tx_stream_buf_initial() {
+        with_tx_view(false, |view| {
+            // initially all descriptors are owned by the DMA, so no space should be available
+            core::assert_eq!(view.available_bytes(), 0);
+
+            let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
+            let (descriptors, buffer) = buf.split();
+
+            // DMA processed first descriptor, now it should be owned by CPU
+            descriptors[0].set_owner(Owner::Cpu);
+
+            let buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
+            let mut view = buf.into_view();
+
+            // the first descriptor is now owned by CPU, so its chunk should be available for
+            // writing
+            core::assert_eq!(view.available_bytes(), CHUNK_SIZE);
+
+            // we can push more data
+            core::assert_eq!(view.push(&[0u8; CHUNK_SIZE]), CHUNK_SIZE);
+
+            // and after pushing, the available space should be reduced accordingly
+            core::assert_eq!(view.available_bytes(), 0);
+        });
+    }
 }

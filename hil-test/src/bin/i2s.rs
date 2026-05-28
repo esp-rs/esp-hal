@@ -79,7 +79,13 @@ mod tests {
         let mut tx_transfer = i2s_tx.write(tx_buffer).ok().unwrap();
 
         loop {
+            let before = tx_transfer.available_bytes();
             tx_transfer.wait_for_available_async().await.ok().unwrap();
+            let after1 = tx_transfer.available_bytes();
+            tx_transfer.wait_for_available_async().await.ok().unwrap();
+            let after2 = tx_transfer.available_bytes();
+            assert!(after1 >= before);
+            assert!(after2 >= after1);
 
             if tx_transfer.available_bytes() > 0 {
                 tx_transfer.push_with(|buffer| {

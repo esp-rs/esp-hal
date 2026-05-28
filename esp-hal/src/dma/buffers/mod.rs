@@ -1487,10 +1487,6 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
         for desc in self.descriptors.iter_mut().rev() {
             desc.next = next;
             next = desc;
-
-            desc.set_owner(Owner::Cpu);
-            desc.set_length(0);
-            desc.set_suc_eof(false);
         }
 
         self.setup_view_state();
