@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{AnyAhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxChannel},
+    dma::{AhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxChannel},
     gpio::{
         InputConfig,
         InputSignal,
@@ -142,7 +142,7 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: LCD_CAM<'d>,
-    rx_channel: ChannelRx<Blocking, AnyAhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Blocking, AhbGdmaRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
@@ -151,7 +151,7 @@ impl<'d> Camera<'d> {
     pub fn new<CH>(cam: Cam<'d>, channel: CH, config: Config) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::CamDmaRxChannel,
-        CH: DmaRxChannel<Erased = AnyAhbGdmaRxChannel<'d>>,
+        CH: DmaRxChannel<Erased = AhbGdmaRxChannel<'d>>,
     {
         let rx_channel = ChannelRx::new(channel.degrade());
         rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);

@@ -168,21 +168,21 @@ pub trait I2sMasterDmaChannel<'d, S>:
 }
 
 #[cfg(dma_kind = "gdma")]
-type I2sMasterErased<'d> = crate::dma::AnyAhbGdmaChannel<'d>;
+type I2sMasterErased<'d> = crate::dma::AhbGdmaChannel<'d>;
 #[cfg(dma_kind = "gdma")]
-type I2sMasterTxErased<'d> = crate::dma::AnyAhbGdmaTxChannel<'d>;
+type I2sMasterTxErased<'d> = crate::dma::AhbGdmaTxChannel<'d>;
 #[cfg(dma_kind = "gdma")]
-type I2sMasterRxErased<'d> = crate::dma::AnyAhbGdmaRxChannel<'d>;
+type I2sMasterRxErased<'d> = crate::dma::AhbGdmaRxChannel<'d>;
 
 #[cfg(dma_kind = "pdma")]
-type I2sMasterErased<'d> = crate::dma::AnyI2sDmaChannel<'d>;
+type I2sMasterErased<'d> = crate::dma::I2sDmaChannel<'d>;
 #[cfg(dma_kind = "pdma")]
-type I2sMasterTxErased<'d> = crate::dma::AnyI2sDmaTxChannel<'d>;
+type I2sMasterTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
 #[cfg(dma_kind = "pdma")]
-type I2sMasterRxErased<'d> = crate::dma::AnyI2sDmaRxChannel<'d>;
+type I2sMasterRxErased<'d> = crate::dma::I2sDmaRxChannel<'d>;
 
 #[cfg(dma_kind = "gdma")]
-impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AnyAhbGdmaChannel<'d> {}
+impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AhbGdmaChannel<'d> {}
 
 #[cfg(dma_kind = "gdma")]
 for_each_dma_channel! {
@@ -192,7 +192,7 @@ for_each_dma_channel! {
 }
 
 #[cfg(dma_kind = "pdma")]
-impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AnyI2sDmaChannel<'d> {}
+impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {}
 
 impl<'d> I2s<'d, crate::Blocking> {
     /// Construct a new I2s instance.

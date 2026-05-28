@@ -26,11 +26,11 @@ for_each_dma_engine! {
     };
     ("I2S_DMA") => {
         mod i2s;
-        pub use i2s::{AnyI2sDmaChannel, AnyI2sDmaRxChannel, AnyI2sDmaTxChannel};
+        pub use i2s::{I2sDmaChannel, I2sDmaRxChannel, I2sDmaTxChannel};
     };
     ("SPI_DMA") => {
         mod spi;
-        pub use spi::{AnySpiDmaChannel, AnySpiDmaRxChannel, AnySpiDmaTxChannel};
+        pub use spi::{SpiDmaChannel, SpiDmaRxChannel, SpiDmaTxChannel};
     };
 }
 

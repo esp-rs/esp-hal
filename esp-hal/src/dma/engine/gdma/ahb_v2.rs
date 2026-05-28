@@ -13,7 +13,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl AnyAhbGdmaTxChannel<'_> {
+impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -25,7 +25,7 @@ impl AnyAhbGdmaTxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyAhbGdmaTxChannel<'_> {
+impl RegisterAccess for AhbGdmaTxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
@@ -100,7 +100,7 @@ impl RegisterAccess for AnyAhbGdmaTxChannel<'_> {
     }
 }
 
-impl TxRegisterAccess for AnyAhbGdmaTxChannel<'_> {
+impl TxRegisterAccess for AhbGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         self.ch()
             .outfifo_status()
@@ -132,7 +132,7 @@ impl TxRegisterAccess for AnyAhbGdmaTxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnyAhbGdmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for AhbGdmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -212,7 +212,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyAhbGdmaTxChannel<'_> {
     fn set_async(&self, _is_async: bool) {}
 }
 
-impl AnyAhbGdmaRxChannel<'_> {
+impl AhbGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &gdma_pac::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -224,7 +224,7 @@ impl AnyAhbGdmaRxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyAhbGdmaRxChannel<'_> {
+impl RegisterAccess for AhbGdmaRxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
@@ -297,7 +297,7 @@ impl RegisterAccess for AnyAhbGdmaRxChannel<'_> {
     }
 }
 
-impl RxRegisterAccess for AnyAhbGdmaRxChannel<'_> {
+impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()
@@ -313,7 +313,7 @@ impl RxRegisterAccess for AnyAhbGdmaRxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnyAhbGdmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for AhbGdmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {

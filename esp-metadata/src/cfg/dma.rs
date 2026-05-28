@@ -104,9 +104,8 @@ impl GenericProperty for DmaEngines {
             engines.push(quote! { #engine_name });
 
             for driver in &engine.drivers {
-                // Convention
                 let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
-                let any_channel = format_ident!("Any{channel}Channel");
+                let any_channel = format_ident!("{channel}Channel");
                 driver_engines
                     .entry(driver.clone())
                     .or_default()

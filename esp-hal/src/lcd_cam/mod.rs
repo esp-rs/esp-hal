@@ -28,8 +28,8 @@ pub trait CamDmaRxChannel: crate::dma::DmaRxChannel + crate::private::Sealed {}
 
 for_each_peripheral! {
     (dma_eligible LCD_CAM, $name:ident, $id:literal, "AHB_GDMA") => {
-        impl LcdDmaTxChannel for crate::dma::AnyAhbGdmaTxChannel<'_> {}
-        impl CamDmaRxChannel for crate::dma::AnyAhbGdmaRxChannel<'_> {}
+        impl LcdDmaTxChannel for crate::dma::AhbGdmaTxChannel<'_> {}
+        impl CamDmaRxChannel for crate::dma::AhbGdmaRxChannel<'_> {}
     };
 }
 

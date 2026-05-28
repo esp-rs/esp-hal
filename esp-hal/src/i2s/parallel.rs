@@ -794,21 +794,15 @@ pub trait I2sParallelDmaChannel<'d, S>:
 {
 }
 
-type I2sParallelErased<'d> = crate::dma::AnyI2sDmaChannel<'d>;
-type I2sParallelTxErased<'d> = crate::dma::AnyI2sDmaTxChannel<'d>;
+type I2sParallelErased<'d> = crate::dma::I2sDmaChannel<'d>;
+type I2sParallelTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
 
-impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::AnyI2sDmaChannel<'d> {}
+impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {}
 
 #[cfg(soc_has_i2s0)]
-impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S0<'d>>
-    for crate::dma::AnyI2sDmaChannel<'d>
-{
-}
+impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S0<'d>> for crate::dma::I2sDmaChannel<'d> {}
 #[cfg(soc_has_i2s1)]
-impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S1<'d>>
-    for crate::dma::AnyI2sDmaChannel<'d>
-{
-}
+impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S1<'d>> for crate::dma::I2sDmaChannel<'d> {}
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
     /// Create a new I2S Parallel Interface

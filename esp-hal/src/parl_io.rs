@@ -137,9 +137,9 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
-        AnyAhbGdmaChannel,
-        AnyAhbGdmaRxChannel,
-        AnyAhbGdmaTxChannel,
+        AhbGdmaChannel,
+        AhbGdmaRxChannel,
+        AhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -942,7 +942,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
     _guard: ParlIoTxGuard,
 }
 
@@ -992,7 +992,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
     _guard: ParlIoRxGuard,
 }
 
@@ -1087,7 +1087,7 @@ impl<'d> ParlIo<'d, Blocking> {
     pub fn new<CH>(_parl_io: PARL_IO<'d>, dma_channel: CH) -> Result<Self, Error>
     where
         CH: ParlIoDmaChannel,
-        CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
+        CH: DmaChannel<Erased = AhbGdmaChannel<'d>>,
     {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
@@ -1502,7 +1502,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -1511,7 +1511,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -2133,7 +2133,7 @@ impl Drop for ParlIoRxGuard {
 
 for_each_peripheral! {
     (dma_eligible PARL_IO, $name:ident, $id:literal, "AHB_GDMA") => {
-        impl ParlIoDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
+        impl ParlIoDmaChannel for crate::dma::AhbGdmaChannel<'_> {}
 
         for_each_dma_channel! {
             ("AHB_GDMA", $ch:ident) => {

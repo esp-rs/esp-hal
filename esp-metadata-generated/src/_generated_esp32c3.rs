@@ -551,7 +551,7 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! with_aes_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_aes_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_aes_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        => {} } _with_inner_aes_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
     };
 }
 #[macro_export]
@@ -559,7 +559,7 @@ macro_rules! with_aes_dma_engine {
 macro_rules! with_sha_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_sha_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_sha_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        => {} } _with_inner_sha_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
     };
 }
 #[macro_export]
@@ -567,8 +567,7 @@ macro_rules! with_sha_dma_engine {
 macro_rules! with_spi_master_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
-        : tt) => {} } _with_inner_spi_master_dma_engine!(("AHB_GDMA",
-        AnyAhbGdmaChannel));
+        : tt) => {} } _with_inner_spi_master_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
     };
 }
 #[macro_export]
@@ -576,7 +575,7 @@ macro_rules! with_spi_master_dma_engine {
 macro_rules! with_spi_slave_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_spi_slave_dma_engine { $(($pattern) => $code;)* ($other
-        : tt) => {} } _with_inner_spi_slave_dma_engine!(("AHB_GDMA", AnyAhbGdmaChannel));
+        : tt) => {} } _with_inner_spi_slave_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
     };
 }
 #[macro_export]

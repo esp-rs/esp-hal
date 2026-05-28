@@ -104,7 +104,7 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AnyAhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxChannel},
+    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxChannel},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -130,7 +130,7 @@ pub enum ConfigError {
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, AnyAhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Blocking, AhbGdmaTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -143,7 +143,7 @@ where
     pub fn new<CH>(lcd: Lcd<'d, Dm>, channel: CH, config: Config) -> Result<Self, ConfigError>
     where
         CH: crate::lcd_cam::LcdDmaTxChannel,
-        CH: DmaTxChannel<Erased = AnyAhbGdmaTxChannel<'d>>,
+        CH: DmaTxChannel<Erased = AhbGdmaTxChannel<'d>>,
     {
         let tx_channel = ChannelTx::new(channel.degrade());
         tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);

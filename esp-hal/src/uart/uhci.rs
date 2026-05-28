@@ -105,9 +105,9 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
-        AnyAhbGdmaChannel,
-        AnyAhbGdmaRxChannel,
-        AnyAhbGdmaTxChannel,
+        AhbGdmaChannel,
+        AhbGdmaRxChannel,
+        AhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -264,7 +264,7 @@ where
     uart: Uart<'d, Dm>,
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     uhci_per: AnyUhci<'static>,
-    channel: Channel<Dm, AnyAhbGdmaChannel<'d>>,
+    channel: Channel<Dm, AhbGdmaChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -387,7 +387,7 @@ impl<'d> Uhci<'d, Blocking> {
     pub fn new<CH>(uart: Uart<'d, Blocking>, uhci: peripherals::UHCI0<'static>, channel: CH) -> Self
     where
         CH: UhciDmaChannel,
-        CH: DmaChannel<Erased = AnyAhbGdmaChannel<'d>>,
+        CH: DmaChannel<Erased = AhbGdmaChannel<'d>>,
     {
         let guard = GenericPeripheralGuard::new();
 
@@ -437,7 +437,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, AnyAhbGdmaTxChannel<'d>>,
+    channel_tx: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -483,7 +483,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, AnyAhbGdmaRxChannel<'d>>,
+    channel_rx: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
@@ -809,7 +809,7 @@ where
 
 for_each_peripheral! {
     (dma_eligible UHCI0, $name:ident, $id:literal, "AHB_GDMA") => {
-        impl UhciDmaChannel for crate::dma::AnyAhbGdmaChannel<'_> {}
+        impl UhciDmaChannel for crate::dma::AhbGdmaChannel<'_> {}
 
         for_each_dma_channel! {
             ("AHB_GDMA", $ch:ident) => {
