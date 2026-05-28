@@ -7,7 +7,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
-        DmaChannelExt,
         DmaExtMemBKSize,
         DmaRxChannel,
         DmaRxInterrupt,
@@ -57,7 +56,7 @@ pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
 /// The RX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaRxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CopyDmaRxChannel<'d>(CopyDmaChannel<'d>);
 
 impl CopyDmaRxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -77,7 +76,7 @@ impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaTxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CopyDmaTxChannel<'d>(CopyDmaChannel<'d>);
 
 impl CopyDmaTxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -422,30 +421,9 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
     }
 }
 
-impl<'d> DmaChannel for DMA_COPY<'d> {
-    type Rx = CopyDmaRxChannel<'d>;
-    type Tx = CopyDmaTxChannel<'d>;
-    type Erased = DMA_COPY<'d>;
+/// A type-erased Copy DMA channel.
+pub type CopyDmaChannel<'d> = DMA_COPY<'d>;
 
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-
-    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (
-            CopyDmaRxChannel(unsafe { Self::steal() }),
-            CopyDmaTxChannel(unsafe { Self::steal() }),
-        )
-    }
-}
-impl DmaChannelExt for DMA_COPY<'_> {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CopyDmaRxChannel(unsafe { Self::steal() })
-    }
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CopyDmaTxChannel(unsafe { Self::steal() })
-    }
-}
 impl DMA_COPY<'_> {
     pub(super) fn info(&self) -> &'static ChannelInfo {
         #[crate::handler(priority = crate::interrupt::Priority::max())]
@@ -470,3 +448,5 @@ impl DMA_COPY<'_> {
         &STATE
     }
 }
+
+crate::dma::impl_channel_common!(CopyDma, DMA_COPY);

@@ -18,11 +18,11 @@ for_each_dma_engine! {
     };
     ("COPY_DMA") => {
         mod copy;
-        pub use copy::{CopyDmaRxChannel, CopyDmaTxChannel};
+        pub use copy::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
     };
     ("CRYPTO_DMA") => {
         mod crypto;
-        pub use crypto::{CryptoDmaRxChannel, CryptoDmaTxChannel};
+        pub use crypto::{CryptoDmaChannel, CryptoDmaRxChannel, CryptoDmaTxChannel};
     };
     ("I2S_DMA") => {
         mod i2s;
@@ -176,13 +176,13 @@ pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {
 /// A description of a DMA Channel.
 pub trait DmaChannel: Sized {
     /// A description of the RX half of a DMA Channel.
-    type Rx: DmaRxChannel;
+    type Rx: DmaRxChannel + From<Self>;
 
     /// A description of the TX half of a DMA Channel.
-    type Tx: DmaTxChannel;
+    type Tx: DmaTxChannel + From<Self>;
 
     /// The engine-erased type this channel degrades to.
-    type Erased: DmaChannel;
+    type Erased: DmaChannel + From<Self>;
 
     /// Erase the concrete channel type, returning the engine-erased form.
     fn degrade(self) -> Self::Erased;
@@ -220,7 +220,7 @@ macro_rules! impl_channel_common {
                 type Erased = [<$peri Channel>]<'d>;
 
                 fn degrade(self) -> Self::Erased {
-                    self.into()
+                    [<$peri Channel>]::from(self)
                 }
 
                 unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
@@ -233,13 +233,26 @@ macro_rules! impl_channel_common {
                 }
             }
 
+            // Convert concrete channel into erased TX/RX half structs
+            impl<'d> From<$instance<'d>> for [<$peri RxChannel>]<'d> {
+                fn from(this: $instance<'d>) -> [<$peri RxChannel>]<'d> {
+                    [<$peri RxChannel>](this.into())
+                }
+            }
+
+            impl<'d> From<$instance<'d>> for [<$peri TxChannel>]<'d> {
+                fn from(this: $instance<'d>) -> [<$peri TxChannel>]<'d> {
+                    [<$peri TxChannel>](this.into())
+                }
+            }
+
             impl crate::dma::DmaChannelExt for $instance<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri RxChannel>](unsafe { Self::steal() }.degrade())
+                    [<$peri RxChannel>]::from(unsafe { Self::steal() })
                 }
 
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri TxChannel>](unsafe { Self::steal() }.degrade())
+                    [<$peri TxChannel>]::from(unsafe { Self::steal() })
                 }
             }
         }

@@ -1198,18 +1198,10 @@ pub mod dma {
     {
     }
 
-    // TODO: replace by an AnyCryptoDma type
-    with_aes_dma_engine! {
-        ("AHB_GDMA", $any_channel:ident) => {
-            type AesErased<'d> = crate::dma::$any_channel<'d>;
-        };
-        ("CRYPTO_DMA", $any_channel:ident) => {
-            type AesErased<'d> = crate::peripherals::DMA_CRYPTO<'d>;
-        };
-    }
-
     with_aes_dma_engine! {
         ($engine:literal, $any_channel:ident) => {
+            type AesErased<'d> = crate::dma::$any_channel<'d>;
+
             impl<'d> AesDmaChannel<'d> for AesErased<'d> {}
 
             for_each_dma_channel_peri_pair! {

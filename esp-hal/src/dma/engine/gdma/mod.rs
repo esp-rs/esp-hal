@@ -227,6 +227,19 @@ macro_rules! impl_channel {
     };
 }
 
+// Convert erased channel into erased TX/RX half structs
+impl<'d> From<AhbGdmaChannel<'d>> for AhbGdmaRxChannel<'d> {
+    fn from(this: AhbGdmaChannel<'d>) -> AhbGdmaRxChannel<'d> {
+        AhbGdmaRxChannel(this)
+    }
+}
+
+impl<'d> From<AhbGdmaChannel<'d>> for AhbGdmaTxChannel<'d> {
+    fn from(this: AhbGdmaChannel<'d>) -> AhbGdmaTxChannel<'d> {
+        AhbGdmaTxChannel(this)
+    }
+}
+
 for_each_dma_channel! {
     ("AHB_GDMA", $ch:ident, $num:literal, interrupt = $interrupt:ident, compatible = [$($compatible:ident),*]) => {
         impl_channel!($ch, $num, $interrupt, compatible = [$($compatible),*]);

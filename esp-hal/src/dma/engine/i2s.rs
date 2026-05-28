@@ -487,6 +487,19 @@ impl I2sDmaChannel<'_> {
     }
 }
 
+// Convert erased channel into erased TX/RX half structs
+impl<'d> From<I2sDmaChannel<'d>> for I2sDmaRxChannel<'d> {
+    fn from(this: I2sDmaChannel<'d>) -> I2sDmaRxChannel<'d> {
+        I2sDmaRxChannel(this)
+    }
+}
+
+impl<'d> From<I2sDmaChannel<'d>> for I2sDmaTxChannel<'d> {
+    fn from(this: I2sDmaChannel<'d>) -> I2sDmaTxChannel<'d> {
+        I2sDmaTxChannel(this)
+    }
+}
+
 for_each_dma_channel_peri_pair! {
     ("I2S_DMA", $dma_peri:ident, $peri:ident) => {
         use crate::peripherals::$dma_peri;

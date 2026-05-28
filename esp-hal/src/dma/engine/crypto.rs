@@ -7,7 +7,6 @@ use crate::{
     dma::{
         BurstConfig,
         DmaChannel,
-        DmaChannelExt,
         DmaExtMemBKSize,
         DmaPeripheral,
         DmaRxChannel,
@@ -58,7 +57,7 @@ pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
 /// The RX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaRxChannel<'d>(pub(crate) DMA_CRYPTO<'d>);
+pub struct CryptoDmaRxChannel<'d>(CryptoDmaChannel<'d>);
 
 impl CryptoDmaRxChannel<'_> {
     fn regs(&self) -> &CryptoRegisterBlock {
@@ -78,7 +77,7 @@ impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {
 /// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaTxChannel<'d>(pub(crate) DMA_CRYPTO<'d>);
+pub struct CryptoDmaTxChannel<'d>(CryptoDmaChannel<'d>);
 
 impl CryptoDmaTxChannel<'_> {
     fn regs(&self) -> &CryptoRegisterBlock {
@@ -479,30 +478,9 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
     }
 }
 
-impl<'d> DmaChannel for DMA_CRYPTO<'d> {
-    type Rx = CryptoDmaRxChannel<'d>;
-    type Tx = CryptoDmaTxChannel<'d>;
-    type Erased = DMA_CRYPTO<'d>;
+/// A crypto-compatible type-erased DMA channel.
+pub type CryptoDmaChannel<'d> = DMA_CRYPTO<'d>;
 
-    fn degrade(self) -> Self::Erased {
-        self
-    }
-
-    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (
-            CryptoDmaRxChannel(unsafe { Self::steal() }),
-            CryptoDmaTxChannel(unsafe { Self::steal() }),
-        )
-    }
-}
-impl DmaChannelExt for DMA_CRYPTO<'_> {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CryptoDmaRxChannel(unsafe { Self::steal() })
-    }
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CryptoDmaTxChannel(unsafe { Self::steal() })
-    }
-}
 impl DMA_CRYPTO<'_> {
     pub(super) fn info(&self) -> &'static ChannelInfo {
         #[crate::handler(priority = crate::interrupt::Priority::max())]
@@ -528,3 +506,5 @@ impl DMA_CRYPTO<'_> {
         &STATE
     }
 }
+
+crate::dma::impl_channel_common!(CryptoDma, DMA_CRYPTO);

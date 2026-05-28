@@ -504,6 +504,19 @@ impl SpiDmaChannel<'_> {
     }
 }
 
+// Convert erased channel into erased TX/RX half structs
+impl<'d> From<SpiDmaChannel<'d>> for SpiDmaRxChannel<'d> {
+    fn from(this: SpiDmaChannel<'d>) -> SpiDmaRxChannel<'d> {
+        SpiDmaRxChannel(this)
+    }
+}
+
+impl<'d> From<SpiDmaChannel<'d>> for SpiDmaTxChannel<'d> {
+    fn from(this: SpiDmaChannel<'d>) -> SpiDmaTxChannel<'d> {
+        SpiDmaTxChannel(this)
+    }
+}
+
 for_each_dma_channel_peri_pair! {
     ("SPI_DMA", $dma_peri:ident, $peri:ident) => {
         use $crate::peripherals::$dma_peri;
