@@ -78,7 +78,7 @@ jobs:
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.95.0.0
+          version: 1.96.0.0
 
       - name: Lint esp-hal on Xtensa chip
         run: cargo xtask lint-packages --chips ${{ matrix.device }} --toolchain esp
@@ -92,7 +92,7 @@ jobs:
         # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.95.0.0
+          version: 1.96.0.0
 
       # Check all chips at once only for esp-hal
       - name: Run check-global-symbols
