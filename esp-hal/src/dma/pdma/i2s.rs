@@ -18,7 +18,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
-    system::Peripheral,
+    system::PeripheralGuard,
 };
 
 /// Immutable per-channel metadata.
@@ -90,7 +90,8 @@ impl<'d> DmaTxChannel for AnyI2sDmaTxChannel<'d> {
 }
 
 impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
         None
     }
 
@@ -277,7 +278,8 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
         None
     }
 

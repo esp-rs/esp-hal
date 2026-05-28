@@ -65,8 +65,6 @@ pub use self::gdma::*;
 pub use self::m2m::*;
 #[cfg(dma_kind = "pdma")]
 pub use self::pdma::*;
-#[cfg(dma_kind = "pdma")]
-use crate::system::Peripheral;
 use crate::{
     Async,
     Blocking,
@@ -74,7 +72,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     soc::is_slice_in_dram,
-    system::{self, Cpu},
+    system::{Cpu, PeripheralGuard},
 };
 
 for_each_peripheral! {
@@ -1223,27 +1221,6 @@ pub trait DmaChannelExt: DmaChannel {
     fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
 }
 
-// NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
-// `GenericPeripheralGuard`.
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "pdma")] {
-        type PeripheralGuard = Option<system::PeripheralGuard>;
-    } else {
-        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
-    }
-}
-
-fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
-            _ch.peripheral_clock().map(|peri_clock| system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
-        } else {
-            // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
-            system::GenericPeripheralGuard::new_with(init_dma_racey)
-        }
-    }
-}
-
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1254,7 +1231,7 @@ where
 {
     pub(crate) rx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
-    pub(crate) _guard: PeripheralGuard,
+    pub(crate) _guard: Option<PeripheralGuard>,
 }
 
 impl<CH> ChannelRx<Blocking, CH>
@@ -1263,7 +1240,7 @@ where
 {
     /// Creates a new RX channel half.
     pub fn new(rx_impl: CH) -> Self {
-        let _guard = create_guard(&rx_impl);
+        let _guard = rx_impl.enable();
 
         #[cfg(dma_kind = "gdma")]
         // clear the mem2mem mode to avoid failed DMA if this
@@ -1302,7 +1279,7 @@ where
         self.clear_in(EnumSet::all());
 
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
-            for core in crate::system::Cpu::other() {
+            for core in Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             crate::interrupt::bind_handler(interrupt, handler);
@@ -1474,7 +1451,7 @@ where
 {
     pub(crate) tx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
-    pub(crate) _guard: PeripheralGuard,
+    pub(crate) _guard: Option<PeripheralGuard>,
 }
 
 impl<CH> ChannelTx<Blocking, CH>
@@ -1483,7 +1460,7 @@ where
 {
     /// Creates a new TX channel half.
     pub fn new(tx_impl: CH) -> Self {
-        let _guard = create_guard(&tx_impl);
+        let _guard = tx_impl.enable();
 
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1516,7 +1493,7 @@ where
         self.clear_out(EnumSet::all());
 
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
-            for core in crate::system::Cpu::other() {
+            for core in Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             crate::interrupt::bind_handler(interrupt, handler);
@@ -1674,8 +1651,8 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess: crate::private::Sealed {
-    #[cfg(dma_kind = "pdma")]
-    fn peripheral_clock(&self) -> Option<Peripheral>;
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard>;
 
     /// Reset the state machine of the channel and FIFO pointer.
     fn reset(&self);

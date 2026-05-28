@@ -18,7 +18,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
-    system::Peripheral,
+    system::{Peripheral, PeripheralGuard},
 };
 
 /// Immutable per-channel metadata.
@@ -90,17 +90,20 @@ impl<'d> DmaTxChannel for AnySpiDmaTxChannel<'d> {
 }
 
 impl RegisterAccess for AnySpiDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                Some(Peripheral::SpiDma)
+                let clock = Peripheral::SpiDma;
             } else {
-                match self.0 {
-                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
-                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
-                }
+                let clock = match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,
+                };
             }
         }
+
+        Some(PeripheralGuard::new_with(clock, enable_spi_dma))
     }
 
     fn reset(&self) {
@@ -285,17 +288,20 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AnySpiDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                Some(Peripheral::SpiDma)
+                let clock = Peripheral::SpiDma;
             } else {
-                match self.0 {
-                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
-                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
-                }
+                let clock = match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,
+                };
             }
         }
+
+        Some(PeripheralGuard::new_with(clock, enable_spi_dma))
     }
 
     fn reset(&self) {
@@ -536,3 +542,20 @@ macro_rules! impl_pdma_channel {
 
 impl_pdma_channel!(AnySpiDma, DMA_SPI2, SPI2_DMA, [SPI2]);
 impl_pdma_channel!(AnySpiDma, DMA_SPI3, SPI3_DMA, [SPI3]);
+
+pub(super) fn enable_spi_dma() {
+    #[cfg(esp32)]
+    {
+        // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
+        // This assigns the DMA channels to the SPI peripherals, which is more
+        // restrictive than necessary but we currently support the same
+        // number of SPI peripherals as SPI DMA channels so it's not a big
+        // deal.
+        use crate::peripherals::DPORT;
+
+        DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+            w.spi2_dma_chan_sel().bits(1);
+            w.spi3_dma_chan_sel().bits(2)
+        });
+    }
+}

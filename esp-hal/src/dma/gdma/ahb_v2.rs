@@ -26,6 +26,11 @@ impl AnyAhbGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AnyAhbGdmaTxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+    }
+
     fn reset(&self) {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
@@ -220,6 +225,11 @@ impl AnyAhbGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AnyAhbGdmaRxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+    }
+
     fn reset(&self) {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }

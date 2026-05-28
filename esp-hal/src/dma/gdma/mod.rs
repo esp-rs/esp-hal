@@ -16,6 +16,7 @@ use crate::{
     handler,
     interrupt::Priority,
     peripherals::{DMA, Interrupt, pac},
+    system::{Peripheral, PeripheralGuard},
 };
 
 #[cfg_attr(dma_gdma_version = "1", path = "ahb_v1.rs")]
@@ -239,13 +240,12 @@ for_each_dma_channel! {
     };
 }
 
-pub(super) fn init_dma_racey() {
+fn init_dma_racey() {
+    // FIXME: reset/clock enable belongs to metadata
+    use crate::RegisterToggle;
     DMA::regs()
         .misc_conf()
-        .modify(|_, w| w.ahbm_rst_inter().set_bit());
-    DMA::regs()
-        .misc_conf()
-        .modify(|_, w| w.ahbm_rst_inter().clear_bit());
+        .toggle(|w, en| w.ahbm_rst_inter().bit(en));
     DMA::regs().misc_conf().modify(|_, w| w.clk_en().set_bit());
 
     implementation::setup();

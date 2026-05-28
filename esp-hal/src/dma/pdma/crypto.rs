@@ -22,7 +22,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_CRYPTO, Interrupt},
-    system::Peripheral,
+    system::{Peripheral, PeripheralGuard},
 };
 
 /// Immutable per-channel metadata.
@@ -96,8 +96,9 @@ impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {
 }
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CryptoDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CryptoDma))
     }
 
     fn reset(&self) {
@@ -293,8 +294,9 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CryptoDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CryptoDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CryptoDma))
     }
 
     fn reset(&self) {

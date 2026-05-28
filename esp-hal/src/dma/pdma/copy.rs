@@ -21,7 +21,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_COPY, Interrupt},
-    system::Peripheral,
+    system::{Peripheral, PeripheralGuard},
 };
 
 /// Immutable per-channel metadata.
@@ -95,8 +95,9 @@ impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {
 }
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CopyDma))
     }
 
     fn reset(&self) {
@@ -266,8 +267,9 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CopyDma))
     }
 
     fn reset(&self) {
