@@ -190,13 +190,7 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    #[allow(
-        clippy::type_complexity,
-        reason = "Need to return both the error and the peripheral/buffer for proper cleanup"
-    )]
-    pub fn wait(
-        mut self,
-    ) -> Result<(I2sTx<'d, Dm>, Buf::Final), (DmaError, I2sTx<'d, Dm>, Buf::Final)> {
+    pub fn wait(mut self) -> (Result<(), DmaError>, I2sTx<'d, Dm>, Buf::Final) {
         while !self.is_done() {}
         self.completed = true;
 
@@ -206,9 +200,9 @@ where
         let (i2s_tx, buf) = self.release();
 
         if i2s_tx.tx_channel.has_error() {
-            Err((DmaError::DescriptorError, i2s_tx, Buf::from_view(buf)))
+            (Err(DmaError::DescriptorError), i2s_tx, Buf::from_view(buf))
         } else {
-            Ok((i2s_tx, Buf::from_view(buf)))
+            (Ok(()), i2s_tx, Buf::from_view(buf))
         }
     }
 
@@ -230,15 +224,13 @@ where
     Buf: DmaTxBuffer,
 {
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub async fn wait_async(
-        mut self,
-    ) -> Result<(I2sTx<'d, Async>, Buf::Final), (DmaError, I2sTx<'d, Async>, Buf::Final)> {
+    pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sTx<'d, Async>, Buf::Final) {
         if !self.completed {
             if let Err(err) = DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await {
                 self.i2s_tx.tx_channel.stop_transfer();
                 self.i2s_tx.i2s.tx_stop();
                 let (i2s_tx, buf) = self.release();
-                return Err((err, i2s_tx, Buf::from_view(buf)));
+                return (Err(err), i2s_tx, Buf::from_view(buf));
             }
             while !self.is_done() {}
             self.completed = true;
@@ -250,9 +242,9 @@ where
         let (i2s_tx, buf) = self.release();
 
         if i2s_tx.tx_channel.has_error() {
-            Err((DmaError::DescriptorError, i2s_tx, Buf::from_view(buf)))
+            (Err(DmaError::DescriptorError), i2s_tx, Buf::from_view(buf))
         } else {
-            Ok((i2s_tx, Buf::from_view(buf)))
+            (Ok(()), i2s_tx, Buf::from_view(buf))
         }
     }
 
@@ -331,13 +323,7 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    #[allow(
-        clippy::type_complexity,
-        reason = "Need to return both the error and the peripheral/buffer for proper cleanup"
-    )]
-    pub fn wait(
-        mut self,
-    ) -> Result<(I2sRx<'d, Dm>, Buf::Final), (DmaError, I2sRx<'d, Dm>, Buf::Final)> {
+    pub fn wait(mut self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
         while !self.is_done() {}
 
         self.i2s_rx.i2s.rx_stop();
@@ -346,9 +332,9 @@ where
         let (i2s_rx, buf) = self.release();
 
         if i2s_rx.rx_channel.has_error() {
-            Err((DmaError::DescriptorError, i2s_rx, Buf::from_view(buf)))
+            (Err(DmaError::DescriptorError), i2s_rx, Buf::from_view(buf))
         } else {
-            Ok((i2s_rx, Buf::from_view(buf)))
+            (Ok(()), i2s_rx, Buf::from_view(buf))
         }
     }
 
@@ -370,9 +356,7 @@ where
     Buf: DmaRxBuffer,
 {
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub async fn wait_async(
-        mut self,
-    ) -> Result<(I2sRx<'d, Async>, Buf::Final), (DmaError, I2sRx<'d, Async>, Buf::Final)> {
+    pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sRx<'d, Async>, Buf::Final) {
         if !self.completed {
             // we treat DescriptorEmpty as rx transfer is done
             if let Err(err) = DmaRxFuture::new_with_config(
@@ -386,7 +370,7 @@ where
                 self.i2s_rx.i2s.rx_stop();
                 self.i2s_rx.rx_channel.stop_transfer();
                 let (i2s_rx, buf) = self.release();
-                return Err((err, i2s_rx, Buf::from_view(buf)));
+                return (Err(err), i2s_rx, Buf::from_view(buf));
             }
             self.completed = true;
         }
@@ -397,9 +381,9 @@ where
         let (i2s_rx, buf) = self.release();
 
         if i2s_rx.rx_channel.has_error() {
-            Err((DmaError::DescriptorError, i2s_rx, Buf::from_view(buf)))
+            (Err(DmaError::DescriptorError), i2s_rx, Buf::from_view(buf))
         } else {
-            Ok((i2s_rx, Buf::from_view(buf)))
+            (Ok(()), i2s_rx, Buf::from_view(buf))
         }
     }
 

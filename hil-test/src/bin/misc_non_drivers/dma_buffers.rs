@@ -354,4 +354,19 @@ mod tests {
             core::assert_eq!(view.available_bytes(), 0);
         });
     }
+
+    #[test]
+    fn test_dma_tx_stream_buf_prefill() {
+        let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
+        buf.push(&[0xffu8; CHUNK_SIZE * 2]);
+
+        buf.prepare();
+
+        // make sure initially all descriptors are owned by the DMA after prepare, even if we pushed
+        // data before
+        let (descriptors, _buffer) = buf.split();
+        for desc in descriptors.iter() {
+            core::assert!(matches!(desc.owner(), Owner::Dma));
+        }
+    }
 }

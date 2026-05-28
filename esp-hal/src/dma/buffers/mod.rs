@@ -1486,6 +1486,9 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
         let mut next = null_mut();
         for desc in self.descriptors.iter_mut().rev() {
             desc.next = next;
+            // set the owner for *all* descriptors - otherwise descriptors with pre-filled data
+            // might be owned by CPU
+            desc.set_owner(Owner::Dma);
             next = desc;
         }
 

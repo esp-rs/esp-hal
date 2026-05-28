@@ -480,20 +480,15 @@ mod interrupt_spi_dma {
     async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
         use esp_hal::dma_tx_stream_buffer;
 
-        let mut buffer = dma_tx_stream_buffer!(128, 128);
+        let mut buffer = dma_tx_stream_buffer!(1024, 256);
 
         let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
 
         loop {
             INTERRUPT_TASK_WORKING.store(true, portable_atomic::Ordering::Relaxed);
-            (i2s_tx, buffer) = i2s_tx
-                .write(buffer)
-                .ok()
-                .unwrap()
-                .wait_async()
-                .await
-                .ok()
-                .unwrap();
+            let res;
+            (res, i2s_tx, buffer) = i2s_tx.write(buffer).ok().unwrap().wait_async().await;
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
             INTERRUPT_TASK_WORKING.store(false, portable_atomic::Ordering::Relaxed);
 
             if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Relaxed) {
