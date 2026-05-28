@@ -8,6 +8,8 @@
 //! The following wiring is assumed:
 //! - LED => GPIO1
 
+//% CHIP_FEATURES: lp_core
+
 #![no_std]
 #![no_main]
 

@@ -5,7 +5,7 @@
 //!
 //! The signal will be output to the pin assigned to `pin`. (GPIO0)
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIP_FEATURES: mcpwm_driver_supported
 
 #![no_std]
 #![no_main]

@@ -3,6 +3,8 @@
 //! The following wiring is assumed:
 //! - Connect GPIO4 and GPIO5
 
+//% CHIP_FEATURES: rmt_driver_supported
+
 #![no_std]
 #![no_main]
 

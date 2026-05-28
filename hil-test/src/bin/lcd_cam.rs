@@ -1,5 +1,5 @@
 //! lcd_cam_i8080 and camera tests
-//% CHIPS: esp32s3
+//% CHIP_FEATURES: camera_driver_supported
 //% FEATURES: unstable
 
 #![no_std]

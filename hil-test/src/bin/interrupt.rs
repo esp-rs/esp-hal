@@ -2,7 +2,7 @@
 //!
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIP_FEATURES: riscv
 //% FEATURES: unstable
 
 #![no_std]

@@ -11,6 +11,8 @@
 //!   - ESP32-P4: GPIO35
 //!   - Others: GPIO9
 
+//% CHIP_FEATURES: gpio_driver_supported
+
 #![no_std]
 #![no_main]
 

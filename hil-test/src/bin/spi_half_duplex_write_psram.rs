@@ -1,6 +1,6 @@
 //! SPI Half Duplex Write Test
 
-//% CHIPS: esp32s3
+//% CHIP_FEATURES: dma_can_access_psram
 //% FEATURES: unstable esp-alloc
 
 #![no_std]

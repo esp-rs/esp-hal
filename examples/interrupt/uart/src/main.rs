@@ -15,6 +15,8 @@
 //! - Send a break condition every 3 seconds
 //! - Print received data and break conditions via esp-println
 
+//% CHIP_FEATURES: uart_driver_supported
+
 #![no_std]
 #![no_main]
 

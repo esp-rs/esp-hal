@@ -12,6 +12,8 @@
 //! MOSI => GPIO4
 //! CS   => GPIO5
 
+//% CHIP_FEATURES: spi_master_driver_supported
+
 #![no_std]
 #![no_main]
 

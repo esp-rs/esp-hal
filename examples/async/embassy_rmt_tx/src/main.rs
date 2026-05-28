@@ -5,6 +5,8 @@
 //! The following wiring is assumed:
 //! - generated pulses => GPIO4
 
+//% CHIP_FEATURES: rmt_driver_supported
+
 #![no_std]
 #![no_main]
 

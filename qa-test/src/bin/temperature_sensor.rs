@@ -1,7 +1,7 @@
 //! This example uses the internal temperature sensor to measure the chip's
 //! temperature
 
-//% CHIPS: esp32c6 esp32c3
+//% CHIP_FEATURES: temp_sensor_driver_supported
 
 #![no_std]
 #![no_main]

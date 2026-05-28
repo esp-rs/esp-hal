@@ -9,6 +9,8 @@
 //! - DP => GPIO20
 //! - DM => GPIO19
 
+//% CHIP_FEATURES: usb_otg_driver_supported
+
 #![no_std]
 #![no_main]
 

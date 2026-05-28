@@ -2,9 +2,9 @@
 //!
 //! Issue: <https://github.com/esp-rs/esp-hal/issues/5183>
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-
-// NOTE: esp32c2 doesn't have rtc-fast memory
+//% CHIP_FEATURES: sleep_driver_supported
+// esp32c2 has no rtc-fast memory, which is required by the persistent BOOT_COUNT variable.
+//% EXCLUDE_CHIP: esp32c2
 #![no_std]
 #![no_main]
 use embassy_executor::Spawner;

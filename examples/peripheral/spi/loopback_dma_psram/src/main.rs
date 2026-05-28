@@ -13,6 +13,8 @@
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
 
+//% CHIP_FEATURES: dma_can_access_psram
+
 #![no_std]
 #![no_main]
 

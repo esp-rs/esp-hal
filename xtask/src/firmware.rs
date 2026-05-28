@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
@@ -124,6 +124,7 @@ impl Metadata {
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
+    excluded_chips: Vec<Chip>,
     name: String,
     cargo_config: Vec<String>,
     features: Vec<String>,
@@ -300,6 +301,36 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     })?;
                     relevant_metadata.apply(|meta| meta.support_firmware = Some(support));
                 }
+                // Takes a list of cfg symbols. The test or example will be built for every
+                // chip where all listed symbols are active. Use the exact cfg name as it
+                // appears in code, e.g. `i2c_master_driver_supported`,`dma_supports_mem2mem`.
+                "CHIP_FEATURES" => {
+                    let features = meta_line
+                        .value
+                        .split_ascii_whitespace()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>();
+                    if features.is_empty() {
+                        anyhow::bail!("CHIP_FEATURES metadata must list at least one cfg symbol");
+                    }
+                    let chips = Chip::iter()
+                        .filter(|chip| {
+                            let config = Config::for_chip(chip);
+                            features.iter().all(|f| config.contains(f))
+                        })
+                        .collect::<Vec<_>>();
+                    relevant_metadata.apply(|meta| meta.chips = chips.clone());
+                }
+                // A space-separated list of chips to exclude even if they would otherwise be
+                // included by CHIPS or CHIP_FEATURE.
+                "EXCLUDE_CHIP" => {
+                    let chips = meta_line
+                        .value
+                        .split_ascii_whitespace()
+                        .map(|s| Chip::from_str(s, false).unwrap())
+                        .collect::<Vec<_>>();
+                    relevant_metadata.apply(|meta| meta.excluded_chips.extend_from_slice(&chips));
+                }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
         }
@@ -310,6 +341,10 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             if meta.chips.is_empty() {
                 meta.chips = all_configuration.chips.clone();
             }
+
+            // Excluded chips are additive: union the "all" exclusions in.
+            meta.excluded_chips
+                .extend_from_slice(&all_configuration.excluded_chips);
 
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
@@ -346,6 +381,10 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             configuration.features.sort();
 
             for chip in &configuration.chips {
+                // Skip any chips explicitly excluded by EXCLUDE_CHIP.
+                if configuration.excluded_chips.contains(chip) {
+                    continue;
+                }
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),

@@ -4,7 +4,7 @@
 //! GPIO4 for ADC1
 //! ONLY ESP32-C3: GPIO5 for ADC2
 
-//% CHIPS: esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
+//% CHIP_FEATURES: adc_driver_supported
 
 #![no_std]
 #![no_main]
