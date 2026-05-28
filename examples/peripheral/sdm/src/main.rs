@@ -7,12 +7,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    main,
-    sdm::{ChannelConfig, Sdm},
-    time::Rate,
-};
+use esp_hal::{delay::Delay, main, sdm::Sdm, time::Rate};
 use esp_println::print;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -23,14 +18,12 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let sdm = Sdm::new(peripherals.GPIO_SD);
-    let mut channel = sdm.channel0;
-    channel
-        .connect(
-            peripherals.GPIO2,
-            ChannelConfig::default()
-                .with_frequency(Rate::from_khz(500))
-                .with_pulse_density(0),
-        )
+    let mut channel = sdm
+        .channel0
+        .with_frequency(Rate::from_khz(500))
+        .unwrap()
+        .with_pulse_density(0)
+        .connect(peripherals.GPIO2)
         .unwrap();
 
     let delay = Delay::new();

@@ -40,14 +40,15 @@ for_each_sdm_channel!(
             /// Sigma-delta peripheral.
             ///
             /// This type only owns the SDM peripheral token and exposes the hardware
-            /// channels. Moving individual channels out of this collection is supported.
+            /// channel creators. Moving individual channel creators out of this
+            /// collection is supported.
             #[derive(Debug)]
             #[non_exhaustive]
             pub struct Sdm<'d> {
                 _instance: GPIO_SD<'d>,
                 $(
-                    #[doc = concat!("Channel ", stringify!($ch), ".")]
-                    pub [<channel $ch>]: Channel<$ch>,
+                    #[doc = concat!("Channel ", stringify!($ch), " creator.")]
+                    pub [<channel $ch>]: ChannelCreator<$ch>,
                 )*
             }
 
@@ -66,13 +67,17 @@ for_each_sdm_channel!(
                     Self {
                         _instance: instance,
                         $(
-                            [<channel $ch>]: Channel::new(config.clock_source),
+                            [<channel $ch>]: ChannelCreator::new(config.clock_source),
                         )*
                     }
                 }
             }
         }
+    };
+);
 
+for_each_sdm_channel!(
+    (channels $(($ch:literal, $signal:ident)),*) => {
         fn output_signal(channel: usize) -> OutputSignal {
             match channel {
                 $(
@@ -157,84 +162,6 @@ impl ClockSource {
     }
 }
 
-/// Sigma-delta channel timing configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum Timing {
-    /// Derive the hardware prescaler from a requested output frequency.
-    Frequency(Rate),
-    /// Use a raw hardware prescaler.
-    ///
-    /// The hardware divider range is `1..=256`.
-    Prescaler(u16),
-}
-
-impl Timing {
-    fn prescaler(self, clock_source: ClockSource) -> Result<u16, Error> {
-        match self {
-            Self::Frequency(frequency) => prescaler_from_frequency(frequency, clock_source),
-            Self::Prescaler(prescaler) => {
-                check_prescaler(prescaler)?;
-                Ok(prescaler)
-            }
-        }
-    }
-}
-
-/// Sigma-delta channel configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ChannelConfig {
-    /// Channel timing.
-    ///
-    /// Requested frequencies are converted to a raw hardware prescaler using
-    /// the SDM clock source selected in [`SdmConfig`].
-    pub timing: Timing,
-    /// Pulse density.
-    ///
-    /// The value ranges from `-128` to `127`.
-    pub pulse_density: i8,
-}
-
-impl ChannelConfig {
-    /// Sets the requested output frequency.
-    pub const fn with_frequency(mut self, frequency: Rate) -> Self {
-        self.timing = Timing::Frequency(frequency);
-        self
-    }
-
-    /// Sets the raw hardware prescaler.
-    pub const fn with_prescaler(mut self, prescaler: u16) -> Self {
-        self.timing = Timing::Prescaler(prescaler);
-        self
-    }
-
-    /// Sets the pulse density.
-    pub const fn with_pulse_density(mut self, density: i8) -> Self {
-        self.pulse_density = density;
-        self
-    }
-
-    /// Sets the duty cycle.
-    ///
-    /// This is a convenience mapping where `0` maps to the minimum density and
-    /// `255` maps to the maximum density.
-    pub const fn with_duty(mut self, duty: u8) -> Self {
-        self.pulse_density = duty_to_density(duty);
-        self
-    }
-}
-
-impl Default for ChannelConfig {
-    fn default() -> Self {
-        Self {
-            timing: Timing::Prescaler(1),
-            pulse_density: 0,
-        }
-    }
-}
-
 /// Sigma-delta configuration or runtime error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -260,89 +187,107 @@ impl fmt::Display for Error {
 
 impl core::error::Error for Error {}
 
-/// A sigma-delta channel.
+/// Creates a connected sigma-delta channel.
 ///
-/// Channels are exposed by [`Sdm`]. A channel enables the SDM peripheral clock
-/// when it is connected.
+/// Channel creators are exposed by [`Sdm`]. Calling [`connect`](Self::connect)
+/// consumes the creator and returns an active [`Channel`], which prevents
+/// accidentally connecting the same channel twice.
 #[derive(Debug)]
-pub struct Channel<const CHANNEL: usize> {
+pub struct ChannelCreator<const CHANNEL: usize> {
     // This is copied from the Sdm-level configuration so partially moved
-    // channels still use the shared clock source selected at construction time.
+    // channel creators still use the shared clock source selected at construction time.
     // It is intentionally not configurable per channel.
     clock_source: ClockSource,
-    pin_guard: Option<PinGuard>,
-    clock_guard: Option<SdmClockGuard>,
+    prescaler: u16,
+    pulse_density: i8,
 }
 
-impl<const CHANNEL: usize> Channel<CHANNEL> {
+impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
     const fn new(clock_source: ClockSource) -> Self {
         Self {
             clock_source,
-            pin_guard: None,
-            clock_guard: None,
+            prescaler: 1,
+            pulse_density: 0,
         }
     }
 
+    const fn with_raw_config(clock_source: ClockSource, prescaler: u16, pulse_density: i8) -> Self {
+        Self {
+            clock_source,
+            prescaler,
+            pulse_density,
+        }
+    }
+
+    /// Sets the requested output frequency.
+    ///
+    /// The frequency is converted immediately using the SDM clock source
+    /// selected in [`SdmConfig`].
+    pub fn with_frequency(mut self, frequency: Rate) -> Result<Self, Error> {
+        self.prescaler = prescaler_from_frequency(frequency, self.clock_source)?;
+        Ok(self)
+    }
+
+    /// Sets the raw hardware prescaler.
+    ///
+    /// The hardware divider range is `1..=256`.
+    pub fn with_prescaler(mut self, prescaler: u16) -> Result<Self, Error> {
+        check_prescaler(prescaler)?;
+        self.prescaler = prescaler;
+        Ok(self)
+    }
+
+    /// Sets the pulse density.
+    ///
+    /// The value ranges is `-128..=127`
+    pub const fn with_pulse_density(mut self, density: i8) -> Self {
+        self.pulse_density = density;
+        self
+    }
+
+    /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
+    /// maximum density.
+    pub const fn with_duty(mut self, duty: u8) -> Self {
+        self.pulse_density = duty_to_density(duty);
+        self
+    }
+
     /// Configures this channel and connects it to an output pin.
-    ///
-    /// Reconnecting a channel replaces the previous pin connection.
-    pub fn connect<'d>(
-        &mut self,
-        pin: impl PeripheralOutput<'d>,
-        config: ChannelConfig,
-    ) -> Result<(), Error> {
-        let prescaler = config.timing.prescaler(self.clock_source)?;
-        self.clock_guard = Some(SdmClockGuard::new(self.clock_source)?);
-        set_prescaler_raw(CHANNEL, prescaler);
-        set_pulse_density_raw(CHANNEL, config.pulse_density);
-        self.reconnect(pin);
-        Ok(())
-    }
+    pub fn connect<'d>(self, pin: impl PeripheralOutput<'d>) -> Result<Channel<CHANNEL>, Error> {
+        let clock_guard = SdmClockGuard::new(self.clock_source)?;
+        set_prescaler_raw(CHANNEL, self.prescaler);
+        set_pulse_density_raw(CHANNEL, self.pulse_density);
 
-    /// Connects this channel to a new output pin without changing its channel
-    /// configuration.
-    ///
-    /// This only changes the GPIO matrix route and replaces the previous pin
-    /// connection.
-    pub fn reconnect<'d>(&mut self, pin: impl PeripheralOutput<'d>) {
-        self.pin_guard = None;
-        let pin: GpioOutputSignal<'d> = pin.into();
-        pin.apply_output_config(&OutputConfig::default());
-        pin.set_output_enable(true);
-        self.pin_guard = Some(pin.connect_with_guard(output_signal(CHANNEL)));
+        Ok(Channel {
+            clock_source: self.clock_source,
+            _pin_guard: connect_pin(CHANNEL, pin),
+            _clock_guard: clock_guard,
+        })
     }
+}
 
-    /// Returns whether the channel is currently routed to an output pin.
-    pub fn is_connected(&self) -> bool {
-        self.pin_guard.is_some()
-    }
+/// A connected sigma-delta channel.
+///
+/// Dropping a channel disconnects its output pin and releases the SDM clock
+/// guard. Use [`disconnect`](Self::disconnect) to explicitly release the
+/// channel and recover its [`ChannelCreator`].
+#[derive(Debug)]
+pub struct Channel<const CHANNEL: usize> {
+    clock_source: ClockSource,
+    _pin_guard: PinGuard,
+    _clock_guard: SdmClockGuard,
+}
 
-    /// Applies channel timing and pulse density configuration.
-    ///
-    /// This is equivalent to setting the prescaler/frequency and pulse density
-    /// separately.
-    ///
-    /// The channel must have been successfully connected first.
-    pub fn apply_config(&mut self, config: ChannelConfig) -> Result<(), Error> {
-        let prescaler = config.timing.prescaler(self.clock_source)?;
-        set_prescaler_raw(CHANNEL, prescaler);
-        set_pulse_density_raw(CHANNEL, config.pulse_density);
-        Ok(())
-    }
-
+impl<const CHANNEL: usize> Channel<CHANNEL> {
     /// Sets raw pulse density.
     ///
     /// The value ranges from `-128` to `127`.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn set_pulse_density(&mut self, density: i8) {
         set_pulse_density_raw(CHANNEL, density);
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
     /// maximum density.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn set_duty(&mut self, duty: u8) {
         self.set_pulse_density(duty_to_density(duty))
     }
@@ -350,8 +295,6 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     /// Sets raw prescaler.
     ///
     /// The hardware divider range is `1..=256`.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn set_prescaler(&mut self, prescaler: u16) -> Result<(), Error> {
         check_prescaler(prescaler)?;
         set_prescaler_raw(CHANNEL, prescaler);
@@ -359,8 +302,6 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     }
 
     /// Sets the output frequency.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn set_frequency(&mut self, frequency: Rate) -> Result<(), Error> {
         let prescaler = prescaler_from_frequency(frequency, self.clock_source)?;
         self.set_prescaler(prescaler)
@@ -369,8 +310,6 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     /// Reads the raw hardware prescaler.
     ///
     /// The returned value is in the hardware divider range `1..=256`.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn prescaler(&mut self) -> Result<u16, Error> {
         Ok(prescaler_raw(CHANNEL))
     }
@@ -378,21 +317,31 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     /// Reads the raw pulse density.
     ///
     /// The returned value is in the hardware range `-128..=127`.
-    ///
-    /// The channel must have been successfully connected first.
     pub fn pulse_density(&mut self) -> Result<i8, Error> {
         Ok(pulse_density_raw(CHANNEL))
+    }
+
+    /// Disconnects this channel and returns its channel creator.
+    pub fn disconnect(self) -> ChannelCreator<CHANNEL> {
+        let clock_source = self.clock_source;
+        let prescaler = prescaler_raw(CHANNEL);
+        let pulse_density = pulse_density_raw(CHANNEL);
+        drop(self);
+        ChannelCreator::with_raw_config(clock_source, prescaler, pulse_density)
     }
 }
 
 impl<const CHANNEL: usize> Drop for Channel<CHANNEL> {
     fn drop(&mut self) {
-        self.pin_guard = None;
-        if self.clock_guard.is_some() {
-            set_pulse_density_raw(CHANNEL, 0);
-        }
-        self.clock_guard = None;
+        set_pulse_density_raw(CHANNEL, 0);
     }
+}
+
+fn connect_pin<'d>(channel: usize, pin: impl PeripheralOutput<'d>) -> PinGuard {
+    let pin: GpioOutputSignal<'d> = pin.into();
+    pin.apply_output_config(&OutputConfig::default());
+    pin.set_output_enable(true);
+    pin.connect_with_guard(output_signal(channel))
 }
 
 #[derive(Debug)]
