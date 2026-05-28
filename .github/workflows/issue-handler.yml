@@ -4,8 +4,105 @@ on:
   issues:
     types:
       - opened
+      - edited
+
+permissions:
+  issues: write
 
 jobs:
+  auto-label:
+    name: Auto-label issue from title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const rules = [
+              [/linker scripts/i, "Area: linker scripts"],
+              [/low power/i, "Area: low power"],
+              [/\bbug\b/i, "bug"],
+
+              [/\besp32\b/i, "Chip:esp32"],
+              [/\besp32c2\b/i, "Chip:esp32c2"],
+              [/\besp32c3\b/i, "Chip:esp32c3"],
+              [/\besp32c5\b/i, "Chip:esp32c5"],
+              [/\besp32c6\b/i, "Chip:esp32c6"],
+              [/\besp32c61\b/i, "Chip:esp32c61"],
+              [/\besp32h2\b/i, "Chip:esp32h2"],
+              [/\besp32p4\b/i, "Chip:esp32p4"],
+              [/\besp32s2\b/i, "Chip:esp32s2"],
+              [/\besp32s3\b/i, "Chip:esp32s3"],
+
+              [/\bci\b/i, "ci"],
+              [/documentation/i, "documentation"],
+              [/feature request/i, "feature request"],
+              [/\brtos\b/i, "package: rtos-*"],
+
+              [/esp alloc/i, "package:esp-alloc"],
+              [/esp backtrace/i, "package:esp-backtrace"],
+              [/bootloader/i, "package:esp-bootloader-esp-idf"],
+              [/config/i, "package:esp-config"],
+              [/embassy/i, "package:esp-hal-embassy"],
+              [/procmacros/i, "package:esp-hal-procmacros"],
+              [/esp-ieee802154/i, "package:esp-ieee802154"],
+              [/esp-lp-hal/i, "package:esp-lp-hal"],
+              [/metadata/i, "package:esp-metadata"],
+              [/println/i, "package:esp-println"],
+              [/radio/i, "package:esp-radio"],
+              [/riscv-rt/i, "package:esp-riscv-rt"],
+              [/esp-rom-sys/i, "package:esp-rom-sys"],
+              [/storage/i, "package:esp-storage"],
+              [/xtensa-lx-rt/i, "package:xtensa-lx-rt"],
+              [/xtensa-lx/i, "package:xtensa-lx"],
+
+              [/performance/i, "performance"],
+
+              [/\badc\b/i, "peripheral:adc"],
+              [/\baes\b/i, "peripheral:aes"],
+              [/\bdac\b/i, "peripheral:dac"],
+              [/\bdma\b/i, "peripheral:dma"],
+              [/ethernet/i, "peripheral:ethernet"],
+              [/\bgpio\b/i, "peripheral:gpio"],
+              [/\bi2c\b/i, "peripheral:i2c"],
+              [/\bi2s\b/i, "peripheral:i2s"],
+              [/interrupt/i, "peripheral:interrupt"],
+              [/lcd_cam/i, "peripheral:lcd_cam"],
+              [/ledc/i, "peripheral:ledc"],
+              [/mcpwm/i, "peripheral:mcpwm"],
+              [/parl_io/i, "peripheral:parl_io"],
+              [/psram/i, "peripheral:psram"],
+              [/\brmt\b/i, "peripheral:rmt"],
+              [/\brng\b/i, "peripheral:rng"],
+              [/\brsa\b/i, "peripheral:rsa"],
+              [/sdmmc/i, "peripheral:sdmmc"],
+              [/\bsha\b/i, "peripheral:sha"],
+              [/\bspi\b/i, "peripheral:spi"],
+              [/systimer/i, "peripheral:systimer"],
+              [/\btimer\b/i, "peripheral:timer"],
+              [/touch/i, "peripheral:touch"],
+              [/twai/i, "peripheral:twai"],
+              [/uart/i, "peripheral:uart"],
+              [/\busb\b/i, "peripheral:usb"],
+              [/watchdog timer|wdt/i, "peripheral:wdt"],
+            ];
+
+            const labels = [...new Set(
+              rules
+                .filter(([regex]) => regex.test(context.payload.issue.title))
+                .map(([, label]) => label)
+            )];
+
+            if (labels.length === 0) {
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels,
+            });
+
   add-to-project:
     name: Add issue to project
     runs-on: ubuntu-latest
