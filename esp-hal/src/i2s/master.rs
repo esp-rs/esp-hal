@@ -190,6 +190,10 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
+    #[allow(
+        clippy::type_complexity,
+        reason = "Need to return both the error and the peripheral/buffer for proper cleanup"
+    )]
     pub fn wait(
         mut self,
     ) -> Result<(I2sTx<'d, Dm>, Buf::Final), (DmaError, I2sTx<'d, Dm>, Buf::Final)> {
@@ -327,6 +331,10 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
+    #[allow(
+        clippy::type_complexity,
+        reason = "Need to return both the error and the peripheral/buffer for proper cleanup"
+    )]
     pub fn wait(
         mut self,
     ) -> Result<(I2sRx<'d, Dm>, Buf::Final), (DmaError, I2sRx<'d, Dm>, Buf::Final)> {
