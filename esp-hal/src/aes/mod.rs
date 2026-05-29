@@ -1199,10 +1199,12 @@ pub mod dma {
         ($engine:tt, $any_channel:ident) => {
             type AesErased<'d> = crate::dma::$any_channel<'d>;
 
-            for_each_dma_channel_peri_pair! {
-                ($engine, $ch:ident, AES) => {
-                    impl<'d> AesDmaChannel<'d> for crate::peripherals::$ch<'d> {}
-                };
+            crate::macros::impl_dma_channel_trait! {
+                $engine,
+                peri = AES,
+                ($peri:path, $ch:path) => {
+                    impl<'d> AesDmaChannel<'d> for $ch {}
+                }
             }
         };
     }

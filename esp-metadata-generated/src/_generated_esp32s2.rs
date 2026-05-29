@@ -495,6 +495,7 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0));
         _for_each_inner_dma_channel!(("CRYPTO_DMA", DMA_CRYPTO));
         _for_each_inner_dma_channel!(("COPY_DMA", DMA_COPY));
+        _for_each_inner_dma_channel!(("SPI_DMA", any_channel = SpiDmaChannel));
         _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI2, 0, interrupt = SPI2_DMA,
         compatible = [SPI2])); _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI3, 1,
         interrupt = SPI3_DMA, compatible = [SPI3]));
@@ -504,10 +505,12 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
         compatible = [])); _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2),
         ("SPI_DMA", DMA_SPI3), ("I2S_DMA", DMA_I2S0), ("CRYPTO_DMA", DMA_CRYPTO),
-        ("COPY_DMA", DMA_COPY))); _for_each_inner_dma_channel!((shared("SPI_DMA",
-        DMA_SPI2, 0, interrupt = SPI2_DMA, compatible = [SPI2]), ("SPI_DMA", DMA_SPI3, 1,
-        interrupt = SPI3_DMA, compatible = [SPI3]), ("I2S_DMA", DMA_I2S0, 0, interrupt =
-        I2S0, compatible = [I2S0]), ("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt = CRYPTO_DMA,
+        ("COPY_DMA", DMA_COPY)));
+        _for_each_inner_dma_channel!((separate_any_type("SPI_DMA", any_channel =
+        SpiDmaChannel))); _for_each_inner_dma_channel!((shared("SPI_DMA", DMA_SPI2, 0,
+        interrupt = SPI2_DMA, compatible = [SPI2]), ("SPI_DMA", DMA_SPI3, 1, interrupt =
+        SPI3_DMA, compatible = [SPI3]), ("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0,
+        compatible = [I2S0]), ("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt = CRYPTO_DMA,
         compatible = [AES, SHA]), ("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
         compatible = []))); _for_each_inner_dma_channel!((split));
     };
@@ -522,9 +525,14 @@ macro_rules! for_each_dma_channel_peri_pair {
         SPI3)); _for_each_inner_dma_channel_peri_pair!(("I2S_DMA", DMA_I2S0, I2S0));
         _for_each_inner_dma_channel_peri_pair!(("CRYPTO_DMA", DMA_CRYPTO, AES));
         _for_each_inner_dma_channel_peri_pair!(("CRYPTO_DMA", DMA_CRYPTO, SHA));
-        _for_each_inner_dma_channel_peri_pair!((all("SPI_DMA", DMA_SPI2, SPI2),
+        _for_each_inner_dma_channel_peri_pair!(("SPI_DMA", any_channel = SpiDmaChannel,
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("SPI_DMA", any_channel =
+        SpiDmaChannel, SPI3));
+        _for_each_inner_dma_channel_peri_pair!((channels("SPI_DMA", DMA_SPI2, SPI2),
         ("SPI_DMA", DMA_SPI3, SPI3), ("I2S_DMA", DMA_I2S0, I2S0), ("CRYPTO_DMA",
         DMA_CRYPTO, AES), ("CRYPTO_DMA", DMA_CRYPTO, SHA)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("SPI_DMA", any_channel =
+        SpiDmaChannel, SPI2), ("SPI_DMA", any_channel = SpiDmaChannel, SPI3)));
     };
 }
 #[macro_export]

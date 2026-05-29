@@ -449,6 +449,7 @@ macro_rules! for_each_dma_channel {
         macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
+        _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
         interrupt_out = DMA_OUT_CH0, compatible = [MEM2MEM0, SPI2, MEM2MEM1, I2S0,
         MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5, MEM2MEM6, MEM2MEM7, MEM2MEM8,
@@ -457,7 +458,8 @@ macro_rules! for_each_dma_channel {
         [MEM2MEM0, SPI2, MEM2MEM1, I2S0, MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5,
         MEM2MEM6, MEM2MEM7, MEM2MEM8, MEM2MEM9, MEM2MEM10, MEM2MEM11]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
-        DMA_CH1))); _for_each_inner_dma_channel!((shared));
+        DMA_CH1))); _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA",
+        any_channel = AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
         DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [MEM2MEM0, SPI2, MEM2MEM1,
         I2S0, MEM2MEM2, MEM2MEM3, MEM2MEM4, SHA, MEM2MEM5, MEM2MEM6, MEM2MEM7, MEM2MEM8,
@@ -502,7 +504,27 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, MEM2MEM9));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, MEM2MEM10));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, MEM2MEM11));
-        _for_each_inner_dma_channel_peri_pair!((all("AHB_GDMA", DMA_CH0, MEM2MEM0),
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        MEM2MEM0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, MEM2MEM1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        I2S0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, MEM2MEM3));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        MEM2MEM4)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, MEM2MEM5));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        MEM2MEM6)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM7)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, MEM2MEM8));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        MEM2MEM9)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM10)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, MEM2MEM11));
+        _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0, MEM2MEM0),
         ("AHB_GDMA", DMA_CH0, SPI2), ("AHB_GDMA", DMA_CH0, MEM2MEM1), ("AHB_GDMA",
         DMA_CH0, I2S0), ("AHB_GDMA", DMA_CH0, MEM2MEM2), ("AHB_GDMA", DMA_CH0, MEM2MEM3),
         ("AHB_GDMA", DMA_CH0, MEM2MEM4), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA",
@@ -515,6 +537,17 @@ macro_rules! for_each_dma_channel_peri_pair {
         ("AHB_GDMA", DMA_CH1, MEM2MEM5), ("AHB_GDMA", DMA_CH1, MEM2MEM6), ("AHB_GDMA",
         DMA_CH1, MEM2MEM7), ("AHB_GDMA", DMA_CH1, MEM2MEM8), ("AHB_GDMA", DMA_CH1,
         MEM2MEM9), ("AHB_GDMA", DMA_CH1, MEM2MEM10), ("AHB_GDMA", DMA_CH1, MEM2MEM11)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM0), ("AHB_GDMA", any_channel = AhbGdmaChannel, SPI2),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM1), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM2),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM3), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM4), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM5), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM6), ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM7),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM8), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, MEM2MEM9), ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM10),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, MEM2MEM11)));
     };
 }
 #[macro_export]

@@ -461,6 +461,8 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI3));
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S0));
         _for_each_inner_dma_channel!(("I2S_DMA", DMA_I2S1));
+        _for_each_inner_dma_channel!(("SPI_DMA", any_channel = SpiDmaChannel));
+        _for_each_inner_dma_channel!(("I2S_DMA", any_channel = I2sDmaChannel));
         _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI2, 0, interrupt = SPI2_DMA,
         compatible = [SPI2])); _for_each_inner_dma_channel!(("SPI_DMA", DMA_SPI3, 1,
         interrupt = SPI3_DMA, compatible = [SPI3]));
@@ -469,6 +471,8 @@ macro_rules! for_each_dma_channel {
         interrupt = I2S1, compatible = [I2S1]));
         _for_each_inner_dma_channel!((names("SPI_DMA", DMA_SPI2), ("SPI_DMA", DMA_SPI3),
         ("I2S_DMA", DMA_I2S0), ("I2S_DMA", DMA_I2S1)));
+        _for_each_inner_dma_channel!((separate_any_type("SPI_DMA", any_channel =
+        SpiDmaChannel), ("I2S_DMA", any_channel = I2sDmaChannel)));
         _for_each_inner_dma_channel!((shared("SPI_DMA", DMA_SPI2, 0, interrupt =
         SPI2_DMA, compatible = [SPI2]), ("SPI_DMA", DMA_SPI3, 1, interrupt = SPI3_DMA,
         compatible = [SPI3]), ("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0, compatible =
@@ -485,8 +489,17 @@ macro_rules! for_each_dma_channel_peri_pair {
         DMA_SPI2, SPI2)); _for_each_inner_dma_channel_peri_pair!(("SPI_DMA", DMA_SPI3,
         SPI3)); _for_each_inner_dma_channel_peri_pair!(("I2S_DMA", DMA_I2S0, I2S0));
         _for_each_inner_dma_channel_peri_pair!(("I2S_DMA", DMA_I2S1, I2S1));
-        _for_each_inner_dma_channel_peri_pair!((all("SPI_DMA", DMA_SPI2, SPI2),
-        ("SPI_DMA", DMA_SPI3, SPI3), ("I2S_DMA", DMA_I2S0, I2S0), ("I2S_DMA", DMA_I2S1,
+        _for_each_inner_dma_channel_peri_pair!(("SPI_DMA", any_channel = SpiDmaChannel,
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("SPI_DMA", any_channel =
+        SpiDmaChannel, SPI3)); _for_each_inner_dma_channel_peri_pair!(("I2S_DMA",
+        any_channel = I2sDmaChannel, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("I2S_DMA", any_channel = I2sDmaChannel,
+        I2S1)); _for_each_inner_dma_channel_peri_pair!((channels("SPI_DMA", DMA_SPI2,
+        SPI2), ("SPI_DMA", DMA_SPI3, SPI3), ("I2S_DMA", DMA_I2S0, I2S0), ("I2S_DMA",
+        DMA_I2S1, I2S1)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("SPI_DMA", any_channel =
+        SpiDmaChannel, SPI2), ("SPI_DMA", any_channel = SpiDmaChannel, SPI3), ("I2S_DMA",
+        any_channel = I2sDmaChannel, I2S0), ("I2S_DMA", any_channel = I2sDmaChannel,
         I2S1)));
     };
 }

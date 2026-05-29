@@ -1826,26 +1826,16 @@ with_spi_master_dma_engine! {
         )]
         pub trait SpiMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
 
-        impl<'d> SpiMasterDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
-
-        for_each_dma_channel! {
-            ($engine, $ch:ident) => {
-                impl<'d> SpiMasterDmaChannel<'d, AnySpi<'d>> for crate::peripherals::$ch<'d> {}
-            };
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnySpi<'d>,
+            peris = for_each_spi_master,
+            ($peri:path, $ch:path) => {
+                impl<'d> SpiMasterDmaChannel<'d, $peri> for $ch {}
+            }
         }
 
-        for_each_spi_master! {
-            ($peri:ident) => {
-                impl<'d> SpiMasterDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::dma::$any_channel<'d> {}
-
-                for_each_dma_channel_peri_pair! {
-                    ($engine, $ch:ident, $peri) => {
-                        impl<'d> SpiMasterDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::peripherals::$ch<'d> {}
-                    };
-                }
-            };
-        }
-
+        // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
 
         impl<'d> Spi<'d, crate::Blocking> {

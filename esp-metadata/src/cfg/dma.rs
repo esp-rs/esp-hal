@@ -93,23 +93,39 @@ impl GenericProperty for DmaEngines {
         let mut split = vec![];
         let mut engines = vec![];
         let mut engine_channels = vec![];
+        let mut engine_any_channels = vec![];
         // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
         // If the list is empty (GDMA), this contains nothing.
         let mut dma_pairs = vec![];
+        let mut dma_any_pairs = vec![];
         // Accumulates engine name tokens per driver, in engine declaration order.
-        let mut driver_engines: BTreeMap<String, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
+        let mut driver_engines: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
         for engine in self.0.iter() {
             let engine_name = engine.name.as_str();
             engines.push(quote! { #engine_name });
 
+            let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
+            let any_channel = format_ident!("{channel}Channel");
+
             for driver in &engine.drivers {
-                let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
-                let any_channel = format_ident!("{channel}Channel");
                 driver_engines
-                    .entry(driver.clone())
+                    .entry(driver)
                     .or_default()
                     .push(quote! { #engine_name, #any_channel });
+            }
+
+            if engine.channels.len() > 1 {
+                engine_any_channels.push(quote! { #engine_name, any_channel = #any_channel });
+
+                for peri_ident in engine
+                    .peripheral_instances
+                    .iter()
+                    .map(|p| format_ident!("{}", p.name))
+                {
+                    dma_any_pairs
+                        .push(quote! { #engine_name, any_channel = #any_channel, #peri_ident });
+                }
             }
 
             for (idx, channel) in engine.channels.iter().enumerate() {
@@ -172,6 +188,7 @@ impl GenericProperty for DmaEngines {
                 "dma_channel",
                 &[
                     ("names", &engine_channels),
+                    ("separate_any_type", &engine_any_channels),
                     ("shared", &shared),
                     ("split", &split),
                 ],
@@ -184,8 +201,10 @@ impl GenericProperty for DmaEngines {
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.
-        let dma_pairs_macro =
-            generate_for_each_macro("dma_channel_peri_pair", &[("all", &dma_pairs)]);
+        let dma_pairs_macro = generate_for_each_macro(
+            "dma_channel_peri_pair",
+            &[("channels", &dma_pairs), ("any_channels", &dma_any_pairs)],
+        );
 
         // One with_{driver}_dma_engine! macro per driver that has DMA support.
         // Each driver uses exactly one engine; assert that invariant here.

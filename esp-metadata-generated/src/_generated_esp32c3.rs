@@ -498,6 +498,7 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
+        _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
         compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1,
@@ -505,11 +506,13 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2,
         compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA", DMA_CH1),
-        ("AHB_GDMA", DMA_CH2))); _for_each_inner_dma_channel!((shared("AHB_GDMA",
-        DMA_CH0, 0, interrupt = DMA_CH0, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC]), ("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1, compatible = [SPI2,
-        UHCI0, I2S0, AES, SHA, APB_SARADC]), ("AHB_GDMA", DMA_CH2, 2, interrupt =
-        DMA_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC])));
+        ("AHB_GDMA", DMA_CH2)));
+        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
+        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0,
+        interrupt = DMA_CH0, compatible = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC]),
+        ("AHB_GDMA", DMA_CH1, 1, interrupt = DMA_CH1, compatible = [SPI2, UHCI0, I2S0,
+        AES, SHA, APB_SARADC]), ("AHB_GDMA", DMA_CH2, 2, interrupt = DMA_CH2, compatible
+        = [SPI2, UHCI0, I2S0, AES, SHA, APB_SARADC])));
         _for_each_inner_dma_channel!((split));
     };
 }
@@ -536,7 +539,15 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, APB_SARADC));
-        _for_each_inner_dma_channel_peri_pair!((all("AHB_GDMA", DMA_CH0, SPI2),
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        AES)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0, SPI2),
         ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA", DMA_CH0, I2S0), ("AHB_GDMA", DMA_CH0,
         AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0, APB_SARADC), ("AHB_GDMA",
         DMA_CH1, SPI2), ("AHB_GDMA", DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0),
@@ -544,6 +555,11 @@ macro_rules! for_each_dma_channel_peri_pair {
         APB_SARADC), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2, UHCI0),
         ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA", DMA_CH2,
         SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SPI2), ("AHB_GDMA", any_channel = AhbGdmaChannel, UHCI0),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC)));
     };
 }
 #[macro_export]

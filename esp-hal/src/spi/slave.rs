@@ -582,24 +582,13 @@ pub mod dma {
             )]
             pub trait SpiSlaveDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
 
-            impl<'d> SpiSlaveDmaChannel<'d, AnySpi<'d>> for crate::dma::$any_channel<'d> {}
-
-            for_each_dma_channel! {
-                ($engine, $ch:ident) => {
-                    impl<'d> SpiSlaveDmaChannel<'d, AnySpi<'d>> for crate::peripherals::$ch<'d> {}
-                };
-            }
-
-            for_each_spi_slave! {
-                ($peri:ident) => {
-                    impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::dma::$any_channel<'d> {}
-
-                    for_each_dma_channel_peri_pair! {
-                        ($engine, $ch:ident, $peri) => {
-                            impl<'d> SpiSlaveDmaChannel<'d, crate::peripherals::$peri<'d>> for crate::peripherals::$ch<'d> {}
-                        };
-                    }
-                };
+            crate::macros::impl_dma_channel_trait! {
+                $engine,
+                any_peri = AnySpi<'d>,
+                peris = for_each_spi_slave,
+                ($peri:path, $ch:path) => {
+                    impl<'d> SpiSlaveDmaChannel<'d, $peri> for $ch {}
+                }
             }
 
             type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;

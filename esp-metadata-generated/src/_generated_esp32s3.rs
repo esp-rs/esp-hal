@@ -523,6 +523,7 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4));
+        _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
         interrupt_out = DMA_OUT_CH0, compatible = [SPI2, SPI3, UHCI0, I2S0, I2S1,
         LCD_CAM, AES, SHA, APB_SARADC, RMT])); _for_each_inner_dma_channel!(("AHB_GDMA",
@@ -538,7 +539,8 @@ macro_rules! for_each_dma_channel {
         LCD_CAM, AES, SHA, APB_SARADC, RMT]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA", DMA_CH1),
         ("AHB_GDMA", DMA_CH2), ("AHB_GDMA", DMA_CH3), ("AHB_GDMA", DMA_CH4)));
-        _for_each_inner_dma_channel!((shared));
+        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
+        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
         DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI2, SPI3, UHCI0, I2S0,
         I2S1, LCD_CAM, AES, SHA, APB_SARADC, RMT]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in
@@ -607,26 +609,47 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, SHA));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, APB_SARADC));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, RMT));
-        _for_each_inner_dma_channel_peri_pair!((all("AHB_GDMA", DMA_CH0, SPI2),
-        ("AHB_GDMA", DMA_CH0, SPI3), ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA", DMA_CH0,
-        I2S0), ("AHB_GDMA", DMA_CH0, I2S1), ("AHB_GDMA", DMA_CH0, LCD_CAM), ("AHB_GDMA",
-        DMA_CH0, AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0, APB_SARADC),
-        ("AHB_GDMA", DMA_CH0, RMT), ("AHB_GDMA", DMA_CH1, SPI2), ("AHB_GDMA", DMA_CH1,
-        SPI3), ("AHB_GDMA", DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0), ("AHB_GDMA",
-        DMA_CH1, I2S1), ("AHB_GDMA", DMA_CH1, LCD_CAM), ("AHB_GDMA", DMA_CH1, AES),
-        ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH1, APB_SARADC), ("AHB_GDMA",
-        DMA_CH1, RMT), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2, SPI3),
-        ("AHB_GDMA", DMA_CH2, UHCI0), ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2,
-        I2S1), ("AHB_GDMA", DMA_CH2, LCD_CAM), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA",
-        DMA_CH2, SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC), ("AHB_GDMA", DMA_CH2, RMT),
-        ("AHB_GDMA", DMA_CH3, SPI2), ("AHB_GDMA", DMA_CH3, SPI3), ("AHB_GDMA", DMA_CH3,
-        UHCI0), ("AHB_GDMA", DMA_CH3, I2S0), ("AHB_GDMA", DMA_CH3, I2S1), ("AHB_GDMA",
-        DMA_CH3, LCD_CAM), ("AHB_GDMA", DMA_CH3, AES), ("AHB_GDMA", DMA_CH3, SHA),
-        ("AHB_GDMA", DMA_CH3, APB_SARADC), ("AHB_GDMA", DMA_CH3, RMT), ("AHB_GDMA",
-        DMA_CH4, SPI2), ("AHB_GDMA", DMA_CH4, SPI3), ("AHB_GDMA", DMA_CH4, UHCI0),
-        ("AHB_GDMA", DMA_CH4, I2S0), ("AHB_GDMA", DMA_CH4, I2S1), ("AHB_GDMA", DMA_CH4,
-        LCD_CAM), ("AHB_GDMA", DMA_CH4, AES), ("AHB_GDMA", DMA_CH4, SHA), ("AHB_GDMA",
-        DMA_CH4, APB_SARADC), ("AHB_GDMA", DMA_CH4, RMT)));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        I2S0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, I2S1)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, LCD_CAM));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        AES)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        RMT)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
+        SPI2), ("AHB_GDMA", DMA_CH0, SPI3), ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA",
+        DMA_CH0, I2S0), ("AHB_GDMA", DMA_CH0, I2S1), ("AHB_GDMA", DMA_CH0, LCD_CAM),
+        ("AHB_GDMA", DMA_CH0, AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0,
+        APB_SARADC), ("AHB_GDMA", DMA_CH0, RMT), ("AHB_GDMA", DMA_CH1, SPI2),
+        ("AHB_GDMA", DMA_CH1, SPI3), ("AHB_GDMA", DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1,
+        I2S0), ("AHB_GDMA", DMA_CH1, I2S1), ("AHB_GDMA", DMA_CH1, LCD_CAM), ("AHB_GDMA",
+        DMA_CH1, AES), ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH1, APB_SARADC),
+        ("AHB_GDMA", DMA_CH1, RMT), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2,
+        SPI3), ("AHB_GDMA", DMA_CH2, UHCI0), ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA",
+        DMA_CH2, I2S1), ("AHB_GDMA", DMA_CH2, LCD_CAM), ("AHB_GDMA", DMA_CH2, AES),
+        ("AHB_GDMA", DMA_CH2, SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC), ("AHB_GDMA",
+        DMA_CH2, RMT), ("AHB_GDMA", DMA_CH3, SPI2), ("AHB_GDMA", DMA_CH3, SPI3),
+        ("AHB_GDMA", DMA_CH3, UHCI0), ("AHB_GDMA", DMA_CH3, I2S0), ("AHB_GDMA", DMA_CH3,
+        I2S1), ("AHB_GDMA", DMA_CH3, LCD_CAM), ("AHB_GDMA", DMA_CH3, AES), ("AHB_GDMA",
+        DMA_CH3, SHA), ("AHB_GDMA", DMA_CH3, APB_SARADC), ("AHB_GDMA", DMA_CH3, RMT),
+        ("AHB_GDMA", DMA_CH4, SPI2), ("AHB_GDMA", DMA_CH4, SPI3), ("AHB_GDMA", DMA_CH4,
+        UHCI0), ("AHB_GDMA", DMA_CH4, I2S0), ("AHB_GDMA", DMA_CH4, I2S1), ("AHB_GDMA",
+        DMA_CH4, LCD_CAM), ("AHB_GDMA", DMA_CH4, AES), ("AHB_GDMA", DMA_CH4, SHA),
+        ("AHB_GDMA", DMA_CH4, APB_SARADC), ("AHB_GDMA", DMA_CH4, RMT)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SPI2), ("AHB_GDMA", any_channel = AhbGdmaChannel, SPI3),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, UHCI0), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S1),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, LCD_CAM), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC), ("AHB_GDMA", any_channel
+        = AhbGdmaChannel, RMT)));
     };
 }
 #[macro_export]

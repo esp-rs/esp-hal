@@ -405,9 +405,9 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
         compatible = [SPI2, SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA",
-        DMA_CH0))); _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0,
-        interrupt = DMA_CH0, compatible = [SPI2, SHA])));
-        _for_each_inner_dma_channel!((split));
+        DMA_CH0))); _for_each_inner_dma_channel!((separate_any_type));
+        _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
+        compatible = [SPI2, SHA]))); _for_each_inner_dma_channel!((split));
     };
 }
 #[macro_export]
@@ -417,8 +417,9 @@ macro_rules! for_each_dma_channel_peri_pair {
         macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
         ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
         DMA_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
-        SHA)); _for_each_inner_dma_channel_peri_pair!((all("AHB_GDMA", DMA_CH0, SPI2),
-        ("AHB_GDMA", DMA_CH0, SHA)));
+        SHA)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
+        SPI2), ("AHB_GDMA", DMA_CH0, SHA)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels));
     };
 }
 #[macro_export]
