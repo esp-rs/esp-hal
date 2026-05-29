@@ -1843,6 +1843,7 @@ mod private {
             // `test_i2s_write_one_shot_twice_*` tests ... it will fail on the second
             // write without this delay, but pass with it. So there you go. (on ESP32 at
             // least)
+            #[cfg(esp32)]
             unsafe {
                 core::arch::asm!(
                     ".rept 40
