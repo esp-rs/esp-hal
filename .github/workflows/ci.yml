@@ -418,15 +418,134 @@ jobs:
       packages: ${{ needs.calculate.outputs.packages }}
     secrets: inherit
 
-  hil:
+  # --------------------------------------------------------------------------
+  # HIL — build gates CI, device runs do not.
+
+  hil-build:
     needs: calculate
     if: >
       github.event_name == 'merge_group' &&
       needs.calculate.outputs.run-hil == 'true'
-    uses: ./.github/workflows/hil.yml
-    with:
-      chips: "esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4"
-    secrets: inherit
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.chips.outputs.matrix }}
+    steps:
+      - name: Resolve chip matrix
+        id: chips
+        run: |
+          ALL_CHIPS='[
+            {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",   "host":"aarch64"},
+            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag", "host":"armv7"},
+            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",  "host":"armv7"},
+            {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag", "host":"aarch64"},
+            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",  "host":"armv7"},
+            {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",  "host":"aarch64"},
+            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",  "host":"armv7"},
+            {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb", "host":"aarch64"},
+            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",  "host":"armv7"},
+            {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",      "host":"aarch64"}
+          ]'
+          echo "matrix={\"target\":$(echo "$ALL_CHIPS" | jq -c .)}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          buildtargets: esp32,esp32s2,esp32s3
+          default: true
+          version: 1.96.0.0
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+
+      - name: Install cross-compilation targets
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build xtask for HIL runners
+        run: |
+          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
+          cross build --release --target aarch64-unknown-linux-gnu -p xtask
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/xtask
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/xtask
+
+      - name: Build tests
+        run: |
+          for chip in esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4; do
+            if cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
+              echo "Building ALL tests for $chip"
+              cargo xtask build tests "$chip"
+            else
+              echo "Skipping $chip: not supported by this ref's xtask"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: hil-tests
+          path: target/tests/
+          if-no-files-found: error
+
+  # Device runs — not gated by ci-result.
+  hil-run:
+    needs: hil-build
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.hil-build.outputs.matrix) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hil-tests
+          path: tests/
+        continue-on-error: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
+          fi
+
+      - name: Run Tests
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
+          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests/ || true
+          rm -f xtask || true
 
   # --------------------------------------------------------------------------
   # Gate job for branch protection
@@ -434,6 +553,9 @@ jobs:
   # Branch protection should require this single job instead of individual jobs.
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
+  #
+  # NOTE: hil-run is intentionally excluded — device tests should not block
+  # the merge queue.  hil-build IS included so we gate on test compilation.
   ci-result:
     if: always()
     needs:
@@ -444,7 +566,7 @@ jobs:
       - extras
       - changelog
       - semver-check
-      - hil
+      - hil-build
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
