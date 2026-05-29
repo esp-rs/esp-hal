@@ -504,6 +504,101 @@ mod tests {
         let (res, _, _done_tx) = tx_transfer.wait_async().await;
         assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
     }
+
+    // Regression test for an ESP32 I2S `reset_tx` defect. `reset_tx()` toggles
+    // the reset bits with a back-to-back register write whose pulse is too short
+    // for the hardware to latch; the TX core then fails to restart, and a
+    // subsequent transfer can silently fail to transmit — no error, no hang, the
+    // data simply never goes out. The failure is intermittent per transfer, so
+    // this sends a run of consecutive one-shot writes, each tagged with a unique
+    // marker, and uses signal loopback to confirm every transfer's data comes
+    // back. The RX stream is drained to idle before tallying, so a marker counts
+    // as dropped only if it never arrived — not merely because capture lagged the
+    // transmitter. Checking marker presence (not exact sample counts) tolerates
+    // the ESP32 loopback occasionally dropping the first sample.
+    #[test]
+    fn test_i2s_consecutive_writes_all_transmit(ctx: Context) {
+        const COUNT: usize = 100;
+        const BASE: u16 = 0x2000; // transfer i -> marker BASE + i
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO)
+                .with_signal_loopback(true),
+        )
+        .unwrap();
+
+        let (din, dout) = unsafe { ctx.dout.split() };
+        let i2s_tx = i2s.i2s_tx.with_bclk(NoPin).with_ws(NoPin).with_dout(dout).build();
+        let i2s_rx = i2s.i2s_rx.with_bclk(NoPin).with_ws(NoPin).with_din(din).build();
+
+        let rx_buffer = dma_rx_stream_buffer!(16384, 1024);
+        let mut rx = i2s_rx.read(rx_buffer).unwrap();
+
+        let buffer = hil_test::mk_static!([u8; 256], [0u8; 256]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let mut tx_buffer = Some(DmaTxBuf::new(descr, buffer).unwrap());
+        let mut tx = Some(i2s_tx);
+
+        let mut received = [false; COUNT];
+        let mut tmp = [0u8; 4096];
+
+        macro_rules! scan {
+            () => {{
+                let avail = rx.available_bytes().min(tmp.len());
+                if avail > 0 {
+                    let n = rx.pop(&mut tmp[..avail]);
+                    for w in tmp[..n].chunks_exact(2) {
+                        let v = u16::from_le_bytes([w[0], w[1]]);
+                        if v >= BASE && (v - BASE) < COUNT as u16 {
+                            received[(v - BASE) as usize] = true;
+                        }
+                    }
+                }
+            }};
+        }
+
+        for i in 0..COUNT {
+            let mut b = tx_buffer.take().unwrap();
+            let bytes = (BASE + i as u16).to_le_bytes();
+            for chunk in b.as_mut_slice().chunks_mut(2) {
+                chunk.copy_from_slice(&bytes);
+            }
+            let transfer = tx.take().unwrap().write(b).unwrap();
+            for _ in 0..1500 {
+                scan!();
+            }
+            let (res, tx_back, buf_back) = transfer.wait();
+            assert!(res.is_ok(), "I2S write {} failed: {:?}", i, res.err());
+            tx = Some(tx_back);
+            tx_buffer = Some(buf_back);
+        }
+        // Drain RX to idle: once TX stops the loopback clock RX produces no new
+        // data, so a long empty streak means everything transmitted has been
+        // captured.
+        let mut empty_streak = 0u32;
+        let mut guard = 0u32;
+        while empty_streak < 200_000 && guard < 50_000_000 {
+            guard += 1;
+            if rx.available_bytes() > 0 {
+                scan!();
+                empty_streak = 0;
+            } else {
+                empty_streak += 1;
+            }
+        }
+
+        let dropped = received.iter().filter(|&&s| !s).count();
+        assert_eq!(
+            dropped, 0,
+            "{}/{} consecutive I2S transfers were not transmitted: reset_tx failed to restart the TX core",
+            dropped, COUNT
+        );
+    }
 }
 
 #[cfg(esp32)]
