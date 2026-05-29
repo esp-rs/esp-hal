@@ -5,19 +5,16 @@
 
 //% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
-// FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
 #![no_main]
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::dma::DmaTxBuf;
-    #[cfg_attr(esp32, expect(unused))]
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::{DmaDescriptor, DmaRxBuf, DmaTxStreamBuf},
+        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf},
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
@@ -34,27 +31,23 @@ mod tests {
         }
     }
 
-    #[cfg_attr(esp32, expect(unused))]
     const BUFFER_SIZE: usize = 2000;
 
-    #[cfg_attr(esp32, expect(unused))]
     #[derive(Clone)]
     struct SampleSource {
         i: u8,
     }
 
-    #[cfg(not(esp32))]
     impl SampleSource {
         // choose values which DON'T restart on every descriptor buffer's start
         const ADD: u8 = 5;
         const CUT_OFF: u8 = 113;
 
         fn new() -> Self {
-            Self { i: 0 }
+            Self { i: 1 }
         }
     }
 
-    #[cfg(not(esp32))]
     impl Iterator for SampleSource {
         type Item = u8;
 
@@ -65,7 +58,6 @@ mod tests {
         }
     }
 
-    #[cfg(not(esp32))]
     #[embassy_executor::task]
     async fn writer(mut tx_buffer: DmaTxStreamBuf, i2s_tx: I2sTx<'static, Async>) {
         let mut samples = SampleSource::new();
@@ -127,11 +119,6 @@ mod tests {
         }
     }
 
-    // FIXME - in loopback mode, the ESP32's I2S RX seems to randomly miss the first sample, causing
-    // this test to fail spuriously. Re-enable when this is fixed.
-    // While this is usually not a problem for audio applications, it does make testing more
-    // difficult.
-    #[cfg(not(esp32))]
     #[test]
     async fn test_i2s_loopback_async(ctx: Context) {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
@@ -173,10 +160,22 @@ mod tests {
         let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;
         let mut samples = SampleSource::new();
-        for _ in 0..30 {
+        for _i in 0..30 {
             rx_transfer.wait_for_available_async().await.unwrap();
             let avl = rx_transfer.available_bytes();
             let len = rx_transfer.pop(&mut rcv[..avl]);
+
+            // WORKAROUND - in loopback mode (only), the ESP32's I2S RX seems to randomly miss the
+            // first sample. Not ideal but skip those extra zeroes to have this tested to the extend
+            // possible.
+            #[cfg(esp32)]
+            let (rcv, len) = if _i == 0 && rcv[0] == 0 {
+                let zeros = rcv.iter().take_while(|&&b| b == 0).count();
+                (&rcv[zeros..], len - zeros)
+            } else {
+                (&rcv[..], len)
+            };
+
             for &b in &rcv[..len] {
                 let expected = samples.next().unwrap();
                 assert_eq!(
@@ -189,11 +188,6 @@ mod tests {
         }
     }
 
-    // FIXME - in loopback mode, the ESP32's I2S RX seems to randomly miss the first sample, causing
-    // this test to fail spuriously. Re-enable when this is fixed.
-    // While this is usually not a problem for audio applications, it does make testing more
-    // difficult.
-    #[cfg(not(esp32))]
     #[test]
     fn test_i2s_loopback(ctx: Context) {
         let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE * 4, 1000);
@@ -275,6 +269,17 @@ mod tests {
                 rcv.fill(0xff);
                 let len = rx_transfer.pop(&mut rcv[..rx_avail]);
                 assert!(len > 0);
+
+                // WORKAROUND - in loopback mode (only), the ESP32's I2S RX seems to randomly miss
+                // the first sample, causing this test to fail spuriously. Not ideal
+                // but skip those zeroes to have this tested to the extend possible.
+                #[cfg(esp32)]
+                let (rcv, len) = if iteration == 0 && rcv[0] == 0 {
+                    let zeros = rcv.iter().take_while(|&&b| b == 0).count();
+                    (&rcv[zeros..], len - zeros)
+                } else {
+                    (&rcv[..], len)
+                };
 
                 for &b in &rcv[..len] {
                     let expected = check_samples.next().unwrap();
