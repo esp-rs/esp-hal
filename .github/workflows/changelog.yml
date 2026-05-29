@@ -1,27 +1,19 @@
 name: Changelog check
 
 on:
-  pull_request:
-    # Run on labeled/unlabeled in addition to defaults to detect
-    # adding/removing the skip-changelog or manual-changelog labels.
-    types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
+  workflow_call:
+    inputs:
+      pr-number:
+        description: "Pull request number to check"
+        required: true
+        type: number
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  get-labels:
-    uses: ./.github/workflows/get-labels.yml
-
   changelog:
-    needs: get-labels
-    # Skip draft PRs and PRs that already carry the skip-changelog label —
-    # the label check inside xtask is authoritative, but skipping here avoids
-    # a full Rust compile when it isn't needed.
-    if: |
-      !github.event.pull_request.draft &&
-      !contains(needs.get-labels.outputs.labels, 'skip-changelog')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -31,6 +23,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check PR changelog
-        run: cargo xtask check-pr-changelog --pr ${{ github.event.pull_request.number }}
+        run: cargo xtask check-pr-changelog --pr ${{ inputs.pr-number }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

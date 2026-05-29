@@ -13,7 +13,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -32,13 +32,91 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
-  get-labels:
-    uses: ./.github/workflows/get-labels.yml
+  # Centralized entry point — fetches labels once, decides which downstream
+  # jobs and reusable workflows run.  Every other job/workflow in this file
+  # gates on `calculate` outputs.
+  calculate:
+    runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.labels.outputs.labels }}
+      packages: ${{ steps.labels.outputs.packages }}
+      run-build: ${{ steps.decide.outputs.run-build }}
+      run-docs: ${{ steps.decide.outputs.run-docs }}
+      run-msrv: ${{ steps.decide.outputs.run-msrv }}
+      run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
+      run-extras: ${{ steps.decide.outputs.run-extras }}
+      run-hil: ${{ steps.decide.outputs.run-hil }}
+      run-changelog: ${{ steps.decide.outputs.run-changelog }}
+      run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get labels
+        id: labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
+            LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            if [ -n "$PR_NUMBER" ]; then
+              LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
+            fi
+          fi
+
+          PACKAGES=""
+          if [ -n "$LABELS" ]; then
+            PACKAGES=$(echo "$LABELS" \
+              | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
+              | tr '\n' ',' \
+              | sed 's/,$//')
+          fi
+
+          LABELS_SPACE=$(echo "$LABELS" | tr '\n' ' ' | xargs)
+          PACKAGES_SPACE=$(echo "$PACKAGES" | tr ',' ' ')
+
+          echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
+          echo "packages=$PACKAGES_SPACE" >> "$GITHUB_OUTPUT"
+
+          echo "Detected labels: $LABELS_SPACE"
+          echo "Detected packages: $PACKAGES_SPACE"
+
+      - name: Decide what to run
+        id: decide
+        env:
+          LABELS: ${{ steps.labels.outputs.labels }}
+        run: |
+          BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
+          HIL=true; CHANGELOG=true; SEMVER=true
+
+          if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
+            BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
+            HIL=false; SEMVER=false
+          fi
+          if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
+          if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
+
+          for pair in \
+            "run-build=$BUILD" \
+            "run-docs=$DOCS" \
+            "run-msrv=$MSRV" \
+            "run-host-tests=$HOST" \
+            "run-extras=$EXTRAS" \
+            "run-hil=$HIL" \
+            "run-changelog=$CHANGELOG" \
+            "run-semver-check=$SEMVER"; do
+            echo "$pair" >> "$GITHUB_OUTPUT"
+          done
+
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST extras=$EXTRAS hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
 
   # --------------------------------------------------------------------------
   # Build Packages
   esp-hal:
-    needs: get-labels
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
     runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
@@ -48,7 +126,6 @@ jobs:
       STATIC_IP: 1.1.1.1
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
-      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     strategy:
       fail-fast: false
@@ -59,71 +136,53 @@ jobs:
           - riscv
 
     steps:
-      - name: Skip CI
-        if: env.SKIP_CI == 'true'
-        run: |
-          echo "skipping"
-
       - uses: actions/checkout@v6
-        if: env.SKIP_CI != 'true'
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        if: matrix.group == 'xtensa'
         with:
           version: 1.96.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
-        if: env.SKIP_CI != 'true'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: stable
           components: rust-src
 
       - name: Setup cargo-batch
-        if: env.SKIP_CI != 'true'
         run: |
           if ! command -v cargo-batch &> /dev/null; then
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa and Risc-V (esp32c2/c3)
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+      - name: Build and Check Xtensa
+        if: matrix.group == 'xtensa'
         shell: bash
         run: |
           # lints and docs are checked separately
           cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
 
       - name: Build and Check RISC-V
-        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        if: matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32p4 --toolchain stable --no-lint --no-docs
 
-  detect-extras-runner:
-    needs: get-labels
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
-    uses: ./.github/workflows/check-runner.yml
-    with:
-      primary-runner: macos-m1-self-hosted
-      fallback-runner: ubuntu-latest
-
   extras:
-    needs: [get-labels, detect-extras-runner]
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
-    runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
+    needs: calculate
+    if: needs.calculate.outputs.run-extras == 'true'
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v6
@@ -144,9 +203,8 @@ jobs:
         run: cd extras/ieee802154-sniffer && cargo build
 
   docs:
-    needs: get-labels
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    needs: calculate
+    if: needs.calculate.outputs.run-docs == 'true'
     runs-on: ubuntu-latest
 
     strategy:
@@ -211,10 +269,9 @@ jobs:
   # MSRV
 
   msrv:
-    needs: get-labels
+    needs: calculate
+    if: needs.calculate.outputs.run-msrv == 'true'
     runs-on: ubuntu-latest
-    env:
-      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     strategy:
       fail-fast: false
@@ -224,62 +281,46 @@ jobs:
           - riscv
 
     steps:
-      - name: Skip CI
-        if: env.SKIP_CI == 'true'
-        run: |
-          echo "skipping"
-
       - uses: actions/checkout@v6
-        if: env.SKIP_CI != 'true'
 
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        if: matrix.group == 'xtensa'
         with:
           version: ${{ env.MSRV }}
 
       - name: esp toolchain checks
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        if: matrix.group == 'xtensa'
         run: rustc +esp --version --verbose
 
       - uses: dtolnay/rust-toolchain@v1
-        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        if: matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
       - name: Stable toolchain checks
-        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        if: matrix.group == 'riscv'
         run: rustc +${{ env.MSRV }} --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISC-V (esp-hal)
-        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        if: matrix.group == 'riscv'
         run: |
           cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        if: matrix.group == 'xtensa'
         run: |
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
 
-  detect-host-tests-runner:
-    needs: get-labels
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
-    uses: ./.github/workflows/check-runner.yml
-    with:
-      primary-runner: macos-m1-self-hosted
-      fallback-runner: ubuntu-latest
-
   host-tests:
-    needs: detect-host-tests-runner
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
-    runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
+    needs: calculate
+    if: needs.calculate.outputs.run-host-tests == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
@@ -335,6 +376,7 @@ jobs:
   # Check links in .rs, .md, and .toml files
 
   link-check:
+    needs: calculate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -354,15 +396,187 @@ jobs:
             './**/*.md'
             './**/*.toml'
 
-  # Single dummy for PR CI, per-chip matrix jobs live in hil.yml and are aggregated there.
+  # --------------------------------------------------------------------------
+  # Reusable workflow calls — gated by calculate outputs
+
+  changelog:
+    needs: calculate
+    if: >
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      needs.calculate.outputs.run-changelog == 'true'
+    uses: ./.github/workflows/changelog.yml
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  semver-check:
+    needs: calculate
+    if: needs.calculate.outputs.run-semver-check == 'true'
+    uses: ./.github/workflows/api-baseline-check.yml
+    with:
+      packages: ${{ needs.calculate.outputs.packages }}
+    secrets: inherit
+
+  # --------------------------------------------------------------------------
+  # HIL — build gates CI, device runs do not.
+
+  hil-build:
+    needs: calculate
+    if: >
+      github.event_name == 'merge_group' &&
+      needs.calculate.outputs.run-hil == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.chips.outputs.matrix }}
+    steps:
+      - name: Resolve chip matrix
+        id: chips
+        run: |
+          ALL_CHIPS='[
+            {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",   "host":"aarch64"},
+            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag", "host":"armv7"},
+            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",  "host":"armv7"},
+            {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag", "host":"aarch64"},
+            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",  "host":"armv7"},
+            {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",  "host":"aarch64"},
+            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",  "host":"armv7"},
+            {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb", "host":"aarch64"},
+            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",  "host":"armv7"},
+            {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",      "host":"aarch64"}
+          ]'
+          echo "matrix={\"target\":$(echo "$ALL_CHIPS" | jq -c .)}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          buildtargets: esp32,esp32s2,esp32s3
+          default: true
+          version: 1.96.0.0
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+
+      - name: Install cross-compilation targets
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build xtask for HIL runners
+        run: |
+          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
+          cross build --release --target aarch64-unknown-linux-gnu -p xtask
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/xtask
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/xtask
+
+      - name: Build tests
+        run: |
+          for chip in esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4; do
+            if cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
+              echo "Building ALL tests for $chip"
+              cargo xtask build tests "$chip"
+            else
+              echo "Skipping $chip: not supported by this ref's xtask"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: hil-tests
+          path: target/tests/
+          if-no-files-found: error
+
+  # Device runs — not gated by ci-result.
+  hil-run:
+    needs: hil-build
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.hil-build.outputs.matrix) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hil-tests
+          path: tests/
+        continue-on-error: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
+          fi
+
+      - name: Run Tests
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
+          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests/ || true
+          rm -f xtask || true
+
+  # --------------------------------------------------------------------------
+  # Gate job for branch protection
   #
-  # Real test builds run in hil.yml on merge_group (and `/hil full`). See:
-  # https://github.com/orgs/community/discussions/102764
-  build-tests-full-report:
-    if: github.event_name != 'merge_group'
+  # Branch protection should require this single job instead of individual jobs.
+  # Skipped jobs (due to calculate outputs) are treated as success.
+  # Failed or cancelled jobs cause this gate to fail.
+  #
+  # NOTE: hil-run is intentionally excluded — device tests should not block
+  # the merge queue.  hil-build IS included so we gate on test compilation.
+  ci-result:
+    if: always()
+    needs:
+      - esp-hal
+      - docs
+      - msrv
+      - host-tests
+      - extras
+      - changelog
+      - semver-check
+      - hil-build
     runs-on: ubuntu-latest
     steps:
-      - name: Placeholder (full-matrix builds run in HIL workflow)
+      - name: Check CI results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "NOOP: build-tests-full-report for PR CI."
-          echo "Real HIL test builds run only in hil.yml (merge_group or /hil full)."
+          for result in $RESULTS; do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
+              echo "::error::One or more CI jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+          echo "All CI checks passed (or were correctly skipped)"

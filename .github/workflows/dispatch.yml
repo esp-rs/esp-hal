@@ -263,9 +263,8 @@ jobs:
             {
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "matrix": "quick",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": "",
+              "chips": "esp32c6 esp32s3",
               "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
@@ -350,9 +349,8 @@ jobs:
             {
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "matrix": "full",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": "",
+              "chips": "esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4",
               "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
@@ -463,7 +461,6 @@ jobs:
             {
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "matrix": "chips",
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "${{ steps.parse.outputs.chips }}",
               "tests": "${{ steps.parse-tests.outputs.tests }}"
