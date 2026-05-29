@@ -104,12 +104,13 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        ErasedTxChannel,
         LcdDmaTxChannel,
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
@@ -131,7 +132,7 @@ pub enum ConfigError {
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, AhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }

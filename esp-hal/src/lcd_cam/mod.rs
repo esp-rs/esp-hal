@@ -5,40 +5,6 @@
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
-pub mod cam;
-pub mod lcd;
-
-/// DMA TX channel trait for LCD (I8080, DPI) peripherals.
-///
-/// Implemented for every TX-capable channel type that can serve the LCD module.
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used as a TX channel for LCD",
-    label = "This DMA channel"
-)]
-pub trait LcdDmaTxChannel<'d>:
-    Into<crate::dma::AhbGdmaTxChannel<'d>> + crate::private::Sealed
-{
-}
-
-/// DMA RX channel trait for the Camera peripheral.
-///
-/// Implemented for every RX-capable channel type that can serve the Camera module.
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used as an RX channel for Camera",
-    label = "This DMA channel"
-)]
-pub trait CamDmaRxChannel<'d>:
-    Into<crate::dma::AhbGdmaRxChannel<'d>> + crate::private::Sealed
-{
-}
-
-for_each_peripheral! {
-    (dma_eligible LCD_CAM, $name:ident, $id:literal, "AHB_GDMA") => {
-        impl<'d> LcdDmaTxChannel<'d> for crate::dma::AhbGdmaTxChannel<'d> {}
-        impl<'d> CamDmaRxChannel<'d> for crate::dma::AhbGdmaRxChannel<'d> {}
-    };
-}
-
 use core::marker::PhantomData;
 
 use crate::{
@@ -51,6 +17,48 @@ use crate::{
     peripherals::{Interrupt, LCD_CAM},
     system::{Cpu, GenericPeripheralGuard},
 };
+
+pub mod cam;
+pub mod lcd;
+
+/// DMA TX channel trait for LCD (I8080, DPI) peripherals.
+///
+/// Implemented for every TX-capable channel type that can serve the LCD module.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used as a TX channel for LCD",
+    label = "This DMA channel"
+)]
+pub trait LcdDmaTxChannel<'d>: Into<ErasedTxChannel<'d>> + crate::private::Sealed {}
+
+/// DMA RX channel trait for the Camera peripheral.
+///
+/// Implemented for every RX-capable channel type that can serve the Camera module.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used as an RX channel for Camera",
+    label = "This DMA channel"
+)]
+pub trait CamDmaRxChannel<'d>: Into<ErasedRxChannel<'d>> + crate::private::Sealed {}
+
+with_lcd_cam_dma_engine! {
+    ($engine:tt, $any_channel:tt) => {
+        type ErasedTxChannel<'d> = <crate::dma::$any_channel<'d> as crate::dma::DmaChannel>::Tx;
+        type ErasedRxChannel<'d> = <crate::dma::$any_channel<'d> as crate::dma::DmaChannel>::Rx;
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            peri = LCD_CAM,
+            ($peri:path, $ch:path) => {
+                impl<'d> LcdDmaTxChannel<'d> for $ch {}
+                impl<'d> CamDmaRxChannel<'d> for $ch {}
+            }
+        }
+
+        // All channels split into the erased TX/RX channels, so we
+        // must implement the traits only once, outside of the macro.
+        impl<'d> LcdDmaTxChannel<'d> for ErasedTxChannel<'d> {}
+        impl<'d> CamDmaRxChannel<'d> for ErasedRxChannel<'d> {}
+    };
+}
 
 /// Represents a combined LCD and Camera interface.
 pub struct LcdCam<'d, Dm: crate::DriverMode> {

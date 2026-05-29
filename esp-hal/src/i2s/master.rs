@@ -126,6 +126,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
+        DmaChannel,
         DmaError,
         DmaRxBuffer,
         DmaRxInterrupt,
@@ -156,41 +157,47 @@ pub enum I2sInterrupt {
     TxDone,
 }
 
-/// DMA channel trait for I2S master peripherals.
-#[cfg(i2s_driver_supported)]
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with this I2S peripheral",
-    label = "This DMA channel",
-    note = "Use a channel that matches the I2S instance."
-)]
-pub trait I2sMasterDmaChannel<'d, S>: Into<I2sMasterErased<'d>> + crate::private::Sealed {}
+// Hacky implementation until we have per-instance metadata
+macro_rules! for_each_i2s {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2s {
+            $(($pattern) => $code;)*
+        }
 
-#[cfg(dma_kind = "gdma")]
-type I2sMasterErased<'d> = crate::dma::AhbGdmaChannel<'d>;
-#[cfg(dma_kind = "gdma")]
-type I2sMasterTxErased<'d> = crate::dma::AhbGdmaTxChannel<'d>;
-#[cfg(dma_kind = "gdma")]
-type I2sMasterRxErased<'d> = crate::dma::AhbGdmaRxChannel<'d>;
+        #[cfg(soc_has_i2s0)]
+        _for_each_inner_i2s!((I2S0));
 
-#[cfg(dma_kind = "pdma")]
-type I2sMasterErased<'d> = crate::dma::I2sDmaChannel<'d>;
-#[cfg(dma_kind = "pdma")]
-type I2sMasterTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
-#[cfg(dma_kind = "pdma")]
-type I2sMasterRxErased<'d> = crate::dma::I2sDmaRxChannel<'d>;
-
-#[cfg(dma_kind = "gdma")]
-impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::AhbGdmaChannel<'d> {}
-
-#[cfg(dma_kind = "gdma")]
-for_each_dma_channel! {
-    ("AHB_GDMA", $ch:ident) => {
-        impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::peripherals::$ch<'d> {}
+        #[cfg(soc_has_i2s1)]
+        _for_each_inner_i2s!((I2S1));
     };
 }
 
-#[cfg(dma_kind = "pdma")]
-impl<'d> I2sMasterDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {}
+with_i2s_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for I2S master peripherals.
+        ///
+        /// Implemented for each channel type that can serve a particular I2S instance `S`.
+        #[instability::unstable]
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with this I2S peripheral",
+            label = "This DMA channel",
+            note = "Use a channel that matches the I2S instance."
+        )]
+        pub trait I2sMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnyI2s<'d>,
+            peris = for_each_i2s,
+            ($peri:path, $ch:path) => {
+                impl<'d> I2sMasterDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+
+        // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
+        type I2sMasterErased<'d> = crate::dma::$any_channel<'d>;
+    };
+}
 
 impl<'d> I2s<'d, crate::Blocking> {
     /// Construct a new I2s instance.
@@ -1291,7 +1298,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    tx_channel: ChannelTx<Dm, I2sMasterTxErased<'d>>,
+    tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -1354,7 +1361,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    rx_channel: ChannelRx<Dm, I2sMasterRxErased<'d>>,
+    rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -1458,7 +1465,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub tx_channel: ChannelTx<Dm, I2sMasterTxErased<'d>>,
+        pub tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
@@ -1518,7 +1525,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub rx_channel: ChannelRx<Dm, I2sMasterRxErased<'d>>,
+        pub rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,

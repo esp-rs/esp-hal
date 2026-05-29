@@ -1280,6 +1280,7 @@ where
     CH: DmaRxChannel,
 {
     /// Asserts that the channel is compatible with the given peripheral.
+    #[allow(dead_code)]
     pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.rx_impl.runtime_ensure_compatible(peripheral);
     }
@@ -1447,6 +1448,7 @@ where
     CH: DmaTxChannel,
 {
     /// Asserts that the channel is compatible with the given peripheral.
+    #[allow(dead_code)]
     pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.tx_impl.runtime_ensure_compatible(peripheral);
     }

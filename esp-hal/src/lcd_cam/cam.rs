@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{AhbGdmaRxChannel, ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer},
+    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer},
     gpio::{
         InputConfig,
         InputSignal,
@@ -64,7 +64,7 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, calculate_clkm},
+    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -142,7 +142,7 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: LCD_CAM<'d>,
-    rx_channel: ChannelRx<Blocking, AhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Blocking, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 

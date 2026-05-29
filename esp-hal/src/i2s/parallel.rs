@@ -783,6 +783,21 @@ impl Instance for I2S0<'_> {}
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
+// Hacky implementation until we have per-instance metadata
+macro_rules! for_each_i2s {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2s {
+            $(($pattern) => $code;)*
+        }
+
+        #[cfg(soc_has_i2s0)]
+        _for_each_inner_i2s!((I2S0));
+
+        #[cfg(soc_has_i2s1)]
+        _for_each_inner_i2s!((I2S1));
+    };
+}
+
 /// DMA channel trait for I2S peripherals.
 #[diagnostic::on_unimplemented(
     message = "The DMA channel cannot be used with this I2S peripheral",
@@ -796,13 +811,28 @@ pub trait I2sParallelDmaChannel<'d, S>:
 
 type I2sParallelTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
 
-impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaChannel<'d> {}
+with_i2s_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnyI2s<'d>,
+            peris = for_each_i2s,
+            ($peri:path, $ch:path) => {
+                impl<'d> I2sParallelDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+    };
+}
+
+// `impl_dma_channel_trait!` only covers full channels; the TX half must be
+// listed explicitly because the trait erases to `I2sDmaTxChannel`.
 impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaTxChannel<'d> {}
 
-#[cfg(soc_has_i2s0)]
-impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S0<'d>> for crate::dma::I2sDmaChannel<'d> {}
-#[cfg(soc_has_i2s1)]
-impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::I2S1<'d>> for crate::dma::I2sDmaChannel<'d> {}
+for_each_i2s! {
+    ($i2s:ident) => {
+        impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::$i2s<'d>> for crate::dma::I2sDmaTxChannel<'d> {}
+    };
+}
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
     /// Create a new I2S Parallel Interface

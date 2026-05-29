@@ -54,12 +54,13 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{AhbGdmaTxChannel, ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        ErasedTxChannel,
         Instance,
         LCD_DONE_WAKER,
         Lcd,
@@ -84,7 +85,7 @@ pub enum ConfigError {
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, AhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
