@@ -17,10 +17,6 @@ on:
   merge_group:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: write
-
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

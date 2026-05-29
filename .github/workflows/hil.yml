@@ -1,20 +1,18 @@
 name: HIL
 
 run-name: >
-  ${{ github.event_name != 'workflow_dispatch' && 'HIL (merge queue)' ||
-
-      github.event.inputs.pr_number != '' &&
+  ${{ inputs.pr_number != '' &&
       format(
         'HIL for PR #{0} ({1}{2})',
-        github.event.inputs.pr_number,
-        github.event.inputs.chips,
-        github.event.inputs.tests != '' && format('; tests: {0}', github.event.inputs.tests) || ''
+        inputs.pr_number,
+        inputs.chips,
+        inputs.tests != '' && format('; tests: {0}', inputs.tests) || ''
       ) ||
 
       format(
-        'HIL (manual dispatch, {0}{1})',
-        github.event.inputs.chips,
-        github.event.inputs.tests != '' && format('; tests: {0}', github.event.inputs.tests) || ''
+        'HIL ({0}{1})',
+        inputs.chips,
+        inputs.tests != '' && format('; tests: {0}', inputs.tests) || ''
       )
   }}
 
@@ -82,6 +80,11 @@ jobs:
           REQUESTED="${{ inputs.chips }}"
           MATRIX=$(echo "$ALL_CHIPS" | jq -c --arg chips "$REQUESTED" \
             '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+
+          if [ "$(echo "$MATRIX" | jq 'length')" -eq 0 ]; then
+            echo "::error::No valid chips selected from input: '$REQUESTED'"
+            exit 1
+          fi
 
           echo "matrix={\"target\":$(echo "$MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
           echo "Selected chips: $(echo "$MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
