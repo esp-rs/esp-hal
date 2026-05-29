@@ -35,9 +35,6 @@ for_each_dma_engine! {
 }
 
 /// Implemented by peripheral singletons that can be used with a DMA engine.
-///
-/// This trait is sealed and automatically implemented for all DMA-eligible
-/// peripheral singletons via code generation.
 pub trait DmaEligiblePeripheral {
     /// The erased DMA channel type for the engine this peripheral belongs to.
     type ErasedChannel<'a>: DmaChannel;
