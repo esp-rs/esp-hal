@@ -40,6 +40,10 @@ mod delay_async;
 #[cfg(dma_driver_supported)]
 mod dma_macros;
 
+#[path = "misc_non_drivers/dma_buffers.rs"]
+#[cfg(dma_driver_supported)]
+mod dma_buffers;
+
 #[path = "misc_non_drivers/dma_mem2mem.rs"]
 #[cfg(all(dma_driver_supported, dma_supports_mem2mem))]
 mod dma_mem2mem;
