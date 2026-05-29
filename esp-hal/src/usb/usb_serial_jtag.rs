@@ -44,7 +44,7 @@
 //! ### Sending and Receiving Data
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 //!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
@@ -56,7 +56,7 @@
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 //!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //! // The USB Serial/JTAG can be split into separate Transmit and Receive
@@ -73,7 +73,7 @@
 //! ### How to output text using USB Serial/JTAG.
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::{delay::Delay, usb_serial_jtag::UsbSerialJtag, Blocking};
+//! # use esp_hal::{delay::Delay, usb::usb_serial_jtag::UsbSerialJtag, Blocking};
 //!
 //! let delay = Delay::new();
 //!
@@ -91,7 +91,7 @@
 //!
 //! # use critical_section::Mutex;
 //! # use core::{cell::RefCell, fmt::Write};
-//! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
+//! # use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 //! static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!

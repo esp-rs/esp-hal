@@ -1,0 +1,32 @@
+[package]
+name    = "embassy-usb-hid-host-hs"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = "0.10.0"
+embassy-usb-host = { version = "0.1.0", default-features = false }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+log = "0.4"
+
+[features]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-rtos/esp32p4",
+    "esp-hal/esp32p4",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1

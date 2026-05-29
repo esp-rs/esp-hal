@@ -788,6 +788,13 @@ driver_configs![
             fifo_depth_words: u32,
         }
     },
+    UsbOtgHsProperties {
+        driver: usb_otg_hs,
+        name: "USB OTG HS",
+        properties: {
+            fifo_depth_words: u32,
+        }
+    },
     UsbSerialJtagProperties {
         driver: usb_serial_jtag,
         name: "USB Serial/JTAG",

@@ -2,13 +2,8 @@
 //!
 //! This example should be built in release mode.
 //!
-//! The following wiring is assumed:
-//! - ESP32-S2/S3:
-//!   - DP => GPIO20
-//!   - DM => GPIO19
-//! - ESP32-P4:
-//!   - DP => GPIO27
-//!   - DM => GPIO26
+//! The example uses the HS USB port of the ESP32-P4.
+//! This port uses dedicated pins, not GPIOs.
 
 #![no_std]
 #![no_main]
@@ -43,11 +38,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    #[cfg(not(feature = "esp32p4"))]
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
-
-    #[cfg(feature = "esp32p4")]
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
+    let usb = Usb::new_hs(peripherals.USB_HS);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
@@ -57,6 +48,7 @@ async fn main(_spawner: Spawner) {
 
     // Create embassy-usb Config
     let mut config = embassy_usb::Config::new(0x303A, 0x3001);
+    config.max_packet_size_0 = 64;
     config.manufacturer = Some("Espressif");
     config.product = Some("USB-serial example");
     config.serial_number = Some("12345678");
@@ -86,7 +78,8 @@ async fn main(_spawner: Spawner) {
     );
 
     // Create classes on the builder.
-    let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
+    // High-speed requires max packet size to be 512.
+    let mut class = CdcAcmClass::new(&mut builder, &mut state, 512);
 
     // Build the builder.
     let mut usb = builder.build();

@@ -409,6 +409,12 @@ macro_rules! property {
     ("usb_otg.fifo_depth_words", str) => {
         stringify!(200)
     };
+    ("usb_otg_hs.fifo_depth_words") => {
+        896
+    };
+    ("usb_otg_hs.fifo_depth_words", str) => {
+        stringify!(896)
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

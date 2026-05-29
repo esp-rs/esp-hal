@@ -4447,6 +4447,7 @@ impl Chip {
                     "timergroup_driver_supported",
                     "uart_driver_supported",
                     "usb_otg_driver_supported",
+                    "usb_otg_hs_driver_supported",
                     "usb_serial_jtag_driver_supported",
                     "i2c_master_i2c0",
                     "i2c_master_i2c1",
@@ -4550,6 +4551,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
                     "usb_otg_fifo_depth_words=\"200\"",
+                    "usb_otg_hs_fifo_depth_words=\"896\"",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32p4",
@@ -4628,6 +4630,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
                     "cargo:rustc-cfg=usb_otg_driver_supported",
+                    "cargo:rustc-cfg=usb_otg_hs_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=i2c_master_i2c1",
@@ -4731,6 +4734,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
                     "cargo:rustc-cfg=usb_otg_fifo_depth_words=\"200\"",
+                    "cargo:rustc-cfg=usb_otg_hs_fifo_depth_words=\"896\"",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -6814,6 +6818,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_wrap)");
     println!("cargo:rustc-check-cfg=cfg(spi_octal)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
@@ -6930,4 +6935,5 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
+    println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_fifo_depth_words, values(\"896\"))");
 }
