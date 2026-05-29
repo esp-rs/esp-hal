@@ -4443,20 +4443,22 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((MEM2MEM7(unstable)));
         _for_each_inner_peripheral!((MEM2MEM8(unstable)));
         _for_each_inner_peripheral!((PSRAM(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM0, Mem2mem0, 0));
-        _for_each_inner_peripheral!((SPI2, Spi2, 1)); _for_each_inner_peripheral!((UHCI0,
-        Uhci0, 2)); _for_each_inner_peripheral!((I2S0, I2s0, 3));
-        _for_each_inner_peripheral!((MEM2MEM1, Mem2mem1, 4));
-        _for_each_inner_peripheral!((MEM2MEM2, Mem2mem2, 5));
-        _for_each_inner_peripheral!((AES, Aes, 6)); _for_each_inner_peripheral!((SHA,
-        Sha, 7)); _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8));
-        _for_each_inner_peripheral!((PARL_IO, ParlIo, 9));
-        _for_each_inner_peripheral!((MEM2MEM3, Mem2mem3, 10));
-        _for_each_inner_peripheral!((MEM2MEM4, Mem2mem4, 11));
-        _for_each_inner_peripheral!((MEM2MEM5, Mem2mem5, 12));
-        _for_each_inner_peripheral!((MEM2MEM6, Mem2mem6, 13));
-        _for_each_inner_peripheral!((MEM2MEM7, Mem2mem7, 14));
-        _for_each_inner_peripheral!((MEM2MEM8, Mem2mem8, 15));
+        _for_each_inner_peripheral!((MEM2MEM0, Mem2mem0, 0, AhbGdmaChannel));
+        _for_each_inner_peripheral!((SPI2, Spi2, 1, AhbGdmaChannel));
+        _for_each_inner_peripheral!((UHCI0, Uhci0, 2, AhbGdmaChannel));
+        _for_each_inner_peripheral!((I2S0, I2s0, 3, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM1, Mem2mem1, 4, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM2, Mem2mem2, 5, AhbGdmaChannel));
+        _for_each_inner_peripheral!((AES, Aes, 6, AhbGdmaChannel));
+        _for_each_inner_peripheral!((SHA, Sha, 7, AhbGdmaChannel));
+        _for_each_inner_peripheral!((APB_SARADC, ApbSaradc, 8, AhbGdmaChannel));
+        _for_each_inner_peripheral!((PARL_IO, ParlIo, 9, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM3, Mem2mem3, 10, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM4, Mem2mem4, 11, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM5, Mem2mem5, 12, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM6, Mem2mem6, 13, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM7, Mem2mem7, 14, AhbGdmaChannel));
+        _for_each_inner_peripheral!((MEM2MEM8, Mem2mem8, 15, AhbGdmaChannel));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
@@ -4751,12 +4753,15 @@ macro_rules! for_each_peripheral {
         (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
         (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
         (MEM2MEM8(unstable)), (PSRAM(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(MEM2MEM0, Mem2mem0, 0), (SPI2, Spi2,
-        1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1, Mem2mem1, 4), (MEM2MEM2,
-        Mem2mem2, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (PARL_IO,
-        ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4, Mem2mem4, 11), (MEM2MEM5,
-        Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7, Mem2mem7, 14), (MEM2MEM8,
-        Mem2mem8, 15)));
+        _for_each_inner_peripheral!((dma_eligible(MEM2MEM0, Mem2mem0, 0, AhbGdmaChannel),
+        (SPI2, Spi2, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0,
+        3, AhbGdmaChannel), (MEM2MEM1, Mem2mem1, 4, AhbGdmaChannel), (MEM2MEM2, Mem2mem2,
+        5, AhbGdmaChannel), (AES, Aes, 6, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel),
+        (APB_SARADC, ApbSaradc, 8, AhbGdmaChannel), (PARL_IO, ParlIo, 9, AhbGdmaChannel),
+        (MEM2MEM3, Mem2mem3, 10, AhbGdmaChannel), (MEM2MEM4, Mem2mem4, 11,
+        AhbGdmaChannel), (MEM2MEM5, Mem2mem5, 12, AhbGdmaChannel), (MEM2MEM6, Mem2mem6,
+        13, AhbGdmaChannel), (MEM2MEM7, Mem2mem7, 14, AhbGdmaChannel), (MEM2MEM8,
+        Mem2mem8, 15, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

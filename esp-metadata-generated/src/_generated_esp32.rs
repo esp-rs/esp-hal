@@ -4157,11 +4157,13 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((TOUCH(unstable)));
-        _for_each_inner_peripheral!((SPI2, Spi2, 0)); _for_each_inner_peripheral!((I2S0,
-        I2s0, 0)); _for_each_inner_peripheral!((SPI3, Spi3, 1));
-        _for_each_inner_peripheral!((I2S1, I2s1, 1)); _for_each_inner_peripheral!((all(@
-        peri_type #[doc = "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""]
-        #[doc = "<section class=\"warning\">"] #[doc =
+        _for_each_inner_peripheral!((SPI2, Spi2, 0, SpiDmaChannel));
+        _for_each_inner_peripheral!((I2S0, I2s0, 0, I2sDmaChannel));
+        _for_each_inner_peripheral!((SPI3, Spi3, 1, SpiDmaChannel));
+        _for_each_inner_peripheral!((I2S1, I2s1, 1, I2sDmaChannel));
+        _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
@@ -4425,8 +4427,9 @@ macro_rules! for_each_peripheral {
         (UART1), (UART2), (UHCI0(unstable)), (UHCI1(unstable)), (WIFI), (ADC1(unstable)),
         (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (DAC1(unstable)),
         (DAC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
-        (TOUCH(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0),
-        (I2S0, I2s0, 0), (SPI3, Spi3, 1), (I2S1, I2s1, 1)));
+        (TOUCH(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0,
+        SpiDmaChannel), (I2S0, I2s0, 0, I2sDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel),
+        (I2S1, I2s1, 1, I2sDmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

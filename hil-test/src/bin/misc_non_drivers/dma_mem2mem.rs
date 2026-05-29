@@ -2,7 +2,7 @@
 mod tests {
     use esp_hal::{
         Blocking,
-        dma::{DmaError, DmaPeripheral, Mem2Mem},
+        dma::{DmaError, Mem2Mem},
         dma_buffers,
         dma_descriptors,
     };
@@ -19,9 +19,9 @@ mod tests {
             if #[cfg(esp32s2)] {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
             } else if #[cfg(soc_has_mem2mem1)] {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, DmaPeripheral::Mem2mem1);
+                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
             } else {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, DmaPeripheral::Spi2);
+                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
             }
         }
 

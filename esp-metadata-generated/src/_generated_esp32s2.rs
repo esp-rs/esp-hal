@@ -4307,10 +4307,12 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((ULP_RISCV_CORE(unstable)));
-        _for_each_inner_peripheral!((SPI2, Spi2, 0)); _for_each_inner_peripheral!((I2S0,
-        I2s0, 0)); _for_each_inner_peripheral!((AES, Aes, 0));
-        _for_each_inner_peripheral!((SPI3, Spi3, 1)); _for_each_inner_peripheral!((SHA,
-        Sha, 1)); _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        _for_each_inner_peripheral!((SPI2, Spi2, 0, SpiDmaChannel));
+        _for_each_inner_peripheral!((I2S0, I2s0, 0, I2sDmaChannel));
+        _for_each_inner_peripheral!((AES, Aes, 0, CryptoDmaChannel));
+        _for_each_inner_peripheral!((SPI3, Spi3, 1, SpiDmaChannel));
+        _for_each_inner_peripheral!((SHA, Sha, 1, CryptoDmaChannel));
+        _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -4576,7 +4578,9 @@ macro_rules! for_each_peripheral {
         (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
-        Spi2, 0), (I2S0, I2s0, 0), (AES, Aes, 0), (SPI3, Spi3, 1), (SHA, Sha, 1)));
+        Spi2, 0, SpiDmaChannel), (I2S0, I2s0, 0, I2sDmaChannel), (AES, Aes, 0,
+        CryptoDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel), (SHA, Sha, 1,
+        CryptoDmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

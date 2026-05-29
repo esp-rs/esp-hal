@@ -638,7 +638,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
-        let mut dma_peripherals: Vec<(String, u32)> = vec![];
+        let mut dma_peripherals: Vec<(String, u32, proc_macro2::Ident)> = vec![];
 
         let mut stable_peris = vec![];
 
@@ -762,16 +762,23 @@ This pin may be available with certain limitations. Check your hardware to make 
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
             for engine in dma.engines.0.iter() {
+                use convert_case::{Case, Casing};
+                let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
+                let any_channel = format_ident!("{channel}Channel");
                 for instance in &engine.peripheral_instances {
-                    dma_peripherals.push((instance.name.clone(), instance.dma_id));
+                    dma_peripherals.push((
+                        instance.name.clone(),
+                        instance.dma_id,
+                        any_channel.clone(),
+                    ));
                 }
             }
         }
 
-        dma_peripherals.sort_by_key(|(_, dma_id)| *dma_id);
+        dma_peripherals.sort_by_key(|(_, dma_id, _)| *dma_id);
 
         let mut dma_eligible = vec![];
-        for (name, dma_id) in dma_peripherals {
+        for (name, dma_id, any_channel) in dma_peripherals {
             use convert_case::{Boundary, Case, Casing, pattern};
 
             let peri = format_ident!("{}", name);
@@ -785,7 +792,7 @@ This pin may be available with certain limitations. Check your hardware to make 
                 })
                 .to_case(Case::Pascal)
             );
-            dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num });
+            dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num, #any_channel });
         }
 
         generate_for_each_macro(

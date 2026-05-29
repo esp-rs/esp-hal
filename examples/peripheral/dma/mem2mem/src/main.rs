@@ -6,7 +6,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, DmaPeripheral, Mem2Mem},
+    dma::{BurstConfig, Mem2Mem},
     dma_buffers,
     main,
     time::Duration,
@@ -31,9 +31,9 @@ fn main() -> ! {
         if #[cfg(feature = "esp32s2")] {
             let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
         } else if #[cfg(any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3"))] {
-            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, DmaPeripheral::Spi2);
+            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
         } else {
-            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, DmaPeripheral::Mem2mem1);
+            let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
         }
     }
 

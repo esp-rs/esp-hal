@@ -56,7 +56,7 @@ fn main() -> ! {
     let intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, DmaPeripheral::Spi2)
+    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
         .with_descriptors(
             rx_descriptors,
             tx_descriptors,
