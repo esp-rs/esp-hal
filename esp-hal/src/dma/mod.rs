@@ -1279,6 +1279,11 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
+        self.rx_impl.runtime_ensure_compatible(peripheral);
+    }
+
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
@@ -1441,6 +1446,11 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
+    /// Asserts that the channel is compatible with the given peripheral.
+    pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
+        self.tx_impl.runtime_ensure_compatible(peripheral);
+    }
+
     /// Configure the channel priority.
     #[cfg(dma_kind = "gdma")]
     pub fn set_priority(&mut self, priority: DmaPriority) {
