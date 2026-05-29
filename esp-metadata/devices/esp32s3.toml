@@ -305,7 +305,7 @@ max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt"], peripheral_instances = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"], peripheral_instances = [
         { name = "SPI2",       dma_id = 0 },
         { name = "SPI3",       dma_id = 1 },
         { name = "UHCI0",      dma_id = 2 },

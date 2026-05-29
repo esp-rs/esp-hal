@@ -296,7 +296,7 @@ separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 5
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave"], peripheral_instances = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s", "parl_io"], peripheral_instances = [
         { name = "SPI2",       dma_id = 0 },
         { name = "MEM2MEM0",   dma_id = 1 },
         { name = "UHCI0",      dma_id = 2 },

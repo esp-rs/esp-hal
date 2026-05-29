@@ -1359,6 +1359,8 @@ impl Chip {
                     "sha_supports_dma",
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
+                    "uhci_supports_dma",
+                    "i2s_supports_dma",
                     "gpio_version=\"2\"",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
@@ -1579,6 +1581,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
+                    "cargo:rustc-cfg=uhci_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
                     "cargo:rustc-cfg=gpio_version=\"2\"",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
@@ -1937,6 +1941,9 @@ impl Chip {
                     "aes_supports_dma",
                     "sha_supports_dma",
                     "spi_master_supports_dma",
+                    "uhci_supports_dma",
+                    "i2s_supports_dma",
+                    "parl_io_supports_dma",
                     "ecc_separate_jacobian_point_memory",
                     "ecc_has_memory_clock_gate",
                     "ecc_supports_enhanced_security",
@@ -2205,6 +2212,9 @@ impl Chip {
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=spi_master_supports_dma",
+                    "cargo:rustc-cfg=uhci_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
+                    "cargo:rustc-cfg=parl_io_supports_dma",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
                     "cargo:rustc-cfg=ecc_supports_enhanced_security",
@@ -2633,6 +2643,9 @@ impl Chip {
                     "sha_supports_dma",
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
+                    "uhci_supports_dma",
+                    "i2s_supports_dma",
+                    "parl_io_supports_dma",
                     "ecc_zero_extend_writes",
                     "ecc_has_memory_clock_gate",
                     "ecc_has_curve_p192",
@@ -2923,6 +2936,9 @@ impl Chip {
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
+                    "cargo:rustc-cfg=uhci_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
+                    "cargo:rustc-cfg=parl_io_supports_dma",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
                     "cargo:rustc-cfg=ecc_has_curve_p192",
@@ -3304,6 +3320,7 @@ impl Chip {
                     "soc_has_dma_ch1",
                     "sha_supports_dma",
                     "spi_master_supports_dma",
+                    "i2s_supports_dma",
                     "ecc_zero_extend_writes",
                     "ecc_separate_jacobian_point_memory",
                     "ecc_has_memory_clock_gate",
@@ -3517,6 +3534,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=spi_master_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
@@ -3905,6 +3923,9 @@ impl Chip {
                     "sha_supports_dma",
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
+                    "uhci_supports_dma",
+                    "i2s_supports_dma",
+                    "parl_io_supports_dma",
                     "ecc_zero_extend_writes",
                     "ecc_separate_jacobian_point_memory",
                     "ecc_has_memory_clock_gate",
@@ -4162,6 +4183,9 @@ impl Chip {
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
+                    "cargo:rustc-cfg=uhci_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
+                    "cargo:rustc-cfg=parl_io_supports_dma",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
@@ -5118,6 +5142,7 @@ impl Chip {
                     "soc_has_dma_copy",
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
+                    "i2s_supports_dma",
                     "aes_supports_dma",
                     "sha_supports_dma",
                     "gpio_version=\"2\"",
@@ -5349,6 +5374,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_copy",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=gpio_version=\"2\"",
@@ -5799,6 +5825,9 @@ impl Chip {
                     "spi_master_supports_dma",
                     "spi_slave_supports_dma",
                     "rmt_supports_dma",
+                    "uhci_supports_dma",
+                    "i2s_supports_dma",
+                    "lcd_cam_supports_dma",
                     "gpio_version=\"2\"",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
@@ -6063,6 +6092,9 @@ impl Chip {
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
                     "cargo:rustc-cfg=rmt_supports_dma",
+                    "cargo:rustc-cfg=uhci_supports_dma",
+                    "cargo:rustc-cfg=i2s_supports_dma",
+                    "cargo:rustc-cfg=lcd_cam_supports_dma",
                     "cargo:rustc-cfg=gpio_version=\"2\"",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -6683,6 +6715,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch2)");
     println!("cargo:rustc-check-cfg=cfg(aes_supports_dma)");
+    println!("cargo:rustc-check-cfg=cfg(uhci_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count_is_set)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_immediate_stop)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_count)");
@@ -6738,6 +6771,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_can_access_psram)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(parl_io_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ecc_separate_jacobian_point_memory)");
     println!("cargo:rustc-check-cfg=cfg(ecc_has_memory_clock_gate)");
     println!("cargo:rustc-check-cfg=cfg(ecc_supports_enhanced_security)");
@@ -6858,6 +6892,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_dma)");
+    println!("cargo:rustc-check-cfg=cfg(lcd_cam_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_d2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_80m)");

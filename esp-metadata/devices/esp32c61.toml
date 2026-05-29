@@ -385,7 +385,7 @@ max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
-    { name = "AHB_GDMA", drivers = ["sha", "spi_master"], peripheral_instances = [
+    { name = "AHB_GDMA", drivers = ["sha", "spi_master", "i2s"], peripheral_instances = [
         { name = "MEM2MEM0",  dma_id = 0 },
         { name = "SPI2",      dma_id = 1 },
         { name = "MEM2MEM1",  dma_id = 2 },

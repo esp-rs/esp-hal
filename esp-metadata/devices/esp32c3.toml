@@ -269,7 +269,7 @@ gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave"], peripheral_instances = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"], peripheral_instances = [
         { name = "SPI2", dma_id = 0 },
         { name = "UHCI0", dma_id = 2 },
         { name = "I2S0", dma_id = 3 },
