@@ -13,7 +13,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
 
@@ -32,41 +32,85 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
-  get-labels:
-    uses: ./.github/workflows/get-labels.yml
-
-  # Centralized job calculation — decides which downstream jobs run.
+  # Centralized entry point — fetches labels once, decides which downstream
+  # jobs and reusable workflows run.  Every other job/workflow in this file
+  # gates on `calculate` outputs.
   calculate:
-    needs: get-labels
     runs-on: ubuntu-latest
     outputs:
+      labels: ${{ steps.labels.outputs.labels }}
+      packages: ${{ steps.labels.outputs.packages }}
       run-build: ${{ steps.decide.outputs.run-build }}
       run-docs: ${{ steps.decide.outputs.run-docs }}
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
       run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
       run-extras: ${{ steps.decide.outputs.run-extras }}
+      run-hil: ${{ steps.decide.outputs.run-hil }}
+      run-changelog: ${{ steps.decide.outputs.run-changelog }}
+      run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
     steps:
+      - uses: actions/checkout@v6
+
+      - name: Get labels
+        id: labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
+            LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            if [ -n "$PR_NUMBER" ]; then
+              LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
+            fi
+          fi
+
+          PACKAGES=""
+          if [ -n "$LABELS" ]; then
+            PACKAGES=$(echo "$LABELS" \
+              | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
+              | tr '\n' ',' \
+              | sed 's/,$//')
+          fi
+
+          LABELS_SPACE=$(echo "$LABELS" | tr '\n' ' ' | xargs)
+          PACKAGES_SPACE=$(echo "$PACKAGES" | tr ',' ' ')
+
+          echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
+          echo "packages=$PACKAGES_SPACE" >> "$GITHUB_OUTPUT"
+
+          echo "Detected labels: $LABELS_SPACE"
+          echo "Detected packages: $PACKAGES_SPACE"
+
       - name: Decide what to run
         id: decide
         env:
-          LABELS: ${{ needs.get-labels.outputs.labels }}
+          LABELS: ${{ steps.labels.outputs.labels }}
         run: |
           BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
+          HIL=true; CHANGELOG=true; SEMVER=true
 
           if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
             BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
+            HIL=false; SEMVER=false
           fi
+          if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
+          if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
 
           for pair in \
             "run-build=$BUILD" \
             "run-docs=$DOCS" \
             "run-msrv=$MSRV" \
             "run-host-tests=$HOST" \
-            "run-extras=$EXTRAS"; do
+            "run-extras=$EXTRAS" \
+            "run-hil=$HIL" \
+            "run-changelog=$CHANGELOG" \
+            "run-semver-check=$SEMVER"; do
             echo "$pair" >> "$GITHUB_OUTPUT"
           done
 
-          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST extras=$EXTRAS"
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST extras=$EXTRAS hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
 
   # --------------------------------------------------------------------------
   # Build Packages
@@ -113,7 +157,7 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa and Risc-V (esp32c2/c3)
+      - name: Build and Check Xtensa
         if: matrix.group == 'xtensa'
         shell: bash
         run: |
@@ -121,14 +165,14 @@ jobs:
           cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
 
       - name: Build and Check RISC-V
         if: matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
@@ -353,6 +397,36 @@ jobs:
             './**/*.toml'
 
   # --------------------------------------------------------------------------
+  # Reusable workflow calls — gated by calculate outputs
+
+  changelog:
+    needs: calculate
+    if: >
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      needs.calculate.outputs.run-changelog == 'true'
+    uses: ./.github/workflows/changelog.yml
+    with:
+      pr-number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  semver-check:
+    needs: calculate
+    if: needs.calculate.outputs.run-semver-check == 'true'
+    uses: ./.github/workflows/api-baseline-check.yml
+    with:
+      packages: ${{ needs.calculate.outputs.packages }}
+    secrets: inherit
+
+  hil:
+    needs: calculate
+    if: >
+      github.event_name == 'merge_group' &&
+      needs.calculate.outputs.run-hil == 'true'
+    uses: ./.github/workflows/hil.yml
+    secrets: inherit
+
+  # --------------------------------------------------------------------------
   # Gate job for branch protection
   #
   # Branch protection should require this single job instead of individual jobs.
@@ -366,6 +440,9 @@ jobs:
       - msrv
       - host-tests
       - extras
+      - changelog
+      - semver-check
+      - hil
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
