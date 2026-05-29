@@ -97,6 +97,21 @@ latter one overwrites the earlier one.
 Here we need to specify an empty `FEATURES(riscv)` otherwise the xtask would only create the
 `xtensa` configuration, ignoring the other chips.
 
+### `//% CHIP_FEATURES`
+
+A space-separated list of cfg symbols. The test or example will be built for every chip where
+**all** listed symbols are present. Use the exact cfg name as it appears in `#[cfg(...)]`, e.g.
+`i2c_master_driver_supported` or `dma_can_access_psram`.
+
+```
+//% CHIP_FEATURES: wifi_driver_supported
+```
+
+This key behaves like `CHIPS`: it is a filter, and the latter line overwrites the earlier one for
+the same configuration.
+
+When no single symbol covers the desired set, use `CHIPS` with an explicit list instead.
+
 ### `//% TAG`
 
 Used to sort examples, when running `run-example` without naming a specific example.

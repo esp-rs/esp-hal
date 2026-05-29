@@ -124,7 +124,6 @@ impl Metadata {
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
-    excluded_chips: Vec<Chip>,
     name: String,
     cargo_config: Vec<String>,
     features: Vec<String>,
@@ -198,6 +197,28 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
+/// Returns all chips for a `CHIPS` or `CHIP_FEATURES` metadata value.
+fn parse_chips(key: &str, value: &str) -> anyhow::Result<Vec<Chip>> {
+    match key {
+        "CHIP_FEATURES" => {
+            let features: Vec<&str> = value.split_ascii_whitespace().collect();
+            if features.is_empty() {
+                anyhow::bail!("CHIP_FEATURES metadata must list at least one cfg symbol");
+            }
+            Ok(Chip::iter()
+                .filter(|chip| {
+                    let config = Config::for_chip(chip);
+                    features.iter().all(|f| config.contains(f))
+                })
+                .collect())
+        }
+        _ => Ok(value
+            .split_ascii_whitespace()
+            .map(|s| Chip::from_str(s, false).unwrap())
+            .collect()),
+    }
+}
+
 /// Load all examples at the given path, and parse their metadata.
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -243,13 +264,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             };
 
             match meta_line.key.as_str() {
-                // A list of chips that can run the example using the current configuration.
-                "CHIPS" => {
-                    let chips = meta_line
-                        .value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap())
-                        .collect::<Vec<_>>();
+                "CHIPS" | "CHIP_FEATURES" => {
+                    let chips = parse_chips(meta_line.key.as_str(), meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
                 // A list of cargo `--config` configurations.
@@ -342,10 +358,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 meta.chips = all_configuration.chips.clone();
             }
 
-            // Excluded chips are additive: union the "all" exclusions in.
-            meta.excluded_chips
-                .extend_from_slice(&all_configuration.excluded_chips);
-
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
@@ -381,10 +393,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             configuration.features.sort();
 
             for chip in &configuration.chips {
-                // Skip any chips explicitly excluded by EXCLUDE_CHIP.
-                if configuration.excluded_chips.contains(chip) {
-                    continue;
-                }
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),
@@ -415,6 +423,35 @@ struct CargoToml {
     features: HashMap<String, Vec<String>>,
 }
 
+/// Parse the chip set from `//% CHIPS:` / `//% CHIP_FEATURES:` annotations in a source file.
+/// Returns `None` if neither annotation is present.
+fn parse_annotation_chips(text: &str) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
+    let mut found = false;
+    let mut chips: Vec<Chip> = Chip::iter().collect();
+
+    for (line_no, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("//%"))
+    {
+        let meta = parse_meta_line(line)
+            .with_context(|| format!("Failed to parse line {}", line_no + 1))?;
+        match meta.key.as_str() {
+            "CHIPS" | "CHIP_FEATURES" => {
+                found = true;
+                chips = parse_chips(meta.key.as_str(), meta.value.as_str())?;
+            }
+            _ => {}
+        }
+    }
+
+    if !found {
+        return Ok(None);
+    }
+
+    Ok(Some(chips.into_iter().collect()))
+}
+
 /// Load all examples by finding all packages in the given path, and parsing their metadata.
 pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -437,10 +474,35 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let toml = fs::read_to_string(&cargo_toml_path)?;
         let toml: CargoToml = toml_edit::de::from_str(&toml)?;
 
-        let chips = toml
+        let cargo_chips: Vec<Chip> = toml
             .features
             .keys()
-            .filter_map(|chip| Chip::from_str(&chip, true).ok());
+            .filter_map(|k| Chip::from_str(k, true).ok())
+            .collect();
+
+        let annotation_chips = parse_annotation_chips(&text).with_context(|| {
+            format!("Failed to parse annotations in {}", main_rs_path.display())
+        })?;
+
+        // If the annotation requires chips that are not declared in Cargo.toml, bail.
+        if let Some(ref required) = annotation_chips {
+            let missing = required
+                .iter()
+                .filter(|c| !cargo_chips.contains(c))
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                anyhow::bail!(
+                    "{}: chips {missing:?} are required by the annotation but missing from Cargo.toml",
+                    package_path.display()
+                );
+            }
+        }
+
+        let chips = cargo_chips.into_iter().filter(|c| {
+            annotation_chips
+                .as_ref()
+                .map_or(true, |set| set.contains(c))
+        });
 
         for chip in chips {
             examples.push(Metadata {

@@ -493,7 +493,9 @@ impl Config {
 
     /// Does the configuration contain `item`?
     pub fn contains(&self, item: &str) -> bool {
-        self.all().iter().any(|i| i == item)
+        // Normalize the item to match the exact name of the symbols.
+        let normalized = item.replace('.', "_");
+        self.all().iter().any(|i| i.replace('.', "_") == normalized)
     }
 
     pub fn generate_metadata(&self) -> TokenStream {
