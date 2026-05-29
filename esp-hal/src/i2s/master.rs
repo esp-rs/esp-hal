@@ -1741,6 +1741,8 @@ mod private {
                 w.tx_short_sync().bit(config.ws_width == WsWidth::Bit)
             });
 
+            self.regs().conf1().modify(|_, w| w.tx_stop_en().set_bit());
+
             #[cfg(not(esp32))]
             self.regs().conf().modify(|_, w| {
                 // Channel configurations other than Stereo should use same data from DMA
@@ -1829,9 +1831,29 @@ mod private {
         }
 
         fn reset_tx(&self) {
-            self.regs().conf().toggle(|w, bit| {
-                w.tx_reset().bit(bit);
-                w.tx_fifo_reset().bit(bit)
+            self.regs().conf().modify(|_, w| {
+                w.tx_reset().bit(true);
+                w.tx_fifo_reset().bit(true)
+            });
+
+            // looks sus? yes - it does
+            // just toggling the reset bits should be enough but you can verify this
+            // by making this function `#[crate::ram]` (just to make sure cache misses don't make
+            // things look good), commenting this out and run the
+            // `test_i2s_write_one_shot_twice_*` tests ... it will fail on the second
+            // write without this delay, but pass with it. So there you go. (on ESP32 at
+            // least)
+            unsafe {
+                core::arch::asm!(
+                    ".rept 40
+                    nop
+                    .endr"
+                );
+            }
+
+            self.regs().conf().modify(|_, w| {
+                w.tx_reset().bit(false);
+                w.tx_fifo_reset().bit(false)
             });
 
             #[cfg(esp32s2)]
