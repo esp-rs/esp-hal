@@ -59,7 +59,7 @@ jobs:
   build-xtasks:
     needs: get-labels
     if: >
-      !contains(needs.get-labels.outputs.labels, 'skip-ci')
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change')
     name: Build xtasks
     runs-on: ubuntu-latest
 
@@ -103,11 +103,7 @@ jobs:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/xtask
 
-  # NOTE:
-  # `ci.yml` defines a single `build-tests-full-report` job on non-merge-group
-  # events as a PR placeholder. This matrix job performs the real compiles on
-  # merge_group and `/hil full`. `build-tests-full-report` waits for every
-  # matrix leg.
+  # HIL test builds — runs on merge_group and `/hil full`.
   build-tests-full:
     needs: get-labels
     if: >
@@ -362,13 +358,10 @@ jobs:
 
   hil-full:
     if: >
-      !contains(needs.get-labels.outputs.labels, 'skip-ci') &&
-      (
-        github.event_name == 'merge_group' ||
-        (github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.matrix == 'full' &&
-        github.event.inputs.chips == '')
-       )
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.matrix == 'full' &&
+      github.event.inputs.chips == '')
     needs: [build-tests-full-report, build-xtasks, get-labels]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -554,12 +547,3 @@ jobs:
         run: |
           rm -rf tests-${{ matrix.target.soc }} || true
           rm -f xtask || true
-
-  required:
-    needs: get-labels
-    if: >
-      github.event_name == 'merge_group' &&
-      !contains(needs.get-labels.outputs.labels, 'skip-ci')
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "All HIL matrix jobs passed on merge_group."
