@@ -134,6 +134,24 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         }
     }
 
+    // Merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md files.
+    if args.no_dry_run {
+        let modified = crate::commands::release::plan::generate_changelog_draft(workspace, &plan);
+        if modified.is_empty() {
+            println!(
+                "Note: No changelog entries were merged. Run \
+                `cargo xtask release changelog-preview` manually if needed."
+            );
+        } else {
+            println!("Merged changelog entries into the following files:");
+            for path in &modified {
+                println!("  {}", path.display());
+            }
+        }
+    } else {
+        println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
+    }
+
     // Update release plan file
     let plan_source = serde_json::to_string_pretty(&plan).with_context(|| {
         format!(
