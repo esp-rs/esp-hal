@@ -127,6 +127,7 @@ use crate::{
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
         DmaRxInterrupt,

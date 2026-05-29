@@ -100,7 +100,7 @@ use crate::{
     Blocking,
     DriverMode,
     RegisterToggle,
-    dma::{ChannelTx, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
+    dma::{ChannelTx, DmaEligiblePeripheral, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
     gpio::{
         OutputConfig,
         OutputSignal,
@@ -480,7 +480,6 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
 pub trait PrivateInstance: crate::private::Sealed {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
@@ -655,10 +654,6 @@ impl PrivateInstance for I2S0<'_> {
         crate::system::Peripheral::I2s0
     }
 
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        crate::dma::DmaPeripheral::I2S0
-    }
-
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S0O_WS
     }
@@ -710,10 +705,6 @@ impl PrivateInstance for I2S1<'_> {
         crate::system::Peripheral::I2s1
     }
 
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        crate::dma::DmaPeripheral::I2S1
-    }
-
     fn ws_signal(&self) -> OutputSignal {
         OutputSignal::I2S1O_WS
     }
@@ -758,10 +749,6 @@ impl PrivateInstance for I2S1<'_> {
 }
 
 impl PrivateInstance for AnyI2s<'_> {
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        super::AnyI2s::dma_peripheral(self)
-    }
-
     delegate::delegate! {
         to match &self.0 {
             super::any::Inner::I2s0(i2s) => i2s,

@@ -45,10 +45,10 @@ pub(crate) struct ChannelState {
     pub(crate) rx_waker: AtomicWaker,
 
     /// Whether the TX half is currently in async mode.
-    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
 
     /// Whether the RX half is currently in async mode.
-    pub(crate) rx_is_async: portable_atomic::AtomicBool,
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
 }
 
 pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
@@ -65,7 +65,7 @@ impl CopyDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for CopyDmaRxChannel<'d> {}
+impl DmaRxChannel for CopyDmaRxChannel<'_> {}
 
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
@@ -79,7 +79,7 @@ impl CopyDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for CopyDmaTxChannel<'d> {}
+impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
     #[allow(private_interfaces)]
@@ -242,13 +242,13 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().tx_is_async.load(Ordering::Acquire)
+        self.0.state().tx_async_flag.load(Ordering::Acquire)
     }
 
     fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .tx_is_async
+            .tx_async_flag
             .store(is_async, Ordering::Release);
     }
 }
@@ -398,14 +398,14 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().rx_is_async.load(Ordering::Relaxed)
+        self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .rx_is_async
-            .store(_is_async, Ordering::Relaxed);
+            .rx_async_flag
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
@@ -430,8 +430,8 @@ impl DMA_COPY<'_> {
         static STATE: ChannelState = ChannelState {
             tx_waker: AtomicWaker::new(),
             rx_waker: AtomicWaker::new(),
-            tx_is_async: AtomicBool::new(false),
-            rx_is_async: AtomicBool::new(false),
+            tx_async_flag: AtomicBool::new(false),
+            rx_async_flag: AtomicBool::new(false),
         };
         &STATE
     }

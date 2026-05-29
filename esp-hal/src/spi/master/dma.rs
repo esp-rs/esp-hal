@@ -21,6 +21,7 @@ use crate::{
         CHUNK_SIZE,
         Channel,
         DmaDescriptor,
+        DmaEligiblePeripheral,
         DmaRxBuf,
         DmaRxBuffer,
         DmaTxBuf,
@@ -42,6 +43,40 @@ use crate::{
 use crate::{dma::ManualWritebackBuffer, soc::is_slice_in_psram};
 
 const MAX_DMA_SIZE: usize = 32736;
+
+impl<'d> Spi<'d, Blocking> {
+    #[doc_replace(
+        "dma_channel" => {
+            cfg(dma_kind = "pdma") => "DMA_SPI2",
+            cfg(dma_kind = "gdma") => "DMA_CH0",
+        }
+    )]
+    /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    ///
+    /// let mut spi_dma = Spi::new(
+    ///     peripherals.SPI2,
+    ///     Config::default()
+    ///         .with_frequency(Rate::from_khz(100))
+    ///         .with_mode(Mode::_0),
+    /// )?
+    /// .with_dma(peripherals.__dma_channel__);
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn with_dma(
+        self,
+        channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>,
+    ) -> SpiDma<'d, crate::Blocking> {
+        SpiDma::new_from_spi(self, channel.into())
+    }
+}
 
 #[doc_replace(
     "dma_channel" => {
@@ -217,7 +252,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
     fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(spi.info().dma_peripheral);
+        channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
 
         for_each_spi_master!((all $($inst:tt),*) => {
             const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
@@ -793,6 +828,7 @@ where
         DmaDriver {
             driver: self.driver(),
             state: self.spi().dma_state(),
+            dma_peripheral: self.spi.spi.dma_peripheral(),
         }
     }
 
@@ -1582,6 +1618,7 @@ where
 
 pub(super) struct DmaDriver {
     driver: Driver,
+    dma_peripheral: crate::dma::DmaPeripheral,
     state: &'static DmaState,
 }
 
@@ -1649,7 +1686,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .rx
-                    .prepare_transfer(self.driver.info.dma_peripheral, rx_buffer)
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)
                     .and_then(|_| channel.rx.start_transfer())?;
             }
         } else {
@@ -1671,7 +1708,7 @@ impl DmaDriver {
             unsafe {
                 channel
                     .tx
-                    .prepare_transfer(self.driver.info.dma_peripheral, tx_buffer)
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)
                     .and_then(|_| channel.tx.start_transfer())?;
             }
         }
@@ -1837,37 +1874,5 @@ with_spi_master_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
-
-        impl<'d> Spi<'d, crate::Blocking> {
-            #[doc_replace(
-                "dma_channel" => {
-                    cfg(dma_kind = "pdma") => "DMA_SPI2",
-                    cfg(dma_kind = "gdma") => "DMA_CH0",
-                }
-            )]
-            /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
-            ///
-            /// ```rust, no_run
-            /// # {before_snippet}
-            /// use esp_hal::spi::{
-            ///     Mode,
-            ///     master::{Config, Spi},
-            /// };
-            ///
-            /// let mut spi_dma = Spi::new(
-            ///     peripherals.SPI2,
-            ///     Config::default()
-            ///         .with_frequency(Rate::from_khz(100))
-            ///         .with_mode(Mode::_0),
-            /// )?
-            /// .with_dma(peripherals.__dma_channel__);
-            /// # {after_snippet}
-            /// ```
-            #[instability::unstable]
-            pub fn with_dma(self, channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>) -> SpiDma<'d, crate::Blocking>
-            {
-                SpiDma::new_from_spi(self, channel.into())
-            }
-        }
     };
 }

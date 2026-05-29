@@ -123,23 +123,11 @@ use core::{
 use enumset::{EnumSet, EnumSetType};
 use private::*;
 
-/// DMA channel trait for the PARL_IO peripheral.
-///
-/// Implemented for every channel type capable of serving PARL_IO.
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with PARL_IO",
-    label = "This DMA channel"
-)]
-pub trait ParlIoDmaChannel<'d>: DmaChannel + Into<AhbGdmaChannel<'d>> {}
-
 use crate::{
     Async,
     Blocking,
     DriverMode,
     dma::{
-        AhbGdmaChannel,
-        AhbGdmaRxChannel,
-        AhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -942,7 +930,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Dm, ErasedTxChannel<'d>>,
     _guard: ParlIoTxGuard,
 }
 
@@ -992,7 +980,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: ParlIoRxGuard,
 }
 
@@ -1501,7 +1489,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
+    tx_channel: ChannelTx<Dm, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -1510,7 +1498,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
+    rx_channel: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -2132,6 +2120,15 @@ impl Drop for ParlIoRxGuard {
 
 with_parl_io_dma_engine! {
     ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for the PARL_IO peripheral.
+        ///
+        /// Implemented for every channel type capable of serving PARL_IO.
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with PARL_IO",
+            label = "This DMA channel"
+        )]
+        pub trait ParlIoDmaChannel<'d>: DmaChannel + Into<ErasedChannel<'d>> {}
+
         crate::macros::impl_dma_channel_trait! {
             $engine,
             peri = PARL_IO,
@@ -2139,5 +2136,9 @@ with_parl_io_dma_engine! {
                 impl<'d> ParlIoDmaChannel<'d> for $ch {}
             }
         }
+
+        type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
+        type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
+        type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
     };
 }

@@ -364,6 +364,7 @@ pub mod dma {
         dma::{
             Channel,
             DmaDescriptor,
+            DmaEligiblePeripheral,
             DmaError,
             DmaRxBuffer,
             DmaTxBuffer,
@@ -417,7 +418,7 @@ pub mod dma {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
             let channel = Channel::new(channel.into());
-            channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::AES);
+            channel.runtime_ensure_compatible(self.aes.dma_peripheral());
             AesDma { aes: self, channel }
         }
     }
@@ -460,7 +461,7 @@ pub mod dma {
             TXBUF: DmaTxBuffer,
             RXBUF: DmaRxBuffer,
         {
-            let peri = crate::dma::DmaPeripheral::AES;
+            let peri = self.aes.aes.dma_peripheral();
 
             if let Err(error) = unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
                 .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })

@@ -84,15 +84,6 @@
 //! ```
 // TODO add support for PDMA and multiple UHCI for 32/S2 support
 
-/// DMA channel trait for UHCI (UART DMA) peripherals.
-///
-/// Implemented for every channel type capable of serving UHCI.
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel cannot be used with UHCI",
-    label = "This DMA channel"
-)]
-pub trait UhciDmaChannel<'d>: DmaChannel + Into<AhbGdmaChannel<'d>> {}
-
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -105,13 +96,11 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
-        AhbGdmaChannel,
-        AhbGdmaRxChannel,
-        AhbGdmaTxChannel,
         Channel,
         ChannelRx,
         ChannelTx,
         DmaChannel,
+        DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
         DmaTxBuffer,
@@ -156,10 +145,20 @@ crate::any_peripheral! {
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
     fn register_block(&self) -> &uhci0::RegisterBlock {
-        match &self.0 {
-            any::Inner::Uhci0(x) => x.register_block(),
-        }
+        any::delegate!(self, uhci => { uhci.register_block() })
     }
+}
+
+with_uhci_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        impl DmaEligiblePeripheral for AnyUhci<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, uhci => { uhci.dma_peripheral() })
+            }
+        }
+    };
 }
 
 /// A configuration error.
@@ -264,7 +263,7 @@ where
     uart: Uart<'d, Dm>,
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     uhci_per: AnyUhci<'static>,
-    channel: Channel<Dm, AhbGdmaChannel<'d>>,
+    channel: Channel<Dm, ErasedChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -392,7 +391,7 @@ impl<'d> Uhci<'d, Blocking> {
         let guard = GenericPeripheralGuard::new();
 
         let channel = Channel::new(channel.into());
-        channel.runtime_ensure_compatible(crate::dma::DmaPeripheral::UHCI0);
+        channel.runtime_ensure_compatible(uhci.dma_peripheral());
 
         let uhci = Uhci {
             uart,
@@ -437,7 +436,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, AhbGdmaTxChannel<'d>>,
+    channel_tx: ChannelTx<Dm, ErasedTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -453,7 +452,7 @@ where
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
-                .prepare_transfer(crate::dma::DmaPeripheral::UHCI0, &mut tx_buffer)
+                .prepare_transfer(self.uhci_per.dma_peripheral(), &mut tx_buffer)
         };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
@@ -483,7 +482,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, AhbGdmaRxChannel<'d>>,
+    channel_rx: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
@@ -499,7 +498,7 @@ where
         {
             let res = unsafe {
                 self.channel_rx
-                    .prepare_transfer(crate::dma::DmaPeripheral::UHCI0, &mut rx_buffer)
+                    .prepare_transfer(self.uhci_per.dma_peripheral(), &mut rx_buffer)
             };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));
@@ -809,6 +808,15 @@ where
 
 with_uhci_dma_engine! {
     ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for UHCI (UART DMA) peripherals.
+        ///
+        /// Implemented for every channel type capable of serving UHCI.
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with UHCI",
+            label = "This DMA channel"
+        )]
+        pub trait UhciDmaChannel<'d>: DmaChannel + Into<ErasedChannel<'d>> {}
+
         crate::macros::impl_dma_channel_trait! {
             $engine,
             peri = UHCI0,
@@ -816,5 +824,9 @@ with_uhci_dma_engine! {
                 impl<'d> UhciDmaChannel<'d> for $ch {}
             }
         }
+
+        type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
+        type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
+        type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
     };
 }

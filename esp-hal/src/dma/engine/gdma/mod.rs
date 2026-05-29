@@ -112,10 +112,10 @@ pub struct AhbGdmaRxChannel<'d>(AhbGdmaChannel<'d>);
 pub struct AhbGdmaTxChannel<'d>(AhbGdmaChannel<'d>);
 
 impl crate::private::Sealed for AhbGdmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for AhbGdmaTxChannel<'d> {}
+impl DmaTxChannel for AhbGdmaTxChannel<'_> {}
 
 impl crate::private::Sealed for AhbGdmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for AhbGdmaRxChannel<'d> {}
+impl DmaRxChannel for AhbGdmaRxChannel<'_> {}
 
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.

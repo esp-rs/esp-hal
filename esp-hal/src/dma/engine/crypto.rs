@@ -46,10 +46,10 @@ pub(crate) struct ChannelState {
     pub(crate) rx_waker: AtomicWaker,
 
     /// Whether the TX half is currently in async mode.
-    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
 
     /// Whether the RX half is currently in async mode.
-    pub(crate) rx_is_async: portable_atomic::AtomicBool,
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
 }
 
 pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
@@ -66,7 +66,7 @@ impl CryptoDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for CryptoDmaRxChannel<'d> {}
+impl DmaRxChannel for CryptoDmaRxChannel<'_> {}
 
 /// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
@@ -80,7 +80,7 @@ impl CryptoDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for CryptoDmaTxChannel<'d> {}
+impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
     #[allow(private_interfaces)]
@@ -269,13 +269,13 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().tx_is_async.load(Ordering::Acquire)
+        self.0.state().tx_async_flag.load(Ordering::Acquire)
     }
 
     fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .tx_is_async
+            .tx_async_flag
             .store(is_async, Ordering::Release);
     }
 }
@@ -455,14 +455,14 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().rx_is_async.load(Ordering::Relaxed)
+        self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .rx_is_async
-            .store(_is_async, Ordering::Relaxed);
+            .rx_async_flag
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
@@ -488,8 +488,8 @@ impl DMA_CRYPTO<'_> {
         static STATE: ChannelState = ChannelState {
             tx_waker: AtomicWaker::new(),
             rx_waker: AtomicWaker::new(),
-            tx_is_async: AtomicBool::new(false),
-            rx_is_async: AtomicBool::new(false),
+            tx_async_flag: AtomicBool::new(false),
+            rx_async_flag: AtomicBool::new(false),
         };
         &STATE
     }

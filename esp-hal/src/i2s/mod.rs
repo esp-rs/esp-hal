@@ -15,13 +15,16 @@ crate::any_peripheral! {
     }
 }
 
-impl AnyI2s<'_> {
-    pub(crate) fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(soc_has_i2s0)]
-            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2S0,
-            #[cfg(soc_has_i2s1)]
-            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2S1,
+with_i2s_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        use crate::dma::DmaEligiblePeripheral;
+
+        impl DmaEligiblePeripheral for AnyI2s<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, i2s => { i2s.dma_peripheral() })
+            }
         }
-    }
+    };
 }

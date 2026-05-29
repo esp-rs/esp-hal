@@ -138,10 +138,6 @@ pub struct Info {
     /// The system peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
-    /// The DMA peripheral identifier for this instance.
-    #[cfg(spi_master_supports_dma)]
-    pub dma_peripheral: crate::dma::DmaPeripheral,
-
     /// Interrupt handler for the asynchronous operations.
     pub async_handler: InterruptHandler,
 
@@ -731,8 +727,6 @@ for_each_spi_master! {
                 static INFO: Info = Info {
                     register_block: crate::peripherals::$peri::regs(),
                     peripheral: crate::system::Peripheral::$sys,
-                    #[cfg(spi_master_supports_dma)]
-                    dma_peripheral: crate::dma::DmaPeripheral::$peri,
                     async_handler: irq_handler,
                     sclk: OutputSignal::$sclk,
                     cs: &[$(OutputSignal::$cs),+],

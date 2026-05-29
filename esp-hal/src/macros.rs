@@ -523,6 +523,7 @@ macro_rules! assign_resources {
 /// ```
 #[doc(hidden)]
 #[rustfmt::skip]
+#[cfg_attr(esp32p4, expect(unused_macros))]
 macro_rules! impl_dma_channel_trait {
     // Single peripheral instance case
     (
@@ -578,4 +579,5 @@ macro_rules! impl_dma_channel_trait {
         }
     };
 }
+#[cfg_attr(esp32p4, expect(unused_imports))]
 pub(crate) use impl_dma_channel_trait;

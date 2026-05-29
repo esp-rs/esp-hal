@@ -41,10 +41,10 @@ pub(crate) struct ChannelState {
     pub(crate) rx_waker: AtomicWaker,
 
     /// Whether the TX half is currently in async mode.
-    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
 
     /// Whether the RX half is currently in async mode.
-    pub(crate) rx_is_async: portable_atomic::AtomicBool,
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
 }
 
 pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
@@ -61,7 +61,7 @@ impl I2sDmaRxChannel<'_> {
 }
 
 impl crate::private::Sealed for I2sDmaRxChannel<'_> {}
-impl<'d> DmaRxChannel for I2sDmaRxChannel<'d> {}
+impl DmaRxChannel for I2sDmaRxChannel<'_> {}
 
 /// The TX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
@@ -75,7 +75,7 @@ impl I2sDmaTxChannel<'_> {
 }
 
 impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
-impl<'d> DmaTxChannel for I2sDmaTxChannel<'d> {}
+impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
 impl RegisterAccess for I2sDmaTxChannel<'_> {
     #[allow(private_interfaces)]
@@ -254,14 +254,14 @@ impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().tx_is_async.load(Ordering::Relaxed)
+        self.0.state().tx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .tx_is_async
-            .store(_is_async, Ordering::Relaxed);
+            .tx_async_flag
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
@@ -422,14 +422,14 @@ impl InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().rx_is_async.load(Ordering::Relaxed)
+        self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
-            .rx_is_async
-            .store(_is_async, Ordering::Relaxed);
+            .rx_async_flag
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
@@ -506,8 +506,8 @@ for_each_dma_channel_peri_pair! {
                 static STATE: ChannelState = ChannelState {
                     tx_waker: AtomicWaker::new(),
                     rx_waker: AtomicWaker::new(),
-                    tx_is_async: portable_atomic::AtomicBool::new(false),
-                    rx_is_async: portable_atomic::AtomicBool::new(false),
+                    tx_async_flag: portable_atomic::AtomicBool::new(false),
+                    rx_async_flag: portable_atomic::AtomicBool::new(false),
                 };
                 &STATE
             }
