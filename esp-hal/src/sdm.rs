@@ -46,6 +46,7 @@ for_each_sdm_channel!(
             #[non_exhaustive]
             pub struct Sdm<'d> {
                 _instance: GPIO_SD<'d>,
+                clock_source: ClockSource,
                 $(
                     #[doc = concat!("Channel ", stringify!($ch), " creator.")]
                     pub [<channel $ch>]: ChannelCreator<$ch>,
@@ -66,10 +67,17 @@ for_each_sdm_channel!(
                 pub fn new_with_config(instance: GPIO_SD<'d>, config: SdmConfig) -> Self {
                     Self {
                         _instance: instance,
+                        clock_source: config.clock_source,
                         $(
                             [<channel $ch>]: ChannelCreator::new(config.clock_source),
                         )*
                     }
+                }
+
+                /// Creates a channel configuration builder using this peripheral's
+                /// clock source.
+                pub const fn channel_config(&self) -> ChannelConfigBuilder {
+                    ChannelConfigBuilder::new(self.clock_source)
                 }
             }
         }
@@ -171,7 +179,7 @@ pub enum Error {
     UnreachableTargetFrequency,
     /// Another SDM channel is already using a different clock source.
     ClockSourceConflict,
-    /// The raw prescaler is outside the hardware range.
+    /// The prescaler is outside the supported range.
     PrescalerOutOfRange,
 }
 
@@ -187,59 +195,32 @@ impl fmt::Display for Error {
 
 impl core::error::Error for Error {}
 
-/// Creates a connected sigma-delta channel.
+/// Sigma-delta channel configuration.
 ///
-/// Channel creators are exposed by [`Sdm`]. Calling [`connect`](Self::connect)
-/// consumes the creator and returns an active [`Channel`], which prevents
-/// accidentally connecting the same channel twice.
-#[derive(Debug)]
-pub struct ChannelCreator<const CHANNEL: usize> {
-    // This is copied from the Sdm-level configuration so partially moved
-    // channel creators still use the shared clock source selected at construction time.
-    // It is intentionally not configurable per channel.
-    clock_source: ClockSource,
-    prescaler: u16,
+/// The hardware stores the prescaler and pulse density in the same register,
+/// so applying a complete channel configuration can update both fields with a
+/// single register write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct ChannelConfig {
+    raw_prescaler: u8,
     pulse_density: i8,
 }
 
-impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
-    const fn new(clock_source: ClockSource) -> Self {
-        Self {
-            clock_source,
-            prescaler: 1,
-            pulse_density: 0,
-        }
-    }
-
-    const fn with_raw_config(clock_source: ClockSource, prescaler: u16, pulse_density: i8) -> Self {
-        Self {
-            clock_source,
-            prescaler,
-            pulse_density,
-        }
-    }
-
-    /// Sets the requested output frequency.
-    ///
-    /// The frequency is converted immediately using the SDM clock source
-    /// selected in [`SdmConfig`].
-    pub fn with_frequency(mut self, frequency: Rate) -> Result<Self, Error> {
-        self.prescaler = prescaler_from_frequency(frequency, self.clock_source)?;
-        Ok(self)
-    }
-
-    /// Sets the raw hardware prescaler.
+impl ChannelConfig {
+    /// Sets the hardware prescaler.
     ///
     /// The hardware divider range is `1..=256`.
     pub fn with_prescaler(mut self, prescaler: u16) -> Result<Self, Error> {
         check_prescaler(prescaler)?;
-        self.prescaler = prescaler;
+        self.raw_prescaler = raw_prescaler(prescaler);
         Ok(self)
     }
 
     /// Sets the pulse density.
     ///
-    /// The value ranges is `-128..=127`
+    /// The value ranges is `-128..=127`.
     pub const fn with_pulse_density(mut self, density: i8) -> Self {
         self.pulse_density = density;
         self
@@ -251,15 +232,92 @@ impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
         self.pulse_density = duty_to_density(duty);
         self
     }
+}
+
+/// Builds a sigma-delta channel configuration.
+///
+/// This builder carries the peripheral-wide clock source so frequencies can be
+/// converted to raw prescaler values without storing clock selection in the
+/// channel configuration itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct ChannelConfigBuilder {
+    clock_source: ClockSource,
+    config: ChannelConfig,
+}
+
+impl ChannelConfigBuilder {
+    const fn new(clock_source: ClockSource) -> Self {
+        Self {
+            clock_source,
+            config: ChannelConfig {
+                raw_prescaler: 0,
+                pulse_density: 0,
+            },
+        }
+    }
+
+    /// Sets the requested output frequency.
+    pub fn with_frequency(mut self, frequency: Rate) -> Result<ChannelConfig, Error> {
+        self.config.raw_prescaler =
+            raw_prescaler(prescaler_from_frequency(frequency, self.clock_source)?);
+        Ok(self.config)
+    }
+
+    /// Sets the hardware prescaler.
+    ///
+    /// The hardware divider range is `1..=256`.
+    pub fn with_prescaler(mut self, prescaler: u16) -> Result<ChannelConfig, Error> {
+        self.config = self.config.with_prescaler(prescaler)?;
+        Ok(self.config)
+    }
+
+    /// Returns the default channel configuration.
+    pub const fn build(self) -> ChannelConfig {
+        self.config
+    }
+}
+
+impl Default for ChannelConfig {
+    fn default() -> Self {
+        Self {
+            raw_prescaler: 0,
+            pulse_density: 0,
+        }
+    }
+}
+
+/// Creates a connected sigma-delta channel.
+///
+/// Channel creators are exposed by [`Sdm`]. Calling [`connect`](Self::connect)
+/// consumes the creator and returns an active [`Channel`], which prevents
+/// accidentally connecting the same channel twice.
+#[derive(Debug)]
+pub struct ChannelCreator<const CHANNEL: usize> {
+    // This is copied from the Sdm-level configuration so partially moved
+    // channel creators still use the shared clock source selected at construction time.
+    // It is intentionally not configurable per channel.
+    clock_source: ClockSource,
+}
+
+impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
+    const fn new(clock_source: ClockSource) -> Self {
+        Self { clock_source }
+    }
 
     /// Configures this channel and connects it to an output pin.
-    pub fn connect<'d>(self, pin: impl PeripheralOutput<'d>) -> Result<Channel<CHANNEL>, Error> {
+    pub fn connect<'d>(
+        self,
+        pin: impl PeripheralOutput<'d>,
+        config: ChannelConfig,
+    ) -> Result<Channel<CHANNEL>, Error> {
         let clock_guard = SdmClockGuard::new(self.clock_source)?;
-        set_prescaler_raw(CHANNEL, self.prescaler);
-        set_pulse_density_raw(CHANNEL, self.pulse_density);
+        write_config_raw(CHANNEL, config);
 
         Ok(Channel {
             clock_source: self.clock_source,
+            config,
             _pin_guard: connect_pin(CHANNEL, pin),
             _clock_guard: clock_guard,
         })
@@ -274,16 +332,24 @@ impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
 #[derive(Debug)]
 pub struct Channel<const CHANNEL: usize> {
     clock_source: ClockSource,
+    config: ChannelConfig,
     _pin_guard: PinGuard,
     _clock_guard: SdmClockGuard,
 }
 
 impl<const CHANNEL: usize> Channel<CHANNEL> {
+    /// Applies a new channel configuration.
+    pub fn apply_config(&mut self, config: &ChannelConfig) {
+        write_config_raw(CHANNEL, *config);
+        self.config = *config;
+    }
+
     /// Sets raw pulse density.
     ///
     /// The value ranges from `-128` to `127`.
     pub fn set_pulse_density(&mut self, density: i8) {
-        set_pulse_density_raw(CHANNEL, density);
+        let config = self.config.with_pulse_density(density);
+        self.apply_config(&config);
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
@@ -292,48 +358,25 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
         self.set_pulse_density(duty_to_density(duty))
     }
 
-    /// Sets raw prescaler.
-    ///
-    /// The hardware divider range is `1..=256`.
-    pub fn set_prescaler(&mut self, prescaler: u16) -> Result<(), Error> {
-        check_prescaler(prescaler)?;
-        set_prescaler_raw(CHANNEL, prescaler);
-        Ok(())
-    }
-
-    /// Sets the output frequency.
-    pub fn set_frequency(&mut self, frequency: Rate) -> Result<(), Error> {
-        let prescaler = prescaler_from_frequency(frequency, self.clock_source)?;
-        self.set_prescaler(prescaler)
-    }
-
-    /// Reads the raw hardware prescaler.
+    /// Reads the hardware prescaler.
     ///
     /// The returned value is in the hardware divider range `1..=256`.
-    pub fn prescaler(&mut self) -> Result<u16, Error> {
-        Ok(prescaler_raw(CHANNEL))
+    pub fn prescaler(&self) -> u16 {
+        self.config.raw_prescaler as u16 + 1
     }
 
     /// Reads the raw pulse density.
     ///
     /// The returned value is in the hardware range `-128..=127`.
-    pub fn pulse_density(&mut self) -> Result<i8, Error> {
-        Ok(pulse_density_raw(CHANNEL))
+    pub fn pulse_density(&self) -> i8 {
+        self.config.pulse_density
     }
 
     /// Disconnects this channel and returns its channel creator.
     pub fn disconnect(self) -> ChannelCreator<CHANNEL> {
         let clock_source = self.clock_source;
-        let prescaler = prescaler_raw(CHANNEL);
-        let pulse_density = pulse_density_raw(CHANNEL);
         drop(self);
-        ChannelCreator::with_raw_config(clock_source, prescaler, pulse_density)
-    }
-}
-
-impl<const CHANNEL: usize> Drop for Channel<CHANNEL> {
-    fn drop(&mut self) {
-        set_pulse_density_raw(CHANNEL, 0);
+        ChannelCreator::new(clock_source)
     }
 }
 
@@ -417,8 +460,12 @@ fn check_prescaler(prescaler: u16) -> Result<(), Error> {
     }
 }
 
+fn raw_prescaler(prescaler: u16) -> u8 {
+    (prescaler - 1) as u8
+}
+
 const fn duty_to_density(duty: u8) -> i8 {
-    (duty as i16 - 128) as i8
+    duty.wrapping_sub(128) as i8
 }
 
 fn configure_clock_source(clock_source: ClockSource) {
@@ -477,53 +524,26 @@ fn configure_clock_source(clock_source: ClockSource) {
     }
 }
 
-fn set_pulse_density_raw(channel: usize, density: i8) {
-    // The register layout is the same conceptually, but ESP32-C5's PAC names
-    // the field `sd_in`; the other supported PACs name it `in`.
+fn write_config_raw(channel: usize, config: ChannelConfig) {
+    // ESP32-C5's PAC names these fields `sd_in`/`sd_prescale`; the other
+    // supported PACs name them `in`/`prescale`.
+    let prescaler = config.raw_prescaler as _;
+    let density = config.pulse_density as _;
     let sd = GPIO_SD::regs();
 
     #[cfg(esp32c5)]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.sd_in().bits(density as _) });
+    sd.sigmadelta(channel).write(|w| unsafe {
+        w.sd_in()
+            .bits(density)
+            .sd_prescale()
+            .bits(prescaler)
+    });
 
     #[cfg(not(esp32c5))]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.in_().bits(density as _) });
-}
-
-fn set_prescaler_raw(channel: usize, prescaler: u16) {
-    // Hardware stores prescaler - 1. ESP32-C5's PAC names the field
-    // `sd_prescale`; the other supported PACs name it `prescale`.
-    let bits = (prescaler - 1) as _;
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.sd_prescale().bits(bits) });
-
-    #[cfg(not(esp32c5))]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.prescale().bits(bits) });
-}
-
-fn pulse_density_raw(channel: usize) -> i8 {
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    return sd.sigmadelta(channel).read().sd_in().bits() as i8;
-
-    #[cfg(not(esp32c5))]
-    return sd.sigmadelta(channel).read().in_().bits() as i8;
-}
-
-fn prescaler_raw(channel: usize) -> u16 {
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    let bits = sd.sigmadelta(channel).read().sd_prescale().bits();
-
-    #[cfg(not(esp32c5))]
-    let bits = sd.sigmadelta(channel).read().prescale().bits();
-
-    bits as u16 + 1
+    sd.sigmadelta(channel).write(|w| unsafe {
+        w.in_()
+            .bits(density)
+            .prescale()
+            .bits(prescaler)
+    });
 }

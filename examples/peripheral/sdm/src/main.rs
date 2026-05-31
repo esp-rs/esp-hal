@@ -18,13 +18,12 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let sdm = Sdm::new(peripherals.GPIO_SD);
-    let mut channel = sdm
-        .channel0
+    let config = sdm
+        .channel_config()
         .with_frequency(Rate::from_khz(500))
         .unwrap()
-        .with_pulse_density(0)
-        .connect(peripherals.GPIO2)
-        .unwrap();
+        .with_pulse_density(0);
+    let mut channel = sdm.channel0.connect(peripherals.GPIO2, config).unwrap();
 
     let delay = Delay::new();
     let mut duty = 0;
