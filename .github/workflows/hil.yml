@@ -115,7 +115,7 @@ jobs:
         if: steps.arch.outputs.xtensa == 'true'
         with:
           buildtargets: esp32,esp32s2,esp32s3
-          default: true
+          default: false
           version: 1.96.0.0
 
       - uses: dtolnay/rust-toolchain@v1
@@ -125,9 +125,15 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      # Cross-compile xtask for HIL runners
-      - name: Install cross-compilation targets
+      # xtask runs on the HIL runners as a host tool. The xtensa/riscv steps
+      # above install esp/nightly only for the firmware test builds (xtask
+      # invokes those via +esp/+nightly), so cross-compile xtask with stable.
+      # Set stable as the job's default explicitly rather than relying on
+      # whichever toolchain the conditional steps happened to leave as default.
+      - name: Install host toolchain for cross-compiling xtask
         run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
           rustup target add aarch64-unknown-linux-gnu
           rustup target add armv7-unknown-linux-gnueabihf
 
