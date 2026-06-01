@@ -519,8 +519,13 @@ impl<'d> SpiDma<'d, Async> {
             }
         }
 
+        let common_length = min(read.len(), write.len());
+        let (read_common, read_remainder) = read.split_at_mut(common_length);
+        let (write_common, write_remainder) = write.split_at(common_length);
+
+        // DmaOperationKind must be determined on the sub-slices actually passed to DMA.
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
+        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
             }
@@ -532,7 +537,7 @@ impl<'d> SpiDma<'d, Async> {
         };
 
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
+        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
             }
@@ -547,10 +552,6 @@ impl<'d> SpiDma<'d, Async> {
         if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
 
         for (read_chunk, write_chunk) in read_common
             .chunks_mut(chunk_size)
@@ -1359,8 +1360,13 @@ aligned, otherwise the driver requires copying the entire buffer."
             }
         }
 
+        let common_length = min(read.len(), write.len());
+        let (read_common, read_remainder) = read.split_at_mut(common_length);
+        let (write_common, write_remainder) = write.split_at(common_length);
+
+        // DmaOperationKind must be determined on the sub-slices actually passed to DMA.
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
+        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
             }
@@ -1372,7 +1378,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         };
 
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
+        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
             }
@@ -1387,10 +1393,6 @@ aligned, otherwise the driver requires copying the entire buffer."
         if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
 
         for (read_chunk, write_chunk) in read_common
             .chunks_mut(chunk_size)
