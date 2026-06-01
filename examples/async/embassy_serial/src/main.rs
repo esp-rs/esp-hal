@@ -4,6 +4,7 @@
 //! writing to and reading from UART.
 
 //% CHIP_FEATURES: uart_driver_supported
+//% EXCLUDE_CHIP: esp32p4
 
 #![no_std]
 #![no_main]

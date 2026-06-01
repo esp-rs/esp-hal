@@ -4,6 +4,7 @@
 //! - Connect GPIO4 and GPIO5
 
 //% CHIP_FEATURES: rmt_driver_supported
+//% EXCLUDE_CHIP: esp32c5
 
 #![no_std]
 #![no_main]

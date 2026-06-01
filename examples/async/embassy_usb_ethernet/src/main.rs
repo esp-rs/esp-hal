@@ -11,6 +11,7 @@
 //! - DM => GPIO19
 
 //% CHIP_FEATURES: usb_otg_driver_supported
+//% EXCLUDE_CHIP: esp32p4
 
 #![no_std]
 #![no_main]
