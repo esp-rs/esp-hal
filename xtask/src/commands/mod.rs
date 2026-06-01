@@ -618,12 +618,44 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         }
     }
 
+    // Ensure required harness firmware is built so the artifact is
+    // self-contained for `run elfs` on the HIL runner. Not needed on Run:
+    // `build_radio_harness` builds harnesses lazily per test.
+    if is_radio_package && matches!(action, CargoAction::Build(_)) {
+        use std::collections::HashSet;
+
+        let mut queued: HashSet<String> = artifact_meta
+            .values()
+            .map(firmware::Metadata::output_file_name)
+            .collect();
+
+        let mut harnesses_to_add: Vec<firmware::Metadata> = Vec::new();
+        for harness in harness_for_artifact.values() {
+            if queued.insert(harness.output_file_name()) {
+                harnesses_to_add.push(harness.clone());
+            }
+        }
+
+        for harness in harnesses_to_add {
+            let command = crate::generate_build_command(
+                &package_path,
+                args.chip,
+                &target,
+                &harness,
+                action.clone(),
+                false,
+                args.toolchain.as_deref(),
+                args.timings,
+                &[],
+            )?;
+            artifact_meta.insert(command.artifact_name.clone(), harness);
+            commands.push(command);
+        }
+    }
+
     let mut failed = Vec::new();
     let built_commands = commands.build(false);
-    let built_artifacts = built_commands
-        .iter()
-        .map(|command| command.artifact_name.clone())
-        .collect::<Vec<_>>();
+    let built_artifacts = artifact_meta.keys().cloned().collect::<Vec<_>>();
 
     let mut built_harness = HashMap::<String, PathBuf>::new();
 
