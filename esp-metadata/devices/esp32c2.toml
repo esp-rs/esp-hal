@@ -57,10 +57,10 @@ peripherals = [
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "MODEM_CLKRST" },
     { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -231,7 +231,10 @@ gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
 engines = [
-    { name = "AHB_GDMA", channels = [
+    { name = "AHB_GDMA", drivers = ["sha", "spi_master", "spi_slave"], peripheral_instances = [
+        { name = "SPI2", dma_id = 0 },
+        { name = "SHA", dma_id = 7 },
+    ], channels = [
         { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
     ] },
 ]
@@ -419,14 +422,12 @@ controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 1
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 version = 3
 fifo_size = 64
 support_status = "supported"
-supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 instances = [
@@ -434,7 +435,6 @@ instances = [
 ]
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]

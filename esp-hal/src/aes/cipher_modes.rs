@@ -53,7 +53,7 @@ impl UnsafeCryptoBuffers {
         self.input.addr() == self.output.addr()
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     pub(crate) unsafe fn byte_add(self, bytes: usize) -> Self {
         UnsafeCryptoBuffers {
             input: unsafe { self.input.byte_add(bytes) },
@@ -182,7 +182,7 @@ impl Ofb {
         self.offset = offset;
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     pub(super) fn flush(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
         let mut offset = self.offset;
         buffer
@@ -247,7 +247,7 @@ impl Ctr {
         self.offset = offset;
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     pub(super) fn flush(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
         let mut offset = self.offset;
         buffer
@@ -369,7 +369,7 @@ impl Cfb128 {
         self.offset = offset;
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     pub(super) fn flush_encrypt(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
         let mut offset = self.offset;
         buffer
@@ -386,7 +386,7 @@ impl Cfb128 {
         flushed
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     pub(super) fn flush_decrypt(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
         let mut offset = self.offset;
         buffer
@@ -424,7 +424,7 @@ impl UnsafeCryptoBuffers {
         }
     }
 
-    #[cfg(aes_dma)]
+    #[cfg(aes_supports_dma)]
     fn first_n(self, n: usize) -> UnsafeCryptoBuffers {
         let len = n.min(self.input.len());
         Self {

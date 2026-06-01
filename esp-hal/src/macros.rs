@@ -483,3 +483,101 @@ macro_rules! assign_resources {
         }
     };
 }
+
+/// Helper macro to implement the relevant DMA channel compatibility trait for peripheral
+/// instances and DMA channel types.
+///
+/// Expected uses:
+///
+/// Drivers that define an AnyPeripheral type:
+///
+/// ```rust, ignore
+/// with_spi_dma_engine! {
+///     ($engine:tt, $any_peri:ident) => {
+///         crate::impl_dma_channel_trait! {
+///             $engine,
+///             any_peri = AnySpi,
+///             peris = for_each_spi_master,
+///             ($peri:path, $ch:path) => {
+///                 impl<'d> SpiMasterDmaChannel<'d, $peri<'d>> for $ch<'d> {}
+///             }
+///         }
+///     }
+/// }
+/// ```
+///
+/// Drivers that do not:
+///
+/// ```rust, ignore
+/// with_aes_dma_engine! {
+///     ($engine:tt, $any_peri:ident) => {
+///         crate::impl_dma_channel_trait! {
+///             $engine,
+///             peri = AES, // no lifetime!
+///             ($peri:path, $ch:path) => {
+///                 impl<'d> AesDmaChannel<'d> for $ch<'d> {}
+///             }
+///         }
+///     }
+/// }
+/// ```
+#[doc(hidden)]
+#[rustfmt::skip]
+#[cfg_attr(esp32p4, expect(unused_macros))]
+macro_rules! impl_dma_channel_trait {
+    // Single peripheral instance case
+    (
+        $dma_engine:tt,
+        peri = $peri:tt,
+        $pattern:tt => $body:tt
+    ) => {
+        macro_rules! impl_dma_channel_trait_inner {
+            ($pattern) => $body;
+        }
+
+        for_each_dma_channel_peri_pair! {
+            ($dma_engine, any_channel = $any_ch:ident, $peri) => {
+                impl_dma_channel_trait_inner! { ( $peri <'d>, $crate::dma::$any_ch<'d>) }
+            };
+            ($dma_engine, $ch:ident, $peri) => {
+                impl_dma_channel_trait_inner! { ( $peri <'d>, $crate::peripherals::$ch<'d>) }
+            };
+        }
+    };
+
+    // Multiple peripheral instances case - implies AnyPeripheral
+    (
+        $dma_engine:tt,
+        any_peri = $any_peri:ty,
+        peris = $for_each_peri_macro:ident,
+        $pattern:tt => $body:tt
+    ) => {
+        macro_rules! impl_dma_channel_trait_inner {
+            ($pattern) => $body;
+        }
+
+        for_each_dma_channel! {
+            ($dma_engine, any_channel = $any_ch:ident) => {
+                impl_dma_channel_trait_inner! { ($any_peri, $crate::dma::$any_ch<'d>) }
+            };
+            ($dma_engine, $ch:ident) => {
+                impl_dma_channel_trait_inner! { ($any_peri, $crate::peripherals::$ch<'d>) }
+            };
+        }
+
+        $for_each_peri_macro! {
+            ($peri:ident) => {
+                for_each_dma_channel_peri_pair! {
+                    ($dma_engine, any_channel = $any_ch:ident, $peri) => {
+                        impl_dma_channel_trait_inner! { ($crate::peripherals::$peri<'d>, $crate::dma::$any_ch<'d>) }
+                    };
+                    ($dma_engine, $ch:ident, $peri) => {
+                        impl_dma_channel_trait_inner! { ($crate::peripherals::$peri<'d>, $crate::peripherals::$ch<'d>) }
+                    };
+                }
+            };
+        }
+    };
+}
+#[cfg_attr(esp32p4, expect(unused_imports))]
+pub(crate) use impl_dma_channel_trait;

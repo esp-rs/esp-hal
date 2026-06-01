@@ -33,7 +33,7 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
-    # { name = "APB_SARADC", dma_peripheral = 8 },
+    # { name = "APB_SARADC" },
     # { name = "AVC" },
     { name = "ASSIST_DEBUG"},
     { name = "CLINT" },
@@ -51,7 +51,7 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
     # { name = "IEEE802154" }, # TODO: add PAC manually later
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -77,12 +77,12 @@ peripherals = [
     { name = "PCR" },
     { name = "PMU" },
     { name = "RNG" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLC" },
     # { name = "SLCHOST" }, TODO: add PAC manually later
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -99,18 +99,18 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
-    { name = "MEM2MEM0", virtual = true, dma_peripheral = 0 },
-    { name = "MEM2MEM1", virtual = true, dma_peripheral = 2 },
-    { name = "MEM2MEM2", virtual = true, dma_peripheral = 4 },
-    { name = "MEM2MEM3", virtual = true, dma_peripheral = 5 },
-    { name = "MEM2MEM4", virtual = true, dma_peripheral = 6 },
-    { name = "MEM2MEM5", virtual = true, dma_peripheral = 9 },
-    { name = "MEM2MEM6", virtual = true, dma_peripheral = 10 },
-    { name = "MEM2MEM7", virtual = true, dma_peripheral = 11 },
-    { name = "MEM2MEM8", virtual = true, dma_peripheral = 12 },
-    { name = "MEM2MEM9", virtual = true, dma_peripheral = 13 },
-    { name = "MEM2MEM10", virtual = true, dma_peripheral = 14 },
-    { name = "MEM2MEM11", virtual = true, dma_peripheral = 15 },
+    { name = "MEM2MEM0", virtual = true },
+    { name = "MEM2MEM1", virtual = true },
+    { name = "MEM2MEM2", virtual = true },
+    { name = "MEM2MEM3", virtual = true },
+    { name = "MEM2MEM4", virtual = true },
+    { name = "MEM2MEM5", virtual = true },
+    { name = "MEM2MEM6", virtual = true },
+    { name = "MEM2MEM7", virtual = true },
+    { name = "MEM2MEM8", virtual = true },
+    { name = "MEM2MEM9", virtual = true },
+    { name = "MEM2MEM10", virtual = true },
+    { name = "MEM2MEM11", virtual = true },
 
     { name = "PSRAM", virtual = true },
 ]
@@ -385,7 +385,23 @@ max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
-    { name = "AHB_GDMA", channels = [
+    { name = "AHB_GDMA", drivers = ["sha", "spi_master", "i2s"], peripheral_instances = [
+        { name = "MEM2MEM0",  dma_id = 0 },
+        { name = "SPI2",      dma_id = 1 },
+        { name = "MEM2MEM1",  dma_id = 2 },
+        { name = "I2S0",      dma_id = 3 },
+        { name = "MEM2MEM2",  dma_id = 4 },
+        { name = "MEM2MEM3",  dma_id = 5 },
+        { name = "MEM2MEM4",  dma_id = 6 },
+        { name = "SHA",       dma_id = 7 },
+        { name = "MEM2MEM5",  dma_id = 9 },
+        { name = "MEM2MEM6",  dma_id = 10 },
+        { name = "MEM2MEM7",  dma_id = 11 },
+        { name = "MEM2MEM8",  dma_id = 12 },
+        { name = "MEM2MEM9",  dma_id = 13 },
+        { name = "MEM2MEM10", dma_id = 14 },
+        { name = "MEM2MEM11", dma_id = 15 },
+    ], channels = [
         { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
         { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
     ] },
@@ -474,7 +490,6 @@ extmem_origin = 0x42000000
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.ecdsa]
@@ -485,13 +500,13 @@ dma_can_access_flash = true
 version = 3
 fifo_size = 64
 support_status = "supported"
-supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 has_clk_pre_div = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
+
 [device.spi_slave]
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },

@@ -44,9 +44,9 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_CTRL" },
-    { name = "APB_SARADC", dma_peripheral = 8 },
+    { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
     { name = "DS" },
@@ -58,19 +58,19 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
-    { name = "I2S1", interrupts = { peri = "I2S1" }, dma_peripheral = 4 },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S1", interrupts = { peri = "I2S1" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
-    { name = "LCD_CAM", dma_peripheral = 5 },
+    { name = "LCD_CAM" },
     { name = "LEDC" },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "PCNT" },
     { name = "PERI_BACKUP" },
-    { name = "RMT", dma_peripheral = 9, clock_group = "RMT" },
+    { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "RTC_CNTL" },
@@ -79,11 +79,11 @@ peripherals = [
     { name = "SDHOST" },
     { name = "SENS" },
     { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3" }, dma_peripheral = 1, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
+    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -92,7 +92,7 @@ peripherals = [
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
-    { name = "UHCI0", dma_peripheral = 2 },
+    { name = "UHCI0" },
     { name = "USB_FS", interrupts = { peri = "USB" } },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "USB_WRAP", hidden = true },
@@ -285,7 +285,6 @@ instances = [
 support_status = "partial"
 has_split_text_registers = true
 endianness_configurable = false
-dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
@@ -306,7 +305,18 @@ max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
-    { name = "GDMA", channels = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"], peripheral_instances = [
+        { name = "SPI2",       dma_id = 0 },
+        { name = "SPI3",       dma_id = 1 },
+        { name = "UHCI0",      dma_id = 2 },
+        { name = "I2S0",       dma_id = 3 },
+        { name = "I2S1",       dma_id = 4 },
+        { name = "LCD_CAM",    dma_id = 5 },
+        { name = "AES",        dma_id = 6 },
+        { name = "SHA",        dma_id = 7 },
+        { name = "APB_SARADC", dma_id = 8 },
+        { name = "RMT",        dma_id = 9 },
+    ], channels = [
         { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
         { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
         { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
@@ -802,7 +812,6 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
-has_dma = true
 
 [device.rsa]
 version = 2
@@ -812,7 +821,6 @@ memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.sdm]
@@ -822,7 +830,6 @@ support_status = { status = "not_supported", issue = 2370 }
 version = 3
 fifo_size = 64
 support_status = "supported"
-supports_dma = true
 has_octal = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
@@ -830,9 +837,9 @@ instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
 ]
+
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },

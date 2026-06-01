@@ -6,13 +6,8 @@ use crate::{
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
-        ChannelInfo,
-        ChannelState,
         DmaChannel,
-        DmaChannelConvert,
-        DmaChannelExt,
         DmaExtMemBKSize,
-        DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -25,15 +20,43 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_COPY, Interrupt},
-    system::Peripheral,
+    system::{Peripheral, PeripheralGuard},
 };
+
+/// Immutable per-channel metadata.
+#[doc(hidden)]
+pub struct ChannelInfo {
+    #[expect(dead_code)]
+    pub(crate) peripheral_interrupt: Interrupt,
+
+    #[expect(dead_code)]
+    pub(crate) async_handler: InterruptHandler,
+
+    /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
+    pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode.
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode.
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
+}
 
 pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
 
 /// The RX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaRxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CopyDmaRxChannel<'d>(CopyDmaChannel<'d>);
 
 impl CopyDmaRxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -47,7 +70,7 @@ impl DmaRxChannel for CopyDmaRxChannel<'_> {}
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaTxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CopyDmaTxChannel<'d>(CopyDmaChannel<'d>);
 
 impl CopyDmaTxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -59,8 +82,9 @@ impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CopyDma))
     }
 
     fn reset(&self) {
@@ -70,10 +94,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
-
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
 
     fn set_link_addr(&self, address: u32) {
         self.regs()
@@ -105,10 +125,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         }
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
         // not supported
@@ -117,6 +133,10 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         false
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
@@ -234,8 +254,9 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CopyDma))
     }
 
     fn reset(&self) {
@@ -245,10 +266,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
-
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
-    }
 
     fn set_link_addr(&self, address: u32) {
         self.regs()
@@ -280,10 +297,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         }
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     #[cfg(dma_ext_mem_configurable_block_size)]
     fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
         // not supported
@@ -292,6 +305,10 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         false
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
@@ -384,34 +401,19 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
         self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
             .rx_async_flag
-            .store(_is_async, Ordering::Relaxed);
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
-impl<'d> DmaChannel for DMA_COPY<'d> {
-    type Rx = CopyDmaRxChannel<'d>;
-    type Tx = CopyDmaTxChannel<'d>;
-    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (
-            CopyDmaRxChannel(unsafe { Self::steal() }),
-            CopyDmaTxChannel(unsafe { Self::steal() }),
-        )
-    }
-}
-impl DmaChannelExt for DMA_COPY<'_> {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CopyDmaRxChannel(unsafe { Self::steal() })
-    }
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CopyDmaTxChannel(unsafe { Self::steal() })
-    }
-}
+/// A type-erased Copy DMA channel.
+pub type CopyDmaChannel<'d> = DMA_COPY<'d>;
+
 impl DMA_COPY<'_> {
-    pub(super) fn info(&self) -> &'static super::ChannelInfo {
+    pub(super) fn info(&self) -> &'static ChannelInfo {
         #[crate::handler(priority = crate::interrupt::Priority::max())]
         fn interrupt_handler() {
             asynch::handle_in_interrupt::<DMA_COPY<'static>>();
@@ -420,11 +422,11 @@ impl DMA_COPY<'_> {
         static INFO: ChannelInfo = ChannelInfo {
             peripheral_interrupt: Interrupt::DMA_COPY,
             async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
+            compatible_peripherals: &[],
         };
         &INFO
     }
-    pub(super) fn state(&self) -> &'static super::ChannelState {
+    pub(super) fn state(&self) -> &'static ChannelState {
         static STATE: ChannelState = ChannelState {
             tx_waker: AtomicWaker::new(),
             rx_waker: AtomicWaker::new(),
@@ -435,13 +437,4 @@ impl DMA_COPY<'_> {
     }
 }
 
-impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaRxChannel<'d> {
-        CopyDmaRxChannel(self)
-    }
-}
-impl<'d> DmaChannelConvert<CopyDmaTxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaTxChannel<'d> {
-        CopyDmaTxChannel(self)
-    }
-}
+crate::dma::impl_channel_common!(CopyDma, DMA_COPY);

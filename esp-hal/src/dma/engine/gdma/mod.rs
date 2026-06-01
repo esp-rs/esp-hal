@@ -16,25 +16,12 @@ use crate::{
     handler,
     interrupt::Priority,
     peripherals::{DMA, Interrupt, pac},
+    system::{Peripheral, PeripheralGuard},
 };
 
 #[cfg_attr(dma_gdma_version = "1", path = "ahb_v1.rs")]
 #[cfg_attr(dma_gdma_version = "2", path = "ahb_v2.rs")]
 mod implementation;
-
-/// Mutable per-channel runtime state (wakers and async-mode flags).
-pub(crate) struct ChannelState {
-    /// Async waker for the TX (out) half of this channel.
-    pub(crate) tx_waker: AtomicWaker,
-    /// Async waker for the RX (in) half of this channel.
-    pub(crate) rx_waker: AtomicWaker,
-    /// Whether the TX half is currently in async mode (shared-interrupt chips only).
-    #[cfg(not(dma_separate_in_out_interrupts))]
-    pub(crate) tx_is_async: portable_atomic::AtomicBool,
-    /// Whether the RX half is currently in async mode (shared-interrupt chips only).
-    #[cfg(not(dma_separate_in_out_interrupts))]
-    pub(crate) rx_is_async: portable_atomic::AtomicBool,
-}
 
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
@@ -48,31 +35,50 @@ pub(crate) struct ChannelInfo {
     pub(crate) isr_in: Option<Interrupt>,
     /// Peripheral interrupt for the TX (out) direction.
     pub(crate) isr_out: Option<Interrupt>,
+    /// List of compatible peripheral IDs for this channel.
+    pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode (shared-interrupt chips only).
+    #[cfg(not(dma_separate_in_out_interrupts))]
+    pub(crate) tx_is_async: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode (shared-interrupt chips only).
+    #[cfg(not(dma_separate_in_out_interrupts))]
+    pub(crate) rx_is_async: portable_atomic::AtomicBool,
 }
 
 /// An arbitrary GDMA channel
-pub struct AnyGdmaChannel<'d> {
+pub struct AhbGdmaChannel<'d> {
     info: &'static ChannelInfo,
     state: &'static ChannelState,
     _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl core::fmt::Debug for AnyGdmaChannel<'_> {
+impl core::fmt::Debug for AhbGdmaChannel<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AnyGdmaChannel")
+        f.debug_struct("AhbGdmaChannel")
             .field("channel", &self.info.channel)
             .finish()
     }
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for AnyGdmaChannel<'_> {
+impl defmt::Format for AhbGdmaChannel<'_> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "AnyGdmaChannel {{ channel: {} }}", self.info.channel)
+        defmt::write!(fmt, "AhbGdmaChannel {{ channel: {} }}", self.info.channel)
     }
 }
 
-impl AnyGdmaChannel<'_> {
+impl AhbGdmaChannel<'_> {
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             info: self.info,
@@ -82,15 +88,15 @@ impl AnyGdmaChannel<'_> {
     }
 }
 
-impl crate::private::Sealed for AnyGdmaChannel<'_> {}
-impl<'d> DmaChannel for AnyGdmaChannel<'d> {
-    type Rx = AnyGdmaRxChannel<'d>;
-    type Tx = AnyGdmaTxChannel<'d>;
+impl crate::private::Sealed for AhbGdmaChannel<'_> {}
+impl<'d> DmaChannel for AhbGdmaChannel<'d> {
+    type Rx = AhbGdmaRxChannel<'d>;
+    type Tx = AhbGdmaTxChannel<'d>;
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
-            AnyGdmaRxChannel(unsafe { self.clone_unchecked() }),
-            AnyGdmaTxChannel(self),
+            AhbGdmaRxChannel(unsafe { self.clone_unchecked() }),
+            AhbGdmaTxChannel(self),
         )
     }
 }
@@ -98,41 +104,22 @@ impl<'d> DmaChannel for AnyGdmaChannel<'d> {
 /// An arbitrary GDMA RX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaRxChannel<'d>(AnyGdmaChannel<'d>);
-
-impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for AnyGdmaRxChannel<'d> {
-    fn degrade(self) -> AnyGdmaRxChannel<'d> {
-        self
-    }
-}
+pub struct AhbGdmaRxChannel<'d>(AhbGdmaChannel<'d>);
 
 /// An arbitrary GDMA TX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyGdmaTxChannel<'d>(AnyGdmaChannel<'d>);
+pub struct AhbGdmaTxChannel<'d>(AhbGdmaChannel<'d>);
 
-impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for AnyGdmaTxChannel<'d> {
-    fn degrade(self) -> AnyGdmaTxChannel<'d> {
-        self
-    }
-}
+impl crate::private::Sealed for AhbGdmaTxChannel<'_> {}
+impl DmaTxChannel for AhbGdmaTxChannel<'_> {}
 
-impl crate::private::Sealed for AnyGdmaTxChannel<'_> {}
-impl DmaTxChannel for AnyGdmaTxChannel<'_> {}
-
-impl crate::private::Sealed for AnyGdmaRxChannel<'_> {}
-impl DmaRxChannel for AnyGdmaRxChannel<'_> {}
-
-impl<CH: DmaChannel, Dm: DriverMode> Channel<Dm, CH> {
-    /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible<P: DmaEligible>(&self, _peripheral: &P) {
-        // No runtime checks; GDMA channels are compatible with any peripheral
-    }
-}
+impl crate::private::Sealed for AhbGdmaRxChannel<'_> {}
+impl DmaRxChannel for AhbGdmaRxChannel<'_> {}
 
 macro_rules! impl_channel {
     // Single shared interrupt: one handler drives both the in and out paths.
-    ($ch:ident, $num:literal, $interrupt_in:ident) => {
+    ($ch:ident, $num:literal, $interrupt_in:ident, compatible = [$($compatible:ident),*]) => {
         use $crate::peripherals::$ch;
         impl $ch<'_> {
             pub(super) fn info() -> &'static ChannelInfo {
@@ -147,6 +134,7 @@ macro_rules! impl_channel {
                     handler_out: None,
                     isr_in: Some(Interrupt::$interrupt_in),
                     isr_out: None,
+                    compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
                 };
                 &INFO
             }
@@ -162,20 +150,20 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaChannel<'d> {
-                AnyGdmaChannel {
-                    info: Self::info(),
-                    state: Self::state(),
+        impl<'d> From<$ch<'d>> for AhbGdmaChannel<'d> {
+            fn from(_ch: $ch<'d>) -> AhbGdmaChannel<'d> {
+                AhbGdmaChannel {
+                    info: $ch::info(),
+                    state: $ch::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
         }
-        crate::dma::impl_channel_common!(AnyGdma, $ch);
+        crate::dma::impl_channel_common!(AhbGdma, $ch);
     };
 
     // Split interrupts: separate handlers for the in and out paths.
-    ($ch:ident, $num:literal, $interrupt_in:ident, $interrupt_out:ident) => {
+    ($ch:ident, $num:literal, $interrupt_in:ident, $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
         use $crate::peripherals::$ch;
         impl $ch<'_> {
             pub(super) fn info() -> &'static ChannelInfo {
@@ -195,6 +183,7 @@ macro_rules! impl_channel {
                     handler_out: Some(interrupt_handler_out),
                     isr_in: Some(Interrupt::$interrupt_in),
                     isr_out: Some(Interrupt::$interrupt_out),
+                    compatible_peripherals: &[$(crate::dma::DmaPeripheral::$compatible.0),*],
                 };
                 &INFO
             }
@@ -208,45 +197,47 @@ macro_rules! impl_channel {
             }
         }
 
-        impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for $ch<'d> {
-            fn degrade(self) -> AnyGdmaChannel<'d> {
-                AnyGdmaChannel {
-                    info: Self::info(),
-                    state: Self::state(),
+        impl<'d> From<$ch<'d>> for AhbGdmaChannel<'d> {
+            fn from(_ch: $ch<'d>) -> AhbGdmaChannel<'d> {
+                AhbGdmaChannel {
+                    info: $ch::info(),
+                    state: $ch::state(),
                     _lifetime: core::marker::PhantomData,
                 }
             }
         }
-        crate::dma::impl_channel_common!(AnyGdma, $ch);
+        crate::dma::impl_channel_common!(AhbGdma, $ch);
     };
+}
+
+// Convert erased channel into erased TX/RX half structs
+impl<'d> From<AhbGdmaChannel<'d>> for AhbGdmaRxChannel<'d> {
+    fn from(this: AhbGdmaChannel<'d>) -> AhbGdmaRxChannel<'d> {
+        AhbGdmaRxChannel(this)
+    }
+}
+
+impl<'d> From<AhbGdmaChannel<'d>> for AhbGdmaTxChannel<'d> {
+    fn from(this: AhbGdmaChannel<'d>) -> AhbGdmaTxChannel<'d> {
+        AhbGdmaTxChannel(this)
+    }
 }
 
 for_each_dma_channel! {
-    ($ch:ident, $num:literal, interrupt = $interrupt:ident) => {
-        impl_channel!($ch, $num, $interrupt);
+    ("AHB_GDMA", $ch:ident, $num:literal, interrupt = $interrupt:ident, compatible = [$($compatible:ident),*]) => {
+        impl_channel!($ch, $num, $interrupt, compatible = [$($compatible),*]);
     };
-    ($ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident) => {
-        impl_channel!($ch, $num, $interrupt_in, $interrupt_out);
-    };
-}
-
-for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
-        crate::dma::impl_dma_eligible! {
-            AnyGdmaChannel {
-                $($peri => $name,)*
-            }
-        }
+    ("AHB_GDMA", $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
+        impl_channel!($ch, $num, $interrupt_in, $interrupt_out, compatible = [$($compatible),*]);
     };
 }
 
-pub(super) fn init_dma_racey() {
+fn init_dma_racey() {
+    // FIXME: reset/clock enable belongs to metadata
+    use crate::RegisterToggle;
     DMA::regs()
         .misc_conf()
-        .modify(|_, w| w.ahbm_rst_inter().set_bit());
-    DMA::regs()
-        .misc_conf()
-        .modify(|_, w| w.ahbm_rst_inter().clear_bit());
+        .toggle(|w, en| w.ahbm_rst_inter().bit(en));
     DMA::regs().misc_conf().modify(|_, w| w.clk_en().set_bit());
 
     implementation::setup();

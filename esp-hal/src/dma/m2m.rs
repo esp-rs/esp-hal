@@ -3,8 +3,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-#[cfg(not(esp32s2))]
-use crate::dma::{AnyGdmaChannel, AnyGdmaRxChannel, AnyGdmaTxChannel, DmaEligible};
+#[cfg(dma_kind = "gdma")]
+use crate::dma::DmaEligiblePeripheral;
 use crate::{
     Async,
     Blocking,
@@ -14,7 +14,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelConvert,
+        DmaChannel,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -26,23 +26,17 @@ use crate::{
         DmaTxInterrupt,
     },
 };
-#[cfg(esp32s2)]
-use crate::{
-    dma::{CopyDmaRxChannel, CopyDmaTxChannel},
-    peripherals::DMA_COPY,
-};
 
+// FIXME: multiple DMA engines support mem2mem, but we don't have code in place to support them.
 cfg_if::cfg_if! {
     if #[cfg(esp32s2)] {
-        type Mem2MemChannel<'d> = DMA_COPY<'d>;
-        type Mem2MemRxChannel<'d> = CopyDmaRxChannel<'d>;
-        type Mem2MemTxChannel<'d> = CopyDmaTxChannel<'d>;
+        type Mem2MemChannel<'d> = crate::dma::CopyDmaChannel<'d>;
     } else {
-        type Mem2MemChannel<'d> = AnyGdmaChannel<'d>;
-        type Mem2MemRxChannel<'d> = AnyGdmaRxChannel<'d>;
-        type Mem2MemTxChannel<'d> = AnyGdmaTxChannel<'d>;
+        type Mem2MemChannel<'d> = crate::dma::AhbGdmaChannel<'d>;
     }
 }
+type Mem2MemRxChannel<'d> = <Mem2MemChannel<'d> as DmaChannel>::Rx;
+type Mem2MemTxChannel<'d> = <Mem2MemChannel<'d> as DmaChannel>::Tx;
 
 /// DMA Memory to Memory pseudo-Peripheral
 ///
@@ -61,17 +55,26 @@ where
 
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
-    pub fn new(
-        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
-        #[cfg(dma_kind = "gdma")] peripheral: impl DmaEligible,
-    ) -> Self {
-        unsafe {
-            Self::new_unsafe(
-                channel,
-                #[cfg(dma_kind = "gdma")]
-                peripheral.dma_peripheral(),
-            )
-        }
+    #[cfg(dma_kind = "pdma")]
+    pub fn new<CH>(channel: CH) -> Self
+    where
+        CH: DmaChannel + Into<Mem2MemChannel<'d>>,
+    {
+        unsafe { Self::new_unsafe(channel) }
+    }
+
+    /// Create a new Mem2Mem instance.
+    #[cfg(dma_kind = "gdma")]
+    pub fn new<CH, P>(channel: CH, peripheral: P) -> Self
+    where
+        CH: DmaChannel + Into<Mem2MemChannel<'d>>,
+        P: DmaEligiblePeripheral<ErasedChannel<'d> = Mem2MemChannel<'d>>,
+    {
+        // FIXME: we also need runtime compatibility checks here.
+        // Some channels **don't** support mem2mem:
+        // - P4 channel 0 (through AhbGdmaChannel)
+        // - S2 SPI3_DMA (through SpiDmaChannel, EDMA engines seem to be M2M capable)
+        unsafe { Self::new_unsafe(channel, peripheral.dma_peripheral()) }
     }
 
     /// Create a new Mem2Mem instance.
@@ -79,12 +82,12 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// # Safety
     ///
     /// You must ensure that you're not using DMA for the same peripheral and
-    /// that you're the only one using the DmaPeripheral.
+    /// that you're the only one using the peripheral.
     pub unsafe fn new_unsafe(
-        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
+        channel: impl DmaChannel + Into<Mem2MemChannel<'d>>,
         #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
-        let channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.into());
 
         cfg_if::cfg_if! {
             if #[cfg(dma_kind = "gdma")] {
@@ -93,7 +96,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
             } else {
                 // The S2's COPY DMA channel doesn't care about this. Once support for other
                 // channels are added, this will need updating.
-                let peripheral = DmaPeripheral::Spi2;
+                let peripheral = DmaPeripheral::SPI2;
             }
         }
 

@@ -283,8 +283,6 @@ driver_configs![
         properties: {
             key_length: AesKeyLength,
             #[serde(default)]
-            dma: bool,
-            #[serde(default)]
             dma_mode: Vec<String>,
             has_split_text_registers: bool,
             endianness_configurable: bool,
@@ -592,8 +590,6 @@ driver_configs![
             #[serde(default)]
             has_rx_demodulation: bool,
             #[serde(default)]
-            has_dma: bool,
-            #[serde(default)]
             has_per_channel_clock: bool,
         }
     },
@@ -639,8 +635,6 @@ driver_configs![
         driver: sha,
         name: "SHA",
         properties: {
-            #[serde(default)]
-            dma: bool,
             #[serde(default)]
             algo: ShaAlgoMap,
         }
@@ -691,8 +685,6 @@ driver_configs![
             #[serde(default)]
             bit_order_is_bool: bool,
             #[serde(default)]
-            supports_dma: bool,
-            #[serde(default)]
             has_octal: bool,
             #[serde(default)]
             has_app_interrupts: bool,
@@ -709,10 +701,7 @@ driver_configs![
     SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
-        properties: {
-            #[serde(default)]
-            supports_dma: bool,
-        }
+        properties: {}
     },
     SysTimerProperties {
         driver: systimer,

@@ -56,7 +56,7 @@ use core::{
 
 use crate::{
     Blocking,
-    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, RxChannelFor},
+    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer},
     gpio::{
         InputConfig,
         InputSignal,
@@ -64,7 +64,7 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, ClockError, calculate_clkm},
+    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
@@ -142,7 +142,7 @@ pub struct Cam<'d> {
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
     lcd_cam: LCD_CAM<'d>,
-    rx_channel: ChannelRx<Blocking, PeripheralRxChannel<LCD_CAM<'d>>>,
+    rx_channel: ChannelRx<Blocking, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
@@ -150,10 +150,11 @@ impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
     pub fn new(
         cam: Cam<'d>,
-        channel: impl RxChannelFor<LCD_CAM<'d>>,
+        channel: impl CamDmaRxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let rx_channel = ChannelRx::new(channel.degrade());
+        let rx_channel = ChannelRx::new(channel.into());
+        rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {
             lcd_cam: cam.lcd_cam,
@@ -414,7 +415,7 @@ impl<'d> Camera<'d> {
         // Start DMA to receive incoming transfer.
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
 

@@ -56,8 +56,8 @@ peripherals = [
     { name = "HINF" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 0 },
-    { name = "I2S1", interrupts = { peri = "I2S1" }, dma_peripheral = 1 },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S1", interrupts = { peri = "I2S1" } },
     { name = "IO_MUX" },
     { name = "LEDC" },
     { name = "MCPWM0", clock_group = "MCPWM" },
@@ -77,16 +77,16 @@ peripherals = [
     { name = "SLCHOST" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA"  }, dma_peripheral = 2, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA"  }, dma_peripheral = 3, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, stable = true },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, stable = true },
     { name = "TIMG0" },
     { name = "TIMG1" },
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
-    { name = "UHCI0", dma_peripheral = 4 },
-    { name = "UHCI1", dma_peripheral = 5 },
+    { name = "UHCI0" },
+    { name = "UHCI1" },
     { name = "WIFI", interrupts = { mac = "WIFI_MAC" }, stable = true },
 
     { name = "ADC1", virtual = true },
@@ -342,13 +342,19 @@ support_status = "partial"
 kind = "pdma"
 supports_mem2mem = false
 engines = [
-    { name = "SPI_DMA", channels = [
-        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA" },
-        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA" },
+    { name = "SPI_DMA", drivers = ["spi_master", "spi_slave"], peripheral_instances = [
+        { name = "SPI2", dma_id = 0 },
+        { name = "SPI3", dma_id = 1 },
+    ], channels = [
+        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
+        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
     ] },
-    { name = "I2S_DMA", channels = [
-        { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0" },
-        { name = "DMA_I2S1", pac = "I2S1", interrupt = "I2S1" },
+    { name = "I2S_DMA", drivers = ["i2s"], peripheral_instances = [
+        { name = "I2S0", dma_id = 0 },
+        { name = "I2S1", dma_id = 1 },
+    ], channels = [
+        { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] },
+        { name = "DMA_I2S1", pac = "I2S1", interrupt = "I2S1", compatible_with = ["I2S1"] },
     ] },
 ]
 
@@ -847,14 +853,12 @@ version = 1
 fifo_size = 64
 bit_order_is_bool = true
 support_status = "supported"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"], cs = ["HSPICS0", "HSPICS1", "HSPICS2"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"], cs = ["VSPICS0", "VSPICS1", "VSPICS2"] },
 ]
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },

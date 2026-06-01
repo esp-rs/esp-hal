@@ -59,23 +59,23 @@ use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fen
 use enumset::{EnumSet, EnumSetType};
 
 pub use self::buffers::*;
-#[cfg(dma_kind = "gdma")]
-pub use self::gdma::*;
 #[cfg(all(any(dma_kind = "gdma", esp32s2), dma_supports_mem2mem))]
 pub use self::m2m::*;
-#[cfg(dma_kind = "pdma")]
-pub use self::pdma::*;
-#[cfg(dma_kind = "pdma")]
-use crate::system::Peripheral;
 use crate::{
     Async,
     Blocking,
     DriverMode,
     interrupt::InterruptHandler,
-    peripherals::Interrupt,
     soc::is_slice_in_dram,
-    system::{self, Cpu},
+    system::{Cpu, PeripheralGuard},
 };
+
+mod buffers;
+#[cfg(dma_supports_mem2mem)]
+mod m2m;
+
+mod engine;
+pub use engine::*;
 
 trait Word: crate::private::Sealed {}
 
@@ -375,19 +375,6 @@ impl DmaDescriptor {
 // Marking this Send also allows DmaBuffer implementations to automatically be
 // Send (where the compiler sees fit).
 unsafe impl Send for DmaDescriptor {}
-
-mod buffers;
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "gdma")] {
-        mod gdma;
-    } else if #[cfg(dma_kind = "pdma")] {
-        mod pdma;
-    } else {
-        compile_error!("Unsupported DMA kind");
-    }
-}
-#[cfg(dma_supports_mem2mem)]
-mod m2m;
 
 /// Kinds of interrupt to listen to.
 #[derive(Debug, EnumSetType)]
@@ -901,22 +888,6 @@ pub enum DmaPriority {
     Priority9 = 9,
 }
 
-for_each_peripheral! {
-    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
-        /// DMA capable peripherals
-        /// The values need to match the TRM
-        #[derive(Debug, Clone, Copy, PartialEq)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub enum DmaPeripheral {
-            $(
-                #[doc = concat!("DMA accesses ", stringify!($name))]
-                $name = $id,
-            )*
-        }
-    };
-}
-
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
@@ -933,15 +904,6 @@ impl From<u32> for Owner {
             _ => Owner::Dma,
         }
     }
-}
-
-#[doc(hidden)]
-#[instability::unstable]
-pub trait DmaEligible {
-    /// The most specific DMA channel type usable by this peripheral.
-    type Dma: DmaChannel;
-
-    fn dma_peripheral(&self) -> DmaPeripheral;
 }
 
 /// Computes the number of descriptors required for a given buffer size with
@@ -1176,196 +1138,6 @@ impl From<ExternalBurstConfig> for DmaExtMemBKSize {
     }
 }
 
-#[doc(hidden)]
-macro_rules! impl_dma_eligible {
-    ([$dma_ch:ident] $name:ident => $dma:ident) => {
-        impl<'d> $crate::dma::DmaEligible for $crate::peripherals::$name<'d> {
-            type Dma = $dma_ch<'d>;
-
-            fn dma_peripheral(&self) -> $crate::dma::DmaPeripheral {
-                $crate::dma::DmaPeripheral::$dma
-            }
-        }
-    };
-
-    (
-        $dma_ch:ident {
-            $($(#[$cfg:meta])? $name:ident => $dma:ident,)*
-        }
-    ) => {
-        $(
-            $(#[$cfg])?
-            $crate::dma::impl_dma_eligible!([$dma_ch] $name => $dma);
-        )*
-    };
-}
-
-pub(crate) use impl_dma_eligible; // TODO: can be removed as soon as DMA is stabilized
-
-/// Helper type to get the DMA (Rx and Tx) channel for a peripheral.
-pub type PeripheralDmaChannel<T> = <T as DmaEligible>::Dma;
-/// Helper type to get the DMA Rx channel for a peripheral.
-pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
-/// Helper type to get the DMA Tx channel for a peripheral.
-pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
-
-#[instability::unstable]
-pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {}
-
-#[instability::unstable]
-pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
-
-/// A description of a DMA Channel.
-pub trait DmaChannel: Sized {
-    /// A description of the RX half of a DMA Channel.
-    type Rx: DmaRxChannel;
-
-    /// A description of the TX half of a DMA Channel.
-    type Tx: DmaTxChannel;
-
-    /// Splits the DMA channel into its RX and TX halves.
-    #[cfg(any(esp32c5, esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
-    fn split(self) -> (Self::Rx, Self::Tx) {
-        // This function is exposed safely on chips that have separate IN and OUT
-        // interrupt handlers.
-        // TODO: this includes the P4 as well.
-        unsafe { self.split_internal(crate::private::Internal) }
-    }
-
-    /// Splits the DMA channel into its RX and TX halves.
-    ///
-    /// # Safety
-    ///
-    /// This function must only be used if the separate halves are used by the
-    /// same peripheral.
-    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx);
-}
-
-#[doc(hidden)]
-pub trait DmaChannelExt: DmaChannel {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt>;
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt>;
-}
-
-#[diagnostic::on_unimplemented(
-    message = "The DMA channel isn't suitable for this peripheral",
-    label = "This DMA channel",
-    note = "Not all channels are useable with all peripherals"
-)]
-#[doc(hidden)]
-pub trait DmaChannelConvert<DEG> {
-    fn degrade(self) -> DEG;
-}
-
-impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
-    fn degrade(self) -> DEG {
-        self
-    }
-}
-
-#[procmacros::doc_replace(
-    "dma_channel" => {
-        cfg(dma_kind = "pdma") => "DMA_SPI2",
-        cfg(dma_kind = "gdma") => "DMA_CH0"
-    },
-    "note" => {
-        cfg(dma_kind = "pdma") => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
-        _ => ""
-    }
-)]
-/// Trait implemented for DMA channels that are compatible with a particular
-/// peripheral.
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaChannel` implementation.
-/// # {note}
-/// ## Example
-///
-/// The following example demonstrates how this trait can be used to only accept
-/// types compatible with a specific peripheral.
-///
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::{
-///     Blocking,
-///     dma::DmaChannelFor,
-///     spi::master::{AnySpi, Config, Instance as SpiInstance, Spi, SpiDma},
-/// };
-///
-/// fn configures_spi_dma<'d>(
-///     spi: Spi<'d, Blocking>,
-///     channel: impl DmaChannelFor<AnySpi<'d>>,
-/// ) -> SpiDma<'d, Blocking> {
-///     spi.with_dma(channel)
-/// }
-///
-/// let spi = Spi::new(peripherals.SPI2, Config::default())?;
-///
-/// let spi_dma = configures_spi_dma(spi, peripherals.__dma_channel__);
-/// # {after_snippet}
-/// ```
-pub trait DmaChannelFor<P: DmaEligible>:
-    DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
-{
-}
-impl<P, CH> DmaChannelFor<P> for CH
-where
-    P: DmaEligible,
-    CH: DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>,
-{
-}
-
-/// Trait implemented for the RX half of split DMA channels that are compatible
-/// with a particular peripheral. Accepts complete DMA channels or split halves.
-///
-/// This trait is similar in use to [`DmaChannelFor`].
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaRxChannel` implementation.
-pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
-impl<P, RX> RxChannelFor<P> for RX
-where
-    P: DmaEligible,
-    RX: DmaChannelConvert<PeripheralRxChannel<P>>,
-{
-}
-
-/// Trait implemented for the TX half of split DMA channels that are compatible
-/// with a particular peripheral. Accepts complete DMA channels or split halves.
-///
-/// This trait is similar in use to [`DmaChannelFor`].
-///
-/// You can use this in places where a peripheral driver would expect a
-/// `DmaTxChannel` implementation.
-pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
-impl<P, TX> TxChannelFor<P> for TX
-where
-    P: DmaEligible,
-    TX: DmaChannelConvert<PeripheralTxChannel<P>>,
-{
-}
-
-// NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
-// `GenericPeripheralGuard`.
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "pdma")] {
-        type PeripheralGuard = Option<system::PeripheralGuard>;
-    } else {
-        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
-    }
-}
-
-fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
-    cfg_if::cfg_if! {
-        if #[cfg(dma_kind = "pdma")] {
-            _ch.peripheral_clock().map(|peri_clock| system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
-        } else {
-            // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
-            system::GenericPeripheralGuard::new_with(init_dma_racey)
-        }
-    }
-}
-
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1376,7 +1148,7 @@ where
 {
     pub(crate) rx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
-    pub(crate) _guard: PeripheralGuard,
+    pub(crate) _guard: Option<PeripheralGuard>,
 }
 
 impl<CH> ChannelRx<Blocking, CH>
@@ -1385,7 +1157,7 @@ where
 {
     /// Creates a new RX channel half.
     pub fn new(rx_impl: CH) -> Self {
-        let _guard = create_guard(&rx_impl);
+        let _guard = rx_impl.enable();
 
         #[cfg(dma_kind = "gdma")]
         // clear the mem2mem mode to avoid failed DMA if this
@@ -1424,7 +1196,7 @@ where
         self.clear_in(EnumSet::all());
 
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
-            for core in crate::system::Cpu::other() {
+            for core in Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             crate::interrupt::bind_handler(interrupt, handler);
@@ -1488,7 +1260,7 @@ where
         self.rx_impl.clear_all();
         self.rx_impl.reset();
         self.rx_impl.set_link_addr(preparation.start as u32);
-        self.rx_impl.set_peripheral(peri as u8);
+        self.rx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1507,6 +1279,12 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
+    /// Asserts that the channel is compatible with the given peripheral.
+    #[allow(dead_code)]
+    pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
+        self.rx_impl.runtime_ensure_compatible(peripheral);
+    }
+
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
         peri: DmaPeripheral,
@@ -1596,7 +1374,7 @@ where
 {
     pub(crate) tx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
-    pub(crate) _guard: PeripheralGuard,
+    pub(crate) _guard: Option<PeripheralGuard>,
 }
 
 impl<CH> ChannelTx<Blocking, CH>
@@ -1605,7 +1383,7 @@ where
 {
     /// Creates a new TX channel half.
     pub fn new(tx_impl: CH) -> Self {
-        let _guard = create_guard(&tx_impl);
+        let _guard = tx_impl.enable();
 
         if let Some(interrupt) = tx_impl.peripheral_interrupt() {
             for cpu in Cpu::all() {
@@ -1638,7 +1416,7 @@ where
         self.clear_out(EnumSet::all());
 
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
-            for core in crate::system::Cpu::other() {
+            for core in Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
             crate::interrupt::bind_handler(interrupt, handler);
@@ -1669,6 +1447,12 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
+    /// Asserts that the channel is compatible with the given peripheral.
+    #[allow(dead_code)]
+    pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
+        self.tx_impl.runtime_ensure_compatible(peripheral);
+    }
+
     /// Configure the channel priority.
     #[cfg(dma_kind = "gdma")]
     pub fn set_priority(&mut self, priority: DmaPriority) {
@@ -1704,7 +1488,7 @@ where
         self.tx_impl.clear_all();
         self.tx_impl.reset();
         self.tx_impl.set_link_addr(preparation.start as u32);
-        self.tx_impl.set_peripheral(peri as u8);
+        self.tx_impl.set_peripheral(peri.0);
 
         Ok(())
     }
@@ -1792,103 +1576,6 @@ where
         self.pending_out_interrupts()
             .contains(DmaTxInterrupt::DescriptorError)
     }
-}
-
-#[doc(hidden)]
-pub trait RegisterAccess: crate::private::Sealed {
-    #[cfg(dma_kind = "pdma")]
-    fn peripheral_clock(&self) -> Option<Peripheral>;
-
-    /// Reset the state machine of the channel and FIFO pointer.
-    fn reset(&self);
-
-    /// Enable/Disable INCR burst transfer for channel reading
-    /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: BurstConfig);
-
-    /// Enable/Disable burst transfer for channel reading
-    /// descriptors in internal RAM.
-    fn set_descr_burst_mode(&self, burst_mode: bool);
-
-    /// The priority of the channel. The larger the value, the higher the
-    /// priority.
-    #[cfg(dma_kind = "gdma")]
-    fn set_priority(&self, priority: DmaPriority);
-
-    /// Select a peripheral for the channel.
-    fn set_peripheral(&self, peripheral: u8);
-
-    /// Set the address of the first descriptor.
-    fn set_link_addr(&self, address: u32);
-
-    /// Enable the channel for data transfer.
-    fn start(&self);
-
-    /// Stop the channel from transferring data.
-    fn stop(&self);
-
-    /// Mount a new descriptor.
-    fn restart(&self);
-
-    /// Configure the bit to enable checking the owner attribute of the
-    /// descriptor.
-    fn set_check_owner(&self, check_owner: Option<bool>);
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
-
-    #[cfg(dma_kind = "pdma")]
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
-
-    #[cfg(dma_can_access_psram)]
-    fn can_access_psram(&self) -> bool;
-}
-
-#[doc(hidden)]
-pub trait RxRegisterAccess: RegisterAccess {
-    #[cfg(dma_kind = "gdma")]
-    fn set_mem2mem_mode(&self, value: bool);
-
-    fn peripheral_interrupt(&self) -> Option<Interrupt>;
-    fn async_handler(&self) -> Option<InterruptHandler>;
-}
-
-#[doc(hidden)]
-pub trait TxRegisterAccess: RegisterAccess {
-    /// Returns whether the DMA's FIFO is empty.
-    fn is_fifo_empty(&self) -> bool;
-
-    /// Enable/disable outlink-writeback
-    fn set_auto_write_back(&self, enable: bool);
-
-    /// Outlink descriptor address when EOF occurs of Tx channel.
-    fn last_dscr_address(&self) -> usize;
-
-    fn peripheral_interrupt(&self) -> Option<Interrupt>;
-    fn async_handler(&self) -> Option<InterruptHandler>;
-}
-
-#[doc(hidden)]
-pub trait InterruptAccess<T: EnumSetType>: crate::private::Sealed {
-    fn listen(&self, interrupts: impl Into<EnumSet<T>>) {
-        self.enable_listen(interrupts.into(), true)
-    }
-    fn unlisten(&self, interrupts: impl Into<EnumSet<T>>) {
-        self.enable_listen(interrupts.into(), false)
-    }
-
-    fn clear_all(&self) {
-        self.clear(EnumSet::all());
-    }
-
-    fn enable_listen(&self, interrupts: EnumSet<T>, enable: bool);
-    fn is_listening(&self) -> EnumSet<T>;
-    fn clear(&self, interrupts: impl Into<EnumSet<T>>);
-    fn pending_interrupts(&self) -> EnumSet<T>;
-    fn waker(&self) -> &'static crate::asynch::AtomicWaker;
-
-    fn is_async(&self) -> bool;
-    fn set_async(&self, is_async: bool);
 }
 
 /// DMA Channel
@@ -1982,6 +1669,18 @@ where
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
         }
+    }
+}
+
+impl<CH, Dm> Channel<Dm, CH>
+where
+    CH: DmaChannel,
+    Dm: DriverMode,
+{
+    /// Asserts that the channel is compatible with the given peripheral.
+    #[instability::unstable]
+    pub fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
+        self.rx.runtime_ensure_compatible(peripheral);
     }
 }
 
@@ -2216,46 +1915,3 @@ pub(crate) mod asynch {
         }
     }
 }
-
-macro_rules! impl_channel_common {
-    ($peri:ident, $instance:ident) => {
-        paste::paste! {
-            impl<'d> DmaChannel for $instance<'d> {
-                type Rx = [<$peri RxChannel>]<'d>;
-                type Tx = [<$peri TxChannel>]<'d>;
-
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    unsafe {
-                        (
-                            [<$peri RxChannel>](Self::steal().degrade()),
-                            [<$peri TxChannel>](Self::steal().degrade()),
-                        )
-                    }
-                }
-            }
-
-            impl<'d> DmaChannelConvert<[<$peri RxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri RxChannel>]<'d> {
-                    [<$peri RxChannel>](self.degrade())
-                }
-            }
-
-            impl<'d> DmaChannelConvert<[<$peri TxChannel>]<'d>> for $instance<'d> {
-                fn degrade(self) -> [<$peri TxChannel>]<'d> {
-                    [<$peri TxChannel>](self.degrade())
-                }
-            }
-
-            impl crate::dma::DmaChannelExt for $instance<'_> {
-                fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri RxChannel>](unsafe { Self::steal() }.degrade())
-                }
-
-                fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri TxChannel>](unsafe { Self::steal() }.degrade())
-                }
-            }
-        }
-    };
-}
-pub(crate) use impl_channel_common;

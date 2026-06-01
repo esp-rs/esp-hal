@@ -1,7 +1,7 @@
 use super::*;
 use crate::RegisterToggle;
 
-impl AnyGdmaTxChannel<'_> {
+impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &pac::dma::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -26,7 +26,12 @@ impl AnyGdmaTxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyGdmaTxChannel<'_> {
+impl RegisterAccess for AhbGdmaTxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+    }
+
     fn reset(&self) {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
@@ -96,9 +101,13 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         true
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
+    }
 }
 
-impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
+impl TxRegisterAccess for AhbGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(esp32s3)] {
@@ -132,7 +141,7 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for AhbGdmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -224,7 +233,7 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 }
 
-impl AnyGdmaRxChannel<'_> {
+impl AhbGdmaRxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::dma::ch::CH {
         DMA::regs().ch(self.0.info.channel as usize)
@@ -249,7 +258,12 @@ impl AnyGdmaRxChannel<'_> {
     }
 }
 
-impl RegisterAccess for AnyGdmaRxChannel<'_> {
+impl RegisterAccess for AhbGdmaRxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+    }
+
     fn reset(&self) {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
@@ -317,9 +331,13 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn can_access_psram(&self) -> bool {
         true
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
+    }
 }
 
-impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
+impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()
@@ -335,7 +353,7 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for AhbGdmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {

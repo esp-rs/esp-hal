@@ -20,15 +20,13 @@ use crate::{
     dma::{
         CHUNK_SIZE,
         Channel,
-        DmaChannelFor,
         DmaDescriptor,
-        DmaEligible,
+        DmaEligiblePeripheral,
         DmaRxBuf,
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
         NoBuffer,
-        PeripheralDmaChannel,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
@@ -72,8 +70,11 @@ impl<'d> Spi<'d, Blocking> {
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new_from_spi(self, channel.degrade())
+    pub fn with_dma(
+        self,
+        channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>,
+    ) -> SpiDma<'d, crate::Blocking> {
+        SpiDma::new_from_spi(self, channel.into())
     }
 }
 
@@ -140,7 +141,7 @@ where
     Dm: DriverMode,
 {
     spi: SpiWrapper<'d>,
-    pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+    pub(crate) channel: Channel<Dm, SpiMasterErased<'d>>,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -249,9 +250,9 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
-    fn new_inner(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+    fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi.spi);
+        channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
 
         for_each_spi_master!((all $($inst:tt),*) => {
             const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
@@ -293,7 +294,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
     pub(super) fn new_from_spi(
         spi_driver: Spi<'d, Blocking>,
-        channel: PeripheralDmaChannel<AnySpi<'d>>,
+        channel: SpiMasterErased<'d>,
     ) -> Self {
         let spi = spi_driver.spi;
 
@@ -826,8 +827,8 @@ where
     fn dma_driver(&self) -> DmaDriver {
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi().dma_peripheral(),
             state: self.spi().dma_state(),
+            dma_peripheral: self.spi.spi.dma_peripheral(),
         }
     }
 
@@ -1663,7 +1664,7 @@ impl DmaDriver {
         tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
-        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+        channel: &mut Channel<Dm, SpiMasterErased<'_>>,
     ) -> Result<(), Error> {
         #[cfg(spi_master_version = "2")]
         {
@@ -1778,21 +1779,6 @@ impl DmaDriver {
     }
 }
 
-impl<'d> DmaEligible for AnySpi<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(dma_kind = "pdma")]
-    type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        let (info, _state) = self.dma_parts();
-        info.dma_peripheral
-    }
-}
-
-struct DmaInfo {
-    dma_peripheral: crate::dma::DmaPeripheral,
-}
 struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
@@ -1837,14 +1823,10 @@ for_each_spi_master!(
     (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
         impl AnySpi<'_> {
             #[inline(always)]
-            fn dma_parts(&self) -> (&'static DmaInfo, &'static DmaState) {
+            fn dma_state(&self) -> &'static DmaState {
                 match &self.0 {
                     $(
                         super::any::Inner::$sys(_spi) => {
-                            static DMA_INFO: DmaInfo = DmaInfo {
-                                dma_peripheral: crate::dma::DmaPeripheral::$sys,
-                            };
-
                             static DMA_STATE: DmaState = DmaState {
                                 tx_transfer_in_progress: Cell::new(false),
                                 rx_transfer_in_progress: Cell::new(false),
@@ -1853,22 +1835,10 @@ for_each_spi_master!(
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                             };
 
-                            (&DMA_INFO, &DMA_STATE)
+                            &DMA_STATE
                         }
                     )*
                 }
-            }
-
-            #[inline(always)]
-            fn dma_state(&self) -> &'static DmaState {
-                let (_, state) = self.dma_parts();
-                state
-            }
-
-            #[inline(always)]
-            fn dma_info(&self) -> &'static DmaInfo {
-                let (info, _) = self.dma_parts();
-                info
             }
         }
     };
@@ -1878,9 +1848,31 @@ impl SpiWrapper<'_> {
     fn dma_state(&self) -> &'static DmaState {
         self.spi.dma_state()
     }
+}
 
-    #[inline(always)]
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        self.spi.dma_peripheral()
-    }
+with_spi_master_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for SPI peripherals.
+        ///
+        /// Implemented for each channel type that can serve a particular SPI instance `S`.
+        #[instability::unstable]
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with this SPI peripheral",
+            label = "This DMA channel",
+            note = "Use a channel that matches the SPI instance."
+        )]
+        pub trait SpiMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnySpi<'d>,
+            peris = for_each_spi_master,
+            ($peri:path, $ch:path) => {
+                impl<'d> SpiMasterDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+
+        // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
+        type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+    };
 }

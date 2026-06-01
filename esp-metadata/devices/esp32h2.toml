@@ -34,8 +34,8 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
-    { name = "APB_SARADC", dma_peripheral = 8 },
+    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
     { name = "DS" },
@@ -49,7 +49,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
     { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -69,7 +69,7 @@ peripherals = [
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
     { name = "OTP_DEBUG" },
-    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, dma_peripheral = 9, clock_group = "PARL_IO" },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU" },
     { name = "PCNT" },
     { name = "PCR" },
@@ -78,11 +78,11 @@ peripherals = [
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", virtual = true }, # a) RNG is LP_PERI in truth. b) we need to offset the rng_data register at runtime for newer revisions.
     { name = "RSA", interrupts = { peri = "RSA" } },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -92,7 +92,7 @@ peripherals = [
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
-    { name = "UHCI0", dma_peripheral = 2 },
+    { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "ADC1", virtual = true },
@@ -100,15 +100,15 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
-    { name = "MEM2MEM0", virtual = true, dma_peripheral = 1 },
-    { name = "MEM2MEM1", virtual = true, dma_peripheral = 4 },
-    { name = "MEM2MEM2", virtual = true, dma_peripheral = 5 },
-    { name = "MEM2MEM3", virtual = true, dma_peripheral = 10 },
-    { name = "MEM2MEM4", virtual = true, dma_peripheral = 11 },
-    { name = "MEM2MEM5", virtual = true, dma_peripheral = 12 },
-    { name = "MEM2MEM6", virtual = true, dma_peripheral = 13 },
-    { name = "MEM2MEM7", virtual = true, dma_peripheral = 14 },
-    { name = "MEM2MEM8", virtual = true, dma_peripheral = 15 },
+    { name = "MEM2MEM0", virtual = true },
+    { name = "MEM2MEM1", virtual = true },
+    { name = "MEM2MEM2", virtual = true },
+    { name = "MEM2MEM3", virtual = true },
+    { name = "MEM2MEM4", virtual = true },
+    { name = "MEM2MEM5", virtual = true },
+    { name = "MEM2MEM6", virtual = true },
+    { name = "MEM2MEM7", virtual = true },
+    { name = "MEM2MEM8", virtual = true },
 ]
 
 clocks = { system_clocks = { clock_tree = [
@@ -277,7 +277,6 @@ instances = [
 support_status = "partial"
 has_split_text_registers = true
 endianness_configurable = false
-dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
@@ -297,7 +296,24 @@ separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 5
 engines = [
-    { name = "AHB_GDMA", channels = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s", "parl_io"], peripheral_instances = [
+        { name = "SPI2",       dma_id = 0 },
+        { name = "MEM2MEM0",   dma_id = 1 },
+        { name = "UHCI0",      dma_id = 2 },
+        { name = "I2S0",       dma_id = 3 },
+        { name = "MEM2MEM1",   dma_id = 4 },
+        { name = "MEM2MEM2",   dma_id = 5 },
+        { name = "AES",        dma_id = 6 },
+        { name = "SHA",        dma_id = 7 },
+        { name = "APB_SARADC", dma_id = 8 },
+        { name = "PARL_IO",    dma_id = 9 },
+        { name = "MEM2MEM3",   dma_id = 10 },
+        { name = "MEM2MEM4",   dma_id = 11 },
+        { name = "MEM2MEM5",   dma_id = 12 },
+        { name = "MEM2MEM6",   dma_id = 13 },
+        { name = "MEM2MEM7",   dma_id = 14 },
+        { name = "MEM2MEM8",   dma_id = 15 },
+    ], channels = [
         { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
         { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
         { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
@@ -595,7 +611,6 @@ memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
@@ -608,15 +623,14 @@ support_status = { status = "not_supported", issue = 5444 }
 version = 3
 fifo_size = 64
 support_status = "supported"
-supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 ]
+
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]

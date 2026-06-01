@@ -40,7 +40,7 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 4 },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
     { name = "DEDICATED_GPIO" },
     { name = "DS" },
@@ -54,7 +54,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 0 },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
     { name = "LEDC" },
@@ -68,11 +68,11 @@ peripherals = [
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 5 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA"  }, dma_peripheral = 1, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA"  }, dma_peripheral = 2, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA"  }, stable = true },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA"  }, stable = true },
     { name = "SYSCON" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
@@ -81,7 +81,7 @@ peripherals = [
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
-    { name = "UHCI0", dma_peripheral = 3 },
+    { name = "UHCI0" },
     { name = "USB_FS", interrupts = { peri = "USB" } },
     { name = "USB_WRAP", hidden = true },
     { name = "XTS_AES" },
@@ -271,7 +271,6 @@ instances = [
 support_status = "partial"
 has_split_text_registers = true
 endianness_configurable = true
-dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
@@ -293,13 +292,21 @@ supports_mem2mem = true
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
-    { name = "SPI_DMA", channels = [
-        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA" },
-        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA" },
+    { name = "SPI_DMA", drivers = ["spi_master", "spi_slave"], peripheral_instances = [
+        { name = "SPI2", dma_id = 0 },
+        { name = "SPI3", dma_id = 1 },
+    ], channels = [
+        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
+        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
     ] },
-    { name = "I2S_DMA",    channels = [{ name = "DMA_I2S0",   pac = "I2S0",       interrupt = "I2S0"       }] },
-    { name = "CRYPTO_DMA", channels = [{ name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA" }] },
-    { name = "COPY_DMA",   channels = [{ name = "DMA_COPY",   pac = "COPY_DMA", mem2mem = true, interrupt = "DMA_COPY" }] },
+    { name = "I2S_DMA", drivers = ["i2s"], peripheral_instances = [
+        { name = "I2S0", dma_id = 0 },
+    ], channels = [{ name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] }] },
+    { name = "CRYPTO_DMA", drivers = ["aes", "sha"], peripheral_instances = [
+        { name = "AES", dma_id = 0 },
+        { name = "SHA", dma_id = 1 },
+    ], channels = [{ name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA", compatible_with = ["AES", "SHA"] }] },
+    { name = "COPY_DMA", channels = [{ name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true }] },
 ]
 
 [device.gpio]
@@ -618,7 +625,6 @@ memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.sdm]
@@ -629,16 +635,15 @@ version = 2
 fifo_size = 72
 bit_order_is_bool = true
 support_status = "supported"
-supports_dma = true
 has_octal = true
 has_dma_segmented_transfer = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
 ]
+
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },

@@ -104,12 +104,14 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        ErasedTxChannel,
+        LcdDmaTxChannel,
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
     },
@@ -130,7 +132,7 @@ pub enum ConfigError {
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
+    tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -142,10 +144,11 @@ where
     /// Create a new instance of the RGB/DPI driver.
     pub fn new(
         lcd: Lcd<'d, Dm>,
-        channel: impl TxChannelFor<LCD_CAM<'d>>,
+        channel: impl LcdDmaTxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let tx_channel = ChannelTx::new(channel.degrade());
+        let tx_channel = ChannelTx::new(channel.into());
+        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -508,7 +511,7 @@ where
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut buf)
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {

@@ -1,6 +1,6 @@
 use embassy_executor::SendSpawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-#[cfg(aes_dma)]
+#[cfg(aes_supports_dma)]
 use esp_hal::aes::dma::AesDmaBackend;
 use esp_hal::{
     Config,
@@ -217,7 +217,7 @@ const CIPHERTEXT_CFB128: [u8; PLAINTEXT_BUF_SIZE] = [
     0xa5, 0x1b, 0xae, 0xdc, 0x78, 0x4f, 0xcf, 0xcf, 0x31, 0xee, 0xb6, 0xc5, 0x7c, 0x2d, 0x81, 0x37,
 ];
 
-#[cfg(aes_dma)]
+#[cfg(aes_supports_dma)]
 extern crate alloc;
 
 const fn pad_to<const K: usize>(input: &[u8]) -> [u8; K] {
@@ -311,7 +311,7 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 }
 
-#[cfg(aes_dma)]
+#[cfg(aes_supports_dma)]
 fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
     let zeros = [0; MAX_SHIFT];
 
@@ -576,7 +576,7 @@ mod work_queue_tests {
     }
 }
 
-#[cfg(aes_dma)]
+#[cfg(aes_supports_dma)]
 #[embedded_test::tests(default_timeout = 10)]
 mod work_queue_dma_tests {
     use allocator_api2::vec::Vec;

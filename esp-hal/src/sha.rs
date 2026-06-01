@@ -332,7 +332,7 @@ impl<'d> Sha<'d> {
 
 impl crate::private::Sealed for Sha<'_> {}
 
-#[cfg(sha_dma)]
+#[cfg(sha_supports_dma)]
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
