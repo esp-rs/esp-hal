@@ -24,10 +24,12 @@ mod tests {
 
     use allocator_api2::vec::Vec;
     use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
+    use esp_hal::clock::CpuClock;
 
     #[init]
     fn init() {
-        let p = esp_hal::init(esp_hal::Config::default());
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
     }
 
