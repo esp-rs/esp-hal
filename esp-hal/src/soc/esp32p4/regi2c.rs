@@ -52,6 +52,12 @@ const LP_I2C_ANA_MST_ANA_CONF2_REG: u32 = LP_I2C_ANA_MST_BASE + 0x08;
 
 /// Select the I2C master for the given analog block.
 fn regi2c_enable_block(block: u8) {
+    // Enable I2C master clock
+    let lp_peri = unsafe { esp32p4::LP_PERI::steal() };
+    lp_peri
+        .clk_en()
+        .modify(|_, w| w.ck_en_lp_i2cmst().set_bit());
+
     // Clear both conf registers first
     unsafe {
         (LP_I2C_ANA_MST_ANA_CONF2_REG as *mut u32).write_volatile(0);
