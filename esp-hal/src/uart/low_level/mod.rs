@@ -697,12 +697,12 @@ impl Info {
         result
     }
 
-    pub(super) fn is_rx_break_detected(&self) -> bool {
-        self.rx_events().contains(RxEvent::BreakDetected)
-    }
-
-    pub(super) fn clear_rx_break_detected(&self) {
-        self.clear_rx_events(RxEvent::BreakDetected);
+    pub(super) fn check_rx_break_detected(&self) -> bool {
+        let detected = self.rx_events().contains(RxEvent::BreakDetected);
+        if detected {
+            self.clear_rx_events(RxEvent::BreakDetected);
+        }
+        detected
     }
 
     pub(super) fn rx_fifo_count(&self) -> u16 {
