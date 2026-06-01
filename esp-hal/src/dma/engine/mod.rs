@@ -16,6 +16,10 @@ for_each_dma_engine! {
         mod gdma;
         pub use gdma::*;
     };
+    ("AXI_GDMA") => {
+        mod axi_gdma;
+        pub use axi_gdma::*;
+    };
     ("COPY_DMA") => {
         mod copy;
         pub use copy::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};

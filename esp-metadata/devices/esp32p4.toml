@@ -289,6 +289,7 @@ peripherals = [
     # DMA: P4 has three DMA blocks; see [device.dma] below for the table.
     # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
+    { name = "AXI_GDMA", pac = "AXI_DMA" },
 
     { name = "ETH", virtual = true },
     { name = "EMAC_DMA", hidden = true },
@@ -377,7 +378,7 @@ max_bus_timeout = 0x1F
 # esp-hal's `Dma` singleton must be GDMA v2 compatible, hence PAC alias AHB_DMA above.
 # Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
-support_status = "not_supported" # PAC needs more work
+support_status = "partial"
 kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true

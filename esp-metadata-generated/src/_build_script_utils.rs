@@ -4434,6 +4434,7 @@ impl Chip {
                     "soc_has_twai2",
                     "soc_has_psram",
                     "soc_has_dma",
+                    "soc_has_axi_gdma",
                     "soc_has_eth",
                     "soc_has_emac_dma",
                     "soc_has_emac_mac",
@@ -4460,6 +4461,7 @@ impl Chip {
                     "rom_md5_bsd",
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
+                    "dma_driver_supported",
                     "ecc_driver_supported",
                     "ethernet_driver_supported",
                     "gpio_driver_supported",
@@ -4621,6 +4623,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_twai2",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=soc_has_dma",
+                    "cargo:rustc-cfg=soc_has_axi_gdma",
                     "cargo:rustc-cfg=soc_has_eth",
                     "cargo:rustc-cfg=soc_has_emac_dma",
                     "cargo:rustc-cfg=soc_has_emac_mac",
@@ -4647,6 +4650,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
+                    "cargo:rustc-cfg=dma_driver_supported",
                     "cargo:rustc-cfg=ecc_driver_supported",
                     "cargo:rustc-cfg=ethernet_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
@@ -6857,6 +6861,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_uart3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_uart4)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_gdma)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_adc)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_fs)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_hs)");

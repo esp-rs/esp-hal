@@ -3976,13 +3976,14 @@ macro_rules! for_each_peripheral {
         #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA peripheral singleton"] DMA
         <= AHB_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ETH peripheral singleton"] ETH <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
+        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
+        EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
+        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LEDC peripheral singleton"]
@@ -4085,6 +4086,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TWAI2(unstable)));
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
+        _for_each_inner_peripheral!((AXI_GDMA(unstable)));
         _for_each_inner_peripheral!((ETH(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((SDHOST(unstable)));
@@ -4300,14 +4302,15 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@ peri_type
         #[doc = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type
-        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type
-        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@
-        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC()
-        (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE
-        <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type #[doc
-        = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
+        #[doc = "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@
+        peri_type #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@
+        peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA()
+        (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
+        EMAC_MAC() (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"]
+        USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type
+        #[doc = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(PWM0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
@@ -4351,14 +4354,15 @@ macro_rules! for_each_peripheral {
         (TIMG0(unstable)), (TIMG1(unstable)), (UART0(unstable)), (UART1(unstable)),
         (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI2), (SPI3),
         (I2C0(unstable)), (I2C1(unstable)), (TWAI0(unstable)), (TWAI1(unstable)),
-        (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (ETH(unstable)),
-        (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
-        (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
-        (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
-        (USB_FS(unstable)), (USB_HS(unstable)), (SW_INTERRUPT(unstable)),
-        (CPU_CTRL(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1,
-        AxiGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AhbGdmaChannel),
-        (SHA, Sha, 5, AhbGdmaChannel)));
+        (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (AXI_GDMA(unstable)),
+        (ETH(unstable)), (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)),
+        (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)),
+        (ADC(unstable)), (AES(unstable)), (SHA(unstable)), (RSA(unstable)),
+        (ECC(unstable)), (USB_FS(unstable)), (USB_HS(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
+        Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AhbGdmaChannel), (SHA, Sha, 5,
+        AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
