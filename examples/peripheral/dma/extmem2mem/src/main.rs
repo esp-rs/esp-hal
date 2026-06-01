@@ -1,7 +1,7 @@
 //! Uses DMA to copy psram to internal memory.
 
 //% CHIP_FEATURES: dma_can_access_psram
-//% EXCLUDE_CHIPS: esp32s2 esp32c5
+//% EXCLUDE_CHIPS: esp32s2
 
 #![no_std]
 #![no_main]

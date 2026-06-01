@@ -7,8 +7,9 @@
 //! - Connect GND between devices
 //!
 //! Default pins:
-//! - TX/RX => GPIO1/GPIO3 (ESP32), GPIO20/GPIO19 (ESP32-C2), GPIO21/GPIO20 (ESP32-C3),
-//!   GPIO16/GPIO17 (ESP32-C6), GPIO24/GPIO23 (ESP32-H2), GPIO43/GPIO44 (ESP32-S2/S3)
+//! - TX/RX => GPIO1/GPIO3 (ESP32), GPIO20/GPIO19 (ESP32-C2), GPIO21/GPIO20 (ESP32-C3), GPIO10/GPIO9
+//!   (ESP32-C5), GPIO16/GPIO17 (ESP32-C6), GPIO3/GPIO2 (ESP32-C61), GPIO24/GPIO23 (ESP32-H2),
+//!   GPIO6/GPIO5 (ESP32-P4), GPIO43/GPIO44 (ESP32-S2/S3)
 //!
 //! Each device will:
 //! - Send a counter value every second
@@ -16,7 +17,6 @@
 //! - Print received data and break conditions via esp-println
 
 //% CHIP_FEATURES: uart_driver_supported
-//% EXCLUDE_CHIPS: esp32c5 esp32c61 esp32p4
 
 #![no_std]
 #![no_main]
@@ -49,10 +49,16 @@ fn main() -> ! {
             let (tx_pin, rx_pin) = (peripherals.GPIO20, peripherals.GPIO19);
         } else if #[cfg(feature = "esp32c3")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO21, peripherals.GPIO20);
+        } else if #[cfg(feature = "esp32c5")] {
+            let (tx_pin, rx_pin) = (peripherals.GPIO10, peripherals.GPIO9);
         } else if #[cfg(feature = "esp32c6")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
+        } else if #[cfg(feature = "esp32c61")] {
+            let (tx_pin, rx_pin) = (peripherals.GPIO3, peripherals.GPIO2);
         } else if #[cfg(feature = "esp32h2")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
+        } else if #[cfg(feature = "esp32p4")] {
+            let (tx_pin, rx_pin) = (peripherals.GPIO6, peripherals.GPIO5);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
             let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }

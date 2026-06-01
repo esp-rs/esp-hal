@@ -6,7 +6,6 @@
 //! - generated pulses => GPIO4
 
 //% CHIP_FEATURES: rmt_driver_supported
-//% EXCLUDE_CHIPS: esp32c5
 
 #![no_std]
 #![no_main]

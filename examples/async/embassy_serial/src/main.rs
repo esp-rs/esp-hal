@@ -4,7 +4,6 @@
 //! writing to and reading from UART.
 
 //% CHIP_FEATURES: uart_driver_supported
-//% EXCLUDE_CHIPS: esp32p4
 
 #![no_std]
 #![no_main]
@@ -92,6 +91,8 @@ async fn main(spawner: Spawner) {
             let (tx_pin, rx_pin) = (peripherals.GPIO11, peripherals.GPIO10);
         } else if #[cfg(feature = "esp32h2")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
+        } else if #[cfg(feature = "esp32p4")] {
+            let (tx_pin, rx_pin) = (peripherals.GPIO6, peripherals.GPIO5);
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
             let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
