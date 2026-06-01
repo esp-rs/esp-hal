@@ -799,22 +799,22 @@ fn configure_mpll(freq_mhz: u32) -> bool {
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| w.lp_aonclkrst_hp_mpll_500m_clk_en().set_bit());
 
-    // div = freq_mhz/20 - 1, ref_div = 1 -> MPLL = XTAL(40) * (div+1) / (ref_div+1)
-    let ref_div: u8 = 1;
-    let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
-    let div_val: u8 = (div << 3) | ref_div;
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().clear_bit());
 
-    let dhref = regi2c::I2C_MPLL_DHREF.read();
-    regi2c::I2C_MPLL_DHREF.write_reg(dhref | (3 << 4));
+    regi2c::I2C_MPLL_DHREF_DHREF.write_field(3);
 
     let rstb = regi2c::I2C_MPLL_IR_CAL_RSTB.read();
     regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb & 0xDF);
     regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb | (1 << 5));
+
+    // div = freq_mhz/20 - 1, ref_div = 1 -> MPLL = XTAL(40) * (div+1) / (ref_div+1)
+    let ref_div: u8 = 1;
+    let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
+    let div_val: u8 = (div << 3) | ref_div;
     regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
 
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().clear_bit());
     let mut t = 1_000_u32;
     let mut success = true;
     while !HP_SYS_CLKRST::regs()

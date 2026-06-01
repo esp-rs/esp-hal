@@ -1,10 +1,12 @@
-use crate::rom::regi2c::{RegI2cMaster, RegI2cRegister, define_regi2c};
+use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
     master: REGI2C_SDIO_PLL(0x62, 0) {}
     master: REGI2C_MSPI(0x63, 0) {
         reg: I2C_MPLL_DIV_REG_ADDR(2) {}
-        reg: I2C_MPLL_DHREF(3) {}
+        reg: I2C_MPLL_DHREF(3) {
+            field: I2C_MPLL_DHREF_DHREF(5..4)
+        }
         reg: I2C_MPLL_IR_CAL_RSTB(5) {}
     }
     master: REGI2C_SYS_PLL(0x66, 0) {
