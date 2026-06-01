@@ -827,11 +827,11 @@ fn configure_mpll(freq_mhz: u32) -> bool {
 
     let mut t = 1_000_u32;
     let mut success = true;
-    while !HP_SYS_CLKRST::regs()
+    while HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .read()
         .mspi_cal_end()
-        .bit_is_set()
+        .bit_is_clear()
     {
         t = t.saturating_sub(1);
         if t == 0 {
