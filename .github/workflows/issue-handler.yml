@@ -110,5 +110,5 @@ jobs:
     steps:
       - uses: actions/add-to-project@v0.5.0
         with:
-          project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/2
-      
+          project-url: https://github.com/orgs/esp-rs/projects/2
+          github-token: ${{ secrets.PAT }}
