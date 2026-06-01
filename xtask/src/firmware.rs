@@ -124,6 +124,7 @@ impl Metadata {
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
+    excluded_chips: Vec<Chip>,
     name: String,
     cargo_config: Vec<String>,
     features: Vec<String>,
@@ -268,6 +269,15 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     let chips = parse_chips(meta_line.key.as_str(), meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
+                // A space-separated list of chips to exclude from the build.
+                "EXCLUDE_CHIP" => {
+                    let chips = meta_line
+                        .value
+                        .split_ascii_whitespace()
+                        .map(|s| Chip::from_str(s, false).unwrap())
+                        .collect::<Vec<_>>();
+                    relevant_metadata.apply(|meta| meta.excluded_chips.extend_from_slice(&chips));
+                }
                 // A list of cargo `--config` configurations.
                 "CARGO-CONFIG" => {
                     relevant_metadata
@@ -358,6 +368,10 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 meta.chips = all_configuration.chips.clone();
             }
 
+            // Excluded chips are additive
+            meta.excluded_chips
+                .extend_from_slice(&all_configuration.excluded_chips);
+
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
@@ -393,6 +407,9 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             configuration.features.sort();
 
             for chip in &configuration.chips {
+                if configuration.excluded_chips.contains(chip) {
+                    continue;
+                }
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),
@@ -428,6 +445,7 @@ struct CargoToml {
 fn parse_annotation_chips(text: &str) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
     let mut found = false;
     let mut chips: Vec<Chip> = Chip::iter().collect();
+    let mut excluded: Vec<Chip> = Vec::new();
 
     for (line_no, line) in text
         .lines()
@@ -441,15 +459,24 @@ fn parse_annotation_chips(text: &str) -> anyhow::Result<Option<std::collections:
                 found = true;
                 chips = parse_chips(meta.key.as_str(), meta.value.as_str())?;
             }
+            "EXCLUDE_CHIP" => {
+                excluded.extend(
+                    meta.value
+                        .split_ascii_whitespace()
+                        .map(|s| Chip::from_str(s, false).unwrap()),
+                );
+            }
             _ => {}
         }
     }
 
-    if !found {
+    if !found && excluded.is_empty() {
         return Ok(None);
     }
 
-    Ok(Some(chips.into_iter().collect()))
+    Ok(Some(
+        chips.into_iter().filter(|c| !excluded.contains(c)).collect(),
+    ))
 }
 
 /// Load all examples by finding all packages in the given path, and parsing their metadata.

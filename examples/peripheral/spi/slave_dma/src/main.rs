@@ -25,6 +25,7 @@
 //! so no immediate neighbor is available.
 
 //% CHIP_FEATURES: spi_slave_driver_supported
+//% EXCLUDE_CHIP: esp32
 
 #![no_std]
 #![no_main]

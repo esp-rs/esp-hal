@@ -112,6 +112,19 @@ the same configuration.
 
 When no single symbol covers the desired set, use `CHIPS` with an explicit list instead.
 
+### `//% EXCLUDE_CHIP`
+
+A space-separated list of chip names to remove from the set selected by `CHIPS` or `CHIP_FEATURES`.
+Useful when a capability-based filter includes a chip that cannot actually run the test or example
+(e.g. missing GPIO pins, different DMA architecture).
+
+```
+//% CHIP_FEATURES: spi_slave_driver_supported
+//% EXCLUDE_CHIP: esp32
+```
+
+This key is additive. Multiple lines and the unnamed list are all merged together.
+
 ### `//% TAG`
 
 Used to sort examples, when running `run-example` without naming a specific example.
