@@ -797,7 +797,7 @@ fn configure_mpll(freq_mhz: u32) {
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());
-    let mut t = 1_000_000_u32;
+    let mut t = 1_000_u32;
     while !HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .read()
@@ -806,9 +806,10 @@ fn configure_mpll(freq_mhz: u32) {
     {
         t = t.saturating_sub(1);
         if t == 0 {
+            warn!("PSRAM MPLL calibration timeout");
             break;
         }
-        core::hint::spin_loop();
+        crate::rom::ets_delay_us(1);
     }
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
