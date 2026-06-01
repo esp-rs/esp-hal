@@ -138,8 +138,7 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM.
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    init_psram_inner(config);
-    true
+    init_psram_inner(config)
 }
 
 pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
@@ -217,7 +216,7 @@ const AP_HEX_CS_HOLD_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
 #[crate::ram]
-fn init_psram_inner(config: &mut PsramConfig) {
+fn init_psram_inner(config: &mut PsramConfig) -> bool {
     // Resolve the speed parameter set from `ram_frequency`. The MPLL
     // override (`config.core_clock`) lets the caller bypass the default
     // pairing (e.g. force 400 MHz MPLL with `Mhz20` bus); `None`
@@ -227,8 +226,10 @@ fn init_psram_inner(config: &mut PsramConfig) {
         params.mpll_mhz = mpll as u32;
     }
 
-    psram_phy_ldo_init(); // PMU EXT_LDO regulator setup for the MSPI PHY analog block.
-    configure_mpll(params.mpll_mhz);
+    psram_phy_ldo_init();
+    if !configure_mpll(params.mpll_mhz) {
+        return false;
+    }
 
     // Module clock + clock source
     HP_SYS_CLKRST::regs()
@@ -271,6 +272,8 @@ fn init_psram_inner(config: &mut PsramConfig) {
 
     configure_psram_mspi(params, MSPI0_BASE); // basic AXI configuration here
     mmu_map_psram(MSPI0_BASE, config); // MMU mapping here
+
+    true
 }
 
 /// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
@@ -787,7 +790,7 @@ fn psram_phy_ldo_init() {
 }
 
 /// Configure MPLL to target frequency for PSRAM clock.
-fn configure_mpll(freq_mhz: u32) {
+fn configure_mpll(freq_mhz: u32) -> bool {
     // Power up the MPLL analog block.
     PMU::regs()
         .rf_pwc()
@@ -813,6 +816,7 @@ fn configure_mpll(freq_mhz: u32) {
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().clear_bit());
     let mut t = 1_000_u32;
+    let mut success = true;
     while !HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .read()
@@ -822,6 +826,7 @@ fn configure_mpll(freq_mhz: u32) {
         t = t.saturating_sub(1);
         if t == 0 {
             warn!("PSRAM MPLL calibration timeout");
+            success = false;
             break;
         }
         crate::rom::ets_delay_us(1);
@@ -829,9 +834,13 @@ fn configure_mpll(freq_mhz: u32) {
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().set_bit());
-    // cal_end timeout (t == 0): surfaces later via `psram_detect_size` fallback.
-    debug!("Calibration timeout left: {}us", t);
-    crate::rom::ets_delay_us(10);
+
+    if success {
+        debug!("Calibration timeout left: {}us", t);
+        crate::rom::ets_delay_us(10);
+    }
+
+    success
 }
 
 /// Configure PSRAM_MSPI0 (AXI cache) for HEX/DDR access at 0x4800_0000.
