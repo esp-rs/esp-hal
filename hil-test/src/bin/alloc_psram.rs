@@ -4,7 +4,7 @@
 
 //% CHIP_FEATURES(llff, tlsf): psram_driver_supported
 //% CHIP_FEATURES(llff_with_storage, tlsf_with_storage): psram_driver_supported
-//% EXCLUDE_CHIP(llff_with_storage, tlsf_with_storage): esp32p4
+//% EXCLUDE_CHIPS(llff_with_storage, tlsf_with_storage): esp32p4
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-alloc/nightly

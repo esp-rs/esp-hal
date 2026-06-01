@@ -12,7 +12,7 @@
 //! We can also run code from RTC memory.
 
 //% CHIP_FEATURES: soc_has_lpwr
-//% EXCLUDE_CHIP: esp32c2 esp32c61 esp32p4
+//% EXCLUDE_CHIPS: esp32c2 esp32c61 esp32p4
 
 #![allow(static_mut_refs)]
 #![no_std]

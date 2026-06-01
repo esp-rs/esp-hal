@@ -25,7 +25,7 @@
 //! - LCD_DATA15 => GPIO1
 
 //% CHIP_FEATURES: rgb_display_driver_supported
-//% EXCLUDE_CHIP: esp32
+//% EXCLUDE_CHIPS: esp32
 
 #![no_std]
 #![no_main]

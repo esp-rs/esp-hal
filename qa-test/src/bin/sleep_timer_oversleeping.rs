@@ -4,7 +4,7 @@
 
 //% CHIP_FEATURES: sleep_driver_supported
 // esp32c2 has no rtc-fast memory, which is required by the persistent BOOT_COUNT variable.
-//% EXCLUDE_CHIP: esp32c2
+//% EXCLUDE_CHIPS: esp32c2
 #![no_std]
 #![no_main]
 use embassy_executor::Spawner;

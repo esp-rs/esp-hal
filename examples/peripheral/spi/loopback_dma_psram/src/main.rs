@@ -8,7 +8,7 @@
 //! data.
 
 //% CHIP_FEATURES: dma_can_access_psram
-//% EXCLUDE_CHIP: esp32s2 esp32c5
+//% EXCLUDE_CHIPS: esp32s2 esp32c5
 
 #![no_std]
 #![no_main]

@@ -7,7 +7,7 @@
 //! values of `FLASH_ON_CORE_0` and `USE_AUTO_PARK`.
 
 //% CHIP_FEATURES: multi_core
-//% EXCLUDE_CHIP: esp32 esp32p4
+//% EXCLUDE_CHIPS: esp32 esp32p4
 //% FEATURES: unstable esp-storage
 
 // TODO: Make esp32 work
