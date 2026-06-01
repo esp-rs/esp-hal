@@ -237,18 +237,7 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
         .soc_clk_ctrl0()
         .modify(|_, w| w.psram_sys_clk_en().set_bit());
 
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+    reset_psram_mspi();
 
     HP_SYS_CLKRST::regs()
         .peri_clk_ctrl00()
@@ -853,6 +842,21 @@ fn configure_mpll(freq_mhz: u32) -> bool {
     success
 }
 
+fn reset_psram_mspi() {
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+}
+
 /// ESP32-P4 silicon revision 3.0 workaround.
 ///
 /// Port of IDF `esp_psram_p4_rev3_workaround` (`esp_psram.c`). Must be called
@@ -920,18 +924,7 @@ fn p4_rev3_psram_workaround() {
 
     // Pulse the PSRAM controller reset (AXI then APB), mirroring IDF's
     // `_psram_ctrlr_ll_reset_module_clock`.
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+    reset_psram_mspi();
 
     // Re-enable bus-error responses.
     HP_SYS::regs()

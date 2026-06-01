@@ -8,7 +8,7 @@
 //% CHIPS(tlsf_with_storage): esp32 esp32s2 esp32c5 esp32c61 esp32s3
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
-//% FEATURES: unstable esp-alloc/nightly defmt
+//% FEATURES: unstable esp-alloc/nightly
 //% FEATURES(llff_with_storage): esp-storage
 
 #![no_std]
