@@ -3481,12 +3481,12 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AES peripheral clock signal
             Aes,
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
             /// APB_SAR_ADC peripheral clock signal
             ApbSarAdc,
             /// DEDICATED_GPIO peripheral clock signal
             DedicatedGpio,
-            /// DMA peripheral clock signal
-            Dma,
             /// DS peripheral clock signal
             Ds,
             /// HMAC peripheral clock signal
@@ -3557,9 +3557,9 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
+                Self::AhbGdma,
                 Self::ApbSarAdc,
                 Self::DedicatedGpio,
-                Self::Dma,
                 Self::Ds,
                 Self::Hmac,
                 Self::I2cExt0,
@@ -3598,6 +3598,11 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en1()
                         .modify(|_, w| w.crypto_aes_clk_en().bit(enable));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en1()
+                        .modify(|_, w| w.dma_clk_en().bit(enable));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
@@ -3607,11 +3612,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .cpu_peri_clk_en()
                         .modify(|_, w| w.dedicated_gpio_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.dma_clk_en().bit(enable));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
@@ -3767,6 +3767,11 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en1()
                         .modify(|_, w| w.crypto_aes_rst().bit(reset));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en1()
+                        .modify(|_, w| w.dma_rst().bit(reset));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
@@ -3776,11 +3781,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .cpu_peri_rst_en()
                         .modify(|_, w| w.dedicated_gpio_rst().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.dma_rst().bit(reset));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()

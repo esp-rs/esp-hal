@@ -4496,8 +4496,12 @@ impl Chip {
                     "soc_has_dma_ch0",
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
+                    "soc_has_axi_dma_ch0",
+                    "soc_has_axi_dma_ch1",
+                    "soc_has_axi_dma_ch2",
                     "aes_supports_dma",
                     "sha_supports_dma",
+                    "spi_master_supports_dma",
                     "ecc_separate_jacobian_point_memory",
                     "ecc_has_memory_clock_gate",
                     "ecc_supports_enhanced_security",
@@ -4679,8 +4683,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
+                    "cargo:rustc-cfg=soc_has_axi_dma_ch0",
+                    "cargo:rustc-cfg=soc_has_axi_dma_ch1",
+                    "cargo:rustc-cfg=soc_has_axi_dma_ch2",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=sha_supports_dma",
+                    "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
                     "cargo:rustc-cfg=ecc_supports_enhanced_security",
@@ -6858,6 +6866,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch2)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");

@@ -194,7 +194,7 @@ clocks = { system_clocks = { clock_tree = [
 ], peripheral_clocks = [
     # TODO: peripheral_clocks are implicit APB clock gates, we will need to tie them into the system to track APB use.
     { name = "Tsens", template_params = { reg_group = "en1" } },
-    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
     { name = "Sha", template_params = { reg_group = "en1", peripheral = "crypto_sha" } },
     { name = "Ecc", template_params = { reg_group = "en1", peripheral = "crypto_ecc" } },
 

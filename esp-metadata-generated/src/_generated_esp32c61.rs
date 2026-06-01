@@ -2669,8 +2669,8 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
-            /// DMA peripheral clock signal
-            Dma,
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
             /// ECC peripheral clock signal
             Ecc,
             /// I2C_EXT0 peripheral clock signal
@@ -2699,7 +2699,7 @@ macro_rules! implement_peripheral_clocks {
                 &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
-                Self::Dma,
+                Self::AhbGdma,
                 Self::Ecc,
                 Self::I2cExt0,
                 Self::I2s0,
@@ -2715,7 +2715,7 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
-                Peripheral::Dma => {
+                Peripheral::AhbGdma => {
                     crate::peripherals::SYSTEM::regs()
                         .gdma_conf()
                         .modify(|_, w| w.gdma_clk_en().bit(enable));
@@ -2783,7 +2783,7 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
-                Peripheral::Dma => {
+                Peripheral::AhbGdma => {
                     crate::peripherals::SYSTEM::regs()
                         .gdma_conf()
                         .modify(|_, w| w.gdma_rst_en().bit(reset));

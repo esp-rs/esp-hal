@@ -247,7 +247,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Etm" },
     { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
-    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
     { name = "Aes" },
     { name = "Sha" },

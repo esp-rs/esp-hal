@@ -4311,10 +4311,10 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AES peripheral clock signal
             Aes,
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
             /// APB_SAR_ADC peripheral clock signal
             ApbSarAdc,
-            /// DMA peripheral clock signal
-            Dma,
             /// DS peripheral clock signal
             Ds,
             /// ECC peripheral clock signal
@@ -4379,8 +4379,8 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
+                Self::AhbGdma,
                 Self::ApbSarAdc,
-                Self::Dma,
                 Self::Ds,
                 Self::Ecc,
                 Self::Etm,
@@ -4416,15 +4416,15 @@ macro_rules! implement_peripheral_clocks {
                         .aes_conf()
                         .modify(|_, w| w.aes_clk_en().bit(enable));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_clk_en().bit(enable));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .saradc_conf()
                         .modify(|_, w| w.saradc_reg_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .gdma_conf()
-                        .modify(|_, w| w.gdma_clk_en().bit(enable));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
@@ -4575,15 +4575,15 @@ macro_rules! implement_peripheral_clocks {
                         .aes_conf()
                         .modify(|_, w| w.aes_rst_en().bit(reset));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_rst_en().bit(reset));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .saradc_conf()
                         .modify(|_, w| w.saradc_reg_rst_en().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .gdma_conf()
-                        .modify(|_, w| w.gdma_rst_en().bit(reset));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
