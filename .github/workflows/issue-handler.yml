@@ -53,7 +53,7 @@ jobs:
               [/esp-rom-sys/i, "package:esp-rom-sys"],
               [/storage/i, "package:esp-storage"],
               [/xtensa-lx-rt/i, "package:xtensa-lx-rt"],
-              [/xtensa-lx/i, "package:xtensa-lx"],
+              [/xtensa-lx(?!-rt)/i, "package:xtensa-lx"],
 
               [/performance/i, "performance"],
 
