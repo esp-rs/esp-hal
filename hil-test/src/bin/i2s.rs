@@ -466,7 +466,7 @@ mod tests {
         .unwrap();
 
         let (other, dout) = unsafe { ctx.dout.split() };
-        let counter = super::EdgeCounter::new(other);
+        let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
             .i2s_tx
@@ -474,6 +474,9 @@ mod tests {
             .with_ws(NoPin)
             .with_dout(dout)
             .build();
+
+        counter.clear();
+        counter.check(0);
 
         let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         esp_hal::delay::Delay::new().delay_millis(500);
@@ -502,7 +505,7 @@ mod tests {
         .into_async();
 
         let (other, dout) = unsafe { ctx.dout.split() };
-        let counter = super::EdgeCounter::new(other);
+        let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
             .i2s_tx
@@ -510,6 +513,9 @@ mod tests {
             .with_ws(NoPin)
             .with_dout(dout)
             .build();
+
+        counter.clear();
+        counter.check(0);
 
         let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         tx_transfer.wait_for_done_async().await.unwrap();
@@ -538,7 +544,7 @@ mod tests {
         .unwrap();
 
         let (other, dout) = unsafe { ctx.dout.split() };
-        let counter = super::EdgeCounter::new(other);
+        let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
             .i2s_tx
@@ -546,6 +552,9 @@ mod tests {
             .with_ws(NoPin)
             .with_dout(dout)
             .build();
+
+        counter.clear();
+        counter.check(0);
 
         let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         let (res, i2s_tx, tx_buffer) = tx_transfer.wait();
@@ -578,7 +587,7 @@ mod tests {
         .into_async();
 
         let (other, dout) = unsafe { ctx.dout.split() };
-        let counter = super::EdgeCounter::new(other);
+        let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
             .i2s_tx
@@ -586,6 +595,9 @@ mod tests {
             .with_ws(NoPin)
             .with_dout(dout)
             .build();
+
+        counter.clear();
+        counter.check(0);
 
         let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         tx_transfer.wait_for_done_async().await.unwrap();
@@ -678,11 +690,16 @@ impl<'a> EdgeCounter<'a> {
             esp_hal::pcnt::channel::EdgeMode::Hold,
             esp_hal::pcnt::channel::EdgeMode::Increment,
         );
+        unit.clear();
 
         Self {
             unit,
             phantom: Default::default(),
         }
+    }
+
+    fn clear(&mut self) {
+        self.unit.clear();
     }
 
     fn count(&self) -> i32 {
@@ -701,6 +718,10 @@ impl<'a> EdgeCounter<'a> {
         Self {
             phantom: Default::default(),
         }
+    }
+
+    fn clear(&mut self) {
+        // NOOP
     }
 
     fn check(&self, _expected: i32) {}
