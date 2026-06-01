@@ -216,6 +216,7 @@ const AP_HEX_CS_SETUP_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
+#[crate::ram]
 fn init_psram_inner(config: &mut PsramConfig) {
     // Resolve the speed parameter set from `ram_frequency`. The MPLL
     // override (`config.core_clock`) lets the caller bypass the default
@@ -233,6 +234,20 @@ fn init_psram_inner(config: &mut PsramConfig) {
     HP_SYS_CLKRST::regs()
         .soc_clk_ctrl0()
         .modify(|_, w| w.psram_sys_clk_en().set_bit());
+
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+
     HP_SYS_CLKRST::regs()
         .peri_clk_ctrl00()
         .modify(|_, w| unsafe {
@@ -815,7 +830,7 @@ fn configure_mpll(freq_mhz: u32) {
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().set_bit());
     // cal_end timeout (t == 0): surfaces later via `psram_detect_size` fallback.
-    let _ = t; // if need print this for debug
+    debug!("Calibration timeout left: {}us", t);
     crate::rom::ets_delay_us(10);
 }
 
