@@ -115,7 +115,7 @@ jobs:
         if: steps.arch.outputs.xtensa == 'true'
         with:
           buildtargets: esp32,esp32s2,esp32s3
-          default: false
+          default: true
           version: 1.96.0.0
 
       - uses: dtolnay/rust-toolchain@v1
@@ -125,40 +125,8 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      # xtask runs on the HIL runners as a host tool. The xtensa/riscv steps
-      # above install esp/nightly only for the firmware test builds (xtask
-      # invokes those via +esp/+nightly), so cross-compile xtask with stable.
-      # Set stable as the job's default explicitly rather than relying on
-      # whichever toolchain the conditional steps happened to leave as default.
-      - name: Install host toolchain for cross-compiling xtask
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          rustup target add aarch64-unknown-linux-gnu
-          rustup target add armv7-unknown-linux-gnueabihf
-
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v2
-
-      - name: Build xtask for HIL runners
-        run: |
-          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
-          cross build --release --target aarch64-unknown-linux-gnu -p xtask
-
-      - name: Upload xtask artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: xtask-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/xtask
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: xtask-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/xtask
 
       # Build test ELFs for each requested chip
       - name: Build tests
@@ -185,6 +153,35 @@ jobs:
           name: hil-tests
           path: target/tests/
           if-no-files-found: warn
+
+      # xtask runs on the HIL runners as a host tool.
+      # We build the actual tests using the correct toolchain before.
+      - name: Install host toolchain for cross-compiling xtask
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build xtask for HIL runners
+        run: |
+          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
+          cross build --release --target aarch64-unknown-linux-gnu -p xtask
+
+      - name: Upload xtask artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: xtask-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/xtask
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/xtask
 
   hil:
     needs: build
