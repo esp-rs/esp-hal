@@ -16,6 +16,7 @@
 //! - Print received data and break conditions via esp-println
 
 //% CHIP_FEATURES: uart_driver_supported
+//% EXCLUDE_CHIP: esp32c5 esp32c61 esp32p4
 
 #![no_std]
 #![no_main]

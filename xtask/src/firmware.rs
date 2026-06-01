@@ -475,7 +475,10 @@ fn parse_annotation_chips(text: &str) -> anyhow::Result<Option<std::collections:
     }
 
     Ok(Some(
-        chips.into_iter().filter(|c| !excluded.contains(c)).collect(),
+        chips
+            .into_iter()
+            .filter(|c| !excluded.contains(c))
+            .collect(),
     ))
 }
 

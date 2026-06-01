@@ -1,7 +1,7 @@
 //! This example uses the internal temperature sensor to measure the chip's
 //! temperature
 
-//% CHIP_FEATURES: temp_sensor_driver_supported
+//% CHIP_FEATURES: soc_has_tsens
 
 #![no_std]
 #![no_main]

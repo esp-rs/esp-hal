@@ -1,7 +1,6 @@
 //! CSI Example
 //!
 //! Set SSID and PASSWORD env variable before running this example.
-
 //% CHIP_FEATURES: wifi_csi_supported
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/csi esp-radio/unstable esp-hal/unstable
 

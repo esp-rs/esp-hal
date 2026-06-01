@@ -8,6 +8,7 @@
 //! data.
 
 //% CHIP_FEATURES: dma_can_access_psram
+//% EXCLUDE_CHIP: esp32s2 esp32c5
 
 #![no_std]
 #![no_main]
@@ -55,9 +56,9 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    #[cfg(esp32s3)]
+    #[cfg(feature = "esp32s3")]
     let (sclk, mosi, cs) = (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38);
-    #[cfg(any(esp32s2, esp32c5))]
+    #[cfg(feature = "esp32c5")]
     let (sclk, mosi, cs) = (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10);
     let miso = unsafe { mosi.clone_unchecked() };
 
