@@ -117,11 +117,12 @@ use core::mem::ManuallyDrop;
 use enumset::{EnumSet, EnumSetType, enum_set};
 use private::*;
 
+#[cfg(i2s_version = "1")]
+use crate::RegisterToggle;
 use crate::{
     Async,
     Blocking,
     DriverMode,
-    RegisterToggle,
     dma::{
         Channel,
         ChannelRx,
@@ -2289,18 +2290,21 @@ mod private {
         }
 
         fn update(&self) {
-            self.regs()
-                .tx_conf()
-                .toggle(|w, bit| w.tx_update().bit(!bit));
-            self.regs()
-                .rx_conf()
-                .toggle(|w, bit| w.rx_update().bit(!bit));
+            self.regs().tx_conf().modify(|_, w| w.tx_update().bit(true));
+
+            self.regs().rx_conf().modify(|_, w| w.rx_update().bit(true));
+
+            while self.regs().tx_conf().read().tx_update().bit_is_set()
+                || self.regs().rx_conf().read().rx_update().bit_is_set()
+            {
+                // wait
+            }
         }
 
         fn reset_tx(&self) {
-            self.regs().tx_conf().toggle(|w, bit| {
-                w.tx_reset().bit(bit);
-                w.tx_fifo_reset().bit(bit)
+            self.regs().tx_conf().modify(|_, w| {
+                w.tx_reset().set_bit();
+                w.tx_fifo_reset().set_bit()
             });
 
             self.regs().int_clr().write(|w| {
@@ -2338,9 +2342,9 @@ mod private {
                 .rx_conf()
                 .modify(|_, w| w.rx_start().clear_bit());
 
-            self.regs().rx_conf().toggle(|w, bit| {
-                w.rx_reset().bit(bit);
-                w.rx_fifo_reset().bit(bit)
+            self.regs().rx_conf().modify(|_, w| {
+                w.rx_reset().set_bit();
+                w.rx_fifo_reset().set_bit()
             });
 
             self.regs().int_clr().write(|w| {
