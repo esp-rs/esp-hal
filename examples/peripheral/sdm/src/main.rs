@@ -7,7 +7,12 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{delay::Delay, main, sdm::Sdm, time::Rate};
+use esp_hal::{
+    delay::Delay,
+    main,
+    sdm::{Sdm, SdmConfig},
+    time::Rate,
+};
 use esp_println::print;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -17,7 +22,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sdm = Sdm::new(peripherals.GPIO_SD);
+    let sdm = Sdm::new(peripherals.GPIO_SD, SdmConfig::default());
     let config = sdm
         .channel_config()
         .with_frequency(Rate::from_khz(500))

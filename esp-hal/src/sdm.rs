@@ -55,16 +55,10 @@ for_each_sdm_channel!(
 
             impl<'d> Sdm<'d> {
                 /// Creates a new sigma-delta peripheral driver.
-                pub fn new(instance: GPIO_SD<'d>) -> Self {
-                    Self::new_with_config(instance, SdmConfig::default())
-                }
-
-                /// Creates a new sigma-delta peripheral driver with the given
-                /// peripheral-wide configuration.
                 ///
                 /// The SDM clock source is shared by all SDM channels through the IO_MUX
                 /// clock, so it is selected here instead of being configurable per channel.
-                pub fn new_with_config(instance: GPIO_SD<'d>, config: SdmConfig) -> Self {
+                pub fn new(instance: GPIO_SD<'d>, config: SdmConfig) -> Self {
                     Self {
                         _instance: instance,
                         clock_source: config.clock_source,
