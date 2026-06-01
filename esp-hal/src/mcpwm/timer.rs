@@ -27,14 +27,7 @@ use enumset::{EnumSet, EnumSetType};
 
 use super::PeripheralGuard;
 use crate::{
-    mcpwm::{
-        Event,
-        FrequencyError,
-        Instance,
-        PeripheralClockConfig,
-        PwmClockGuard,
-        sync::{SyncInSelect, SyncOut, SyncSource},
-    },
+    mcpwm::{Event, FrequencyError, Info, PeripheralClockConfig, PwmClockGuard, sync::SyncKind},
     pac,
     time::Rate,
 };
@@ -57,25 +50,32 @@ pub enum TimerEvent {
 /// Every timer of a particular [`MCPWM`](super::McPwm) peripheral can be used
 /// as a timing reference for every
 /// [`Operator`](super::operator::Operator) of that peripheral
-pub struct Timer<'d, const TIM: u8, PWM: Instance> {
+pub struct Timer<'d> {
     /// Sync out for the timer that can be connected to other timers sync in or operators sync in
-    pub sync_out: SyncOut<'d, TIM, PWM>,
-    _phantom: PhantomData<&'d PWM>,
+    number: u8,
+    mcpwm_info: &'static Info,
+    _phantom: PhantomData<&'d ()>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
     config: TimerClockConfig,
 }
 
-impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
-    pub(super) fn new(guard: PeripheralGuard, peripheral_clock: &PeripheralClockConfig) -> Self {
+impl<'d> Timer<'d> {
+    pub(super) fn new(
+        guard: PeripheralGuard,
+        mcpwm_info: &'static Info,
+        number: u8,
+        peripheral_clock: &PeripheralClockConfig,
+    ) -> Self {
         // Default configuration for the timer
         let config = TimerClockConfig::default(peripheral_clock);
 
         let mut timer = Timer {
-            sync_out: SyncOut::new(),
+            number,
+            mcpwm_info,
             _phantom: PhantomData,
             _guard: guard,
-            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
+            _pwm_clock_guard: PwmClockGuard::new(mcpwm_info),
             config,
         };
         timer.configure();
@@ -175,28 +175,42 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
         doc = "**Note:** Software triggered sync events from timers will propagate to their respective sync outputs on this chip."
     )]
     pub fn trigger_sync(&mut self) {
-        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
-        let tmr = unsafe { Self::tmr() };
-        tmr.sync().modify(|r, w| w.sw().bit(!r.sw().bit()));
+        self.sync().modify(|r, w| w.sw().bit(!r.sw().bit()));
     }
 
     /// Read the counter value and counter direction of the timer
     pub fn status(&self) -> (u16, CounterDirection) {
         // SAFETY: Only read TIMERx_STATUS; unique per TIM const
-        let reg = unsafe { Self::tmr() }.status().read();
+        let reg = unsafe { self.tmr() }.status().read();
         (reg.value().bits(), reg.direction().bit_is_set().into())
     }
 
     /// Sets the timers sync source. Refer to how sync events are
     /// handled in the [`Timer`] documentation.
-    pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
-        let sync_in_sel = sync_source.get_kind().into();
-        self.set_sync_in_select(sync_in_sel);
+    pub fn set_sync_in(&mut self, sync_sel: SyncKind) {
+        let info = self.mcpwm_info;
+
+        // SAFETY: Only TIMER_SYNCI_CFG and TIMERx_SYNC accessed
+        info.regs()
+            .timer_synci_cfg()
+            .modify(|_r, w| unsafe { w.timer_syncisel(self.number).bits(sync_sel as u8) });
+        self.sync()
+            .modify(|_r, w| w.synci_en().bit(sync_sel != SyncKind::None));
     }
 
     /// Clears the sync in for the timer and disables sync input
     pub fn clear_sync_in(&mut self) {
-        self.set_sync_in_select(SyncInSelect::None);
+        self.set_sync_in(SyncKind::None);
+    }
+
+    /// Get the sync out selection for the timer
+    pub fn get_sync_out(&self) -> SyncKind {
+        match self.number {
+            0 => SyncKind::Timer0Sync,
+            1 => SyncKind::Timer1Sync,
+            2 => SyncKind::Timer2Sync,
+            _ => unreachable!(),
+        }
     }
 
     #[instability::unstable]
@@ -212,16 +226,16 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     #[instability::unstable]
     pub fn interrupts(&self) -> EnumSet<TimerEvent> {
         let mut res = EnumSet::new();
-        let info = PWM::info();
+        let info = self.mcpwm_info;
 
         let ints = info.regs().int_st().read();
-        if ints.timer_stop(TIM).bit() {
+        if ints.timer_stop(self.number).bit() {
             res.insert(TimerEvent::TimerStop);
         }
-        if ints.timer_tep(TIM).bit() {
+        if ints.timer_tep(self.number).bit() {
             res.insert(TimerEvent::TimerEqualPeriod);
         }
-        if ints.timer_tez(TIM).bit() {
+        if ints.timer_tez(self.number).bit() {
             res.insert(TimerEvent::TimerEqualZero);
         }
 
@@ -230,13 +244,13 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, events: EnumSet<TimerEvent>) {
-        let info = PWM::info();
+        let info = self.mcpwm_info;
         info.regs().int_clr().write(|w| {
             for event in events {
                 match event {
-                    TimerEvent::TimerStop => w.timer_stop(TIM).bit(true),
-                    TimerEvent::TimerEqualPeriod => w.timer_tep(TIM).bit(true),
-                    TimerEvent::TimerEqualZero => w.timer_tez(TIM).bit(true),
+                    TimerEvent::TimerStop => w.timer_stop(self.number).bit(true),
+                    TimerEvent::TimerEqualPeriod => w.timer_tep(self.number).bit(true),
+                    TimerEvent::TimerEqualZero => w.timer_tez(self.number).bit(true),
                 };
             }
             w
@@ -249,6 +263,12 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
     pub fn update_period(&mut self, new_period: u16) {
         self.cfg0()
             .modify(|_r, w| unsafe { w.period().bits(new_period) });
+    }
+
+    /// Get the timer number
+    #[doc(hidden)]
+    pub fn number(&self) -> u8 {
+        self.number
     }
 
     fn configure(&mut self) {
@@ -272,67 +292,50 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 
     fn set_sync_phase(&mut self, sync_phase: u16) {
         // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
-        let tmr = unsafe { Self::tmr() };
-        tmr.sync()
+        self.sync()
             .modify(|_r, w| unsafe { w.phase().bits(sync_phase) });
     }
 
     fn set_sync_counter_direction(&mut self, direction: CounterDirection) {
-        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
-        let tmr = unsafe { Self::tmr() };
-        tmr.sync()
+        self.sync()
             .modify(|_r, w| w.phase_direction().bit(direction as u8 != 0));
     }
 
     fn set_sync_out_selection(&mut self, sync_out: SyncOutSelect) {
-        // SAFETY: Only TIMERx_SYNC accessed; unique per TIM const
-        let timer = unsafe { Self::tmr() };
-        timer
-            .sync()
+        self.sync()
             .modify(|_r, w| unsafe { w.synco_sel().bits(sync_out as u8) });
     }
 
-    fn set_sync_in_select(&mut self, sync_sel: SyncInSelect) {
-        let info = PWM::info();
-
-        // SAFETY: Only TIMER_SYNCI_CFG and TIMERx_SYNC accessed
-        info.regs()
-            .timer_synci_cfg()
-            .modify(|_r, w| unsafe { w.timer_syncisel(TIM).bits(sync_sel as u8) });
-        self.sync()
-            .modify(|_r, w| w.synci_en().bit(sync_sel != SyncInSelect::None));
-    }
-
     fn enable_listen(&mut self, events: EnumSet<TimerEvent>, value: bool) {
-        let info = PWM::info();
+        let info = self.mcpwm_info;
         let mut int_events = EnumSet::new();
         for timer_event in events {
             int_events.insert(timer_event.into());
         }
 
-        info.enable_listen::<TIM>(int_events, value);
+        info.enable_listen(self.number, int_events, value);
     }
 
     fn cfg0(&mut self) -> &pac::mcpwm0::timer::CFG0 {
         // SAFETY: Unique register access per TIM
-        unsafe { Self::tmr() }.cfg0()
+        unsafe { self.tmr().cfg0() }
     }
 
     fn cfg1(&mut self) -> &pac::mcpwm0::timer::CFG1 {
         // SAFETY: Unique register access per TIM
-        unsafe { Self::tmr() }.cfg1()
+        unsafe { self.tmr().cfg1() }
     }
 
     fn sync(&mut self) -> &pac::mcpwm0::timer::SYNC {
         // SAFETY: Unique register access per TIM
-        unsafe { Self::tmr() }.sync()
+        unsafe { self.tmr().sync() }
     }
 
     // Marked unsafe as the caller must ensure that only one timer
     // is accessing the registers for a given TIM const
-    unsafe fn tmr() -> &'static pac::mcpwm0::TIMER {
-        let info = PWM::info();
-        info.regs().timer(TIM as usize)
+    unsafe fn tmr(&self) -> &'d pac::mcpwm0::TIMER {
+        let info = self.mcpwm_info;
+        info.regs().timer(self.number as usize)
     }
 }
 
@@ -342,9 +345,9 @@ impl<'d, const TIM: u8, PWM: Instance> Timer<'d, TIM, PWM> {
 #[repr(u8)]
 pub enum SyncOutSelect {
     /// Sync out is triggered when a timer receives a sync in
-    SyncIn              = 0,
+    SyncIn = 0,
     /// Sync out is triggered when the timer equals zero
-    SyncWhenEqualZero   = 1,
+    SyncWhenEqualZero = 1,
     /// Sync out is triggered when the timer equals the period
     SyncWhenEqualPeriod = 2,
 }
@@ -513,11 +516,11 @@ impl TimerClockConfig {
 #[repr(u8)]
 pub enum PeriodUpdatingMethod {
     /// The period is updated immediately.
-    Immediately           = 0,
+    Immediately = 0,
     /// The period is updated when the timer equals zero.
-    TimerEqualsZero       = 1,
+    TimerEqualsZero = 1,
     /// The period is updated on a synchronization event.
-    Sync                  = 2,
+    Sync = 2,
     /// The period is updated either when the timer equals zero or on a
     /// synchronization event.
     TimerEqualsZeroOrSync = 3,
@@ -532,10 +535,10 @@ pub enum StopCondition {
     RunContinuously = 2,
     /// Defines to start the timer now and run till
     /// the counter equals zero
-    StopAtZero      = 3,
+    StopAtZero = 3,
     /// Defines to start the timer now and run till
     /// the counter equals period
-    StopAtPeriod    = 4,
+    StopAtPeriod = 4,
 }
 
 /// PWM working mode
@@ -557,7 +560,7 @@ pub enum PwmWorkingMode {
     /// starts increasing from zero until the period value is reached. Then,
     /// the timer decreases back to zero. This pattern is then repeated. The
     /// PWM period is the result of the value of the period field × 2.
-    UpDown   = 3,
+    UpDown = 3,
 }
 
 impl From<bool> for CounterDirection {
@@ -572,6 +575,7 @@ impl From<bool> for CounterDirection {
 /// The direction the timer counter is changing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CounterDirection {
     /// The timer counter is increasing
     Increasing = 0,

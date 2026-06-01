@@ -110,10 +110,7 @@
 //! # {after_snippet}
 //! ```
 
-use core::marker::PhantomData;
-
 use enumset::{EnumSet, EnumSetType};
-use paste::paste;
 
 #[cfg(soc_has_mcpwm0)]
 use crate::mcpwm::{
@@ -142,77 +139,62 @@ pub mod sync;
 /// MCPWM timers
 pub mod timer;
 
-for_each_mcpwm!(
-    ($id:literal, $inst:ident, $sys:ident) => {
-        paste! {
-            /// Provides nice types for public API
-            pub mod [<$inst:lower>] {
-                use crate::{mcpwm::*, peripherals::[<$inst>] as MCPWMPeripheral};
+crate::any_peripheral! {
+    /// Any MCPWM peripheral.
+    pub peripheral AnyMcPwm<'d> {
+        #[cfg(soc_has_mcpwm0)]
+        Mcpwm0(crate::peripherals::MCPWM0<'d>),
+        #[cfg(soc_has_mcpwm1)]
+        Mcpwm1(crate::peripherals::MCPWM1<'d>),
+    }
+}
 
-                /// MCPWM Driver for MCPWM<$id>
-                pub type McPwm<'d> = super::McPwm<'d, MCPWMPeripheral<'d>>;
-                /// Capture Channel for MCPWM<$id>
-                pub type CaptureChannel<'d, const NUM: u8> =
-                    capture::CaptureChannel<'d, NUM, MCPWMPeripheral<'d>>;
-                /// Capture timer for MCPWM<$id>
-                pub type CaptureTimer<'d> = capture::CaptureTimer<'d, MCPWMPeripheral<'d>>;
-                /// Timer for MCPWM<$id>
-                pub type Timer<'d, const NUM: u8> = timer::Timer<'d, NUM, MCPWMPeripheral<'d>>;
-                /// Operator for MCPWM<$id>
-                pub type Operator<'d, const NUM: u8> = operator::Operator<'d, NUM, MCPWMPeripheral<'d>>;
-                /// Pwm Pin for MCPWM<$id>
-                pub type PwmPin<'d, const NUM: u8, const IS_A: bool> =
-                    operator::PwmPin<'d, MCPWMPeripheral<'d>, NUM, IS_A>;
-                /// Linked Pins for MCPWM<$id>
-                pub type LinkedPins<'d, const NUM: u8> = operator::LinkedPins<'d, MCPWMPeripheral<'d>, NUM>;
-                /// Sync source for MCPWM<$id>
-                pub type SyncSource<'d> = dyn sync::SyncSource<MCPWMPeripheral<'d>> + 'd;
-            }
-        }
-    };
-);
+impl Instance for AnyMcPwm<'_> {
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, mcpwm => { mcpwm.info() })
+    }
+}
 
 /// The MCPWM peripheral
 #[non_exhaustive]
-pub struct McPwm<'d, PWM: Instance> {
-    _phantom: PhantomData<&'d PWM>,
-    _instance: PWM,
+pub struct McPwm<'d> {
+    mcpwm: AnyMcPwm<'d>,
 
     /// Timer0
-    pub timer0: Timer<'d, 0, PWM>,
+    pub timer0: Timer<'d>,
     /// Timer1
-    pub timer1: Timer<'d, 1, PWM>,
+    pub timer1: Timer<'d>,
     /// Timer2
-    pub timer2: Timer<'d, 2, PWM>,
+    pub timer2: Timer<'d>,
     /// Capture Timer
-    pub capture_timer: CaptureTimer<'d, PWM>,
+    pub capture_timer: CaptureTimer<'d>,
 
     /// Operator0
-    pub operator0: Operator<'d, 0, PWM>,
+    pub operator0: Operator<'d>,
     /// Operator1
-    pub operator1: Operator<'d, 1, PWM>,
+    pub operator1: Operator<'d>,
     /// Operator2
-    pub operator2: Operator<'d, 2, PWM>,
+    pub operator2: Operator<'d>,
 
     /// Capture0
-    pub capture0: CaptureChannel<'d, 0, PWM>,
+    pub capture0: CaptureChannel<'d>,
     /// Capture1
-    pub capture1: CaptureChannel<'d, 1, PWM>,
+    pub capture1: CaptureChannel<'d>,
     /// Capture2
-    pub capture2: CaptureChannel<'d, 2, PWM>,
+    pub capture2: CaptureChannel<'d>,
 
-    /// Sync0
-    pub sync0: SyncLine<'d, 0, PWM>,
-    /// Sync1
-    pub sync1: SyncLine<'d, 1, PWM>,
-    /// Sync2
-    pub sync2: SyncLine<'d, 2, PWM>,
+    /// Sync line 0
+    pub sync0: SyncLine,
+    /// Sync line 1
+    pub sync1: SyncLine,
+    /// Sync line 2
+    pub sync2: SyncLine,
 }
 
-impl<'d, PWM: Instance> McPwm<'d, PWM> {
+impl<'d> McPwm<'d> {
     /// Create a new instance generics
-    pub fn new(_peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
-        let info = PWM::info();
+    pub fn new(mcpwm: AnyMcPwm<'d>, peripheral_clock: PeripheralClockConfig) -> Self {
+        let info = mcpwm.info();
         let guard = PeripheralGuard::new(info.peripheral());
 
         // set prescaler for timer (0-2)
@@ -223,22 +205,22 @@ impl<'d, PWM: Instance> McPwm<'d, PWM> {
         // enable clock
         info.regs().clk().write(|w| w.en().set_bit());
 
+        let info = mcpwm.info();
         Self {
-            _phantom: PhantomData,
-            _instance: _peripheral,
-            timer0: Timer::new(guard.clone(), &peripheral_clock),
-            timer1: Timer::new(guard.clone(), &peripheral_clock),
-            timer2: Timer::new(guard.clone(), &peripheral_clock),
-            operator0: Operator::new(guard.clone()),
-            operator1: Operator::new(guard.clone()),
-            operator2: Operator::new(guard.clone()),
-            capture_timer: CaptureTimer::new(guard.clone()),
-            capture0: CaptureChannel::new(guard.clone(), CaptureChannelConfig::default()),
-            capture1: CaptureChannel::new(guard.clone(), CaptureChannelConfig::default()),
-            capture2: CaptureChannel::new(guard, CaptureChannelConfig::default()),
-            sync0: SyncLine::new(),
-            sync1: SyncLine::new(),
-            sync2: SyncLine::new(),
+            mcpwm,
+            timer0: Timer::new(guard.clone(), info, 0, &peripheral_clock),
+            timer1: Timer::new(guard.clone(), info, 1, &peripheral_clock),
+            timer2: Timer::new(guard.clone(), info, 2, &peripheral_clock),
+            operator0: Operator::new(guard.clone(), 0, info),
+            operator1: Operator::new(guard.clone(), 1, info),
+            operator2: Operator::new(guard.clone(), 2, info),
+            capture_timer: CaptureTimer::new(guard.clone(), info),
+            capture0: CaptureChannel::new(guard.clone(), info, 0, CaptureChannelConfig::default()),
+            capture1: CaptureChannel::new(guard.clone(), info, 1, CaptureChannelConfig::default()),
+            capture2: CaptureChannel::new(guard, info, 2, CaptureChannelConfig::default()),
+            sync0: SyncLine::new(0, info),
+            sync1: SyncLine::new(1, info),
+            sync2: SyncLine::new(2, info),
         }
     }
 
@@ -248,7 +230,7 @@ impl<'d, PWM: Instance> McPwm<'d, PWM> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        let info = PWM::info();
+        let info = self.mcpwm.info();
         let interrupt = info.interrupt();
 
         for core in crate::system::Cpu::other() {
@@ -478,6 +460,13 @@ pub enum Event {
     Capture,
 }
 
+/// A peripheral singleton compatible with the MCPWM driver.
+pub trait Instance: crate::private::Sealed + any::Degrade {
+    /// Returns the peripheral data describing this instance.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
+}
+
 impl Info {
     /// Returns the register block for this PWM instance.
     pub fn regs(&self) -> &RegisterBlock {
@@ -495,46 +484,46 @@ impl Info {
     }
 
     /// Returns the output signal for operators
-    pub fn operator_output_signal<const OP: u8, const IS_A: bool>(&self) -> OutputSignal {
-        match IS_A {
-            true => self.operator_a_output[OP as usize],
-            false => self.operator_b_output[OP as usize],
+    pub fn operator_output_signal(&self, operator: u8, is_a: bool) -> OutputSignal {
+        match is_a {
+            true => self.operator_a_output[operator as usize],
+            false => self.operator_b_output[operator as usize],
         }
     }
 
     /// Returns the sync input signal
-    pub fn sync_input_signal<const SYNC: u8>(&self) -> InputSignal {
-        self.sync_input[SYNC as usize]
+    pub fn sync_input_signal(&self, sync: u8) -> InputSignal {
+        self.sync_input[sync as usize]
     }
 
     /// Returns the capture input signal
-    pub fn capture_input_signal<const CHAN: u8>(&self) -> InputSignal {
-        self.capture_input[CHAN as usize]
+    pub fn capture_input_signal(&self, chan: u8) -> InputSignal {
+        self.capture_input[chan as usize]
     }
 
     /// Return if the interrupt for an event is set
-    pub fn interrupt_set<const UNIT: u8>(&self, event: Event) -> bool {
+    pub fn interrupt_set(&self, unit: u8, event: Event) -> bool {
         let regs = self.regs();
         let int_st = regs.int_st().read();
-        dispatch_event_bit!(int_st, event, UNIT)
+        dispatch_event_bit!(int_st, event, unit)
     }
 
     /// Clear the interrupt for an event on a specific UNIT #
-    pub fn clear_interrupt<const UNIT: u8>(&self, event: Event) {
+    pub fn clear_interrupt(&self, unit: u8, event: Event) {
         let regs = self.regs();
         regs.int_clr().write(|w| {
-            dispatch_event_write!(w, event, UNIT, true);
+            dispatch_event_write!(w, event, unit, true);
             w
         });
     }
 
     /// Enables listening for an event on a specific UNIT #
-    pub fn enable_listen<const UNIT: u8>(&self, events: EnumSet<Event>, value: bool) {
+    pub fn enable_listen(&self, unit: u8, events: EnumSet<Event>, value: bool) {
         let regs = self.regs();
         critical_section::with(|_| {
             regs.int_ena().modify(|_, w| {
                 for event in events {
-                    dispatch_event_write!(w, event, UNIT, value);
+                    dispatch_event_write!(w, event, unit, value);
                 }
                 w
             });
@@ -550,20 +539,13 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-/// Represents a MCPWM peripheral
-pub trait Instance: crate::private::Sealed {
-    #[doc(hidden)]
-    /// Returns the peripheral data and state.
-    fn info() -> &'static Info;
-}
-
 // Create an `Instance` impl for each MCPWM peripheral
 for_each_mcpwm!(
     ($id:literal, $inst:ident, $sys:ident) => {
         paste::paste! {
             impl Instance for crate::peripherals::$inst<'_> {
                 /// Returns peripheral data for MCPWM $id
-                fn info() -> &'static Info {
+                fn info(&self) -> &'static Info {
                     static INFO: Info = Info {
                         register_block: crate::peripherals::$inst::regs(),
                         _peripheral: crate::system::Peripheral::$sys,
@@ -598,12 +580,11 @@ for_each_mcpwm!(
 );
 
 #[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
-struct PwmClockGuard(DropGuard<(), fn(())>);
+struct PwmClockGuard(DropGuard<clocks::McpwmInstance, fn(clocks::McpwmInstance)>);
 
 impl PwmClockGuard {
-    fn instance<PWM: Instance>() -> clocks::McpwmInstance {
-        let info = PWM::info();
-        match info.peripheral() {
+    fn instance(mcpwm_info: &'static Info) -> clocks::McpwmInstance {
+        match mcpwm_info.peripheral() {
             Peripheral::Mcpwm0 => clocks::McpwmInstance::Mcpwm0,
             #[cfg(soc_has_mcpwm1)]
             Peripheral::Mcpwm1 => clocks::McpwmInstance::Mcpwm1,
@@ -611,18 +592,18 @@ impl PwmClockGuard {
         }
     }
 
-    pub fn new<PWM: Instance>() -> Self {
-        ClockTree::with(move |clocks| Self::instance::<PWM>().request_function_clock(clocks));
+    pub fn new(mcpwm_info: &'static Info) -> Self {
+        ClockTree::with(move |clocks| Self::instance(mcpwm_info).request_function_clock(clocks));
 
-        Self(DropGuard::new((), |_| {
-            ClockTree::with(move |clocks| Self::instance::<PWM>().release_function_clock(clocks));
+        Self(DropGuard::new(Self::instance(mcpwm_info), move |mcpwm| {
+            ClockTree::with(move |clocks| mcpwm.release_function_clock(clocks));
         }))
     }
 }
 
-impl<'d, PWM: Instance + 'd> crate::private::Sealed for McPwm<'d, PWM> {}
+impl<'d> crate::private::Sealed for McPwm<'d> {}
 #[instability::unstable]
-impl<'d, PWM: Instance + 'd> crate::interrupt::InterruptConfigurable for McPwm<'d, PWM> {
+impl<'d> crate::interrupt::InterruptConfigurable for McPwm<'d> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }

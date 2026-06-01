@@ -70,6 +70,7 @@
 //!     });
 //! }
 //! ```
+
 use core::marker::PhantomData;
 
 use enumset::EnumSet;
@@ -81,11 +82,7 @@ pub use crate::pac::mcpwm0::{
 };
 use crate::{
     gpio::interconnect::PeripheralInput,
-    mcpwm::{
-        Instance,
-        PwmClockGuard,
-        sync::{SyncInSelect, SyncSource},
-    },
+    mcpwm::{Info, PwmClockGuard, sync::SyncKind},
     pac,
 };
 
@@ -120,18 +117,20 @@ impl Default for CaptureTimerConfig {
 /// to the phase value set in [`CaptureTimerConfig`].
 ///
 /// **Note:** This timer always counts up.
-pub struct CaptureTimer<'d, PWM: Instance> {
-    phantom: PhantomData<&'d PWM>,
+pub struct CaptureTimer<'d> {
+    mcpwm_info: &'static Info,
+    _phantom: PhantomData<&'d ()>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
 
-impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
-    pub(super) fn new(guard: PeripheralGuard) -> Self {
+impl<'d> CaptureTimer<'d> {
+    pub(super) fn new(guard: PeripheralGuard, mcpwm_info: &'static Info) -> Self {
         Self {
-            phantom: PhantomData,
+            mcpwm_info,
+            _phantom: PhantomData,
             _guard: guard,
-            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
+            _pwm_clock_guard: PwmClockGuard::new(mcpwm_info),
         }
     }
 
@@ -161,44 +160,35 @@ impl<'d, PWM: Instance> CaptureTimer<'d, PWM> {
     /// Triggers a software sync event on the capture timer.
     /// Refer to how sync events are handled in the [`CaptureTimer`] documentation.
     pub fn trigger_sync(&mut self) {
-        Self::cfg().modify(|_r, w| w.cap_sync_sw().set_bit());
+        self.cfg().modify(|_r, w| w.cap_sync_sw().set_bit());
     }
 
     /// Sets the capture timers sync source. Refer to how sync events are
     /// handled in the [`CaptureTimer`] documentation.
-    pub fn set_sync_in(&mut self, sync_source: &impl SyncSource<PWM>) {
-        let sync_in = sync_source.get_kind().into();
-        self.set_sync_in_select(sync_in);
-    }
-
-    /// Clears the sync in
-    pub fn clear_sync_in(&mut self) {
-        self.set_sync_in_select(SyncInSelect::None);
-    }
-
-    fn set_enable(&mut self, enable: bool) {
-        Self::cfg().modify(|_r, w| w.cap_timer_en().bit(enable));
-    }
-
-    fn set_sync_phase(&mut self, sync_phase: u32) {
-        Self::phase().write(|w| unsafe { w.cap_phase().bits(sync_phase) });
-    }
-
-    fn set_sync_in_select(&mut self, sync_sel: SyncInSelect) {
+    pub fn set_sync_in(&mut self, sync_sel: SyncKind) {
         // SAFETY: Only CAP_TIMER_CFG accessed; unique per PWM instance
-        Self::cfg().modify(|_r, w| {
-            w.cap_synci_en().bit(sync_sel != SyncInSelect::None);
+        self.cfg().modify(|_r, w| {
+            w.cap_synci_en().bit(sync_sel != SyncKind::None);
             unsafe { w.cap_synci_sel().bits(sync_sel as u8) }
         });
     }
 
-    fn cfg() -> &'static crate::Reg<pac::mcpwm0::cap_timer_cfg::CAP_TIMER_CFG_SPEC> {
-        let info = PWM::info();
+    fn set_enable(&mut self, enable: bool) {
+        self.cfg().modify(|_r, w| w.cap_timer_en().bit(enable));
+    }
+
+    fn set_sync_phase(&mut self, sync_phase: u32) {
+        self.phase()
+            .write(|w| unsafe { w.cap_phase().bits(sync_phase) });
+    }
+
+    fn cfg(&mut self) -> &'d crate::Reg<pac::mcpwm0::cap_timer_cfg::CAP_TIMER_CFG_SPEC> {
+        let info = self.mcpwm_info;
         info.regs().cap_timer_cfg()
     }
 
-    fn phase() -> &'static crate::Reg<pac::mcpwm0::cap_timer_phase::CAP_TIMER_PHASE_SPEC> {
-        let info = PWM::info();
+    fn phase(&mut self) -> &'d crate::Reg<pac::mcpwm0::cap_timer_phase::CAP_TIMER_PHASE_SPEC> {
+        let info = self.mcpwm_info;
         info.regs().cap_timer_phase()
     }
 }
@@ -261,25 +251,34 @@ impl Default for CaptureChannelConfig {
 /// * Setting the capture input GPIO pin
 /// * Whether to trigger capture events on rising and/or falling edges
 /// * Read the last capture edge, and the last capture time
-pub struct CaptureChannel<'d, const CHAN: u8, PWM: Instance> {
-    phantom: PhantomData<&'d PWM>,
+pub struct CaptureChannel<'d> {
+    mcpwm_info: &'static Info,
+    number: u8,
+    _phantom: PhantomData<&'d ()>,
     _guard: PeripheralGuard,
     _pwm_clock_guard: PwmClockGuard,
 }
 
-impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
-    pub(super) fn new(guard: PeripheralGuard, config: CaptureChannelConfig) -> Self {
+impl<'d> CaptureChannel<'d> {
+    pub(super) fn new(
+        guard: PeripheralGuard,
+        mcpwm_info: &'static Info,
+        number: u8,
+        config: CaptureChannelConfig,
+    ) -> Self {
         let mut channel = Self {
-            phantom: PhantomData,
+            mcpwm_info,
+            number,
+            _phantom: PhantomData,
             _guard: guard,
-            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
+            _pwm_clock_guard: PwmClockGuard::new(mcpwm_info),
         };
         channel.configure(config);
         channel
     }
 
     pub(super) fn configure(&mut self, config: CaptureChannelConfig) {
-        Self::cfg().modify(|_, w| {
+        self.cfg().modify(|_, w| {
             w.in_invert().variant(config.invert);
             unsafe { w.prescale().bits(config.prescaler) }
         });
@@ -287,8 +286,8 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
 
     /// Assign the input signal for the capture
     pub fn with_signal_input<'a>(self, input: impl PeripheralInput<'a>) -> Self {
-        let info = PWM::info();
-        let input_signal = info.capture_input_signal::<CHAN>();
+        let info = self.mcpwm_info;
+        let input_signal = info.capture_input_signal(self.number);
 
         if input_signal as usize <= property!("gpio.input_signal_max") {
             let source = input.into();
@@ -303,7 +302,7 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
 
     /// Enable or disables this capture channel
     pub fn set_enable(&mut self, enable: bool) {
-        Self::cfg().modify(|_, w| w.en().variant(enable));
+        self.cfg().modify(|_, w| w.en().variant(enable));
     }
 
     /// Set the config
@@ -313,7 +312,7 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
 
     /// Triggers a software capture on the current capture channel
     pub fn trigger_capture(&mut self) {
-        Self::cfg().modify(|_, w| w.sw().set_bit());
+        self.cfg().modify(|_, w| w.sw().set_bit());
     }
 
     /// Sets the capture channel to listen to captures on specific edge events
@@ -322,10 +321,11 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
     /// stop listening to any events on this channel.
     #[instability::unstable]
     pub fn listen(&mut self, capture_mode: CaptureMode) {
-        Self::cfg().modify(|_, w| w.mode().variant(capture_mode));
+        self.cfg().modify(|_, w| w.mode().variant(capture_mode));
 
-        let info = PWM::info();
-        info.enable_listen::<CHAN>(
+        let info = self.mcpwm_info;
+        info.enable_listen(
+            self.number,
             EnumSet::only(Event::Capture),
             capture_mode != CaptureMode::None,
         );
@@ -340,28 +340,37 @@ impl<'d, const CHAN: u8, PWM: Instance> CaptureChannel<'d, CHAN, PWM> {
     /// If the interrupt was set for this channel
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
-        let info = PWM::info();
-        info.interrupt_set::<CHAN>(Event::Capture)
+        let info = self.mcpwm_info;
+        info.interrupt_set(self.number, Event::Capture)
     }
 
     /// Clear the interrupt
     #[instability::unstable]
     pub fn clear_interrupt(&self) {
-        let info = PWM::info();
-        info.clear_interrupt::<CHAN>(Event::Capture);
+        let info = self.mcpwm_info;
+        info.clear_interrupt(self.number, Event::Capture);
     }
 
     /// Gets the last captured event
     #[instability::unstable]
     pub fn events(&self) -> CaptureEvent {
-        let info = PWM::info();
-        let time = info.regs().cap_ch(CHAN as usize).read().value().bits();
-        let edge = info.regs().cap_status().read().cap_edge(CHAN).variant();
+        let info = self.mcpwm_info;
+        let time = info
+            .regs()
+            .cap_ch(self.number as usize)
+            .read()
+            .value()
+            .bits();
+        let edge = info
+            .regs()
+            .cap_status()
+            .read()
+            .cap_edge(self.number)
+            .variant();
         CaptureEvent { time, edge }
     }
 
-    fn cfg() -> &'static crate::Reg<pac::mcpwm0::cap_ch_cfg::CAP_CH_CFG_SPEC> {
-        let info = PWM::info();
-        info.regs().cap_ch_cfg(CHAN as usize)
+    fn cfg(&mut self) -> &'d crate::Reg<pac::mcpwm0::cap_ch_cfg::CAP_CH_CFG_SPEC> {
+        self.mcpwm_info.regs().cap_ch_cfg(self.number as usize)
     }
 }
