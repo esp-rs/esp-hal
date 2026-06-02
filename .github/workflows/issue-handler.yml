@@ -85,7 +85,10 @@ jobs:
               [/\busb\b/i, "peripheral:usb"],
               [/watchdog timer|wdt/i, "peripheral:wdt"],
             ];
-
+if (context.payload.action === 'edited' && 
+    !context.payload.changes?.title) {
+  return; // body-only edit, skip
+}
             const labels = [...new Set(
               rules
                 .filter(([regex]) => regex.test(context.payload.issue.title))
