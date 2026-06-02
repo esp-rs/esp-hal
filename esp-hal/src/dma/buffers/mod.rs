@@ -1934,14 +1934,12 @@ pub(crate) unsafe fn prepare_for_rx(
                 // cache_invalidate_addr in write_back() can safely discard the stale
                 // cache without losing those metadata fields.
                 #[cfg(soc_internal_memory_cached)]
-                for buf in align_buffers.iter() {
-                    if let Some(buf) = buf {
-                        unsafe {
-                            crate::soc::cache_writeback_addr(
-                                buf as *const ManualWritebackBuffer as u32,
-                                core::mem::size_of::<ManualWritebackBuffer>() as u32,
-                            );
-                        }
+                for buf in align_buffers.iter().flatten() {
+                    unsafe {
+                        crate::soc::cache_writeback_addr(
+                            buf as *const ManualWritebackBuffer as u32,
+                            core::mem::size_of::<ManualWritebackBuffer>() as u32,
+                        );
                     }
                 }
 
