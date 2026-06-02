@@ -1215,6 +1215,8 @@ mod tests {
             48_000_000
         } else if cfg!(esp32c5) {
             80_000_000 // pre-divided by 2
+        } else if cfg!(esp32p4) {
+            40_000_000 // default clock source is XTAL
         } else {
             80_000_000
         };

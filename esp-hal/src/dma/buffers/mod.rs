@@ -876,6 +876,15 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             desc.reset_for_tx(desc.next.is_null());
         }
 
+        #[cfg(esp32p4)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                self.tx_descriptors.head() as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32
+                    * self.tx_descriptors.descriptors.len() as u32,
+            );
+        }
+
         cfg_if::cfg_if! {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
@@ -918,6 +927,15 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.linked_iter_mut() {
             desc.reset_for_rx();
+        }
+
+        #[cfg(esp32p4)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                self.rx_descriptors.head() as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32
+                    * self.rx_descriptors.descriptors.len() as u32,
+            );
         }
 
         cfg_if::cfg_if! {
