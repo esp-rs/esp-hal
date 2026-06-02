@@ -400,7 +400,7 @@ mod tests {
         assert_eq!(byte[0], 0x42);
 
         // Join UART
-        let mut uart = Uart::join(rx, tx).unwrap_or_else(|_| panic!("Uart::join failed"));
+        let mut uart = Uart::join(rx, tx);
 
         // Send and receive byte
         uart.write(&[0x43]).unwrap();
@@ -410,15 +410,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_join_different_uarts(ctx: Context) {
         let tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        let joined = Uart::join(rx, tx);
-        assert!(
-            joined.is_err(),
-            "Uart::join should fail with different UARTs"
-        );
+        let _joined = Uart::join(rx, tx);
     }
 }
 
@@ -1158,8 +1155,7 @@ mod uhci {
                 SHORT_TEST_STRING.as_bytes()
             );
 
-            uhci_opt =
-                Some(Uhci::join(uhci_rx, uhci_tx).unwrap_or_else(|_| panic!("Uhci::join failed")));
+            uhci_opt = Some(Uhci::join(uhci_rx, uhci_tx));
             dma_rx_opt = Some(dma_rx);
             dma_tx_opt = Some(dma_tx);
         }
