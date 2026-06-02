@@ -213,10 +213,11 @@ fn parse_chips(key: &str, value: &str) -> anyhow::Result<Vec<Chip>> {
                 })
                 .collect())
         }
-        _ => Ok(value
+        "CHIPS" => Ok(value
             .split_ascii_whitespace()
             .map(|s| Chip::from_str(s, false).unwrap())
             .collect()),
+        _ => anyhow::bail!("parse_chips called with unexpected key '{key}'"),
     }
 }
 
@@ -442,7 +443,7 @@ struct CargoToml {
 
 /// Parse the chip set from `//% CHIPS:` / `//% CHIP_FEATURES:` annotations in a source file.
 /// Returns `None` if neither annotation is present.
-fn parse_annotation_chips(text: &str) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
+fn parse_chips_from_annotation(text: &str) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
     let mut found = false;
     let mut chips: Vec<Chip> = Chip::iter().collect();
     let mut excluded: Vec<Chip> = Vec::new();
@@ -510,12 +511,12 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
             .filter_map(|k| Chip::from_str(k, true).ok())
             .collect();
 
-        let annotation_chips = parse_annotation_chips(&text).with_context(|| {
+        let chips_from_annotations = parse_chips_from_annotation(&text).with_context(|| {
             format!("Failed to parse annotations in {}", main_rs_path.display())
         })?;
 
         // If the annotation requires chips that are not declared in Cargo.toml, bail.
-        if let Some(ref required) = annotation_chips {
+        if let Some(ref required) = chips_from_annotations {
             let missing = required
                 .iter()
                 .filter(|c| !cargo_chips.contains(c))
@@ -529,7 +530,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         }
 
         let chips = cargo_chips.into_iter().filter(|c| {
-            annotation_chips
+            chips_from_annotations
                 .as_ref()
                 .map_or(true, |set| set.contains(c))
         });
