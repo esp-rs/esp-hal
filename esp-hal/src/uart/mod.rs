@@ -980,6 +980,8 @@ impl<'d> UartRx<'d, Blocking> {
         while !self.is_break_detected() {
             // wait
         }
+
+        self.clear_break_detected();
     }
 
     /// Waits for a break condition to be detected with a timeout.
@@ -1001,6 +1003,7 @@ impl<'d> UartRx<'d, Blocking> {
             }
         }
 
+        self.clear_break_detected();
         true
     }
 
@@ -1219,11 +1222,18 @@ where
 
     /// Returns whether a break condition has been detected.
     ///
-    /// If a break has been detected, the break-detection status is cleared before
-    /// this method returns.
+    /// The returned status is sticky and remains set until
+    /// [`Self::clear_break_detected`] is called, or until one of the
+    /// `wait_for_break` methods observes and clears it.
     #[instability::unstable]
-    pub fn is_break_detected(&mut self) -> bool {
+    pub fn is_break_detected(&self) -> bool {
         self.uart.info().check_rx_break_detected()
+    }
+
+    /// Clears the break-detection status.
+    #[instability::unstable]
+    pub fn clear_break_detected(&mut self) {
+        self.uart.info().clear_rx_break_detected();
     }
 
     /// Change the configuration.
@@ -1892,11 +1902,18 @@ where
 
     /// Returns whether a break condition has been detected.
     ///
-    /// If a break has been detected, the break-detection status is cleared before
-    /// this method returns.
+    /// The returned status is sticky and remains set until
+    /// [`Self::clear_break_detected`] is called, or until one of the
+    /// `wait_for_break` methods observes and clears it.
     #[instability::unstable]
-    pub fn is_break_detected(&mut self) -> bool {
+    pub fn is_break_detected(&self) -> bool {
         self.rx.is_break_detected()
+    }
+
+    /// Clears the break-detection status.
+    #[instability::unstable]
+    pub fn clear_break_detected(&mut self) {
+        self.rx.clear_break_detected();
     }
 
     #[procmacros::doc_replace]

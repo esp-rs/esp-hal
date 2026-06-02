@@ -526,7 +526,7 @@ mod async_tx_rx {
         join::join,
         select::{Either, select},
     };
-    use embassy_time::{Duration, Timer};
+    use embassy_time::{Delay, Duration, Timer};
     use embedded_io_async::Write;
     use esp_hal::{
         Async,
@@ -576,8 +576,10 @@ mod async_tx_rx {
 
     #[test]
     async fn test_break_detection(mut ctx: Context) {
+        let mut delay = Delay;
+
         join(ctx.rx.wait_for_break_async(), async {
-            ctx.tx.send_break(100);
+            ctx.tx.send_break_async(&mut delay, 100).await;
         })
         .await;
     }
