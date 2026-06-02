@@ -880,7 +880,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram || cfg!(esp32p4) {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_writeback_addr(
                             self.buffer.as_ptr() as u32,
@@ -924,7 +924,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram || cfg!(esp32p4) {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_invalidate_addr(
                             self.buffer.as_ptr() as u32,
@@ -1596,7 +1596,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
-        #[cfg(esp32p4)]
+        #[cfg(soc_internal_memory_cached)]
         unsafe {
             crate::soc::cache_writeback_addr(
                 (&raw const EMPTY) as u32,
@@ -1634,7 +1634,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
-        #[cfg(esp32p4)]
+        #[cfg(soc_internal_memory_cached)]
         unsafe {
             crate::soc::cache_writeback_addr(
                 (&raw const EMPTY) as u32,
@@ -1840,7 +1840,7 @@ pub(crate) unsafe fn prepare_for_tx(
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
             // Make sure input data is in PSRAM instead of cache
-            if data_in_psram || cfg!(esp32p4) {
+            if data_in_psram || cfg!(soc_internal_memory_cached) {
                 unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
             }
         } else if #[cfg(soc_internal_memory_cached)] {
