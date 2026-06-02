@@ -86,7 +86,7 @@
 //!         }
 //!
 //!         // Join rx and tx back
-//!         uhci = Uhci::join(uhci_rx, uhci_tx);
+//!         uhci = Uhci::join(uhci_rx, uhci_tx).unwrap_or_else(|_| panic!("Uhci::join failed"));
 //!     }
 //!     software_reset()
 //! }
@@ -382,16 +382,44 @@ where
     }
 
     /// Join the UhciRx and UhciTx into a Uhci instance
-    pub fn join(rx: UhciRx<'d, Dm>, tx: UhciTx<'d, Dm>) -> Self {
-        Self {
-            uart: Uart::join(rx.uart_rx, tx.uart_tx),
+    ///
+    /// Returns an error with the transmitter and receiver if they are not
+    /// from the same UART instance.
+    pub fn join(
+        rx: UhciRx<'d, Dm>,
+        tx: UhciTx<'d, Dm>,
+    ) -> Result<Self, (UhciRx<'d, Dm>, UhciTx<'d, Dm>)> {
+        // Try to join the two uart parts
+        let uart = match Uart::join(rx.uart_rx, tx.uart_tx) {
+            Ok(uart) => uart,
+            Err((uart_rx, uart_tx)) => {
+                // Could not join, return rx and tx instances back as an error
+                return Err((
+                    UhciRx {
+                        uhci_per: rx.uhci_per,
+                        uart_rx,
+                        channel_rx: rx.channel_rx,
+                        _guard: rx._guard,
+                    },
+                    UhciTx {
+                        uhci_per: tx.uhci_per,
+                        uart_tx,
+                        channel_tx: tx.channel_tx,
+                        _guard: tx._guard,
+                    },
+                ));
+            }
+        };
+
+        Ok(Self {
+            uart,
             uhci_per: tx.uhci_per,
             channel: Channel {
                 rx: rx.channel_rx,
                 tx: tx.channel_tx,
             },
             _guard: tx._guard,
-        }
+        })
     }
 
     /// Sets the config to the UHCI peripheral, Rx part

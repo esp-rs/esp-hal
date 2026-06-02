@@ -50,7 +50,7 @@ crate::unstable_driver! {
 mod compat;
 mod low_level;
 
-use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
+use core::{marker::PhantomData, mem::discriminant, sync::atomic::Ordering, task::Poll};
 
 use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
@@ -2014,6 +2014,9 @@ where
     /// This allows to go back to an UART instance after splitting it into
     /// separate transmitter and receiver components.
     ///
+    /// Returns an error with the transmitter and receiver if they are not
+    /// from the same UART instance.
+    ///
     /// ## Example
     ///
     /// ```rust, no_run
@@ -2027,12 +2030,21 @@ where
     /// let (rx, tx) = uart.split();
     ///
     /// // These components can then later be joined back together:
-    /// let _uart = Uart::join(rx, tx);
+    /// let _uart = Uart::join(rx, tx).unwrap_or_else(|_| panic!("Uart::join failed"));
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub fn join(rx: UartRx<'d, Dm>, tx: UartTx<'d, Dm>) -> Self {
-        Self { rx, tx }
+    pub fn join(
+        rx: UartRx<'d, Dm>,
+        tx: UartTx<'d, Dm>,
+    ) -> Result<Self, (UartRx<'d, Dm>, UartTx<'d, Dm>)> {
+        // Check if rx and tx are from the same UART instance
+        if discriminant(&rx.uart.0) != discriminant(&tx.uart.0) {
+            // Return rx and tx back as an error
+            return Err((rx, tx));
+        }
+
+        Ok(Self { rx, tx })
     }
 
     /// Reads and clears errors set by received data.
