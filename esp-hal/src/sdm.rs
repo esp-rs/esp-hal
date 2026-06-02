@@ -1,8 +1,34 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
+
 //! Sigma-delta modulation peripheral.
 //!
 //! The sigma-delta modulator produces a pulse-density modulated output on a
 //! GPIO matrix signal. Each channel can be configured with a carrier frequency
 //! and pulse density, then routed to one output pin.
+//!
+//! ## Examples
+//!
+//! Generate a sigma-delta output signal on a GPIO pin.
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! use esp_hal::{
+//!     sdm::{Sdm, SdmConfig},
+//!     time::Rate,
+//! };
+//!
+//! let sdm = Sdm::new(peripherals.GPIO_SD, SdmConfig::default());
+//! let config = sdm
+//!     .channel_config()
+//!     .with_frequency(Rate::from_khz(500))?
+//!     .with_duty(128);
+//! let mut channel = sdm.channel0.connect(peripherals.GPIO2, config)?;
+//!
+//! channel.set_duty(192); // duty ranges from 0 to 255
+//! channel.set_pulse_density(0); // pulse density ranges from -128 to 127
+//! //
+//! # {after_snippet}
+//! ```
 
 use core::fmt;
 
@@ -10,7 +36,9 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     gpio::{
-        OutputConfig, OutputSignal, PinGuard,
+        OutputConfig,
+        OutputSignal,
+        PinGuard,
         interconnect::{OutputSignal as GpioOutputSignal, PeripheralOutput},
     },
     peripherals::GPIO_SD,
@@ -92,7 +120,7 @@ for_each_sdm_channel!(
 );
 
 /// Sigma-delta peripheral configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SdmConfig {
@@ -108,45 +136,26 @@ impl SdmConfig {
     }
 }
 
-impl Default for SdmConfig {
-    fn default() -> Self {
-        Self {
-            clock_source: ClockSource::default(),
-        }
-    }
-}
-
 /// Source clock for the shared SDM/IO_MUX clock.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ClockSource {
     /// APB clock.
     #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
+    #[default]
     Apb,
     /// XTAL clock.
     #[cfg(any(esp32c5, esp32c6, esp32h2, esp32p4))]
     Xtal,
     /// Fixed 80 MHz PLL clock.
     #[cfg(any(esp32c5, esp32c6, esp32p4))]
+    #[cfg_attr(any(esp32c5, esp32c6, esp32p4), default)]
     PllF80m,
     /// Fixed 48 MHz PLL clock.
     #[cfg(esp32h2)]
+    #[cfg_attr(esp32h2, default)]
     PllF48m,
-}
-
-impl Default for ClockSource {
-    fn default() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                Self::Apb
-            } else if #[cfg(any(esp32c5, esp32c6, esp32p4))] {
-                Self::PllF80m
-            } else if #[cfg(esp32h2)] {
-                Self::PllF48m
-            }
-        }
-    }
 }
 
 impl ClockSource {
@@ -194,7 +203,7 @@ impl core::error::Error for Error {}
 /// The hardware stores the prescaler and pulse density in the same register,
 /// so applying a complete channel configuration can update both fields with a
 /// single register write.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct ChannelConfig {
@@ -270,15 +279,6 @@ impl ChannelConfigBuilder {
     /// Returns the default channel configuration.
     pub const fn build(self) -> ChannelConfig {
         self.config
-    }
-}
-
-impl Default for ChannelConfig {
-    fn default() -> Self {
-        Self {
-            raw_prescaler: 0,
-            pulse_density: 0,
-        }
     }
 }
 
@@ -464,12 +464,10 @@ const fn duty_to_density(duty: u8) -> i8 {
 
 fn configure_clock_source(clock_source: ClockSource) {
     // Newer chips expose this selector in different clock-control blocks:
-    // - C5/C6/H2 use PCR.iomux_clk_conf.iomux_func_clk_sel, but the selector
-    //   encodings differ by chip.
-    // - P4 uses HP_SYS_CLKRST.peri_clk_ctrl26.iomux_clk_src_sel, a one-bit
-    //   XTAL/PLL_F80M selector.
-    // - ESP32/C3/S2/S3 use APB for this driver path and do not need a source
-    //   selector write here.
+    // - C5/C6/H2 use PCR.iomux_clk_conf.iomux_func_clk_sel, but the selector encodings differ by
+    //   chip.
+    // - P4 uses HP_SYS_CLKRST.peri_clk_ctrl26.iomux_clk_src_sel, a one-bit XTAL/PLL_F80M selector.
+    // - ESP32/C3/S2/S3 use APB for this driver path and do not need a source selector write here.
     cfg_if::cfg_if! {
         if #[cfg(esp32c5)] {
             crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
@@ -526,18 +524,10 @@ fn write_config_raw(channel: usize, config: ChannelConfig) {
     let sd = GPIO_SD::regs();
 
     #[cfg(esp32c5)]
-    sd.sigmadelta(channel).write(|w| unsafe {
-        w.sd_in()
-            .bits(density)
-            .sd_prescale()
-            .bits(prescaler)
-    });
+    sd.sigmadelta(channel)
+        .write(|w| unsafe { w.sd_in().bits(density).sd_prescale().bits(prescaler) });
 
     #[cfg(not(esp32c5))]
-    sd.sigmadelta(channel).write(|w| unsafe {
-        w.in_()
-            .bits(density)
-            .prescale()
-            .bits(prescaler)
-    });
+    sd.sigmadelta(channel)
+        .write(|w| unsafe { w.in_().bits(density).prescale().bits(prescaler) });
 }
