@@ -6,9 +6,14 @@ pub(crate) const FRAME_SIZE: usize = 129;
 pub(crate) const FRAME_VERSION_1: u8 = 0x10; // IEEE 802.15.4 - 2006 & 2011
 pub(crate) const FRAME_VERSION_2: u8 = 0x20; // IEEE 802.15.4 - 2015
 
-const FRAME_AR_OFFSET: usize = 1;
+// These offsets index the length-stripped PSDU that every caller passes in:
+// frames are built from a pointer one byte past the PHY length byte (`.add(1)`)
+// and the RX path reads `RX_BUFFER[1..]`, so byte 0 is the first FCF octet. The
+// IEEE 802.15.4 FCF carries the AR (ack-request) bit in FCF octet 0 and the
+// frame-version field in FCF octet 1.
+const FRAME_AR_OFFSET: usize = 0;
 const FRAME_AR_BIT: u8 = 0x20;
-const FRAME_VERSION_OFFSET: usize = 2;
+const FRAME_VERSION_OFFSET: usize = 1;
 const FRAME_VERSION_MASK: u8 = 0x30;
 
 /// IEEE 802.15.4 MAC frame
