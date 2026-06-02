@@ -522,7 +522,8 @@ pub mod dma {
         fn enable_dma(&self) {
             cfg_select! {
                 any(esp32, esp32s2) => {
-                    self.regs().dma_conf().toggle(|w, en| {
+                    use crate::RegisterToggle;
+                    self.regs().dma_conf().toggle(|w, bit| {
                         w.in_rst().bit(bit);
                         w.out_rst().bit(bit);
                         w.ahbm_fifo_rst().bit(bit);

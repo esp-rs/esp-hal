@@ -60,7 +60,7 @@ use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fen
 use enumset::{EnumSet, EnumSetType};
 
 pub use self::buffers::*;
-#[cfg(all(any(dma_kind = "gdma", esp32s2), dma_supports_mem2mem))]
+#[cfg(dma_supports_mem2mem)]
 pub use self::m2m::*;
 use crate::{
     Async,
@@ -1161,9 +1161,9 @@ where
     pub fn new(rx_impl: CH) -> Self {
         let _guard = rx_impl.enable();
 
-        #[cfg(dma_kind = "gdma")]
         // clear the mem2mem mode to avoid failed DMA if this
         // channel was previously used for a mem2mem transfer.
+        #[cfg(dma_supports_mem2mem)]
         rx_impl.set_mem2mem_mode(false);
 
         if let Some(interrupt) = rx_impl.peripheral_interrupt() {
@@ -1230,7 +1230,7 @@ where
     CH: DmaRxChannel,
 {
     /// Configure the channel.
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.rx_impl.set_priority(priority);
     }
@@ -1313,7 +1313,7 @@ where
         self.rx_impl.stop()
     }
 
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_supports_mem2mem)]
     pub(crate) fn set_mem2mem_mode(&mut self, value: bool) {
         self.rx_impl.set_mem2mem_mode(value);
     }
@@ -1456,7 +1456,7 @@ where
     }
 
     /// Configure the channel priority.
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
     }
@@ -1659,7 +1659,7 @@ where
     }
 
     /// Configure the channel priorities.
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx.set_priority(priority);
         self.rx.set_priority(priority);

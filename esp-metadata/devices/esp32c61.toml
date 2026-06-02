@@ -377,7 +377,6 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true

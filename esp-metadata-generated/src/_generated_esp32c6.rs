@@ -79,9 +79,6 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.kind") => {
-        "gdma"
-    };
     ("dma.supports_mem2mem") => {
         true
     };

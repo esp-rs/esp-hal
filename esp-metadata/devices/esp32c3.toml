@@ -264,7 +264,6 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
 supports_mem2mem = true
 max_priority = 9

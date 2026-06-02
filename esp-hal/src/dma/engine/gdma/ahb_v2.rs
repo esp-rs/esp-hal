@@ -304,6 +304,7 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()

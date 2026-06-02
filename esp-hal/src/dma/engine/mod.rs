@@ -1,7 +1,5 @@
 use enumset::{EnumSet, EnumSetType};
 
-#[cfg(dma_kind = "gdma")]
-use crate::dma::DmaPriority;
 use crate::{
     asynch::AtomicWaker,
     dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
@@ -91,8 +89,8 @@ pub trait RegisterAccess: Sealed {
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.
-    #[cfg(dma_kind = "gdma")]
-    fn set_priority(&self, priority: DmaPriority);
+    #[cfg(dma_max_priority_is_set)]
+    fn set_priority(&self, priority: crate::dma::DmaPriority);
 
     /// Select a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
@@ -133,7 +131,7 @@ pub trait RegisterAccess: Sealed {
 
 #[doc(hidden)]
 pub trait RxRegisterAccess: RegisterAccess {
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool);
 
     fn peripheral_interrupt(&self) -> Option<Interrupt>;

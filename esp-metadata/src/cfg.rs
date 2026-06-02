@@ -341,7 +341,6 @@ driver_configs![
         driver: dma,
         name: "DMA",
         properties: {
-            kind: String,
             #[serde(default)]
             supports_mem2mem: bool,
             #[serde(default)]

@@ -378,6 +378,7 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for AxiGdmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()

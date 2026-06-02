@@ -3,8 +3,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-#[cfg(dma_kind = "gdma")]
-use crate::dma::DmaEligiblePeripheral;
 use crate::{
     Async,
     Blocking,
@@ -55,7 +53,7 @@ where
 
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
-    #[cfg(dma_kind = "pdma")]
+    #[cfg(esp32s2)]
     pub fn new<CH>(channel: CH) -> Self
     where
         CH: DmaChannel + Into<Mem2MemChannel<'d>>,
@@ -64,11 +62,11 @@ impl<'d> Mem2Mem<'d, Blocking> {
     }
 
     /// Create a new Mem2Mem instance.
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(not(esp32s2))]
     pub fn new<CH, P>(channel: CH, peripheral: P) -> Self
     where
         CH: DmaChannel + Into<Mem2MemChannel<'d>>,
-        P: DmaEligiblePeripheral<ErasedChannel<'d> = Mem2MemChannel<'d>>,
+        P: crate::dma::DmaEligiblePeripheral<ErasedChannel<'d> = Mem2MemChannel<'d>>,
     {
         // FIXME: we also need runtime compatibility checks here.
         // Some channels **don't** support mem2mem:
@@ -85,20 +83,21 @@ impl<'d> Mem2Mem<'d, Blocking> {
     /// that you're the only one using the peripheral.
     pub unsafe fn new_unsafe(
         channel: impl DmaChannel + Into<Mem2MemChannel<'d>>,
-        #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
+        #[cfg(not(esp32s2))] peripheral: DmaPeripheral,
     ) -> Self {
         let channel = Channel::new(channel.into());
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "gdma")] {
-                let mut channel = channel;
-                channel.rx.set_mem2mem_mode(true);
-            } else {
+        cfg_select! {
+            esp32s2 => {
                 // The S2's COPY DMA channel doesn't care about this. Once support for other
                 // channels are added, this will need updating.
                 let peripheral = DmaPeripheral::SPI2;
+            },
+            _ => {
+                let mut channel = channel;
+                channel.rx.set_mem2mem_mode(true);
             }
-        }
+        };
 
         Mem2Mem {
             rx: Mem2MemRx {

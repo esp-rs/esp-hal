@@ -352,6 +352,11 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for SpiDmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
+    fn set_mem2mem_mode(&self, _value: bool) {
+        unimplemented!("SPI DMA mem2mem mode is not supported on this chip")
+    }
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         Some(self.0.info().peripheral_interrupt)
     }

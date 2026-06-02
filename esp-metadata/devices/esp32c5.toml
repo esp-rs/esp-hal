@@ -300,7 +300,6 @@ key_length = { options = [
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true

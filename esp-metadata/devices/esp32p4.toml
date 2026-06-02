@@ -379,7 +379,6 @@ max_bus_timeout = 0x1F
 # Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 max_priority = 5
