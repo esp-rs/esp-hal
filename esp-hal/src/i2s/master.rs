@@ -76,8 +76,8 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, Config};
-//! # use esp_hal::dma_buffers;
-//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
+//! # use esp_hal::dma_rx_stream_buffer;
+//! let rx_buffer = dma_rx_stream_buffer!(4 * 4092, 1024);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
@@ -93,16 +93,16 @@
 //!     .with_bclk(peripherals.GPIO1)
 //!     .with_ws(peripherals.GPIO2)
 //!     .with_din(peripherals.GPIO5)
-//!     .build(rx_descriptors);
+//!     .build();
 //!
-//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
+//! let mut transfer = i2s_rx.read(rx_buffer)?;
 //!
 //! loop {
-//!     let avail = transfer.available()?;
+//!     let avail = transfer.available_bytes();
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
-//!         transfer.pop(&mut rcv[..avail])?;
+//!         transfer.pop(&mut rcv[..avail]);
 //!     }
 //! }
 //! # }
@@ -112,7 +112,9 @@
 //!
 //! - Only TDM mode is supported.
 
-use enumset::{EnumSet, EnumSetType};
+use core::mem::ManuallyDrop;
+
+use enumset::{EnumSet, EnumSetType, enum_set};
 use private::*;
 
 use crate::{
@@ -124,19 +126,14 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DescriptorChain,
-        DmaChannelFor,
-        DmaEligible,
+        DmaChannel,
+        DmaEligiblePeripheral,
         DmaError,
-        DmaTransferRx,
-        DmaTransferRxCircular,
-        DmaTransferTx,
-        DmaTransferTxCircular,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
-        ReadBuffer,
-        WriteBuffer,
-        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
+        DmaRxBuffer,
+        DmaRxInterrupt,
+        DmaTxBuffer,
+        DmaTxInterrupt,
+        asynch::{DmaRxFuture, DmaTxFuture},
     },
     gpio::{OutputConfig, interconnect::PeripheralOutput},
     i2s::AnyI2s,
@@ -161,18 +158,343 @@ pub enum I2sInterrupt {
     TxDone,
 }
 
+// Hacky implementation until we have per-instance metadata
+macro_rules! for_each_i2s {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2s {
+            $(($pattern) => $code;)*
+        }
+
+        #[cfg(soc_has_i2s0)]
+        _for_each_inner_i2s!((I2S0));
+
+        #[cfg(soc_has_i2s1)]
+        _for_each_inner_i2s!((I2S1));
+    };
+}
+
+with_i2s_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for I2S master peripherals.
+        ///
+        /// Implemented for each channel type that can serve a particular I2S instance `S`.
+        #[instability::unstable]
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with this I2S peripheral",
+            label = "This DMA channel",
+            note = "Use a channel that matches the I2S instance."
+        )]
+        pub trait I2sMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnyI2s<'d>,
+            peris = for_each_i2s,
+            ($peri:path, $ch:path) => {
+                impl<'d> I2sMasterDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+
+        // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
+        type I2sMasterErased<'d> = crate::dma::$any_channel<'d>;
+    };
+}
+
+impl<'d> I2s<'d, crate::Blocking> {
+    /// Construct a new I2s instance.
+    pub fn new<I: Instance + 'd>(
+        i2s: I,
+        channel: impl I2sMasterDmaChannel<'d, I>,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
+        Self::new_internal(i2s, channel.into(), config)
+    }
+}
+
 pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = property!("i2s.mclk_divider_bit_width");
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
-/// Data types that the I2S peripheral can work with.
-pub trait AcceptedWord: crate::private::Sealed {}
-impl AcceptedWord for u8 {}
-impl AcceptedWord for u16 {}
-impl AcceptedWord for u32 {}
-impl AcceptedWord for i8 {}
-impl AcceptedWord for i16 {}
-impl AcceptedWord for i32 {}
+/// A structure representing a DMA transfer.
+///
+/// This structure holds references to the driver instance, DMA buffers, and
+/// transfer status.
+#[instability::unstable]
+pub struct I2sTxDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+    Buf: DmaTxBuffer,
+{
+    i2s_tx: ManuallyDrop<I2sTx<'d, Dm>>,
+    buffer_view: ManuallyDrop<Buf::View>,
+    completed: bool,
+}
+
+impl<'d, Dm, Buf> I2sTxDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+    Buf: DmaTxBuffer,
+{
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        self.completed || self.i2s_tx.i2s.is_tx_done()
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> (Result<(), DmaError>, I2sTx<'d, Dm>, Buf::Final) {
+        while !self.is_done() {}
+        self.completed = true;
+
+        self.i2s_tx.tx_channel.stop_transfer();
+        self.i2s_tx.i2s.tx_stop();
+
+        let (i2s_tx, buf) = self.release();
+
+        if i2s_tx.tx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_tx, Buf::from_view(buf))
+        } else {
+            (Ok(()), i2s_tx, Buf::from_view(buf))
+        }
+    }
+
+    fn release(mut self) -> (I2sTx<'d, Dm>, Buf::View) {
+        let (i2s_tx, buffer_view) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.i2s_tx),
+                ManuallyDrop::take(&mut self.buffer_view),
+            )
+        };
+
+        core::mem::forget(self);
+        (i2s_tx, buffer_view)
+    }
+}
+
+impl<'d, Buf> I2sTxDmaTransfer<'d, Async, Buf>
+where
+    Buf: DmaTxBuffer,
+{
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sTx<'d, Async>, Buf::Final) {
+        if !self.completed {
+            if let Err(err) = DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await {
+                self.i2s_tx.tx_channel.stop_transfer();
+                self.i2s_tx.i2s.tx_stop();
+                let (i2s_tx, buf) = self.release();
+                return (Err(err), i2s_tx, Buf::from_view(buf));
+            }
+            while !self.is_done() {}
+            self.completed = true;
+        }
+
+        self.i2s_tx.tx_channel.stop_transfer();
+        self.i2s_tx.i2s.tx_stop();
+
+        let (i2s_tx, buf) = self.release();
+
+        if i2s_tx.tx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_tx, Buf::from_view(buf))
+        } else {
+            (Ok(()), i2s_tx, Buf::from_view(buf))
+        }
+    }
+
+    /// Waits for the transfer to finish.
+    pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
+        if !self.completed {
+            DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await?;
+            while !self.is_done() {}
+            self.completed = true;
+        }
+        Ok(())
+    }
+
+    /// Waits for a condition that might indicate more data is available.
+    pub async fn wait_for_available_async(&mut self) -> Result<(), DmaError> {
+        DmaTxFuture::new_with_config(
+            &mut self.i2s_tx.tx_channel,
+            enum_set!(DmaTxInterrupt::Eof),
+            enum_set!(DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof),
+        )
+        .await
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::Deref for I2sTxDmaTransfer<'_, Dm, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::DerefMut for I2sTxDmaTransfer<'_, Dm, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for I2sTxDmaTransfer<'_, Dm, BUF> {
+    fn drop(&mut self) {
+        self.i2s_tx.tx_channel.stop_transfer();
+        self.i2s_tx.i2s.tx_stop();
+
+        // SAFETY: This is Drop, we know that the parts are no longer used
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.i2s_tx);
+            ManuallyDrop::take(&mut self.buffer_view)
+        };
+        let _ = BUF::from_view(view);
+    }
+}
+
+/// A structure representing a DMA transfer.
+///
+/// This structure holds references to the driver instance, DMA buffers, and
+/// transfer status.
+#[instability::unstable]
+pub struct I2sRxDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+    Buf: DmaRxBuffer,
+{
+    i2s_rx: ManuallyDrop<I2sRx<'d, Dm>>,
+    buffer_view: ManuallyDrop<Buf::View>,
+    completed: bool,
+}
+
+impl<'d, Dm, Buf> I2sRxDmaTransfer<'d, Dm, Buf>
+where
+    Dm: DriverMode,
+    Buf: DmaRxBuffer,
+{
+    /// Returns true when [Self::wait] will not block.
+    pub fn is_done(&self) -> bool {
+        self.completed || self.i2s_rx.i2s.is_rx_done()
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub fn wait(mut self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
+        while !self.is_done() {}
+
+        self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.rx_channel.stop_transfer();
+
+        let (i2s_rx, buf) = self.release();
+
+        if i2s_rx.rx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_rx, Buf::from_view(buf))
+        } else {
+            (Ok(()), i2s_rx, Buf::from_view(buf))
+        }
+    }
+
+    fn release(mut self) -> (I2sRx<'d, Dm>, Buf::View) {
+        let (i2s_rx, buffer_view) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.i2s_rx),
+                ManuallyDrop::take(&mut self.buffer_view),
+            )
+        };
+
+        core::mem::forget(self);
+        (i2s_rx, buffer_view)
+    }
+}
+
+impl<'d, Buf> I2sRxDmaTransfer<'d, Async, Buf>
+where
+    Buf: DmaRxBuffer,
+{
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub async fn wait_async(mut self) -> (Result<(), DmaError>, I2sRx<'d, Async>, Buf::Final) {
+        if !self.completed {
+            // we treat DescriptorEmpty as rx transfer is done
+            if let Err(err) = DmaRxFuture::new_with_config(
+                &mut self.i2s_rx.rx_channel,
+                enum_set!(DmaRxInterrupt::DescriptorEmpty),
+                enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
+            )
+            .await
+            {
+                self.completed = true;
+                self.i2s_rx.i2s.rx_stop();
+                self.i2s_rx.rx_channel.stop_transfer();
+                let (i2s_rx, buf) = self.release();
+                return (Err(err), i2s_rx, Buf::from_view(buf));
+            }
+            self.completed = true;
+        }
+
+        self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.rx_channel.stop_transfer();
+
+        let (i2s_rx, buf) = self.release();
+
+        if i2s_rx.rx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_rx, Buf::from_view(buf))
+        } else {
+            (Ok(()), i2s_rx, Buf::from_view(buf))
+        }
+    }
+
+    /// Waits for the transfer to finish and returns the peripheral and buffer.
+    pub async fn wait_for_done_async(&mut self) -> Result<(), DmaError> {
+        if !self.completed {
+            // we treat DescriptorEmpty as rx transfer is done
+            DmaRxFuture::new_with_config(
+                &mut self.i2s_rx.rx_channel,
+                enum_set!(DmaRxInterrupt::DescriptorEmpty),
+                enum_set!(DmaRxInterrupt::ErrorEof | DmaRxInterrupt::DescriptorError),
+            )
+            .await?;
+            self.completed = true;
+        }
+        Ok(())
+    }
+
+    /// Waits for a condition that might indicate more data is available.
+    pub async fn wait_for_available_async(&mut self) -> Result<(), DmaError> {
+        DmaRxFuture::new_with_config(
+            &mut self.i2s_rx.rx_channel,
+            enum_set!(DmaRxInterrupt::SuccessfulEof | DmaRxInterrupt::Done),
+            enum_set!(
+                DmaRxInterrupt::ErrorEof
+                    | DmaRxInterrupt::DescriptorError
+                    | DmaRxInterrupt::DescriptorEmpty
+            ),
+        )
+        .await
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::Deref for I2sRxDmaTransfer<'_, Dm, BUF> {
+    type Target = BUF::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::DerefMut for I2sRxDmaTransfer<'_, Dm, BUF> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer_view
+    }
+}
+
+impl<Dm: DriverMode, BUF: DmaRxBuffer> Drop for I2sRxDmaTransfer<'_, Dm, BUF> {
+    fn drop(&mut self) {
+        self.i2s_rx.rx_channel.stop_transfer();
+        self.i2s_rx.i2s.rx_stop();
+
+        // SAFETY: This is Drop, we know that the parts are no longer used
+        let view = unsafe {
+            ManuallyDrop::drop(&mut self.i2s_rx);
+            ManuallyDrop::take(&mut self.buffer_view)
+        };
+        let _ = BUF::from_view(view);
+    }
+}
 
 /// I2S Error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -816,16 +1138,15 @@ where
 }
 
 impl<'d> I2s<'d, Blocking> {
-    /// Construct a new I2s instance.
-    pub fn new(
+    #[cfg(i2s_driver_supported)]
+    fn new_internal(
         i2s: impl Instance + 'd,
-        channel: impl DmaChannelFor<AnyI2s<'d>>,
+        channel: I2sMasterErased<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let channel = Channel::new(channel.degrade());
-        channel.runtime_ensure_compatible(&i2s);
-
+        let channel = Channel::new(channel);
         let i2s = i2s.degrade();
+        channel.runtime_ensure_compatible(i2s.dma_peripheral());
 
         // on ESP32-C3 / ESP32-S3 and later RX and TX are independent and
         // could be configured totally independently but for now handle all
@@ -978,8 +1299,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
-    tx_chain: DescriptorChain,
+    tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -994,79 +1314,34 @@ where
     }
 }
 
-impl<Dm> DmaSupport for I2sTx<'_, Dm>
+impl<'d, Dm> I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type DriverMode = Dm;
-
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        self.i2s.wait_for_tx_done();
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        self.i2s.tx_stop();
-    }
-}
-
-impl<'d, Dm> DmaSupportTx for I2sTx<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    type Channel = PeripheralTxChannel<AnyI2s<'d>>;
-
-    fn tx(&mut self) -> &mut ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>> {
-        &mut self.tx_channel
-    }
-
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.tx_chain
-    }
-}
-
-impl<Dm> I2sTx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        self.start_tx_transfer(&data, false)?;
-
-        // wait until I2S_TX_IDLE is 1
-        self.i2s.wait_for_tx_done();
-
-        Ok(())
-    }
-
-    fn start_tx_transfer<'t, TXBUF>(
-        &'t mut self,
-        words: &'t TXBUF,
-        circular: bool,
-    ) -> Result<(), Error>
-    where
-        TXBUF: ReadBuffer,
-        Dm: DriverMode,
-    {
-        let (ptr, len) = unsafe { words.read_buffer() };
-
-        // Reset TX unit and TX FIFO
+    /// Perform a DMA write.
+    #[allow(clippy::type_complexity)]
+    #[instability::unstable]
+    pub fn write<TX: DmaTxBuffer>(
+        mut self,
+        mut buffer: TX,
+    ) -> Result<I2sTxDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
         self.i2s.reset_tx();
-
-        // Enable corresponding interrupts if needed
-
-        // configure DMA outlink
-        unsafe {
-            self.tx_chain.fill_for_tx(circular, ptr, len)?;
+        let res = unsafe {
             self.tx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
-                .and_then(|_| self.tx_channel.start_transfer())?;
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .and_then(|_| self.tx_channel.start_transfer())
+        };
+        if let Err(err) = res {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
-        // set I2S_TX_STOP_EN if needed
-
-        // start: set I2S_TX_START
         self.i2s.tx_start();
 
-        Ok(())
+        Ok(I2sTxDmaTransfer {
+            i2s_tx: ManuallyDrop::new(self),
+            buffer_view: ManuallyDrop::new(buffer.into_view()),
+            completed: false,
+        })
     }
 
     /// Change the I2S Tx unit configuration.
@@ -1079,40 +1354,6 @@ where
             }
         }
     }
-
-    /// Writes a slice of data to the I2S peripheral.
-    pub fn write_words(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
-        self.write(unsafe {
-            core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), core::mem::size_of_val(words))
-        })
-    }
-
-    /// Write I2S.
-    /// Returns [DmaTransferTx] which represents the in-progress DMA
-    /// transfer
-    pub fn write_dma<'t>(
-        &'t mut self,
-        words: &'t impl ReadBuffer,
-    ) -> Result<DmaTransferTx<'t, Self>, Error>
-    where
-        Self: DmaSupportTx,
-    {
-        self.start_tx_transfer(words, false)?;
-        Ok(DmaTransferTx::new(self))
-    }
-
-    /// Continuously write to I2S. Returns [DmaTransferTxCircular] which
-    /// represents the in-progress DMA transfer
-    pub fn write_dma_circular<'t>(
-        &'t mut self,
-        words: &'t impl ReadBuffer,
-    ) -> Result<DmaTransferTxCircular<'t, Self>, Error>
-    where
-        Self: DmaSupportTx,
-    {
-        self.start_tx_transfer(words, true)?;
-        Ok(DmaTransferTxCircular::new(self))
-    }
 }
 
 /// I2S RX channel
@@ -1121,8 +1362,7 @@ where
     Dm: DriverMode,
 {
     i2s: AnyI2s<'d>,
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
-    rx_chain: DescriptorChain,
+    rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -1137,80 +1377,43 @@ where
     }
 }
 
-impl<Dm> DmaSupport for I2sRx<'_, Dm>
+impl<'d, Dm> I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    type DriverMode = Dm;
-
-    fn peripheral_wait_dma(&mut self, _is_rx: bool, _is_tx: bool) {
-        self.i2s.wait_for_rx_done();
-    }
-
-    fn peripheral_dma_stop(&mut self) {
-        self.i2s.reset_rx();
-    }
-}
-
-#[instability::unstable]
-impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
-where
-    Dm: DriverMode,
-{
-    type Channel = PeripheralRxChannel<AnyI2s<'d>>;
-
-    fn rx(&mut self) -> &mut ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>> {
-        &mut self.rx_channel
-    }
-
-    fn chain(&mut self) -> &mut DescriptorChain {
-        &mut self.rx_chain
-    }
-}
-
-impl<Dm> I2sRx<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn read(&mut self, mut data: &mut [u8]) -> Result<(), Error> {
-        self.start_rx_transfer(&mut data, false)?;
-
-        // wait until I2S_RX_IDLE is 1
-        self.i2s.wait_for_rx_done();
-
-        Ok(())
-    }
-
-    fn start_rx_transfer<'t, RXBUF>(
-        &'t mut self,
-        words: &'t mut RXBUF,
-        circular: bool,
-    ) -> Result<(), Error>
+    /// Perform a DMA read.
+    ///
+    /// The number of read bytes might be less than the capacity of the provided buffer since the
+    /// peripheral might not completely fill each descriptor's buffer.
+    ///
+    /// This will return a [I2sRxDmaTransfer]
+    pub fn read<BUF>(
+        mut self,
+        mut buffer: BUF,
+    ) -> Result<I2sRxDmaTransfer<'d, Dm, BUF>, (Error, Self, BUF)>
     where
-        RXBUF: WriteBuffer,
+        BUF: DmaRxBuffer,
     {
-        let (ptr, len) = unsafe { words.write_buffer() };
-
-        if !len.is_multiple_of(4) {
-            return Err(Error::IllegalArgument);
-        }
-
         // Reset RX unit and RX FIFO
         self.i2s.reset_rx();
 
-        // Enable corresponding interrupts if needed
-
-        // configure DMA inlink
-        unsafe {
-            self.rx_chain.fill_for_rx(circular, ptr, len)?;
+        let res = unsafe {
             self.rx_channel
-                .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.rx_chain)
-                .and_then(|_| self.rx_channel.start_transfer())?;
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
+                .and_then(|_| self.rx_channel.start_transfer())
+        };
+        if let Err(err) = res {
+            return Err((Error::DmaError(err), self, buffer));
         }
 
         // start: set I2S_RX_START
-        self.i2s.rx_start(len);
-        Ok(())
+        self.i2s.rx_start(usize::MAX); // really limited by exhausting DMA rx buffer
+
+        Ok(I2sRxDmaTransfer {
+            i2s_rx: ManuallyDrop::new(self),
+            buffer_view: ManuallyDrop::new(buffer.into_view()),
+            completed: false,
+        })
     }
 
     /// Change the I2S Rx unit configuration.
@@ -1222,49 +1425,6 @@ where
                 self.i2s.configure_rx(rx_config)
             }
         }
-    }
-
-    /// Reads a slice of data from the I2S peripheral and stores it in the
-    /// provided buffer.
-    pub fn read_words(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
-        if core::mem::size_of_val(words) > 4096 || words.is_empty() {
-            return Err(Error::IllegalArgument);
-        }
-
-        self.read(unsafe {
-            core::slice::from_raw_parts_mut(
-                words.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(words),
-            )
-        })
-    }
-
-    /// Read I2S.
-    /// Returns [DmaTransferRx] which represents the in-progress DMA
-    /// transfer
-    pub fn read_dma<'t>(
-        &'t mut self,
-        words: &'t mut impl WriteBuffer,
-    ) -> Result<DmaTransferRx<'t, Self>, Error>
-    where
-        Self: DmaSupportRx,
-    {
-        self.start_rx_transfer(words, false)?;
-        Ok(DmaTransferRx::new(self))
-    }
-
-    /// Continuously read from I2S.
-    /// Returns [DmaTransferRxCircular] which represents the in-progress DMA
-    /// transfer
-    pub fn read_dma_circular<'t>(
-        &'t mut self,
-        words: &'t mut impl WriteBuffer,
-    ) -> Result<DmaTransferRxCircular<'t, Self>, Error>
-    where
-        Self: DmaSupportRx,
-    {
-        self.start_rx_transfer(words, true)?;
-        Ok(DmaTransferRxCircular::new(self))
     }
 }
 
@@ -1284,7 +1444,7 @@ mod private {
     use crate::pac::i2s0::RegisterBlock;
     use crate::{
         DriverMode,
-        dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
+        dma::{ChannelRx, ChannelTx},
         gpio::{
             InputConfig,
             InputSignal,
@@ -1306,7 +1466,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+        pub tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
@@ -1316,12 +1476,11 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub fn build(self, descriptors: &'static mut [DmaDescriptor]) -> I2sTx<'d, Dm> {
+        pub fn build(self) -> I2sTx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
-                tx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
@@ -1367,7 +1526,7 @@ mod private {
         Dm: DriverMode,
     {
         pub i2s: AnyI2s<'d>,
-        pub rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
+        pub rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
@@ -1377,12 +1536,11 @@ mod private {
     where
         Dm: DriverMode,
     {
-        pub fn build(self, descriptors: &'static mut [DmaDescriptor]) -> I2sRx<'d, Dm> {
+        pub fn build(self) -> I2sRx<'d, Dm> {
             let peripheral = self.i2s.peripheral();
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
-                rx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
@@ -1423,8 +1581,7 @@ mod private {
         }
     }
 
-    #[allow(private_bounds)]
-    pub trait RegBlock: DmaEligible {
+    pub trait RegBlock: crate::private::Sealed {
         fn regs(&self) -> &RegisterBlock;
         fn peripheral(&self) -> crate::system::Peripheral;
     }
@@ -1677,6 +1834,9 @@ mod private {
                 w.tx_fifo_reset().bit(bit)
             });
 
+            #[cfg(esp32s2)]
+            while self.regs().conf().read().tx_reset_st().bit_is_set() {}
+
             self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
 
             self.regs().int_clr().write(|w| {
@@ -1687,18 +1847,18 @@ mod private {
 
         fn tx_start(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().set_bit());
-
-            while self.regs().state().read().tx_idle().bit_is_set() {
-                // wait
-            }
         }
 
         fn tx_stop(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
+        fn is_tx_done(&self) -> bool {
+            self.regs().state().read().tx_idle().bit_is_set()
+        }
+
         fn wait_for_tx_done(&self) {
-            while self.regs().state().read().tx_idle().bit_is_clear() {
+            while !self.is_tx_done() {
                 // wait
             }
 
@@ -1710,6 +1870,9 @@ mod private {
                 w.rx_reset().bit(bit);
                 w.rx_fifo_reset().bit(bit)
             });
+
+            #[cfg(esp32s2)]
+            while self.regs().conf().read().rx_reset_st().bit_is_set() {}
 
             self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
 
@@ -1740,8 +1903,16 @@ mod private {
             self.regs().conf().modify(|_, w| w.rx_start().set_bit());
         }
 
+        fn rx_stop(&self) {
+            self.regs().conf().modify(|_, w| w.rx_start().clear_bit());
+        }
+
+        fn is_rx_done(&self) -> bool {
+            self.regs().int_raw().read().in_dscr_empty().bit_is_set()
+        }
+
         fn wait_for_rx_done(&self) {
-            while self.regs().int_raw().read().in_suc_eof().bit_is_clear() {
+            while !self.is_rx_done() {
                 // wait
             }
 
@@ -2125,8 +2296,12 @@ mod private {
                 .modify(|_, w| w.tx_start().clear_bit());
         }
 
+        fn is_tx_done(&self) -> bool {
+            self.regs().state().read().tx_idle().bit_is_set()
+        }
+
         fn wait_for_tx_done(&self) {
-            while self.regs().state().read().tx_idle().bit_is_clear() {
+            while !self.is_tx_done() {
                 // wait
             }
 
@@ -2160,8 +2335,18 @@ mod private {
             self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
+        fn rx_stop(&self) {
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_start().clear_bit());
+        }
+
+        fn is_rx_done(&self) -> bool {
+            self.regs().int_raw().read().rx_done().bit_is_set()
+        }
+
         fn wait_for_rx_done(&self) {
-            while self.regs().int_raw().read().rx_done().bit_is_clear() {
+            while !self.is_rx_done() {
                 // wait
             }
 
@@ -2496,225 +2681,6 @@ mod private {
             }
 
             I2sMclkDividers { x, y, z, yn1 }
-        }
-    }
-}
-
-/// Async functionality
-pub mod asynch {
-    use super::{Error, I2sRx, I2sTx, RegisterAccessPrivate};
-    use crate::{
-        Async,
-        dma::{
-            DmaEligible,
-            ReadBuffer,
-            RxCircularState,
-            TxCircularState,
-            WriteBuffer,
-            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
-        },
-    };
-
-    impl<'d> I2sTx<'d, Async> {
-        /// One-shot write I2S.
-        pub async fn write_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (ptr, len) = (words.as_ptr(), words.len());
-
-            self.i2s.reset_tx();
-
-            let future = DmaTxFuture::new(&mut self.tx_channel);
-
-            unsafe {
-                self.tx_chain.fill_for_tx(false, ptr, len)?;
-                future
-                    .tx
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
-                    .and_then(|_| future.tx.start_transfer())?;
-            }
-
-            self.i2s.tx_start();
-            future.await?;
-
-            Ok(())
-        }
-
-        /// Continuously write to I2S. Returns [I2sWriteDmaTransferAsync]
-        pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
-            mut self,
-            words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF>, Error> {
-            let (ptr, len) = unsafe { words.read_buffer() };
-
-            // Reset TX unit and TX FIFO
-            self.i2s.reset_tx();
-
-            // Enable corresponding interrupts if needed
-
-            // configure DMA outlink
-            unsafe {
-                self.tx_chain.fill_for_tx(true, ptr, len)?;
-                self.tx_channel
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.tx_chain)
-                    .and_then(|_| self.tx_channel.start_transfer())?;
-            }
-
-            // set I2S_TX_STOP_EN if needed
-
-            // start: set I2S_TX_START
-            self.i2s.tx_start();
-
-            let state = TxCircularState::new(&mut self.tx_chain);
-            Ok(I2sWriteDmaTransferAsync {
-                i2s_tx: self,
-                state,
-                _buffer: words,
-            })
-        }
-    }
-
-    /// An in-progress async circular DMA write transfer.
-    pub struct I2sWriteDmaTransferAsync<'d, BUFFER> {
-        i2s_tx: I2sTx<'d, Async>,
-        state: TxCircularState,
-        _buffer: BUFFER,
-    }
-
-    impl<BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER> {
-        /// How many bytes can be pushed into the DMA transaction.
-        /// Will wait for more than 0 bytes available.
-        pub async fn available(&mut self) -> Result<usize, Error> {
-            loop {
-                self.state.update(&self.i2s_tx.tx_channel)?;
-                let res = self.state.available;
-
-                if res != 0 {
-                    break Ok(res);
-                }
-
-                DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel).await?
-            }
-        }
-
-        /// Push bytes into the DMA transaction.
-        pub async fn push(&mut self, data: &[u8]) -> Result<usize, Error> {
-            let avail = self.available().await?;
-            let to_send = usize::min(avail, data.len());
-            Ok(self.state.push(&data[..to_send])?)
-        }
-
-        /// Push bytes into the DMA buffer via the given closure.
-        /// The closure *must* return the actual number of bytes written.
-        /// The closure *might* get called with a slice which is smaller than
-        /// the total available buffer. Only useful for circular DMA
-        /// transfers
-        pub async fn push_with(
-            &mut self,
-            f: impl FnOnce(&mut [u8]) -> usize,
-        ) -> Result<usize, Error> {
-            let _avail = self.available().await;
-            Ok(self.state.push_with(f)?)
-        }
-    }
-
-    impl<'d> I2sRx<'d, Async> {
-        /// One-shot read I2S.
-        pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            let (ptr, len) = (words.as_mut_ptr(), words.len());
-
-            if !len.is_multiple_of(4) {
-                return Err(Error::IllegalArgument);
-            }
-
-            // Reset RX unit and RX FIFO
-            self.i2s.reset_rx();
-
-            let future = DmaRxFuture::new(&mut self.rx_channel);
-
-            // configure DMA inlink
-            unsafe {
-                self.rx_chain.fill_for_rx(false, ptr, len)?;
-                future
-                    .rx
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.rx_chain)
-                    .and_then(|_| future.rx.start_transfer())?;
-            }
-
-            // start: set I2S_RX_START
-            self.i2s.rx_start(len);
-
-            future.await?;
-
-            Ok(())
-        }
-
-        /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
-        pub fn read_dma_circular_async<RXBUF>(
-            mut self,
-            mut words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF>, Error>
-        where
-            RXBUF: WriteBuffer,
-        {
-            let (ptr, len) = unsafe { words.write_buffer() };
-
-            if !len.is_multiple_of(4) {
-                return Err(Error::IllegalArgument);
-            }
-
-            // Reset RX unit and RX FIFO
-            self.i2s.reset_rx();
-
-            // Enable corresponding interrupts if needed
-
-            // configure DMA inlink
-            unsafe {
-                self.rx_chain.fill_for_rx(true, ptr, len)?;
-                self.rx_channel
-                    .prepare_transfer_without_start(self.i2s.dma_peripheral(), &self.rx_chain)
-                    .and_then(|_| self.rx_channel.start_transfer())?;
-            }
-
-            // start: set I2S_RX_START
-            self.i2s.rx_start(len);
-
-            let state = RxCircularState::new(&mut self.rx_chain);
-            Ok(I2sReadDmaTransferAsync {
-                i2s_rx: self,
-                state,
-                _buffer: words,
-            })
-        }
-    }
-
-    /// An in-progress async circular DMA read transfer.
-    pub struct I2sReadDmaTransferAsync<'d, BUFFER> {
-        i2s_rx: I2sRx<'d, Async>,
-        state: RxCircularState,
-        _buffer: BUFFER,
-    }
-
-    impl<BUFFER> I2sReadDmaTransferAsync<'_, BUFFER> {
-        /// How many bytes can be popped from the DMA transaction.
-        /// Will wait for more than 0 bytes available.
-        pub async fn available(&mut self) -> Result<usize, Error> {
-            loop {
-                self.state.update()?;
-
-                let res = self.state.available;
-
-                if res != 0 {
-                    break Ok(res);
-                }
-
-                DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel).await?;
-            }
-        }
-
-        /// Pop bytes from the DMA transaction.
-        pub async fn pop(&mut self, data: &mut [u8]) -> Result<usize, Error> {
-            let avail = self.available().await?;
-            let to_rcv = usize::min(avail, data.len());
-            Ok(self.state.pop(&mut data[..to_rcv])?)
         }
     }
 }

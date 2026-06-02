@@ -140,6 +140,7 @@ macro_rules! driver_configs {
         }
     ) => {
         #[derive(Debug, Clone, serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
         pub(crate) struct $struct {
             #[serde(default)]
             #[serde(deserialize_with = "crate::support_status::string_or_struct")]
@@ -284,8 +285,6 @@ driver_configs![
         properties: {
             key_length: AesKeyLength,
             #[serde(default)]
-            dma: bool,
-            #[serde(default)]
             dma_mode: Vec<String>,
             has_split_text_registers: bool,
             endianness_configurable: bool,
@@ -332,6 +331,8 @@ driver_configs![
         driver: dedicated_gpio,
         name: "Dedicated GPIO",
         properties: {
+            /// Low-level access generation derived from CPU instruction/CSR support.
+            version: String,
             #[serde(default)]
             needs_initialization: bool,
             #[serde(flatten)]
@@ -403,6 +404,8 @@ driver_configs![
         name: "GPIO",
         has_computed_properties: true,
         properties: {
+            /// Digital GPIO register-layout generation derived from the chip SVD.
+            version: u32,
             #[serde(default)]
             has_bank_1: bool,
             gpio_function: u32,
@@ -589,8 +592,6 @@ driver_configs![
             #[serde(default)]
             has_rx_demodulation: bool,
             #[serde(default)]
-            has_dma: bool,
-            #[serde(default)]
             has_per_channel_clock: bool,
         }
     },
@@ -636,8 +637,6 @@ driver_configs![
         driver: sha,
         name: "SHA",
         properties: {
-            #[serde(default)]
-            dma: bool,
             #[serde(default)]
             algo: ShaAlgoMap,
         }
@@ -696,8 +695,6 @@ driver_configs![
             #[serde(default)]
             bit_order_is_bool: bool,
             #[serde(default)]
-            supports_dma: bool,
-            #[serde(default)]
             has_octal: bool,
             #[serde(default)]
             has_app_interrupts: bool,
@@ -714,10 +711,7 @@ driver_configs![
     SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
-        properties: {
-            #[serde(default)]
-            supports_dma: bool,
-        }
+        properties: {}
     },
     SysTimerProperties {
         driver: systimer,
@@ -789,6 +783,13 @@ driver_configs![
     UsbOtgProperties {
         driver: usb_otg,
         name: "USB OTG FS",
+        properties: {
+            fifo_depth_words: u32,
+        }
+    },
+    UsbOtgHsProperties {
+        driver: usb_otg_hs,
+        name: "USB OTG HS",
         properties: {
             fifo_depth_words: u32,
         }

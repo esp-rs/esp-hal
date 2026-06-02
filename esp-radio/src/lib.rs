@@ -6,27 +6,31 @@
 //!
 //! This documentation is built for the
 #![doc = concat!("**", chip_pretty!(), "**")]
-//! . Please ensure you are reading the correct [documentation](https://docs.espressif.com/projects/rust/esp-radio/latest/) for your target
+//! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
-//! ## Usage
+//! ## Overview
 //!
-//! ### Importing
+//! esp-radio provides Wi-Fi, Bluetooth Low Energy (BLE), ESP-NOW and IEEE
+//! 802.15.4 drivers for Espressif microcontrollers. It builds on top of
+//! [esp-hal] and the vendor binary blobs to provide wireless connectivity in a
+//! `no_std` environment.
 //!
-//! Enabling the `unstable` feature on `esp-radio` requires you to also enable
-//! the `unstable` feature on `esp-hal` in the final binary crate.
-//!
-//! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
-//!
-//! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
-//! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
-//! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
-//! OS or other operating systems as well.
+//! Wi-Fi and BLE require a dynamic memory allocator and a preemptive task
+//! scheduler at runtime. We recommend [`esp-alloc`] and [`esp-rtos`] for this,
+//! though any allocator or RTOS (such as Ariel OS) that implements the required
+//! interfaces will work.
 #![cfg_attr(
     feature = "ieee802154",
-    doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for the 802.15.4.</div>"
+    doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for IEEE 802.15.4.</div>"
 )]
-#![doc = ""]
+//! Drivers that don't currently have a stable API are marked as `unstable` in
+//! the documentation. Enabling the `unstable` feature on `esp-radio` requires
+//! you to also enable the `unstable` feature on `esp-hal` in the final binary
+//! crate.
+//!
+//! ### Quick start
+//!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
 //! use esp_hal::interrupt::software::SoftwareInterruptControl;
@@ -46,7 +50,7 @@
     wifi_driver_supported,
     doc = r#"
 
-if let Ok(controller) = esp_radio::wifi::new(
+if let Ok(controller) = esp_radio::wifi::WifiController::new(
     peripherals.WIFI,
     Default::default(),
 ) {}
@@ -72,26 +76,52 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![doc = concat!(r#"features = [""#, chip!(), r#""]"#)]
 //! ```
 //! 
-//! ### Optimization Level
+//! ## Examples
 //!
-//! It is necessary to build with optimization level 2 or 3 since otherwise, it
-//! might not even be able to connect or advertise.
+//! We have a number of [examples] in the esp-hal repository. We use
+//! an [xtask] to automate the building, running, and testing of code and
+//! examples within esp-hal.
 //!
-//! To make it work also for your debug builds add this to your `Cargo.toml`
+//! Invoke the following command in the root of the esp-hal repository to get
+//! started:
+//! ```bash
+//! cargo xtask help
+//! ```
+//! 
+//! We have a [book] that explains the full esp-hal ecosystem
+//! and how to get started, and a [training] that covers some common
+//! scenarios with examples.
+//!
+//! ## Optimization level
+//!
+//! The radio blobs require optimization level 2 or 3 to function correctly.
+//! Without it, Wi-Fi may fail to connect and BLE may fail to advertise.
+//!
+//! To apply this only to esp-radio in debug builds, add to your `Cargo.toml`:
 //! ```toml
 //! [profile.dev.package.esp-radio]
 //! opt-level = 3
 //! ```
-//! ## Globally disable logging
+//! 
+//! ## Disabling logging
 //!
-//! `esp-radio` contains a lot of trace-level logging statements.
-//! For maximum performance you might want to disable logging via
-//! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
-//! You should set it to `release_max_level_off`.
+//! `esp-radio` contains trace-level logging statements that may impact
+//! performance. To disable them, use the `log` crate's compile-time
+//! [filters](https://docs.rs/log/latest/log/#compile-time-filters) and set
+//! `release_max_level_off`.
+//!
+//! [documentation]: https://docs.espressif.com/projects/rust/esp-radio/latest/
+//! [esp-hal]: https://docs.espressif.com/projects/rust/esp-hal/latest/
+//! [`esp-alloc`]: https://docs.espressif.com/projects/rust/esp-alloc/latest/
+//! [`esp-rtos`]: https://docs.espressif.com/projects/rust/esp-rtos/latest/
+//! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
+//! [xtask]: https://github.com/matklad/cargo-xtask
+//! [book]: https://docs.espressif.com/projects/rust/book/
+//! [training]: https://docs.espressif.com/projects/rust/no_std-training/
 #![cfg_attr(
     multi_core,
     doc = concat!(
-        "### Running on the Second Core",
+        "## Running on the second core",
         "\n\n",
         "BLE and Wi-Fi can also be run on the second core.",
         "\n\n",

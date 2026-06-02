@@ -8,7 +8,12 @@ use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
-    commands::{VersionBump, checker::generate_baseline, release::plan::Plan, update_package},
+    commands::{
+        VersionBump,
+        checker::generate_baseline,
+        release::plan::{PackagePlan, Plan},
+        update_package,
+    },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -57,51 +62,59 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    // Make code changes
-    for step in plan.packages.iter_mut() {
-        let mut package = CargoToml::new(workspace, step.package).with_context(|| {
+    // Preflight: load and validate every package up front, before touching any
+    // files, so a mismatched version or other plan error aborts without leaving
+    // the workspace half-edited. The parsed manifests are reused by the apply
+    // loop below, so each is read and validated exactly once.
+    let mut manifests = Vec::with_capacity(plan.packages.len());
+    for step in plan.packages.iter() {
+        let package = CargoToml::new(workspace, step.package).with_context(|| {
             format!(
                 "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
                 step.package
             )
         })?;
 
-        if package.package_version() != step.current_version {
-            if package.package_version() == step.new_version {
+        match validate_package(&package, step)? {
+            Preflight::Bump => manifests.push(Some(package)),
+            Preflight::AlreadyReleased => {
                 println!(
                     "Package {} is already at version {}. Skipping.",
                     step.package, step.new_version
                 );
-                continue;
+                manifests.push(None);
             }
-            bail!(
-                "The version of package {} has changed in an unexpected way. Cannot continue.",
-                step.package
-            );
         }
+    }
 
-        if let Some(metadata) = package.espressif_metadata()
-            && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
-        {
-            // Special case: some packages are perma-unstable, meaning they won't ever have
-            // a stable release. For these packages, we always use a
-            // patch release.
-            let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
-                *forever_unstable.value()
-            } else {
-                log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
-                true
-            };
-
-            if forever_unstable && step.bump != VersionBump::patch() {
-                bail!(
-                    "Cannot bump perma-unstable package {} to a non-patch version",
-                    step.package
-                );
+    // Must run before the apply loop: `update_package` finalizes Unreleased into
+    // the new version section, so fragments added after would land in the wrong
+    // (new, empty) Unreleased.
+    if args.no_dry_run {
+        let modified = crate::commands::release::plan::generate_changelog_draft(workspace, &plan);
+        if modified.is_empty() {
+            println!(
+                "Note: No changelog entries were merged. Run \
+                `cargo xtask release changelog-preview` manually if needed."
+            );
+        } else {
+            println!("Merged changelog entries into the following files:");
+            for path in &modified {
+                println!("  {}", path.display());
             }
+        }
+    } else {
+        println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
+    }
+
+    // Make code changes, reusing the manifests validated above. Packages that
+    // were already at their target version are stored as `None` and skipped.
+    let skip_dependent_rewrites = plan.backport.is_some();
+    for (step, manifest) in plan.packages.iter_mut().zip(manifests) {
+        let Some(mut package) = manifest else {
+            continue;
         };
 
-        let skip_dependent_rewrites = plan.backport.is_some();
         let new_version = update_package(
             &mut package,
             &step.bump,
@@ -171,6 +184,56 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Outcome of validating a package against its plan entry.
+enum Preflight {
+    /// The package is at its expected current version and should be bumped.
+    Bump,
+    /// The package is already at the planned new version, so there is nothing
+    /// to do (e.g. `execute-plan` is being re-run). Skip it.
+    AlreadyReleased,
+}
+
+/// Validate a package against its plan entry without mutating anything.
+///
+/// Run for every package before any changelog or version edits happen, so that
+/// a bad plan aborts cleanly instead of leaving the workspace half-edited. The
+/// same checks gate the actual bump, but live here only — the apply loop reuses
+/// the [`Preflight`] result instead of repeating them.
+fn validate_package(package: &CargoToml, step: &PackagePlan) -> Result<Preflight> {
+    let current = package.package_version();
+    if current != step.current_version {
+        if current == step.new_version {
+            return Ok(Preflight::AlreadyReleased);
+        }
+        bail!(
+            "The version of package {} has changed in an unexpected way. Cannot continue.",
+            step.package
+        );
+    }
+
+    if let Some(metadata) = package.espressif_metadata()
+        && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
+    {
+        // Special case: some packages are perma-unstable, meaning they won't ever
+        // have a stable release. For these packages, we always use a patch release.
+        let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
+            *forever_unstable.value()
+        } else {
+            log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
+            true
+        };
+
+        if forever_unstable && step.bump != VersionBump::patch() {
+            bail!(
+                "Cannot bump perma-unstable package {} to a non-patch version",
+                step.package
+            );
+        }
+    }
+
+    Ok(Preflight::Bump)
 }
 
 pub(crate) struct Branch {

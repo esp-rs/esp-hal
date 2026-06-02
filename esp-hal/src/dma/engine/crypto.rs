@@ -6,11 +6,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
-        ChannelInfo,
-        ChannelState,
         DmaChannel,
-        DmaChannelConvert,
-        DmaChannelExt,
         DmaExtMemBKSize,
         DmaPeripheral,
         DmaRxChannel,
@@ -24,55 +20,104 @@ use crate::{
         asynch,
     },
     interrupt::InterruptHandler,
-    peripherals::{DMA_COPY, Interrupt},
-    system::Peripheral,
+    peripherals::{DMA_CRYPTO, Interrupt},
+    system::{Peripheral, PeripheralGuard},
 };
 
-pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
+/// Immutable per-channel metadata.
+#[doc(hidden)]
+pub struct ChannelInfo {
+    #[expect(dead_code)]
+    pub(crate) peripheral_interrupt: Interrupt,
 
-/// The RX half of a Copy DMA channel.
+    #[expect(dead_code)]
+    pub(crate) async_handler: InterruptHandler,
+
+    /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
+    pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode.
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode.
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
+}
+
+pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
+
+/// The RX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaRxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CryptoDmaRxChannel<'d>(CryptoDmaChannel<'d>);
 
-impl CopyDmaRxChannel<'_> {
-    fn regs(&self) -> &CopyRegisterBlock {
+impl CryptoDmaRxChannel<'_> {
+    fn regs(&self) -> &CryptoRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CopyDmaRxChannel<'_> {}
-impl DmaRxChannel for CopyDmaRxChannel<'_> {}
+impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
+impl DmaRxChannel for CryptoDmaRxChannel<'_> {}
 
-/// The TX half of a Copy DMA channel.
+/// The TX half of a Crypto DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaTxChannel<'d>(pub(crate) DMA_COPY<'d>);
+pub struct CryptoDmaTxChannel<'d>(CryptoDmaChannel<'d>);
 
-impl CopyDmaTxChannel<'_> {
-    fn regs(&self) -> &CopyRegisterBlock {
+impl CryptoDmaTxChannel<'_> {
+    fn regs(&self) -> &CryptoRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
-impl DmaTxChannel for CopyDmaTxChannel<'_> {}
+impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
+impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
-impl RegisterAccess for CopyDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+impl RegisterAccess for CryptoDmaTxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CryptoDma))
     }
 
     fn reset(&self) {
-        self.regs().conf().toggle(|w, bit| w.out_rst().bit(bit));
+        self.regs().conf().toggle(|w, bit| {
+            w.out_rst().bit(bit);
+            w.ahbm_rst().bit(bit);
+            w.ahbm_fifo_rst().bit(bit)
+        });
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        self.regs()
+            .conf()
+            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    }
 
-    fn set_descr_burst_mode(&self, _burst_mode: bool) {}
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.regs()
+            .conf()
+            .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
+    }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
+    fn set_peripheral(&self, peripheral: u8) {
+        use esp32s2::crypto_dma::aes_sha_select::SELECT;
+        let sel = match peripheral {
+            p if p == DmaPeripheral::AES.0 => SELECT::Aes,
+            p if p == DmaPeripheral::SHA.0 => SELECT::Sha,
+            _ => unreachable!(),
+        };
+        self.regs()
+            .aes_sha_select()
+            .modify(|_, w| w.select().variant(sel));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -101,28 +146,30 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
         if check_owner == Some(true) {
-            panic!("Copy DMA does not support checking descriptor ownership");
+            panic!("Crypto DMA does not support checking descriptor ownership");
         }
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        self.regs()
+            .conf1()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        false
+        true
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
-impl TxRegisterAccess for CopyDmaTxChannel<'_> {
+impl TxRegisterAccess for CryptoDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        self.regs().in_st().read().fifo_empty().bit()
+        self.regs().state1().read().outfifo_cnt_debug().bits() == 0
     }
 
     fn set_auto_write_back(&self, enable: bool) {
@@ -148,7 +195,7 @@ impl TxRegisterAccess for CopyDmaTxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -233,21 +280,38 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
     }
 }
 
-impl RegisterAccess for CopyDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CopyDma)
+impl RegisterAccess for CryptoDmaRxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new(Peripheral::CryptoDma))
     }
 
     fn reset(&self) {
-        self.regs().conf().toggle(|w, bit| w.in_rst().bit(bit));
+        self.regs().conf().toggle(|w, bit| {
+            w.in_rst().bit(bit);
+            w.ahbm_rst().bit(bit);
+            w.ahbm_fifo_rst().bit(bit)
+        });
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
-    fn set_descr_burst_mode(&self, _burst_mode: bool) {}
+    fn set_descr_burst_mode(&self, burst_mode: bool) {
+        self.regs()
+            .conf()
+            .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
+    }
 
-    fn set_peripheral(&self, _peripheral: u8) {
-        // no-op
+    fn set_peripheral(&self, peripheral: u8) {
+        use esp32s2::crypto_dma::aes_sha_select::SELECT;
+        let sel = match peripheral {
+            p if p == DmaPeripheral::AES.0 => SELECT::Aes,
+            p if p == DmaPeripheral::SHA.0 => SELECT::Sha,
+            _ => unreachable!(),
+        };
+        self.regs()
+            .aes_sha_select()
+            .modify(|_, w| w.select().variant(sel));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -276,27 +340,31 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
         if check_owner == Some(true) {
-            panic!("Copy DMA does not support checking descriptor ownership");
+            panic!("Crypto DMA does not support checking descriptor ownership");
         }
     }
 
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
-    }
-
     #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
+    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+        self.regs()
+            .conf1()
+            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        false
+        true
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
-impl RxRegisterAccess for CopyDmaRxChannel<'_> {
+impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
+        // We don't know if the channel is used by AES or SHA, so interrupt handler
+        // setup is the responsibility of the peripheral driver.
         None
     }
 
@@ -305,13 +373,13 @@ impl RxRegisterAccess for CopyDmaRxChannel<'_> {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().bit(enable),
-                    DmaRxInterrupt::ErrorEof => unimplemented!(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().bit(enable),
                     DmaRxInterrupt::DescriptorError => w.in_dscr_err().bit(enable),
                     DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().bit(enable),
                     DmaRxInterrupt::Done => w.in_done().bit(enable),
@@ -334,6 +402,9 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
         if int_ena.in_suc_eof().bit_is_set() {
             result |= DmaRxInterrupt::SuccessfulEof;
         }
+        if int_ena.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
         if int_ena.in_done().bit_is_set() {
             result |= DmaRxInterrupt::Done;
         }
@@ -346,7 +417,7 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
             for interrupt in interrupts.into() {
                 match interrupt {
                     DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
-                    DmaRxInterrupt::ErrorEof => continue,
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
                     DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
                     DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
                     DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
@@ -369,6 +440,9 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
         if int_raw.in_suc_eof().bit_is_set() {
             result |= DmaRxInterrupt::SuccessfulEof;
         }
+        if int_raw.in_err_eof().bit_is_set() {
+            result |= DmaRxInterrupt::ErrorEof;
+        }
         if int_raw.in_done().bit_is_set() {
             result |= DmaRxInterrupt::Done;
         }
@@ -384,47 +458,33 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
         self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
             .rx_async_flag
-            .store(_is_async, Ordering::Relaxed);
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
-impl<'d> DmaChannel for DMA_COPY<'d> {
-    type Rx = CopyDmaRxChannel<'d>;
-    type Tx = CopyDmaTxChannel<'d>;
-    unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
-        (
-            CopyDmaRxChannel(unsafe { Self::steal() }),
-            CopyDmaTxChannel(unsafe { Self::steal() }),
-        )
-    }
-}
-impl DmaChannelExt for DMA_COPY<'_> {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CopyDmaRxChannel(unsafe { Self::steal() })
-    }
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CopyDmaTxChannel(unsafe { Self::steal() })
-    }
-}
-impl DMA_COPY<'_> {
-    pub(super) fn info(&self) -> &'static super::ChannelInfo {
+/// A crypto-compatible type-erased DMA channel.
+pub type CryptoDmaChannel<'d> = DMA_CRYPTO<'d>;
+
+impl DMA_CRYPTO<'_> {
+    pub(super) fn info(&self) -> &'static ChannelInfo {
         #[crate::handler(priority = crate::interrupt::Priority::max())]
         fn interrupt_handler() {
-            asynch::handle_in_interrupt::<DMA_COPY<'static>>();
-            asynch::handle_out_interrupt::<DMA_COPY<'static>>();
+            asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
+            asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
         }
         static INFO: ChannelInfo = ChannelInfo {
-            peripheral_interrupt: Interrupt::DMA_COPY,
+            peripheral_interrupt: Interrupt::CRYPTO_DMA,
             async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
+            compatible_peripherals: &[DmaPeripheral::AES.0, DmaPeripheral::SHA.0],
         };
         &INFO
     }
-    pub(super) fn state(&self) -> &'static super::ChannelState {
+
+    pub(super) fn state(&self) -> &'static ChannelState {
         static STATE: ChannelState = ChannelState {
             tx_waker: AtomicWaker::new(),
             rx_waker: AtomicWaker::new(),
@@ -435,13 +495,4 @@ impl DMA_COPY<'_> {
     }
 }
 
-impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaRxChannel<'d> {
-        CopyDmaRxChannel(self)
-    }
-}
-impl<'d> DmaChannelConvert<CopyDmaTxChannel<'d>> for DMA_COPY<'d> {
-    fn degrade(self) -> CopyDmaTxChannel<'d> {
-        CopyDmaTxChannel(self)
-    }
-}
+crate::dma::impl_channel_common!(CryptoDma, DMA_CRYPTO);

@@ -2,7 +2,7 @@
 name = "esp-radio"
 version = "0.18.0"
 edition = "2024"
-rust-version  = "1.88.0"
+rust-version  = "1.95.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 documentation = "https://docs.espressif.com/projects/rust/esp-radio/latest/"
 keywords = ["wifi", "bluetooth", "esp-now", "esp32", "no-std"]

@@ -638,7 +638,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
-        let mut dma_peripherals = vec![];
+        let mut dma_peripherals: Vec<(String, u32, proc_macro2::Ident)> = vec![];
 
         let mut stable_peris = vec![];
 
@@ -758,40 +758,49 @@ This pin may be available with certain limitations. Check your hardware to make 
                     singleton_peripherals.push(quote! { #hal (unstable) });
                 }
             }
+        }
 
-            if let Some(dma_peripheral) = peri.dma_peripheral {
-                dma_peripherals.push((peri.name.as_str(), dma_peripheral));
+        if let Some(dma) = self.device.peri_config.dma.as_ref() {
+            for engine in dma.engines.0.iter() {
+                use convert_case::{Case, Casing};
+                let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
+                let any_channel = format_ident!("{channel}Channel");
+                for instance in &engine.peripheral_instances {
+                    dma_peripherals.push((
+                        instance.name.clone(),
+                        instance.dma_id,
+                        any_channel.clone(),
+                    ));
+                }
             }
         }
 
-        dma_peripherals.sort_by_key(|(_, dma_peripheral)| *dma_peripheral);
+        dma_peripherals.sort_by_key(|(_, dma_id, _)| *dma_id);
 
-        let dma_peripherals = dma_peripherals
-            .into_iter()
-            .map(|(name, dma_peripheral)| {
-                use convert_case::{Boundary, Case, Casing, pattern};
+        let mut dma_eligible = vec![];
+        for (name, dma_id, any_channel) in dma_peripherals {
+            use convert_case::{Boundary, Case, Casing, pattern};
 
-                let peri = format_ident!("{}", name);
-                let dma_peripheral = number(dma_peripheral);
-                let variant_name = format_ident!(
-                    "{}",
-                    name.from_case(Case::Custom {
-                        boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
-                        pattern: pattern::capital,
-                        delim: "",
-                    })
-                    .to_case(Case::Pascal)
-                );
-                quote! { #peri, #variant_name, #dma_peripheral }
-            })
-            .collect::<Vec<_>>();
+            let peri = format_ident!("{}", name);
+            let dma_id_num = number(dma_id);
+            let variant_name = format_ident!(
+                "{}",
+                name.from_case(Case::Custom {
+                    boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
+                    pattern: pattern::capital,
+                    delim: "",
+                })
+                .to_case(Case::Pascal)
+            );
+            dma_eligible.push(quote! { #peri, #variant_name, #dma_id_num, #any_channel });
+        }
 
         generate_for_each_macro(
             "peripheral",
             &[
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
-                ("dma_eligible", &dma_peripherals),
+                ("dma_eligible", &dma_eligible),
             ],
         )
     }

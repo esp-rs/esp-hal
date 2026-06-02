@@ -505,7 +505,7 @@ pub const MAC1: EfuseField = EfuseField::new(1, 0, 32, 16);
 /// Minor chip version
 pub const WAFER_VERSION_MINOR: EfuseField = EfuseField::new(1, 2, 64, 4);
 /// Major chip version (lower 2 bits)
-pub const WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(1, 2, 87, 3);
+pub const WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(1, 2, 68, 2);
 /// Disables check of wafer version major
 pub const DISABLE_WAFER_VERSION_MAJOR: EfuseField = EfuseField::new(1, 2, 70, 1);
 /// Disables check of blk version major

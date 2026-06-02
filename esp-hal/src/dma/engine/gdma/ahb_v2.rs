@@ -1,32 +1,36 @@
 use super::*;
 use crate::RegisterToggle;
 
-impl AnyGdmaTxChannel<'_> {
-    #[inline(always)]
-    pub(super) fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
-    }
-
-    #[cfg(any(esp32c2, esp32c3))]
-    #[inline(always)]
-    pub(super) fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.info.channel as usize)
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
-    pub(super) fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
-        DMA::regs().out_int_ch(self.info.channel as usize)
-    }
-
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    pub(super) fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
-        DMA::regs().ch(self.info.channel as usize).out_int()
+// P4 has two DMA controllers: `ahb_dma` (GDMA-AHB, GDMA v2 layout, used here) and
+// `axi_dma` (GDMA-AXI, different register layout). The PAC's `dma` module maps to
+// a separate block that is not GDMA-AHB, so alias `ahb_dma` as `gdma_pac` on P4.
+// Other chips: PAC `dma` module is the GDMA v2 module directly.
+cfg_if::cfg_if! {
+    if #[cfg(esp32p4)] {
+        use pac::ahb_dma as gdma_pac;
+    } else {
+        use pac::dma as gdma_pac;
     }
 }
 
-impl RegisterAccess for AnyGdmaTxChannel<'_> {
+impl AhbGdmaTxChannel<'_> {
+    #[inline(always)]
+    pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
+        DMA::regs().ch(self.0.info.channel as usize)
+    }
+
+    #[inline(always)]
+    pub(super) fn int(&self) -> &gdma_pac::out_int_ch::OUT_INT_CH {
+        DMA::regs().out_int_ch(self.0.info.channel as usize)
+    }
+}
+
+impl RegisterAccess for AhbGdmaTxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+    }
+
     fn reset(&self) {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
@@ -52,13 +56,14 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .out_peri_sel()
-            .modify(|_, w| unsafe { w.peri_out_sel().bits(peripheral) });
+            .write(|w| unsafe { w.peri_out_sel().bits(peripheral) });
     }
 
     fn set_link_addr(&self, address: u32) {
-        self.ch()
-            .out_link()
-            .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+        trace!("Setting out-link address to 0x{:08X}", address);
+        DMA::regs()
+            .out_link_addr_ch(self.0.info.channel as usize)
+            .write(|w| unsafe { w.outlink_addr().bits(address) });
     }
 
     fn start(&self) {
@@ -85,28 +90,23 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .out_conf1()
-            .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
-    }
-
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
+    }
 }
 
-impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
+impl TxRegisterAccess for AhbGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
-                 self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
-            } else {
-                 self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
-            }
-        }
+        self.ch()
+            .outfifo_status()
+            .read()
+            .outfifo_empty()
+            .bit_is_set()
     }
 
     fn set_auto_write_back(&self, enable: bool) {
@@ -124,15 +124,15 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_out
+        self.0.info.handler_out
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_out
+        self.0.info.isr_out
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for AhbGdmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -202,54 +202,34 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.tx_waker
+        &self.0.state.tx_waker
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.tx_is_async.load(portable_atomic::Ordering::Acquire)
-            } else {
-                true
-            }
-        }
+        true
     }
 
-    fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
-            }
-        }
+    fn set_async(&self, _is_async: bool) {}
+}
+
+impl AhbGdmaRxChannel<'_> {
+    #[inline(always)]
+    fn ch(&self) -> &gdma_pac::ch::CH {
+        DMA::regs().ch(self.0.info.channel as usize)
+    }
+
+    #[inline(always)]
+    fn int(&self) -> &gdma_pac::in_int_ch::IN_INT_CH {
+        DMA::regs().in_int_ch(self.0.info.channel as usize)
     }
 }
 
-impl AnyGdmaRxChannel<'_> {
-    #[inline(always)]
-    fn ch(&self) -> &pac::dma::ch::CH {
-        DMA::regs().ch(self.info.channel as usize)
+impl RegisterAccess for AhbGdmaRxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
     }
 
-    #[cfg(any(esp32c2, esp32c3))]
-    #[inline(always)]
-    fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.info.channel as usize)
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
-    fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
-        DMA::regs().in_int_ch(self.info.channel as usize)
-    }
-
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
-        DMA::regs().ch(self.info.channel as usize).in_int()
-    }
-}
-
-impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn reset(&self) {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
@@ -275,13 +255,14 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .in_peri_sel()
-            .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
+            .write(|w| unsafe { w.peri_in_sel().bits(peripheral) });
     }
 
     fn set_link_addr(&self, address: u32) {
-        self.ch()
-            .in_link()
-            .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+        trace!("Setting in-link address to 0x{:08X}", address);
+        DMA::regs()
+            .in_link_addr_ch(self.0.info.channel as usize)
+            .write(|w| unsafe { w.inlink_addr().bits(address) });
     }
 
     fn start(&self) {
@@ -306,20 +287,17 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .in_conf1()
-            .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
-    }
-
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true
     }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info.compatible_peripherals
+    }
 }
 
-impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
+impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()
@@ -327,15 +305,15 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        self.info.handler_in
+        self.0.info.handler_in
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        self.info.isr_in
+        self.0.info.isr_in
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for AhbGdmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.int().ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -413,26 +391,27 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn waker(&self) -> &'static AtomicWaker {
-        &self.state.rx_waker
+        &self.0.state.rx_waker
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.rx_is_async.load(portable_atomic::Ordering::Acquire)
-            } else {
-                true
-            }
-        }
+        true
     }
 
-    fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                self.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
-            }
-        }
-    }
+    fn set_async(&self, _is_async: bool) {}
 }
 
-pub(crate) fn setup() {}
+pub(crate) fn setup() {
+    // TODO: configure accessible memory range with non-hardcoded data
+    // let range = 0x4080_0000..0x4400_0000;
+    // trace!(
+    //     "Configuring accessible memory range: 0x{:x}..0x{:x}",
+    //     range.start, range.end
+    // );
+    // DMA::regs()
+    //     .intr_mem_start_addr()
+    //     .write(|w| unsafe { w.bits(range.start) });
+    // DMA::regs()
+    //     .intr_mem_end_addr()
+    //     .write(|w| unsafe { w.bits(range.end) });
+}

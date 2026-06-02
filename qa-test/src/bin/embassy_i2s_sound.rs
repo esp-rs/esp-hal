@@ -33,7 +33,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma_buffers,
+    dma_tx_stream_buffer,
     i2s::master::{Channels, Config, DataFormat, I2s},
     interrupt::software::SoftwareInterruptControl,
     time::Rate,
@@ -67,7 +67,7 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 32000);
+    let mut buffer = dma_tx_stream_buffer!(4092 * 4, 2048);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -85,36 +85,41 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_dout(peripherals.GPIO5)
-        .build(tx_descriptors);
+        .build();
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let buffer = tx_buffer;
     let mut idx = 0;
-    for i in 0..usize::min(data.len(), buffer.len()) {
-        buffer[i] = data[idx];
+    buffer.push_with(|buf| {
+        for b in buf.iter_mut() {
+            *b = data[idx];
+            idx += 1;
 
-        idx += 1;
-
-        if idx >= data.len() {
-            idx = 0;
+            if idx >= data.len() {
+                idx = 0;
+            }
         }
-    }
-
-    let mut filler = [0u8; 10000];
-    let mut idx = 32000 % data.len();
+        buf.len()
+    });
 
     println!("Start");
-    let mut transaction = i2s_tx.write_dma_circular_async(buffer).unwrap();
+    let mut transaction = i2s_tx.write(buffer).ok().unwrap();
     loop {
-        for i in 0..filler.len() {
-            filler[i] = data[(idx + i) % data.len()];
-        }
-        println!("Next");
+        transaction.wait_for_available_async().await.unwrap();
 
-        let written = transaction.push(&filler).await.unwrap();
-        idx = (idx + written) % data.len();
+        let written = transaction.push_with(|buf| {
+            for b in buf.iter_mut() {
+                *b = data[idx];
+                idx += 1;
+
+                if idx >= data.len() {
+                    idx = 0;
+                }
+            }
+            buf.len()
+        });
+
         println!("written {}", written);
     }
 }

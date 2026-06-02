@@ -1485,6 +1485,21 @@ crate::any_peripheral! {
     }
 }
 
+#[cfg(spi_master_supports_dma)]
+with_spi_master_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        use crate::dma::DmaEligiblePeripheral;
+
+        impl DmaEligiblePeripheral for AnySpi<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, spi => { spi.dma_peripheral() })
+            }
+        }
+    };
+}
+
 impl QspiInstance for AnySpi<'_> {}
 
 impl Instance for AnySpi<'_> {

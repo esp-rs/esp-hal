@@ -19,7 +19,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma_buffers,
+    dma_rx_stream_buffer,
     i2s::master::{Channels, Config, DataFormat, I2s},
     interrupt::software::SoftwareInterruptControl,
     time::Rate,
@@ -31,6 +31,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
@@ -45,7 +46,7 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(4092 * 4, 0);
+    let buffer = dma_rx_stream_buffer!(4092 * 8, 2048);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -64,29 +65,32 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
-        .build(rx_descriptors);
+        .build();
 
-    let buffer = rx_buffer;
     println!("Start");
 
-    let mut data = [0u8; 5000];
-    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
+    let mut data = [0u8; 9000];
+    let mut transaction = i2s_rx.read(buffer).ok().unwrap();
     loop {
-        let avail = transaction.available().await.unwrap();
+        transaction.wait_for_available_async().await.unwrap();
+
+        let avail = transaction.available_bytes();
         println!("available {}", avail);
 
-        let count = transaction.pop(&mut data).await.unwrap();
+        if avail > 0 {
+            let count = transaction.pop(&mut data[..avail]);
 
-        #[cfg(not(feature = "esp32s2"))]
-        println!(
-            "got {} bytes, {:x?}..{:x?}",
-            count,
-            &data[..10],
-            &data[count - 10..count]
-        );
+            #[cfg(not(feature = "esp32s2"))]
+            println!(
+                "got {} bytes, {:x?}..{:x?}",
+                count,
+                &data[..10],
+                &data[count - 10..count]
+            );
 
-        // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
-        #[cfg(feature = "esp32s2")]
-        println!("got {} bytes", count,);
+            // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
+            #[cfg(feature = "esp32s2")]
+            println!("got {} bytes", count,);
+        }
     }
 }

@@ -54,15 +54,17 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
         ClockError,
+        ErasedTxChannel,
         Instance,
         LCD_DONE_WAKER,
         Lcd,
+        LcdDmaTxChannel,
         calculate_clkm,
         lcd::{ClockMode, DelayMode, Phase, Polarity},
     },
@@ -83,7 +85,7 @@ pub enum ConfigError {
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
     lcd_cam: LCD_CAM<'d>,
-    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
+    tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -95,10 +97,11 @@ where
     /// Creates a new instance of the I8080 LCD interface.
     pub fn new(
         lcd: Lcd<'d, Dm>,
-        channel: impl TxChannelFor<LCD_CAM<'d>>,
+        channel: impl LcdDmaTxChannel<'d>,
         config: Config,
     ) -> Result<Self, ConfigError> {
-        let tx_channel = ChannelTx::new(channel.degrade());
+        let tx_channel = ChannelTx::new(channel.into());
+        tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -458,7 +461,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::LcdCam, &mut data)
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut data)
         }
         .and_then(|_| self.tx_channel.start_transfer());
         if let Err(err) = result {

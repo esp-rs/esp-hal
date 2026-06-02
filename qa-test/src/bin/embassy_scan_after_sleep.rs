@@ -50,7 +50,8 @@ async fn main(_spawner: Spawner) {
     esp_println::println!("Done sleeping");
 
     // WiFi
-    let mut controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default()).unwrap();
 
     let res = controller
         .scan_async(&esp_radio::wifi::scan::ScanConfig::default())

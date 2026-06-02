@@ -131,13 +131,11 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelFor,
+        DmaChannel,
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
         DmaTxBuffer,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
     },
     gpio::{
         self,
@@ -932,7 +930,7 @@ pub struct ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, ErasedTxChannel<'d>>,
     _guard: ParlIoTxGuard,
 }
 
@@ -982,7 +980,7 @@ pub struct ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: ParlIoRxGuard,
 }
 
@@ -1076,11 +1074,12 @@ impl<'d> ParlIo<'d, Blocking> {
     /// Create a new instance of [ParlIo]
     pub fn new(
         _parl_io: PARL_IO<'d>,
-        dma_channel: impl DmaChannelFor<PARL_IO<'d>>,
+        dma_channel: impl ParlIoDmaChannel<'d>,
     ) -> Result<Self, Error> {
         let tx_guard = GenericPeripheralGuard::new();
         let rx_guard = GenericPeripheralGuard::new();
-        let dma_channel = Channel::new(dma_channel.degrade());
+        let dma_channel = Channel::new(dma_channel.into());
+        dma_channel.runtime_ensure_compatible(DmaPeripheral::PARL_IO);
 
         Ok(Self {
             tx: TxCreator {
@@ -1195,7 +1194,7 @@ where
 
         let result = unsafe {
             self.tx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
                 .and_then(|_| self.tx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1357,7 +1356,7 @@ where
 
         let result = unsafe {
             self.rx_channel
-                .prepare_transfer(DmaPeripheral::ParlIo, &mut buffer)
+                .prepare_transfer(DmaPeripheral::PARL_IO, &mut buffer)
                 .and_then(|_| self.rx_channel.start_transfer())
         };
         if let Err(err) = result {
@@ -1490,7 +1489,7 @@ pub struct TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<PARL_IO<'d>>>,
+    tx_channel: ChannelTx<Dm, ErasedTxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -1499,7 +1498,7 @@ pub struct RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    rx_channel: ChannelRx<Dm, PeripheralRxChannel<PARL_IO<'d>>>,
+    rx_channel: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::ParlIo as u8 }>,
 }
 
@@ -2117,4 +2116,29 @@ impl Drop for ParlIoRxGuard {
     fn drop(&mut self) {
         ClockTree::with(|clocks| ParlIoInstance::ParlIo.release_rx_clock(clocks));
     }
+}
+
+with_parl_io_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for the PARL_IO peripheral.
+        ///
+        /// Implemented for every channel type capable of serving PARL_IO.
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with PARL_IO",
+            label = "This DMA channel"
+        )]
+        pub trait ParlIoDmaChannel<'d>: DmaChannel + Into<ErasedChannel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            peri = PARL_IO,
+            ($peri:path, $ch:path) => {
+                impl<'d> ParlIoDmaChannel<'d> for $ch {}
+            }
+        }
+
+        type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
+        type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
+        type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+    };
 }

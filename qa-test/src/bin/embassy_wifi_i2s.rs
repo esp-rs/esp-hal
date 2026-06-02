@@ -13,7 +13,7 @@ use embassy_time::{Duration, Instant, Timer};
 use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{
-    dma_buffers,
+    dma::DmaRxStreamBuf,
     i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
     interrupt::software::SoftwareInterruptControl,
     ram,
@@ -81,7 +81,7 @@ async fn connection_manager(
 #[embassy_executor::task]
 async fn i2s_dma_drain(
     i2s_rx: esp_hal::i2s::master::I2sRx<'static, esp_hal::Async>,
-    buffer: &'static mut [u8],
+    buffer: DmaRxStreamBuf,
     connected_signal: &'static Signal<NoopRawMutex, bool>,
 ) {
     // Temporary buffer for DMA pops
@@ -89,74 +89,41 @@ async fn i2s_dma_drain(
     let i2s_data = I2S_DATA_BUFFER.init([0u8; 8192]);
 
     // Create circular DMA transaction
-    println!(
-        "🎛️  Creating I2S DMA circular transaction with ring size: {} bytes",
-        buffer.len()
-    );
-    let mut transaction = match i2s_rx.read_dma_circular_async(buffer) {
+    println!("🎛️  Creating I2S DMA circular transaction");
+    let mut transaction = match i2s_rx.read(buffer) {
         Ok(t) => t,
         Err(e) => {
-            println!("Failed to start I2S DMA: {:?}", e);
+            println!("Failed to start I2S DMA: {:?}", e.0);
             return;
         }
     };
 
     let mut total_drained: usize = 0;
-    let mut late_errors: u32 = 0;
     let start = Instant::now();
 
     // Start continuous draining to prevent DmaError(Late)
     println!("Starting continuous buffer drain to keep DMA synchronized...");
     while !connected_signal.signaled() {
         // Check for available data and drain it
-        match transaction.pop(i2s_data).await {
-            Ok(bytes) => {
-                total_drained += bytes;
-            }
-            Err(e) => {
-                if matches!(
-                    e,
-                    esp_hal::i2s::master::Error::DmaError(esp_hal::dma::DmaError::Late)
-                ) {
-                    println!(
-                        "Late error during drain - (waiting connection signal) {:?}",
-                        esp_hal::system::Cpu::current()
-                    );
-                    late_errors += 1;
-                } else {
-                    println!(
-                        "Error during continuous drain: {:?}  {:?}",
-                        e,
-                        esp_hal::system::Cpu::current()
-                    );
-                }
-            }
-        }
+        transaction.wait_for_available_async().await.unwrap();
 
-        // Small delay to prevent busy waiting
-        Timer::after(Duration::from_millis(1)).await;
+        let avl = transaction.available_bytes();
+
+        if avl > 0 {
+            let bytes = transaction.pop(&mut i2s_data[..avl]);
+            total_drained += bytes;
+        }
     }
     println!(
-        "Drained: {} bytes | Late errors: {} | uptime: {} ms",
+        "Drained: {} bytes | uptime: {} ms",
         total_drained,
-        late_errors,
         start.elapsed().as_millis()
     );
-    match transaction.pop(i2s_data).await {
-        Ok(bytes) => {
-            println!("Final drained {} bytes total", bytes);
-        }
-        Err(e) => {
-            if matches!(
-                e,
-                esp_hal::i2s::master::Error::DmaError(esp_hal::dma::DmaError::Late)
-            ) {
-                println!("Late error during drain -  (final drain)");
-            } else {
-                println!("Error during final drain: {:?}", e);
-            }
-        }
-    }
+
+    transaction.wait_for_available_async().await.unwrap();
+    let avl = transaction.available_bytes();
+    let bytes = transaction.pop(&mut i2s_data[..avl]);
+    println!("Final drained {} bytes total", bytes);
 }
 
 #[esp_hal::main]
@@ -181,7 +148,7 @@ async fn main(spawner: Spawner) {
     let dma_channel = peripherals.DMA_I2S0;
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = peripherals.DMA_CH0;
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(I2S_BUFFER_SIZE, 0);
+    let buffer = esp_hal::dma_rx_stream_buffer!(I2S_BUFFER_SIZE, 2048);
 
     let i2s_cfg = I2sConfig::new_tdm_philips()
         .with_sample_rate(Rate::from_hz(SAMPLE_RATE))
@@ -197,7 +164,7 @@ async fn main(spawner: Spawner) {
         .with_bclk(peripherals.GPIO2) // SCK
         .with_ws(peripherals.GPIO4) // WS
         .with_din(peripherals.GPIO5) // SD
-        .build(rx_descriptors);
+        .build();
 
     // WiFi + network stack
     let station_config = Config::Station(
@@ -208,7 +175,7 @@ async fn main(spawner: Spawner) {
 
     println!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
-    let controller = esp_radio::wifi::new(
+    let controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )
@@ -233,5 +200,5 @@ async fn main(spawner: Spawner) {
     // Tasks
     spawner.spawn(net_task(runner).unwrap());
     spawner.spawn(connection_manager(controller, connected_signal).unwrap());
-    spawner.spawn(i2s_dma_drain(i2s_rx, rx_buffer, connected_signal).unwrap());
+    spawner.spawn(i2s_dma_drain(i2s_rx, buffer, connected_signal).unwrap());
 }

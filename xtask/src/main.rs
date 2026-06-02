@@ -464,6 +464,7 @@ impl Runner {
                 }
                 if options.no_docs {
                     skip.push(String::from("docs"));
+                    skip.push(String::from("doc-tests"));
                 }
                 if options.no_check_crates {
                     skip.push(String::from("check"));

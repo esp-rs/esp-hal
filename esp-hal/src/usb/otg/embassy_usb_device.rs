@@ -1,4 +1,4 @@
-//! USB OTG device driver for embassy-usb.
+//! USB OTG device driver for embassy-usb (Synopsys DWC).
 
 use embassy_usb_driver::{EndpointAddress, EndpointAllocError, EndpointType, Event, Unsupported};
 pub use embassy_usb_synopsys_otg::Config;
@@ -10,49 +10,32 @@ use embassy_usb_synopsys_otg::{
     In,
     OtgInstance,
     Out,
-    PhyType,
-    State,
-    on_interrupt,
     otg_v1::Otg,
 };
-use procmacros::handler;
 
-use crate::{interrupt::Priority, otg_fs::Usb};
-
-static DEVICE_STATE: State<{ Usb::MAX_EP_COUNT }> = State::new();
+use crate::usb::otg::Usb;
 
 /// Asynchronous USB driver.
 pub struct Driver<'d> {
-    inner: OtgDriver<'d, { Usb::MAX_EP_COUNT }>,
+    inner: OtgDriver<'d>,
     _usb: Usb<'d>,
 }
 
 impl<'d> Driver<'d> {
-    const REGISTERS: Otg = unsafe { Otg::from_ptr(Usb::REGISTERS.cast_mut()) };
-
-    /// Initializes USB OTG peripheral with internal Full-Speed PHY, for
-    /// asynchronous operation.
+    /// Initializes USB OTG for asynchronous device operation.
     ///
     /// # Arguments
     ///
-    /// * `ep_out_buffer` - An internal buffer used to temporarily store received packets.
-    ///
-    /// Must be large enough to fit all OUT endpoint max packet sizes.
-    /// Endpoint allocation will fail if it is too small.
+    /// * `ep_out_buffer` - Buffer for received OUT packets. Must be large enough for all OUT
+    ///   endpoint max packet sizes.
     pub fn new(peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
-        // From `synopsys-usb-otg` crate:
-        // This calculation doesn't correspond to one in a Reference Manual.
-        // In fact, the required number of words is higher than indicated in RM.
-        // The following numbers are pessimistic and were figured out empirically.
-        const RX_FIFO_EXTRA_SIZE_WORDS: u16 = 30;
-
+        let info = peri.info();
         let instance = OtgInstance {
-            regs: Self::REGISTERS,
-            state: &DEVICE_STATE,
-            fifo_depth_words: Usb::FIFO_DEPTH_WORDS as u16,
-            extra_rx_fifo_words: RX_FIFO_EXTRA_SIZE_WORDS,
-            endpoint_count: Usb::MAX_EP_COUNT,
-            phy_type: PhyType::InternalFullSpeed,
+            regs: unsafe { Otg::from_ptr(info.register_ptr.cast_mut()) },
+            state: peri.embassy_device_state(),
+            fifo_depth_words: info.fifo_depth_words as u16,
+            extra_rx_fifo_words: info.rx_fifo_extra_words,
+            phy_type: info.phy_type,
             calculate_trdt_fn: |_| 5,
         };
         Self {
@@ -93,57 +76,55 @@ impl<'d> embassy_usb_driver::Driver<'d> for Driver<'d> {
     fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {
         let (bus, cp) = self.inner.start(control_max_packet_size);
 
-        let mut bus = Bus {
-            inner: bus,
-            _usb: self._usb,
-        };
-
-        bus.init();
-
-        (bus, cp)
+        (
+            Bus {
+                inner: bus,
+                inited: false,
+                _usb: self._usb,
+            },
+            cp,
+        )
     }
 }
 
-/// Asynchronous USB bus mainly used internally by `embassy-usb`.
-// We need a custom wrapper implementation to handle custom initialization.
+/// Asynchronous USB bus used internally by embassy-usb.
 pub struct Bus<'d> {
-    inner: OtgBus<'d, { Usb::MAX_EP_COUNT }>,
+    inner: OtgBus<'d>,
+    inited: bool,
     _usb: Usb<'d>,
 }
 
-impl Bus<'_> {
+impl<'d> Bus<'d> {
     fn init(&mut self) {
-        Usb::_enable();
+        let i = self._usb.info();
+        (i.enable_device_mode)();
 
-        let r = Driver::REGISTERS;
+        let r = unsafe { Otg::from_ptr(i.register_ptr.cast_mut()) };
 
-        // Soft-reset the DWC core. Handles both the legacy (csrst self-clear)
-        // and the >= v4.20a (csrstdone) reset completion paths.
         self.inner.core_soft_reset();
 
-        // Write GUSBCFG: forces device mode (FDMOD), selects the embedded
-        // full-speed serial PHY (PHYSEL=1, UTMI/ULPI disabled), and waits
-        // for the core to enter device mode (GINTSTS.CMOD = 0). PHYSEL must
-        // be 1 for the FS PHY; without it the core stays attached to the
-        // (non-existent) UTMI/ULPI PHY and never drives D+/D-.
         self.inner.configure_as_device();
         self.inner.config_v5();
 
-        // Clear PCGCCTL.StopPclk and other gates so the PHY clock is running.
         r.pcgcctl().write(|w| w.0 = 0);
 
-        self._usb._usb.bind_peri_interrupt(interrupt_handler);
+        self._usb.bind_device_interrupt();
     }
 
     fn disable(&mut self) {
-        self._usb._usb.disable_peri_interrupt_on_all_cores();
-
-        Usb::_disable();
+        self._usb.disable_device_interrupt();
+        (self._usb.info().platform_bus_disable_on_drop)();
+        self.inited = false;
     }
 }
 
-impl embassy_usb_driver::Bus for Bus<'_> {
+impl<'d> embassy_usb_driver::Bus for Bus<'d> {
     async fn poll(&mut self) -> Event {
+        if !self.inited {
+            self.init();
+            self.inited = true;
+        }
+
         self.inner.poll().await
     }
 
@@ -172,13 +153,8 @@ impl embassy_usb_driver::Bus for Bus<'_> {
     }
 }
 
-impl Drop for Bus<'_> {
+impl<'d> Drop for Bus<'d> {
     fn drop(&mut self) {
         Bus::disable(self);
     }
-}
-
-#[handler(priority = Priority::max())]
-fn interrupt_handler() {
-    unsafe { on_interrupt(Driver::REGISTERS, &DEVICE_STATE, Usb::MAX_EP_COUNT) }
 }

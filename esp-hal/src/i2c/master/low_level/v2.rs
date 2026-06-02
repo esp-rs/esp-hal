@@ -1,58 +1,61 @@
 use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
+use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
 /// i2c_ll_set_bus_timing in ESP-IDF
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
-
-    // TODO: could be REF_TICK
-    let source_clk = crate::soc::clocks::apb_clk_frequency();
-
     let bus_freq = clock_config.frequency.as_hz();
+    let sclk = clock_config.clock_source;
+    let clock = driver.info.clock_instance;
 
-    let half_cycle: u32 = source_clk / bus_freq / 2;
-    // SCL
-    let scl_low = half_cycle;
-    // default, scl_wait_high < scl_high
-    let scl_high = half_cycle / 2 + 2;
-    let scl_wait_high = half_cycle - scl_high;
-    let sda_hold = half_cycle / 2;
-    // scl_wait_high < sda_sample <= scl_high
-    let sda_sample = half_cycle / 2 - 1;
-    let setup = half_cycle;
-    let hold = half_cycle;
+    ClockTree::with(|clocks| -> Result<(), ConfigError> {
+        let source_clk =
+            clock.function_clock_config_frequency(clocks, I2cFunctionClockConfig::new(sclk));
 
-    // scl period
-    let scl_low_period = scl_low - 1;
-    let scl_high_period = scl_high;
-    let scl_wait_high_period = scl_wait_high;
-    // sda sample
-    let sda_hold_time = sda_hold;
-    let sda_sample_time = sda_sample;
-    // setup
-    let scl_rstart_setup_time = setup;
-    let scl_stop_setup_time = setup;
-    // hold
-    let scl_start_hold_time = hold - 1;
-    let scl_stop_hold_time = hold;
+        let half_cycle: u32 = source_clk / bus_freq / 2;
+        // SCL
+        let scl_low = half_cycle;
+        // default, scl_wait_high < scl_high
+        let scl_high = half_cycle / 2 + 2;
+        let scl_wait_high = half_cycle - scl_high;
+        let sda_hold = half_cycle / 2;
+        // scl_wait_high < sda_sample <= scl_high
+        let sda_sample = half_cycle / 2 - 1;
+        let setup = half_cycle;
+        let hold = half_cycle;
 
-    configure_clock(
-        driver.info,
-        0,
-        scl_low_period,
-        scl_high_period,
-        scl_wait_high_period,
-        sda_hold_time,
-        sda_sample_time,
-        scl_rstart_setup_time,
-        scl_stop_setup_time,
-        scl_start_hold_time,
-        scl_stop_hold_time,
-        timeout.apb_cycles(half_cycle)?,
-    )?;
+        // scl period
+        let scl_low_period = scl_low - 1;
+        let scl_high_period = scl_high;
+        let scl_wait_high_period = scl_wait_high;
+        // sda sample
+        let sda_hold_time = sda_hold;
+        let sda_sample_time = sda_sample;
+        // setup
+        let scl_rstart_setup_time = setup;
+        let scl_stop_setup_time = setup;
+        // hold
+        let scl_start_hold_time = hold - 1;
+        let scl_stop_hold_time = hold;
 
-    Ok(())
+        clock.configure_function_clock(clocks, I2cFunctionClockConfig::new(sclk));
+
+        configure_clock(
+            driver.info,
+            scl_low_period,
+            scl_high_period,
+            scl_wait_high_period,
+            sda_hold_time,
+            sda_sample_time,
+            scl_rstart_setup_time,
+            scl_stop_setup_time,
+            scl_start_hold_time,
+            scl_stop_hold_time,
+            timeout.apb_cycles(half_cycle)?,
+        )
+    })
 }
 
 /// Resets the transmit and receive FIFO buffers.

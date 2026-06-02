@@ -1,18 +1,12 @@
 use enumset::EnumSet;
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::Ordering;
 
 use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
         BurstConfig,
-        ChannelInfo,
-        ChannelState,
         DmaChannel,
-        DmaChannelConvert,
-        DmaChannelExt,
-        DmaExtMemBKSize,
-        DmaPeripheral,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -21,78 +15,88 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
-        asynch,
     },
     interrupt::InterruptHandler,
-    peripherals::{DMA_CRYPTO, Interrupt},
-    system::Peripheral,
+    peripherals::Interrupt,
+    system::PeripheralGuard,
 };
 
-pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
+/// Immutable per-channel metadata.
+#[doc(hidden)]
+pub struct ChannelInfo {
+    pub(crate) peripheral_interrupt: Interrupt,
 
-/// The RX half of a Crypto DMA channel.
+    pub(crate) async_handler: InterruptHandler,
+
+    /// Peripheral IDs this channel can serve. An empty slice means no runtime check is needed.
+    pub(crate) compatible_peripherals: &'static [u8],
+}
+
+/// Mutable per-channel runtime state (wakers and async-mode flags).
+pub(crate) struct ChannelState {
+    /// Async waker for the TX (out) half of this channel.
+    pub(crate) tx_waker: AtomicWaker,
+
+    /// Async waker for the RX (in) half of this channel.
+    pub(crate) rx_waker: AtomicWaker,
+
+    /// Whether the TX half is currently in async mode.
+    pub(crate) tx_async_flag: portable_atomic::AtomicBool,
+
+    /// Whether the RX half is currently in async mode.
+    pub(crate) rx_async_flag: portable_atomic::AtomicBool,
+}
+
+pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
+
+/// The RX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaRxChannel<'d>(pub(crate) DMA_CRYPTO<'d>);
+pub struct I2sDmaRxChannel<'d>(pub(crate) I2sDmaChannel<'d>);
 
-impl CryptoDmaRxChannel<'_> {
-    fn regs(&self) -> &CryptoRegisterBlock {
+impl I2sDmaRxChannel<'_> {
+    fn regs(&self) -> &I2sRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CryptoDmaRxChannel<'_> {}
-impl DmaRxChannel for CryptoDmaRxChannel<'_> {}
+impl crate::private::Sealed for I2sDmaRxChannel<'_> {}
+impl DmaRxChannel for I2sDmaRxChannel<'_> {}
 
-/// The TX half of a Crypto DMA channel.
+/// The TX half of an arbitrary I2S DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CryptoDmaTxChannel<'d>(pub(crate) DMA_CRYPTO<'d>);
+pub struct I2sDmaTxChannel<'d>(pub(crate) I2sDmaChannel<'d>);
 
-impl CryptoDmaTxChannel<'_> {
-    fn regs(&self) -> &CryptoRegisterBlock {
+impl I2sDmaTxChannel<'_> {
+    fn regs(&self) -> &I2sRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
-impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
+impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
+impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
-impl RegisterAccess for CryptoDmaTxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CryptoDma)
+impl RegisterAccess for I2sDmaTxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        None
     }
 
     fn reset(&self) {
-        self.regs().conf().toggle(|w, bit| {
-            w.out_rst().bit(bit);
-            w.ahbm_rst().bit(bit);
-            w.ahbm_fifo_rst().bit(bit)
-        });
+        self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, burst_mode: BurstConfig) {
         self.regs()
-            .conf()
+            .lc_conf()
             .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
-            .conf()
+            .lc_conf()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_peripheral(&self, peripheral: u8) {
-        use esp32s2::crypto_dma::aes_sha_select::SELECT;
-        let peripheral = match peripheral {
-            p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
-            _ => unreachable!(),
-        };
-        self.regs()
-            .aes_sha_select()
-            .modify(|_, w| w.select().variant(peripheral));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -120,36 +124,42 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
     }
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
-        if check_owner == Some(true) {
-            panic!("Crypto DMA does not support checking descriptor ownership");
-        }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
+        self.regs()
+            .lc_conf()
+            .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
-            .conf1()
+            .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        true
+        matches!(self.0, I2sDmaChannel(any::Inner::I2s0(_)))
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
-impl TxRegisterAccess for CryptoDmaTxChannel<'_> {
+impl TxRegisterAccess for I2sDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        self.regs().state1().read().outfifo_cnt_debug().bits() == 0
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().lc_state0().read().bits() & 0x80000000 != 0
+            } else {
+                self.regs().lc_state0().read().out_empty().bit_is_set()
+            }
+        }
     }
 
     fn set_auto_write_back(&self, enable: bool) {
         self.regs()
-            .conf()
+            .lc_conf()
             .modify(|_, w| w.out_auto_wrback().bit(enable));
     }
 
@@ -162,15 +172,15 @@ impl TxRegisterAccess for CryptoDmaTxChannel<'_> {
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        None
+        Some(self.0.info().peripheral_interrupt)
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        None
+        Some(self.0.info().async_handler)
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
+impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -205,20 +215,6 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
         result
     }
 
-    fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
-        self.regs().int_clr().write(|w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
-                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
-                    DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
-                    DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
-                };
-            }
-            w
-        });
-    }
-
     fn pending_interrupts(&self) -> EnumSet<DmaTxInterrupt> {
         let mut result = EnumSet::new();
 
@@ -239,53 +235,52 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
         result
     }
 
+    fn clear(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.regs().int_clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaTxInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                    DmaTxInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                    DmaTxInterrupt::Done => w.out_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
     fn waker(&self) -> &'static AtomicWaker {
         &self.0.state().tx_waker
     }
 
     fn is_async(&self) -> bool {
-        self.0.state().tx_async_flag.load(Ordering::Acquire)
+        self.0.state().tx_async_flag.load(Ordering::Relaxed)
     }
 
     fn set_async(&self, is_async: bool) {
         self.0
             .state()
             .tx_async_flag
-            .store(is_async, Ordering::Release);
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
-impl RegisterAccess for CryptoDmaRxChannel<'_> {
-    fn peripheral_clock(&self) -> Option<Peripheral> {
-        Some(Peripheral::CryptoDma)
+impl RegisterAccess for I2sDmaRxChannel<'_> {
+    #[allow(private_interfaces)]
+    fn enable(&self) -> Option<PeripheralGuard> {
+        None
     }
 
     fn reset(&self) {
-        self.regs().conf().toggle(|w, bit| {
-            w.in_rst().bit(bit);
-            w.ahbm_rst().bit(bit);
-            w.ahbm_fifo_rst().bit(bit)
-        });
+        self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
     fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
-            .conf()
+            .lc_conf()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_peripheral(&self, peripheral: u8) {
-        use esp32s2::crypto_dma::aes_sha_select::SELECT;
-        let peripheral = match peripheral {
-            p if p == DmaPeripheral::Aes as u8 => SELECT::Aes,
-            p if p == DmaPeripheral::Sha as u8 => SELECT::Sha,
-            _ => unreachable!(),
-        };
-        self.regs()
-            .aes_sha_select()
-            .modify(|_, w| w.select().variant(peripheral));
     }
 
     fn set_link_addr(&self, address: u32) {
@@ -313,41 +308,39 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     }
 
     fn set_check_owner(&self, check_owner: Option<bool>) {
-        if check_owner == Some(true) {
-            panic!("Crypto DMA does not support checking descriptor ownership");
-        }
-    }
-
-    fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool {
-        self.0.info().is_compatible_with(peripheral)
+        self.regs()
+            .lc_conf()
+            .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
     }
 
     #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
-            .conf1()
+            .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
-        true
+        matches!(self.0, I2sDmaChannel(any::Inner::I2s0(_)))
+    }
+
+    fn compatible_peripherals(&self) -> &[u8] {
+        self.0.info().compatible_peripherals
     }
 }
 
-impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
+impl RxRegisterAccess for I2sDmaRxChannel<'_> {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
-        // We don't know if the channel is used by AES or SHA, so interrupt handler
-        // setup is the responsibility of the peripheral driver.
-        None
+        Some(self.0.info().peripheral_interrupt)
     }
 
     fn async_handler(&self) -> Option<InterruptHandler> {
-        None
+        Some(self.0.info().async_handler)
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
+impl InterruptAccess<DmaRxInterrupt> for I2sDmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.regs().int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -386,21 +379,6 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
         result
     }
 
-    fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
-        self.regs().int_clr().write(|w| {
-            for interrupt in interrupts.into() {
-                match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
-                    DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
-                };
-            }
-            w
-        });
-    }
-
     fn pending_interrupts(&self) -> EnumSet<DmaRxInterrupt> {
         let mut result = EnumSet::new();
 
@@ -424,6 +402,21 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
         result
     }
 
+    fn clear(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.regs().int_clr().write(|w| {
+            for interrupt in interrupts.into() {
+                match interrupt {
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
+                    DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
+                };
+            }
+            w
+        });
+    }
+
     fn waker(&self) -> &'static AtomicWaker {
         &self.0.state().rx_waker
     }
@@ -432,68 +425,94 @@ impl InterruptAccess<DmaRxInterrupt> for CryptoDmaRxChannel<'_> {
         self.0.state().rx_async_flag.load(Ordering::Relaxed)
     }
 
-    fn set_async(&self, _is_async: bool) {
+    fn set_async(&self, is_async: bool) {
         self.0
             .state()
             .rx_async_flag
-            .store(_is_async, Ordering::Relaxed);
+            .store(is_async, Ordering::Relaxed);
     }
 }
 
-impl<'d> DmaChannel for DMA_CRYPTO<'d> {
-    type Rx = CryptoDmaRxChannel<'d>;
-    type Tx = CryptoDmaTxChannel<'d>;
+crate::any_peripheral! {
+    /// An I2S-compatible type-erased DMA channel.
+    pub peripheral I2sDmaChannel<'d> {
+        #[cfg(soc_has_i2s0)]
+        I2s0(DMA_I2S0<'d>),
+        #[cfg(soc_has_i2s1)]
+        I2s1(DMA_I2S1<'d>),
+    }
+}
+
+impl<'d> DmaChannel for I2sDmaChannel<'d> {
+    type Rx = I2sDmaRxChannel<'d>;
+    type Tx = I2sDmaTxChannel<'d>;
+
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
-            CryptoDmaRxChannel(unsafe { Self::steal() }),
-            CryptoDmaTxChannel(unsafe { Self::steal() }),
+            I2sDmaRxChannel(unsafe { self.clone_unchecked() }),
+            I2sDmaTxChannel(self),
         )
     }
 }
-impl DmaChannelExt for DMA_CRYPTO<'_> {
-    fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-        CryptoDmaRxChannel(unsafe { Self::steal() })
-    }
-    fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-        CryptoDmaTxChannel(unsafe { Self::steal() })
-    }
-}
-impl DMA_CRYPTO<'_> {
-    pub(super) fn info(&self) -> &'static super::ChannelInfo {
-        #[crate::handler(priority = crate::interrupt::Priority::max())]
-        fn interrupt_handler() {
-            asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
-            asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
+
+impl I2sDmaChannel<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(soc_has_i2s0)]
+            any::Inner::I2s0(channel) => channel,
+            #[cfg(soc_has_i2s1)]
+            any::Inner::I2s1(channel) => channel,
+        } {
+            fn register_block(&self) -> &I2sRegisterBlock;
+            fn info(&self) -> &'static ChannelInfo;
+            fn state(&self) -> &'static ChannelState;
         }
-        static INFO: ChannelInfo = ChannelInfo {
-            peripheral_interrupt: Interrupt::CRYPTO_DMA,
-            async_handler: interrupt_handler,
-            compatible_peripherals: &[DmaPeripheral::Aes, DmaPeripheral::Sha],
-        };
-        &INFO
-    }
-
-    pub(super) fn state(&self) -> &'static super::ChannelState {
-        static STATE: ChannelState = ChannelState {
-            tx_waker: AtomicWaker::new(),
-            rx_waker: AtomicWaker::new(),
-            tx_async_flag: AtomicBool::new(false),
-            rx_async_flag: AtomicBool::new(false),
-        };
-        &STATE
     }
 }
 
-impl<'d> DmaChannelConvert<CryptoDmaRxChannel<'d>> for DMA_CRYPTO<'d> {
-    fn degrade(self) -> CryptoDmaRxChannel<'d> {
-        CryptoDmaRxChannel(self)
-    }
-}
-impl<'d> DmaChannelConvert<CryptoDmaTxChannel<'d>> for DMA_CRYPTO<'d> {
-    fn degrade(self) -> CryptoDmaTxChannel<'d> {
-        CryptoDmaTxChannel(self)
+// Convert erased channel into erased TX/RX half structs
+impl<'d> From<I2sDmaChannel<'d>> for I2sDmaRxChannel<'d> {
+    fn from(this: I2sDmaChannel<'d>) -> I2sDmaRxChannel<'d> {
+        I2sDmaRxChannel(this)
     }
 }
 
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
-crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);
+impl<'d> From<I2sDmaChannel<'d>> for I2sDmaTxChannel<'d> {
+    fn from(this: I2sDmaChannel<'d>) -> I2sDmaTxChannel<'d> {
+        I2sDmaTxChannel(this)
+    }
+}
+
+for_each_dma_channel_peri_pair! {
+    ("I2S_DMA", $dma_peri:ident, $peri:ident) => {
+        use crate::peripherals::$dma_peri;
+        impl $dma_peri<'_> {
+            pub(super) fn info(&self) -> &'static ChannelInfo {
+                #[crate::handler(priority = crate::interrupt::Priority::max())]
+                fn interrupt_handler() {
+                    crate::dma::asynch::handle_in_interrupt::<$dma_peri<'static>>();
+                    crate::dma::asynch::handle_out_interrupt::<$dma_peri<'static>>();
+                }
+
+                static INFO: ChannelInfo = ChannelInfo {
+                    peripheral_interrupt: Interrupt::$peri,
+                    async_handler: interrupt_handler,
+                    compatible_peripherals: &[crate::dma::DmaPeripheral::$peri.0],
+                };
+                &INFO
+            }
+
+            pub(super) fn state(&self) -> &'static ChannelState {
+                static STATE: ChannelState = ChannelState {
+                    tx_waker: AtomicWaker::new(),
+                    rx_waker: AtomicWaker::new(),
+                    tx_async_flag: portable_atomic::AtomicBool::new(false),
+                    rx_async_flag: portable_atomic::AtomicBool::new(false),
+                };
+                &STATE
+            }
+        }
+
+        crate::dma::impl_channel_common!(I2sDma, $dma_peri);
+    };
+}

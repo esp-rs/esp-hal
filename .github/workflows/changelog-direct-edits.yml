@@ -13,18 +13,14 @@ permissions:
   pull-requests: write
 
 jobs:
-  get-labels:
-    uses: ./.github/workflows/get-labels.yml
-
   no-changelog-edits:
     # Release PRs (labelled `release-pr`) and PRs where the author is taking
     # full manual control of the changelog (`manual-changelog`) legitimately
     # modify CHANGELOG.md — skip this check for them.
-    needs: get-labels
     if: |
       !github.event.pull_request.draft &&
-      !contains(needs.get-labels.outputs.labels, 'release-pr') &&
-      !contains(needs.get-labels.outputs.labels, 'manual-changelog')
+      !contains(github.event.pull_request.labels.*.name, 'release-pr') &&
+      !contains(github.event.pull_request.labels.*.name, 'manual-changelog')
     runs-on: ubuntu-latest
     steps:
       - name: Check for direct CHANGELOG.md edits

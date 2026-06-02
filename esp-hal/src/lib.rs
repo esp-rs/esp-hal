@@ -347,8 +347,6 @@ unstable_module! {
     pub mod dma;
     #[cfg(etm_driver_supported)]
     pub mod etm;
-    #[cfg(usb_otg_driver_supported)]
-    pub mod otg_fs;
     #[cfg(soc_has_psram)] // DMA needs some things from here
     pub mod psram;
 }
@@ -399,8 +397,12 @@ unstable_driver! {
     pub mod tsens;
     #[cfg(twai_driver_supported)]
     pub mod twai;
-    #[cfg(usb_serial_jtag_driver_supported)]
-    pub mod usb_serial_jtag;
+    #[cfg(any(
+        usb_otg_driver_supported,
+        usb_otg_hs_driver_supported,
+        usb_serial_jtag_driver_supported,
+    ))]
+    pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
 }
@@ -423,6 +425,7 @@ mod soc;
 // Some PAC-related utility
 use crate::pac::generic::{Readable, Reg, Resettable, W, Writable};
 
+#[allow(unused)]
 trait RegisterToggle {
     type Reg: Readable + Resettable + Writable;
 

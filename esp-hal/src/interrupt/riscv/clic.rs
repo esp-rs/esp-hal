@@ -207,7 +207,7 @@ _mtvt_table:
 );
 
 // Core 2
-#[cfg(multi_core)]
+#[cfg(all(feature = "rt", multi_core))]
 core::arch::global_asm!(
     r#"
     .section .trap, "ax"

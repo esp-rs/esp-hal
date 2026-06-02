@@ -50,14 +50,19 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
     let code = riscv::register::mcause::read().code();
     let mtval = riscv::register::mtval::read();
 
+    #[cfg(esp32p4)]
+    let code = code & 0x3F;
+
     unsafe extern "C" {
         static mut __stack_chk_guard: u32;
     }
 
+    let core = crate::system::Cpu::current();
+
     if code == 14 {
         panic!(
-            "Stack overflow detected at 0x{:x}, possibly called by 0x{:x}",
-            mepc, context.ra
+            "[{:?}] Stack overflow detected at 0x{:x}, possibly called by 0x{:x}",
+            core, mepc, context.ra
         );
     }
 
@@ -67,30 +72,30 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
 
         if mtval == guard_addr {
             panic!(
-                "Detected a write to the main stack's guard value at 0x{:x}, possibly called by 0x{:x}",
-                mepc, context.ra
+                "[{:?}] Detected a write to the main stack's guard value at 0x{:x}, possibly called by 0x{:x}",
+                core, mepc, context.ra
             )
         } else {
             if unsafe { crate::debugger::watchpoint_hit(1) } {
                 panic!(
-                    "Detected a write to the trap/rwtext segment at 0x{:x}, possibly called by 0x{:x}",
-                    mepc, context.ra
+                    "[{:?}] Detected a write to the trap/rwtext segment at 0x{:x}, possibly called by 0x{:x}",
+                    core, mepc, context.ra
                 );
             } else if unsafe { crate::debugger::watchpoint_hit(0) } {
                 panic!(
-                    "Detected a write to a stack guard value at 0x{:x}, possibly called by 0x{:x}",
-                    mepc, context.ra
+                    "[{:?}] Detected a write to a stack guard value at 0x{:x}, possibly called by 0x{:x}",
+                    core, mepc, context.ra
                 );
             } else {
                 panic!(
-                    "Breakpoint exception at 0x{:08x}, mtval=0x{:08x}\n{:?}",
-                    mepc, mtval, context
+                    "[{:?}] Breakpoint exception at 0x{:08x}, mtval=0x{:08x}\n{:?}",
+                    core, mepc, mtval, context
                 );
             }
         }
     }
 
-    let code = match code {
+    let code_str = match code {
         0 => "Instruction address misaligned",
         1 => "Instruction access fault",
         2 => "Illegal instruction",
@@ -107,11 +112,13 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         13 => "Load page fault",
         14 => "Reserved",
         15 => "Store/AMO page fault",
+        #[cfg(esp32p4)]
+        0x1f => "Illegal PIE instruction",
         _ => "UNKNOWN",
     };
 
     panic!(
-        "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
-        code, mepc, mtval, context
+        "[{:?}] Exception '{} ({:x})' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
+        core, code_str, code, mepc, mtval, context
     );
 }

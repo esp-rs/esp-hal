@@ -342,12 +342,11 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // `base` is an error, as it would produce a version lower than the current
 // one.
 //
-// CHANGELOG REVIEW REQUIRED
-// Changelog entries from recently merged PRs have been collected and merged
-// into each package's CHANGELOG.md (Unreleased section) and MIGRATING-*.md
-// files. Please review and adjust those files before running execute-plan:
-//   - Add, remove, or reword entries as appropriate.
-//   - Ensure migration guide content is accurate and complete.
+// CHANGELOG NOTE
+// When you run `cargo xrelease execute-plan`, changelog entries from recently
+// merged PRs will be collected and merged into each package's CHANGELOG.md
+// (Unreleased section) and MIGRATING-*.md files. You can preview them with:
+//   cargo xtask release changelog-preview
 "#,
     );
 
@@ -376,25 +375,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         "To apply the release plan, you'll need to remove the heading comment, save the \
         file, then run the following command: `cargo xrelease execute-plan`",
     );
-
-    // Merge PR changelog entries directly into CHANGELOG.md / MIGRATING-*.md files.
-    let modified = generate_changelog_draft(workspace, &plan);
-    if modified.is_empty() {
-        println!();
-        println!(
-            "Note: No changelog entries were merged. Run \
-            `cargo xtask release changelog-preview` manually if needed."
-        );
-    } else {
-        println!();
-        println!("Merged changelog entries into the following files:");
-        for path in &modified {
-            println!("  {}", path.display());
-        }
-        println!(
-            "Please review and adjust these files before running `cargo xrelease execute-plan`."
-        );
-    }
 
     Ok(())
 }
@@ -538,7 +518,7 @@ fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
 /// Returns the paths of files that were modified. Returns an empty list if the
 /// `gh` CLI is unavailable, no entries were found, or any other non-fatal
 /// problem occurred.
-fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std::path::PathBuf> {
+pub(super) fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std::path::PathBuf> {
     if plan.packages.is_empty() {
         return vec![];
     }

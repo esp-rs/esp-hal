@@ -39,9 +39,9 @@ memory_map = { ranges = [
 ] }
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_CTRL" },
-    { name = "APB_SARADC", dma_peripheral = 8 },
+    { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "BB" },
     { name = "DMA" },
@@ -54,8 +54,8 @@ peripherals = [
     { name = "GPIO_SD" },
     { name = "HMAC" },
     { name = "I2C_ANA_MST" },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
     { name = "LEDC" },
@@ -65,10 +65,10 @@ peripherals = [
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -76,7 +76,7 @@ peripherals = [
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
-    { name = "UHCI0", dma_peripheral = 2 },
+    { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "XTS_AES" },
 
@@ -191,6 +191,12 @@ clocks = { system_clocks = { clock_tree = [
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
+    { group = "I2C", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -246,7 +252,6 @@ instances = [
 support_status = "partial"
 has_split_text_registers = true
 endianness_configurable = false
-dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
@@ -265,7 +270,14 @@ gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
 engines = [
-    { name = "AHB_GDMA", channels = [
+    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"], peripheral_instances = [
+        { name = "SPI2", dma_id = 0 },
+        { name = "UHCI0", dma_id = 2 },
+        { name = "I2S0", dma_id = 3 },
+        { name = "AES", dma_id = 6 },
+        { name = "SHA", dma_id = 7 },
+        { name = "APB_SARADC", dma_id = 8 },
+    ], channels = [
         { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
         { name = "DMA_CH1", mem2mem = true, interrupt = "DMA_CH1" },
         { name = "DMA_CH2", mem2mem = true, interrupt = "DMA_CH2" },
@@ -273,6 +285,7 @@ engines = [
 ]
 
 [device.gpio]
+version = 2
 support_status = "supported"
 gpio_function = 1
 constant_0_input = 0x1f
@@ -434,6 +447,7 @@ output_signals = [
 ]
 
 [device.dedicated_gpio]
+version = "riscv_v1"
 support_status = "partial"
 channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
@@ -484,7 +498,6 @@ memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
-dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
@@ -498,7 +511,6 @@ version = 3
 fifo_size = 64
 bit_order_is_bool = true
 support_status = "supported"
-supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 instances = [
@@ -506,7 +518,6 @@ instances = [
 ]
 [device.spi_slave]
 support_status = "partial"
-supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]
