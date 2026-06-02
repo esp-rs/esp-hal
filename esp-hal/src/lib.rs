@@ -423,6 +423,7 @@ mod soc;
 // Some PAC-related utility
 use crate::pac::generic::{Readable, Reg, Resettable, W, Writable};
 
+#[allow(unused)]
 trait RegisterToggle {
     type Reg: Readable + Resettable + Writable;
 
