@@ -4560,6 +4560,7 @@ impl Chip {
                     "uart_uart4",
                     "aes_has_split_text_registers",
                     "dma_kind=\"gdma\"",
+                    "dma_can_access_psram",
                     "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"5\"",
                     "dma_max_priority_is_set",
@@ -4572,9 +4573,9 @@ impl Chip {
                     "soc_has_dma_axi_ch1",
                     "soc_has_dma_axi_ch2",
                     "aes_supports_dma",
-                    "aes_dma_engine = \"AHB_GDMA\"",
+                    "aes_dma_engine = \"AXI_GDMA\"",
                     "sha_supports_dma",
-                    "sha_dma_engine = \"AHB_GDMA\"",
+                    "sha_dma_engine = \"AXI_GDMA\"",
                     "spi_master_supports_dma",
                     "spi_master_dma_engine = \"AXI_GDMA\"",
                     "ecc_separate_jacobian_point_memory",
@@ -4752,6 +4753,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart4",
                     "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
+                    "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"5\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
@@ -4764,9 +4766,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_axi_ch1",
                     "cargo:rustc-cfg=soc_has_dma_axi_ch2",
                     "cargo:rustc-cfg=aes_supports_dma",
-                    "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
+                    "cargo:rustc-cfg=aes_dma_engine = \"AXI_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
-                    "cargo:rustc-cfg=sha_dma_engine = \"AHB_GDMA\"",
+                    "cargo:rustc-cfg=sha_dma_engine = \"AXI_GDMA\"",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_master_dma_engine = \"AXI_GDMA\"",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
@@ -7091,8 +7093,14 @@ pub fn emit_check_cfg_directives() {
     );
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
-    println!("cargo:rustc-check-cfg=cfg(sha_dma_engine, values(\"AHB_GDMA\",\"CRYPTO_DMA\"))");
-    println!("cargo:rustc-check-cfg=cfg(aes_dma_engine, values(\"AHB_GDMA\",\"CRYPTO_DMA\"))");
+    println!(
+        "cargo:rustc-check-cfg=cfg(sha_dma_engine, \
+         values(\"AHB_GDMA\",\"AXI_GDMA\",\"CRYPTO_DMA\"))"
+    );
+    println!(
+        "cargo:rustc-check-cfg=cfg(aes_dma_engine, \
+         values(\"AHB_GDMA\",\"AXI_GDMA\",\"CRYPTO_DMA\"))"
+    );
     println!("cargo:rustc-check-cfg=cfg(uhci_dma_engine, values(\"AHB_GDMA\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(parl_io_dma_engine, values(\"AHB_GDMA\"))");

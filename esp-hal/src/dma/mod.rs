@@ -280,7 +280,8 @@ impl defmt::Format for DmaDescriptorFlags {
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(C)]
+#[cfg_attr(esp32p4, repr(C, align(8)))] // TODO: only needed for GDMA_AXI
+#[cfg_attr(not(esp32p4), repr(C, align(4)))]
 pub struct DmaDescriptor {
     /// Descriptor flags.
     pub flags: DmaDescriptorFlags,
