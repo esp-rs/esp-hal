@@ -1832,26 +1832,10 @@ mod private {
         }
 
         fn reset_tx(&self) {
-            self.regs().conf().modify(|_, w| {
-                w.tx_reset().bit(true);
-                w.tx_fifo_reset().bit(true)
-            });
-
-            // looks sus? yes - it does
-            // just toggling the reset bits should be enough but you can verify this
-            // by making this function `#[crate::ram]` (just to make sure cache misses don't make
-            // things look good), commenting this out and run the
-            // `test_i2s_write_one_shot_twice_*` tests ... it will fail on the second
-            // write without this delay, but pass with it. So there you go. (on ESP32 at
-            // least)
-            #[cfg(esp32)]
-            unsafe {
-                core::arch::asm!(
-                    ".rept 40
-                    nop
-                    .endr"
-                );
-            }
+            self.regs().conf().modify(|_, w| w.tx_reset().bit(true));
+            self.regs()
+                .conf()
+                .modify(|_, w| w.tx_fifo_reset().bit(true));
 
             self.regs().conf().modify(|_, w| {
                 w.tx_reset().bit(false);
@@ -1861,7 +1845,11 @@ mod private {
             #[cfg(esp32s2)]
             while self.regs().conf().read().tx_reset_st().bit_is_set() {}
 
-            self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
+            #[cfg(esp32)]
+            while self.regs().state().read().tx_fifo_reset_back().bit_is_set() {}
+
+            self.regs().lc_conf().modify(|_, w| w.out_rst().bit(true));
+            self.regs().lc_conf().modify(|_, w| w.out_rst().bit(false));
 
             self.regs().int_clr().write(|w| {
                 w.out_done().clear_bit_by_one();
@@ -1871,6 +1859,10 @@ mod private {
 
         fn tx_start(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().set_bit());
+
+            while self.regs().state().read().tx_idle().bit_is_set() {
+                // wait
+            }
         }
 
         fn tx_stop(&self) {

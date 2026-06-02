@@ -528,10 +528,10 @@ mod tests {
     // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
     // write completes.
     #[test]
-    async fn test_i2s_write_one_shot_twice(ctx: Context) {
+    async fn test_i2s_write_one_shot_multiple(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -546,7 +546,7 @@ mod tests {
         let (other, dout) = unsafe { ctx.dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
-        let i2s_tx = i2s
+        let mut i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
@@ -556,24 +556,26 @@ mod tests {
         counter.clear();
         counter.check(0);
 
-        let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
-        let (res, i2s_tx, tx_buffer) = tx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
-        counter.check(4);
+        let mut compare = 4;
+        for _ in 0..10 {
+            let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+            let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait();
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+            counter.check(compare);
+            compare += 4;
 
-        let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
-        let (res, _i2s_tx, _tx_buffer) = tx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
-        counter.check(8);
+            tx_buffer = tx_buffer_back;
+            i2s_tx = i2s_tx_back;
+        }
     }
 
     // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
     // write completes.
     #[test]
-    async fn test_i2s_write_one_shot_twice_async(ctx: Context) {
+    async fn test_i2s_write_one_shot_multiple_async(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -589,7 +591,7 @@ mod tests {
         let (other, dout) = unsafe { ctx.dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
-        let i2s_tx = i2s
+        let mut i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
@@ -599,19 +601,18 @@ mod tests {
         counter.clear();
         counter.check(0);
 
-        let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
-        tx_transfer.wait_for_done_async().await.unwrap();
-        assert_eq!(tx_transfer.is_done(), true);
-        let (res, i2s_tx, tx_buffer) = tx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
-        counter.check(4);
-
-        let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
-        tx_transfer.wait_for_done_async().await.unwrap();
-        assert_eq!(tx_transfer.is_done(), true);
-        let (res, _i2s_tx, _tx_buffer) = tx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
-        counter.check(8);
+        let mut compare = 4;
+        for _ in 0..10 {
+            let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+            tx_transfer.wait_for_done_async().await.unwrap();
+            assert_eq!(tx_transfer.is_done(), true);
+            let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait_async().await;
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+            counter.check(compare);
+            compare += 4;
+            tx_buffer = tx_buffer_back;
+            i2s_tx = i2s_tx_back;
+        }
     }
 }
 
