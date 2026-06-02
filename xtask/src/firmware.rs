@@ -443,7 +443,9 @@ struct CargoToml {
 
 /// Parse the chip set from `//% CHIPS:` / `//% CHIP_FEATURES:` annotations in a source file.
 /// Returns `None` if neither annotation is present.
-fn parse_chips_from_annotation(text: &str) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
+fn parse_chips_from_annotation(
+    text: &str,
+) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
     let mut found = false;
     let mut chips: Vec<Chip> = Chip::iter().collect();
     let mut excluded: Vec<Chip> = Vec::new();
