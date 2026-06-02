@@ -2,7 +2,7 @@
 
 // TODO: clean configurations up once esp-storage is enabled for the P4
 
-//% CHIP_FEATURES(llff, tlsf): psram_driver_supported
+//% CHIP_FEATURES(llff, tlsf): psram_driver_supported && esp32p4
 //% CHIP_FEATURES(llff_with_storage, tlsf_with_storage): psram_driver_supported && !esp32p4
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF

@@ -66,10 +66,11 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32p4")] {
+    core::cfg_select! {
+        feature = "esp32p4" => {
             let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
-        } else {       
+        }
+        _ => {
             let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
         }
     }

@@ -1,5 +1,10 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
+//! The following wiring is assumed:
+//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5)
+//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5)
+//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5)
+//!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
@@ -55,19 +60,21 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32s3")] {
+    core::cfg_select! {
+        feature = "esp32s3" => {
             let (sclk, mosi, cs) = (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38);
-        } else {
+        }
+        _ => {
             let (sclk, mosi, cs) = (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10);
         }
     }
     let miso = unsafe { mosi.clone_unchecked() };
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32s2")] {
+    core::cfg_select! {
+        feature = "esp32s2" => {
             let dma_channel = peripherals.DMA_SPI2;
-        } else {
+        }
+        _ => {
             let dma_channel = peripherals.DMA_CH0;
         }
     }
