@@ -110,7 +110,14 @@ mod tests {
             }
         }
 
+        #[cfg(not(esp32c5))]
         let (_, dout) = hil_test::common_test_pins!(peripherals);
+
+        // there are some random pulses counted on ESP32-C5 in our HIL setup
+        // with the common test pin, so just use a fixed GPIO pin which is not used for anything
+        // else in this test on that chip in the hope it will fix it
+        #[cfg(esp32c5)]
+        let dout = peripherals.GPIO6;
 
         Context {
             dout: dout.degrade(),
