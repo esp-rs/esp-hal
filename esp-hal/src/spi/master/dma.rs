@@ -733,22 +733,17 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 align_buffer,
                 ..
             } => {
+                #[cfg(soc_internal_memory_cached)]
+                unsafe {
+                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
+                }
+
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
                     if let Some(buffer) = buffer.as_ref() {
                         buffer.write_back();
                     }
                     *buffer = None;
-                }
-
-                // On ESP32-P4, the HP CPU caches DRAM. The DMA writes directly to DRAM,
-                // bypassing the cache. The pre-transfer cache_invalidate_addr in prepare_for_rx
-                // is insufficient because the cache line gets re-populated with stale data
-                // during the function calls between invalidation and DMA completion. We must
-                // invalidate after the DMA completes so the CPU reads the fresh DMA-written data.
-                #[cfg(esp32p4)]
-                unsafe {
-                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
                 }
             }
         }

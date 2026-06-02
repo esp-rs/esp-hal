@@ -4603,6 +4603,7 @@ impl Chip {
                     "soc_multi_core_enabled",
                     "soc_rc_fast_clk_default=\"20000000\"",
                     "soc_rc_fast_clk_default_is_set",
+                    "soc_internal_memory_cached",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_cpll_clk",
                     "soc_has_clock_node_spll_clk",
@@ -4795,6 +4796,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_multi_core_enabled",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"20000000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
+                    "cargo:rustc-cfg=soc_internal_memory_cached",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_spll_clk",
@@ -6960,6 +6962,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch2)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
+    println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mpll_clk)");

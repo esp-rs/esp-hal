@@ -54,6 +54,7 @@ multi_core_enabled = true
 cpu_has_csr_pc = false
 # ESP32-P4 v3.x: 20 MHz RC_FAST default (TRM v0.5, Ch 12)
 rc_fast_clk_default = 20_000_000
+internal_memory_cached = true
 
 # Clock tree for ESP32-P4 (eco5 / chip revision v3.x)
 # 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)

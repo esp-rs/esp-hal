@@ -668,6 +668,8 @@ driver_configs![
             cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
+            #[serde(default)]
+            internal_memory_cached: bool,
             #[serde(flatten)]
             config: SocConfig,
         }

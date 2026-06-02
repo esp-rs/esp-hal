@@ -271,6 +271,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("soc.internal_memory_cached") => {
+        false
+    };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)
     };
