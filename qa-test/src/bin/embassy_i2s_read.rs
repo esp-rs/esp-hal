@@ -80,17 +80,18 @@ async fn main(_spawner: Spawner) {
         if avail > 0 {
             let count = transaction.pop(&mut data[..avail]);
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32s2")] {
-                // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
-                println!("got {} bytes", count,);
-            } else {
-                println!(
-                    "got {} bytes, {:x?}..{:x?}",
-                    count,
-                    &data[..10],
-                    &data[count - 10..count]
-                );
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "esp32s2")] {
+                    // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
+                    println!("got {} bytes", count,);
+                } else {
+                    println!(
+                        "got {} bytes, {:x?}..{:x?}",
+                        count,
+                        &data[..10],
+                        &data[count - 10..count]
+                    );
+                }
             }
         }
     }

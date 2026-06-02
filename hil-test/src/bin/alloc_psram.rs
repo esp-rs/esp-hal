@@ -1,13 +1,13 @@
 //! Allocator and PSRAM-related tests
 
-// TODO: clean configurations up once esp-storage is enabled for the P4
+// TODO: clean configurations up once esp-storage is enabled for the P4 (https://github.com/esp-rs/esp-hal/issues/5648)
 
 //% CHIP_FEATURES(llff, tlsf): psram_driver_supported && esp32p4
 //% CHIP_FEATURES(llff_with_storage, tlsf_with_storage): psram_driver_supported && !esp32p4
-//% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
-//% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+//% ENV(llff, llff_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+//% ENV(tlsf, tlsf_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-alloc/nightly
-//% FEATURES(llff_with_storage): esp-storage
+//% FEATURES(llff_with_storage, tlsf_with_storage): esp-storage
 
 #![no_std]
 #![no_main]
