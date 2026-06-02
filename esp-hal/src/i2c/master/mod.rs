@@ -567,6 +567,21 @@ enum Ack {
 #[instability::unstable]
 pub use crate::soc::clocks::I2cFunctionClockSclk as ClockSource;
 
+/// Selects whether the controller samples the SDA line while SCL is high or low.
+///
+/// Standard I2C devices place valid data on SDA while SCL is high, so
+/// [`SclSampleLevel::High`] is the default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, strum::Display)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum SclSampleLevel {
+    /// Sample the SDA line while SCL is high.
+    #[default]
+    High,
+    /// Sample the SDA line while SCL is low.
+    Low,
+}
+
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -609,6 +624,19 @@ pub struct Config {
     /// Default value: [`ClockSource::default()`].
     #[builder_lite(unstable)]
     clock_source: ClockSource,
+
+    /// Selects when the controller samples the SDA line.
+    ///
+    /// Default value: [`SclSampleLevel::High`].
+    #[builder_lite(unstable)]
+    scl_sample_level: SclSampleLevel,
+
+    /// Enables I2C bus arbitration detection.
+    ///
+    /// Default value: `false`.
+    #[cfg(i2c_master_has_arbitration_en)]
+    #[builder_lite(unstable)]
+    bus_arbitration: bool,
 }
 
 impl Default for Config {
@@ -629,6 +657,11 @@ impl Default for Config {
             scl_main_st_timeout: Default::default(),
 
             clock_source: Default::default(),
+
+            scl_sample_level: Default::default(),
+
+            #[cfg(i2c_master_has_arbitration_en)]
+            bus_arbitration: false,
         }
     }
 }
