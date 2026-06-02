@@ -2,7 +2,7 @@
     "dma_channel" => {
         cfg(spi_master_dma_engine = "SPI_DMA") => "DMA_SPI2",
         cfg(spi_master_dma_engine = "AHB_GDMA") => "DMA_CH0",
-        cfg(spi_master_dma_engine = "AXI_GDMA") => "AXI_DMA_CH0",
+        cfg(spi_master_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
     }
 ))]
 //! # Direct Memory Access (DMA)
