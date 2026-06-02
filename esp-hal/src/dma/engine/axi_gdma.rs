@@ -435,11 +435,11 @@ impl InterruptAccess<DmaRxInterrupt> for AxiGdmaRxChannel<'_> {
         self.ch().in_int().clr().write(|w| {
             for interrupt in interrupts.into() {
                 match interrupt {
-                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().set_bit(),
-                    DmaRxInterrupt::ErrorEof => w.in_err_eof().set_bit(),
-                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().set_bit(),
-                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().set_bit(),
-                    DmaRxInterrupt::Done => w.in_done().set_bit(),
+                    DmaRxInterrupt::SuccessfulEof => w.in_suc_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::ErrorEof => w.in_err_eof().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorError => w.in_dscr_err().clear_bit_by_one(),
+                    DmaRxInterrupt::DescriptorEmpty => w.in_dscr_empty().clear_bit_by_one(),
+                    DmaRxInterrupt::Done => w.in_done().clear_bit_by_one(),
                 };
             }
             w
