@@ -623,4 +623,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         pretty_assertions::assert_eq!(changelog.to_string(), expected);
     }
+
+    #[test]
+    fn test_add_entry_then_finalize_lands_in_version_section() {
+        // Regression test for the ordering bug in PR #5642.
+        let mut changelog = Changelog::parse(
+            "## [Unreleased]
+
+### Fixed
+
+- Pre-existing fix (#10)
+
+## [v1.1.0] - 2025-09-19
+
+[v1.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-v1.1.0
+",
+        )
+        .unwrap();
+
+        changelog.add_entry("Added", "New API", 20);
+        changelog.add_entry("Changed", "Renamed thing", 21);
+        changelog.add_entry("Removed", "Old API", 22);
+
+        changelog.finalize(
+            Package::EspHal,
+            &semver::Version::new(1, 1, 1),
+            "2025-11-05 08:36-04".parse().unwrap(),
+        );
+
+        let expected = "# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.1.1] - 2025-11-05
+
+### Fixed
+
+- Pre-existing fix (#10)
+
+### Added
+
+- New API (#20)
+
+### Changed
+
+- Renamed thing (#21)
+
+### Removed
+
+- Old API (#22)
+
+## [v1.1.0] - 2025-09-19
+
+[v1.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-v1.1.0
+[v1.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.1.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.1...HEAD
+";
+
+        pretty_assertions::assert_eq!(changelog.to_string(), expected);
+    }
 }
