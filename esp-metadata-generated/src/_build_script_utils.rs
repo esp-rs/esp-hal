@@ -4568,9 +4568,9 @@ impl Chip {
                     "soc_has_dma_ch0",
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
-                    "soc_has_axi_dma_ch0",
-                    "soc_has_axi_dma_ch1",
-                    "soc_has_axi_dma_ch2",
+                    "soc_has_dma_axi_ch0",
+                    "soc_has_dma_axi_ch1",
+                    "soc_has_dma_axi_ch2",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -4760,9 +4760,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
-                    "cargo:rustc-cfg=soc_has_axi_dma_ch0",
-                    "cargo:rustc-cfg=soc_has_axi_dma_ch1",
-                    "cargo:rustc-cfg=soc_has_axi_dma_ch2",
+                    "cargo:rustc-cfg=soc_has_dma_axi_ch0",
+                    "cargo:rustc-cfg=soc_has_dma_axi_ch1",
+                    "cargo:rustc-cfg=soc_has_dma_axi_ch2",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -6973,9 +6973,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch1)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_axi_dma_ch2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch2)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");

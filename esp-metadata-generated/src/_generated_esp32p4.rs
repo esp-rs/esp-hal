@@ -434,9 +434,9 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH0));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH1));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH2));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2));
         _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
         _for_each_inner_dma_channel!(("AXI_GDMA", any_channel = AxiGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in =
@@ -445,15 +445,15 @@ macro_rules! for_each_dma_channel {
         AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1, compatible = [AES, SHA]));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in =
         AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [AES, SHA]));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH0, 0, interrupt_in =
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in =
         AHB_PDMA_IN_CH0, interrupt_out = AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3]));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH1, 1, interrupt_in =
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1, 1, interrupt_in =
         AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible = [SPI2, SPI3]));
-        _for_each_inner_dma_channel!(("AXI_GDMA", AXI_DMA_CH2, 2, interrupt_in =
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
         AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [SPI2, SPI3]));
         _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA", DMA_CH1),
-        ("AHB_GDMA", DMA_CH2), ("AXI_GDMA", AXI_DMA_CH0), ("AXI_GDMA", AXI_DMA_CH1),
-        ("AXI_GDMA", AXI_DMA_CH2)));
+        ("AHB_GDMA", DMA_CH2), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA", DMA_AXI_CH1),
+        ("AXI_GDMA", DMA_AXI_CH2)));
         _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
         AhbGdmaChannel), ("AXI_GDMA", any_channel = AxiGdmaChannel)));
         _for_each_inner_dma_channel!((shared));
@@ -462,10 +462,10 @@ macro_rules! for_each_dma_channel {
         ("AHB_GDMA", DMA_CH1, 1, interrupt_in = AHB_PDMA_IN_CH1, interrupt_out =
         AHB_PDMA_OUT_CH1, compatible = [AES, SHA]), ("AHB_GDMA", DMA_CH2, 2, interrupt_in
         = AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [AES, SHA]),
-        ("AXI_GDMA", AXI_DMA_CH0, 0, interrupt_in = AHB_PDMA_IN_CH0, interrupt_out =
-        AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3]), ("AXI_GDMA", AXI_DMA_CH1, 1,
+        ("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in = AHB_PDMA_IN_CH0, interrupt_out =
+        AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3]), ("AXI_GDMA", DMA_AXI_CH1, 1,
         interrupt_in = AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible =
-        [SPI2, SPI3]), ("AXI_GDMA", AXI_DMA_CH2, 2, interrupt_in = AXI_PDMA_IN_CH2,
+        [SPI2, SPI3]), ("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in = AXI_PDMA_IN_CH2,
         interrupt_out = AXI_PDMA_OUT_CH2, compatible = [SPI2, SPI3])));
     };
 }
@@ -480,12 +480,12 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SHA));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH0, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH0, SPI3));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH1, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH1, SPI3));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH2, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", AXI_DMA_CH2, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH0, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH0, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH1, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH1, SPI3));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH2, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH2, SPI3));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
         AES)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
         AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
@@ -494,9 +494,9 @@ macro_rules! for_each_dma_channel_peri_pair {
         SPI3)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
         AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH1, AES), ("AHB_GDMA",
         DMA_CH1, SHA), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA", DMA_CH2, SHA),
-        ("AXI_GDMA", AXI_DMA_CH0, SPI2), ("AXI_GDMA", AXI_DMA_CH0, SPI3), ("AXI_GDMA",
-        AXI_DMA_CH1, SPI2), ("AXI_GDMA", AXI_DMA_CH1, SPI3), ("AXI_GDMA", AXI_DMA_CH2,
-        SPI2), ("AXI_GDMA", AXI_DMA_CH2, SPI3)));
+        ("AXI_GDMA", DMA_AXI_CH0, SPI2), ("AXI_GDMA", DMA_AXI_CH0, SPI3), ("AXI_GDMA",
+        DMA_AXI_CH1, SPI2), ("AXI_GDMA", DMA_AXI_CH1, SPI3), ("AXI_GDMA", DMA_AXI_CH2,
+        SPI2), ("AXI_GDMA", DMA_AXI_CH2, SPI3)));
         _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
         AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
         ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI2), ("AXI_GDMA", any_channel =
@@ -3895,16 +3895,16 @@ macro_rules! for_each_peripheral {
         disable_dma_in_interrupt }, AHB_PDMA_OUT_CH2 : { bind_dma_out_interrupt,
         enable_dma_out_interrupt, disable_dma_out_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
-        "AXI_DMA_CH0 peripheral singleton"] AXI_DMA_CH0 <= virtual(AHB_PDMA_IN_CH0 : {
+        "DMA_AXI_CH0 peripheral singleton"] DMA_AXI_CH0 <= virtual(AHB_PDMA_IN_CH0 : {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AXI_PDMA_OUT_CH0 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
-        peri_type #[doc = "AXI_DMA_CH1 peripheral singleton"] AXI_DMA_CH1 <=
+        peri_type #[doc = "DMA_AXI_CH1 peripheral singleton"] DMA_AXI_CH1 <=
         virtual(AXI_PDMA_IN_CH1 : { bind_dma_in_interrupt, enable_dma_in_interrupt,
         disable_dma_in_interrupt }, AXI_PDMA_OUT_CH1 : { bind_dma_out_interrupt,
         enable_dma_out_interrupt, disable_dma_out_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
-        "AXI_DMA_CH2 peripheral singleton"] AXI_DMA_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
+        "DMA_AXI_CH2 peripheral singleton"] DMA_AXI_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AXI_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
@@ -4051,9 +4051,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
         _for_each_inner_peripheral!((DMA_CH1(unstable)));
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
-        _for_each_inner_peripheral!((AXI_DMA_CH0(unstable)));
-        _for_each_inner_peripheral!((AXI_DMA_CH1(unstable)));
-        _for_each_inner_peripheral!((AXI_DMA_CH2(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH0(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH1(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH2(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
@@ -4241,15 +4241,15 @@ macro_rules! for_each_peripheral {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AHB_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
-        "AXI_DMA_CH0 peripheral singleton"] AXI_DMA_CH0 <= virtual(AHB_PDMA_IN_CH0 : {
+        "DMA_AXI_CH0 peripheral singleton"] DMA_AXI_CH0 <= virtual(AHB_PDMA_IN_CH0 : {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AXI_PDMA_OUT_CH0 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
-        "AXI_DMA_CH1 peripheral singleton"] AXI_DMA_CH1 <= virtual(AXI_PDMA_IN_CH1 : {
+        "DMA_AXI_CH1 peripheral singleton"] DMA_AXI_CH1 <= virtual(AXI_PDMA_IN_CH1 : {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AXI_PDMA_OUT_CH1 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
-        "AXI_DMA_CH2 peripheral singleton"] AXI_DMA_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
+        "DMA_AXI_CH2 peripheral singleton"] DMA_AXI_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AXI_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
@@ -4344,8 +4344,8 @@ macro_rules! for_each_peripheral {
         (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42),
         (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50),
         (GPIO51), (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (DMA_CH2(unstable)), (AXI_DMA_CH0(unstable)), (AXI_DMA_CH1(unstable)),
-        (AXI_DMA_CH2(unstable)), (GPIO(unstable)), (SYSTEM(unstable)),
+        (DMA_CH2(unstable)), (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)),
+        (DMA_AXI_CH2(unstable)), (GPIO(unstable)), (SYSTEM(unstable)),
         (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (RNG(unstable)),
         (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
         (LP_I2C_ANA_MST(unstable)), (CLIC(unstable)), (IO_MUX(unstable)),
