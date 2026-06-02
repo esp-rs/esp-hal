@@ -1,6 +1,8 @@
 use std::{
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::{Child, Command},
+    process::{Child, Command, Stdio},
+    sync::mpsc,
     thread,
     time::Duration,
 };
@@ -27,6 +29,7 @@ pub fn run_radio_test(
     dut_command: &BuiltCommand,
     harness: Option<HarnessSpec<'_>>,
     probes: Option<String>,
+    chip_name: &str,
 ) -> Result<()> {
     let probes = detect_probes(probes)?;
     let (harness_probe, dut_probe) = match harness.as_ref() {
@@ -49,6 +52,7 @@ pub fn run_radio_test(
 
     log::info!("Resetting DUT probe ({dut_probe})");
     reset_probe(dut_probe)?;
+    erase_chip(dut_probe, chip_name)?;
 
     let mut harness_guard = match (harness_probe, harness.as_ref()) {
         (Some(harness_probe), Some(spec)) => {
@@ -60,9 +64,12 @@ pub fn run_radio_test(
                 spec.binary_path.display()
             );
             reset_probe(harness_probe)?;
-            let child = spawn_probe_run("HARNESS", spec.binary_path, harness_probe)?;
-            // Give support firmware time to initialize support part.
-            thread::sleep(Duration::from_millis(2000));
+            erase_chip(dut_probe, chip_name)?;
+            let child = spawn_harness_and_wait_until_ready(
+                spec.binary_path,
+                harness_probe,
+                HARNESS_BOOT_TIMEOUT,
+            )?;
             Some(HarnessGuard { child })
         }
         _ => None,
@@ -94,6 +101,7 @@ pub fn run_radio_test_elf(
     harness_binary_path: Option<&Path>,
     timeout_secs: u64,
     probes: Option<String>,
+    chip_name: &str,
 ) -> Result<()> {
     use std::time::Instant;
 
@@ -128,6 +136,7 @@ pub fn run_radio_test_elf(
 
     log::info!("Resetting DUT probe ({dut_probe})");
     reset_probe(dut_probe)?;
+    erase_chip(dut_probe, chip_name)?;
 
     let mut harness_guard = if let (Some(harness_probe), Some(harness_binary_path)) =
         (harness_probe, harness_binary_path)
@@ -137,8 +146,13 @@ pub fn run_radio_test_elf(
             harness_binary_path.display()
         );
         reset_probe(harness_probe)?;
-        let child = spawn_probe_run("HARNESS", harness_binary_path, harness_probe)?;
-        thread::sleep(Duration::from_millis(2000));
+        erase_chip(dut_probe, chip_name)?;
+
+        let child = spawn_harness_and_wait_until_ready(
+            harness_binary_path,
+            harness_probe,
+            HARNESS_BOOT_TIMEOUT,
+        )?;
         Some(HarnessGuard { child })
     } else {
         None
@@ -196,6 +210,89 @@ pub fn resolve_release_binary(workspace: &Path, target: &str, artifact_name: &st
         .collect::<Vec<_>>()
         .join("_");
     release_dir.join(base_name)
+}
+
+// Maximum time we wait for the harness firmware to flash and emit its
+// first defmt log line before giving up.
+const HARNESS_BOOT_TIMEOUT: Duration = Duration::from_secs(90);
+
+/// Spawn `probe-rs run` for the harness, capture its stdout, and block
+/// until the firmware emits its first defmt log line (i.e. flashing is
+/// complete and the support firmware is actually running).  
+fn spawn_harness_and_wait_until_ready(
+    binary_path: &Path,
+    probe: &str,
+    boot_timeout: Duration,
+) -> Result<Child> {
+    log::info!(
+        "[HARNESS] probe-rs run --preverify --probe {probe} {} (waiting for first defmt line, timeout {}s)",
+        binary_path.display(),
+        boot_timeout.as_secs(),
+    );
+
+    let mut child = Command::new("probe-rs")
+        .args(["run", "--preverify", "--probe", probe])
+        .arg(binary_path)
+        .env("DEFMT_LOG", "info")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|e| anyhow!("[HARNESS] failed to spawn probe-rs run: {e}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("[HARNESS] could not capture probe-rs stdout"))?;
+
+    let (ready_tx, ready_rx) = mpsc::channel::<()>();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut line = String::new();
+        let mut signaled = false;
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break,
+                Ok(_) => {
+                    print!("[HARNESS] {line}");
+                    if !signaled && looks_like_defmt_line(&line) {
+                        let _ = ready_tx.send(());
+                        signaled = true;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    match ready_rx.recv_timeout(boot_timeout) {
+        Ok(()) => {
+            log::info!("[HARNESS] firmware booted; starting DUT");
+            Ok(child)
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!(
+                "[HARNESS] firmware did not produce any defmt output within {}s",
+                boot_timeout.as_secs()
+            );
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("[HARNESS] probe-rs exited before producing any defmt output");
+        }
+    }
+}
+
+fn looks_like_defmt_line(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("[INFO ")
+        || trimmed.starts_with("[WARN ")
+        || trimmed.starts_with("[ERROR]")
+        || trimmed.starts_with("[DEBUG]")
+        || trimmed.starts_with("[TRACE]")
 }
 
 struct HarnessGuard {
@@ -288,6 +385,23 @@ fn reset_probe(probe: &str) -> Result<()> {
         .output()?;
     if !output.status.success() {
         bail!("Failed to reset probe {probe}");
+    }
+    thread::sleep(Duration::from_millis(500));
+    Ok(())
+}
+
+fn erase_chip(probe: &str, chip_name: &str) -> Result<()> {
+    log::info!("Erasing flash on probe {probe} ({chip_name})");
+    let output = Command::new("probe-rs")
+        .args(["erase", "--probe", probe, "--chip", chip_name])
+        .output()
+        .map_err(|e| anyhow!("Failed to spawn probe-rs erase: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "probe-rs erase --probe {probe} --chip {chip_name} failed: {}",
+            stderr.trim()
+        );
     }
     thread::sleep(Duration::from_millis(500));
     Ok(())

@@ -714,9 +714,12 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                     binary_path: &harness_path,
                     target: &target,
                 };
-                if let Err(e) =
-                    crate::radio_hil_runner::run_radio_test(&c, Some(harness_spec), None)
-                {
+                if let Err(e) = crate::radio_hil_runner::run_radio_test(
+                    &c,
+                    Some(harness_spec),
+                    None,
+                    &args.chip.to_string(),
+                ) {
                     failed.push(c.artifact_name.clone());
                     log::error!("Radio test '{}' failed: {}", c.artifact_name, e);
                     break;
