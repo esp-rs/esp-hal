@@ -1571,6 +1571,7 @@ where
     ///
     /// This method returns `true` if both RX and TX operations are done,
     /// and the SPI instance is no longer busy.
+    #[instability::unstable]
     pub fn is_done(&self) -> bool {
         self.spi_dma.is_done()
     }
