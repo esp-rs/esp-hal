@@ -332,8 +332,10 @@ impl RegisterAccess for I2sDmaRxChannel<'_> {
 
 impl RxRegisterAccess for I2sDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
-    fn set_mem2mem_mode(&self, _value: bool) {
-        unimplemented!("I2S DMA mem2mem mode is not supported on this chip")
+    fn set_mem2mem_mode(&self, en: bool) {
+        if en {
+            unimplemented!("I2S DMA mem2mem mode is not supported on this chip");
+        }
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
