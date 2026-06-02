@@ -258,11 +258,14 @@ impl Cpu {
         // in the case of Xtensa.
         match raw_core() {
             0 => Cpu::ProCpu,
+
             #[cfg(all(multi_core, riscv))]
             1 => Cpu::AppCpu,
+
             #[cfg(all(multi_core, xtensa))]
             0x2000 => Cpu::AppCpu,
-            _ => unreachable!(),
+
+            other => unreachable!("unknown core id: {}", other),
         }
     }
 
