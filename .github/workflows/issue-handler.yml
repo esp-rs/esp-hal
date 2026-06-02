@@ -41,7 +41,7 @@ jobs:
               [/\besp[-_ ]alloc\b/i, "package:esp-alloc"],
               [/\besp[-_ ]backtrace\b/i, "package:esp-backtrace"],
               [/bootloader/i, "package:esp-bootloader-esp-idf"],
-              [/config/i, "package:esp-config"],
+              [/\besp[-_]?config\b/i, "package:esp-config"],
               [/embassy/i, "package:esp-hal-embassy"],
               [/procmacros/i, "package:esp-hal-procmacros"],
               [/esp-ieee802154/i, "package:esp-ieee802154"],
