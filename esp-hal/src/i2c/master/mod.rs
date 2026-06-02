@@ -130,6 +130,7 @@ use crate::{
     gpio::{
         DriveMode,
         InputSignal,
+        Level,
         OutputConfig,
         OutputSignal,
         PinGuard,
@@ -567,21 +568,6 @@ enum Ack {
 #[instability::unstable]
 pub use crate::soc::clocks::I2cFunctionClockSclk as ClockSource;
 
-/// Selects whether the controller samples the SDA line while SCL is high or low.
-///
-/// Standard I2C devices place valid data on SDA while SCL is high, so
-/// [`SclSampleLevel::High`] is the default.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, strum::Display)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum SclSampleLevel {
-    /// Sample the SDA line while SCL is high.
-    #[default]
-    High,
-    /// Sample the SDA line while SCL is low.
-    Low,
-}
-
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -625,11 +611,14 @@ pub struct Config {
     #[builder_lite(unstable)]
     clock_source: ClockSource,
 
-    /// Selects when the controller samples the SDA line.
+    /// Selects whether the controller samples the SDA line while SCL is high or
+    /// low.
     ///
-    /// Default value: [`SclSampleLevel::High`].
+    /// Standard I2C devices change SDA while SCL is low and hold it stable while
+    /// SCL is high, so the line is sampled while SCL is high by default
+    /// ([`Level::High`]).
     #[builder_lite(unstable)]
-    scl_sample_level: SclSampleLevel,
+    scl_sample_level: Level,
 
     /// Enables I2C bus arbitration detection.
     ///
@@ -658,7 +647,7 @@ impl Default for Config {
 
             clock_source: Default::default(),
 
-            scl_sample_level: Default::default(),
+            scl_sample_level: Level::High,
 
             #[cfg(i2c_master_has_arbitration_en)]
             bus_arbitration: false,

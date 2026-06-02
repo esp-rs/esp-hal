@@ -446,8 +446,7 @@ impl Driver<'_> {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
 
-            w.sample_scl_level()
-                .bit(matches!(config.scl_sample_level, SclSampleLevel::Low));
+            w.sample_scl_level().bit(config.scl_sample_level == Level::Low);
 
             #[cfg(i2c_master_has_arbitration_en)]
             w.arbitration_en().bit(config.bus_arbitration);
