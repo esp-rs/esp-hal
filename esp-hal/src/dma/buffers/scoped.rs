@@ -139,7 +139,19 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 
     fn prepare(&mut self) -> Preparation {
         cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+            if #[cfg(esp32p4)] {
+                unsafe {
+                    crate::soc::cache_writeback_addr(
+                        self.descriptors.head() as u32,
+                        core::mem::size_of::<DmaDescriptor>() as u32
+                            * self.descriptors.descriptors.len() as u32,
+                    );
+                    crate::soc::cache_writeback_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    );
+                }
+            } else if #[cfg(dma_can_access_psram)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
                     unsafe {
@@ -336,7 +348,19 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+            if #[cfg(esp32p4)] {
+                unsafe {
+                    crate::soc::cache_writeback_addr(
+                        self.descriptors.head() as u32,
+                        core::mem::size_of::<DmaDescriptor>() as u32
+                            * self.descriptors.descriptors.len() as u32,
+                    );
+                    crate::soc::cache_invalidate_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    );
+                }
+            } else if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {

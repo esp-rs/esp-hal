@@ -876,17 +876,20 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             desc.reset_for_tx(desc.next.is_null());
         }
 
-        #[cfg(esp32p4)]
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                self.tx_descriptors.head() as u32,
-                core::mem::size_of::<DmaDescriptor>() as u32
-                    * self.tx_descriptors.descriptors.len() as u32,
-            );
-        }
-
         cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+            if #[cfg(esp32p4)] {
+                unsafe {
+                    crate::soc::cache_writeback_addr(
+                        self.tx_descriptors.head() as u32,
+                        core::mem::size_of::<DmaDescriptor>() as u32
+                            * self.tx_descriptors.descriptors.len() as u32,
+                    );
+                    crate::soc::cache_writeback_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    );
+                }
+            } else if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
@@ -929,17 +932,20 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             desc.reset_for_rx();
         }
 
-        #[cfg(esp32p4)]
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                self.rx_descriptors.head() as u32,
-                core::mem::size_of::<DmaDescriptor>() as u32
-                    * self.rx_descriptors.descriptors.len() as u32,
-            );
-        }
-
         cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+            if #[cfg(esp32p4)] {
+                unsafe {
+                    crate::soc::cache_writeback_addr(
+                        self.rx_descriptors.head() as u32,
+                        core::mem::size_of::<DmaDescriptor>() as u32
+                            * self.rx_descriptors.descriptors.len() as u32,
+                    );
+                    crate::soc::cache_invalidate_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    );
+                }
+            } else if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram {
@@ -1614,8 +1620,16 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(esp32p4)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1644,8 +1658,16 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(esp32p4)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1837,7 +1859,9 @@ pub(crate) unsafe fn prepare_for_tx(
     let data_len = data.len().min(chunk_size * descriptors.len());
 
     cfg_if::cfg_if! {
-        if #[cfg(dma_can_access_psram)] {
+        if #[cfg(esp32p4)] {
+            unsafe { crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32) };
+        } else if #[cfg(dma_can_access_psram)] {
             let data_addr = data.addr().get();
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
@@ -1856,6 +1880,14 @@ pub(crate) unsafe fn prepare_for_tx(
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_tx(desc.next.is_null());
+    }
+
+    #[cfg(esp32p4)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            descriptors.descriptors.len() as u32 * core::mem::size_of::<DmaDescriptor>() as u32,
+        );
     }
 
     Ok((
@@ -1931,11 +1963,27 @@ pub(crate) unsafe fn prepare_for_rx(
         unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
         unwrap!(descriptors.set_tx_length(data_len, chunk_size));
 
+        #[cfg(esp32p4)]
+        // Invalidate data written by the DMA. As this likely affects more data than we touched,
+        // write back first.
+        unsafe {
+            crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32);
+            crate::soc::cache_invalidate_addr(data.addr().get() as u32, data_len as u32);
+        }
+
         data_len
     };
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_rx();
+    }
+
+    #[cfg(esp32p4)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            descriptors.descriptors.len() as u32 * core::mem::size_of::<DmaDescriptor>() as u32,
+        );
     }
 
     (
