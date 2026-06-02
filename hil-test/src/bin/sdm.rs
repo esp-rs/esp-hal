@@ -247,7 +247,7 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
     Measurement::new(&rx_data, count)
 }
 
-#[embedded_test::tests(default_timeout = 10)]
+#[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use hil_test::assert;
 
