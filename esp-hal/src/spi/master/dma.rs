@@ -47,8 +47,9 @@ const MAX_DMA_SIZE: usize = 32736;
 impl<'d> Spi<'d, Blocking> {
     #[doc_replace(
         "dma_channel" => {
-            cfg(dma_kind = "pdma") => "DMA_SPI2",
-            cfg(dma_kind = "gdma") => "DMA_CH0",
+            cfg(spi_master_dma_engine = "SPI_DMA") => "DMA_SPI2",
+            cfg(spi_master_dma_engine = "AHB_GDMA") => "DMA_CH0",
+            cfg(spi_master_dma_engine = "AXI_GDMA") => "AXI_DMA_CH0",
         }
     )]
     /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
@@ -80,8 +81,9 @@ impl<'d> Spi<'d, Blocking> {
 
 #[doc_replace(
     "dma_channel" => {
-        cfg(dma_kind = "pdma") => "DMA_SPI2",
-        cfg(dma_kind = "gdma") => "DMA_CH0",
+        cfg(spi_master_dma_engine = "SPI_DMA") => "DMA_SPI2",
+        cfg(spi_master_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(spi_master_dma_engine = "AXI_GDMA") => "AXI_DMA_CH0",
     }
 )]
 /// DMA-controlled SPI driver.
@@ -1645,7 +1647,7 @@ impl DmaDriver {
     }
 
     fn disable_dma(&self) {
-        #[cfg(dma_kind = "gdma")]
+        #[cfg(not(any(spi_master_version = "1", spi_master_version = "2")))]
         self.regs().dma_conf().modify(|_, w| {
             w.dma_tx_ena().clear_bit();
             w.dma_rx_ena().clear_bit()
@@ -1715,7 +1717,7 @@ impl DmaDriver {
             }
         }
 
-        #[cfg(dma_kind = "gdma")]
+        #[cfg(not(any(spi_master_version = "1", spi_master_version = "2")))]
         self.reset_dma();
 
         self.driver.start_operation();
@@ -1724,59 +1726,61 @@ impl DmaDriver {
     }
 
     fn enable_dma(&self) {
-        #[cfg(dma_kind = "gdma")]
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-        self.regs().dma_conf().modify(|_, w| {
-            w.dma_tx_ena().set_bit();
-            w.dma_rx_ena().set_bit()
-        });
-
-        #[cfg(dma_kind = "pdma")]
-        self.reset_dma();
+        cfg_select! {
+            any(spi_master_version = "1", spi_master_version = "2") => {
+                self.reset_dma();
+            },
+            _ => {
+                self.regs().dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit()
+                });
+            }
+        }
     }
 
     fn reset_dma(&self) {
-        #[cfg(dma_kind = "pdma")]
         self.regs().dma_conf().toggle(|w, bit| {
-            w.out_rst().bit(bit);
-            w.in_rst().bit(bit);
-            w.ahbm_fifo_rst().bit(bit);
-            w.ahbm_rst().bit(bit)
-        });
-
-        #[cfg(dma_kind = "gdma")]
-        self.regs().dma_conf().toggle(|w, bit| {
-            w.rx_afifo_rst().bit(bit);
-            w.buf_afifo_rst().bit(bit);
-            w.dma_afifo_rst().bit(bit)
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.out_rst().bit(bit);
+                    w.in_rst().bit(bit);
+                    w.ahbm_fifo_rst().bit(bit);
+                    w.ahbm_rst().bit(bit)
+                },
+                _ => {
+                    w.rx_afifo_rst().bit(bit);
+                    w.buf_afifo_rst().bit(bit);
+                    w.dma_afifo_rst().bit(bit)
+                }
+            }
         });
 
         self.clear_dma_interrupts();
     }
 
-    #[cfg(dma_kind = "gdma")]
     fn clear_dma_interrupts(&self) {
         self.regs().dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-        });
-    }
-
-    #[cfg(dma_kind = "pdma")]
-    fn clear_dma_interrupts(&self) {
-        self.regs().dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.inlink_dscr_empty().clear_bit_by_one();
+                    w.outlink_dscr_error().clear_bit_by_one();
+                    w.inlink_dscr_error().clear_bit_by_one();
+                    w.in_done().clear_bit_by_one();
+                    w.in_err_eof().clear_bit_by_one();
+                    w.in_suc_eof().clear_bit_by_one();
+                    w.out_done().clear_bit_by_one();
+                    w.out_eof().clear_bit_by_one();
+                    w.out_total_eof().clear_bit_by_one()
+                },
+                _ => {
+                    w.dma_infifo_full_err().clear_bit_by_one();
+                    w.dma_outfifo_empty_err().clear_bit_by_one();
+                    w.trans_done().clear_bit_by_one();
+                    w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                    w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                }
+            }
         });
     }
 }

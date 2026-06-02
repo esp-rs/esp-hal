@@ -599,13 +599,17 @@ mod interrupt_spi_dma {
             system::{Cpu, CpuControl, Stack},
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
-            } else {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
-            }
-        }
+        type DmaChannel<'a> = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                esp_hal::peripherals::DMA_SPI2<'a>
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                esp_hal::peripherals::DMA_CH0<'a>
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                esp_hal::peripherals::DMA_AXI_CH0<'a>
+            },
+        };
 
         const BUFFER_SIZE: usize = 256;
 
@@ -650,13 +654,17 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                peripherals.DMA_SPI2
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                peripherals.DMA_CH0
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                peripherals.DMA_AXI_CH0
+            },
+        };
 
         let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
