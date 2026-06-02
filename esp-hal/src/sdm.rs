@@ -311,7 +311,6 @@ impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
 
         Ok(Channel {
             clock_source: self.clock_source,
-            config,
             _pin_guard: connect_pin(CHANNEL, pin),
             _clock_guard: clock_guard,
         })
@@ -326,7 +325,6 @@ impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
 #[derive(Debug)]
 pub struct Channel<const CHANNEL: usize> {
     clock_source: ClockSource,
-    config: ChannelConfig,
     _pin_guard: PinGuard,
     _clock_guard: SdmClockGuard,
 }
@@ -335,15 +333,13 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     /// Applies a new channel configuration.
     pub fn apply_config(&mut self, config: &ChannelConfig) {
         write_config_raw(CHANNEL, *config);
-        self.config = *config;
     }
 
     /// Sets raw pulse density.
     ///
     /// The value ranges from `-128` to `127`.
     pub fn set_pulse_density(&mut self, density: i8) {
-        let config = self.config.with_pulse_density(density);
-        self.apply_config(&config);
+        modify_pulse_density_raw(CHANNEL, density);
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
@@ -356,14 +352,14 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     ///
     /// The returned value is in the hardware divider range `1..=256`.
     pub fn prescaler(&self) -> u16 {
-        self.config.raw_prescaler as u16 + 1
+        prescaler_raw(CHANNEL) + 1
     }
 
     /// Reads the raw pulse density.
     ///
     /// The returned value is in the hardware range `-128..=127`.
     pub fn pulse_density(&self) -> i8 {
-        self.config.pulse_density
+        pulse_density_raw(CHANNEL)
     }
 
     /// Disconnects this channel and returns its channel creator.
@@ -530,4 +526,41 @@ fn write_config_raw(channel: usize, config: ChannelConfig) {
     #[cfg(not(esp32c5))]
     sd.sigmadelta(channel)
         .write(|w| unsafe { w.in_().bits(density).prescale().bits(prescaler) });
+}
+
+fn modify_pulse_density_raw(channel: usize, density: i8) {
+    // ESP32-C5's PAC names this field `sd_in`; the other supported PACs name it `in`.
+    let sd = GPIO_SD::regs();
+
+    #[cfg(esp32c5)]
+    sd.sigmadelta(channel)
+        .modify(|_, w| unsafe { w.sd_in().bits(density as _) });
+
+    #[cfg(not(esp32c5))]
+    sd.sigmadelta(channel)
+        .modify(|_, w| unsafe { w.in_().bits(density as _) });
+}
+
+fn prescaler_raw(channel: usize) -> u16 {
+    let sd = GPIO_SD::regs();
+
+    #[cfg(esp32c5)]
+    let bits = sd.sigmadelta(channel).read().sd_prescale().bits();
+
+    #[cfg(not(esp32c5))]
+    let bits = sd.sigmadelta(channel).read().prescale().bits();
+
+    bits as u16
+}
+
+fn pulse_density_raw(channel: usize) -> i8 {
+    let sd = GPIO_SD::regs();
+
+    #[cfg(esp32c5)]
+    let bits = sd.sigmadelta(channel).read().sd_in().bits();
+
+    #[cfg(not(esp32c5))]
+    let bits = sd.sigmadelta(channel).read().in_().bits();
+
+    bits as i8
 }
