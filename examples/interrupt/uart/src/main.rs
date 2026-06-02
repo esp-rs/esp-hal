@@ -6,10 +6,17 @@
 //! - Device 2 TX => Device 1 RX
 //! - Connect GND between devices
 //!
-//! Default pins:
-//! - TX/RX => GPIO1/GPIO3 (ESP32), GPIO20/GPIO19 (ESP32-C2), GPIO21/GPIO20 (ESP32-C3), GPIO10/GPIO9
-//!   (ESP32-C5), GPIO16/GPIO17 (ESP32-C6), GPIO3/GPIO2 (ESP32-C61), GPIO24/GPIO23 (ESP32-H2),
-//!   GPIO6/GPIO5 (ESP32-P4), GPIO43/GPIO44 (ESP32-S2/S3)
+//! Default TX/RX pins:
+//! - ESP32:     GPIO1  / GPIO3
+//! - ESP32-C2:  GPIO20 / GPIO19
+//! - ESP32-C3:  GPIO21 / GPIO20
+//! - ESP32-C5:  GPIO10 / GPIO9
+//! - ESP32-C6:  GPIO16 / GPIO17
+//! - ESP32-C61: GPIO3  / GPIO2
+//! - ESP32-H2:  GPIO24 / GPIO23
+//! - ESP32-P4:  GPIO6  / GPIO5
+//! - ESP32-S2:  GPIO43 / GPIO44
+//! - ESP32-S3:  GPIO43 / GPIO44
 //!
 //! Each device will:
 //! - Send a counter value every second

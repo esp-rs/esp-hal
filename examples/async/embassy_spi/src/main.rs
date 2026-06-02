@@ -12,8 +12,7 @@
 //! MOSI => GPIO4
 //! CS   => GPIO5
 
-//% CHIP_FEATURES: spi_master_driver_supported
-//% EXCLUDE_CHIPS: esp32p4
+//% CHIP_FEATURES: spi_master_supports_dma
 
 #![no_std]
 #![no_main]

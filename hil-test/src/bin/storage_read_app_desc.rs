@@ -1,5 +1,7 @@
 //! Test we place the app descriptor at the right position in the image and we
 //! can read it
+//!
+//! TODO: P4 support is blocked on https://github.com/esp-rs/esp-hal/issues/5648
 
 //% CHIP_FEATURES: spi_master_driver_supported
 //% EXCLUDE_CHIPS: esp32p4

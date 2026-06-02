@@ -24,8 +24,8 @@
 //! pins except SCLK. SCLK is between MOSI and VDD3P3_RTC on the barebones chip,
 //! so no immediate neighbor is available.
 
-//% CHIP_FEATURES: spi_slave_driver_supported
-//% EXCLUDE_CHIPS: esp32 esp32c5 esp32c61
+//% CHIP_FEATURES: spi_slave_supports_dma
+//% EXCLUDE_CHIPS: esp32
 
 #![no_std]
 #![no_main]

@@ -8,7 +8,6 @@
 //! data.
 
 //% CHIP_FEATURES: dma_can_access_psram
-//% EXCLUDE_CHIPS: esp32s2
 
 #![no_std]
 #![no_main]
@@ -56,11 +55,22 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    #[cfg(feature = "esp32s3")]
-    let (sclk, mosi, cs) = (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38);
-    #[cfg(feature = "esp32c5")]
-    let (sclk, mosi, cs) = (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32s3")] {
+            let (sclk, mosi, cs) = (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38);
+        } else {
+            let (sclk, mosi, cs) = (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10);
+        }
+    }
     let miso = unsafe { mosi.clone_unchecked() };
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32s2")] {
+            let dma_channel = peripherals.DMA_SPI2;
+        } else {
+            let dma_channel = peripherals.DMA_CH0;
+        }
+    }
 
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
@@ -94,7 +104,7 @@ fn main() -> ! {
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(peripherals.DMA_CH0);
+    .with_dma(dma_channel);
 
     delay.delay_millis(100); // delay to let the above messages display
 

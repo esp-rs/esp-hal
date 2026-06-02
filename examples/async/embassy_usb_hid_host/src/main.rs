@@ -6,11 +6,10 @@
 //! console.
 //!
 //! The following wiring is assumed:
-//! - DP => GPIO20
-//! - DM => GPIO19
+//! - DP => GPIO20 (GPIO27 on ESP32-P4)
+//! - DM => GPIO19 (GPIO26 on ESP32-P4)
 
 //% CHIP_FEATURES: usb_otg_driver_supported
-//% EXCLUDE_CHIPS: esp32p4
 
 #![no_std]
 #![no_main]
@@ -38,7 +37,13 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "esp32p4")] {
+            let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
+        } else {
+            let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+        }
+    }
     static BUS_STATE: BusState = BusState::new();
     let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");

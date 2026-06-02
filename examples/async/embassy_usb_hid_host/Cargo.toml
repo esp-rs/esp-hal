@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+cfg-if = "1"
 embassy-executor = "0.10.0"
 embassy-usb-host = { version = "0.1.0", default-features = false }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
