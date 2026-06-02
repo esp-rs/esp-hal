@@ -124,7 +124,6 @@ impl Metadata {
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
-    excluded_chips: Vec<Chip>,
     name: String,
     cargo_config: Vec<String>,
     features: Vec<String>,
@@ -198,18 +197,36 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
+/// Whether a chip satisfies a single `CHIP_FEATURES` symbol. A chip name matches only that chip;
+/// any other symbol is looked up as a cfg of the chip.
+fn chip_has_feature(chip: &Chip, symbol: &str) -> bool {
+    match Chip::from_str(symbol, false) {
+        Ok(named) => named == *chip,
+        Err(_) => Config::for_chip(chip).contains(symbol),
+    }
+}
+
 /// Returns all chips for a `CHIPS` or `CHIP_FEATURES` metadata value.
 fn parse_chips(key: &str, value: &str) -> anyhow::Result<Vec<Chip>> {
     match key {
         "CHIP_FEATURES" => {
-            let features: Vec<&str> = value.split_ascii_whitespace().collect();
+            // `&&` is just an optional separator between the symbols.
+            let features: Vec<&str> = value
+                .split_ascii_whitespace()
+                .filter(|f| *f != "&&")
+                .collect();
             if features.is_empty() {
-                anyhow::bail!("CHIP_FEATURES metadata must list at least one cfg symbol");
+                anyhow::bail!("CHIP_FEATURES metadata must list at least one cfg symbol or chip");
             }
+
             Ok(Chip::iter()
                 .filter(|chip| {
-                    let config = Config::for_chip(chip);
-                    features.iter().all(|f| config.contains(f))
+                    features
+                        .iter()
+                        .all(|feature| match feature.strip_prefix('!') {
+                            Some(name) => !chip_has_feature(chip, name),
+                            None => chip_has_feature(chip, feature),
+                        })
                 })
                 .collect())
         }
@@ -269,15 +286,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 "CHIPS" | "CHIP_FEATURES" => {
                     let chips = parse_chips(meta_line.key.as_str(), meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
-                }
-                // A space-separated list of chips to exclude from the build.
-                "EXCLUDE_CHIPS" => {
-                    let chips = meta_line
-                        .value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap())
-                        .collect::<Vec<_>>();
-                    relevant_metadata.apply(|meta| meta.excluded_chips.extend_from_slice(&chips));
                 }
                 // A list of cargo `--config` configurations.
                 "CARGO-CONFIG" => {
@@ -369,10 +377,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 meta.chips = all_configuration.chips.clone();
             }
 
-            // Excluded chips are additive
-            meta.excluded_chips
-                .extend_from_slice(&all_configuration.excluded_chips);
-
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
@@ -408,9 +412,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             configuration.features.sort();
 
             for chip in &configuration.chips {
-                if configuration.excluded_chips.contains(chip) {
-                    continue;
-                }
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),
@@ -448,7 +449,6 @@ fn parse_chips_from_annotation(
 ) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
     let mut found = false;
     let mut chips: Vec<Chip> = Chip::iter().collect();
-    let mut excluded: Vec<Chip> = Vec::new();
 
     for (line_no, line) in text
         .lines()
@@ -462,27 +462,15 @@ fn parse_chips_from_annotation(
                 found = true;
                 chips = parse_chips(meta.key.as_str(), meta.value.as_str())?;
             }
-            "EXCLUDE_CHIPS" => {
-                excluded.extend(
-                    meta.value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap()),
-                );
-            }
             _ => {}
         }
     }
 
-    if !found && excluded.is_empty() {
+    if !found {
         return Ok(None);
     }
 
-    Ok(Some(
-        chips
-            .into_iter()
-            .filter(|c| !excluded.contains(c))
-            .collect(),
-    ))
+    Ok(Some(chips.into_iter().collect()))
 }
 
 /// Load all examples by finding all packages in the given path, and parsing their metadata.

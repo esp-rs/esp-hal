@@ -107,23 +107,13 @@ A space-separated list of cfg symbols. The test or example will be built for eve
 //% CHIP_FEATURES: wifi_driver_supported
 ```
 
-This key behaves like `CHIPS`: it is a filter, and the latter line overwrites the earlier one for
-the same configuration.
-
-When no single symbol covers the desired set, use `CHIPS` with an explicit list instead.
-
-### `//% EXCLUDE_CHIP`
-
-A space-separated list of chip names to remove from the set selected by `CHIPS` or `CHIP_FEATURES`.
-Useful when a capability-based filter includes a chip that cannot actually run the test or example
-(e.g. missing GPIO pins, different DMA architecture).
+A chip name can be used as a symbol too, and any symbol may be negated with a leading `!`. This is
+how a chip that is capable but for some reason incompatible with a given test/example is excluded. `&&`
+between symbols is accepted as an optional, readability-only separator.
 
 ```
-//% CHIP_FEATURES: spi_slave_driver_supported
-//% EXCLUDE_CHIP: esp32
+//% CHIP_FEATURES: spi_slave_supports_dma && !esp32
 ```
-
-This key is additive. Multiple lines and the unnamed list are all merged together.
 
 ### `//% TAG`
 

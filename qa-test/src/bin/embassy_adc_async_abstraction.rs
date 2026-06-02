@@ -4,8 +4,7 @@
 //! PINS
 //! GPIO4 for ADC1
 
-//% CHIP_FEATURES: adc_driver_supported
-//% EXCLUDE_CHIPS: esp32 esp32s2 esp32s3
+//% CHIP_FEATURES: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3
 
 #![no_std]
 #![no_main]
