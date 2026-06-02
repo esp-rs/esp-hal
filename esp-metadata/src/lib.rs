@@ -224,17 +224,19 @@ impl Chip {
                 let config = Config::for_chip(&chip);
                 for symbol in config.all() {
                     if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
-                        let symbol_name = symbol_name.replace('.', "_");
+                        let symbol_name = symbol_name.trim().replace('.', "_");
+                        let symbol_value = symbol_value.trim().to_string();
+
                         let entry = cfgs.entry(symbol_name).or_default();
                         let vec = entry.get_or_insert_with(Vec::new);
 
                         // Avoid duplicates in the same cfg.
-                        if !vec.contains(&symbol_value.to_string()) {
-                            vec.push(symbol_value.to_string());
+                        if !vec.contains(&symbol_value) {
+                            vec.push(symbol_value);
                         }
                     } else {
                         // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-                        let cfg = symbol.replace('.', "_");
+                        let cfg = symbol.trim().replace('.', "_");
 
                         if !cfgs.contains_key(&cfg) {
                             cfgs.insert(cfg, None);

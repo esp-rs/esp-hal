@@ -7018,13 +7018,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_kind, values(\"pdma\",\"gdma\"))");
     println!(
-        "cargo:rustc-check-cfg=cfg(spi_master_dma_engine , values( \"SPI_DMA\", \"AHB_GDMA\", \
-         \"AXI_GDMA\"))"
+        "cargo:rustc-check-cfg=cfg(spi_master_dma_engine, \
+         values(\"SPI_DMA\",\"AHB_GDMA\",\"AXI_GDMA\"))"
     );
-    println!(
-        "cargo:rustc-check-cfg=cfg(spi_slave_dma_engine , values( \"SPI_DMA\", \"AHB_GDMA\"))"
-    );
-    println!("cargo:rustc-check-cfg=cfg(i2s_dma_engine , values( \"I2S_DMA\", \"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(spi_slave_dma_engine, values(\"SPI_DMA\",\"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(i2s_dma_engine, values(\"I2S_DMA\",\"AHB_GDMA\"))");
     println!("cargo:rustc-check-cfg=cfg(gpio_version, values(\"1\",\"2\",\"3\"))");
     println!("cargo:rustc-check-cfg=cfg(gpio_gpio_function, values(\"2\",\"1\"))");
     println!(
@@ -7093,17 +7091,17 @@ pub fn emit_check_cfg_directives() {
     );
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
-    println!("cargo:rustc-check-cfg=cfg(sha_dma_engine , values( \"AHB_GDMA\", \"CRYPTO_DMA\"))");
-    println!("cargo:rustc-check-cfg=cfg(aes_dma_engine , values( \"AHB_GDMA\", \"CRYPTO_DMA\"))");
-    println!("cargo:rustc-check-cfg=cfg(uhci_dma_engine , values( \"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(sha_dma_engine, values(\"AHB_GDMA\",\"CRYPTO_DMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(aes_dma_engine, values(\"AHB_GDMA\",\"CRYPTO_DMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(uhci_dma_engine, values(\"AHB_GDMA\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
-    println!("cargo:rustc-check-cfg=cfg(parl_io_dma_engine , values( \"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(parl_io_dma_engine, values(\"AHB_GDMA\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_fifo_depth_words, values(\"896\"))");
-    println!("cargo:rustc-check-cfg=cfg(rmt_dma_engine , values( \"AHB_GDMA\"))");
-    println!("cargo:rustc-check-cfg=cfg(lcd_cam_dma_engine , values( \"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(rmt_dma_engine, values(\"AHB_GDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(lcd_cam_dma_engine, values(\"AHB_GDMA\"))");
 }
