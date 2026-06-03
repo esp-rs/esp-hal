@@ -17,7 +17,7 @@ env:
 jobs:
   check:
     runs-on: macos-m1-self-hosted
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') || contains(github.event.pull_request.labels.*.name, 'release:registry:ci'))) }}
 
     steps:
       - uses: actions/checkout@v6
@@ -57,36 +57,38 @@ jobs:
           cargo xrel-check update
           cargo xrel-check replace-path-deps
 
-      - name: try-build
+      # Build the compile-tests against the local registry. This is the cheap smoke
+      # test, so it runs first. Gated on `release:registry:compile-test` so it can be
+      # run independently of the heavier CI build.
+      - name: try-build [compile-tests]
+        if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') }}
+        shell: bash
+        run: |
+          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
+          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
+          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c6
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
+
+      # Build the examples/qa-test/tests against the local registry. Gated on
+      # `release:registry:ci` so a release can opt out of this heavy check.
+      - name: try-build [examples/qa-test/tests]
+        if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:ci') }}
         shell: bash
         run: |
           # lints and docs are checked a couple of times already by other workflows
           cargo xcheck ci esp32 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
-
           cargo xcheck ci esp32s2 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
-
           cargo xcheck ci esp32s3 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
-
           cargo xcheck ci esp32c2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
-
           cargo xcheck ci esp32c3 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
-
           cargo xcheck ci esp32c5 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
-
           cargo xcheck ci esp32c6 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c6
-
           cargo xcheck ci esp32c61 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
-
           cargo xcheck ci esp32p4 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
-
           cargo xcheck ci esp32h2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
