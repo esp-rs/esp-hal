@@ -1209,17 +1209,7 @@ mod tests {
     fn test_clock_calculation_accuracy(mut ctx: Context) {
         let lowest = if cfg!(esp32h2) { 78048 } else { 78125 };
 
-        let f_mst = if cfg!(esp32c2) {
-            40_000_000
-        } else if cfg!(esp32h2) {
-            48_000_000
-        } else if cfg!(esp32c5) {
-            80_000_000 // pre-divided by 2
-        } else if cfg!(esp32p4) {
-            40_000_000 // default clock source is XTAL
-        } else {
-            80_000_000
-        };
+        let f_mst = esp_hal::clock::ll::SpiInstance::Spi2.function_clock_frequency();
         let inputs = [lowest, 100_000, 1_000_000, f_mst];
         let expected_outputs = [lowest, 100_000, 1_000_000, f_mst];
 

@@ -1,7 +1,7 @@
 use enumset::EnumSet;
 
 use super::{
-    super::{Config, DataMode, SpiInterrupt},
+    super::{DataMode, SpiInterrupt},
     Driver,
 };
 use crate::spi::{Error, Mode};
@@ -41,7 +41,7 @@ pub(super) fn init_spi_data_mode(
     Ok(())
 }
 
-pub(super) fn apply_config(_driver: &Driver, _config: &Config) {}
+pub(super) fn apply_config(_driver: &Driver) {}
 
 pub(super) fn set_data_mode(driver: &Driver, data_mode: Mode) {
     driver.regs().misc().modify(|_, w| {

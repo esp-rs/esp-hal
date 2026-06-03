@@ -18,7 +18,18 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     peripherals::{
-        I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SPI2, SPI3, SYSTEM, TIMG0, TIMG1, UART0, UART1,
+        I2C_ANA_MST,
+        I2C0,
+        I2C1,
+        LPWR,
+        RMT,
+        SPI2,
+        SPI3,
+        SYSTEM,
+        TIMG0,
+        TIMG1,
+        UART0,
+        UART1,
         UART2,
     },
     soc::regi2c,

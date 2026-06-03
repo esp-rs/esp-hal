@@ -750,6 +750,7 @@ impl SpiInstance {
     ) {
         match self {
             SpiInstance::Spi2 => PCR::regs().spi2_clkm_conf().modify(|_, w| unsafe {
+                w.spi2_clkm_div_num().bits(0);
                 w.spi2_clkm_sel().bits(match new_config {
                     SpiFunctionClockConfig::Xtal => 0,
                     SpiFunctionClockConfig::PllF160m => 1,

@@ -1,7 +1,7 @@
 use enumset::EnumSet;
 
 use super::{
-    super::{Config, DataMode, SpiInterrupt},
+    super::{DataMode, SpiInterrupt},
     Driver,
 };
 use crate::{
@@ -108,19 +108,16 @@ pub(super) fn clear_interrupts(driver: &Driver, interrupts: EnumSet<SpiInterrupt
     }
 }
 
-pub(super) fn apply_config(driver: &Driver, config: &Config) {
-    let f_apb = 80_000_000;
-    let source_freq_hz = match config.clock_source {
-        super::super::ClockSource::Apb => f_apb,
-    };
+pub(super) fn apply_config(driver: &Driver) {
+    let source_freq_hz = crate::soc::clocks::apb_clk_frequency() as i32;
 
     let clock_reg = driver.regs().clock().read();
     let eff_clk = if clock_reg.clk_equ_sysclk().bit_is_set() {
-        f_apb
+        source_freq_hz
     } else {
         let pre = clock_reg.clkdiv_pre().bits() as i32 + 1;
         let n = clock_reg.clkcnt_n().bits() as i32 + 1;
-        f_apb / (pre * n)
+        source_freq_hz / (pre * n)
     };
 
     let apbclk_khz = source_freq_hz / 1000;
