@@ -263,9 +263,6 @@ mod tests {
 
         cfg_select! {
             feature = "unstable" => {
-                #[cfg(pcnt_driver_supported)]
-                let pcnt = Pcnt::new(peripherals.PCNT);
-
                 Context {
                     spi,
                     rx_buffer,
@@ -280,7 +277,7 @@ mod tests {
                     #[cfg(spi_master_supports_dma)]
                     tx_descriptors,
                     #[cfg(pcnt_driver_supported)]
-                    pcnt_unit: pcnt.unit0,
+                    pcnt_unit: Pcnt::new(peripherals.PCNT).unit0,
                 }
             }
             _ => {
