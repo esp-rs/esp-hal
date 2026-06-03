@@ -1,0 +1,65 @@
+diff --git a/.github/workflows/hil.yml b/.github/workflows/hil.yml
+index 4dcce476..a3412a00 100644
+--- a/.github/workflows/hil.yml
++++ b/.github/workflows/hil.yml
+@@ -155,8 +155,10 @@ jobs:
+       - name: Cache Dependencies
+         uses: Swatinem/rust-cache@v2
+ 
+-      # Build test ELFs for each requested chip
+-      - name: Build tests
++      # Build hil-test ELFs for each requested chip (unless the dispatch
++      # asked for radio-only via package=hil-test-radio).
++      - name: Build hil-test tests
++        if: ${{ inputs.package != 'hil-test-radio' }}
+         run: |
+           CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
+           TESTS="${{ inputs.tests }}"
+@@ -195,10 +197,6 @@ jobs:
+           CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
+           TESTS="${{ inputs.tests }}"
+           for chip in $CHIPS; do
+-            if ! cargo xtask build tests "$chip" hil-test-radio --help >/dev/null 2>&1; then
+-              echo "Skipping $chip: not supported by this ref's xtask"
+-              continue
+-            fi
+             if [ -n "$TESTS" ]; then
+               echo "Building selected hil-test-radio tests for $chip: $TESTS"
+               cargo xtask build tests "$chip" hil-test-radio --tests "$TESTS"
+@@ -216,6 +214,35 @@ jobs:
+           path: target/tests/
+           if-no-files-found: ignore
+ 
++      # xtask runs on the HIL runners as a host tool.
++      # We build the actual tests using the correct toolchain before.
++      - name: Install host toolchain for cross-compiling xtask
++        run: |
++          rustup toolchain install stable --profile minimal
++          rustup default stable
++          rustup target add aarch64-unknown-linux-gnu
++          rustup target add armv7-unknown-linux-gnueabihf
++
++      - uses: taiki-e/install-action@v2
++        with:
++          tool: cross
++
++      - name: Build xtask for HIL runners
++        run: |
++          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
++          cross build --release --target aarch64-unknown-linux-gnu -p xtask
++
++      - name: Upload xtask artifacts
++        uses: actions/upload-artifact@v6
++        with:
++          name: xtask-armv7
++          path: target/armv7-unknown-linux-gnueabihf/release/xtask
++
++      - uses: actions/upload-artifact@v6
++        with:
++          name: xtask-aarch64
++          path: target/aarch64-unknown-linux-gnu/release/xtask
++
+   hil:
+     needs: build
+     if: ${{ inputs.package != 'hil-test-radio' }}
+     

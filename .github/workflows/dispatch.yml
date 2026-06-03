@@ -251,8 +251,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseTests } = require('./.github/scripts/hil-parse.js');
-            core.setOutput('tests', parseTests(context.payload.comment.body));
+            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const body = context.payload.comment.body;
+
+            core.setOutput('tests', parseTests(body));
+            core.setOutput('package', parsePackage(body));
 
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
@@ -265,7 +268,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "esp32c6 esp32s3",
-              "tests": "${{ steps.parse-tests.outputs.tests }}"
+              "tests": "${{ steps.parse-tests.outputs.tests }}",
+              "package": "${{ steps.parse-tests.outputs.package }}"
             }
 
       - name: Find HIL run URL (quick)
@@ -337,8 +341,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseTests } = require('./.github/scripts/hil-parse.js');
-            core.setOutput('tests', parseTests(context.payload.comment.body));
+            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const body = context.payload.comment.body;
+
+            core.setOutput('tests', parseTests(body));
+            core.setOutput('package', parsePackage(body));
 
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
@@ -351,7 +358,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4",
-              "tests": "${{ steps.parse-tests.outputs.tests }}"
+              "tests": "${{ steps.parse-tests.outputs.tests }}",
+              "package": "${{ steps.parse-tests.outputs.package }}"
             }
 
       - name: Find HIL run URL (full)
@@ -440,8 +448,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseTests } = require('./.github/scripts/hil-parse.js');
-            core.setOutput('tests', parseTests(context.payload.comment.body));
+            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const body = context.payload.comment.body;
+
+            core.setOutput('tests', parseTests(body));
+            core.setOutput('package', parsePackage(body));
 
       - name: Report invalid chips
         if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
@@ -463,7 +474,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "${{ steps.parse.outputs.chips }}",
-              "tests": "${{ steps.parse-tests.outputs.tests }}"
+              "tests": "${{ steps.parse-tests.outputs.tests }}",
+              "package": "${{ steps.parse-tests.outputs.package }}"
             }
 
       - name: Find HIL run URL (per-chip)
@@ -558,6 +570,7 @@ jobs:
             - `/hil <chip1> [<chip2> ...]` — run the full HIL tests **only** for the listed chips
             - `/test-size <example_name> [--package <pkg>] <chip1> [chip2 ...]` — run binary size analysis for the specified example on one or more chips. Example: `/test-size embassy_hello_world esp32c3 esp32c6` or `/test-size sleep_timer --package qa-test esp32c3`
             - You can optionally append `--test <name>[,<name>...]` to any `/hil` command to only run selected tests.
+            - You can optionally include `hil-test` or `hil-test-radio` in the comment body of any `/hil` command to limit the run to that package (default: both are run).
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```

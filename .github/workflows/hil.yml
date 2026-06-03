@@ -3,16 +3,18 @@ name: HIL
 run-name: >
   ${{ inputs.pr_number != '' &&
       format(
-        'HIL for PR #{0} ({1}{2})',
+        'HIL for PR #{0} ({1}{2}{3})',
         inputs.pr_number,
         inputs.chips,
-        inputs.tests != '' && format('; tests: {0}', inputs.tests) || ''
+        inputs.tests != '' && format('; tests: {0}', inputs.tests) || '',
+        inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || ''
       ) ||
 
       format(
-        'HIL ({0}{1})',
+        'HIL ({0}{1}{2})',
         inputs.chips,
-        inputs.tests != '' && format('; tests: {0}', inputs.tests) || ''
+        inputs.tests != '' && format('; tests: {0}', inputs.tests) || '',
+        inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || ''
       )
   }}
 
@@ -28,6 +30,11 @@ on:
         required: false
         type: string
         default: ""
+      package:
+        description: '"hil-test", "hil-test-radio", or "all"'
+        required: false
+        type: string
+        default: "all"
   workflow_dispatch:
     inputs:
       repository:
@@ -50,6 +57,9 @@ on:
         description: "Optional list of test names to run (ELF basenames)"
         required: false
         default: ""
+      package:
+        description: '"hil-test", "hil-test-radio", or "all"'
+        default: "all"
 
 env:
   CARGO_TERM_COLOR: always
@@ -60,6 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.chips.outputs.matrix }}
+      radio_matrix: ${{ steps.chips.outputs.radio_matrix }}
     steps:
       - name: Resolve chip matrix
         id: chips
@@ -77,6 +88,11 @@ jobs:
             {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",      "host":"aarch64"}
           ]'
 
+          # Chips that have a dedicated radio HIL runner.
+          RADIO_CHIPS='[
+            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-radio", "host":"aarch64"}
+          ]'
+
           REQUESTED="${{ inputs.chips }}"
           MATRIX=$(echo "$ALL_CHIPS" | jq -c --arg chips "$REQUESTED" \
             '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
@@ -86,8 +102,19 @@ jobs:
             exit 1
           fi
 
+          RADIO_MATRIX=$(echo "$RADIO_CHIPS" | jq -c --arg chips "$REQUESTED" \
+            '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+
+          PKG="${{ inputs.package }}"
+          # `package: hil-test` disables the radio HIL run entirely.
+          if [ "$PKG" = "hil-test" ]; then
+            RADIO_MATRIX='[]'
+          fi
+
           echo "matrix={\"target\":$(echo "$MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
+          echo "radio_matrix={\"target\":$(echo "$RADIO_MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
           echo "Selected chips: $(echo "$MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
+          echo "Selected radio chips: $(echo "$RADIO_MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
 
       - name: Determine required architectures
         id: arch
@@ -128,8 +155,10 @@ jobs:
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v2
 
-      # Build test ELFs for each requested chip
-      - name: Build tests
+      # Build hil-test ELFs for each requested chip (unless the dispatch
+      # asked for radio-only via package=hil-test-radio).
+      - name: Build hil-test tests
+        if: ${{ inputs.package != 'hil-test-radio' }}
         run: |
           CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
           TESTS="${{ inputs.tests }}"
@@ -139,20 +168,51 @@ jobs:
               continue
             fi
             if [ -n "$TESTS" ]; then
-              echo "Building selected tests for $chip: $TESTS"
+              echo "Building selected hil-test tests for $chip: $TESTS"
               cargo xtask build tests "$chip" --tests "$TESTS"
             else
-              echo "Building ALL tests for $chip"
+              echo "Building ALL hil-test tests for $chip"
               cargo xtask build tests "$chip"
             fi
           done
 
-      - name: Upload test artifacts
+      - name: Upload hil-test artifacts
+        if: ${{ inputs.package != 'hil-test-radio' }}
         uses: actions/upload-artifact@v6
         with:
           name: hil-tests
           path: target/tests/
           if-no-files-found: warn
+
+      # Build hil-test-radio ELFs (unless the dispatch asked for hil-test
+      # only).  Chips for which the radio package has no applicable binaries
+      # produce no output and are silently skipped via if-no-files-found.
+      - name: Reset tests output directory for radio build
+        if: ${{ inputs.package != 'hil-test' }}
+        run: rm -rf target/tests
+
+      - name: Build hil-test-radio tests
+        if: ${{ inputs.package != 'hil-test' }}
+        run: |
+          CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
+          TESTS="${{ inputs.tests }}"
+          for chip in $CHIPS; do
+            if [ -n "$TESTS" ]; then
+              echo "Building selected hil-test-radio tests for $chip: $TESTS"
+              cargo xtask build tests "$chip" hil-test-radio --tests "$TESTS"
+            else
+              echo "Building ALL hil-test-radio tests for $chip"
+              cargo xtask build tests "$chip" hil-test-radio
+            fi
+          done
+
+      - name: Upload hil-test-radio artifacts
+        if: ${{ inputs.package != 'hil-test' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: hil-tests-radio
+          path: target/tests/
+          if-no-files-found: ignore
 
       # xtask runs on the HIL runners as a host tool.
       # We build the actual tests using the correct toolchain before.
@@ -185,6 +245,7 @@ jobs:
 
   hil:
     needs: build
+    if: ${{ inputs.package != 'hil-test-radio' }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -220,6 +281,64 @@ jobs:
           fi
 
       - name: Run Tests
+        if: steps.guard.outputs.skip != 'true'
+        id: run-tests
+        run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
+          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests/ || true
+          rm -f xtask || true
+
+  # Radio HIL device runs (hil-test-radio) — wifi/BT capable chips on dedicated
+  # radio runners.  The matrix is empty when no requested chip has a radio
+  # runner, which causes this job to be skipped entirely.
+  hil-radio:
+    needs: build
+    if: >
+      inputs.package != 'hil-test' &&
+      needs.build.outputs.radio_matrix != '{"target":[]}'
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.build.outputs.radio_matrix) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hil-tests-radio
+          path: tests/
+        continue-on-error: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No radio tests for ${{ matrix.target.soc }} in this run; skipping."
+          fi
+
+      - name: Compute tests arg
+        if: steps.guard.outputs.skip != 'true'
+        id: tests
+        run: |
+          if [ -n "${{ inputs.tests }}" ]; then
+            echo "value=--elfs ${{ inputs.tests }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Radio Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
         run: |
