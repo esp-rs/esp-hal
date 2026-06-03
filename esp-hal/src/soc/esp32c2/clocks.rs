@@ -743,7 +743,6 @@ impl I2cInstance {
     // I2C_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let _ = self;
         I2C0::regs()
             .clk_conf()
             .modify(|_, w| w.sclk_active().bit(en));
@@ -755,8 +754,6 @@ impl I2cInstance {
         _old_config: Option<I2cFunctionClockConfig>,
         new_config: I2cFunctionClockConfig,
     ) {
-        let _ = self;
-        // sclk_sel: 0 = XTAL, 1 = RC_FAST
         I2C0::regs().clk_conf().modify(|_, w| unsafe {
             w.sclk_sel()
                 .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));

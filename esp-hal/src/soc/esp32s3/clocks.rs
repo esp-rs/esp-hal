@@ -970,7 +970,6 @@ impl I2cInstance {
 
 impl SpiInstance {
     // SPI_FUNCTION_CLOCK
-    // mst_clk_sel: 0 = XTAL, 1 = APB
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         let regs = match self {
@@ -994,10 +993,8 @@ impl SpiInstance {
             SpiInstance::Spi3 => SPI3::regs(),
         };
         regs.clk_gate().modify(|_, w| {
-            w.mst_clk_sel().bit(match new_config {
-                SpiFunctionClockConfig::Apb => true,
-                SpiFunctionClockConfig::Xtal => false,
-            })
+            w.mst_clk_sel()
+                .bit(matches!(new_config, SpiFunctionClockConfig::Apb))
         });
     }
 }

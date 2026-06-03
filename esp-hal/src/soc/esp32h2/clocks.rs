@@ -638,7 +638,6 @@ impl I2cInstance {
             I2cInstance::I2c0 => 0,
             I2cInstance::I2c1 => 1,
         };
-        // sclk_sel: 0 = XTAL, 1 = RC_FAST
         PCR::regs().i2c_sclk_conf(i2c).modify(|_, w| unsafe {
             w.i2c_sclk_sel()
                 .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));

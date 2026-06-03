@@ -326,7 +326,6 @@ impl I2cInstance {
         _old_config: Option<I2cFunctionClockConfig>,
         new_config: I2cFunctionClockConfig,
     ) {
-        // clk_src_sel: 0 = XTAL, 1 = RC_FAST
         let rc_fast = matches!(new_config.sclk, I2cFunctionClockSclk::RcFast);
         match self {
             I2cInstance::I2c0 => {
