@@ -22,7 +22,7 @@ pub struct SemverCheckArgs {
     pub command: SemverCheckCmd,
 
     /// Package(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys])]
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys, Package::EspRadio])]
     pub packages: Vec<Package>,
 
     /// Default packages that are not supposed to run, used in CI.

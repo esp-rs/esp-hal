@@ -11,6 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+semver-checked = true
 doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
     { if = 'chip_has("wifi_driver_supported")', features = ["wifi", "wifi-eap", "esp-now", "sniffer"] },
     { if = 'chip_has("wifi_driver_supported") && chip_has("wifi_csi_supported")', features = ["csi"] },
@@ -18,6 +19,9 @@ doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-a
     { if = 'chip_has("ieee802154_driver_supported")', features = ["ieee802154", "__docs_build"] },
     { if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")', features = ["coex"] },
     { if = 'chip_has("wifi_driver_supported") || chip_has("bt_driver_supported") || chip_has("ieee802154_driver_supported")', features = ["unstable"] },
+] }
+semver-config = { features = ["esp-hal/rt"], append = [
+    { if = 'chip_has("wifi_driver_supported")', features = ["wifi"] },
 ] }
 check-configs = [
     { features = ["esp-hal/rt"] },
