@@ -184,6 +184,14 @@ impl<'d> MipiDsi<'d> {
         });
         let ref_freq_mhz = ref_freq_hz as f32 / 1_000_000.0;
 
+        let dphy_guard = DphyGuard {
+            _dsi: dsi,
+            vdma_channel_id,
+            _dsi_guard: dsi_guard,
+            _vdma_guard: vdma_guard,
+            _phantom: PhantomData,
+        };
+
         let host = MIPI_DSI_HOST::regs();
         let bridge = MIPI_DSI_BRIDGE::regs();
 
@@ -293,13 +301,7 @@ impl<'d> MipiDsi<'d> {
             .modify(|_, w| unsafe { w.phy_stop_wait_time().bits(0x3F) });
 
         Ok(Self {
-            guard: DphyGuard {
-                _dsi: dsi,
-                vdma_channel_id,
-                _dsi_guard: dsi_guard,
-                _vdma_guard: vdma_guard,
-                _phantom: PhantomData,
-            },
+            guard: dphy_guard,
             lane_bit_rate_mbps: actual_rate,
             num_data_lanes: config.num_data_lanes,
         })
