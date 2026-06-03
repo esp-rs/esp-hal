@@ -244,21 +244,23 @@ where
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     pub fn wait(self) -> (Result<(), DmaError>, I2sTx<'d, Dm>, Buf::Final) {
         while !self.is_done() {}
-        self.stop()
+        let (i2s_tx, buf) = self.stop();
+
+        if i2s_tx.tx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_tx, buf)
+        } else {
+            (Ok(()), i2s_tx, buf)
+        }
     }
 
     /// Immediately stop the transfer and return the peripheral and buffer.
-    pub fn stop(mut self) -> (Result<(), DmaError>, I2sTx<'d, Dm>, Buf::Final) {
+    pub fn stop(mut self) -> (I2sTx<'d, Dm>, Buf::Final) {
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
 
         let (i2s_tx, buf) = self.release();
 
-        if i2s_tx.tx_channel.has_error() {
-            (Err(DmaError::DescriptorError), i2s_tx, Buf::from_view(buf))
-        } else {
-            (Ok(()), i2s_tx, Buf::from_view(buf))
-        }
+        (i2s_tx, Buf::from_view(buf))
     }
 
     fn release(mut self) -> (I2sTx<'d, Dm>, Buf::View) {
@@ -291,7 +293,13 @@ where
             self.completed = true;
         }
 
-        self.stop()
+        let (i2s_tx, buf) = self.stop();
+
+        if i2s_tx.tx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_tx, buf)
+        } else {
+            (Ok(()), i2s_tx, buf)
+        }
     }
 
     /// Waits for the transfer to finish.
@@ -372,21 +380,22 @@ where
     pub fn wait(self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
         while !self.is_done() {}
 
-        self.stop()
+        let (i2s_rx, buf) = self.stop();
+
+        if i2s_rx.rx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_rx, buf)
+        } else {
+            (Ok(()), i2s_rx, buf)
+        }
     }
 
     /// Immediately stop the transfer and return the peripheral and buffer.
-    pub fn stop(mut self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
+    pub fn stop(mut self) -> (I2sRx<'d, Dm>, Buf::Final) {
         self.i2s_rx.i2s.rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
 
         let (i2s_rx, buf) = self.release();
-
-        if i2s_rx.rx_channel.has_error() {
-            (Err(DmaError::DescriptorError), i2s_rx, Buf::from_view(buf))
-        } else {
-            (Ok(()), i2s_rx, Buf::from_view(buf))
-        }
+        (i2s_rx, Buf::from_view(buf))
     }
 
     fn release(mut self) -> (I2sRx<'d, Dm>, Buf::View) {
@@ -426,7 +435,13 @@ where
             self.completed = true;
         }
 
-        self.stop()
+        let (i2s_rx, buf) = self.stop();
+
+        if i2s_rx.rx_channel.has_error() {
+            (Err(DmaError::DescriptorError), i2s_rx, buf)
+        } else {
+            (Ok(()), i2s_rx, buf)
+        }
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
