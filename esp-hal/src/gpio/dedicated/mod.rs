@@ -42,14 +42,7 @@
 //! This module also exposes low-level helpers for direct, channel-bitmask-based access:
 //! - [`write_ll`]: write output levels for a selected set of channels in one operation
 //! - [`read_all_ll`]: read the current input levels of all channels
-#![cfg_attr(
-    not(dedicated_gpio_version = "esp32s3"),
-    doc = r#"- [`output_levels_ll`]: read the current output levels of all channels"#
-)]
-#![cfg_attr(
-    dedicated_gpio_version = "esp32s3",
-    doc = r#"- `output_levels_ll`: read the current output levels of all channels (not available on ESP32-S3 due to an LLVM bug, see <https://github.com/espressif/llvm-project/issues/120>)"#
-)]
+//! - [`output_levels_ll`]: read the current output levels of all channels
 //! These functions operate purely on channel bitmasks (bit 0 -> channel 0, bit 1 -> channel 1, ...)
 //! and do not track pin configuration. Prefer the higher-level drivers and bundles unless you
 //! specifically need the lowest overhead.
@@ -576,16 +569,6 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
 /// create a driver, you can use the [`DedicatedGpioOutput::new`] method, then
 /// [`DedicatedGpioOutput::with_pin`] to add output drivers.
 #[cfg_attr(
-    dedicated_gpio_version = "esp32s3",
-    doc = r#"
-
-<section class="warning">
-The method <code>output_level</code> is currently not available on ESP32-S3 due to
-an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
-</section>
-"#
-)]
-#[cfg_attr(
     multi_core,
     doc = r#"
 
@@ -685,7 +668,6 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     /// Returns the current output state of the GPIO pins.
     ///
     /// Returns [`Level::High`] if any of the GPIO pins are set high, otherwise [`Level::Low`].
-    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -842,7 +824,6 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     }
 
     /// Returns the current output state of the GPIO pin.
-    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -957,7 +938,6 @@ pub fn read_all_ll() -> u32 {
 ///
 /// The returned value is a bitmask where each bit represents the output level of a channel:
 /// bit 0 -> channel 0, bit 1 -> channel 1, etc. A bit value of 1 means the channel output is high.
-#[cfg(not(dedicated_gpio_version = "esp32s3"))]
 #[inline(always)]
 pub fn output_levels_ll() -> u32 {
     low_level::read_out()
@@ -980,16 +960,6 @@ pub fn output_levels_ll() -> u32 {
 /// [`DedicatedGpioOutput::with_pin`]. The bundle operates on *channels*, not
 /// individual pins: writing channel bits affects every pin connected to that
 /// channel.
-#[cfg_attr(
-    dedicated_gpio_version = "esp32s3",
-    doc = r#"
-
-<section class="warning">
-The method <code>output_levels</code> is currently not available on ESP32-S3 due to
-an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
-</section>
-"#
-)]
 #[cfg_attr(
     multi_core,
     doc = r#"
@@ -1297,7 +1267,6 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
     /// state of other channels.
-    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
@@ -1577,16 +1546,6 @@ impl<'lt> Default for DedicatedGpioInputBundle<'lt> {
 /// A [`DedicatedGpioFlex`] connects one dedicated channel to one GPIO pin for both
 /// input and output. The bundle operates on *channels*, not pins: writing channel bits
 /// affects the pins currently connected to those channels.
-#[cfg_attr(
-    dedicated_gpio_version = "esp32s3",
-    doc = r#"
-
-<section class="warning">
-The method <code>output_levels</code> is currently not available on ESP32-S3 due to
-an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
-</section>
-"#
-)]
 #[cfg_attr(
     multi_core,
     doc = r#"
@@ -1877,7 +1836,6 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
     /// state of other channels.
-    #[cfg(not(dedicated_gpio_version = "esp32s3"))]
     #[inline(always)]
     pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
