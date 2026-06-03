@@ -358,10 +358,10 @@ mod tests {
     }
 
     #[test]
-    fn test_i2s_read_one_shot(ctx: Context) {
+    fn test_i2s_read_one_shot_multiple(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -377,38 +377,43 @@ mod tests {
         // check was received correctly
         let (din, ws) = unsafe { ctx.dout.split() };
 
-        let i2s_rx = i2s
+        let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(ws)
             .with_din(din)
             .build();
 
-        let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-        let (res, _, done_rx) = rx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for _ in 0..10 {
+            let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+            let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-        assert!(done_rx.number_of_received_bytes() != 0);
+            assert!(done_rx.number_of_received_bytes() != 0);
 
-        let mut tmp = [0u8; 8000];
-        let read = done_rx.read_received_data(&mut tmp);
+            let mut tmp = [0u8; 8000];
+            let read = done_rx.read_received_data(&mut tmp);
 
-        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
-        // less than the buffer size, but it should never be zero if the transfer completed
-        // successfully.
-        assert!(read != 0);
+            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
+            // be less than the buffer size, but it should never be zero if the transfer
+            // completed successfully.
+            assert!(read != 0);
 
-        let l = read - read % 4;
-        for chunk in tmp[..l].chunks(4) {
-            assert_eq!(chunk, [1, 0, 254, 255]);
+            let l = read - read % 4;
+            for chunk in tmp[..l].chunks(4) {
+                assert_eq!(chunk, [1, 0, 254, 255]);
+            }
+
+            i2s_rx = i2s_rx_back;
+            rx_buffer = done_rx;
         }
     }
 
     #[test]
-    async fn test_i2s_read_one_shot_async(ctx: Context) {
+    async fn test_i2s_read_one_shot_multiple_async(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -425,32 +430,37 @@ mod tests {
         // check was received correctly
         let (din, ws) = unsafe { ctx.dout.split() };
 
-        let i2s_rx = i2s
+        let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(ws)
             .with_din(din)
             .build();
 
-        let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-        rx_transfer.wait_for_done_async().await.unwrap();
-        assert_eq!(rx_transfer.is_done(), true);
-        let (res, _, done_rx) = rx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for _ in 0..10 {
+            let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+            rx_transfer.wait_for_done_async().await.unwrap();
+            assert_eq!(rx_transfer.is_done(), true);
+            let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-        assert!(done_rx.number_of_received_bytes() != 0);
+            assert!(done_rx.number_of_received_bytes() != 0);
 
-        let mut tmp = [0u8; 8000];
-        let read = done_rx.read_received_data(&mut tmp);
+            let mut tmp = [0u8; 8000];
+            let read = done_rx.read_received_data(&mut tmp);
 
-        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
-        // less than the buffer size, but it should never be zero if the transfer completed
-        // successfully.
-        assert!(read != 0);
+            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
+            // be less than the buffer size, but it should never be zero if the transfer
+            // completed successfully.
+            assert!(read != 0);
 
-        let l = read - read % 4;
-        for chunk in tmp[..l].chunks(4) {
-            assert_eq!(chunk, [1, 0, 254, 255]);
+            let l = read - read % 4;
+            for chunk in tmp[..l].chunks(4) {
+                assert_eq!(chunk, [1, 0, 254, 255]);
+            }
+
+            i2s_rx = i2s_rx_back;
+            rx_buffer = done_rx;
         }
     }
 
@@ -488,7 +498,7 @@ mod tests {
         let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         esp_hal::delay::Delay::new().delay_millis(500);
         let (res, _, _done_tx) = tx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
         counter.check(8000);
     }
 
@@ -528,7 +538,7 @@ mod tests {
         tx_transfer.wait_for_done_async().await.unwrap();
         assert_eq!(tx_transfer.is_done(), true);
         let (res, _, _done_tx) = tx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
         counter.check(8000);
     }
 
@@ -567,7 +577,7 @@ mod tests {
         for _ in 0..10 {
             let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
             let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait();
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
             counter.check(compare);
             compare += 4;
 
@@ -614,7 +624,7 @@ mod tests {
             tx_transfer.wait_for_done_async().await.unwrap();
             assert_eq!(tx_transfer.is_done(), true);
             let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait_async().await;
-            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
             counter.check(compare);
             compare += 4;
             tx_buffer = tx_buffer_back;
