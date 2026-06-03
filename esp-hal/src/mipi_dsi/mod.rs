@@ -9,8 +9,8 @@
 //! ```rust,no_run
 //! # {before_snippet}
 //! use esp_hal::{
+//!     clock::ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
 //!     mipi_dsi::{Config, DataLanes, MipiDsi},
-//!     soc::clocks::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
 //! };
 //!
 //! let bus = MipiDsi::new(
