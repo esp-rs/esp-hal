@@ -20,15 +20,12 @@ doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-a
     { if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")', features = ["coex"] },
     { if = 'chip_has("wifi_driver_supported") || chip_has("bt_driver_supported") || chip_has("ieee802154_driver_supported")', features = ["unstable"] },
 ] }
-# Mirrors `doc-config`: the semver baseline is built with `cargo rustdoc`, which needs the same
-# feature set so feature-gated intra-doc links (e.g. `WifiController::esp_now`) resolve.
-semver-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
-    { if = 'chip_has("wifi_driver_supported")', features = ["wifi", "wifi-eap", "esp-now", "sniffer"] },
-    { if = 'chip_has("wifi_driver_supported") && chip_has("wifi_csi_supported")', features = ["csi"] },
-    { if = 'chip_has("bt_driver_supported")', features = ["ble"] },
-    { if = 'chip_has("ieee802154_driver_supported")', features = ["ieee802154", "__docs_build"] },
-    { if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")', features = ["coex"] },
-    { if = 'chip_has("wifi_driver_supported") || chip_has("bt_driver_supported") || chip_has("ieee802154_driver_supported")', features = ["unstable"] },
+# Semver guarantees cover only the stable API, so the `unstable` feature is left OFF: the
+# `instability_disable_unstable_docs` escape (set in `build_doc_json`) then drops all
+# `#[instability::unstable]` items from the baseline. `wifi` is the only radio feature that
+# does not pull in `unstable`.
+semver-config = { features = ["esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
+    { if = 'chip_has("wifi_driver_supported")', features = ["wifi"] },
 ] }
 check-configs = [
     { features = ["esp-hal/rt"] },

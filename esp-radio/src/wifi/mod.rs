@@ -2271,9 +2271,11 @@ impl<'d> WifiController<'d> {
     /// Dropping the controller will deinitialize / stop Wi-Fi.
     ///
     /// Create [`Interface`]s separately via [`Interface::station()`] /
-    /// [`Interface::access_point()`]. ESP-NOW and sniffer instances are
-    /// available through the controller's [`WifiController::esp_now()`] and
-    /// [`WifiController::sniffer()`] methods.
+    /// [`Interface::access_point()`].
+    #[cfg_attr(
+        feature = "unstable",
+        doc = "ESP-NOW and sniffer instances are available through the controller's [`WifiController::esp_now()`] and [`WifiController::sniffer()`] methods."
+    )]
     ///
     /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
     /// currently in use.
