@@ -3,8 +3,8 @@
 use core::{
     marker::PhantomData,
     pin::Pin,
-    task::{Context, Poll},
     sync::atomic,
+    task::{Context, Poll},
 };
 
 use crate::{

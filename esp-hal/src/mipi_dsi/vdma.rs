@@ -165,9 +165,10 @@ impl VdmaChannel {
     pub(super) fn new(channel_id: u8) -> Self {
         VDMA::regs().reset0().write(|w| w.dmac_rst().set_bit());
         while VDMA::regs().reset0().read().dmac_rst().bit_is_set() {}
-        VDMA::regs()
-            .cfg0()
-            .modify(|_, w| w.dmac_en().set_bit().int_en().set_bit());
+        VDMA::regs().cfg0().modify(|_, w| {
+            w.dmac_en().set_bit();
+            w.int_en().set_bit()
+        });
 
         let ch = VDMA::regs().ch(channel_id as usize);
 
