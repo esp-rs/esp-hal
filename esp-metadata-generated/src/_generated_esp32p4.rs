@@ -1231,6 +1231,22 @@ macro_rules! for_each_sha_algorithm {
 ///         todo!()
 ///     }
 /// }
+/// impl SpiInstance {
+///     // SPI_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<SpiFunctionClockConfig>,
+///         _new_config: SpiFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl I2cInstance {
 ///     // I2C_FUNCTION_CLOCK
 ///
@@ -1264,6 +1280,12 @@ macro_rules! define_clock_tree_types {
             Uart2 = 2,
             Uart3 = 3,
             Uart4 = 4,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiInstance {
+            Spi2 = 0,
+            Spi3 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1529,6 +1551,18 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
+        /// The list of clock signals that the `SPI2_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiFunctionClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+            /// Selects `SPLL_CLK`.
+            Spll,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cFunctionClockSclk {
@@ -1582,6 +1616,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 5],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 5],
+            spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
             cpll_clk_refcount: u32,
             spll_clk_refcount: u32,
@@ -1603,6 +1638,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 5],
             uart_baud_rate_generator_refcount: [u32; 5],
+            spi_function_clock_refcount: [u32; 2],
             i2c_function_clock_refcount: [u32; 2],
         }
         impl ClockTree {
@@ -1698,6 +1734,14 @@ macro_rules! define_clock_tree_types {
             pub fn uart4_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart4 as usize]
             }
+            /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
+            pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi2 as usize]
+            }
+            /// Returns the current configuration of the SPI3_FUNCTION_CLOCK clock tree node
+            pub fn spi3_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi3 as usize]
+            }
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
@@ -1721,6 +1765,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 5],
                 uart_baud_rate_generator: [None; 5],
+                spi_function_clock: [None; 2],
                 i2c_function_clock: [None; 2],
                 cpll_clk_refcount: 0,
                 spll_clk_refcount: 0,
@@ -1742,6 +1787,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 5],
                 uart_baud_rate_generator_refcount: [0; 5],
+                spi_function_clock_refcount: [0; 2],
                 i2c_function_clock_refcount: [0; 2],
             });
         static CPU_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1768,6 +1814,8 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 5];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 5] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 5];
+        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
@@ -2686,6 +2734,81 @@ macro_rules! define_clock_tree_types {
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl SpiInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: SpiFunctionClockConfig,
+            ) {
+                let old_selector = clocks.spi_function_clock[self as usize].replace(new_selector);
+                refresh_spi_function_clock_downstream(clocks, self);
+                if clocks.spi_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                            SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<SpiFunctionClockConfig> {
+                clocks.spi_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: SpiFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
+                    SpiFunctionClockConfig::Spll => spll_clk_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+        }
         impl I2cInstance {
             pub fn configure_function_clock(
                 self,
@@ -2923,6 +3046,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.uart_baud_rate_generator[instance as usize] {
                 UART_BAUD_RATE_GENERATOR_FREQ_CACHE[instance as usize].store(
                     instance.baud_rate_generator_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
+            if let Some(config) = clocks.spi_function_clock[instance as usize] {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }

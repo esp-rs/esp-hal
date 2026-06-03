@@ -77,8 +77,8 @@ peripherals = [
     { name = "SLCHOST" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, stable = true, clock_group = "SPI" },
     { name = "TIMG0" },
     { name = "TIMG1" },
     { name = "TWAI0" },
@@ -262,6 +262,11 @@ clocks = { system_clocks = { clock_tree = [
         { name = "SCLK", type = "mux", variants = [
             { name = "REF_TICK", outputs = "REF_TICK" },
             { name = "APB_CLK",  outputs = "APB_CLK", default = true },
+        ] },
+    ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "APB", outputs = "APB_CLK", default = true },
         ] },
     ] },
 ] }, peripheral_clocks = { templates = [

@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, LPWR, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, LPWR, SPI2, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -754,6 +754,31 @@ impl I2cInstance {
             w.sclk_sel()
                 .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
             w.sclk_div_num().bits(new_config.div_num as _)
+        });
+    }
+}
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let _ = self;
+        SPI2::regs().clk_gate().modify(|_, w| {
+            w.clk_en().bit(en);
+            w.mst_clk_active().bit(en)
+        });
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        new_config: SpiFunctionClockConfig,
+    ) {
+        let _ = self;
+        SPI2::regs().clk_gate().modify(|_, w| {
+            w.mst_clk_sel()
+                .bit(matches!(new_config, SpiFunctionClockConfig::Pll80m))
         });
     }
 }

@@ -850,3 +850,20 @@ impl I2cInstance {
         // ESP32 I2C is hardwired to APB; no clock source selection register.
     }
 }
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        _new_config: SpiFunctionClockConfig,
+    ) {
+        // ESP32 SPI is hardwired to APB; no clock source selection register.
+    }
+}

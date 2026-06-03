@@ -1240,6 +1240,22 @@ macro_rules! for_each_sha_algorithm {
 ///         todo!()
 ///     }
 /// }
+/// impl SpiInstance {
+///     // SPI_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<SpiFunctionClockConfig>,
+///         _new_config: SpiFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl TimgInstance {
 ///     // TIMG_FUNCTION_CLOCK
 ///
@@ -1329,6 +1345,11 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RmtInstance {
             Rmt = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiInstance {
+            Spi2 = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1575,6 +1596,16 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL_CLK`.
             XtalClk,
         }
+        /// The list of clock signals that the `SPI2_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiFunctionClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `PLL_80M`.
+            Pll80m,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1706,6 +1737,7 @@ macro_rules! define_clock_tree_types {
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
+            spi_function_clock: [Option<SpiFunctionClockConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
@@ -1717,12 +1749,14 @@ macro_rules! define_clock_tree_types {
             rc_fast_div_clk_refcount: u32,
             apb_clk_refcount: u32,
             crypto_clk_refcount: u32,
+            pll_80m_refcount: u32,
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
             i2c_function_clock_refcount: [u32; 1],
             rmt_sclk_refcount: [u32; 1],
+            spi_function_clock_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 2],
@@ -1794,6 +1828,10 @@ macro_rules! define_clock_tree_types {
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
                 self.rmt_sclk[RmtInstance::Rmt as usize]
             }
+            /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
+            pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi2 as usize]
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<TimgFunctionClockConfig> {
                 self.timg_function_clock[TimgInstance::Timg0 as usize]
@@ -1852,6 +1890,7 @@ macro_rules! define_clock_tree_types {
                 timg_calibration_clock: None,
                 i2c_function_clock: [None; 1],
                 rmt_sclk: [None; 1],
+                spi_function_clock: [None; 1],
                 timg_function_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 2],
@@ -1863,12 +1902,14 @@ macro_rules! define_clock_tree_types {
                 rc_fast_div_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 crypto_clk_refcount: 0,
+                pll_80m_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
                 i2c_function_clock_refcount: [0; 1],
                 rmt_sclk_refcount: [0; 1],
+                spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 2],
@@ -1898,6 +1939,8 @@ macro_rules! define_clock_tree_types {
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
@@ -2300,15 +2343,19 @@ macro_rules! define_clock_tree_types {
         }
         pub fn request_pll_80m(clocks: &mut ClockTree) {
             trace!("Requesting PLL_80M");
-            trace!("Enabling PLL_80M");
-            request_cpu_clk(clocks);
-            enable_pll_80m_impl(clocks, true);
+            if increment_reference_count(&mut clocks.pll_80m_refcount) {
+                trace!("Enabling PLL_80M");
+                request_cpu_clk(clocks);
+                enable_pll_80m_impl(clocks, true);
+            }
         }
         pub fn release_pll_80m(clocks: &mut ClockTree) {
             trace!("Releasing PLL_80M");
-            trace!("Disabling PLL_80M");
-            enable_pll_80m_impl(clocks, false);
-            release_cpu_clk(clocks);
+            if decrement_reference_count(&mut clocks.pll_80m_refcount) {
+                trace!("Disabling PLL_80M");
+                enable_pll_80m_impl(clocks, false);
+                release_cpu_clk(clocks);
+            }
         }
         pub fn pll_80m_frequency() -> u32 {
             80000000
@@ -2772,6 +2819,76 @@ macro_rules! define_clock_tree_types {
                 RMT_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl SpiInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: SpiFunctionClockConfig,
+            ) {
+                let old_selector = clocks.spi_function_clock[self as usize].replace(new_selector);
+                refresh_spi_function_clock_downstream(clocks, self);
+                if clocks.spi_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Pll80m => request_pll_80m(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            SpiFunctionClockConfig::Pll80m => release_pll_80m(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<SpiFunctionClockConfig> {
+                clocks.spi_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Pll80m => request_pll_80m(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Pll80m => release_pll_80m(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: SpiFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    SpiFunctionClockConfig::Pll80m => pll_80m_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+        }
         impl TimgInstance {
             pub fn configure_function_clock(
                 self,
@@ -3158,6 +3275,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [I2cInstance::I2c0] {
                 refresh_i2c_function_clock_downstream(clocks, child_instance);
             }
+            for child_instance in [SpiInstance::Spi2] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_mem_clock_downstream(clocks, child_instance);
                 refresh_uart_function_clock_downstream(clocks, child_instance);
@@ -3215,6 +3335,9 @@ macro_rules! define_clock_tree_types {
             }
             refresh_apb_clk_downstream(clocks);
             refresh_crypto_clk_downstream(clocks);
+            for child_instance in [SpiInstance::Spi2] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
         }
         fn refresh_rc_fast_clk_div_n_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.rc_fast_clk_div_n {
@@ -3261,6 +3384,14 @@ macro_rules! define_clock_tree_types {
         fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
             if let Some(config) = clocks.i2c_function_clock[instance as usize] {
                 I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
+            if let Some(config) = clocks.spi_function_clock[instance as usize] {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
                     instance.function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
