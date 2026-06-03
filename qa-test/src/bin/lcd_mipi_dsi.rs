@@ -73,7 +73,7 @@ fn main() -> ! {
     // ── MIPI DSI bus ────────────────────────────────────────────────────────
     let mut bus = MipiDsi::new(
         peripherals.MIPI_DSI,
-        peripherals.VDMA,
+        peripherals.VDMA_CH0,
         Config {
             num_data_lanes: DataLanes::_2,
             lane_bit_rate_mbps: 1000.0,

@@ -2,7 +2,7 @@
 //! MIPI DSI bus driver (ESP32-P4).
 //!
 //! Wraps `MIPI_DSI_HOST` and `MIPI_DSI_BRIDGE` register blocks behind two
-//! virtual-peripheral ownership tokens (`MIPI_DSI` + `VDMA`).
+//! virtual-peripheral ownership tokens (`MIPI_DSI` + one `VDMA_CH*` channel).
 //!
 //! # Example
 //!
@@ -12,7 +12,7 @@
 //!
 //! let bus = MipiDsi::new(
 //!     peripherals.MIPI_DSI,
-//!     peripherals.VDMA,
+//!     peripherals.VDMA_CH0,
 //!     Config {
 //!         num_data_lanes: DataLanes::_2,
 //!         lane_bit_rate_mbps: 500.0,
@@ -28,10 +28,13 @@ pub mod dbi;
 pub mod dpi;
 pub(crate) mod vdma;
 
+use core::marker::PhantomData;
+
 use dpi::DsiDpi;
+pub use vdma::VdmaDmaChannel;
 
 use crate::{
-    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU, VDMA},
+    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU},
     rom,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -131,12 +134,14 @@ pub enum ConfigError {
 
 // ── MipiDsi bus struct ────────────────────────────────────────────────────────
 
-/// Owns the DSI/VDMA peripherals and powers down the D-PHY on drop.
+/// Owns the DSI peripheral and one VDMA channel; powers down the D-PHY on drop.
 pub(crate) struct DphyGuard<'d> {
     pub(crate) _dsi: MIPI_DSI<'d>,
-    pub(crate) _vdma: VDMA<'d>,
+    /// The hardware channel index (0–3) of the VDMA channel in use.
+    pub(crate) vdma_channel_id: u8,
     pub(crate) _dsi_guard: GenericPeripheralGuard<{ Peripheral::MipiDsi as u8 }>,
     pub(crate) _vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }>,
+    pub(crate) _phantom: PhantomData<&'d mut ()>,
 }
 
 impl Drop for DphyGuard<'_> {
@@ -147,8 +152,8 @@ impl Drop for DphyGuard<'_> {
 
 /// MIPI DSI bus.
 ///
-/// Holds ownership of both the `MIPI_DSI` and `VDMA` virtual peripherals and
-/// keeps their clocks enabled for as long as this value lives.
+/// Holds ownership of the `MIPI_DSI` virtual peripheral and one VDMA channel
+/// singleton, and keeps their clocks enabled for as long as this value lives.
 pub struct MipiDsi<'d> {
     pub(crate) guard: DphyGuard<'d>,
     /// Actual lane bit rate after PLL rounding (MHz).
@@ -164,10 +169,20 @@ impl<'d> MipiDsi<'d> {
     /// Enables APB clock, resets the bridge, powers up the D-PHY LDO,
     /// configures D-PHY PLL, and polls for PLL lock + lane-stopped status
     /// before returning.
-    pub fn new(dsi: MIPI_DSI<'d>, vdma: VDMA<'d>, config: Config) -> Result<Self, ConfigError> {
+    ///
+    /// `vdma_channel` is one of the four `VDMA_CH*` peripheral singletons;
+    /// it is consumed to ensure exclusive access to that DMA channel for the
+    /// lifetime of the bus.
+    pub fn new(
+        dsi: MIPI_DSI<'d>,
+        vdma_channel: impl VdmaDmaChannel + 'd,
+        config: Config,
+    ) -> Result<Self, ConfigError> {
         if config.lane_bit_rate_mbps < 80.0 || config.lane_bit_rate_mbps > 1500.0 {
             return Err(ConfigError::InvalidLaneBitRate);
         }
+
+        let vdma_channel_id = vdma_channel.channel_id();
 
         dphy_ldo_power_on();
 
@@ -309,9 +324,10 @@ impl<'d> MipiDsi<'d> {
         Ok(Self {
             guard: DphyGuard {
                 _dsi: dsi,
-                _vdma: vdma,
+                vdma_channel_id,
                 _dsi_guard: dsi_guard,
                 _vdma_guard: vdma_guard,
+                _phantom: PhantomData,
             },
             lane_bit_rate_mbps: actual_rate,
             num_data_lanes: config.num_data_lanes,

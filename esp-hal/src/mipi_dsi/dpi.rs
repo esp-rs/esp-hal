@@ -4,6 +4,7 @@ use core::{
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
+    sync::atomic,
 };
 
 use crate::{
@@ -17,6 +18,13 @@ use crate::{
     peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
     system::Cpu,
 };
+
+/// Channel index used by the static VDMA block-done ISR.
+///
+/// Set before the channel is started; read by the ISR which cannot capture
+/// runtime state.  A single MIPI-DSI instance is the only VDMA user, so
+/// this value is stable for the lifetime of `DsiDpi`.
+static VDMA_ISR_CHANNEL: atomic::AtomicU8 = atomic::AtomicU8::new(0);
 
 const MAX_FBS: usize = 3;
 /// LLIs in the circular DMA ring.  The ISR re-arms each one immediately after
@@ -167,7 +175,8 @@ static LLI_STORAGE: [VdmaLinkItem; NUM_LLIS] = [const { VdmaLinkItem::zeroed() }
 #[crate::ram]
 #[crate::handler]
 fn vdma_block_done_isr() {
-    let ch = VDMA::regs().ch(0);
+    let channel_id = VDMA_ISR_CHANNEL.load(atomic::Ordering::Relaxed) as usize;
+    let ch = VDMA::regs().ch(channel_id);
     ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
 
     for lli in LLI_STORAGE.iter() {
@@ -216,7 +225,8 @@ pub struct DsiDpi<'d> {
 impl Drop for DsiDpi<'_> {
     fn drop(&mut self) {
         // Disable the block-done interrupt before shutting down.
-        let ch = VDMA::regs().ch(0);
+        let channel_id = self._guard.vdma_channel_id as usize;
+        let ch = VDMA::regs().ch(channel_id);
         unsafe {
             ch.intsignal_enable0().write_with_zero(|w| w);
             ch.intstatus_enable0().write_with_zero(|w| w);
@@ -412,13 +422,15 @@ impl<'d> DsiDpi<'d> {
             );
         }
 
-        VdmaChannel::new(0).start(&LLI_STORAGE[0]);
+        let vdma_channel_id = bus.guard.vdma_channel_id;
+        VDMA_ISR_CHANNEL.store(vdma_channel_id, atomic::Ordering::Relaxed);
+        VdmaChannel::new(vdma_channel_id).start(&LLI_STORAGE[0]);
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
-        // Enable the block-transfer-done signal for channel 0 so the ISR
-        // fires after every frame block and re-arms the consumed LLI.
+        // Enable the block-transfer-done signal so the ISR fires after every
+        // frame block and re-arms the consumed LLI.
         {
-            let ch = VDMA::regs().ch(0);
+            let ch = VDMA::regs().ch(vdma_channel_id as usize);
             ch.intstatus_enable0()
                 .write(|w| w.ch1_enable_block_tfr_done_intstat().set_bit());
             ch.intsignal_enable0()

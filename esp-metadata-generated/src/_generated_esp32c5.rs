@@ -564,7 +564,7 @@ macro_rules! for_each_dma_channel {
         interrupt_out = DMA_OUT_CH1, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
         APB_SARADC, PARL_IO]), ("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
         interrupt_out = DMA_OUT_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC, PARL_IO])));
+        APB_SARADC, PARL_IO]))); _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]

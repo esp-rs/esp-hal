@@ -516,6 +516,7 @@ macro_rules! for_each_dma_channel {
         compatible = [I2S0]), ("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt = CRYPTO_DMA,
         compatible = [AES, SHA]), ("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
         compatible = []))); _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]

@@ -1,6 +1,26 @@
 //! Minimal VDMA abstraction for MIPI-DSI video streaming.
 
-use crate::{peripherals::VDMA, reg_access::VolatileCell};
+use crate::{peripherals::VDMA, private::Sealed, reg_access::VolatileCell};
+
+/// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`).
+///
+/// Provides the hardware channel index without exposing the full DMA trait
+/// surface, since VDMA uses DW-GDMA linked-list mode which is incompatible
+/// with the standard GDMA channel traits.
+pub trait VdmaDmaChannel: Sealed {
+    /// Zero-based hardware channel index (0–3).
+    fn channel_id(&self) -> u8;
+}
+
+for_each_dma_channel! {
+    ("VDMA", $ch:ident, $num:literal, compatible = [$($compatible:ident),*]) => {
+        impl Sealed for crate::peripherals::$ch<'_> {}
+        impl VdmaDmaChannel for crate::peripherals::$ch<'_> {
+            #[inline]
+            fn channel_id(&self) -> u8 { $num }
+        }
+    };
+}
 
 /// Fixed write destination for all DSI DMA transfers (DSI bridge pixel FIFO).
 pub(super) const DSI_BRG_MEM_BASE: u32 = 0x5010_5000;

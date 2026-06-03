@@ -4512,6 +4512,10 @@ impl Chip {
                     "soc_has_dma_axi_ch0",
                     "soc_has_dma_axi_ch1",
                     "soc_has_dma_axi_ch2",
+                    "soc_has_vdma_ch0",
+                    "soc_has_vdma_ch1",
+                    "soc_has_vdma_ch2",
+                    "soc_has_vdma_ch3",
                     "dma_supports_mem2mem",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AXI_GDMA\"",
@@ -4519,6 +4523,8 @@ impl Chip {
                     "sha_dma_engine = \"AXI_GDMA\"",
                     "spi_master_supports_dma",
                     "spi_master_dma_engine = \"AXI_GDMA\"",
+                    "mipi_dsi_supports_dma",
+                    "mipi_dsi_dma_engine = \"VDMA\"",
                     "ecc_separate_jacobian_point_memory",
                     "ecc_has_memory_clock_gate",
                     "ecc_supports_enhanced_security",
@@ -4714,6 +4720,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_axi_ch0",
                     "cargo:rustc-cfg=soc_has_dma_axi_ch1",
                     "cargo:rustc-cfg=soc_has_dma_axi_ch2",
+                    "cargo:rustc-cfg=soc_has_vdma_ch0",
+                    "cargo:rustc-cfg=soc_has_vdma_ch1",
+                    "cargo:rustc-cfg=soc_has_vdma_ch2",
+                    "cargo:rustc-cfg=soc_has_vdma_ch3",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AXI_GDMA\"",
@@ -4721,6 +4731,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_dma_engine = \"AXI_GDMA\"",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_master_dma_engine = \"AXI_GDMA\"",
+                    "cargo:rustc-cfg=mipi_dsi_supports_dma",
+                    "cargo:rustc-cfg=mipi_dsi_dma_engine = \"VDMA\"",
                     "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=ecc_has_memory_clock_gate",
                     "cargo:rustc-cfg=ecc_supports_enhanced_security",
@@ -6934,6 +6946,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch3)");
+    println!("cargo:rustc-check-cfg=cfg(mipi_dsi_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");
@@ -7064,6 +7081,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
+    println!("cargo:rustc-check-cfg=cfg(mipi_dsi_dma_engine, values(\"VDMA\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_fifo_depth_words, values(\"896\"))");
     println!("cargo:rustc-check-cfg=cfg(rmt_dma_engine, values(\"AHB_GDMA\"))");

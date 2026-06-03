@@ -248,8 +248,6 @@ clocks = { system_clocks = { clock_tree = [
     { name = "LcdCam", template_params = { default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_lcdcam" } },
     # MIPI-DSI -- sys_clk in SOC_CLK_CTRL1; bridge reset in HP_RST_EN0.
     { name = "MipiDsi", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "dsi_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_dsi_brg" } },
-    # VDMA (DW-GDMA) -- same clock/reset gate as Gdma.
-    { name = "Vdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
 ] } }
 
 # HP L2MEM: 0x4FF0_0000 - 0x4FFC_0000 (768 KB)
@@ -309,7 +307,7 @@ peripherals = [
     { name = "EMAC_DMA", hidden = true },
     { name = "EMAC_MAC", hidden = true },
     { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" } },
-    { name = "VDMA", pac = "DMA" },
+    { name = "VDMA", pac = "DMA", hidden = true },
     { name = "MIPI_DSI_HOST", hidden = true },
     { name = "MIPI_DSI_BRIDGE", hidden = true },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
@@ -421,6 +419,15 @@ engines = [
         { name = "DMA_AXI_CH0", mem2mem = true, mem2mem_id = 6, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
         { name = "DMA_AXI_CH1", mem2mem = true, mem2mem_id = 7, interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" },
         { name = "DMA_AXI_CH2", mem2mem = true, mem2mem_id = 8, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
+    ] },
+    # DW-GDMA / VDMA: used for MIPI-DSI video streaming (mem → DSI bridge FIFO).
+    # All 4 channels share the single DMA interrupt; interrupt binding is managed
+    # by the MIPI-DSI driver directly rather than through the standard DMA traits.
+    { name = "VDMA", drivers = ["mipi_dsi"], peripheral_instances = [], channels = [
+        { name = "VDMA_CH0" },
+        { name = "VDMA_CH1" },
+        { name = "VDMA_CH2" },
+        { name = "VDMA_CH3" },
     ] },
 ]
 
