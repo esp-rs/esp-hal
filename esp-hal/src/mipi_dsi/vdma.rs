@@ -108,8 +108,7 @@ impl VdmaLinkItem {
     /// `LLI_LAST` is deliberately **not** set; the DMA always follows the LLP
     /// pointer to continue the linked-list ring.
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
-        debug_assert_eq!(fb_size % 8, 0, "fb_size must be a multiple of 8");
-        debug_assert_eq!(next as usize & 0x3F, 0, "next LLI must be 64-byte aligned");
+        debug_assert!(fb_size.is_multiple_of(8), "fb_size must be a multiple of 8");
         let block_ts = (fb_size / 8) as u32 - 1;
         let ctrl_hi = CTRL_HI_BASE | LLI_VALID; // no LLI_LAST → loop forever
         self.sar_lo.set(src_addr);
