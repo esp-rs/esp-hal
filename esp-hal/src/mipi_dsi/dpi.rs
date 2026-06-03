@@ -7,6 +7,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use esp_sync::NonReentrantMutex;
+
 use crate::{
     asynch::AtomicWaker,
     interrupt,
@@ -34,6 +36,11 @@ const MAX_FBS: usize = 3;
 const NUM_LLIS: usize = 2;
 const DMA_BURST_LEN: u32 = 256;
 const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
+
+// ── Static link-list storage ──────────────────────────────────────────────────
+
+static LLI_STORAGE: NonReentrantMutex<[VdmaLinkItem; NUM_LLIS]> =
+    NonReentrantMutex::new([const { VdmaLinkItem::zeroed() }; NUM_LLIS]);
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -121,10 +128,6 @@ pub struct DpiConfig {
     pub timing: FrameTiming,
 }
 
-// ── Static link-list storage ──────────────────────────────────────────────────
-
-static LLI_STORAGE: [VdmaLinkItem; NUM_LLIS] = [const { VdmaLinkItem::zeroed() }; NUM_LLIS];
-
 // ── VDMA block-done ISR ───────────────────────────────────────────────────────
 
 /// Fired by the DW-GDMA at the end of every frame block transfer.
@@ -140,17 +143,19 @@ fn vdma_block_done_isr() {
     let ch = VDMA::regs().ch(channel_id);
     ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
 
-    for lli in LLI_STORAGE.iter() {
-        lli.rearm();
-    }
+    LLI_STORAGE.with(|storage| {
+        for lli in storage.iter() {
+            lli.rearm();
+        }
 
-    // Flush LLIs from CPU cache → SRAM.
-    unsafe {
-        crate::soc::cache_writeback_addr(
-            LLI_STORAGE.as_ptr() as u32,
-            core::mem::size_of::<VdmaLinkItem>() as u32 * NUM_LLIS as u32,
-        );
-    }
+        // Flush LLIs from CPU cache → SRAM.
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                storage.as_ptr() as u32,
+                core::mem::size_of::<VdmaLinkItem>() as u32 * NUM_LLIS as u32,
+            );
+        }
+    });
 }
 
 // ── Async waker ───────────────────────────────────────────────────────────────
@@ -373,22 +378,25 @@ impl<'d> DsiDpi<'d> {
             }
         });
 
-        for i in 0..NUM_LLIS {
-            let next = &LLI_STORAGE[(i + 1) % NUM_LLIS] as *const VdmaLinkItem;
-            LLI_STORAGE[i].configure(fb_ptrs[0] as u32, fb_size, next);
-        }
-
-        // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                LLI_STORAGE.as_ptr() as u32,
-                (core::mem::size_of::<VdmaLinkItem>() * NUM_LLIS) as u32,
-            );
-        }
-
         let vdma_channel_id = bus.guard.vdma_channel_id;
         VDMA_ISR_CHANNEL.store(vdma_channel_id, atomic::Ordering::Relaxed);
-        VdmaChannel::new(vdma_channel_id).start(&LLI_STORAGE[0]);
+
+        LLI_STORAGE.with(|storage| {
+            for i in 0..NUM_LLIS {
+                let next = &storage[(i + 1) % NUM_LLIS] as *const VdmaLinkItem;
+                storage[i].configure(fb_ptrs[0] as u32, fb_size, next);
+            }
+
+            // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
+            unsafe {
+                crate::soc::cache_writeback_addr(
+                    storage.as_ptr() as u32,
+                    (core::mem::size_of::<VdmaLinkItem>() * NUM_LLIS) as u32,
+                );
+            }
+
+            VdmaChannel::new(vdma_channel_id).start(&storage[0]);
+        });
 
         // ── VDMA block-done interrupt ──────────────────────────────────────
         // Enable the block-transfer-done signal so the ISR fires after every
@@ -451,9 +459,11 @@ impl<'d> DsiDpi<'d> {
         // The DMA latches sar_lo at the start of each block, so an in-progress
         // block is unaffected; the new pixels appear on the next block boundary.
         let src = self.fb_ptrs[back] as u32;
-        for lli in LLI_STORAGE.iter() {
-            lli.set_source(src);
-        }
+        LLI_STORAGE.with(|storage| {
+            for lli in storage.iter() {
+                lli.set_source(src);
+            }
+        });
 
         // The ISR will flush the cache, no need to do it here.
 
