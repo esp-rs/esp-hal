@@ -10,7 +10,9 @@
 //! - DP => GPIO20 (GPIO27 on ESP32-P4)
 //! - DM => GPIO19 (GPIO26 on ESP32-P4)
 
-//% CHIP_FILTER: usb_otg_driver_supported
+// TODO: impl_trait_in_assoc_type can't be used on stable rustc, so we need to exclude ESP32-P4 for
+// now.
+//% CHIP_FILTER: usb_otg_driver_supported && !esp32p4
 
 #![no_std]
 #![no_main]
