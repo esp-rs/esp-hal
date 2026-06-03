@@ -1,6 +1,6 @@
 //! Uses DMA to copy psram to internal memory.
 
-//% CHIP_FILTER: dma_can_access_psram
+//% CHIP_FILTER: dma_can_access_psram && dma_supports_mem2mem
 
 #![no_std]
 #![no_main]
