@@ -211,7 +211,7 @@ clocks = { system_clocks = { clock_tree = [
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
     { name = "Tsens", template_params = { reg_group = "en1" } },
-    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
     { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
     { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
     { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
@@ -264,7 +264,6 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
 supports_mem2mem = true
 max_priority = 9

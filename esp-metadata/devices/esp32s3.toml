@@ -239,7 +239,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
     { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
     { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
-    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
     { name = "SdioHost", template_params = { reg_group = "en1" } },
     { name = "LcdCam", template_params = { reg_group = "en1" } },
     { name = "Uart2", template_params = { reg_group = "en1" } },
@@ -297,7 +297,6 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
 separate_in_out_interrupts = true
 supports_mem2mem = true

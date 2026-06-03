@@ -61,9 +61,6 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm"
     };
-    ("dma.kind") => {
-        "pdma"
-    };
     ("dma.supports_mem2mem") => {
         false
     };
@@ -330,6 +327,9 @@ macro_rules! property {
     };
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8500000)
+    };
+    ("soc.internal_memory_cached") => {
+        false
     };
     ("clock_tree.syscon_pre_div.divisor") => {
         (0, 1023)

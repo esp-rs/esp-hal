@@ -1,6 +1,6 @@
 //! SPI Full Duplex test suite.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4 esp32s2 esp32s3
 //% FEATURES(unstable): esp-alloc unstable
 //% FEATURES(stable):
 
@@ -44,13 +44,17 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "pdma")] {
-        type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-    } else {
-        type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
-    }
-}
+type DmaChannel<'a> = cfg_select! {
+    spi_master_dma_engine = "SPI_DMA" => {
+        esp_hal::peripherals::DMA_SPI2<'a>
+    },
+    spi_master_dma_engine = "AHB_GDMA" => {
+        esp_hal::peripherals::DMA_CH0<'a>
+    },
+    spi_master_dma_engine = "AXI_GDMA" => {
+        esp_hal::peripherals::DMA_AXI_CH0<'a>
+    },
+};
 
 struct Context {
     spi: Spi<'static, Blocking>,
@@ -220,13 +224,17 @@ mod tests {
         let sclk_input = Input::new(sclk_input, Default::default());
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                peripherals.DMA_SPI2
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                peripherals.DMA_CH0
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                peripherals.DMA_AXI_CH0
+            },
+        };
 
         cfg_if::cfg_if! {
             if #[cfg(all(spi_master_supports_dma, feature = "unstable"))] {
@@ -1207,6 +1215,8 @@ mod tests {
             48_000_000
         } else if cfg!(esp32c5) {
             80_000_000 // pre-divided by 2
+        } else if cfg!(esp32p4) {
+            40_000_000 // default clock source is XTAL
         } else {
             80_000_000
         };

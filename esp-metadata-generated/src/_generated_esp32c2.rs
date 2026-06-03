@@ -73,9 +73,6 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.kind") => {
-        "gdma"
-    };
     ("dma.supports_mem2mem") => {
         true
     };
@@ -273,6 +270,9 @@ macro_rules! property {
     };
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
+    };
+    ("soc.internal_memory_cached") => {
+        false
     };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)
@@ -3000,10 +3000,10 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
             /// APB_SAR_ADC peripheral clock signal
             ApbSarAdc,
-            /// DMA peripheral clock signal
-            Dma,
             /// ECC peripheral clock signal
             Ecc,
             /// I2C_EXT0 peripheral clock signal
@@ -3032,8 +3032,8 @@ macro_rules! implement_peripheral_clocks {
                 &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UartMem];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
+                Self::AhbGdma,
                 Self::ApbSarAdc,
-                Self::Dma,
                 Self::Ecc,
                 Self::I2cExt0,
                 Self::Ledc,
@@ -3049,15 +3049,15 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en1()
+                        .modify(|_, w| w.dma_clk_en().bit(enable));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
                         .modify(|_, w| w.apb_saradc_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.dma_clk_en().bit(enable));
                 }
                 Peripheral::Ecc => {
                     crate::peripherals::SYSTEM::regs()
@@ -3118,15 +3118,15 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en1()
+                        .modify(|_, w| w.dma_rst().bit(reset));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
                         .modify(|_, w| w.apb_saradc_rst().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.dma_rst().bit(reset));
                 }
                 Peripheral::Ecc => {
                     crate::peripherals::SYSTEM::regs()

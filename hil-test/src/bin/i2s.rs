@@ -102,13 +102,14 @@ mod tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_I2S0;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                peripherals.DMA_I2S0
+            },
+            _ => {
+                peripherals.DMA_CH0
+            },
+        };
 
         let (_, dout) = hil_test::common_test_pins!(peripherals);
 

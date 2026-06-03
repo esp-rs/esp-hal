@@ -880,7 +880,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_writeback_addr(
                             self.buffer.as_ptr() as u32,
@@ -924,7 +924,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_invalidate_addr(
                             self.buffer.as_ptr() as u32,
@@ -1596,8 +1596,16 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1626,8 +1634,16 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1824,9 +1840,11 @@ pub(crate) unsafe fn prepare_for_tx(
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
             // Make sure input data is in PSRAM instead of cache
-            if data_in_psram {
+            if data_in_psram || cfg!(soc_internal_memory_cached) {
                 unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
             }
+        } else if #[cfg(soc_internal_memory_cached)] {
+            unsafe { crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32) };
         }
     }
 
@@ -1838,6 +1856,14 @@ pub(crate) unsafe fn prepare_for_tx(
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_tx(desc.next.is_null());
+    }
+
+    #[cfg(soc_internal_memory_cached)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
+        );
     }
 
     Ok((
@@ -1902,6 +1928,21 @@ pub(crate) unsafe fn prepare_for_rx(
                     crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
                 }
 
+                // On chips with cached internal memory, the ManualWritebackBuffer alignment
+                // buffers live in cached DRAM. Flush the entire struct (including
+                // dst_address and n_bytes) to memory now so that the post-DMA
+                // cache_invalidate_addr in write_back() can safely discard the stale
+                // cache without losing those metadata fields.
+                #[cfg(soc_internal_memory_cached)]
+                for buf in align_buffers.iter().flatten() {
+                    unsafe {
+                        crate::soc::cache_writeback_addr(
+                            buf as *const ManualWritebackBuffer as u32,
+                            core::mem::size_of::<ManualWritebackBuffer>() as u32,
+                        );
+                    }
+                }
+
                 consumed_bytes
             } else {
                 unreachable!()
@@ -1913,11 +1954,27 @@ pub(crate) unsafe fn prepare_for_rx(
         unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
         unwrap!(descriptors.set_tx_length(data_len, chunk_size));
 
+        #[cfg(soc_internal_memory_cached)]
+        // Invalidate data written by the DMA. As this likely affects more data than we touched,
+        // write back first.
+        unsafe {
+            crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32);
+            crate::soc::cache_invalidate_addr(data.addr().get() as u32, data_len as u32);
+        }
+
         data_len
     };
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_rx();
+    }
+
+    #[cfg(soc_internal_memory_cached)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
+        );
     }
 
     (
@@ -2095,6 +2152,12 @@ impl ManualWritebackBuffer {
 
     pub fn write_back(&self) {
         unsafe {
+            // The DMA wrote its data directly to memory, bypassing the CPU cache.
+            // Invalidate the cache lines covering the alignment buffer so the CPU
+            // reads the fresh DMA data rather than the stale zeros from new().
+            #[cfg(soc_internal_memory_cached)]
+            crate::soc::cache_invalidate_addr(self.buffer.as_ptr() as u32, BUF_LEN as u32);
+
             self.dst_address
                 .as_ptr()
                 .copy_from(self.buffer.as_ptr(), self.n_bytes as usize);

@@ -295,7 +295,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "SdioSlave" },
-    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
     { name = "Aes" },
     { name = "Sha" },
@@ -337,7 +337,6 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
 separate_in_out_interrupts = true
 supports_mem2mem = true

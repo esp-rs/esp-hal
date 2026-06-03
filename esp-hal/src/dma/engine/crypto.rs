@@ -362,6 +362,13 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
+    fn set_mem2mem_mode(&self, en: bool) {
+        if en {
+            unimplemented!("Crypto DMA mem2mem mode is not supported on this chip");
+        }
+    }
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         // We don't know if the channel is used by AES or SHA, so interrupt handler
         // setup is the responsibility of the peripheral driver.

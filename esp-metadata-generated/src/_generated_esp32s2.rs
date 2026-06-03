@@ -70,9 +70,6 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.kind") => {
-        "pdma"
-    };
     ("dma.supports_mem2mem") => {
         true
     };
@@ -336,6 +333,9 @@ macro_rules! property {
     };
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8500000)
+    };
+    ("soc.internal_memory_cached") => {
+        false
     };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)

@@ -54,6 +54,7 @@ multi_core_enabled = true
 cpu_has_csr_pc = false
 # ESP32-P4 v3.x: 20 MHz RC_FAST default (TRM v0.5, Ch 12)
 rc_fast_clk_default = 20_000_000
+internal_memory_cached = true
 
 # Clock tree for ESP32-P4 (eco5 / chip revision v3.x)
 # 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)
@@ -226,12 +227,10 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ecdsa", template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecdsa" } },
     { name = "Hmac",  template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_hmac" } },
     { name = "Ds",    template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ds" } },
-    # DMA -- P4 has multiple controllers (AHB-PDMA / AXI-PDMA / GDMA-DW). `Dma` is the GDMA-AHB
-    # variant esp-hal's DMA driver targets. `Gdma` covers the DW block at 0x5008_1000.
-    { name = "Dma",     template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
-    { name = "Gdma",    template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
-    { name = "AhbPdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
-    { name = "AxiPdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_axi_pdma" } },
+    # DMA
+    { name = "AhbGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
+    { name = "AxiGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_axi_pdma" } },
+    { name = "Vdma",    template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en",     default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
     # ADC.
     { name = "Adc", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "adc_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
@@ -291,6 +290,7 @@ peripherals = [
     # DMA: P4 has three DMA blocks; see [device.dma] below for the table.
     # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
+    { name = "AXI_GDMA", pac = "AXI_DMA" },
 
     { name = "ETH", virtual = true },
     { name = "EMAC_DMA", hidden = true },
@@ -379,21 +379,30 @@ max_bus_timeout = 0x1F
 # esp-hal's `Dma` singleton must be GDMA v2 compatible, hence PAC alias AHB_DMA above.
 # Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
-support_status = "not_supported" # PAC needs more work
-kind = "gdma"
+support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
 max_priority = 5
+can_access_psram = true
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha"], peripheral_instances = [
+    { name = "AHB_GDMA", drivers = [], peripheral_instances = [
+        # I3C, UHCI, I2S, ADC, RMT
+    ], channels = [
+        { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
+    ] },
+    { name = "AXI_GDMA", drivers = ["aes", "sha", "spi_master"], peripheral_instances = [
+        # LCD_CAM
         { name = "SPI2", dma_id = 1 },
         { name = "SPI3", dma_id = 2 },
+        # PARL_IO
         { name = "AES",  dma_id = 4 },
         { name = "SHA",  dma_id = 5 },
     ], channels = [
-        { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
-        { name = "DMA_CH2", mem2mem = false, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
+        { name = "DMA_AXI_CH0", interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" }, # , mem2mem = true
+        { name = "DMA_AXI_CH1", interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" }, # , mem2mem = true
+        { name = "DMA_AXI_CH2", interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" }, # , mem2mem = true
     ] },
 ]
 

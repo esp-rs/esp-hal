@@ -273,7 +273,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
-    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
     { name = "Aes" },
@@ -300,7 +300,6 @@ key_length = { options = [
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true
