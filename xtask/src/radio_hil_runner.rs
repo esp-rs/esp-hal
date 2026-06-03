@@ -314,7 +314,7 @@ impl Drop for HarnessGuard {
 fn runner_env_key(target: &str) -> String {
     format!(
         "CARGO_TARGET_{}_RUNNER",
-        target.replace(['-', '.'], "_").to_uppercase()
+        target.replace('-', "_").replace('.', "_").to_uppercase()
     )
 }
 

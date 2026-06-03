@@ -12,7 +12,7 @@ const DEFAULT_ALLOWED = [
 ];
 
 function parsePackage(body) {
-  const text = String(body || "").trim();
+  const text = String(body || "").trim().toLowerCase();
   if (text.includes("hil-test-radio")) {
     return "hil-test-radio";
   }
