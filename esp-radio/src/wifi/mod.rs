@@ -2264,7 +2264,16 @@ impl Drop for WifiController<'_> {
 }
 
 impl<'d> WifiController<'d> {
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "esp_now" => {
+            cfg(all(feature = "esp-now", feature = "unstable")) => "An ESP-NOW instance is available through the controller's [`WifiController::esp_now()`] method.",
+            _ => "",
+        },
+        "sniffer" => {
+            cfg(all(feature = "sniffer", feature = "unstable")) => "A sniffer instance is available through the controller's [`WifiController::sniffer()`] method.",
+            _ => "",
+        },
+    )]
     /// Create a Wi-Fi controller. The default initial configuration is
     /// [`Config::Station`]`(`[`StationConfig::default()`]`)`.
     ///
@@ -2272,10 +2281,9 @@ impl<'d> WifiController<'d> {
     ///
     /// Create [`Interface`]s separately via [`Interface::station()`] /
     /// [`Interface::access_point()`].
-    #[cfg_attr(
-        feature = "unstable",
-        doc = "ESP-NOW and sniffer instances are available through the controller's [`WifiController::esp_now()`] and [`WifiController::sniffer()`] methods."
-    )]
+    /// # {esp_now}
+    /// # {sniffer}
+    ///
     /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
     /// currently in use.
     ///

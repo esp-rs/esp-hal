@@ -91,9 +91,11 @@ jobs:
           BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
           HIL=true; CHANGELOG=true; SEMVER=true
 
+          # `skip-ci-non-code-change` only skips building/testing; API checks (semver) still run.
+          # Use the dedicated `skip-semver-checks` label to skip semver checks.
           if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
             BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
-            HIL=false; SEMVER=false
+            HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
           if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
