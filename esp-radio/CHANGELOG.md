@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AccessPointStationDisconnectedInfo` renamed to `ap::DisconnectedInfo` and moved to the `ap` module. (#5605)
 - `AccessPointStationEventInfo` renamed to `ap::EventInfo` and moved to the `ap` module. (#5605)
 - `AccessPointConfig::max_connections` and `AccessPointConfig::dtim_period` setters are now gated behind the `unstable` feature. (#5605)
-- `wifi::new()` now returns `WifiController` instead of `(WifiController, Interfaces)`. (#5480)
+- `WifiController::new()` now returns `WifiController` instead of `(WifiController, Interfaces)`. (#5480)
 - `Interface` no longer has a lifetime parameter and is no longer `Clone`/`Copy` (singleton semantics). (#5480)
 
 ### Fixed

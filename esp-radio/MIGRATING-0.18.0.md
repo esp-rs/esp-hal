@@ -37,14 +37,12 @@ The following types have been moved from `esp_radio::wifi` into `esp_radio::wifi
 
 `AccessPointConfig::with_max_connections()` and `AccessPointConfig::with_dtim_period()` now require the `unstable` feature. If you use these setters, enable the `unstable` feature on `esp-radio`.
 
-## Wi-Fi
+### `WifiController::new()` no longer returns `Interfaces`
 
-### `wifi::new()` no longer returns `Interfaces`
-
-`wifi::new()` now returns just a `WifiController` instead of `(WifiController, Interfaces)`.
+`WifiController::new()` now returns just a `WifiController` instead of `(WifiController, Interfaces)`.
 
 `Interface` is now a lifetime-free singleton — create it via `Interface::station()` or
-`Interface::access_point()` before or after calling `wifi::new()`. ESP-NOW and Sniffer
+`Interface::access_point()` before or after calling `WifiController::new()`. ESP-NOW and Sniffer
 instances are obtained from the controller.
 
 ```rust
@@ -54,7 +52,7 @@ let wifi_interface = interfaces.station;
 
 // After
 let wifi_interface = esp_radio::wifi::Interface::station();
-let mut controller = esp_radio::wifi::new(peripherals.WIFI, config)?;
+let mut controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, config)?;
 ```
 
 For ESP-NOW and Sniffer, use the controller methods. The returned instances borrow the
@@ -67,7 +65,7 @@ let mut sniffer = interfaces.sniffer;
 let esp_now = interfaces.esp_now;
 
 // After
-let controller = esp_radio::wifi::new(peripherals.WIFI, config)?;
+let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, config)?;
 let mut sniffer = controller.sniffer();
 let esp_now = controller.esp_now();
 ```
