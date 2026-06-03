@@ -165,6 +165,29 @@ clocks = { system_clocks = { clock_tree = [
             { name = "SPLL",    outputs = "SPLL_CLK" },
         ] },
     ] },
+    # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
+    # because it is not yet modelled in the clock tree.
+    { group = "MIPI_DSI", clocks = [
+        # Pixel clock for the DPI (video) interface
+        { name = "DPI_CLK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",      outputs = "XTAL_CLK",  default = true },
+            { name = "PLL_F240M", outputs = "PLL_F240M" },
+            { name = "PLL_F160M", outputs = "PLL_F160M" },
+        ], div_num = "0 .. 0x100" } },
+        # Reference for the D-PHY internal PLL
+        { name = "PHY_PLL_REFCLK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL", outputs = "XTAL_CLK", default = true },
+            { name = "CPLL", outputs = "CPLL_CLK" },
+            { name = "SPLL", outputs = "SPLL_CLK" },
+            { name = "MPLL", outputs = "MPLL_CLK" },
+        ], div_num = "0 .. 0x100" } },
+        # Low-speed configuration clock for the D-PHY
+        { name = "PHY_CFG_CLK", type = "mux", variants = [
+            { name = "PLL_F20M", outputs = "PLL_F20M",    default = true },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "PLL_F25M", outputs = "PLL_F25M" },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # ESP32-P4 peripheral clock and reset gates -- all live in HP_SYS_CLKRST.
     # Clock enables: SOC_CLK_CTRL0/1/2 + PERI_CLK_CTRL{21,26}.
@@ -306,7 +329,7 @@ peripherals = [
     { name = "ETH", virtual = true },
     { name = "EMAC_DMA", hidden = true },
     { name = "EMAC_MAC", hidden = true },
-    { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" } },
+    { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" }, clock_group = "MIPI_DSI" },
     { name = "VDMA", pac = "DMA", hidden = true },
     { name = "MIPI_DSI_HOST", hidden = true },
     { name = "MIPI_DSI_BRIDGE", hidden = true },

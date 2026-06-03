@@ -20,7 +20,7 @@ use core::alloc::Layout;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock,
+    clock::{CpuClock, ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk}},
     delay::Delay,
     gpio::{Level, Output, OutputConfig},
     main,
@@ -28,7 +28,6 @@ use esp_hal::{
         Config,
         DataLanes,
         MipiDsi,
-        PhyPllClockSource,
         dpi::{ColorFormat, DpiClockSource, DpiConfig, FrameTiming},
     },
     peripherals::Peripherals,
@@ -77,7 +76,7 @@ fn main() -> ! {
         Config {
             num_data_lanes: DataLanes::_2,
             lane_bit_rate_mbps: 1000.0,
-            phy_clk_src: PhyPllClockSource::Xtal,
+            phy_pll_refclk: MipiDsiPhyPllRefclkConfig::new(MipiDsiPhyPllRefclkSclk::Xtal, 0),
             force_clock_lane_hs: false,
         },
     )

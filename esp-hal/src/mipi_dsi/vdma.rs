@@ -14,7 +14,6 @@ pub trait VdmaDmaChannel: Sealed {
 
 for_each_dma_channel! {
     ("VDMA", $ch:ident, $num:literal, compatible = [$($compatible:ident),*]) => {
-        impl Sealed for crate::peripherals::$ch<'_> {}
         impl VdmaDmaChannel for crate::peripherals::$ch<'_> {
             #[inline]
             fn channel_id(&self) -> u8 { $num }

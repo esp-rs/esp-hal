@@ -8,7 +8,8 @@
 //!
 //! ```rust,no_run
 //! # {before_snippet}
-//! use esp_hal::mipi_dsi::{Config, DataLanes, MipiDsi, PhyPllClockSource};
+//! use esp_hal::mipi_dsi::{Config, DataLanes, MipiDsi};
+//! use esp_hal::soc::clocks::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk};
 //!
 //! let bus = MipiDsi::new(
 //!     peripherals.MIPI_DSI,
@@ -16,7 +17,8 @@
 //!     Config {
 //!         num_data_lanes: DataLanes::_2,
 //!         lane_bit_rate_mbps: 500.0,
-//!         phy_clk_src: PhyPllClockSource::Xtal,
+//!         // XTAL as reference, divider = 1 (div_num register = 0)
+//!         phy_pll_refclk: MipiDsiPhyPllRefclkConfig::new(MipiDsiPhyPllRefclkSclk::Xtal, 0),
 //!         force_clock_lane_hs: false,
 //!     },
 //! )
@@ -34,8 +36,15 @@ use dpi::DsiDpi;
 pub use vdma::VdmaDmaChannel;
 
 use crate::{
-    peripherals::{HP_SYS_CLKRST, MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU},
+    peripherals::{MIPI_DSI, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, PMU},
     rom,
+    soc::clocks::{
+        ClockTree,
+        MipiDsiInstance,
+        MipiDsiPhyCfgClkConfig,
+        MipiDsiPhyPllRefclkConfig,
+        MipiDsiPhyPllRefclkSclk,
+    },
     system::{GenericPeripheralGuard, Peripheral},
 };
 
@@ -56,47 +65,6 @@ pub enum DataLanes {
     _2 = 2,
 }
 
-/// PLL reference clock source for the D-PHY.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum PhyPllClockSource {
-    /// Crystal oscillator (40 MHz on ESP32-P4).
-    Xtal = 0,
-    /// Audio PLL.
-    Apll = 1,
-    /// CPU PLL.
-    Cpll = 2,
-    /// System PLL.
-    Spll = 3,
-    /// MSPI PLL.
-    Mpll = 4,
-}
-
-impl PhyPllClockSource {
-    /// Reference clock frequency in MHz for PLL M/N calculation.
-    fn freq_mhz(self) -> f32 {
-        match self {
-            Self::Xtal => 40.0,
-            Self::Apll => 40.0, // APLL default; caller may differ
-            Self::Cpll => 480.0,
-            Self::Spll => 480.0,
-            Self::Mpll => 400.0,
-        }
-    }
-}
-
-/// D-PHY configuration clock source (used for all PHY modes except shutdown).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum PhyCfgClockSource {
-    /// 20 MHz from PLL.
-    PllF20m = 0,
-    /// Fast RC oscillator (~17.5 MHz).
-    RcFast  = 1,
-    /// 25 MHz from PLL.
-    PllF25m = 2,
-}
-
 /// Bus-level configuration.
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
@@ -104,8 +72,10 @@ pub struct Config {
     pub num_data_lanes: DataLanes,
     /// Lane bit rate in Mbps (80–1500).
     pub lane_bit_rate_mbps: f32,
-    /// PLL reference clock source.
-    pub phy_clk_src: PhyPllClockSource,
+    /// PLL reference clock source for the D-PHY.
+    ///
+    /// APLL is not yet modelled in the clock tree and cannot be selected here.
+    pub phy_pll_refclk: MipiDsiPhyPllRefclkConfig,
     /// Keep the clock lane continuously in HS mode (`true`) or use auto mode
     /// where the DSI host manages HS↔LP transitions (`false`).
     pub force_clock_lane_hs: bool,
@@ -116,7 +86,7 @@ impl Default for Config {
         Self {
             num_data_lanes: DataLanes::_2,
             lane_bit_rate_mbps: 500.0,
-            phy_clk_src: PhyPllClockSource::Xtal,
+            phy_pll_refclk: MipiDsiPhyPllRefclkConfig::new(MipiDsiPhyPllRefclkSclk::Xtal, 0),
             force_clock_lane_hs: false,
         }
     }
@@ -147,6 +117,10 @@ pub(crate) struct DphyGuard<'d> {
 impl Drop for DphyGuard<'_> {
     fn drop(&mut self) {
         dphy_power_down();
+        ClockTree::with(|clocks| {
+            MipiDsiInstance::MipiDsi.release_phy_pll_refclk(clocks);
+            MipiDsiInstance::MipiDsi.release_phy_cfg_clk(clocks);
+        });
     }
 }
 
@@ -192,25 +166,24 @@ impl<'d> MipiDsi<'d> {
         let vdma_guard: GenericPeripheralGuard<{ Peripheral::Vdma as u8 }> =
             GenericPeripheralGuard::new();
 
-        // PHY configuration clock: always use PLL_F20M (0) as default.
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl02()
-            .modify(|_, w| unsafe { w.mipi_dsi_dphy_clk_src_sel().bits(0) });
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl03()
-            .modify(|_, w| w.mipi_dsi_dphy_cfg_clk_en().set_bit());
+        // Configure and enable PHY clocks through the clock tree so upstream
+        // PLLs are reference-counted and the register writes are centralised in
+        // the clock-tree implementation functions in clocks.rs.
+        let ref_freq_hz = ClockTree::with(|clocks| {
+            // D-PHY configuration clock: always PLL_F20M.
+            MipiDsiInstance::MipiDsi
+                .configure_phy_cfg_clk(clocks, MipiDsiPhyCfgClkConfig::PllF20m);
+            MipiDsiInstance::MipiDsi.request_phy_cfg_clk(clocks);
 
-        // PHY PLL reference clock.
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl03()
-            .modify(|_, w| unsafe {
-                w.mipi_dsi_dphy_pll_refclk_src_sel()
-                    .bits(config.phy_clk_src as u8);
-                w   .mipi_dsi_dphy_pll_refclk_div_num()
-                    .bits(0) // div=1 → reg = div-1 = 0
-                ;
-                w.mipi_dsi_dphy_pll_refclk_en().set_bit()
-            });
+            // D-PHY PLL reference clock (user-selected source).
+            MipiDsiInstance::MipiDsi
+                .configure_phy_pll_refclk(clocks, config.phy_pll_refclk);
+            MipiDsiInstance::MipiDsi.request_phy_pll_refclk(clocks);
+
+            MipiDsiInstance::MipiDsi
+                .phy_pll_refclk_config_frequency(clocks, config.phy_pll_refclk)
+        });
+        let ref_freq_mhz = ref_freq_hz as f32 / 1_000_000.0;
 
         let host = MIPI_DSI_HOST::regs();
         let bridge = MIPI_DSI_BRIDGE::regs();
@@ -237,7 +210,7 @@ impl<'d> MipiDsi<'d> {
 
         // Configure D-PHY PLL via test interface.
         let (pll_m, pll_n, actual_rate) =
-            compute_pll(config.phy_clk_src.freq_mhz(), config.lane_bit_rate_mbps)
+            compute_pll(ref_freq_mhz, config.lane_bit_rate_mbps)
                 .ok_or(ConfigError::PllNoSolution)?;
 
         let hs_freq_sel = hs_freq_range(config.lane_bit_rate_mbps);

@@ -15,7 +15,8 @@ use crate::{
         MipiDsi,
         vdma::{VdmaChannel, VdmaLinkItem},
     },
-    peripherals::{HP_SYS_CLKRST, Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    peripherals::{Interrupt, MIPI_DSI_BRIDGE, MIPI_DSI_HOST, VDMA},
+    soc::clocks::{ClockTree, MipiDsiDpiClkConfig, MipiDsiInstance},
     system::Cpu,
 };
 
@@ -36,50 +37,10 @@ const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-/// Pixel clock source for the DPI interface.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DpiClockSource {
-    /// Crystal oscillator (40 MHz on ESP32-P4).
-    Xtal     = 0,
-    /// 240 MHz PLL (derived from SPLL).
-    PllF240m = 1,
-    /// 160 MHz PLL (derived from SPLL).
-    PllF160m = 2,
-    // TODO: add APLL support when the clock tree gains an APLL node for ESP32-P4.
-}
-
-impl DpiClockSource {
-    /// Returns the source clock frequency in Hz from the clock tree.
-    pub(crate) fn freq_hz(self) -> u32 {
-        use crate::soc::clocks;
-        match self {
-            Self::Xtal => clocks::xtal_clk_frequency(),
-            Self::PllF240m => clocks::pll_f240m_frequency(),
-            Self::PllF160m => clocks::pll_f160m_frequency(),
-        }
-    }
-
-    /// Increment the reference count for this clock source.
-    fn request(self) {
-        use crate::soc::clocks;
-        clocks::ClockTree::with(|clocks| match self {
-            Self::PllF240m => clocks::request_pll_f240m(clocks),
-            Self::PllF160m => clocks::request_pll_f160m(clocks),
-            Self::Xtal => {}
-        });
-    }
-
-    /// Decrement the reference count, potentially disabling the PLL.
-    fn release(self) {
-        use crate::soc::clocks;
-        clocks::ClockTree::with(|clocks| match self {
-            Self::PllF240m => clocks::release_pll_f240m(clocks),
-            Self::PllF160m => clocks::release_pll_f160m(clocks),
-            Self::Xtal => {}
-        });
-    }
-}
+// DPI pixel clock source is represented by the generated `MipiDsiDpiClkSclk`
+// enum from the clock tree. Re-export it so callers don't need to reach into
+// `soc::clocks` directly.
+pub use crate::soc::clocks::MipiDsiDpiClkSclk as DpiClockSource;
 
 /// Input/output pixel color format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,7 +111,7 @@ pub struct DpiConfig {
     pub virtual_channel: u8,
     /// Desired pixel clock in MHz.
     pub pixel_clock_mhz: f32,
-    /// DPI clock source.
+    /// Pixel clock source (XTAL, PLL_F240M, or PLL_F160M).
     pub dpi_clk_src: DpiClockSource,
     /// Input pixel format (from frame buffer).
     pub in_color_format: ColorFormat,
@@ -218,7 +179,6 @@ pub struct DsiDpi<'d> {
     fb_size: usize,
     num_fbs: usize,
     current_fb: usize,
-    clk_src: DpiClockSource,
     _phantom: PhantomData<&'d mut [u8]>,
 }
 
@@ -236,8 +196,8 @@ impl Drop for DsiDpi<'_> {
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
             .modify(|_, w| w.dpi_en().clear_bit());
-        self.clk_src.release();
-        // _guard is dropped next, which calls dphy_power_down().
+        ClockTree::with(|clocks| MipiDsiInstance::MipiDsi.release_dpi_clk(clocks));
+        // _guard is dropped next, which calls dphy_power_down() and releases PHY clocks.
     }
 }
 
@@ -252,19 +212,23 @@ impl<'d> DsiDpi<'d> {
         let fb_size = framebuffers[0].len();
 
         // ── DPI clock ──────────────────────────────────────────────────────
-        config.dpi_clk_src.request();
-        let src_mhz = config.dpi_clk_src.freq_hz() as f32 / 1_000_000.0;
-        let div = ((src_mhz / config.pixel_clock_mhz) + 0.5) as u32;
-        let div = div.max(1);
-        let real_dpi_mhz = src_mhz / div as f32;
-
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl03()
-            .modify(|_, w| unsafe {
-                w.mipi_dsi_dpiclk_src_sel().bits(config.dpi_clk_src as u8);
-                w.mipi_dsi_dpiclk_div_num().bits((div - 1) as u8);
-                w.mipi_dsi_dpiclk_en().set_bit()
-            });
+        // Compute the divider from the source frequency and the desired pixel
+        // clock, then configure and enable through the clock tree so that the
+        // upstream PLL reference count is maintained correctly.
+        let (_dpi_clk_config, real_dpi_mhz) = ClockTree::with(|clocks| {
+            // Obtain source frequency (div_num = 0 → no division applied yet).
+            let src_hz = MipiDsiInstance::MipiDsi.dpi_clk_config_frequency(
+                clocks,
+                MipiDsiDpiClkConfig::new(config.dpi_clk_src, 0),
+            );
+            let src_mhz = src_hz as f32 / 1_000_000.0;
+            let div = ((src_mhz / config.pixel_clock_mhz) + 0.5) as u32;
+            let div = div.max(1);
+            let cfg = MipiDsiDpiClkConfig::new(config.dpi_clk_src, div - 1);
+            MipiDsiInstance::MipiDsi.configure_dpi_clk(clocks, cfg);
+            MipiDsiInstance::MipiDsi.request_dpi_clk(clocks);
+            (cfg, src_mhz / div as f32)
+        });
 
         let host = MIPI_DSI_HOST::regs();
         let bridge = MIPI_DSI_BRIDGE::regs();
@@ -456,7 +420,6 @@ impl<'d> DsiDpi<'d> {
             fb_size,
             num_fbs,
             current_fb: 0,
-            clk_src: config.dpi_clk_src,
             _phantom: PhantomData,
         })
     }
