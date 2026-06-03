@@ -142,8 +142,7 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
         unsafe {
             crate::soc::cache_writeback_addr(
                 self.descriptors.head() as u32,
-                core::mem::size_of::<DmaDescriptor>() as u32
-                    * self.descriptors.descriptors.len() as u32,
+                core::mem::size_of_val(self.descriptors.descriptors) as u32,
             );
         }
 
@@ -355,8 +354,7 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
         unsafe {
             crate::soc::cache_writeback_addr(
                 self.descriptors.head() as u32,
-                core::mem::size_of::<DmaDescriptor>() as u32
-                    * self.descriptors.descriptors.len() as u32,
+                core::mem::size_of_val(self.descriptors.descriptors) as u32,
             );
         }
 

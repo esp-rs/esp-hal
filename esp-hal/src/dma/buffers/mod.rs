@@ -1862,7 +1862,7 @@ pub(crate) unsafe fn prepare_for_tx(
     unsafe {
         crate::soc::cache_writeback_addr(
             descriptors.head() as u32,
-            descriptors.descriptors.len() as u32 * core::mem::size_of::<DmaDescriptor>() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
         );
     }
 
@@ -1973,7 +1973,7 @@ pub(crate) unsafe fn prepare_for_rx(
     unsafe {
         crate::soc::cache_writeback_addr(
             descriptors.head() as u32,
-            descriptors.descriptors.len() as u32 * core::mem::size_of::<DmaDescriptor>() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
         );
     }
 
