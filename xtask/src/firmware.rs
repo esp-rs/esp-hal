@@ -239,7 +239,7 @@ fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
         }
 
         let selected = ctx.evaluate::<bool>(expr).map_err(|err| {
-            anyhow::anyhow!("Failed to evaluate chip expression '{expr}': {err:?}")
+            anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression")
         })?;
         if selected {
             chips.push(chip);
