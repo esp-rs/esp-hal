@@ -60,24 +60,16 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    core::cfg_select! {
-        feature = "esp32s3" => {
-            let (sclk, mosi, cs) = (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38);
-        }
-        _ => {
-            let (sclk, mosi, cs) = (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10);
-        }
-    }
+    let (sclk, mosi, cs) = cfg_select! {
+        feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+        _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+    };
     let miso = unsafe { mosi.clone_unchecked() };
 
-    core::cfg_select! {
-        feature = "esp32s2" => {
-            let dma_channel = peripherals.DMA_SPI2;
-        }
-        _ => {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        _ => peripherals.DMA_CH0,
+    };
 
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);

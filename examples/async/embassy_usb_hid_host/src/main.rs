@@ -37,14 +37,11 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    core::cfg_select! {
-        feature = "esp32p4" => {
-            let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
-        }
-        _ => {
-            let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
-        }
-    }
+    let (dp, dm) = cfg_select! {
+        feature = "esp32p4" => (peripherals.GPIO27, peripherals.GPIO26),
+        _ => (peripherals.GPIO20, peripherals.GPIO19),
+    };
+    let usb = Usb::new_fs(peripherals.USB_FS, dp, dm);
     static BUS_STATE: BusState = BusState::new();
     let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");
