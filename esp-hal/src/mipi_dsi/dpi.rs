@@ -372,7 +372,7 @@ impl<'d> DsiDpi<'d> {
         // Build ring: LLI[i] → LLI[(i+1) % NUM_LLIS].
         let fb_ptrs = core::array::from_fn::<_, MAX_FBS, _>(|i| {
             if i < num_fbs {
-                framebuffers[i].as_ptr() as *mut u8
+                framebuffers[i].as_ptr().cast_mut()
             } else {
                 core::ptr::null_mut::<u8>()
             }
@@ -483,13 +483,15 @@ impl<'d> DsiDpi<'d> {
 
     /// Async: yield until the next vsync event.
     pub fn wait_for_vsync_async(&mut self) -> impl Future<Output = ()> {
-        VsyncFuture(PhantomData)
+        VsyncFuture { _dpi: self }
     }
 }
 
-struct VsyncFuture<'a>(PhantomData<&'a mut ()>);
+struct VsyncFuture<'a, 'b> {
+    _dpi: &'a mut DsiDpi<'b>,
+}
 
-impl Future for VsyncFuture<'_> {
+impl Future for VsyncFuture<'_, '_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -505,7 +507,7 @@ impl Future for VsyncFuture<'_> {
     }
 }
 
-impl Drop for VsyncFuture<'_> {
+impl Drop for VsyncFuture<'_, '_> {
     fn drop(&mut self) {
         let bridge = MIPI_DSI_BRIDGE::regs();
         bridge.int_ena().modify(|_, w| w.vsync().clear_bit());
