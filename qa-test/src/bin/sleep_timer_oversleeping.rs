@@ -99,14 +99,15 @@ async fn main(_spawner: Spawner) {
         PRE_SLEEP_US = rtc.current_time_us();
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))] {
-            let config = RtcSleepConfig::deep();
-        } else { //esp32/c3/s2
+    let config = cfg_select! {
+        any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3") => RtcSleepConfig::deep(),
+        // esp32/c3/s2
+        _ => {
             let mut config = RtcSleepConfig::deep();
             config.set_rtc_fastmem_pd_en(false);
+            config
         }
-    }
+    };
 
     let delay = esp_hal::delay::Delay::new();
 

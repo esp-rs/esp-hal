@@ -419,13 +419,10 @@ mod tests {
         }
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let dma_channel = peripherals.DMA_CRYPTO;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            esp32s2 => peripherals.DMA_CRYPTO,
+            _ => peripherals.DMA_CH0,
+        };
 
         let aes = Aes::new(peripherals.AES).with_dma(dma_channel);
 
@@ -596,13 +593,10 @@ mod work_queue_dma_tests {
         #[cfg(soc_has_psram)]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let dma = p.DMA_CRYPTO;
-            } else {
-                let dma = p.DMA_CH0;
-            }
-        }
+        let dma = cfg_select! {
+            esp32s2 => p.DMA_CRYPTO,
+            _ => p.DMA_CH0,
+        };
 
         Context {
             aes: AesDmaBackend::new(p.AES, dma),

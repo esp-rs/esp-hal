@@ -29,15 +29,11 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 24 * 1024);
 
     // Default pins for Uart communication
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c6")] {
-            let (tx_pin, rx_pin) = (peripherals.GPIO16, peripherals.GPIO17);
-        } else if #[cfg(feature = "esp32h2")] {
-            let (tx_pin, rx_pin) = (peripherals.GPIO24, peripherals.GPIO23);
-        } else if #[cfg(feature = "esp32c5")] {
-            let (tx_pin, rx_pin) = (peripherals.GPIO11, peripherals.GPIO12);
-        }
-    }
+    let (tx_pin, rx_pin) = cfg_select! {
+        feature = "esp32c6" => (peripherals.GPIO16, peripherals.GPIO17),
+        feature = "esp32h2" => (peripherals.GPIO24, peripherals.GPIO23),
+        feature = "esp32c5" => (peripherals.GPIO11, peripherals.GPIO12),
+    };
 
     let mut uart0 = Uart::new(peripherals.UART0, uart::Config::default())
         .unwrap()

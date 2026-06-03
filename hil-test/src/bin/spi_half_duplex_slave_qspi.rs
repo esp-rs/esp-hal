@@ -745,10 +745,11 @@ mod qspi_dma {
         },
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
-        } else {
+        }
+        _ => {
             const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
         }
     }

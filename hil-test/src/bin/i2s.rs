@@ -23,10 +23,11 @@ mod tests {
         time::Rate,
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+        any(esp32, esp32s2) => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-        } else {
+        }
+        _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
     }

@@ -15,15 +15,11 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
-            } else if #[cfg(soc_has_mem2mem1)] {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
-            } else {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
-            }
-        }
+        let mem2mem = cfg_select! {
+            esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
+            soc_has_mem2mem1 => Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1),
+            _ => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+        };
 
         Context { mem2mem }
     }

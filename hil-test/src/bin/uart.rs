@@ -168,17 +168,12 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c2)] {
-                let fastest_clock_source = ClockSource::PllF40m;
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61))] {
-                let fastest_clock_source = ClockSource::PllF80m;
-            } else if #[cfg(esp32h2)] {
-                let fastest_clock_source = ClockSource::PllF48m;
-            } else {
-                let fastest_clock_source = ClockSource::Apb;
-            }
-        }
+        let fastest_clock_source = cfg_select! {
+            esp32c2 => ClockSource::PllF40m,
+            any(esp32c5, esp32c6, esp32c61) => ClockSource::PllF80m,
+            esp32h2 => ClockSource::PllF48m,
+            _ => ClockSource::Apb,
+        };
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]

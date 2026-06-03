@@ -6,7 +6,6 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-cfg-if = "1"
 embassy-executor = "0.10.0"
 embassy-time = "0.5.0"
 embassy-futures = "0.1"

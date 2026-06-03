@@ -11,8 +11,8 @@
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
+cfg_select! {
+    feature = "unstable" => {
         use core::cell::RefCell;
         use critical_section::Mutex;
         use embassy_time::{Duration, Timer};
@@ -28,12 +28,14 @@ cfg_if::cfg_if! {
         static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
         static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
     }
+    _ => {}
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(all(multi_core, feature = "unstable"))] {
+cfg_select! {
+    all(multi_core, feature = "unstable") => {
         use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
     }
+    _ => {}
 }
 
 #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]

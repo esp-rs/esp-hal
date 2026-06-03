@@ -60,13 +60,10 @@ fn main() -> ! {
     let slave_mosi = peripherals.GPIO2;
     let slave_cs = peripherals.GPIO3;
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32s2")] {
-            let dma_channel = peripherals.DMA_SPI2;
-        } else {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        _ => peripherals.DMA_CH0,
+    };
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();

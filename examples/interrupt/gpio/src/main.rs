@@ -43,17 +43,12 @@ fn main() -> ! {
 
     let mut led = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = peripherals.GPIO0;
-        } else if #[cfg(any(feature = "esp32c5"))] {
-            let button = peripherals.GPIO28;
-        } else if #[cfg(any(feature = "esp32p4"))] {
-            let button = peripherals.GPIO35;
-        } else {
-            let button = peripherals.GPIO9;
-        }
-    }
+    let button = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
+        feature = "esp32c5" => peripherals.GPIO28,
+        feature = "esp32p4" => peripherals.GPIO35,
+        _ => peripherals.GPIO9,
+    };
 
     let config = InputConfig::default().with_pull(Pull::Up);
     let mut button = Input::new(button, config);
@@ -75,13 +70,14 @@ fn main() -> ! {
 #[handler]
 #[ram]
 fn handler() {
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
+    cfg_select! {
+        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
             esp_println::println!(
                 "GPIO Interrupt with priority {}",
                 esp_hal::xtensa_lx::interrupt::get_level()
             );
-        } else {
+        }
+        _ => {
             esp_println::println!("GPIO Interrupt");
         }
     }

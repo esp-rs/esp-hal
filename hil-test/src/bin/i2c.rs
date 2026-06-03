@@ -381,13 +381,10 @@ mod tests {
     fn test_read_cali_with_different_clock_sources(mut ctx: Context) {
         use esp_hal::i2c::master::ClockSource;
 
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_version = "3")] {
-                let configs = [ClockSource::Xtal, ClockSource::RcFast];
-            } else {
-                let configs = [ClockSource::Apb, ClockSource::RefTick];
-            }
-        }
+        let configs = cfg_select! {
+            i2c_master_version = "3" => [ClockSource::Xtal, ClockSource::RcFast],
+            _ => [ClockSource::Apb, ClockSource::RefTick],
+        };
 
         for clock_source in configs {
             ctx.i2c
