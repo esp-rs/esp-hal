@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -206,91 +206,37 @@ fn chip_has_feature(chip: Chip, symbol: &str) -> bool {
     }
 }
 
-/// Whether `token` is a bare symbol (a cfg name or chip name): an identifier-like word.
-fn is_symbol(token: &str) -> bool {
-    let mut chars = token.chars();
-    chars
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
+/// Rewrites a chip expression into a `somni`-understandable boolean expression by wrapping every
+/// known metadata symbol (a cfg name or a chip name) in a `chip_has("symbol")` call, leaving the
+/// logical operators (`&&`, `||`, `!`, parentheses) untouched. Only known symbols and operators are
+/// valid tokens, anything else (e.g. a typo'd cfg name) is rejected.
+fn rewrite_chip_expr(expr: &str) -> anyhow::Result<String> {
+    // Every symbol known to the metadata, each chip's name plus all of its cfg symbols.
+    let known: HashSet<String> = Chip::iter()
+        .flat_map(|chip| {
+            Config::for_chip(&chip)
+                .all()
+                .iter()
+                .map(|symbol| symbol.replace('.', "_"))
+                .collect::<Vec<_>>()
+        })
+        .collect();
 
-/// Validates that a chip expression is a single, well-formed boolean expression. `somni` silently
-/// ignores any tokens after the first complete expression.
-fn validate_chip_expr(expr: &str) -> anyhow::Result<()> {
-    // Pad the operators with spaces so the expression splits into clean, whitespace-separated
-    // tokens.
-    let padded = expr
-        .replace('(', " ( ")
+    expr.replace('(', " ( ")
         .replace(')', " ) ")
         .replace('!', " ! ")
         .replace("&&", " && ")
-        .replace("||", " || ");
-
-    // `true` once we've consumed an operand and now expect a binary operator (or the end).
-    let mut have_operand = false;
-    // a tiny "state machine" to track the depth of parentheses
-    let mut depth: i32 = 0;
-    for token in padded.split_whitespace() {
-        match token {
-            "(" => {
-                anyhow::ensure!(!have_operand, "missing operator before '(' in '{expr}'");
-                depth += 1;
-            }
-            ")" => {
-                anyhow::ensure!(have_operand, "unexpected ')' in '{expr}'");
-                depth -= 1;
-                anyhow::ensure!(depth >= 0, "unbalanced parentheses in '{expr}'");
-            }
-            "!" => anyhow::ensure!(!have_operand, "unexpected '!' in '{expr}'"),
-            "&&" | "||" => {
-                anyhow::ensure!(have_operand, "missing operand before '{token}' in '{expr}'");
-                have_operand = false;
-            }
-            symbol => {
-                anyhow::ensure!(
-                    !have_operand,
-                    "missing operator before '{symbol}' in '{expr}' (separate symbols with '&&' or '||')"
-                );
-                anyhow::ensure!(is_symbol(symbol), "invalid token '{symbol}' in '{expr}'");
-                have_operand = true;
-            }
-        }
-    }
-    anyhow::ensure!(
-        have_operand,
-        "chip expression '{expr}' ends with a dangling operator"
-    );
-    anyhow::ensure!(depth == 0, "unbalanced parentheses in '{expr}'");
-    Ok(())
-}
-
-/// Rewrites a chip expression into a `somni`-understandable boolean expression by wrapping every
-/// bare symbol (a cfg name or a chip name) in a `chip_has("symbol")` call, leaving the logical
-/// operators (`&&`, `||`, `!`, parentheses) untouched.
-fn rewrite_chip_expr(expr: &str) -> String {
-    let bytes = expr.as_bytes();
-    let mut out = String::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        let c = bytes[i] as char;
-        if c.is_ascii_alphabetic() || c == '_' {
-            let start = i;
-            while i < bytes.len()
-                && matches!(bytes[i] as char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
-            {
-                i += 1;
-            }
-            match &expr[start..i] {
-                lit @ ("true" | "false") => out.push_str(lit),
-                symbol => out.push_str(&format!("chip_has(\"{symbol}\")")),
-            }
-        } else {
-            out.push(c);
-            i += 1;
-        }
-    }
-    out
+        .replace("||", " || ")
+        .split_whitespace()
+        .map(|token| match token {
+            "(" | ")" | "!" | "&&" | "||" => Ok(token.to_string()),
+            symbol if known.contains(symbol) => Ok(format!("chip_has(\"{symbol}\")")),
+            other => anyhow::bail!(
+                "unknown symbol '{other}' in CHIP_FILTER '{expr}', expected a chip name or cfg symbol"
+            ),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(|tokens| tokens.join(" "))
 }
 
 /// Evaluates a `somni` chip expression against every chip, returning those it selects. The `chip`
@@ -318,8 +264,7 @@ fn parse_chips(value: &str) -> anyhow::Result<Vec<Chip>> {
     if value.trim().is_empty() {
         anyhow::bail!("CHIP_FILTER metadata must list at least one cfg symbol or chip");
     }
-    validate_chip_expr(value)?;
-    eval_chip_expr(&rewrite_chip_expr(value))
+    eval_chip_expr(&rewrite_chip_expr(value)?)
 }
 
 /// Load all examples at the given path, and parse their metadata.
