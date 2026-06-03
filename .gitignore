@@ -32,3 +32,6 @@ api-baseline/
 
 .mcp.json
 .cursor/
+
+# Ignore compile tests
+compile-tests/
