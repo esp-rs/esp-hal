@@ -377,7 +377,16 @@ fn commit_message(plan: &Plan) -> String {
 }
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
-const PR_LABELS: &[&str] = &["release-pr", "skip-changelog"];
+// `manual-changelog` exempts the PR from the direct-CHANGELOG-edit check (the release
+// tooling writes the changelog wholesale). The `release:*` labels each gate an optional,
+// heavy CI workflow; all are applied by default so every check runs, and a maintainer can
+// remove individual ones to skip a check that isn't relevant to the packages being released.
+const PR_LABELS: &[&str] = &[
+    "manual-changelog",
+    "release:docs",
+    "release:registry:compile-test",
+    "release:registry:ci",
+];
 
 fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
     let packages = format_package_list(plan);
