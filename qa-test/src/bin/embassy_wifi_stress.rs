@@ -1,7 +1,7 @@
 //! This example stress-tests esp-radio and esp-rtos's ability to deal with repeatedly
 //! disconnecting and reconnecting to networks.
 
-//% CHIP_FEATURES: wifi_driver_supported
+//% CHIP_FILTER: wifi_driver_supported
 //% FEATURES: esp-radio esp-radio/wifi
 
 #![no_std]

@@ -1,6 +1,6 @@
 //! Demonstrates deep sleep with timer wakeup
 
-//% CHIP_FEATURES: sleep_driver_supported
+//% CHIP_FILTER: sleep_driver_supported
 
 #![no_std]
 #![no_main]

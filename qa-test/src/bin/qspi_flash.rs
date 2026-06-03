@@ -22,7 +22,7 @@
 //! Connect a flash chip (GD25Q64C was used) and make sure QE in the status
 //! register is set.
 
-//% CHIP_FEATURES: spi_master_supports_dma
+//% CHIP_FILTER: spi_master_supports_dma
 //% TAG: flashchip
 
 #![no_std]

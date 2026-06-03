@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now in an async way
 
-//% CHIP_FEATURES: wifi_driver_supported
+//% CHIP_FILTER: wifi_driver_supported
 
 #![no_std]
 #![no_main]

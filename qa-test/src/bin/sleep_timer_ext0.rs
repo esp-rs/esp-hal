@@ -3,7 +3,7 @@
 //! The following wiring is assumed:
 //! - ext0 wakeup pin => GPIO4
 
-//% CHIP_FEATURES: xtensa sleep_driver_supported
+//% CHIP_FILTER: xtensa && sleep_driver_supported
 
 #![no_std]
 #![no_main]

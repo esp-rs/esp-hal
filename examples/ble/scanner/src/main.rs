@@ -1,6 +1,6 @@
 //! A bluetooth scanner built using Embassy and trouBLE.
 
-//% CHIP_FEATURES: bt_driver_supported
+//% CHIP_FILTER: bt_driver_supported
 
 #![no_std]
 #![no_main]

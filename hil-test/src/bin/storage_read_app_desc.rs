@@ -3,7 +3,7 @@
 //!
 //! TODO: P4 support is blocked on https://github.com/esp-rs/esp-hal/issues/5648
 
-//% CHIP_FEATURES: spi_master_driver_supported && !esp32p4
+//% CHIP_FILTER: spi_master_driver_supported && !esp32p4
 //% FEATURES: unstable esp-storage
 
 #![no_std]

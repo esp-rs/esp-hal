@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIP_FEATURES: i2s_driver_supported
+//% CHIP_FILTER: i2s_driver_supported
 //% FEATURES: unstable
 
 #![no_std]

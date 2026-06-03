@@ -12,7 +12,7 @@
 //! MOSI => GPIO4
 //! CS   => GPIO5
 
-//% CHIP_FEATURES: spi_master_supports_dma
+//% CHIP_FILTER: spi_master_supports_dma
 
 #![no_std]
 #![no_main]

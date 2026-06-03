@@ -1,6 +1,6 @@
 //! Uses DMA to copy memory to memory.
 
-//% CHIP_FEATURES: dma_supports_mem2mem
+//% CHIP_FILTER: dma_supports_mem2mem
 
 #![no_std]
 #![no_main]

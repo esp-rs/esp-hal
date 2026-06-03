@@ -1,6 +1,6 @@
 //! I2C test
 
-//% CHIP_FEATURES: i2c_master_driver_supported
+//% CHIP_FILTER: i2c_master_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]

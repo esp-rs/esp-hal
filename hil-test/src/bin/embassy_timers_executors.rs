@@ -3,7 +3,7 @@
 //! code.
 //!
 //! Reproduction and regression test for a sneaky issue.
-//% CHIP_FEATURES: timergroup_driver_supported
+//% CHIP_FILTER: timergroup_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]

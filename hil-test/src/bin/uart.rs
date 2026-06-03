@@ -1,6 +1,6 @@
 //! UART Test
 
-//% CHIP_FEATURES: uart_driver_supported
+//% CHIP_FILTER: uart_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]

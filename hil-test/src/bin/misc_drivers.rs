@@ -4,7 +4,7 @@
 //! RNG Tests
 //! System Timer Tests
 //! TWAI Tests
-//% CHIP_FEATURES: gpio_driver_supported
+//% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]

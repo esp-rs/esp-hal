@@ -1,7 +1,7 @@
 //! This example uses the internal temperature sensor to measure the chip's
 //! temperature
 
-//% CHIP_FEATURES: soc_has_tsens
+//% CHIP_FILTER: soc_has_tsens
 
 #![no_std]
 #![no_main]

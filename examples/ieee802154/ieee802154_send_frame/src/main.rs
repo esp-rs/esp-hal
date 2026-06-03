@@ -1,4 +1,4 @@
-//% CHIP_FEATURES: ieee802154_driver_supported
+//% CHIP_FILTER: ieee802154_driver_supported
 #![no_std]
 #![no_main]
 

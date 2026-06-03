@@ -197,45 +197,129 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
-/// Whether a chip satisfies a single `CHIP_FEATURES` symbol. A chip name matches only that chip;
-/// any other symbol is looked up as a cfg of the chip.
-fn chip_has_feature(chip: &Chip, symbol: &str) -> bool {
+/// Whether a chip satisfies a single symbol used in a chip expression. A chip name matches only
+/// that chip, any other symbol is looked up as a cfg of the chip.
+fn chip_has_feature(chip: Chip, symbol: &str) -> bool {
     match Chip::from_str(symbol, false) {
-        Ok(named) => named == *chip,
-        Err(_) => Config::for_chip(chip).contains(symbol),
+        Ok(named) => named == chip,
+        Err(_) => Config::for_chip(&chip).contains(symbol),
     }
 }
 
-/// Returns all chips for a `CHIPS` or `CHIP_FEATURES` metadata value.
-fn parse_chips(key: &str, value: &str) -> anyhow::Result<Vec<Chip>> {
-    match key {
-        "CHIP_FEATURES" => {
-            // `&&` is just an optional separator between the symbols.
-            let features: Vec<&str> = value
-                .split_ascii_whitespace()
-                .filter(|f| *f != "&&")
-                .collect();
-            if features.is_empty() {
-                anyhow::bail!("CHIP_FEATURES metadata must list at least one cfg symbol or chip");
-            }
+/// Whether `token` is a bare symbol (a cfg name or chip name): an identifier-like word.
+fn is_symbol(token: &str) -> bool {
+    let mut chars = token.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
 
-            Ok(Chip::iter()
-                .filter(|chip| {
-                    features
-                        .iter()
-                        .all(|feature| match feature.strip_prefix('!') {
-                            Some(name) => !chip_has_feature(chip, name),
-                            None => chip_has_feature(chip, feature),
-                        })
-                })
-                .collect())
+/// Validates that a chip expression is a single, well-formed boolean expression. `somni` silently
+/// ignores any tokens after the first complete expression.
+fn validate_chip_expr(expr: &str) -> anyhow::Result<()> {
+    // Pad the operators with spaces so the expression splits into clean, whitespace-separated
+    // tokens.
+    let padded = expr
+        .replace('(', " ( ")
+        .replace(')', " ) ")
+        .replace('!', " ! ")
+        .replace("&&", " && ")
+        .replace("||", " || ");
+
+    // `true` once we've consumed an operand and now expect a binary operator (or the end).
+    let mut have_operand = false;
+    // a tiny "state machine" to track the depth of parentheses
+    let mut depth: i32 = 0;
+    for token in padded.split_whitespace() {
+        match token {
+            "(" => {
+                anyhow::ensure!(!have_operand, "missing operator before '(' in '{expr}'");
+                depth += 1;
+            }
+            ")" => {
+                anyhow::ensure!(have_operand, "unexpected ')' in '{expr}'");
+                depth -= 1;
+                anyhow::ensure!(depth >= 0, "unbalanced parentheses in '{expr}'");
+            }
+            "!" => anyhow::ensure!(!have_operand, "unexpected '!' in '{expr}'"),
+            "&&" | "||" => {
+                anyhow::ensure!(have_operand, "missing operand before '{token}' in '{expr}'");
+                have_operand = false;
+            }
+            symbol => {
+                anyhow::ensure!(
+                    !have_operand,
+                    "missing operator before '{symbol}' in '{expr}' (separate symbols with '&&' or '||')"
+                );
+                anyhow::ensure!(is_symbol(symbol), "invalid token '{symbol}' in '{expr}'");
+                have_operand = true;
+            }
         }
-        "CHIPS" => Ok(value
-            .split_ascii_whitespace()
-            .map(|s| Chip::from_str(s, false).unwrap())
-            .collect()),
-        _ => anyhow::bail!("parse_chips called with unexpected key '{key}'"),
     }
+    anyhow::ensure!(
+        have_operand,
+        "chip expression '{expr}' ends with a dangling operator"
+    );
+    anyhow::ensure!(depth == 0, "unbalanced parentheses in '{expr}'");
+    Ok(())
+}
+
+/// Rewrites a chip expression into a `somni`-understandable boolean expression by wrapping every
+/// bare symbol (a cfg name or a chip name) in a `chip_has("symbol")` call, leaving the logical
+/// operators (`&&`, `||`, `!`, parentheses) untouched.
+fn rewrite_chip_expr(expr: &str) -> String {
+    let bytes = expr.as_bytes();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i] as char;
+        if c.is_ascii_alphabetic() || c == '_' {
+            let start = i;
+            while i < bytes.len()
+                && matches!(bytes[i] as char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
+            {
+                i += 1;
+            }
+            match &expr[start..i] {
+                lit @ ("true" | "false") => out.push_str(lit),
+                symbol => out.push_str(&format!("chip_has(\"{symbol}\")")),
+            }
+        } else {
+            out.push(c);
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Evaluates a `somni` chip expression against every chip, returning those it selects. The `chip`
+/// is bound into a `chip_has` function the expression calls.
+fn eval_chip_expr(expr: &str) -> anyhow::Result<Vec<Chip>> {
+    let mut chips = Vec::new();
+    for chip in Chip::iter() {
+        let mut ctx = somni_expr::Context::new();
+        ctx.add_function("chip_has", move |symbol: &str| {
+            chip_has_feature(chip, symbol)
+        });
+        let selected = ctx.evaluate::<bool>(expr).map_err(|err| {
+            anyhow::anyhow!("Failed to evaluate chip expression '{expr}': {err:?}")
+        })?;
+        if selected {
+            chips.push(chip);
+        }
+    }
+    Ok(chips)
+}
+
+/// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
+/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
+fn parse_chips(value: &str) -> anyhow::Result<Vec<Chip>> {
+    if value.trim().is_empty() {
+        anyhow::bail!("CHIP_FILTER metadata must list at least one cfg symbol or chip");
+    }
+    validate_chip_expr(value)?;
+    eval_chip_expr(&rewrite_chip_expr(value))
 }
 
 /// Load all examples at the given path, and parse their metadata.
@@ -283,8 +367,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             };
 
             match meta_line.key.as_str() {
-                "CHIPS" | "CHIP_FEATURES" => {
-                    let chips = parse_chips(meta_line.key.as_str(), meta_line.value.as_str())?;
+                "CHIP_FILTER" => {
+                    let chips = parse_chips(meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
                 // A list of cargo `--config` configurations.
@@ -442,8 +526,8 @@ struct CargoToml {
     features: HashMap<String, Vec<String>>,
 }
 
-/// Parse the chip set from `//% CHIPS:` / `//% CHIP_FEATURES:` annotations in a source file.
-/// Returns `None` if neither annotation is present.
+/// Parse the chip set from `//% CHIP_FILTER:` annotations in a source file.
+/// Returns `None` if the annotation is not present.
 fn parse_chips_from_annotation(
     text: &str,
 ) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
@@ -458,9 +542,9 @@ fn parse_chips_from_annotation(
         let meta = parse_meta_line(line)
             .with_context(|| format!("Failed to parse line {}", line_no + 1))?;
         match meta.key.as_str() {
-            "CHIPS" | "CHIP_FEATURES" => {
+            "CHIP_FILTER" => {
                 found = true;
-                chips = parse_chips(meta.key.as_str(), meta.value.as_str())?;
+                chips = parse_chips(meta.value.as_str())?;
             }
             _ => {}
         }

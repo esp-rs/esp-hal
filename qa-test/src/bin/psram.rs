@@ -2,7 +2,7 @@
 //!
 //! You need a supported target with at least 2 MB of PSRAM memory.
 
-//% CHIP_FEATURES: psram_driver_supported
+//% CHIP_FILTER: psram_driver_supported
 //% FEATURES: esp-alloc/internal-heap-stats
 
 #![no_std]

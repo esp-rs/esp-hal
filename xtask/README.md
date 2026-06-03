@@ -72,48 +72,48 @@ Metadata lines come in the form of:
 
 The following metadata keys can be used:
 
-### `//% CHIPS`
+### `//% CHIP_FILTER`
 
-A space-separated list of chip names. The test or example will be built for these chips. If the line
-is missing, the file is built for all known chips.
+A boolean expression that selects which chips the test or example is built for. If the line is
+missing, the file is built for all known chips. A symbol in the expression is either a cfg name
+(exactly as it appears in `#[cfg(...)]`, e.g. `i2c_master_driver_supported` or
+`dma_can_access_psram`) or a chip name (e.g. `esp32`).
 
-```
-//% CHIPS: esp32c6 esp32s3
-```
-
-This key is a filter. If a named configuration contains a list of chips, the named list overwrites
-the unnamed list for that configuration. If multiple lines specify the same configuration, the
-latter one overwrites the earlier one.
-
-`CHIPS` can be used to set a specific feature for a specific chip, like this:
+Prefer a capability cfg flag over an explicit chip list: it describes *why* a chip is supported and
+automatically picks up new chips that gain the capability. Only fall back to chip names when no cfg
+flag captures the requirement.
 
 ```
-//% CHIPS: esp32c3 esp32c6
-//% CHIPS(xtensa): esp32s3
+//% CHIP_FILTER: wifi_driver_supported
+```
+
+Symbols can be combined with the logical operators `&&`, `||`, `!` and parentheses; an operator is
+required between symbols (`foo bar` is invalid, write `foo && bar`). Use `!` to exclude a chip that is
+otherwise capable but incompatible with the test/example, and `||` to list specific chips only when a
+capability flag does not exist:
+
+```
+//% CHIP_FILTER: spi_slave_supports_dma && !esp32
+//% CHIP_FILTER: lp_core || ulp_riscv_core
+//% CHIP_FILTER: esp32c6 || esp32h2
+```
+
+The expression is evaluated with [`somni`](https://crates.io/crates/somni-expr): `xtask` wraps each
+bare symbol into a `chip_has("symbol")` call and evaluates it per chip.
+
+This key is a filter. If a named configuration contains an expression, the named line overwrites the
+unnamed line for that configuration. If multiple lines specify the same configuration, the latter one
+overwrites the earlier one. This can be used to build different chips with different features:
+
+```
+//% CHIP_FILTER: esp32c3 || esp32c6
+//% CHIP_FILTER(xtensa): esp32s3
 //% FEATURES(riscv):
 //% FEATURES(xtensa): psram
 ```
 
 Here we need to specify an empty `FEATURES(riscv)` otherwise the xtask would only create the
 `xtensa` configuration, ignoring the other chips.
-
-### `//% CHIP_FEATURES`
-
-A space-separated list of cfg symbols. The test or example will be built for every chip where
-**all** listed symbols are present. Use the exact cfg name as it appears in `#[cfg(...)]`, e.g.
-`i2c_master_driver_supported` or `dma_can_access_psram`.
-
-```
-//% CHIP_FEATURES: wifi_driver_supported
-```
-
-A chip name can be used as a symbol too, and any symbol may be negated with a leading `!`. This is
-how a chip that is capable but for some reason incompatible with a given test/example is excluded. `&&`
-between symbols is accepted as an optional, readability-only separator.
-
-```
-//% CHIP_FEATURES: spi_slave_supports_dma && !esp32
-```
 
 ### `//% TAG`
 
@@ -172,7 +172,7 @@ option, while the other will select `multiple-integrated`.
 
 ```
 // This is a hypothetical "embassy_test.rs"
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: esp32 || esp32c2 || esp32c3 || esp32c6 || esp32h2 || esp32s2 || esp32s3
 //% FEATURES: unstable embassy
 //% ENV(single_integrated):   ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = single-integrated
 //% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated

@@ -3,7 +3,7 @@
 //! This is an example of running the embassy executor and asynchronously
 //! writing to and reading from UART.
 
-//% CHIP_FEATURES: uart_driver_supported
+//% CHIP_FILTER: uart_driver_supported
 
 #![no_std]
 #![no_main]

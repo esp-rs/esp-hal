@@ -1,6 +1,6 @@
 //! SPI Half Duplex Read/Write, SPI Slave and QSPI Tests
 
-//% CHIP_FEATURES: spi_slave_driver_supported
+//% CHIP_FILTER: spi_slave_driver_supported
 //% FEATURES: unstable
 
 #![no_std]

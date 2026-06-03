@@ -10,7 +10,7 @@
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 
-//% CHIP_FEATURES: i2c_master_driver_supported
+//% CHIP_FILTER: i2c_master_driver_supported
 //% TAG: bmp180
 
 #![no_std]

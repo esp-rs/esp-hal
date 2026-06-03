@@ -140,13 +140,27 @@ sudo reboot
 2. Add a corresponding `[[test]]` entry to `Cargo.toml` (**MUST** set `harness = false`)
 3. Write the tests
 4. Document any necessary physical connections on boards connected to self-hosted runners
-5. Add a header in the test stating which targets support the given tests. Eg:
+5. Add a header in the test stating which targets support the given tests. The `//% CHIP_FILTER:`
+   line is a boolean expression evaluated per chip, where a symbol is either a chip name or a cfg
+   name (exactly as it appears in `#[cfg(...)]`). It supports `&&`, `||`, `!` and parentheses, so you
+   can do any of the following:
 ```rust
-//! AES Test
+//! Test Name
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+// An explicit list of chips (OR them together):
+//% CHIP_FILTER: esp32 || esp32c3 || esp32c6 || esp32h2 || esp32s2 || esp32s3
+
+// Every chip whose driver/peripheral is supported (preferred — no need to touch this when a new
+// chip gains support):
+//% CHIP_FILTER: i2c_master_driver_supported
+
+// A capability, but excluding a chip that is otherwise capable yet incompatible with this test:
+//% CHIP_FILTER: spi_slave_supports_dma && !esp32
+
+// Combine capabilities and group with parentheses:
+//% CHIP_FILTER: adc_driver_supported && (esp32c6 || esp32h2)
 ```
-If the test is supported by all the targets, you can omit the header.
+If the test is supported by all the targets, you can omit the header. See [`xtask/README.md`](../xtask/README.md) for the full description of the metadata keys.
 
 6. Write some documentation at the top of the `tests/$PERIPHERAL.rs` file with the pins being used and the required connections, if applicable.
 
@@ -158,7 +172,7 @@ you want to run. Eg:
 ```rust
 //! AES Test
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: esp32 || esp32c3 || esp32c6 || esp32h2 || esp32s2 || esp32s3
 //% FEATURES: defmt
 ```
 

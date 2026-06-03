@@ -6,7 +6,7 @@
 //! It tests the `multicore_auto_park()` and `multicore_ignore()` functionality based on the boolean
 //! values of `FLASH_ON_CORE_0` and `USE_AUTO_PARK`.
 
-//% CHIP_FEATURES: multi_core && !esp32 && !esp32p4
+//% CHIP_FILTER: multi_core && !esp32 && !esp32p4
 //% FEATURES: unstable esp-storage
 
 // TODO: Make esp32 work

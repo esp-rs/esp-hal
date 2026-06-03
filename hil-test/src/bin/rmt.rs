@@ -5,7 +5,7 @@
 //! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
-//% CHIP_FEATURES: rmt_driver_supported
+//% CHIP_FILTER: rmt_driver_supported
 //% FEATURES: embassy esp-alloc unstable
 
 #![no_std]

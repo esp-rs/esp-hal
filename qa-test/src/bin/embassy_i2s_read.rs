@@ -11,7 +11,7 @@
 //! - WS   =>  GPIO4
 //! - DIN  =>  GPIO5
 
-//% CHIP_FEATURES: i2s_driver_supported
+//% CHIP_FILTER: i2s_driver_supported
 
 #![no_std]
 #![no_main]

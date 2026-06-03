@@ -17,7 +17,7 @@
 //! - D6        => GPIO16
 //! - D7        => GPIO15
 
-//% CHIP_FEATURES: camera_driver_supported
+//% CHIP_FILTER: camera_driver_supported
 
 #![no_std]
 #![no_main]

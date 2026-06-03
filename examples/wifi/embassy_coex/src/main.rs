@@ -5,7 +5,7 @@
 //! - performs an HTTP get request to some "random" server
 //! - does BLE advertising and allows to connect
 
-//% CHIP_FEATURES: wifi_driver_supported bt_driver_supported
+//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported
 
 #![no_std]
 #![no_main]

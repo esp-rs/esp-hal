@@ -41,15 +41,15 @@ Tests and examples use `//% KEY: value` comments to control xtask builds (full d
 
 | Annotation | Purpose | Example |
 |------------|---------|---------|
-| `//% CHIPS:` | Restrict to specific chips | `//% CHIPS: esp32c6 esp32s3` |
+| `//% CHIP_FILTER:` | Boolean expression selecting chips; prefer a capability cfg flag over a chip list | `//% CHIP_FILTER: spi_slave_supports_dma && !esp32` |
 | `//% FEATURES:` | Enable cargo features | `//% FEATURES: unstable embassy` |
 | `//% ENV:` | Set environment variables | `//% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4` |
 | `//% CARGO-CONFIG:` | Cargo `--config` passthrough | `//% CARGO-CONFIG: ...` |
 
 Named configs build the same file with different settings:
 ```
-//% CHIPS(wifi): esp32 esp32c3 esp32c6 esp32s3
-//% CHIPS(ble_only): esp32h2
+//% CHIP_FILTER(wifi): esp32 || esp32c3 || esp32c6 || esp32s3
+//% CHIP_FILTER(ble_only): esp32h2
 //% FEATURES(wifi): esp-radio/wifi
 //% FEATURES(ble_only): esp-radio/ble
 ```

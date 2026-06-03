@@ -1,7 +1,7 @@
 //! Check that trying to send after drop doesn't crash
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% CHIP_FEATURES: wifi_driver_supported
+//% CHIP_FILTER: wifi_driver_supported
 
 #![no_std]
 #![no_main]

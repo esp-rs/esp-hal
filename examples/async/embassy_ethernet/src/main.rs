@@ -25,7 +25,7 @@
 //! | PHY Reset    |                    5    |                       51   |
 //! | PHY address  |                    1    |                        1   |
 
-//% CHIP_FEATURES: ethernet_driver_supported
+//% CHIP_FILTER: ethernet_driver_supported
 
 #![no_std]
 #![no_main]

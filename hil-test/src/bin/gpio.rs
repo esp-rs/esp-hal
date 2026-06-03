@@ -1,6 +1,6 @@
 //! GPIO Test
 
-//% CHIP_FEATURES: gpio_driver_supported
+//% CHIP_FILTER: gpio_driver_supported
 //% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
 

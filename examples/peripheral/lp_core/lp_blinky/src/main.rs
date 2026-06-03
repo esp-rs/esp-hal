@@ -8,7 +8,7 @@
 //! The following wiring is assumed:
 //! - LED => GPIO1
 
-//% CHIPS: esp32c6 esp32s2 esp32s3
+//% CHIP_FILTER: lp_core || ulp_riscv_core
 
 #![no_std]
 #![no_main]

@@ -8,7 +8,7 @@
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
-//% CHIP_FEATURES: wifi_driver_supported
+//% CHIP_FILTER: wifi_driver_supported
 
 #![no_std]
 #![no_main]

@@ -1,5 +1,5 @@
 //! lcd_cam_i8080 and camera tests
-//% CHIP_FEATURES: camera_driver_supported
+//% CHIP_FILTER: camera_driver_supported
 //% FEATURES: unstable
 
 #![no_std]

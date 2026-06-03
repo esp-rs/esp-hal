@@ -2,7 +2,7 @@
 //!
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
-//% CHIP_FEATURES: riscv
+//% CHIP_FILTER: riscv
 //% FEATURES: unstable
 
 #![no_std]

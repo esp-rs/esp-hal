@@ -1,6 +1,6 @@
 //! SPI Half Duplex Write Test
 
-//% CHIP_FEATURES: dma_can_access_psram
+//% CHIP_FILTER: dma_can_access_psram
 //% FEATURES: unstable esp-alloc
 
 #![no_std]

@@ -11,7 +11,7 @@
 //! variable before running this example.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% CHIP_FEATURES: wifi_driver_supported
+//% CHIP_FILTER: wifi_driver_supported
 
 #![allow(static_mut_refs)]
 #![no_std]

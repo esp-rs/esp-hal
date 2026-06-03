@@ -1,6 +1,6 @@
 //! Demonstrates clock setup and LP_TIMER's accuracy
 
-//% CHIP_FEATURES: lp_timer_driver_supported
+//% CHIP_FILTER: lp_timer_driver_supported
 
 #![no_std]
 #![no_main]

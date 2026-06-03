@@ -1,6 +1,6 @@
 //! SPI Full Duplex test suite.
 
-//% CHIP_FEATURES: spi_master_driver_supported
+//% CHIP_FILTER: spi_master_driver_supported
 //% FEATURES(unstable): esp-alloc unstable
 //% FEATURES(stable):
 

@@ -9,7 +9,7 @@
 //! let user-defined raw `GPIO()` handlers re-enable the async API
 //! (regression coverage for esp-rs/esp-hal#2659).
 
-//% CHIP_FEATURES: gpio_driver_supported
+//% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]

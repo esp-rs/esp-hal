@@ -13,7 +13,7 @@
 //! generated square waves are 90 degrees out of phase. DO NOT CONNECT GPIO2 and
 //! GPIO4 - they read back themselves.
 
-//% CHIP_FEATURES: gpio_driver_supported
+//% CHIP_FILTER: gpio_driver_supported
 
 #![no_std]
 #![no_main]

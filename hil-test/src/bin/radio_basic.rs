@@ -1,8 +1,9 @@
-//% CHIPS(no_wifi): esp32h2
-//% CHIPS(no_ble): esp32s2
-//% CHIPS(no_radio): esp32p4
-//% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3 esp32c5
-//% CHIPS(stable_wifi): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32s2 esp32s3
+// TODO: validate ESP32-C61 radio, then drop the `!esp32c61` exclusions.
+//% CHIP_FILTER(no_wifi):      bt_driver_supported && !wifi_driver_supported
+//% CHIP_FILTER(no_ble):       wifi_driver_supported && !bt_driver_supported
+//% CHIP_FILTER(no_radio):     !wifi_driver_supported && !bt_driver_supported
+//% CHIP_FILTER(has_wifi_ble): wifi_driver_supported && bt_driver_supported && !esp32c61
+//% CHIP_FILTER(stable_wifi):  wifi_driver_supported && !esp32c61
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(no_radio): rtos-radio-driver

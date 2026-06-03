@@ -9,7 +9,7 @@
 //! - SDA => GPIO6
 //! - SCL => GPIO7
 
-//% CHIP_FEATURES: lp_core
+//% CHIP_FILTER: lp_core
 
 #![no_std]
 #![no_main]

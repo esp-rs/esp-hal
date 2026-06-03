@@ -6,7 +6,7 @@
 //! The following wiring is assumed for ESP32-H2:
 //! - ext1 wakeup pin => GPIO9 (low level) / GPIO10 (high level)
 
-//% CHIPS: esp32c6 esp32h2
+//% CHIP_FILTER: esp32c6 || esp32h2
 
 #![no_std]
 #![no_main]

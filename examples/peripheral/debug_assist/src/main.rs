@@ -2,7 +2,7 @@
 //!
 //! Uncomment the functionality you want to test
 
-//% CHIP_FEATURES: assist_debug_driver_supported
+//% CHIP_FILTER: assist_debug_driver_supported
 
 #![no_std]
 #![no_main]

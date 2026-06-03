@@ -8,7 +8,7 @@
 //! - RTC wakeup pin => GPIO17 (low level)
 //! - RTC wakeup pin => GPIO18 (high level)
 
-//% CHIPS: esp32c3 esp32s2 esp32s3 esp32c2
+//% CHIP_FILTER: esp32c3 || esp32s2 || esp32s3 || esp32c2
 
 #![no_std]
 #![no_main]

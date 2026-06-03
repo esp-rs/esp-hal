@@ -1,6 +1,6 @@
 //! PARL_IO test
 
-//% CHIP_FEATURES: parl_io_driver_supported
+//% CHIP_FILTER: parl_io_driver_supported
 //% FEATURES: unstable
 
 #![no_std]

@@ -5,7 +5,7 @@
 //!
 //! The signal will be output to the pin assigned to `pin`. (GPIO0)
 
-//% CHIP_FEATURES: mcpwm_driver_supported
+//% CHIP_FILTER: mcpwm_driver_supported
 
 #![no_std]
 #![no_main]
