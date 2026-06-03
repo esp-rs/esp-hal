@@ -219,7 +219,7 @@ impl<'d> MipiDsi<'d> {
         let (pll_m, pll_n, actual_rate) = compute_pll(ref_freq_mhz, config.lane_bit_rate_mbps)
             .ok_or(ConfigError::PllNoSolution)?;
 
-        let hs_freq_sel = hs_freq_range(config.lane_bit_rate_mbps);
+        let hs_freq_sel = hs_freq_range(actual_rate);
         phy_write(0x44, hs_freq_sel << 1);
         phy_write(0x19, 0x30); // use external N and M
         phy_write(0x17, pll_n - 1);
