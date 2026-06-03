@@ -41,6 +41,12 @@ jobs:
           toolchain: nightly
           components: rust-src
 
+      - name: Setup cargo-batch
+        run: |
+          if ! command -v cargo-batch &> /dev/null; then
+              cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
+          fi
+
       - name: init-local-registry
         run: |
           # this example relies on a Cargo.lock file and won't compile after `cargo update` - for now lets remove it
