@@ -307,16 +307,18 @@ impl<'d> DsiDpi<'d> {
                 .bits((t.hsw + t.hbp + t.h_active + brg_hfp) as u16);
             w.hdisp().bits(t.h_active as u16)
         });
-        bridge
-            .dpi_h_cfg1()
-            .modify(|_, w| unsafe { w.hsync().bits(t.hsw as u16).hbank().bits(t.hbp as u16) });
+        bridge.dpi_h_cfg1().modify(|_, w| unsafe {
+            w.hsync().bits(t.hsw as u16);
+            w.hbank().bits(t.hbp as u16)
+        });
         bridge.dpi_v_cfg0().modify(|_, w| unsafe {
             w.vtotal().bits((t.vsw + t.vbp + t.v_active + t.vfp) as u16);
             w.vdisp().bits(t.v_active as u16)
         });
-        bridge
-            .dpi_v_cfg1()
-            .modify(|_, w| unsafe { w.vsync().bits(t.vsw as u16).vbank().bits(t.vbp as u16) });
+        bridge.dpi_v_cfg1().modify(|_, w| unsafe {
+            w.vsync().bits(t.vsw as u16);
+            w.vbank().bits(t.vbp as u16)
+        });
 
         // ── Bridge: pixel format & DMA ─────────────────────────────────────
         let total_bits = t.h_active * t.v_active * config.in_color_format.bits_per_pixel();
@@ -407,9 +409,6 @@ impl<'d> DsiDpi<'d> {
         bridge
             .dpi_config_update()
             .write(|w| w.dpi_config_update().set_bit());
-
-        // Enable underrun interrupt (for status monitoring).
-        bridge.int_ena().modify(|_, w| w.underrun().set_bit());
 
         let MipiDsi { guard, .. } = bus;
         Ok(Self {
