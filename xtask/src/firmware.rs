@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -197,57 +197,47 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
-/// Whether a chip satisfies a single symbol used in a chip expression. A chip name matches only
-/// that chip, any other symbol is looked up as a cfg of the chip.
-fn chip_has_feature(chip: Chip, symbol: &str) -> bool {
-    match Chip::from_str(symbol, false) {
-        Ok(named) => named == chip,
-        Err(_) => Config::for_chip(&chip).contains(symbol),
+/// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
+/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
+fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
+    fn symbol_to_ident(s: &String) -> Option<String> {
+        s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+            .then_some(s.replace(".", "_"))
     }
-}
 
-/// Rewrites a chip expression into a `somni`-understandable boolean expression by wrapping every
-/// known metadata symbol (a cfg name or a chip name) in a `chip_has("symbol")` call, leaving the
-/// logical operators (`&&`, `||`, `!`, parentheses) untouched. Only known symbols and operators are
-/// valid tokens, anything else (e.g. a typo'd cfg name) is rejected.
-fn rewrite_chip_expr(expr: &str) -> anyhow::Result<String> {
-    // Every symbol known to the metadata, each chip's name plus all of its cfg symbols.
-    let known: HashSet<String> = Chip::iter()
-        .flat_map(|chip| {
-            Config::for_chip(&chip)
-                .all()
-                .iter()
-                .map(|symbol| symbol.replace('.', "_"))
-                .collect::<Vec<_>>()
+    let possible_symbols = Chip::list_of_possible_symbols()
+        .iter()
+        .filter_map(|(sym, values)| {
+            if values.is_none() {
+                symbol_to_ident(sym)
+            } else {
+                None
+            }
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    expr.replace('(', " ( ")
-        .replace(')', " ) ")
-        .replace('!', " ! ")
-        .replace("&&", " && ")
-        .replace("||", " || ")
-        .split_whitespace()
-        .map(|token| match token {
-            "(" | ")" | "!" | "&&" | "||" => Ok(token.to_string()),
-            symbol if known.contains(symbol) => Ok(format!("chip_has(\"{symbol}\")")),
-            other => anyhow::bail!(
-                "unknown symbol '{other}' in CHIP_FILTER '{expr}', expected a chip name or cfg symbol"
-            ),
-        })
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map(|tokens| tokens.join(" "))
-}
-
-/// Evaluates a `somni` chip expression against every chip, returning those it selects. The `chip`
-/// is bound into a `chip_has` function the expression calls.
-fn eval_chip_expr(expr: &str) -> anyhow::Result<Vec<Chip>> {
     let mut chips = Vec::new();
     for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        let chip_symbols = config
+            .all()
+            .iter()
+            .filter_map(symbol_to_ident)
+            .collect::<Vec<_>>();
+
         let mut ctx = somni_expr::Context::new();
-        ctx.add_function("chip_has", move |symbol: &str| {
-            chip_has_feature(chip, symbol)
-        });
+
+        // All known symbols are initially false
+        for sym in possible_symbols.iter() {
+            ctx.add_variable(sym.as_str(), false);
+        }
+
+        // All defined symbols for this chip are true
+        for sym in chip_symbols.iter() {
+            ctx.add_variable(sym.as_str(), true);
+        }
+
         let selected = ctx.evaluate::<bool>(expr).map_err(|err| {
             anyhow::anyhow!("Failed to evaluate chip expression '{expr}': {err:?}")
         })?;
@@ -256,15 +246,6 @@ fn eval_chip_expr(expr: &str) -> anyhow::Result<Vec<Chip>> {
         }
     }
     Ok(chips)
-}
-
-/// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
-/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
-fn parse_chips(value: &str) -> anyhow::Result<Vec<Chip>> {
-    if value.trim().is_empty() {
-        anyhow::bail!("CHIP_FILTER metadata must list at least one cfg symbol or chip");
-    }
-    eval_chip_expr(&rewrite_chip_expr(value)?)
 }
 
 /// Load all examples at the given path, and parse their metadata.
