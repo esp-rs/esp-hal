@@ -2276,7 +2276,6 @@ impl<'d> WifiController<'d> {
         feature = "unstable",
         doc = "ESP-NOW and sniffer instances are available through the controller's [`WifiController::esp_now()`] and [`WifiController::sniffer()`] methods."
     )]
-    ///
     /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
     /// currently in use.
     ///
