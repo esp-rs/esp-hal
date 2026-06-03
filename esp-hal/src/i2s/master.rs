@@ -246,6 +246,11 @@ where
         while !self.is_done() {}
         self.completed = true;
 
+        self.stop()
+    }
+
+    /// Immediately stop the transfer and return the peripheral and buffer.
+    pub fn stop(mut self) -> (Result<(), DmaError>, I2sTx<'d, Dm>, Buf::Final) {
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.tx_stop();
 
@@ -375,9 +380,14 @@ where
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub fn wait(mut self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
+    pub fn wait(self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
         while !self.is_done() {}
 
+        self.stop()
+    }
+
+    /// Immediately stop the transfer and return the peripheral and buffer.
+    pub fn stop(mut self) -> (Result<(), DmaError>, I2sRx<'d, Dm>, Buf::Final) {
         self.i2s_rx.i2s.rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
 
