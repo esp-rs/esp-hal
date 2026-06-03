@@ -20,7 +20,10 @@ use core::alloc::Layout;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::{CpuClock, ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk}},
+    clock::{
+        CpuClock,
+        ll::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
+    },
     delay::Delay,
     gpio::{Level, Output, OutputConfig},
     main,

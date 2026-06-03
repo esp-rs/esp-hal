@@ -457,7 +457,7 @@ impl MipiDsiInstance {
     ) {
         // Register values: 0 = XTAL, 1 = PLL_F240M, 2 = PLL_F160M.
         let src_sel = match new_config.sclk() {
-            MipiDsiDpiClkSclk::Xtal     => 0,
+            MipiDsiDpiClkSclk::Xtal => 0,
             MipiDsiDpiClkSclk::PllF240m => 1,
             MipiDsiDpiClkSclk::PllF160m => 2,
         };
@@ -495,7 +495,8 @@ impl MipiDsiInstance {
             .peri_clk_ctrl03()
             .modify(|_, w| unsafe {
                 w.mipi_dsi_dphy_pll_refclk_src_sel().bits(src_sel);
-                w.mipi_dsi_dphy_pll_refclk_div_num().bits(new_config.div_num() as u8)
+                w.mipi_dsi_dphy_pll_refclk_div_num()
+                    .bits(new_config.div_num() as u8)
             });
     }
 
@@ -518,7 +519,7 @@ impl MipiDsiInstance {
         // Register values: 0 = PLL_F20M, 1 = RC_FAST, 2 = PLL_F25M.
         let src_sel = match new_config {
             MipiDsiPhyCfgClkConfig::PllF20m => 0,
-            MipiDsiPhyCfgClkConfig::RcFast  => 1,
+            MipiDsiPhyCfgClkConfig::RcFast => 1,
             MipiDsiPhyCfgClkConfig::PllF25m => 2,
         };
         HP_SYS_CLKRST::regs()

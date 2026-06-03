@@ -8,8 +8,10 @@
 //!
 //! ```rust,no_run
 //! # {before_snippet}
-//! use esp_hal::mipi_dsi::{Config, DataLanes, MipiDsi};
-//! use esp_hal::soc::clocks::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk};
+//! use esp_hal::{
+//!     mipi_dsi::{Config, DataLanes, MipiDsi},
+//!     soc::clocks::{MipiDsiPhyPllRefclkConfig, MipiDsiPhyPllRefclkSclk},
+//! };
 //!
 //! let bus = MipiDsi::new(
 //!     peripherals.MIPI_DSI,
@@ -171,17 +173,14 @@ impl<'d> MipiDsi<'d> {
         // the clock-tree implementation functions in clocks.rs.
         let ref_freq_hz = ClockTree::with(|clocks| {
             // D-PHY configuration clock: always PLL_F20M.
-            MipiDsiInstance::MipiDsi
-                .configure_phy_cfg_clk(clocks, MipiDsiPhyCfgClkConfig::PllF20m);
+            MipiDsiInstance::MipiDsi.configure_phy_cfg_clk(clocks, MipiDsiPhyCfgClkConfig::PllF20m);
             MipiDsiInstance::MipiDsi.request_phy_cfg_clk(clocks);
 
             // D-PHY PLL reference clock (user-selected source).
-            MipiDsiInstance::MipiDsi
-                .configure_phy_pll_refclk(clocks, config.phy_pll_refclk);
+            MipiDsiInstance::MipiDsi.configure_phy_pll_refclk(clocks, config.phy_pll_refclk);
             MipiDsiInstance::MipiDsi.request_phy_pll_refclk(clocks);
 
-            MipiDsiInstance::MipiDsi
-                .phy_pll_refclk_config_frequency(clocks, config.phy_pll_refclk)
+            MipiDsiInstance::MipiDsi.phy_pll_refclk_config_frequency(clocks, config.phy_pll_refclk)
         });
         let ref_freq_mhz = ref_freq_hz as f32 / 1_000_000.0;
 
@@ -209,9 +208,8 @@ impl<'d> MipiDsi<'d> {
         bridge.en().modify(|_, w| w.dsi_brig_rst().clear_bit());
 
         // Configure D-PHY PLL via test interface.
-        let (pll_m, pll_n, actual_rate) =
-            compute_pll(ref_freq_mhz, config.lane_bit_rate_mbps)
-                .ok_or(ConfigError::PllNoSolution)?;
+        let (pll_m, pll_n, actual_rate) = compute_pll(ref_freq_mhz, config.lane_bit_rate_mbps)
+            .ok_or(ConfigError::PllNoSolution)?;
 
         let hs_freq_sel = hs_freq_range(config.lane_bit_rate_mbps);
         phy_write(0x44, hs_freq_sel << 1);
