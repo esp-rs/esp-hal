@@ -182,7 +182,7 @@ macro_rules! property {
         false
     };
     ("i2c_master.has_arbitration_en") => {
-        false
+        true
     };
     ("i2c_master.has_tx_fifo_watermark") => {
         false

@@ -130,6 +130,7 @@ use crate::{
     gpio::{
         DriveMode,
         InputSignal,
+        Level,
         OutputConfig,
         OutputSignal,
         PinGuard,
@@ -609,6 +610,22 @@ pub struct Config {
     /// Default value: [`ClockSource::default()`].
     #[builder_lite(unstable)]
     clock_source: ClockSource,
+
+    /// Selects whether the controller samples the SDA line while SCL is high or
+    /// low.
+    ///
+    /// Standard I2C devices change SDA while SCL is low and hold it stable while
+    /// SCL is high, so the line is sampled while SCL is high by default
+    /// ([`Level::High`]).
+    #[builder_lite(unstable)]
+    scl_sample_level: Level,
+
+    /// Enables I2C bus arbitration detection.
+    ///
+    /// Default value: `false`.
+    #[cfg(i2c_master_has_arbitration_en)]
+    #[builder_lite(unstable)]
+    bus_arbitration: bool,
 }
 
 impl Default for Config {
@@ -629,6 +646,11 @@ impl Default for Config {
             scl_main_st_timeout: Default::default(),
 
             clock_source: Default::default(),
+
+            scl_sample_level: Level::High,
+
+            #[cfg(i2c_master_has_arbitration_en)]
+            bus_arbitration: false,
         }
     }
 }
