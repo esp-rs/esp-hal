@@ -66,7 +66,11 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
     pub fn write_cmd(&mut self, cmd: u8, params: &[u8]) -> Result<(), Error> {
         let h = MIPI_DSI_HOST::regs();
         let vc = self.virtual_channel;
-        let payload_size = 1usize + params.len(); // cmd byte + params
+        let payload_size = 1 + params.len(); // cmd byte + params
+
+        if payload_size > u16::MAX as usize {
+            return Err(Error::PayloadTooLarge);
+        }
 
         if payload_size > 2 {
             // Long write: push payload into FIFO 4 bytes at a time.
@@ -133,6 +137,10 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
     pub fn read_cmd(&mut self, cmd: u8, out: &mut [u8]) -> Result<usize, Error> {
         let h = MIPI_DSI_HOST::regs();
         let vc = self.virtual_channel;
+
+        if out.len() > u16::MAX as usize {
+            return Err(Error::PayloadTooLarge);
+        }
 
         // SET_MAXIMUM_RETURN_PKT_SIZE.
         let max_ret = out.len() as u16;
