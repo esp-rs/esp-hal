@@ -90,6 +90,10 @@ pub mod checker {
             log::info!("Generating API baseline for {package}");
 
             for chip in &chips {
+                if !package.supports_chip(*chip) {
+                    log::info!("Skipping unsupported chip {chip} for {package}");
+                    continue;
+                }
                 log::info!("Chip = {}", chip.to_string());
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
@@ -149,6 +153,9 @@ pub mod checker {
 
         let mut highest_result = ReleaseType::Patch;
         for chip in chips {
+            if !package.supports_chip(*chip) {
+                continue;
+            }
             let result = minimum_update(workspace, package, *chip)?;
 
             if result == ReleaseType::Major {
