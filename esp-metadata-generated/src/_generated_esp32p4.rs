@@ -115,6 +115,9 @@ macro_rules! property {
     ("gpio.has_bank_1") => {
         true
     };
+    ("gpio.has_input_sync") => {
+        true
+    };
     ("gpio.gpio_function") => {
         1
     };

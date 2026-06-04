@@ -345,6 +345,7 @@ supports_enhanced_security = true # only after revision 1.2
 
 [device.gpio]
 version = 2
+has_input_sync = true
 support_status = "supported"
 gpio_function = 1
 constant_0_input = 0x3c

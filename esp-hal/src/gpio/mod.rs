@@ -941,6 +941,22 @@ impl<'d> Output<'d> {
     }
 }
 
+/// Configures the clock edge used to synchronize the GPIO input signal to the
+/// system clock, reducing metastability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[cfg(gpio_has_input_sync)]
+pub enum InputSync {
+    /// Input signal passes through without synchronization (hardware default).
+    #[default]
+    Disabled,
+    /// Both synchronization stages latch on the falling edge of the GPIO clock.
+    NegativeSync,
+    /// Both synchronization stages latch on the rising edge of the GPIO clock.
+    PositiveSync,
+}
+
 /// Input pin configuration.
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
@@ -948,11 +964,22 @@ impl<'d> Output<'d> {
 pub struct InputConfig {
     /// Initial pull of the pin.
     pull: Pull,
+
+    /// Input signal synchronization.
+    ///
+    /// Default value: [`InputSync::Disabled`].
+    #[cfg(gpio_has_input_sync)]
+    #[builder_lite(unstable)]
+    input_sync: InputSync,
 }
 
 impl Default for InputConfig {
     fn default() -> Self {
-        Self { pull: Pull::None }
+        Self {
+            pull: Pull::None,
+            #[cfg(gpio_has_input_sync)]
+            input_sync: Default::default(),
+        }
     }
 }
 
@@ -1815,6 +1842,21 @@ impl<'lt> AnyPin<'lt> {
             w.fun_wpd().bit(pull_down);
             w.fun_wpu().bit(pull_up)
         });
+
+        #[cfg(gpio_has_input_sync)]
+        {
+            let sync_bits: u8 = match config.input_sync {
+                InputSync::Disabled => 0,
+                InputSync::NegativeSync => 1,
+                InputSync::PositiveSync => 2,
+            };
+            self.with_gpio_lock(|| {
+                GPIO::regs().pin(self.number() as usize).modify(|_, w| unsafe {
+                    w.sync1_bypass().bits(sync_bits);
+                    w.sync2_bypass().bits(sync_bits)
+                });
+            });
+        }
     }
 
     fn clear_interrupt(&self) {

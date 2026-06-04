@@ -405,6 +405,8 @@ driver_configs![
             version: u32,
             #[serde(default)]
             has_bank_1: bool,
+            #[serde(default)]
+            has_input_sync: bool,
             gpio_function: u32,
             constant_0_input: u32,
             constant_1_input: u32,
