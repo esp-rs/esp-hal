@@ -19,9 +19,7 @@ with_i2s_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
         use crate::dma::DmaEligiblePeripheral;
 
-        impl DmaEligiblePeripheral for AnyI2s<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnyI2s<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, i2s => { i2s.dma_peripheral() })
             }

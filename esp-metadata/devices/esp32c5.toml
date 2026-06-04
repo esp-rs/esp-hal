@@ -126,16 +126,6 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
-    { name = "MEM2MEM0", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM2", virtual = true },
-    { name = "MEM2MEM3", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM6", virtual = true },
-    { name = "MEM2MEM7", virtual = true },
-    { name = "MEM2MEM8", virtual = true },
-
     { name = "PSRAM", virtual = true },
 ]
 clocks = { system_clocks = { clock_tree = [
@@ -310,33 +300,23 @@ key_length = { options = [
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
-supports_mem2mem = true
 max_priority = 5
 can_access_psram = true
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
     { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "uhci", "i2s", "parl_io"], peripheral_instances = [
-        { name = "MEM2MEM0", dma_id = 0 },
         { name = "SPI2", dma_id = 1 },
         { name = "UHCI0", dma_id = 2 },
         { name = "I2S0", dma_id = 3 },
-        { name = "MEM2MEM1", dma_id = 4 },
-        { name = "MEM2MEM2", dma_id = 5 },
         { name = "AES", dma_id = 6 },
         { name = "SHA", dma_id = 7 },
         { name = "APB_SARADC", dma_id = 8 },
         { name = "PARL_IO", dma_id = 9 },
-        { name = "MEM2MEM3", dma_id = 10 },
-        { name = "MEM2MEM4", dma_id = 11 },
-        { name = "MEM2MEM5", dma_id = 12 },
-        { name = "MEM2MEM6", dma_id = 13 },
-        { name = "MEM2MEM7", dma_id = 14 },
-        { name = "MEM2MEM8", dma_id = 15 },
     ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
-        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 4, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, mem2mem_id = 5, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH2", mem2mem = true, mem2mem_id = 10, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
     ] },
 ]
 

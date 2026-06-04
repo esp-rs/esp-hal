@@ -37,10 +37,7 @@ for_each_dma_engine! {
 }
 
 /// Implemented by peripheral singletons that can be used with a DMA engine.
-pub trait DmaEligiblePeripheral {
-    /// The erased DMA channel type for the engine this peripheral belongs to.
-    type ErasedChannel<'a>: DmaChannel;
-
+pub trait DmaEligiblePeripheral<D: DmaChannel> {
     /// Returns the `DmaPeripheral` ID for runtime compatibility checks.
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
@@ -51,7 +48,7 @@ for_each_peripheral! {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
-        pub struct DmaPeripheral(pub u8);
+        pub struct DmaPeripheral(pub(crate) u8);
         impl DmaPeripheral {
             $(
                 #[doc = concat!("DMA accesses ", stringify!($name))]
@@ -60,9 +57,7 @@ for_each_peripheral! {
         }
 
         $(
-            impl DmaEligiblePeripheral for crate::peripherals::$peri<'_> {
-                type ErasedChannel<'a> = $any_ch<'a>;
-
+            impl<'d> DmaEligiblePeripheral<$any_ch<'d>> for crate::peripherals::$peri<'d> {
                 fn dma_peripheral(&self) -> DmaPeripheral {
                     DmaPeripheral::$peri
                 }

@@ -151,9 +151,7 @@ impl AnyUhci<'_> {
 
 with_uhci_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
-        impl DmaEligiblePeripheral for AnyUhci<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnyUhci<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, uhci => { uhci.dma_peripheral() })
             }

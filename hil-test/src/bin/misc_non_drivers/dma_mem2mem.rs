@@ -11,14 +11,16 @@ mod tests {
     struct Context {
         mem2mem: Mem2Mem<'static, Blocking>,
     }
+
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
-            soc_has_mem2mem1 => Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1),
-            _ => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+            any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+            esp32p4 => Mem2Mem::new(peripherals.DMA_CH1),
+            _ => Mem2Mem::new(peripherals.DMA_CH0),
         };
 
         Context { mem2mem }

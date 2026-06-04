@@ -79,7 +79,7 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.supports_mem2mem") => {
+    ("dma.mem2mem_requires_peripheral") => {
         true
     };
     ("dma.can_access_psram") => {
@@ -563,6 +563,25 @@ macro_rules! for_each_dma_channel_peri_pair {
         ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel =
         AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
         ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH1, 0));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2,
+        0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0, 0,
+        1, 0, 2, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel)); _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH1, 0),
+        ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2, 0)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
+        0, 1, 0, 2, 0))); _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel)));
     };
 }
 #[macro_export]

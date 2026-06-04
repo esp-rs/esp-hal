@@ -70,8 +70,8 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.supports_mem2mem") => {
-        true
+    ("dma.mem2mem_requires_peripheral") => {
+        false
     };
     ("dma.can_access_psram") => {
         true
@@ -536,6 +536,19 @@ macro_rules! for_each_dma_channel_peri_pair {
         DMA_CRYPTO, AES), ("CRYPTO_DMA", DMA_CRYPTO, SHA)));
         _for_each_inner_dma_channel_peri_pair!((any_channels("SPI_DMA", any_channel =
         SpiDmaChannel, SPI2), ("SPI_DMA", any_channel = SpiDmaChannel, SPI3)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("COPY_DMA", CopyDma,
+        CopyDmaChannel, DMA_COPY, 0)); _for_each_inner_mem2mem_channel!(("COPY_DMA",
+        CopyDma, CopyDmaChannel)); _for_each_inner_mem2mem_channel!((channels("COPY_DMA",
+        CopyDma, CopyDmaChannel, DMA_COPY, 0)));
+        _for_each_inner_mem2mem_channel!((erased));
+        _for_each_inner_mem2mem_channel!((engines("COPY_DMA", CopyDma, CopyDmaChannel)));
     };
 }
 #[macro_export]
