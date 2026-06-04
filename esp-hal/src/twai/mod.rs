@@ -543,7 +543,7 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
         let frame_info = bytes[0];
         let is_extended_format = frame_info & (0b1 << 7) != 0;
         let is_remote_request = frame_info & (0b1 << 6) != 0;
-        let self_reception = frame_info & (0b1 << 4) != 0;
+        let is_self_reception = frame_info & (0b1 << 4) != 0;
         let dlc = frame_info & 0b1111;
         if dlc > 8 {
             // Max data length: 8 bytes
@@ -580,7 +580,7 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
         };
 
         // Set Self Reception bit
-        frame.self_reception = self_reception;
+        frame.self_reception = is_self_reception;
 
         Ok(frame)
     }
