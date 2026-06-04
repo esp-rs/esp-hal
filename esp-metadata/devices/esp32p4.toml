@@ -156,6 +156,15 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            # { name = "SDIO_PLL0", outputs = "SDIO_PLL0_CLK" },
+            # { name = "APLL", outputs = "APLL_CLK" },
+            { name = "SPLL",    outputs = "SPLL_CLK" },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # ESP32-P4 peripheral clock and reset gates -- all live in HP_SYS_CLKRST.
     # Clock enables: SOC_CLK_CTRL0/1/2 + PERI_CLK_CTRL{21,26}.
@@ -279,8 +288,8 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART" },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART" },
     { name = "UART4", interrupts = { peri = "UART4" }, clock_group = "UART" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C" },
     { name = "TWAI0", interrupts = { peri = "TWAI0" } },

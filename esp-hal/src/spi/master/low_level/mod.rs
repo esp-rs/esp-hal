@@ -96,6 +96,12 @@ impl Drop for SpiWrapper<'_> {
         unsafe {
             // SAFETY: we "own" the state, we are allowed to deinit it
             self.spi.state().deinit();
+            crate::clock::ll::ClockTree::with(|clocks| {
+                self.spi
+                    .info()
+                    .clock_instance
+                    .release_function_clock(clocks);
+            });
         }
     }
 }
@@ -149,6 +155,9 @@ pub struct Info {
 
     pub sio_inputs: &'static [InputSignal],
     pub sio_outputs: &'static [OutputSignal],
+
+    /// Clock tree instance for this SPI peripheral.
+    pub clock_instance: crate::soc::clocks::SpiInstance,
 }
 
 impl Info {
@@ -204,25 +213,13 @@ impl Driver {
             w.usr_command().clear_bit()
         });
 
-        #[cfg(spi_master_version = "3")]
-        self.regs().clk_gate().modify(|_, w| {
-            w.clk_en().set_bit();
-            w.mst_clk_active().set_bit();
-            w.mst_clk_sel().set_bit()
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            self.info.clock_instance.configure_function_clock(
+                clocks,
+                crate::soc::clocks::SpiFunctionClockConfig::default(),
+            );
+            self.info.clock_instance.request_function_clock(clocks);
         });
-
-        #[cfg(soc_has_pcr)]
-        unsafe {
-            // use default clock source
-            crate::peripherals::PCR::regs()
-                .spi2_clkm_conf()
-                .modify(|_, w| {
-                    #[cfg(spi_master_has_clk_pre_div)]
-                    w.spi2_clkm_div_num().bits(1);
-                    w.spi2_clkm_sel().bits(1);
-                    w.spi2_clkm_en().set_bit()
-                });
-        }
 
         version::init(self);
 
@@ -257,40 +254,32 @@ impl Driver {
 
     pub(super) fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
         config.validate()?;
-        self.ch_bus_freq(config)?;
+
+        let raw = config.raw_clock_reg_value()?;
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            self.info
+                .clock_instance
+                .configure_function_clock(clocks, config.clock_source);
+
+            // TODO: release should return whether the clock was released
+            self.info.clock_instance.release_function_clock(clocks);
+            self.regs().clock().write(|w| unsafe { w.bits(raw) });
+            self.info.clock_instance.request_function_clock(clocks);
+        });
+
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
         self.set_data_mode(config.mode);
         self.state
             .min_async_transfer_size
             .store(config.min_async_transfer_size, Ordering::Relaxed);
 
-        version::apply_config(self, config);
+        version::apply_config(self);
 
         Ok(())
     }
 
     fn set_data_mode(&self, data_mode: Mode) {
         version::set_data_mode(self, data_mode);
-    }
-
-    fn ch_bus_freq(&self, bus_clock_config: &Config) -> Result<(), ConfigError> {
-        fn enable_clocks(_reg_block: &RegisterBlock, _enable: bool) {
-            #[cfg(spi_master_version = "3")]
-            _reg_block.clk_gate().modify(|_, w| {
-                w.clk_en().bit(_enable);
-                w.mst_clk_active().bit(_enable);
-                w.mst_clk_sel().bit(true) // TODO: support XTAL clock source
-            });
-        }
-
-        // Change clock frequency
-        let raw = bus_clock_config.raw_clock_reg_value()?;
-
-        enable_clocks(self.regs(), false);
-        self.regs().clock().write(|w| unsafe { w.bits(raw) });
-        enable_clocks(self.regs(), true);
-
-        Ok(())
     }
 
     #[cfg(not(spi_master_bit_order_is_bool))]
@@ -732,6 +721,7 @@ for_each_spi_master! {
                     cs: &[$(OutputSignal::$cs),+],
                     sio_inputs: &[$(InputSignal::$sio),*],
                     sio_outputs: &[$(OutputSignal::$sio),*],
+                    clock_instance: crate::soc::clocks::SpiInstance::$sys,
                 };
 
                 static STATE: State = State {

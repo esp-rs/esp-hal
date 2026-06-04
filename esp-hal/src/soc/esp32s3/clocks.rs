@@ -17,7 +17,21 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
+    peripherals::{
+        I2C_ANA_MST,
+        I2C0,
+        I2C1,
+        LPWR,
+        RMT,
+        SPI2,
+        SPI3,
+        SYSTEM,
+        TIMG0,
+        TIMG1,
+        UART0,
+        UART1,
+        UART2,
+    },
     soc::regi2c,
     time::Rate,
 };
@@ -950,6 +964,37 @@ impl I2cInstance {
             w.sclk_sel()
                 .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
             w.sclk_div_num().bits(new_config.div_num as _)
+        });
+    }
+}
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let regs = match self {
+            SpiInstance::Spi2 => SPI2::regs(),
+            SpiInstance::Spi3 => SPI3::regs(),
+        };
+        regs.clk_gate().modify(|_, w| {
+            w.clk_en().bit(en);
+            w.mst_clk_active().bit(en)
+        });
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        new_config: SpiFunctionClockConfig,
+    ) {
+        let regs = match self {
+            SpiInstance::Spi2 => SPI2::regs(),
+            SpiInstance::Spi3 => SPI3::regs(),
+        };
+        regs.clk_gate().modify(|_, w| {
+            w.mst_clk_sel()
+                .bit(matches!(new_config, SpiFunctionClockConfig::Apb))
         });
     }
 }

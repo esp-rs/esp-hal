@@ -709,7 +709,6 @@ impl I2cInstance {
     // I2C_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let _ = self;
         PCR::regs()
             .i2c_sclk_conf()
             .modify(|_, w| w.i2c_sclk_en().bit(en));
@@ -721,12 +720,41 @@ impl I2cInstance {
         _old_config: Option<I2cFunctionClockConfig>,
         new_config: I2cFunctionClockConfig,
     ) {
-        let _ = self;
-        // sclk_sel: 0 = XTAL, 1 = RC_FAST
         PCR::regs().i2c_sclk_conf().modify(|_, w| unsafe {
             w.i2c_sclk_sel()
                 .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
             w.i2c_sclk_div_num().bits(new_config.div_num as _)
         });
+    }
+}
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            SpiInstance::Spi2 => PCR::regs()
+                .spi2_clkm_conf()
+                .modify(|_, w| w.spi2_clkm_en().bit(en)),
+        };
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        new_config: SpiFunctionClockConfig,
+    ) {
+        match self {
+            SpiInstance::Spi2 => PCR::regs().spi2_clkm_conf().modify(|_, w| unsafe {
+                w.spi2_clkm_div_num().bits(0);
+                w.spi2_clkm_sel().bits(match new_config {
+                    SpiFunctionClockConfig::Xtal => 0,
+                    SpiFunctionClockConfig::PllF160m => 1,
+                    SpiFunctionClockConfig::RcFast => 2,
+                    SpiFunctionClockConfig::PllF120m => 3,
+                })
+            }),
+        };
     }
 }

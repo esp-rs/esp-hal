@@ -68,7 +68,7 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -196,6 +196,12 @@ clocks = { system_clocks = { clock_tree = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
+    ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "PLL_80M", outputs = "PLL_80M" },
+        ] },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates

@@ -768,7 +768,6 @@ impl I2cInstance {
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // No dedicated enable bit on ESP32-S2; clock selection via ref_always_on.
-        let _ = self;
     }
 
     fn configure_function_clock_impl(
@@ -781,10 +780,26 @@ impl I2cInstance {
             I2cInstance::I2c0 => I2C0::regs(),
             I2cInstance::I2c1 => I2C1::regs(),
         };
-        // ref_always_on: 1 = APB, 0 = REF_TICK
         regs.ctr().modify(|_, w| {
             w.ref_always_on()
                 .bit(!matches!(new_config.sclk, I2cFunctionClockSclk::RefTick))
         });
+    }
+}
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        _new_config: SpiFunctionClockConfig,
+    ) {
+        // ESP32-S2 SPI is hardwired to APB; no clock source selection register.
     }
 }
