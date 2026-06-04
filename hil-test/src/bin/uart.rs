@@ -260,7 +260,6 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        rx.enable_break_detection();
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
@@ -277,7 +276,6 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        rx.enable_break_detection();
         for _ in 0..3 {
             tx.send_break(100);
             assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
@@ -288,8 +286,6 @@ mod tests {
     fn test_break_detection_interleaved(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
@@ -314,8 +310,6 @@ mod tests {
     fn test_break_detection_with_data(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
@@ -354,8 +348,6 @@ mod tests {
     fn test_break_detection_preserves_data(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Send data, flush to ensure transmission, then send break
         tx.write(&[0x01, 0x02, 0x03, 0x04]).unwrap();
@@ -534,7 +526,7 @@ mod async_tx_rx {
         join::join,
         select::{Either, select},
     };
-    use embassy_time::{Duration, Timer};
+    use embassy_time::{Delay, Duration, Timer};
     use embedded_io_async::Write;
     use esp_hal::{
         Async,
@@ -580,6 +572,16 @@ mod async_tx_rx {
         let _ = ctx.rx.read_async(&mut read).await;
 
         assert_eq!(read, byte);
+    }
+
+    #[test]
+    async fn test_break_detection(mut ctx: Context) {
+        let mut delay = Delay;
+
+        join(ctx.rx.wait_for_break_async(), async {
+            ctx.tx.send_break_async(&mut delay, 100).await;
+        })
+        .await;
     }
 
     #[test]

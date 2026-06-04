@@ -972,45 +972,38 @@ impl<'d> UartRx<'d, Blocking> {
 
     /// Waits for a break condition to be detected.
     ///
-    /// This is a blocking function that will continuously check for a break condition.
-    /// After detection, the break interrupt flag is automatically cleared.
+    /// This function polls the break-detection interrupt status and returns once
+    /// the receiver has detected a break condition. After detection, the break
+    /// status is automatically cleared.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
-        self.enable_break_detection();
-
-        while !self.regs().int_raw().read().brk_det().bit_is_set() {
+        while !self.is_break_detected() {
             // wait
         }
 
-        self.regs()
-            .int_clr()
-            .write(|w| w.brk_det().clear_bit_by_one());
+        self.clear_break_detected();
     }
 
     /// Waits for a break condition to be detected with a timeout.
     ///
-    /// This is a blocking function that will check for a break condition up to
-    /// the specified timeout. Returns `true` if a break was detected, `false` if
-    /// the timeout elapsed. After successful detection, the break interrupt flag
-    /// is automatically cleared.
+    /// This function polls the break-detection interrupt status until a break is
+    /// detected or the specified timeout expires. Returns `true` if a break was
+    /// detected, `false` if the timeout elapsed. After successful detection, the
+    /// break status is automatically cleared.
     ///
     /// ## Arguments
     /// * `timeout` - Maximum time to wait for a break condition
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout: crate::time::Duration) -> bool {
-        self.enable_break_detection();
-
         let start = crate::time::Instant::now();
 
-        while !self.regs().int_raw().read().brk_det().bit_is_set() {
+        while !self.is_break_detected() {
             if crate::time::Instant::now() - start >= timeout {
                 return false;
             }
         }
 
-        self.regs()
-            .int_clr()
-            .write(|w| w.brk_det().clear_bit_by_one());
+        self.clear_break_detected();
         true
     }
 
@@ -1181,9 +1174,6 @@ impl<'d> UartRx<'d, Async> {
     #[instability::unstable]
     pub async fn wait_for_break_async(&mut self) {
         UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
-        self.regs()
-            .int_clr()
-            .write(|w| w.brk_det().clear_bit_by_one());
     }
 }
 
@@ -1230,20 +1220,20 @@ where
         self
     }
 
-    /// Enable break detection.
+    /// Returns whether a break condition has been detected.
     ///
-    /// This must be called before any breaks are expected to be received.
-    /// Break detection is enabled automatically by [`Self::wait_for_break`]
-    /// and [`Self::wait_for_break_with_timeout`], but calling this method
-    /// explicitly ensures that breaks occurring before the first wait call
-    /// will be reliably detected.
+    /// The returned status is sticky and remains set until
+    /// [`Self::clear_break_detected`] is called, or until one of the
+    /// `wait_for_break` methods observes and clears it.
     #[instability::unstable]
-    pub fn enable_break_detection(&mut self) {
-        self.uart
-            .info()
-            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+    pub fn is_break_detected(&self) -> bool {
+        self.uart.info().check_rx_break_detected()
+    }
 
-        sync_regs(self.regs());
+    /// Clears the break-detection status.
+    #[instability::unstable]
+    pub fn clear_break_detected(&mut self) {
+        self.uart.info().clear_rx_break_detected();
     }
 
     /// Change the configuration.
@@ -1685,7 +1675,7 @@ impl<'d> Uart<'d, Async> {
 #[non_exhaustive]
 #[instability::unstable]
 pub enum UartInterrupt {
-    /// Indicates that the received has detected the configured
+    /// Indicates that the receiver has detected the configured
     /// [`Uart::set_at_cmd`] byte.
     AtCmd,
 
@@ -1908,6 +1898,22 @@ where
     /// ```
     pub fn read_ready(&self) -> bool {
         self.rx.read_ready()
+    }
+
+    /// Returns whether a break condition has been detected.
+    ///
+    /// The returned status is sticky and remains set until
+    /// [`Self::clear_break_detected`] is called, or until one of the
+    /// `wait_for_break` methods observes and clears it.
+    #[instability::unstable]
+    pub fn is_break_detected(&self) -> bool {
+        self.rx.is_break_detected()
+    }
+
+    /// Clears the break-detection status.
+    #[instability::unstable]
+    pub fn clear_break_detected(&mut self) {
+        self.rx.clear_break_detected();
     }
 
     #[procmacros::doc_replace]

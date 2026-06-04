@@ -697,6 +697,14 @@ impl Info {
         result
     }
 
+    pub(super) fn check_rx_break_detected(&self) -> bool {
+        self.rx_events().contains(RxEvent::BreakDetected)
+    }
+
+    pub(super) fn clear_rx_break_detected(&self) {
+        self.clear_rx_events(RxEvent::BreakDetected);
+    }
+
     pub(super) fn rx_fifo_count(&self) -> u16 {
         version::rx_fifo_count(self)
     }
