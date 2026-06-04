@@ -4,7 +4,6 @@ on:
   issues:
     types:
       - opened
-      - edited
 
 permissions:
   issues: write
@@ -22,16 +21,16 @@ jobs:
               [/low power/i, "Area: low power"],
               [/\bbug\b/i, "bug"],
 
-              [/\besp32\b/i, "chip:esp32"],
-              [/\besp32c2\b/i, "chip:esp32c2"],
-              [/\besp32c3\b/i, "chip:esp32c3"],
-              [/\besp32c5\b/i, "chip:esp32c5"],
-              [/\besp32c6\b/i, "chip:esp32c6"],
-              [/\besp32c61\b/i, "chip:esp32c61"],
-              [/\besp32h2\b/i, "chip:esp32h2"],
-              [/\besp32p4\b/i, "chip:esp32p4"],
-              [/\besp32s2\b/i, "chip:esp32s2"],
-              [/\besp32s3\b/i, "chip:esp32s3"],
+              [/\besp32(?![-_ ]?(?:c2|c3|c5|c6|c61|h2|p4|s2|s3)\b)\b/i, "chip:esp32"],
+              [/\besp32[-_ ]?c2\b/i, "chip:esp32c2"],
+              [/\besp32[-_ ]?c3\b/i, "chip:esp32c3"],
+              [/\besp32[-_ ]?c5\b/i, "chip:esp32c5"],
+              [/\besp32[-_ ]?c6\b/i, "chip:esp32c6"],
+              [/\besp32[-_ ]?c61\b/i, "chip:esp32c61"],
+              [/\besp32[-_ ]?h2\b/i, "chip:esp32h2"],
+              [/\besp32[-_ ]?p4\b/i, "chip:esp32p4"],
+              [/\besp32[-_ ]?s2\b/i, "chip:esp32s2"],
+              [/\besp32[-_ ]?s3\b/i, "chip:esp32s3"],
 
               [/\bci\b/i, "ci"],
               [/documentation/i, "documentation"],
@@ -85,10 +84,6 @@ jobs:
               [/\busb\b/i, "peripheral:usb"],
               [/\b(?:watchdog(?: timer)?|wdt)\b/i, "peripheral:wdt"],
             ];
-if (context.payload.action === 'edited' && 
-    !context.payload.changes?.title) {
-  return; // body-only edit, skip
-}
             const labels = [...new Set(
               rules
                 .filter(([regex]) => regex.test(context.payload.issue.title))
