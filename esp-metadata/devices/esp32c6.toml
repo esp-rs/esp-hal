@@ -392,6 +392,7 @@ has_memory_clock_gate = true
 
 [device.gpio]
 version = 2
+has_input_sync = true
 support_status = "supported"
 gpio_function = 1
 constant_0_input = 0x3c
