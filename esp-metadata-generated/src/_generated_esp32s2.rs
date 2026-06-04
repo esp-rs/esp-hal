@@ -540,9 +540,12 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("COPY_DMA", DMA_COPY, 0));
-        _for_each_inner_mem2mem_channel!((channels("COPY_DMA", DMA_COPY, 0)));
+        tt) => {} } _for_each_inner_mem2mem_channel!(("COPY_DMA", CopyDma,
+        CopyDmaChannel, DMA_COPY, 0)); _for_each_inner_mem2mem_channel!(("COPY_DMA",
+        CopyDma, CopyDmaChannel)); _for_each_inner_mem2mem_channel!((channels("COPY_DMA",
+        CopyDma, CopyDmaChannel, DMA_COPY, 0)));
         _for_each_inner_mem2mem_channel!((erased));
+        _for_each_inner_mem2mem_channel!((engines("COPY_DMA", CopyDma, CopyDmaChannel)));
     };
 }
 #[macro_export]

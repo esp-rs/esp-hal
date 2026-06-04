@@ -657,16 +657,22 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH0, 0));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH1, 0));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH2, 0));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH3, 0));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH4, 0));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdmaChannel, 0, 0, 1, 0, 2, 0,
-        3, 0, 4, 0)); _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH0, 0),
-        ("AHB_GDMA", DMA_CH1, 0), ("AHB_GDMA", DMA_CH2, 0), ("AHB_GDMA", DMA_CH3, 0),
-        ("AHB_GDMA", DMA_CH4, 0))); _for_each_inner_mem2mem_channel!((erased("AHB_GDMA",
-        AhbGdmaChannel, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0)));
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH1, 0));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2,
+        0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH3, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH4, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel));
+        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH0, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH1, 0), ("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH2, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH3, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH4, 0)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
+        0, 1, 0, 2, 0, 3, 0, 4, 0)));
+        _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma, AhbGdmaChannel)));
     };
 }
 #[macro_export]

@@ -3,6 +3,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::EnumSet;
+
 #[cfg(dma_mem2mem_requires_peripheral)]
 use crate::dma::DmaEligiblePeripheral;
 use crate::{
@@ -35,28 +37,161 @@ use crate::{
     message = "this DMA channel does not support memory-to-memory transfers",
     note = "Use a channel with `mem2mem = true` in device metadata. See `Mem2Mem::new`."
 )]
-pub trait Mem2MemCapableChannel: crate::private::Sealed {
+pub trait Mem2MemCapableChannel<'d>: DmaChannel {
+    #[doc(hidden)]
+    type Erased: DmaChannel + From<Self>;
+
     /// Peripheral selector programmed for memory-to-memory on this channel.
     #[cfg(not(dma_mem2mem_requires_peripheral))]
     fn mem2mem_id(&self) -> DmaPeripheral;
+
+    #[doc(hidden)]
+    #[allow(private_interfaces)]
+    fn into_channel(self) -> ErasedChannel<'d, Blocking>;
 }
 
+// Type-erased version of Channel/ChannelRx/ChannelTx
 for_each_mem2mem_channel! {
-    ($engine:literal, $ch:ident, $id:literal) => {
-        impl Mem2MemCapableChannel for crate::peripherals::$ch<'_> {
-            #[cfg(not(dma_mem2mem_requires_peripheral))]
-            fn mem2mem_id(&self) -> DmaPeripheral {
-                DmaPeripheral($id)
+    (engines $( ($engine:literal, $variant:ident, $any_ch:ident) ),* ) => {
+        struct ErasedChannel<'d, Dm: DriverMode> {
+            rx: ErasedChannelRx<'d, Dm>,
+            tx: ErasedChannelTx<'d, Dm>,
+        }
+
+        enum ErasedChannelRx<'d, Dm: DriverMode> {
+            $(
+                $variant(ChannelRx<Dm, <crate::dma::$any_ch<'d> as DmaChannel>::Rx>),
+            )*
+        }
+
+        impl<Dm: DriverMode> ErasedChannelRx<'_, Dm> {
+            delegate::delegate! {
+                to match self {
+                    $( Self::$variant(channel) => channel, )*
+                } {
+                    fn has_error(&self) -> bool;
+                    fn pending_in_interrupts(&self) -> EnumSet<DmaRxInterrupt>;
+                    #[cfg(dma_mem2mem_requires_peripheral)]
+                    fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral);
+                }
+
+                to match self {
+                    $( Self::$variant(channel) => channel, )*
+                } {
+                    fn set_mem2mem_mode(&mut self, value: bool);
+                    fn start_transfer(&mut self) -> Result<(), DmaError>;
+                    fn stop_transfer(&mut self);
+                    unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
+                        &mut self,
+                        peri: DmaPeripheral,
+                        buffer: &mut BUF,
+                    ) -> Result<(), DmaError>;
+                }
+            }
+        }
+
+        impl<'d> ErasedChannelRx<'d, Blocking> {
+            fn into_async(self) -> ErasedChannelRx<'d, Async> {
+                match self {
+                    $( Self::$variant(channel) => ErasedChannelRx::$variant(channel.into_async()), )*
+                }
+            }
+        }
+
+        impl<'d> ErasedChannelRx<'d, Async> {
+            fn into_blocking(self) -> ErasedChannelRx<'d, Blocking> {
+                match self {
+                    $( Self::$variant(channel) => ErasedChannelRx::$variant(channel.into_blocking()), )*
+                }
+            }
+        }
+
+        enum ErasedChannelTx<'d, Dm: DriverMode> {
+            $(
+                $variant(ChannelTx<Dm, <crate::dma::$any_ch<'d> as DmaChannel>::Tx>),
+            )*
+        }
+
+        impl<Dm: DriverMode> ErasedChannelTx<'_, Dm> {
+            delegate::delegate! {
+                to match self {
+                    $( Self::$variant(channel) => channel, )*
+                } {
+                    fn has_error(&self) -> bool;
+                    fn pending_out_interrupts(&self) -> EnumSet<DmaTxInterrupt>;
+                }
+
+                to match self {
+                    $( Self::$variant(channel) => channel, )*
+                } {
+                    fn start_transfer(&mut self) -> Result<(), DmaError>;
+                    fn stop_transfer(&mut self);
+                    unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
+                        &mut self,
+                        peri: DmaPeripheral,
+                        buffer: &mut BUF,
+                    ) -> Result<(), DmaError>;
+                }
+            }
+        }
+
+        impl<'d> ErasedChannelTx<'d, Blocking> {
+            fn into_async(self) -> ErasedChannelTx<'d, Async> {
+                match self {
+                    $( Self::$variant(channel) => ErasedChannelTx::$variant(channel.into_async()), )*
+                }
+            }
+        }
+
+        impl<'d> ErasedChannelTx<'d, Async> {
+            fn into_blocking(self) -> ErasedChannelTx<'d, Blocking> {
+                match self {
+                    $( Self::$variant(channel) => ErasedChannelTx::$variant(channel.into_blocking()), )*
+                }
             }
         }
     };
-    ($engine:literal, $any_ch:ident, $($hw:literal, $id:literal),+) => {
-        impl Mem2MemCapableChannel for crate::dma::$any_ch<'_> {
+}
+
+for_each_mem2mem_channel! {
+    ($engine:literal, $variant:ident, $any_ch:ident, $($hw:literal, $id:literal),+) => {
+        impl<'d> Mem2MemCapableChannel<'d> for crate::dma::$any_ch<'d> {
+            type Erased = Self;
+
             #[cfg(not(dma_mem2mem_requires_peripheral))]
             fn mem2mem_id(&self) -> DmaPeripheral {
                 match self.channel_index() {
                     $( $hw => DmaPeripheral($id), )+
-                    ch => panic!("Channel {} does not support memory-to-memory transfers", ch),
+                    ch => panic!(
+                        "Channel {} does not support memory-to-memory transfers",
+                        ch
+                    ),
+                }
+            }
+
+            fn into_channel(self) -> ErasedChannel<'d, Blocking> {
+                let channel = Channel::new(self);
+                ErasedChannel {
+                    rx: ErasedChannelRx::$variant(channel.rx),
+                    tx: ErasedChannelTx::$variant(channel.tx),
+                }
+            }
+        }
+    };
+    ($engine:literal, $variant:ident, $any_ch:ident, $ch:ident, $id:literal) => {
+        impl<'d> Mem2MemCapableChannel<'d> for crate::peripherals::$ch<'d> {
+            type Erased = crate::dma::$any_ch<'d>;
+
+            #[cfg(not(dma_mem2mem_requires_peripheral))]
+            fn mem2mem_id(&self) -> DmaPeripheral {
+                DmaPeripheral($id)
+            }
+
+            fn into_channel(self) -> ErasedChannel<'d, Blocking> {
+                let channel = Channel::new(crate::dma::$any_ch::from(self));
+                ErasedChannel {
+                    rx: ErasedChannelRx::$variant(channel.rx),
+                    tx: ErasedChannelTx::$variant(channel.tx),
                 }
             }
         }
@@ -68,26 +203,22 @@ for_each_mem2mem_channel! {
 /// This is a pseudo-peripheral that allows for memory to memory transfers.
 /// It is not a real peripheral, but a way to use the DMA engine for memory
 /// to memory transfers.
-pub struct Mem2Mem<E, Dm>
+pub struct Mem2Mem<'d, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     /// RX Half
-    pub rx: Mem2MemRx<E::Rx, Dm>,
+    pub rx: Mem2MemRx<'d, Dm>,
     /// TX Half
-    pub tx: Mem2MemTx<E::Tx, Dm>,
+    pub tx: Mem2MemTx<'d, Dm>,
 }
 
-impl<E> Mem2Mem<E, Blocking>
-where
-    E: DmaChannel,
-{
+impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new [`Mem2Mem`] instance.
     #[cfg(not(dma_mem2mem_requires_peripheral))]
-    pub fn new(channel: E) -> Self
+    pub fn new<CH>(channel: CH) -> Self
     where
-        E: Mem2MemCapableChannel,
+        CH: Mem2MemCapableChannel<'d>,
     {
         let dma_peri = channel.mem2mem_id();
         Self::new_inner(channel, dma_peri)
@@ -95,12 +226,12 @@ where
 
     /// Create a new [`Mem2Mem`] instance from a capable channel and a DMA peripheral.
     #[cfg(dma_mem2mem_requires_peripheral)]
-    pub fn new<'d, CH, P>(channel: CH, peripheral: P) -> Self
+    pub fn new<CH, P>(channel: CH, peripheral: P) -> Self
     where
-        CH: Mem2MemCapableChannel + Into<E>,
-        P: DmaEligiblePeripheral<ErasedChannel<'d> = E>,
+        CH: Mem2MemCapableChannel<'d>,
+        P: DmaEligiblePeripheral<ErasedChannel<'d> = CH::Erased>,
     {
-        Self::new_inner(channel.into(), peripheral.dma_peripheral())
+        Self::new_inner(channel, peripheral.dma_peripheral())
     }
 
     /// Create a new [`Mem2Mem`] instance.
@@ -113,13 +244,13 @@ where
     #[cfg(dma_mem2mem_requires_peripheral)]
     pub unsafe fn new_unsafe<CH>(channel: CH, peripheral: DmaPeripheral) -> Self
     where
-        CH: Mem2MemCapableChannel + Into<E>,
+        CH: Mem2MemCapableChannel<'d>,
     {
-        Self::new_inner(channel.into(), peripheral)
+        Self::new_inner(channel, peripheral)
     }
 
     /// Convert Mem2Mem to an async Mem2Mem.
-    pub fn into_async(self) -> Mem2Mem<E, Async> {
+    pub fn into_async(self) -> Mem2Mem<'d, Async> {
         Mem2Mem {
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
@@ -127,12 +258,12 @@ where
     }
 }
 
-impl<E> Mem2Mem<E, Blocking>
-where
-    E: DmaChannel,
-{
-    fn new_inner(channel: E, peripheral: DmaPeripheral) -> Self {
-        let mut channel = Channel::new(channel);
+impl<'d> Mem2Mem<'d, Blocking> {
+    fn new_inner(channel: impl Mem2MemCapableChannel<'d>, peripheral: DmaPeripheral) -> Self {
+        let mut channel = channel.into_channel();
+
+        #[cfg(dma_mem2mem_requires_peripheral)]
+        channel.rx.runtime_ensure_compatible(peripheral);
 
         #[cfg(dma_supports_mem2mem)]
         channel.rx.set_mem2mem_mode(true);
@@ -150,35 +281,28 @@ where
     }
 
     /// Shortcut to create a [SimpleMem2Mem]
-    pub fn with_descriptors<'d>(
+    pub fn with_descriptors(
         self,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
         config: BurstConfig,
-    ) -> Result<SimpleMem2Mem<'d, E, Blocking>, DmaError>
-    where
-        Self: 'd,
-    {
+    ) -> Result<SimpleMem2Mem<'d, Blocking>, DmaError> {
         SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
     }
 }
 
 /// The RX half of [Mem2Mem].
-pub struct Mem2MemRx<Rx, Dm>
+pub struct Mem2MemRx<'d, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     Dm: DriverMode,
 {
-    channel: ChannelRx<Dm, Rx>,
+    channel: ErasedChannelRx<'d, Dm>,
     peripheral: DmaPeripheral,
 }
 
-impl<Rx> Mem2MemRx<Rx, Blocking>
-where
-    Rx: crate::dma::DmaRxChannel,
-{
+impl<'d> Mem2MemRx<'d, Blocking> {
     /// Convert Mem2MemRx to an async Mem2MemRx.
-    pub fn into_async(self) -> Mem2MemRx<Rx, Async> {
+    pub fn into_async(self) -> Mem2MemRx<'d, Async> {
         Mem2MemRx {
             channel: self.channel.into_async(),
             peripheral: self.peripheral,
@@ -186,16 +310,15 @@ where
     }
 }
 
-impl<Rx, Dm> Mem2MemRx<Rx, Dm>
+impl<'d, Dm> Mem2MemRx<'d, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     Dm: DriverMode,
 {
     /// Start the RX half of a memory to memory transfer.
     pub fn receive<BUF>(
         mut self,
         mut buf: BUF,
-    ) -> Result<Mem2MemRxTransfer<Rx, BUF, Dm>, (DmaError, Self, BUF)>
+    ) -> Result<Mem2MemRxTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)>
     where
         BUF: DmaRxBuffer,
     {
@@ -218,19 +341,17 @@ where
 
 /// Represents an ongoing (or potentially finished) DMA Memory-to-Memory RX
 /// transfer.
-pub struct Mem2MemRxTransfer<Rx, BUF, Dm>
+pub struct Mem2MemRxTransfer<'d, BUF, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
-    m2m: ManuallyDrop<Mem2MemRx<Rx, Dm>>,
+    m2m: ManuallyDrop<Mem2MemRx<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<Rx, BUF, Dm> Mem2MemRxTransfer<Rx, BUF, Dm>
+impl<'d, BUF, Dm> Mem2MemRxTransfer<'d, BUF, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
@@ -245,7 +366,7 @@ where
     }
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
-    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<Rx, Dm>, BUF::Final) {
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         let (m2m, view) = self.release();
@@ -260,7 +381,7 @@ where
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(self) -> (Mem2MemRx<Rx, Dm>, BUF::Final) {
+    pub fn stop(self) -> (Mem2MemRx<'d, Dm>, BUF::Final) {
         let (mut m2m, view) = self.release();
 
         m2m.channel.stop_transfer();
@@ -268,7 +389,7 @@ where
         (m2m, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Mem2MemRx<Rx, Dm>, BUF::View) {
+    fn release(mut self) -> (Mem2MemRx<'d, Dm>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.m2m and
         // self.buf_view won't be touched again.
         let result = unsafe {
@@ -281,9 +402,8 @@ where
     }
 }
 
-impl<Rx, BUF, Dm> Deref for Mem2MemRxTransfer<Rx, BUF, Dm>
+impl<'d, BUF, Dm> Deref for Mem2MemRxTransfer<'d, BUF, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
@@ -294,9 +414,8 @@ where
     }
 }
 
-impl<Rx, BUF, Dm> DerefMut for Mem2MemRxTransfer<Rx, BUF, Dm>
+impl<'d, BUF, Dm> DerefMut for Mem2MemRxTransfer<'d, BUF, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
@@ -305,9 +424,8 @@ where
     }
 }
 
-impl<Rx, BUF, Dm> Drop for Mem2MemRxTransfer<Rx, BUF, Dm>
+impl<'d, BUF, Dm> Drop for Mem2MemRxTransfer<'d, BUF, Dm>
 where
-    Rx: crate::dma::DmaRxChannel,
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
@@ -325,21 +443,17 @@ where
 }
 
 /// The TX half of [Mem2Mem].
-pub struct Mem2MemTx<Tx, Dm>
+pub struct Mem2MemTx<'d, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     Dm: DriverMode,
 {
-    channel: ChannelTx<Dm, Tx>,
+    channel: ErasedChannelTx<'d, Dm>,
     peripheral: DmaPeripheral,
 }
 
-impl<Tx> Mem2MemTx<Tx, Blocking>
-where
-    Tx: crate::dma::DmaTxChannel,
-{
+impl<'d> Mem2MemTx<'d, Blocking> {
     /// Convert Mem2MemTx to an async Mem2MemTx.
-    pub fn into_async(self) -> Mem2MemTx<Tx, Async> {
+    pub fn into_async(self) -> Mem2MemTx<'d, Async> {
         Mem2MemTx {
             channel: self.channel.into_async(),
             peripheral: self.peripheral,
@@ -347,16 +461,15 @@ where
     }
 }
 
-impl<Tx, Dm> Mem2MemTx<Tx, Dm>
+impl<'d, Dm> Mem2MemTx<'d, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     Dm: DriverMode,
 {
     /// Start the TX half of a memory to memory transfer.
     pub fn send<BUF>(
         mut self,
         mut buf: BUF,
-    ) -> Result<Mem2MemTxTransfer<Tx, BUF, Dm>, (DmaError, Self, BUF)>
+    ) -> Result<Mem2MemTxTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)>
     where
         BUF: DmaTxBuffer,
     {
@@ -379,19 +492,17 @@ where
 
 /// Represents an ongoing (or potentially finished) DMA Memory-to-Memory TX
 /// transfer.
-pub struct Mem2MemTxTransfer<Tx, BUF, Dm>
+pub struct Mem2MemTxTransfer<'d, BUF, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    m2m: ManuallyDrop<Mem2MemTx<Tx, Dm>>,
+    m2m: ManuallyDrop<Mem2MemTx<'d, Dm>>,
     buf_view: ManuallyDrop<BUF::View>,
 }
 
-impl<Tx, BUF, Dm> Mem2MemTxTransfer<Tx, BUF, Dm>
+impl<'d, BUF, Dm> Mem2MemTxTransfer<'d, BUF, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -406,7 +517,7 @@ where
     }
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
-    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<Tx, Dm>, BUF::Final) {
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         let (m2m, view) = self.release();
@@ -421,7 +532,7 @@ where
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(self) -> (Mem2MemTx<Tx, Dm>, BUF::Final) {
+    pub fn stop(self) -> (Mem2MemTx<'d, Dm>, BUF::Final) {
         let (mut m2m, view) = self.release();
 
         m2m.channel.stop_transfer();
@@ -429,7 +540,7 @@ where
         (m2m, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Mem2MemTx<Tx, Dm>, BUF::View) {
+    fn release(mut self) -> (Mem2MemTx<'d, Dm>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.m2m and
         // self.buf_view won't be touched again.
         let result = unsafe {
@@ -442,9 +553,8 @@ where
     }
 }
 
-impl<Tx, BUF, Dm> Deref for Mem2MemTxTransfer<Tx, BUF, Dm>
+impl<'d, BUF, Dm> Deref for Mem2MemTxTransfer<'d, BUF, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -455,9 +565,8 @@ where
     }
 }
 
-impl<Tx, BUF, Dm> DerefMut for Mem2MemTxTransfer<Tx, BUF, Dm>
+impl<'d, BUF, Dm> DerefMut for Mem2MemTxTransfer<'d, BUF, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -466,9 +575,8 @@ where
     }
 }
 
-impl<Tx, BUF, Dm> Drop for Mem2MemTxTransfer<Tx, BUF, Dm>
+impl<'d, BUF, Dm> Drop for Mem2MemTxTransfer<'d, BUF, Dm>
 where
-    Tx: crate::dma::DmaTxChannel,
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
@@ -487,36 +595,34 @@ where
 
 /// A simple and easy to use wrapper around [SimpleMem2Mem].
 /// More complex memory to memory transfers should use [Mem2Mem] directly.
-pub struct SimpleMem2Mem<'d, E, Dm>
+pub struct SimpleMem2Mem<'d, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
-    state: State<'d, E, Dm>,
+    state: State<'d, Dm>,
     config: BurstConfig,
 }
 
-enum State<'d, E: DmaChannel, Dm: DriverMode> {
+enum State<'d, Dm: DriverMode> {
     Idle(
-        Mem2Mem<E, Dm>,
+        Mem2Mem<'d, Dm>,
         &'d mut [DmaDescriptor],
         &'d mut [DmaDescriptor],
     ),
     Active(
-        Mem2MemRxTransfer<E::Rx, DmaRxBuf, Dm>,
-        Mem2MemTxTransfer<E::Tx, DmaTxBuf, Dm>,
+        Mem2MemRxTransfer<'d, DmaRxBuf, Dm>,
+        Mem2MemTxTransfer<'d, DmaTxBuf, Dm>,
     ),
     InUse,
 }
 
-impl<'d, E, Dm> SimpleMem2Mem<'d, E, Dm>
+impl<'d, Dm> SimpleMem2Mem<'d, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     /// Creates a new [SimpleMem2Mem].
     pub fn new(
-        mem2mem: Mem2Mem<E, Dm>,
+        mem2mem: Mem2Mem<'d, Dm>,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
         config: BurstConfig,
@@ -531,9 +637,8 @@ where
     }
 }
 
-impl<'d, E, Dm> SimpleMem2Mem<'d, E, Dm>
+impl<'d, Dm> SimpleMem2Mem<'d, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     /// Starts a memory to memory transfer.
@@ -541,7 +646,7 @@ where
         &mut self,
         rx_buffer: &mut [u8],
         tx_buffer: &[u8],
-    ) -> Result<SimpleMem2MemTransfer<'_, 'd, E, Dm>, DmaError> {
+    ) -> Result<SimpleMem2MemTransfer<'_, 'd, Dm>, DmaError> {
         let State::Idle(mem2mem, rx_descriptors, tx_descriptors) =
             core::mem::replace(&mut self.state, State::InUse)
         else {
@@ -606,9 +711,8 @@ where
     }
 }
 
-impl<E, Dm> Drop for SimpleMem2Mem<'_, E, Dm>
+impl<Dm> Drop for SimpleMem2Mem<'_, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     fn drop(&mut self) {
@@ -620,14 +724,12 @@ where
 
 /// Represents an ongoing (or potentially finished) DMA Memory-to-Memory
 /// transfer.
-pub struct SimpleMem2MemTransfer<'a, 'd, E, Dm>(&'a mut SimpleMem2Mem<'d, E, Dm>)
+pub struct SimpleMem2MemTransfer<'a, 'd, Dm>(&'a mut SimpleMem2Mem<'d, Dm>)
 where
-    E: DmaChannel,
     Dm: DriverMode;
 
-impl<E, Dm> SimpleMem2MemTransfer<'_, '_, E, Dm>
+impl<Dm> SimpleMem2MemTransfer<'_, '_, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     /// Returns true when [Self::wait] will not block.
@@ -653,9 +755,8 @@ where
     }
 }
 
-impl<E, Dm> Drop for SimpleMem2MemTransfer<'_, '_, E, Dm>
+impl<Dm> Drop for SimpleMem2MemTransfer<'_, '_, Dm>
 where
-    E: DmaChannel,
     Dm: DriverMode,
 {
     fn drop(&mut self) {
