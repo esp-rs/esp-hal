@@ -4,6 +4,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+#[cfg(dma_mem2mem_requires_peripheral)]
+use crate::dma::DmaEligiblePeripheral;
 use crate::{
     Async,
     Blocking,
@@ -15,7 +17,6 @@ use crate::{
         ChannelTx,
         DmaChannel,
         DmaDescriptor,
-        DmaEligiblePeripheral,
         DmaError,
         DmaPeripheral,
         DmaRxBuf,
@@ -35,43 +36,17 @@ use crate::{
     message = "this DMA channel does not support memory-to-memory transfers",
     note = "Use a channel with `mem2mem = true` in device metadata. See `Mem2Mem::new`."
 )]
-pub trait Mem2MemCapableChannel: crate::private::Sealed {}
-
-for_each_mem2mem_channel! {
-    ($engine:literal, $ch:ident) => {
-        impl Mem2MemCapableChannel for crate::peripherals::$ch<'_> {}
-        // TODO: any channel
-    };
+pub trait Mem2MemCapableChannel: crate::private::Sealed {
+    /// GDMA peripheral selector programmed for memory-to-memory on this channel.
+    /// Only used when `dma_mem2mem_requires_peripheral` is not set.
+    const MEM2MEM_ID: u8;
 }
 
-/// Marker for DMA engines whose [`Mem2Mem::new`] does not take a peripheral argument.
-///
-/// Currently only the ESP32-S2 copy DMA engine (`DMA_COPY`).
-#[diagnostic::on_unimplemented(
-    message = "this DMA engine requires a peripheral for `Mem2Mem::new`",
-    note = "Pass a `DmaEligiblePeripheral` whose erased channel matches the DMA engine, e.g. `Mem2Mem::new(channel, peripherals.SPI2)`."
-)]
-pub trait NoPeripheral: crate::private::Sealed {}
-
-/// Marker for DMA engines whose [`Mem2Mem::new`] requires a [`DmaEligiblePeripheral`].
-///
-/// The peripheral's [`DmaEligiblePeripheral::ErasedChannel`] must match the erased
-/// channel type produced by [`Mem2MemCapableChannel`] + [`Into`].
-#[diagnostic::on_unimplemented(
-    message = "this DMA engine does not take a peripheral argument",
-    note = "Use `Mem2Mem::new(channel)` without a peripheral, e.g. on ESP32-S2 with `DMA_COPY`."
-)]
-pub trait RequiresPeripheral: crate::private::Sealed {}
-
-for_each_dma_engine! {
-    ("COPY_DMA") => {
-        impl NoPeripheral for crate::dma::CopyDmaChannel<'_> {}
-    };
-    ("AHB_GDMA") => {
-        impl RequiresPeripheral for crate::dma::AhbGdmaChannel<'_> {}
-    };
-    ("AXI_GDMA") => {
-        impl RequiresPeripheral for crate::dma::AxiGdmaChannel<'_> {}
+for_each_mem2mem_channel! {
+    ($engine:literal, $ch:ident, $id:literal) => {
+        impl Mem2MemCapableChannel for crate::peripherals::$ch<'_> {
+            const MEM2MEM_ID: u8 = $id;
+        }
     };
 }
 
@@ -95,35 +70,20 @@ impl<'d, E> Mem2Mem<'d, Blocking, E>
 where
     E: DmaChannel,
 {
-    /// Create a new [`Mem2Mem`] instance from a capable channel on a [`NoPeripheral`] engine.
+    /// Create a new [`Mem2Mem`] instance.
+    #[cfg(not(dma_mem2mem_requires_peripheral))]
     pub fn new(channel: E) -> Self
     where
-        E: Mem2MemCapableChannel + NoPeripheral,
+        E: Mem2MemCapableChannel,
     {
-        unsafe { Self::new_unsafe(channel) }
+        Self::new_inner(channel.into(), DmaPeripheral(E::MEM2MEM_ID))
     }
 
-    /// Create a new [`Mem2Mem`] instance.
-    ///
-    /// # Safety
-    ///
-    /// You must ensure that you're not using DMA for the same peripheral and
-    /// that you're the only one using the peripheral. You must also ensure that
-    /// the peripheral is compatible with the channel.
-    pub unsafe fn new_unsafe(channel: E) -> Self
-    where
-        E: Mem2MemCapableChannel + NoPeripheral,
-    {
-        // The S2 COPY DMA channel still needs a `DmaPeripheral` value for
-        // `prepare_transfer` even though no peripheral singleton is passed in.
-        Self::new_inner(channel.into(), DmaPeripheral::SPI2)
-    }
-
-    /// Create a new [`Mem2Mem`] instance from a capable channel and a matching peripheral.
-    pub fn new_with_peri<CH, P>(channel: CH, peripheral: P) -> Self
+    /// Create a new [`Mem2Mem`] instance from a capable channel and a DMA peripheral.
+    #[cfg(dma_mem2mem_requires_peripheral)]
+    pub fn new<CH, P>(channel: CH, peripheral: P) -> Self
     where
         CH: Mem2MemCapableChannel + Into<E>,
-        E: RequiresPeripheral,
         P: DmaEligiblePeripheral<ErasedChannel<'d> = E>,
     {
         Self::new_inner(channel.into(), peripheral.dma_peripheral())
@@ -136,12 +96,20 @@ where
     /// You must ensure that you're not using DMA for the same peripheral and
     /// that you're the only one using the peripheral. You must also ensure that
     /// the peripheral is compatible with the channel.
-    pub unsafe fn new_unsafe_with_peri<CH>(channel: CH, peripheral: DmaPeripheral) -> Self
+    #[cfg(dma_mem2mem_requires_peripheral)]
+    pub unsafe fn new_unsafe<CH>(channel: CH, peripheral: DmaPeripheral) -> Self
     where
         CH: Mem2MemCapableChannel + Into<E>,
-        E: RequiresPeripheral,
     {
         Self::new_inner(channel.into(), peripheral)
+    }
+
+    /// Convert Mem2Mem to an async Mem2Mem.
+    pub fn into_async(self) -> Mem2Mem<'d, Async, E> {
+        Mem2Mem {
+            rx: self.rx.into_async(),
+            tx: self.tx.into_async(),
+        }
     }
 }
 
@@ -177,14 +145,6 @@ where
         config: BurstConfig,
     ) -> Result<SimpleMem2Mem<'d, Blocking, E>, DmaError> {
         SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
-    }
-
-    /// Convert Mem2Mem to an async Mem2Mem.
-    pub fn into_async(self) -> Mem2Mem<'d, Async, E> {
-        Mem2Mem {
-            rx: self.rx.into_async(),
-            tx: self.tx.into_async(),
-        }
     }
 }
 

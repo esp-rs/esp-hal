@@ -64,6 +64,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         false
     };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
     ("dma.can_access_psram") => {
         false
     };

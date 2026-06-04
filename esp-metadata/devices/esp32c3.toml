@@ -272,6 +272,7 @@ has_region_monitor = true
 support_status = "partial"
 gdma_version = 1
 supports_mem2mem = true
+mem2mem_requires_peripheral = true
 max_priority = 9
 engines = [
     { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"], peripheral_instances = [

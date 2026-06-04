@@ -76,6 +76,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
     ("dma.can_access_psram") => {
         false
     };
@@ -427,8 +430,8 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH0));
-        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH0)));
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH0, 2));
+        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH0, 2)));
     };
 }
 #[macro_export]

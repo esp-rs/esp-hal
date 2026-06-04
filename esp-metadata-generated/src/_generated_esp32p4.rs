@@ -67,6 +67,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
     ("dma.can_access_psram") => {
         true
     };
@@ -509,14 +512,14 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH1));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH2));
-        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH0));
-        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH1));
-        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH2));
-        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH1), ("AHB_GDMA",
-        DMA_CH2), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA", DMA_AXI_CH1), ("AXI_GDMA",
-        DMA_AXI_CH2)));
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH1, 11));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH2, 12));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH0, 6));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH1, 7));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH2, 8));
+        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH1, 11), ("AHB_GDMA",
+        DMA_CH2, 12), ("AXI_GDMA", DMA_AXI_CH0, 6), ("AXI_GDMA", DMA_AXI_CH1, 7),
+        ("AXI_GDMA", DMA_AXI_CH2, 8)));
     };
 }
 #[macro_export]

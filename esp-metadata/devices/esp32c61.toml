@@ -99,19 +99,6 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
-    { name = "MEM2MEM0", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM2", virtual = true },
-    { name = "MEM2MEM3", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM6", virtual = true },
-    { name = "MEM2MEM7", virtual = true },
-    { name = "MEM2MEM8", virtual = true },
-    { name = "MEM2MEM9", virtual = true },
-    { name = "MEM2MEM10", virtual = true },
-    { name = "MEM2MEM11", virtual = true },
-
     { name = "PSRAM", virtual = true },
 ]
 
@@ -391,24 +378,12 @@ max_priority = 5
 # TODO: weight-based arbitration
 engines = [
     { name = "AHB_GDMA", drivers = ["sha", "spi_master", "i2s"], peripheral_instances = [
-        { name = "MEM2MEM0",  dma_id = 0 },
         { name = "SPI2",      dma_id = 1 },
-        { name = "MEM2MEM1",  dma_id = 2 },
         { name = "I2S0",      dma_id = 3 },
-        { name = "MEM2MEM2",  dma_id = 4 },
-        { name = "MEM2MEM3",  dma_id = 5 },
-        { name = "MEM2MEM4",  dma_id = 6 },
         { name = "SHA",       dma_id = 7 },
-        { name = "MEM2MEM5",  dma_id = 9 },
-        { name = "MEM2MEM6",  dma_id = 10 },
-        { name = "MEM2MEM7",  dma_id = 11 },
-        { name = "MEM2MEM8",  dma_id = 12 },
-        { name = "MEM2MEM9",  dma_id = 13 },
-        { name = "MEM2MEM10", dma_id = 14 },
-        { name = "MEM2MEM11", dma_id = 15 },
     ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 4, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, mem2mem_id = 5, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
     ] },
 ]
 

@@ -240,7 +240,7 @@ engines = [
         { name = "SPI2", dma_id = 0 },
         { name = "SHA", dma_id = 7 },
     ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
+        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 2, interrupt = "DMA_CH0" }, # 2 is UHCI - not supported on chip, but DMA peripheral exists
     ] },
 ]
 

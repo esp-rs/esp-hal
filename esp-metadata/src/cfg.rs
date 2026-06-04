@@ -343,6 +343,9 @@ driver_configs![
         properties: {
             #[serde(default)]
             supports_mem2mem: bool,
+            /// When true, memory-to-memory setup requires a real DMA peripheral (e.g. ESP32-C3/S3).
+            #[serde(default)]
+            mem2mem_requires_peripheral: bool,
             #[serde(default)]
             can_access_psram: bool,
             #[serde(default)]

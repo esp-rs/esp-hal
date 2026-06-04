@@ -25,8 +25,8 @@ mod tests {
 
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
-            soc_has_mem2mem1 => Mem2Mem::new_with_peri(peripherals.DMA_CH0, peripherals.MEM2MEM1),
-            _ => Mem2Mem::new_with_peri(peripherals.DMA_CH0, peripherals.SPI2),
+            any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+            _ => Mem2Mem::new(peripherals.DMA_CH0),
         };
 
         Context { mem2mem }

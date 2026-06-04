@@ -1359,6 +1359,7 @@ impl Chip {
                     "bt_controller=\"btdm\"",
                     "dedicated_gpio_version=\"riscv_v1\"",
                     "dma_supports_mem2mem",
+                    "dma_mem2mem_requires_peripheral",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
@@ -1587,6 +1588,7 @@ impl Chip {
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=dedicated_gpio_version=\"riscv_v1\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_mem2mem_requires_peripheral",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
@@ -1887,15 +1889,6 @@ impl Chip {
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
-                    "soc_has_mem2mem0",
-                    "soc_has_mem2mem1",
-                    "soc_has_mem2mem2",
-                    "soc_has_mem2mem3",
-                    "soc_has_mem2mem4",
-                    "soc_has_mem2mem5",
-                    "soc_has_mem2mem6",
-                    "soc_has_mem2mem7",
-                    "soc_has_mem2mem8",
                     "soc_has_psram",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -2164,15 +2157,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=soc_has_mem2mem0",
-                    "cargo:rustc-cfg=soc_has_mem2mem1",
-                    "cargo:rustc-cfg=soc_has_mem2mem2",
-                    "cargo:rustc-cfg=soc_has_mem2mem3",
-                    "cargo:rustc-cfg=soc_has_mem2mem4",
-                    "cargo:rustc-cfg=soc_has_mem2mem5",
-                    "cargo:rustc-cfg=soc_has_mem2mem6",
-                    "cargo:rustc-cfg=soc_has_mem2mem7",
-                    "cargo:rustc-cfg=soc_has_mem2mem8",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -2585,15 +2569,6 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_tsens",
                     "soc_has_wifi",
-                    "soc_has_mem2mem0",
-                    "soc_has_mem2mem1",
-                    "soc_has_mem2mem2",
-                    "soc_has_mem2mem3",
-                    "soc_has_mem2mem4",
-                    "soc_has_mem2mem5",
-                    "soc_has_mem2mem6",
-                    "soc_has_mem2mem7",
-                    "soc_has_mem2mem8",
                     "phy",
                     "lp_core",
                     "swd",
@@ -2885,15 +2860,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_tsens",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=soc_has_mem2mem0",
-                    "cargo:rustc-cfg=soc_has_mem2mem1",
-                    "cargo:rustc-cfg=soc_has_mem2mem2",
-                    "cargo:rustc-cfg=soc_has_mem2mem3",
-                    "cargo:rustc-cfg=soc_has_mem2mem4",
-                    "cargo:rustc-cfg=soc_has_mem2mem5",
-                    "cargo:rustc-cfg=soc_has_mem2mem6",
-                    "cargo:rustc-cfg=soc_has_mem2mem7",
-                    "cargo:rustc-cfg=soc_has_mem2mem8",
                     "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=lp_core",
                     "cargo:rustc-cfg=swd",
@@ -3308,18 +3274,6 @@ impl Chip {
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
-                    "soc_has_mem2mem0",
-                    "soc_has_mem2mem1",
-                    "soc_has_mem2mem2",
-                    "soc_has_mem2mem3",
-                    "soc_has_mem2mem4",
-                    "soc_has_mem2mem5",
-                    "soc_has_mem2mem6",
-                    "soc_has_mem2mem7",
-                    "soc_has_mem2mem8",
-                    "soc_has_mem2mem9",
-                    "soc_has_mem2mem10",
-                    "soc_has_mem2mem11",
                     "soc_has_psram",
                     "swd",
                     "rom_crc_le",
@@ -3525,18 +3479,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=soc_has_mem2mem0",
-                    "cargo:rustc-cfg=soc_has_mem2mem1",
-                    "cargo:rustc-cfg=soc_has_mem2mem2",
-                    "cargo:rustc-cfg=soc_has_mem2mem3",
-                    "cargo:rustc-cfg=soc_has_mem2mem4",
-                    "cargo:rustc-cfg=soc_has_mem2mem5",
-                    "cargo:rustc-cfg=soc_has_mem2mem6",
-                    "cargo:rustc-cfg=soc_has_mem2mem7",
-                    "cargo:rustc-cfg=soc_has_mem2mem8",
-                    "cargo:rustc-cfg=soc_has_mem2mem9",
-                    "cargo:rustc-cfg=soc_has_mem2mem10",
-                    "cargo:rustc-cfg=soc_has_mem2mem11",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
@@ -3895,15 +3837,6 @@ impl Chip {
                     "soc_has_flash",
                     "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
-                    "soc_has_mem2mem0",
-                    "soc_has_mem2mem1",
-                    "soc_has_mem2mem2",
-                    "soc_has_mem2mem3",
-                    "soc_has_mem2mem4",
-                    "soc_has_mem2mem5",
-                    "soc_has_mem2mem6",
-                    "soc_has_mem2mem7",
-                    "soc_has_mem2mem8",
                     "phy",
                     "swd",
                     "rom_crc_le",
@@ -4162,15 +4095,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_flash",
                     "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
-                    "cargo:rustc-cfg=soc_has_mem2mem0",
-                    "cargo:rustc-cfg=soc_has_mem2mem1",
-                    "cargo:rustc-cfg=soc_has_mem2mem2",
-                    "cargo:rustc-cfg=soc_has_mem2mem3",
-                    "cargo:rustc-cfg=soc_has_mem2mem4",
-                    "cargo:rustc-cfg=soc_has_mem2mem5",
-                    "cargo:rustc-cfg=soc_has_mem2mem6",
-                    "cargo:rustc-cfg=soc_has_mem2mem7",
-                    "cargo:rustc-cfg=soc_has_mem2mem8",
                     "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
@@ -5913,6 +5837,7 @@ impl Chip {
                     "dedicated_gpio_version=\"esp32s3\"",
                     "dedicated_gpio_needs_initialization",
                     "dma_supports_mem2mem",
+                    "dma_mem2mem_requires_peripheral",
                     "dma_can_access_psram",
                     "dma_ext_mem_configurable_block_size",
                     "dma_separate_in_out_interrupts",
@@ -6188,6 +6113,7 @@ impl Chip {
                     "cargo:rustc-cfg=dedicated_gpio_version=\"esp32s3\"",
                     "cargo:rustc-cfg=dedicated_gpio_needs_initialization",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_mem2mem_requires_peripheral",
                     "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_ext_mem_configurable_block_size",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
@@ -6835,6 +6761,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb128)");
     println!("cargo:rustc-check-cfg=cfg(aes_has_split_text_registers)");
     println!("cargo:rustc-check-cfg=cfg(assist_debug_has_region_monitor)");
+    println!("cargo:rustc-check-cfg=cfg(dma_mem2mem_requires_peripheral)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch2)");
     println!("cargo:rustc-check-cfg=cfg(aes_supports_dma)");
@@ -6880,15 +6807,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_pvt_monitor)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem1)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem2)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem3)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem4)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem5)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem6)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
@@ -6954,9 +6872,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32c61)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem9)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem10)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem11)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f96m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");

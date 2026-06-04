@@ -14,6 +14,11 @@ pub struct DmaChannelDef {
     /// Whether this channel supports memory-to-memory transfers.
     #[serde(default)]
     pub mem2mem: bool,
+    /// GDMA peripheral selector for memory-to-memory on this channel (dummy slot).
+    /// Required when `mem2mem = true` and the device has `mem2mem_requires_peripheral = false`.
+    /// Must not be set when `mem2mem_requires_peripheral = true`.
+    #[serde(default)]
+    pub mem2mem_id: Option<u32>,
     /// PAC peripheral type backing this channel's register block.
     /// When absent the singleton is virtual (GDMA channels).
     /// When present the singleton maps to the given PAC type (PDMA channels).
@@ -64,6 +69,43 @@ pub struct DmaEngineDef {
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 #[serde(transparent)]
 pub struct DmaEngines(pub Vec<DmaEngineDef>);
+
+impl DmaEngines {
+    pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) {
+        for engine in &self.0 {
+            let mut seen_ids = std::collections::HashSet::new();
+            for channel in &engine.channels {
+                if !channel.mem2mem {
+                    assert!(
+                        channel.mem2mem_id.is_none(),
+                        "DMA channel '{}': mem2mem_id is only valid when mem2mem = true",
+                        channel.name
+                    );
+                    continue;
+                }
+
+                match (requires_peripheral, channel.mem2mem_id) {
+                    (true, Some(id)) => panic!(
+                        "DMA channel '{}': mem2mem_id = {id} is forbidden when mem2mem_requires_peripheral is true",
+                        channel.name
+                    ),
+                    (false, None) => panic!(
+                        "DMA channel '{}': mem2mem_id is required when mem2mem_requires_peripheral is false",
+                        channel.name
+                    ),
+                    (false, Some(id)) => {
+                        assert!(
+                            seen_ids.insert(id),
+                            "DMA channel '{}': duplicate mem2mem_id {id}",
+                            channel.name
+                        );
+                    }
+                    (true, None) => {}
+                }
+            }
+        }
+    }
+}
 
 impl GenericProperty for DmaEngines {
     fn cfgs(&self) -> Option<Vec<String>> {
@@ -134,7 +176,8 @@ impl GenericProperty for DmaEngines {
                 let ch = quote::format_ident!("{}", channel.name);
 
                 if channel.mem2mem {
-                    mem2mem_channels.push(quote! { #engine_name, #ch });
+                    let mem2mem_id = number(channel.mem2mem_id.unwrap_or(0));
+                    mem2mem_channels.push(quote! { #engine_name, #ch, #mem2mem_id });
                 }
 
                 engine_channels.push(quote! { #engine_name, #ch });
