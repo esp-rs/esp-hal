@@ -541,7 +541,7 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
         let bytes = raw_frame.bytes;
 
         let frame_info = bytes[0];
-        let is_standard_format = frame_info & (0b1 << 7) == 0;
+        let is_extended_format = frame_info & (0b1 << 7) != 0;
         let is_data_frame = frame_info & (0b1 << 6) == 0;
         let self_reception = frame_info & (0b1 << 4) != 0;
         let dlc = frame_info & 0b1111;
@@ -552,14 +552,14 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
         let dlc = dlc as usize;
 
         // Frame Identifier: 2 or 4 bytes long
-        let (id, data_start) = match is_standard_format {
-            true => {
+        let (id, data_start) = match is_extended_format {
+            false => {
                 // Standard Format: 11-bit Identifier, 2 bytes long
                 let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
                 let id = Id::from(StandardId::new(raw_id).unwrap());
                 (id, 3)
             }
-            false => {
+            true => {
                 // Extended Format: 29-bit Identifier, 4 bytes long
                 let raw_id: u32 = ((bytes[1] as u32) << 21)
                     | ((bytes[2] as u32) << 13)
