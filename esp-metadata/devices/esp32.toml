@@ -344,7 +344,6 @@ instances = [
 
 [device.dma]
 support_status = "partial"
-supports_mem2mem = false
 engines = [
     { name = "SPI_DMA", drivers = ["spi_master", "spi_slave"], peripheral_instances = [
         { name = "SPI2", dma_id = 0 },

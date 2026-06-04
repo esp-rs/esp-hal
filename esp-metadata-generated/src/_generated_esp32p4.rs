@@ -64,9 +64,6 @@ macro_rules! property {
     ("assist_debug.has_region_monitor") => {
         false
     };
-    ("dma.supports_mem2mem") => {
-        true
-    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };

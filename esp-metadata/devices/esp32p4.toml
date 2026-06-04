@@ -392,7 +392,6 @@ has_arbitration_en = true
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
-supports_mem2mem = true
 max_priority = 5
 can_access_psram = true
 engines = [

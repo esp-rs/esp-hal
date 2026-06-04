@@ -292,7 +292,6 @@ instances = [
 
 [device.dma]
 support_status = "partial"
-supports_mem2mem = true
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
@@ -313,7 +312,7 @@ engines = [
         { name = "SHA", dma_id = 1 },
     ], channels = [{ name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA", compatible_with = ["AES", "SHA"] }] },
     { name = "COPY_DMA", channels = [
-        { name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true },
+        { name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true, mem2mem_id = 0 },
     ] },
 ]
 

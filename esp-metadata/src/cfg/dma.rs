@@ -116,6 +116,15 @@ impl GenericProperty for DmaEngines {
             .map(|ch| format!("soc_has_{}", ch.name.to_lowercase()))
             .collect();
 
+        if self
+            .0
+            .iter()
+            .flat_map(|e| e.channels.iter())
+            .any(|ch| ch.mem2mem)
+        {
+            cfgs.push("dma.supports_mem2mem".to_string());
+        }
+
         // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
         let mut seen = std::collections::HashSet::new();
         for engine in &self.0 {

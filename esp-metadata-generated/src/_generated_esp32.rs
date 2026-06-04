@@ -61,9 +61,6 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm"
     };
-    ("dma.supports_mem2mem") => {
-        false
-    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };

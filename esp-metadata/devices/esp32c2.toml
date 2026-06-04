@@ -233,7 +233,6 @@ has_sp_monitor = true
 [device.dma]
 support_status = "partial"
 gdma_version = 1
-supports_mem2mem = true
 max_priority = 9
 engines = [
     { name = "AHB_GDMA", drivers = ["sha", "spi_master", "spi_slave"], peripheral_instances = [
