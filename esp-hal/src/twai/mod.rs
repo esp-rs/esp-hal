@@ -542,7 +542,7 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
 
         let frame_info = bytes[0];
         let is_extended_format = frame_info & (0b1 << 7) != 0;
-        let is_data_frame = frame_info & (0b1 << 6) == 0;
+        let is_remote_request = frame_info & (0b1 << 6) != 0;
         let self_reception = frame_info & (0b1 << 4) != 0;
         let dlc = frame_info & 0b1111;
         if dlc > 8 {
@@ -571,12 +571,12 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
         };
 
         // Frame Data: `dlc` bytes long
-        let mut frame = match is_data_frame {
-            true => {
+        let mut frame = match is_remote_request {
+            false => {
                 let data_end = data_start + dlc;
                 EspTwaiFrame::new(id, &bytes[data_start..data_end]).unwrap()
             }
-            false => EspTwaiFrame::new_remote(id, dlc).unwrap(),
+            true => EspTwaiFrame::new_remote(id, dlc).unwrap(),
         };
 
         // Set Self Reception bit
