@@ -392,6 +392,7 @@ has_arbitration_en = true
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
+supports_mem2mem = true
 max_priority = 5
 can_access_psram = true
 engines = [
@@ -410,9 +411,9 @@ engines = [
         { name = "AES",  dma_id = 4 },
         { name = "SHA",  dma_id = 5 },
     ], channels = [
-        { name = "DMA_AXI_CH0", interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" }, # , mem2mem = true
-        { name = "DMA_AXI_CH1", interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" }, # , mem2mem = true
-        { name = "DMA_AXI_CH2", interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" }, # , mem2mem = true
+        { name = "DMA_AXI_CH0", mem2mem = true, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
+        { name = "DMA_AXI_CH1", mem2mem = true, interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" },
+        { name = "DMA_AXI_CH2", mem2mem = true, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
     ] },
 ]
 

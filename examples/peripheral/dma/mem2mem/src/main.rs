@@ -31,10 +31,11 @@ fn main() -> ! {
 
     let mem2mem = cfg_select! {
         feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_COPY),
+        feature = "esp32p4" => Mem2Mem::new_with_peri(peripherals.DMA_AXI_CH0, peripherals.SPI2),
         any(feature = "esp32c2", feature = "esp32c3", feature = "esp32s3") => {
-            Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
+            Mem2Mem::new_with_peri(peripherals.DMA_CH0, peripherals.SPI2)
         }
-        _ => Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1),
+        _ => Mem2Mem::new_with_peri(peripherals.DMA_CH0, peripherals.MEM2MEM1),
     };
 
     let mut mem2mem = mem2mem

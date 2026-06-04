@@ -13,7 +13,6 @@ pub struct DmaChannelDef {
     pub name: String,
     /// Whether this channel supports memory-to-memory transfers.
     #[serde(default)]
-    #[expect(unused)]
     pub mem2mem: bool,
     /// PAC peripheral type backing this channel's register block.
     /// When absent the singleton is virtual (GDMA channels).
@@ -99,6 +98,7 @@ impl GenericProperty for DmaEngines {
         // If the list is empty (GDMA), this contains nothing.
         let mut dma_pairs = vec![];
         let mut dma_any_pairs = vec![];
+        let mut mem2mem_channels = vec![];
         // Accumulates engine name tokens per driver, in engine declaration order.
         let mut driver_engines: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
@@ -132,6 +132,10 @@ impl GenericProperty for DmaEngines {
             for (idx, channel) in engine.channels.iter().enumerate() {
                 let idx = number(idx);
                 let ch = quote::format_ident!("{}", channel.name);
+
+                if channel.mem2mem {
+                    mem2mem_channels.push(quote! { #engine_name, #ch });
+                }
 
                 engine_channels.push(quote! { #engine_name, #ch });
 
@@ -207,6 +211,15 @@ impl GenericProperty for DmaEngines {
             &[("channels", &dma_pairs), ("any_channels", &dma_any_pairs)],
         );
 
+        let mem2mem_channel_macro = if !mem2mem_channels.is_empty() {
+            Some(generate_for_each_macro(
+                "mem2mem_channel",
+                &[("channels", &mem2mem_channels)],
+            ))
+        } else {
+            None
+        };
+
         // One with_{driver}_dma_engine! macro per driver that has DMA support.
         // Each driver uses exactly one engine; assert that invariant here.
         let driver_engine_macros: Vec<_> = driver_engines
@@ -226,6 +239,7 @@ impl GenericProperty for DmaEngines {
             #dma_engines_macro
             #dma_channel_macro
             #dma_pairs_macro
+            #mem2mem_channel_macro
             #(#driver_engine_macros)*
         })
     }

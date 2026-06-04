@@ -65,7 +65,7 @@ macro_rules! property {
         false
     };
     ("dma.supports_mem2mem") => {
-        false
+        true
     };
     ("dma.can_access_psram") => {
         true
@@ -502,6 +502,21 @@ macro_rules! for_each_dma_channel_peri_pair {
         AxiGdmaChannel, SPI2), ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI3),
         ("AXI_GDMA", any_channel = AxiGdmaChannel, AES), ("AXI_GDMA", any_channel =
         AxiGdmaChannel, SHA)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH1));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH2));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH0));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH1));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH2));
+        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH1), ("AHB_GDMA",
+        DMA_CH2), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA", DMA_AXI_CH1), ("AXI_GDMA",
+        DMA_AXI_CH2)));
     };
 }
 #[macro_export]

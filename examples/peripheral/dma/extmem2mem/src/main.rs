@@ -12,7 +12,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, DmaPeripheral, ExternalBurstConfig, Mem2Mem},
+    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
     dma_descriptors_chunk_size,
     main,
     time::Duration,
@@ -60,7 +60,8 @@ fn main() -> ! {
 
     let mem2mem = cfg_select! {
         feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_COPY),
-        _ => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+        feature = "esp32p4" => Mem2Mem::new_with_peri(peripherals.DMA_AXI_CH0, peripherals.SPI2),
+        _ => Mem2Mem::new_with_peri(peripherals.DMA_CH0, peripherals.SPI2),
     };
 
     let mut mem2mem = mem2mem
