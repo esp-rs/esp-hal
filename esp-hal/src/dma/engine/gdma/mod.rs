@@ -79,6 +79,10 @@ impl defmt::Format for AhbGdmaChannel<'_> {
 }
 
 impl AhbGdmaChannel<'_> {
+    pub(crate) fn channel_index(&self) -> u8 {
+        self.info.channel
+    }
+
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             info: self.info,

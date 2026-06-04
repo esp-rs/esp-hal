@@ -514,9 +514,13 @@ macro_rules! for_each_mem2mem_channel {
         _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH0, 6));
         _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH1, 7));
         _for_each_inner_mem2mem_channel!(("AXI_GDMA", DMA_AXI_CH2, 8));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdmaChannel, 1, 11, 2, 12));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", AxiGdmaChannel, 0, 6, 1, 7, 2, 8));
         _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH1, 11), ("AHB_GDMA",
         DMA_CH2, 12), ("AXI_GDMA", DMA_AXI_CH0, 6), ("AXI_GDMA", DMA_AXI_CH1, 7),
         ("AXI_GDMA", DMA_AXI_CH2, 8)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdmaChannel, 1, 11, 2,
+        12), ("AXI_GDMA", AxiGdmaChannel, 0, 6, 1, 7, 2, 8)));
     };
 }
 #[macro_export]

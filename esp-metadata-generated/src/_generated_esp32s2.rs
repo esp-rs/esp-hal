@@ -542,6 +542,7 @@ macro_rules! for_each_mem2mem_channel {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_mem2mem_channel!(("COPY_DMA", DMA_COPY, 0));
         _for_each_inner_mem2mem_channel!((channels("COPY_DMA", DMA_COPY, 0)));
+        _for_each_inner_mem2mem_channel!((erased));
     };
 }
 #[macro_export]

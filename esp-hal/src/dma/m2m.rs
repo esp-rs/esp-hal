@@ -37,15 +37,29 @@ use crate::{
     note = "Use a channel with `mem2mem = true` in device metadata. See `Mem2Mem::new`."
 )]
 pub trait Mem2MemCapableChannel: crate::private::Sealed {
-    /// GDMA peripheral selector programmed for memory-to-memory on this channel.
-    /// Only used when `dma_mem2mem_requires_peripheral` is not set.
-    const MEM2MEM_ID: u8;
+    /// Peripheral selector programmed for memory-to-memory on this channel.
+    #[cfg(not(dma_mem2mem_requires_peripheral))]
+    fn mem2mem_id(&self) -> DmaPeripheral;
 }
 
 for_each_mem2mem_channel! {
     ($engine:literal, $ch:ident, $id:literal) => {
         impl Mem2MemCapableChannel for crate::peripherals::$ch<'_> {
-            const MEM2MEM_ID: u8 = $id;
+            #[cfg(not(dma_mem2mem_requires_peripheral))]
+            fn mem2mem_id(&self) -> DmaPeripheral {
+                DmaPeripheral($id)
+            }
+        }
+    };
+    ($engine:literal, $any_ch:ident, $($hw:literal, $id:literal),+) => {
+        impl Mem2MemCapableChannel for crate::dma::$any_ch<'_> {
+            #[cfg(not(dma_mem2mem_requires_peripheral))]
+            fn mem2mem_id(&self) -> DmaPeripheral {
+                match self.channel_index() {
+                    $( $hw => DmaPeripheral($id), )+
+                    ch => panic!("Channel {} does not support memory-to-memory transfers", ch),
+                }
+            }
         }
     };
 }
@@ -76,7 +90,8 @@ where
     where
         E: Mem2MemCapableChannel,
     {
-        Self::new_inner(channel.into(), DmaPeripheral(E::MEM2MEM_ID))
+        let dma_peri = channel.mem2mem_id();
+        Self::new_inner(channel.into(), dma_peri)
     }
 
     /// Create a new [`Mem2Mem`] instance from a capable channel and a DMA peripheral.

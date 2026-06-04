@@ -8,13 +8,11 @@ mod tests {
     };
     const DATA_SIZE: usize = 1024 * 10;
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            type TestMem2Mem<'d> = Mem2Mem<'d, Blocking, esp_hal::dma::CopyDmaChannel<'d>>;
-        } else {
-            type TestMem2Mem<'d> = Mem2Mem<'d, Blocking, esp_hal::dma::AhbGdmaChannel<'d>>;
-        }
-    }
+    type Mem2MemChannel<'d> = cfg_select! {
+        esp32s2 => { esp_hal::dma::CopyDmaChannel<'d> },
+        _ => { esp_hal::dma::AhbGdmaChannel<'d> },
+    };
+    type TestMem2Mem<'d> = Mem2Mem<'d, Blocking, Mem2MemChannel<'d>>;
 
     struct Context {
         mem2mem: TestMem2Mem<'static>,
@@ -25,8 +23,9 @@ mod tests {
 
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
-            any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
-            _ => Mem2Mem::new(peripherals.DMA_CH0),
+            any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0.into(), peripherals.SPI2),
+            esp32p4 => Mem2Mem::new(peripherals.DMA_CH1.into()),
+                _ => Mem2Mem::new(peripherals.DMA_CH0.into()),
         };
 
         Context { mem2mem }

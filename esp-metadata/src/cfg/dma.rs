@@ -150,6 +150,9 @@ impl GenericProperty for DmaEngines {
         let mut dma_pairs = vec![];
         let mut dma_any_pairs = vec![];
         let mut mem2mem_channels = vec![];
+        // Per-engine (hardware channel index, mem2mem peripheral id) for type-erased channels.
+        let mut mem2mem_erased_by_engine: BTreeMap<&str, Vec<(TokenStream, TokenStream)>> =
+            BTreeMap::new();
         // Accumulates engine name tokens per driver, in engine declaration order.
         let mut driver_engines: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
@@ -187,6 +190,10 @@ impl GenericProperty for DmaEngines {
                 if channel.mem2mem {
                     let mem2mem_id = number(channel.mem2mem_id.unwrap_or(0));
                     mem2mem_channels.push(quote! { #engine_name, #ch, #mem2mem_id });
+                    mem2mem_erased_by_engine
+                        .entry(engine_name)
+                        .or_default()
+                        .push((idx.clone(), mem2mem_id));
                 }
 
                 engine_channels.push(quote! { #engine_name, #ch });
@@ -263,10 +270,22 @@ impl GenericProperty for DmaEngines {
             &[("channels", &dma_pairs), ("any_channels", &dma_any_pairs)],
         );
 
+        let mem2mem_erased = mem2mem_erased_by_engine
+            .iter()
+            .filter(|(engine_name, _)| **engine_name != "COPY_DMA")
+            .map(|(engine_name, arms)| {
+                let engine_pascal = engine_name.from_case(Case::Snake).to_case(Case::Pascal);
+                let any_channel = format_ident!("{engine_pascal}Channel");
+                let engine_name = *engine_name;
+                let (hws, ids): (Vec<_>, Vec<_>) = arms.iter().cloned().unzip();
+                quote! { #engine_name, #any_channel, #( #hws, #ids ),* }
+            })
+            .collect::<Vec<_>>();
+
         let mem2mem_channel_macro = if !mem2mem_channels.is_empty() {
             Some(generate_for_each_macro(
                 "mem2mem_channel",
-                &[("channels", &mem2mem_channels)],
+                &[("channels", &mem2mem_channels), ("erased", &mem2mem_erased)],
             ))
         } else {
             None

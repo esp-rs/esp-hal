@@ -428,7 +428,9 @@ macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", DMA_CH0, 2));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdmaChannel, 0, 2));
         _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", DMA_CH0, 2)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdmaChannel, 0, 2)));
     };
 }
 #[macro_export]
