@@ -1,6 +1,6 @@
 //! PARL_IO test
 
-//% CHIPS: esp32c5 esp32c6 esp32h2
+//% CHIP_FILTER: parl_io_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -10,6 +10,8 @@ use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+    #[cfg(esp32c6)]
+    use esp_hal::parl_io::{RxEightBits, TxEightBits};
     use esp_hal::{
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
@@ -21,14 +23,12 @@ mod tests {
             ParlIo,
             RxClkInPin,
             RxConfig,
-            RxEightBits,
             RxFourBits,
             RxOneBit,
             RxPinConfigWithValidPin,
             RxTwoBits,
             SampleEdge,
             TxConfig,
-            TxEightBits,
             TxFourBits,
             TxOneBit,
             TxPinConfigWithValidPin,
@@ -62,51 +62,59 @@ mod tests {
 
         let parl_io = peripherals.PARL_IO;
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c5)] {
+        let (valid_pin, clock_pin, data_pins) = cfg_select! {
+            esp32c5 => {
                 // 27 is RGB, 9 and 10 are connected, 13 and 14 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO3.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO6.degrade(),
-                    peripherals.GPIO7.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                ];
-            } else if #[cfg(esp32c6)] {
-                // 8 is RGB, 2 and 3 are connected, 12 and 13 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO6.degrade(),
-                    peripherals.GPIO7.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                    peripherals.GPIO10.degrade(),
-                ];
-            } else if #[cfg(esp32h2)] {
-                // 8 is RGB, 2 and 3 are connected, 26 and 27 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                    peripherals.GPIO10.degrade(),
-                    peripherals.GPIO11.degrade(),
-                    peripherals.GPIO23.degrade(),
-                ];
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO3.degrade(),
+                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO5.degrade(),
+                        peripherals.GPIO6.degrade(),
+                        peripherals.GPIO7.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                    ],
+                )
             }
-        }
+            esp32c6 => {
+                // 8 is RGB, 2 and 3 are connected, 12 and 13 is USB
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO5.degrade(),
+                        peripherals.GPIO6.degrade(),
+                        peripherals.GPIO7.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                        peripherals.GPIO10.degrade(),
+                    ],
+                )
+            }
+            esp32h2 => {
+                // 8 is RGB, 2 and 3 are connected, 26 and 27 is USB
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO5.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                        peripherals.GPIO10.degrade(),
+                        peripherals.GPIO11.degrade(),
+                        peripherals.GPIO23.degrade(),
+                    ],
+                )
+            }
+        };
 
         Context {
             parl_io,

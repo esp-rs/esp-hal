@@ -1,7 +1,9 @@
 //! Test we place the app descriptor at the right position in the image and we
 //! can read it
+//!
+//! TODO: P4 support is blocked on https://github.com/esp-rs/esp-hal/issues/5648
 
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2
+//% CHIP_FILTER: spi_master_driver_supported && !esp32p4
 //% FEATURES: unstable esp-storage
 
 #![no_std]

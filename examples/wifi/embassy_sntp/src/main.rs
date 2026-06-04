@@ -7,6 +7,8 @@
 //! response. The RTC time is then compared with the received data parsed with jiff.
 //! You can change the timezone to your local timezone.
 
+//% CHIP_FILTER: wifi_driver_supported
+
 #![no_std]
 #![no_main]
 

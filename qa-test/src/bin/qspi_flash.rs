@@ -22,7 +22,7 @@
 //! Connect a flash chip (GD25Q64C was used) and make sure QE in the status
 //! register is set.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: spi_master_supports_dma && !esp32p4
 //% TAG: flashchip
 
 #![no_std]
@@ -48,31 +48,29 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.GPIO12;
-            let miso = peripherals.GPIO2;
-            let mosi = peripherals.GPIO4;
-            let sio2 = peripherals.GPIO5;
-            let sio3 = peripherals.GPIO13;
-            let cs = peripherals.GPIO14;
-        } else {
-            let sclk = peripherals.GPIO0;
-            let miso = peripherals.GPIO1;
-            let mosi = peripherals.GPIO2;
-            let sio2 = peripherals.GPIO3;
-            let sio3 = peripherals.GPIO4;
-            let cs = peripherals.GPIO5;
-        }
-    }
+    let (sclk, miso, mosi, sio2, sio3, cs) = cfg_select! {
+        feature = "esp32" => (
+            peripherals.GPIO12,
+            peripherals.GPIO2,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+            peripherals.GPIO13,
+            peripherals.GPIO14,
+        ),
+        _ => (
+            peripherals.GPIO0,
+            peripherals.GPIO1,
+            peripherals.GPIO2,
+            peripherals.GPIO3,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+        ),
+    };
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let dma_channel = peripherals.DMA_SPI2;
-        } else {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
+        _ => peripherals.DMA_CH0,
+    };
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(320, 256);
     let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();

@@ -6,6 +6,8 @@
 //! This gets an IP address via DHCP and performs an HTTP GET request
 //! using the reqwless HTTP client.
 
+//% CHIP_FILTER: wifi_driver_supported
+
 #![no_std]
 #![no_main]
 

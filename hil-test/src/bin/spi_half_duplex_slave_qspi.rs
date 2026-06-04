@@ -1,6 +1,6 @@
 //! SPI Half Duplex Read/Write, SPI Slave and QSPI Tests
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: spi_slave_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -745,10 +745,11 @@ mod qspi_dma {
         },
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
-        } else {
+        }
+        _ => {
             const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
         }
     }

@@ -2,6 +2,8 @@
 //!
 //! Periodically transmits a beacon frame.
 
+//% CHIP_FILTER: wifi_driver_supported
+
 #![no_std]
 #![no_main]
 

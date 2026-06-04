@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: i2s_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -23,10 +23,11 @@ mod tests {
         time::Rate,
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+        any(esp32, esp32s2) => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-        } else {
+        }
+        _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
     }

@@ -1,7 +1,7 @@
 // ESP32 has some serious (light-)sleep issues - so don't include it here until that is fixed.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-hal/unstable
-//% CHIPS: esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
+//% CHIP_FILTER: wifi_driver_supported && sleep_driver_supported && !esp32
 
 #![no_std]
 #![no_main]

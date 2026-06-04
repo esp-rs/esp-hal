@@ -5,7 +5,7 @@
 //! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: rmt_driver_supported
 //% FEATURES: embassy esp-alloc unstable
 
 #![no_std]
@@ -58,11 +58,12 @@ use esp_hal::{
 use hil_test::{assert, assert_eq};
 
 // RMT channel clock = 500kHz
-cfg_if::cfg_if! {
-    if #[cfg(esp32h2)] {
+cfg_select! {
+    esp32h2 => {
         const FREQ: Rate = Rate::from_mhz(32);
         const DIV: u8 = 64;
-    } else {
+    }
+    _ => {
         const FREQ: Rate = Rate::from_mhz(80);
         const DIV: u8 = 160;
     }
@@ -440,21 +441,22 @@ macro_rules! pins {
     };
 }
 
-cfg_if::cfg_if!(
-    if #[cfg(any(esp32, esp32s3))] {
+cfg_select! {
+    any(esp32, esp32s3) => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel4
             };
         }
-    } else {
+    }
+    _ => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel2
             };
         }
     }
-);
+}
 
 struct Context {
     rmt: RMT<'static>,

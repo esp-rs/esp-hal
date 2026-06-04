@@ -7,7 +7,7 @@
 //! - SDA => GPIO6
 //! - SCL => GPIO7
 
-//% CHIPS: esp32c6
+//% CHIP_FILTER: lp_core
 
 #![no_std]
 #![no_main]

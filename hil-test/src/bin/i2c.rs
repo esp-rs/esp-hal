@@ -1,6 +1,6 @@
 //! I2C test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: i2c_master_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -56,6 +56,14 @@ const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 #[embassy_executor::task]
 async fn waiting_blocking_task() {
     esp_hal::delay::Delay::new().delay_millis(10);
+}
+
+fn pull_scl_low() {
+    let scl = cfg_select! {
+        esp32p4 => esp_hal::gpio::InputSignal::I2C0_SCL,
+        _ => esp_hal::gpio::InputSignal::I2CEXT0_SCL,
+    };
+    scl.connect_to(&esp_hal::gpio::Level::Low);
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
@@ -295,7 +303,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
@@ -314,7 +322,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
@@ -332,7 +340,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
@@ -381,13 +389,10 @@ mod tests {
     fn test_read_cali_with_different_clock_sources(mut ctx: Context) {
         use esp_hal::i2c::master::ClockSource;
 
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_version = "3")] {
-                let configs = [ClockSource::Xtal, ClockSource::RcFast];
-            } else {
-                let configs = [ClockSource::Apb, ClockSource::RefTick];
-            }
-        }
+        let configs = cfg_select! {
+            i2c_master_version = "3" => [ClockSource::Xtal, ClockSource::RcFast],
+            _ => [ClockSource::Apb, ClockSource::RefTick],
+        };
 
         for clock_source in configs {
             ctx.i2c

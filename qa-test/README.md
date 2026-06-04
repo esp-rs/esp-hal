@@ -4,7 +4,7 @@ This package contains a number of binary applications intended for manual/qualit
 
 Each device has its own unique set of peripherals, and as such not every test will run on every device. We recommend building and flashing the tests using the `xtask` method documented below, which will greatly simplify the process.
 
-To check if a device is compatible with a given test, check the metadata comments above the imports, which will list all supported devices following the `//% CHIPS:` designator. If this metadata is not present, then the test will work on any device supported by `esp-hal`.
+To check if a device is compatible with a given test, check the metadata comments above the imports, which describe the supported devices following the `//% CHIP_FILTER:` designator. If this metadata is not present, then the test will work on any device supported by `esp-hal`.
 
 As previously stated, we use the [cargo-xtask] pattern for automation. Commands invoking this tool must be run from the root of the repository.
 
@@ -24,12 +24,12 @@ Again, note that we must specify which package to build the test from, plus whic
 
 If you are contributing to `esp-hal` and would like to add a test, the process is generally the same as any other project.
 
-One major difference in our case is the metadata comments which state the compatible devices and required features for a test. Both of these designators are optional; if `//% CHIPS:` is omitted then all devices are considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
+One major difference in our case is the metadata comments which state the compatible devices and required features for a test. Both of these designators are optional; if `//% CHIP_FILTER:` is omitted then all devices are considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
 
 To demonstrate, in `src/bin/psram.rs` you will see the following:
 
 ```rust
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIP_FILTER: esp32 || esp32s2 || esp32s3
 //% FEATURES: esp-alloc/internal-heap-stats
 ```
 

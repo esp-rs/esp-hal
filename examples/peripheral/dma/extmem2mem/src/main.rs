@@ -1,5 +1,7 @@
 //! Uses DMA to copy psram to internal memory.
 
+//% CHIP_FILTER: dma_can_access_psram && dma_supports_mem2mem
+
 #![no_std]
 #![no_main]
 
@@ -56,7 +58,12 @@ fn main() -> ! {
     let intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
+    let mem2mem = cfg_select! {
+        feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_COPY),
+        _ => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+    };
+
+    let mut mem2mem = mem2mem
         .with_descriptors(
             rx_descriptors,
             tx_descriptors,

@@ -8,6 +8,8 @@
 //! The following wiring is assumed:
 //! - LED => GPIO1
 
+//% CHIP_FILTER: lp_core || ulp_riscv_core
+
 #![no_std]
 #![no_main]
 

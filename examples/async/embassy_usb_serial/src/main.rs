@@ -10,6 +10,8 @@
 //!   - DP => GPIO27
 //!   - DM => GPIO26
 
+//% CHIP_FILTER: usb_otg_driver_supported
+
 #![no_std]
 #![no_main]
 

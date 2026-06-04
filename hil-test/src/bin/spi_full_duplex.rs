@@ -1,6 +1,6 @@
 //! SPI Full Duplex test suite.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4 esp32s2 esp32s3
+//% CHIP_FILTER: spi_master_driver_supported
 //% FEATURES(unstable): esp-alloc unstable
 //% FEATURES(stable):
 
@@ -19,8 +19,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
+cfg_select! {
+    feature = "unstable" => {
         use esp_hal::peripherals::SPI2;
         use esp_hal::spi::master::{Address, Command, DataMode};
 
@@ -41,6 +41,7 @@ cfg_if::cfg_if! {
         #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
         use esp_hal::Async;
     }
+    _ => {}
 }
 
 #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
@@ -236,10 +237,11 @@ mod tests {
             },
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_supports_dma, feature = "unstable"))] {
+        cfg_select! {
+            all(spi_master_supports_dma, feature = "unstable") => {
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-            } else {
+            }
+            _ => {
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
                 static mut RX_BUFFER: [u8; 4096] = [0; 4096];
 
@@ -259,11 +261,8 @@ mod tests {
         .with_miso(miso)
         .with_mosi(mosi);
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "unstable")] {
-                #[cfg(pcnt_driver_supported)]
-                let pcnt = Pcnt::new(peripherals.PCNT);
-
+        cfg_select! {
+            feature = "unstable" => {
                 Context {
                     spi,
                     rx_buffer,
@@ -278,9 +277,10 @@ mod tests {
                     #[cfg(spi_master_supports_dma)]
                     tx_descriptors,
                     #[cfg(pcnt_driver_supported)]
-                    pcnt_unit: pcnt.unit0,
+                    pcnt_unit: Pcnt::new(peripherals.PCNT).unit0,
                 }
-            } else {
+            }
+            _ => {
                 Context {
                     spi,
                     rx_buffer,

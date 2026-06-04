@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
@@ -197,6 +197,57 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
+/// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
+/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
+fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
+    fn symbol_to_ident(s: &String) -> Option<String> {
+        s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+            .then_some(s.replace(".", "_"))
+    }
+
+    let possible_symbols = Chip::list_of_possible_symbols()
+        .iter()
+        .filter_map(|(sym, values)| {
+            if values.is_none() {
+                symbol_to_ident(sym)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let mut chips = Vec::new();
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        let chip_symbols = config
+            .all()
+            .iter()
+            .filter_map(symbol_to_ident)
+            .collect::<Vec<_>>();
+
+        let mut ctx = somni_expr::Context::new();
+
+        // All known symbols are initially false
+        for sym in possible_symbols.iter() {
+            ctx.add_variable(sym.as_str(), false);
+        }
+
+        // All defined symbols for this chip are true
+        for sym in chip_symbols.iter() {
+            ctx.add_variable(sym.as_str(), true);
+        }
+
+        let selected = ctx.evaluate::<bool>(expr).map_err(|err| {
+            anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression")
+        })?;
+        if selected {
+            chips.push(chip);
+        }
+    }
+    Ok(chips)
+}
+
 /// Load all examples at the given path, and parse their metadata.
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -242,13 +293,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             };
 
             match meta_line.key.as_str() {
-                // A list of chips that can run the example using the current configuration.
-                "CHIPS" => {
-                    let chips = meta_line
-                        .value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap())
-                        .collect::<Vec<_>>();
+                "CHIP_FILTER" => {
+                    let chips = parse_chips(meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
                 // A list of cargo `--config` configurations.
@@ -376,6 +422,37 @@ struct CargoToml {
     features: HashMap<String, Vec<String>>,
 }
 
+/// Parse the chip set from `//% CHIP_FILTER:` annotations in a source file.
+/// Returns `None` if the annotation is not present.
+fn parse_chips_from_annotation(
+    text: &str,
+) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
+    let mut found = false;
+    let mut chips: Vec<Chip> = Chip::iter().collect();
+
+    for (line_no, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("//%"))
+    {
+        let meta = parse_meta_line(line)
+            .with_context(|| format!("Failed to parse line {}", line_no + 1))?;
+        match meta.key.as_str() {
+            "CHIP_FILTER" => {
+                found = true;
+                chips = parse_chips(meta.value.as_str())?;
+            }
+            _ => {}
+        }
+    }
+
+    if !found {
+        return Ok(None);
+    }
+
+    Ok(Some(chips.into_iter().collect()))
+}
+
 /// Load all examples by finding all packages in the given path, and parsing their metadata.
 pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -398,10 +475,35 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let toml = fs::read_to_string(&cargo_toml_path)?;
         let toml: CargoToml = toml_edit::de::from_str(&toml)?;
 
-        let chips = toml
+        let cargo_chips: Vec<Chip> = toml
             .features
             .keys()
-            .filter_map(|chip| Chip::from_str(&chip, true).ok());
+            .filter_map(|k| Chip::from_str(k, true).ok())
+            .collect();
+
+        let chips_from_annotations = parse_chips_from_annotation(&text).with_context(|| {
+            format!("Failed to parse annotations in {}", main_rs_path.display())
+        })?;
+
+        // If the annotation requires chips that are not declared in Cargo.toml, bail.
+        if let Some(ref required) = chips_from_annotations {
+            let missing = required
+                .iter()
+                .filter(|c| !cargo_chips.contains(c))
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                anyhow::bail!(
+                    "{}: chips {missing:?} are required by the annotation but missing from Cargo.toml",
+                    package_path.display()
+                );
+            }
+        }
+
+        let chips = cargo_chips.into_iter().filter(|c| {
+            chips_from_annotations
+                .as_ref()
+                .map_or(true, |set| set.contains(c))
+        });
 
         for chip in chips {
             examples.push(Metadata {

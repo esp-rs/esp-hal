@@ -2,7 +2,7 @@
 //!
 //! You need a supported target with at least 2 MB of PSRAM memory.
 
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c5 esp32c61
+//% CHIP_FILTER: psram_driver_supported
 //% FEATURES: esp-alloc/internal-heap-stats
 
 #![no_std]

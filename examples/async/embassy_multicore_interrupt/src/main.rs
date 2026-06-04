@@ -9,6 +9,8 @@
 //! The following wiring is assumed:
 //! - LED => GPIO0
 
+//% CHIP_FILTER: multi_core
+
 #![no_std]
 #![no_main]
 

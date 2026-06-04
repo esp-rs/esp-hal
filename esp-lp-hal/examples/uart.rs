@@ -5,7 +5,7 @@
 //! It is neccessary to use Serial-Uart bridge connected to TX and RX to see
 //! logs from LP_UART. Make sure the LP RAM is cleared before loading the code.
 
-//% CHIPS: esp32c6
+//% CHIP_FILTER: lp_core
 
 #![no_std]
 #![no_main]

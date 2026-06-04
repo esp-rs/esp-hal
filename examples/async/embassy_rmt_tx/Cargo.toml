@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-cfg-if = "1"
 embassy-executor = "0.10.0"
 embassy-time = "0.5.0"
 esp-backtrace = { path = "../../../esp-backtrace", features = [
@@ -53,6 +52,12 @@ esp32s3 = [
     "esp-bootloader-esp-idf/esp32s3",
     "esp-rtos/esp32s3",
     "esp-hal/esp32s3",
+]
+esp32c5 = [
+    "esp-backtrace/esp32c5",
+    "esp-bootloader-esp-idf/esp32c5",
+    "esp-rtos/esp32c5",
+    "esp-hal/esp32c5",
 ]
 
 [profile.release]

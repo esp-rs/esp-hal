@@ -24,7 +24,7 @@
 //! - LCD_DATA14 => GPIO2
 //! - LCD_DATA15 => GPIO1
 
-//% CHIPS: esp32s3
+//% CHIP_FILTER: rgb_display_driver_supported && !esp32
 
 #![no_std]
 #![no_main]

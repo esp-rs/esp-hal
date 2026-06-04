@@ -6,7 +6,7 @@
 //! - performs an HTTP get request to some "random" server
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/ble esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32s3
+//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported
 
 #![no_std]
 #![no_main]

@@ -2,9 +2,9 @@
 //!
 //! Issue: <https://github.com/esp-rs/esp-hal/issues/5183>
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-
-// NOTE: esp32c2 doesn't have rtc-fast memory
+// esp32c2 and esp32c61 have no rtc-fast memory, which is required by the persistent BOOT_COUNT
+// variable.
+//% CHIP_FILTER: sleep_driver_supported && !esp32c2 && !esp32c61
 #![no_std]
 #![no_main]
 use embassy_executor::Spawner;
@@ -99,10 +99,12 @@ async fn main(_spawner: Spawner) {
         PRE_SLEEP_US = rtc.current_time_us();
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))] {
+    cfg_select! {
+        any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3") => {
             let config = RtcSleepConfig::deep();
-        } else { //esp32/c3/s2
+        }
+        _ => {
+            // esp32/c3/s2
             let mut config = RtcSleepConfig::deep();
             config.set_rtc_fastmem_pd_en(false);
         }

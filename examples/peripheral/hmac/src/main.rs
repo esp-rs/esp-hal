@@ -54,6 +54,8 @@
 //! xxd -p key.bin
 //! ```
 
+//% CHIP_FILTER: hmac_driver_supported
+
 #![no_std]
 #![no_main]
 

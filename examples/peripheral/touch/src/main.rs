@@ -6,6 +6,8 @@
 //! GPIO pins 2 and 4 must be connected to a touch pad (usually a larger copper
 //! pad on a PCB).
 
+//% CHIP_FILTER: touch_driver_supported
+
 #![no_std]
 #![no_main]
 

@@ -10,6 +10,8 @@
 //!
 //! This example transfers data via SPI.
 
+//% CHIP_FILTER: spi_master_driver_supported
+
 #![no_std]
 #![no_main]
 

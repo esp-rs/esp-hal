@@ -11,7 +11,7 @@
 //! - WS   =>  GPIO4
 //! - DIN  =>  GPIO5
 
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: i2s_driver_supported
 
 #![no_std]
 #![no_main]
@@ -38,13 +38,10 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let dma_channel = peripherals.DMA_I2S0;
-        } else {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_I2S0,
+        _ => peripherals.DMA_CH0,
+    };
 
     let buffer = dma_rx_stream_buffer!(4092 * 8, 2048);
 
@@ -80,17 +77,19 @@ async fn main(_spawner: Spawner) {
         if avail > 0 {
             let count = transaction.pop(&mut data[..avail]);
 
-            #[cfg(not(feature = "esp32s2"))]
-            println!(
-                "got {} bytes, {:x?}..{:x?}",
-                count,
-                &data[..10],
-                &data[count - 10..count]
-            );
-
-            // esp-println is a bit slow on ESP32-S2 - don't run into DMA too late errors
-            #[cfg(feature = "esp32s2")]
-            println!("got {} bytes", count,);
+            cfg_select! {
+                feature = "esp32s2" => {
+                    println!("got {} bytes", count,);
+                }
+                _ => {
+                    println!(
+                        "got {} bytes, {:x?}..{:x?}",
+                        count,
+                        &data[..10],
+                        &data[count - 10..count]
+                    );
+                }
+            }
         }
     }
 }

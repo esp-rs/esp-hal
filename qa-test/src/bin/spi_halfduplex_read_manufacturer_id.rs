@@ -22,7 +22,7 @@
 //! Connect a flash chip (GD25Q64C was used) and make sure QE in the status
 //! register is set.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: spi_master_driver_supported
 //% TAG: flashchip
 
 #![no_std]
@@ -47,23 +47,24 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.GPIO12;
-            let miso = peripherals.GPIO2;
-            let mosi = peripherals.GPIO4;
-            let sio2 = peripherals.GPIO5;
-            let sio3 = peripherals.GPIO13;
-            let cs = peripherals.GPIO14;
-        } else {
-            let sclk = peripherals.GPIO0;
-            let miso = peripherals.GPIO1;
-            let mosi = peripherals.GPIO2;
-            let sio2 = peripherals.GPIO3;
-            let sio3 = peripherals.GPIO4;
-            let cs = peripherals.GPIO5;
-        }
-    }
+    let (sclk, miso, mosi, sio2, sio3, cs) = cfg_select! {
+        feature = "esp32" => (
+            peripherals.GPIO12,
+            peripherals.GPIO2,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+            peripherals.GPIO13,
+            peripherals.GPIO14,
+        ),
+        _ => (
+            peripherals.GPIO0,
+            peripherals.GPIO1,
+            peripherals.GPIO2,
+            peripherals.GPIO3,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+        ),
+    };
 
     let mut spi = Spi::new(
         peripherals.SPI2,
