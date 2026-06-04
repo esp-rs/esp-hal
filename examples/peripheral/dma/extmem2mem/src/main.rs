@@ -60,15 +60,9 @@ fn main() -> ! {
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let mem2mem = cfg_select! {
-        feature = "esp32c3" | "esp32s3" => {
-            Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
-        },
-        feature = "esp32p4" => {
-            Mem2Mem::new(peripherals.DMA_AXI_CH0)
-        },
-        _ => {
-            Mem2Mem::new(peripherals.DMA_CH0)
-        }
+        feature = "esp32s3" => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+        feature = "esp32p4" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
+        _ => Mem2Mem::new(peripherals.DMA_CH0),
     };
 
     let mut mem2mem = mem2mem

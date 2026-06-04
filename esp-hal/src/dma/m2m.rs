@@ -90,7 +90,7 @@ where
         E: Mem2MemCapableChannel,
     {
         let dma_peri = channel.mem2mem_id();
-        Self::new_inner(channel.into(), dma_peri)
+        Self::new_inner(channel, dma_peri)
     }
 
     /// Create a new [`Mem2Mem`] instance from a capable channel and a DMA peripheral.
