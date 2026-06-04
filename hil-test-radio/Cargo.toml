@@ -19,11 +19,25 @@ harness           = false
 required-features = ["esp-alloc"]
 path              = "src/bin/support/wifi_ap_support.rs"
 
+[[bin]]
+name              = "ble"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/tests/ble.rs"
+
+[[bin]]
+name              = "ble_peripheral_support"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/support/ble_peripheral_support.rs"
+
 [dependencies]
 cfg-if             = "1"
 defmt              = "1.0.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
+embassy-futures    = "0.1"
+embassy-sync       = "0.7"
 embassy-time       = "0.5.0"
 embedded-io        = "0.7.1"
 embedded-io-async  = "0.7.0"
@@ -50,6 +64,14 @@ reqwless = { version = "0.14.0", default-features = false }
 edge-dhcp = "0.7.0"
 edge-nal = "0.6.0"
 edge-nal-embassy = "0.8.1"
+trouble-host = { version = "0.6.0", default-features = false, features = [
+    "central",
+    "default-packet-pool-mtu-255",
+    "derive",
+    "gatt",
+    "peripheral",
+    "scan",
+] }
 
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
