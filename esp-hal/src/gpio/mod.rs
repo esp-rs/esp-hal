@@ -941,20 +941,24 @@ impl<'d> Output<'d> {
     }
 }
 
-/// Configures the clock edge used to synchronize the GPIO input signal to the
-/// system clock, reducing metastability.
+/// Configures the clock edge used in one of the two input synchronization stages to synchronize the
+/// GPIO input signal to the system clock, reducing metastability.
+///
+/// See [`InputConfig::with_input_sync_stage1`] and
+/// [`InputConfig::with_input_sync_stage2`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[cfg(gpio_has_input_sync)]
 pub enum InputSync {
-    /// Input signal passes through without synchronization (hardware default).
+    /// Stage is disabled; the signal passes through without latching (hardware
+    /// default).
     #[default]
-    Disabled,
-    /// Both synchronization stages latch on the falling edge of the GPIO clock.
-    NegativeSync,
-    /// Both synchronization stages latch on the rising edge of the GPIO clock.
-    PositiveSync,
+    Disabled     = 0,
+    /// Stage latches on the falling edge of the GPIO clock.
+    NegativeEdge = 1,
+    /// Stage latches on the rising edge of the GPIO clock.
+    PositiveEdge = 2,
 }
 
 /// Input pin configuration.
@@ -965,12 +969,19 @@ pub struct InputConfig {
     /// Initial pull of the pin.
     pull: Pull,
 
-    /// Input signal synchronization.
+    /// First input synchronization stage.
     ///
     /// Default value: [`InputSync::Disabled`].
     #[cfg(gpio_has_input_sync)]
     #[builder_lite(unstable)]
-    input_sync: InputSync,
+    input_sync_stage1: InputSync,
+
+    /// Second input synchronization stage.
+    ///
+    /// Default value: [`InputSync::Disabled`].
+    #[cfg(gpio_has_input_sync)]
+    #[builder_lite(unstable)]
+    input_sync_stage2: InputSync,
 }
 
 impl Default for InputConfig {
@@ -978,7 +989,9 @@ impl Default for InputConfig {
         Self {
             pull: Pull::None,
             #[cfg(gpio_has_input_sync)]
-            input_sync: Default::default(),
+            input_sync_stage1: Default::default(),
+            #[cfg(gpio_has_input_sync)]
+            input_sync_stage2: Default::default(),
         }
     }
 }
@@ -1844,19 +1857,14 @@ impl<'lt> AnyPin<'lt> {
         });
 
         #[cfg(gpio_has_input_sync)]
-        {
-            let sync_bits: u8 = match config.input_sync {
-                InputSync::Disabled => 0,
-                InputSync::NegativeSync => 1,
-                InputSync::PositiveSync => 2,
-            };
-            self.with_gpio_lock(|| {
-                GPIO::regs().pin(self.number() as usize).modify(|_, w| unsafe {
-                    w.sync1_bypass().bits(sync_bits);
-                    w.sync2_bypass().bits(sync_bits)
+        self.with_gpio_lock(|| {
+            GPIO::regs()
+                .pin(self.number() as usize)
+                .modify(|_, w| unsafe {
+                    w.sync1_bypass().bits(config.input_sync_stage1 as u8);
+                    w.sync2_bypass().bits(config.input_sync_stage2 as u8)
                 });
-            });
-        }
+        });
     }
 
     fn clear_interrupt(&self) {
