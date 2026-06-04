@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
+use anyhow::{Result, bail, ensure};
 use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -71,12 +72,12 @@ pub struct DmaEngineDef {
 pub struct DmaEngines(pub Vec<DmaEngineDef>);
 
 impl DmaEngines {
-    pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) {
+    pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
         for engine in &self.0 {
             let mut seen_ids = std::collections::HashSet::new();
             for channel in &engine.channels {
                 if !channel.mem2mem {
-                    assert!(
+                    ensure!(
                         channel.mem2mem_id.is_none(),
                         "DMA channel '{}': mem2mem_id is only valid when mem2mem = true",
                         channel.name
@@ -85,16 +86,16 @@ impl DmaEngines {
                 }
 
                 match (requires_peripheral, channel.mem2mem_id) {
-                    (true, Some(id)) => panic!(
+                    (true, Some(id)) => bail!(
                         "DMA channel '{}': mem2mem_id = {id} is forbidden when mem2mem_requires_peripheral is true",
                         channel.name
                     ),
-                    (false, None) => panic!(
+                    (false, None) => bail!(
                         "DMA channel '{}': mem2mem_id is required when mem2mem_requires_peripheral is false",
                         channel.name
                     ),
                     (false, Some(id)) => {
-                        assert!(
+                        ensure!(
                             seen_ids.insert(id),
                             "DMA channel '{}': duplicate mem2mem_id {id}",
                             channel.name
@@ -104,6 +105,7 @@ impl DmaEngines {
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -195,7 +197,8 @@ impl GenericProperty for DmaEngines {
                         "{}",
                         engine.name.from_case(Case::Snake).to_case(Case::Pascal)
                     );
-                    mem2mem_channels.push(quote! { #engine_name, #variant, #any_channel, #ch, #mem2mem_id });
+                    mem2mem_channels
+                        .push(quote! { #engine_name, #variant, #any_channel, #ch, #mem2mem_id });
                     mem2mem_erased_by_engine
                         .entry(engine_name)
                         .or_default()
