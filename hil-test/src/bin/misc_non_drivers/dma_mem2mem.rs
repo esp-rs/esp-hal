@@ -8,14 +8,13 @@ mod tests {
     };
     const DATA_SIZE: usize = 1024 * 10;
 
-    type Mem2MemChannel<'d> = cfg_select! {
+    type TestMem2MemChannel<'d> = cfg_select! {
         esp32s2 => { esp_hal::dma::CopyDmaChannel<'d> },
         _ => { esp_hal::dma::AhbGdmaChannel<'d> },
     };
-    type TestMem2Mem<'d> = Mem2Mem<'d, Blocking, Mem2MemChannel<'d>>;
 
     struct Context {
-        mem2mem: TestMem2Mem<'static>,
+        mem2mem: Mem2Mem<TestMem2MemChannel<'static>, Blocking>,
     }
     #[init]
     fn init() -> Context {

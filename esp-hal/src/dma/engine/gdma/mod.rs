@@ -79,6 +79,7 @@ impl defmt::Format for AhbGdmaChannel<'_> {
 }
 
 impl AhbGdmaChannel<'_> {
+    #[cfg(not(dma_mem2mem_requires_peripheral))]
     pub(crate) fn channel_index(&self) -> u8 {
         self.info.channel
     }
