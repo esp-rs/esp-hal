@@ -8,6 +8,8 @@
 //! The example uses the HS USB port of the ESP32-P4.
 //! This port uses dedicated pins, not GPIOs.
 
+//% CHIP_FILTER: usb_otg_hs_driver_supported
+
 #![no_std]
 #![no_main]
 
