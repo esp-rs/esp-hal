@@ -1,6 +1,10 @@
 name: Binary Size Analysis
 
-run-name: Binary size for PR
+run-name: >-
+  ${{ format('Binary size for PR #{0}{1}',
+      inputs.pr_number,
+      inputs.distinct_id != '' && format(' [dispatch-id: {0}]', inputs.distinct_id) || ''
+  ) }}
 
 on:
   workflow_dispatch:
@@ -24,6 +28,11 @@ on:
         type: string
       comment_id:
         description: "Comment ID to update with binary size results"
+        required: false
+        default: ""
+        type: string
+      distinct_id:
+        description: "Correlation marker set by the dispatcher; do not set manually"
         required: false
         default: ""
         type: string

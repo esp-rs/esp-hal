@@ -13,6 +13,12 @@ permissions:
   pull-requests: write
   contents: read
 
+# Unique marker correlating a dispatched run with this dispatcher invocation.
+# The dispatch step and its matching find-run step MUST use the same value, so
+# define it once here rather than repeating the expression at every call site.
+env:
+  DISTINCT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   # ---------------------------------------------------------------------------
   # LABEL: TRUSTED AUTHOR
@@ -269,7 +275,8 @@ jobs:
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "esp32c6 esp32s3",
               "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}"
+              "package": "${{ steps.parse-tests.outputs.package }}",
+              "distinct_id": "${{ env.DISTINCT_ID }}"
             }
 
       - name: Find HIL run URL (quick)
@@ -284,7 +291,7 @@ jobs:
               context,
               pr: context.payload.issue.number,
               selector: 'quick',
-              tests: '${{ steps.parse-tests.outputs.tests }}',
+              distinctId: '${{ env.DISTINCT_ID }}',
             });
 
             core.setOutput('run_id', runId);
@@ -359,7 +366,8 @@ jobs:
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4",
               "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}"
+              "package": "${{ steps.parse-tests.outputs.package }}",
+              "distinct_id": "${{ env.DISTINCT_ID }}"
             }
 
       - name: Find HIL run URL (full)
@@ -374,7 +382,7 @@ jobs:
               context,
               pr: context.payload.issue.number,
               selector: 'full',
-              tests: '${{ steps.parse-tests.outputs.tests }}',
+              distinctId: '${{ env.DISTINCT_ID }}',
             });
 
             core.setOutput('run_id', runId);
@@ -475,7 +483,8 @@ jobs:
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "${{ steps.parse.outputs.chips }}",
               "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}"
+              "package": "${{ steps.parse-tests.outputs.package }}",
+              "distinct_id": "${{ env.DISTINCT_ID }}"
             }
 
       - name: Find HIL run URL (per-chip)
@@ -491,7 +500,7 @@ jobs:
               context,
               pr: context.payload.issue.number,
               selector: '${{ steps.parse.outputs.chips }}',
-              tests: '${{ steps.parse-tests.outputs.tests }}',
+              distinctId: '${{ env.DISTINCT_ID }}',
             });
 
             core.setOutput('run_id', runId);
@@ -588,6 +597,10 @@ jobs:
       startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Extract parameters from comment
         id: extract
         run: |
@@ -665,12 +678,27 @@ jobs:
             Results will be posted as a comment when ready.
 
       - name: Dispatch Binary Size Analysis
-        id: dispatch
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: binary-size.yml
           ref: ${{ github.event.repository.default_branch }}
-          inputs: '{"pr_number":"${{ github.event.issue.number }}","comment_id":"${{ steps.comment.outputs.comment-id }}","example_name":"${{ steps.extract.outputs.example_name }}","package":"${{ steps.extract.outputs.package }}","chips":"${{ steps.extract.outputs.chips_escaped }}"}'
+          inputs: '{"pr_number":"${{ github.event.issue.number }}","comment_id":"${{ steps.comment.outputs.comment-id }}","example_name":"${{ steps.extract.outputs.example_name }}","package":"${{ steps.extract.outputs.package }}","chips":"${{ steps.extract.outputs.chips_escaped }}","distinct_id":"${{ env.DISTINCT_ID }}"}'
+
+      - name: Find binary size run URL
+        id: find-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { findDispatchedRun } = require('./.github/scripts/hil-find-run.js');
+
+            const run = await findDispatchedRun({
+              github,
+              context,
+              workflowId: 'binary-size.yml',
+              distinctId: '${{ env.DISTINCT_ID }}',
+            });
+
+            core.setOutput('url', run?.html_url || '');
 
       - name: Add run URL to comment
         uses: peter-evans/create-or-update-comment@v4
@@ -680,5 +708,5 @@ jobs:
             Triggered **binary size analysis** for #${{ github.event.issue.number }}
             (example: `${{ steps.extract.outputs.example_name }}`, chips: `${{ steps.extract.outputs.chips }}`).
 
-            Run: ${{ steps.dispatch.outputs.runUrlHtml }}
+            Run: ${{ steps.find-run.outputs.url != '' && steps.find-run.outputs.url || 'could not be determined yet; check the Binary Size Analysis workflow runs manually.' }}
           edit-mode: replace
