@@ -188,9 +188,10 @@ jobs:
   # instead of GNU LD. RISC-V already links with `rust-lld`, so only the
   # Xtensa chips are exercised here. Kept intentionally small.
   #
-  # TODO: expand this to also cover the radio examples (Wi-Fi/BLE) once the
-  # Xtensa LLD fixes from https://github.com/espressif/llvm-project/pull/130
-  # are merged and included in the esp Rust toolchain.
+  # The radio examples (embassy_dhcp for Wi-Fi, bas_peripheral for BLE) link
+  # the Espressif blobs and exercise the per-archive `.text` grouping that
+  # keeps L32R literal loads in reach under LLD, so they are included to guard
+  # that layout against regressions.
   xtensa-lld:
     needs: calculate
     if: needs.calculate.outputs.run-build == 'true'
@@ -224,6 +225,14 @@ jobs:
 
       - name: Build embassy_hello_world with LLD
         working-directory: examples/async/embassy_hello_world
+        run: cargo +esp build --release --target xtensa-${{ matrix.chip }}-none-elf --features ${{ matrix.chip }}
+
+      - name: Build embassy_dhcp with LLD
+        working-directory: examples/wifi/embassy_dhcp
+        run: cargo +esp build --release --target xtensa-${{ matrix.chip }}-none-elf --features ${{ matrix.chip }}
+
+      - name: Build bas_peripheral (trouble BLE) with LLD
+        working-directory: examples/ble/bas_peripheral
         run: cargo +esp build --release --target xtensa-${{ matrix.chip }}-none-elf --features ${{ matrix.chip }}
 
   extras:
