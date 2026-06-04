@@ -10,6 +10,8 @@ use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+    #[cfg(esp32c6)]
+    use esp_hal::parl_io::{RxEightBits, TxEightBits};
     use esp_hal::{
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
@@ -21,14 +23,12 @@ mod tests {
             ParlIo,
             RxClkInPin,
             RxConfig,
-            RxEightBits,
             RxFourBits,
             RxOneBit,
             RxPinConfigWithValidPin,
             RxTwoBits,
             SampleEdge,
             TxConfig,
-            TxEightBits,
             TxFourBits,
             TxOneBit,
             TxPinConfigWithValidPin,

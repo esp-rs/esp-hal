@@ -58,6 +58,14 @@ async fn waiting_blocking_task() {
     esp_hal::delay::Delay::new().delay_millis(10);
 }
 
+fn pull_scl_low() {
+    let scl = cfg_select! {
+        esp32p4 => esp_hal::gpio::InputSignal::I2C0_SCL,
+        _ => esp_hal::gpio::InputSignal::I2CEXT0_SCL,
+    };
+    scl.connect_to(&esp_hal::gpio::Level::Low);
+}
+
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::gpio::{DriveMode, Flex, OutputConfig, Pull};
@@ -295,7 +303,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
@@ -314,7 +322,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
@@ -332,7 +340,7 @@ mod tests {
         )
         .unwrap();
 
-        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+        pull_scl_low();
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least

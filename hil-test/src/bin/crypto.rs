@@ -12,6 +12,9 @@
 
 use hil_test as _;
 
+// Macros are only used by some driver modules (e.g. ECC), so the import is unused on chips
+// that don't compile those modules.
+#[allow(unused_imports)]
 #[macro_use]
 extern crate esp_metadata_generated;
 

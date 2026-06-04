@@ -15,7 +15,6 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{
         self,
-        CpuInterrupt,
         Priority,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
@@ -78,7 +77,7 @@ mod tests {
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let cpu_intr = cfg_select! {
-            any(feature = "esp32c6", feature = "esp32h2") => &peripherals.INTPRI,
+            soc_has_intpri => &peripherals.INTPRI,
             _ => &peripherals.SYSTEM,
         };
 
