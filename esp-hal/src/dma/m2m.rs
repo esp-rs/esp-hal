@@ -215,23 +215,18 @@ where
 
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new [`Mem2Mem`] instance.
-    #[cfg(not(dma_mem2mem_requires_peripheral))]
-    pub fn new<CH>(channel: CH) -> Self
+    pub fn new<CH>(
+        channel: CH,
+        #[cfg(dma_mem2mem_requires_peripheral)] peripheral: impl DmaEligiblePeripheral<CH::Erased>,
+    ) -> Self
     where
         CH: Mem2MemCapableChannel<'d>,
     {
-        let dma_peri = channel.mem2mem_id();
+        let dma_peri = cfg_select! {
+            dma_mem2mem_requires_peripheral => peripheral.dma_peripheral(),
+            _ => channel.mem2mem_id(),
+        };
         Self::new_inner(channel, dma_peri)
-    }
-
-    /// Create a new [`Mem2Mem`] instance from a capable channel and a DMA peripheral.
-    #[cfg(dma_mem2mem_requires_peripheral)]
-    pub fn new<CH, P>(channel: CH, peripheral: P) -> Self
-    where
-        CH: Mem2MemCapableChannel<'d>,
-        P: DmaEligiblePeripheral<ErasedChannel<'d> = CH::Erased>,
-    {
-        Self::new_inner(channel, peripheral.dma_peripheral())
     }
 
     /// Create a new [`Mem2Mem`] instance.
