@@ -940,6 +940,22 @@ macro_rules! for_each_sha_algorithm {
 ///         todo!()
 ///     }
 /// }
+/// impl I2sInstance {
+///     // I2S_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<I2sFunctionClockConfig>,
+///         _new_config: I2sFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl McpwmInstance {
 ///     // MCPWM_FUNCTION_CLOCK
 ///
@@ -1042,6 +1058,12 @@ macro_rules! define_clock_tree_types {
         pub enum I2cInstance {
             I2c0 = 0,
             I2c1 = 1,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2sInstance {
+            I2s0 = 0,
+            I2s1 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1409,6 +1431,14 @@ macro_rules! define_clock_tree_types {
                 self.sclk
             }
         }
+        /// The list of clock signals that the `I2S0_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2sFunctionClockConfig {
+            #[default]
+            /// Selects `PLL_F160M_CLK`.
+            PllF160m,
+        }
         /// The list of clock signals that the `MCPWM0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1535,6 +1565,7 @@ macro_rules! define_clock_tree_types {
             rtc_fast_clk: Option<RtcFastClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
+            i2s_function_clock: [Option<I2sFunctionClockConfig>; 2],
             mcpwm_function_clock: [Option<McpwmFunctionClockConfig>; 2],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
             spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
@@ -1554,6 +1585,7 @@ macro_rules! define_clock_tree_types {
             uart_mem_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
             i2c_function_clock_refcount: [u32; 2],
+            i2s_function_clock_refcount: [u32; 2],
             mcpwm_function_clock_refcount: [u32; 2],
             rmt_sclk_refcount: [u32; 1],
             spi_function_clock_refcount: [u32; 2],
@@ -1642,6 +1674,14 @@ macro_rules! define_clock_tree_types {
             pub fn i2c1_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c1 as usize]
             }
+            /// Returns the current configuration of the I2S0_FUNCTION_CLOCK clock tree node
+            pub fn i2s0_function_clock(&self) -> Option<I2sFunctionClockConfig> {
+                self.i2s_function_clock[I2sInstance::I2s0 as usize]
+            }
+            /// Returns the current configuration of the I2S1_FUNCTION_CLOCK clock tree node
+            pub fn i2s1_function_clock(&self) -> Option<I2sFunctionClockConfig> {
+                self.i2s_function_clock[I2sInstance::I2s1 as usize]
+            }
             /// Returns the current configuration of the MCPWM0_FUNCTION_CLOCK clock tree node
             pub fn mcpwm0_function_clock(&self) -> Option<McpwmFunctionClockConfig> {
                 self.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]
@@ -1719,6 +1759,7 @@ macro_rules! define_clock_tree_types {
                 rtc_fast_clk: None,
                 timg_calibration_clock: None,
                 i2c_function_clock: [None; 2],
+                i2s_function_clock: [None; 2],
                 mcpwm_function_clock: [None; 2],
                 rmt_sclk: [None; 1],
                 spi_function_clock: [None; 2],
@@ -1738,6 +1779,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
                 i2c_function_clock_refcount: [0; 2],
+                i2s_function_clock_refcount: [0; 2],
                 mcpwm_function_clock_refcount: [0; 2],
                 rmt_sclk_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 2],
@@ -2826,6 +2868,64 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        impl I2sInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: I2sFunctionClockConfig,
+            ) {
+                let old_selector = clocks.i2s_function_clock[self as usize].replace(new_selector);
+                refresh_i2s_function_clock_downstream(clocks, self);
+                if clocks.i2s_function_clock_refcount[self as usize] > 0 {
+                    request_pll_f160m_clk(clocks);
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        release_pll_f160m_clk(clocks);
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<I2sFunctionClockConfig> {
+                clocks.i2s_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.i2s_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_pll_f160m_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.i2s_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_pll_f160m_clk(clocks);
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: I2sFunctionClockConfig,
+            ) -> u32 {
+                pll_f160m_clk_frequency()
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                pll_f160m_clk_frequency()
+            }
+            pub fn function_clock_source_frequency(source: I2sFunctionClockConfig) -> u32 {
+                match source {
+                    I2sFunctionClockConfig::PllF160m => pll_f160m_clk_frequency(),
+                }
+            }
+        }
         impl McpwmInstance {
             pub fn configure_function_clock(
                 self,
@@ -3266,6 +3366,9 @@ macro_rules! define_clock_tree_types {
             }
             refresh_apll_clk_downstream(clocks);
             refresh_cpu_pll_div_in_downstream(clocks);
+            for child_instance in [I2sInstance::I2s0, I2sInstance::I2s1] {
+                refresh_i2s_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [McpwmInstance::Mcpwm0, McpwmInstance::Mcpwm1] {
                 refresh_mcpwm_function_clock_downstream(clocks, child_instance);
             }
@@ -3348,6 +3451,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_i2s_function_clock_downstream(clocks: &mut ClockTree, instance: I2sInstance) {}
         fn refresh_mcpwm_function_clock_downstream(
             clocks: &mut ClockTree,
             instance: McpwmInstance,

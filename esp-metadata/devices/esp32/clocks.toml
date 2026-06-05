@@ -166,6 +166,11 @@ system_clocks = { clock_tree = [
             { name = "APB", outputs = "APB_CLK", default = true },
         ] },
     ] },
+    { group = "I2S", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [

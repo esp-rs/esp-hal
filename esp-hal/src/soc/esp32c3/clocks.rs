@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, LPWR, SPI2, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, I2S0, LPWR, SPI2, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -769,6 +769,55 @@ impl SpiInstance {
         SPI2::regs().clk_gate().modify(|_, w| {
             w.mst_clk_sel()
                 .bit(matches!(new_config, SpiFunctionClockConfig::Pll80m))
+        });
+    }
+}
+
+impl I2sInstance {
+    // I2S_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs().tx_clkm_conf().modify(|_, w| {
+            w.clk_en().bit(en);
+            w.tx_clk_active().bit(en)
+        });
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sTxClockConfig>,
+        new_config: I2sTxClockConfig,
+    ) {
+        I2S0::regs().tx_clkm_conf().modify(|_, w| unsafe {
+            w.tx_clk_sel().bits(match new_config {
+                I2sTxClockConfig::XtalClk => 0,
+                I2sTxClockConfig::PllD2 => 1,
+                I2sTxClockConfig::Pll160m => 2,
+            })
+        });
+    }
+
+    // I2S_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs()
+            .rx_clkm_conf()
+            .modify(|_, w| w.rx_clk_active().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sRxClockConfig>,
+        new_config: I2sRxClockConfig,
+    ) {
+        I2S0::regs().rx_clkm_conf().modify(|_, w| unsafe {
+            w.rx_clk_sel().bits(match new_config {
+                I2sRxClockConfig::XtalClk => 0,
+                I2sRxClockConfig::PllD2 => 1,
+                I2sRxClockConfig::Pll160m => 2,
+            })
         });
     }
 }

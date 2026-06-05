@@ -52,7 +52,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
     { name = "LEDC" },

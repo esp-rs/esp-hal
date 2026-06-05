@@ -108,6 +108,18 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    { group = "I2S", clocks = [
+        { name = "TX_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+            { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+        ] },
+        { name = "RX_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+            { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [

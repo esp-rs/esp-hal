@@ -114,6 +114,18 @@ system_clocks = { clock_tree = [
             { name = "APB",  outputs = "APB_CLK" }, # PLL_F80M?
         ] },
     ] },
+    { group = "I2S", clocks = [
+        { name = "TX_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_D2",   outputs = "PLL_D2" },
+            { name = "PLL_160M", outputs = "PLL_160M", default = true },
+        ] },
+        { name = "RX_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_D2",   outputs = "PLL_D2" },
+            { name = "PLL_160M", outputs = "PLL_160M", default = true },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [

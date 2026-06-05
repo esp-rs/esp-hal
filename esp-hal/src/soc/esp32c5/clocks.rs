@@ -758,3 +758,51 @@ impl SpiInstance {
         };
     }
 }
+
+impl I2sInstance {
+    // I2S_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .i2s_tx_clkm_conf()
+            .modify(|_, w| w.i2s_tx_clkm_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sTxClockConfig>,
+        new_config: I2sTxClockConfig,
+    ) {
+        PCR::regs().i2s_tx_clkm_conf().modify(|_, w| unsafe {
+            w.i2s_tx_clkm_sel().bits(match new_config {
+                I2sTxClockConfig::XtalClk => 0,
+                I2sTxClockConfig::PllF240m => 1,
+                I2sTxClockConfig::PllF160m => 2,
+            })
+        });
+    }
+
+    // I2S_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .i2s_rx_clkm_conf()
+            .modify(|_, w| w.i2s_rx_clkm_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sRxClockConfig>,
+        new_config: I2sRxClockConfig,
+    ) {
+        PCR::regs().i2s_rx_clkm_conf().modify(|_, w| unsafe {
+            w.i2s_rx_clkm_sel().bits(match new_config {
+                I2sRxClockConfig::XtalClk => 0,
+                I2sRxClockConfig::PllF240m => 1,
+                I2sRxClockConfig::PllF160m => 2,
+            })
+        });
+    }
+}

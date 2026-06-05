@@ -18,7 +18,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{I2C_ANA_MST, I2C0, I2C1, I2S0, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -801,5 +801,28 @@ impl SpiInstance {
         _new_config: SpiFunctionClockConfig,
     ) {
         // ESP32-S2 SPI is hardwired to APB; no clock source selection register.
+    }
+}
+
+impl I2sInstance {
+    // I2S_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs()
+            .clkm_conf()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sFunctionClockConfig>,
+        new_config: I2sFunctionClockConfig,
+    ) {
+        I2S0::regs().clkm_conf().modify(|_, w| unsafe {
+            w.clk_sel().bits(match new_config {
+                I2sFunctionClockConfig::PllF160m => 2,
+            })
+        });
     }
 }
