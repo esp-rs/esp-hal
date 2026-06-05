@@ -201,6 +201,14 @@ impl Driver {
 
     /// Initialize for full-duplex 1 bit mode
     pub(super) fn init(&self) {
+        version::enable_peripheral_clock(self);
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            self.info.clock_instance.configure_function_clock(
+                clocks,
+                crate::soc::clocks::SpiFunctionClockConfig::default(),
+            );
+            self.info.clock_instance.request_function_clock(clocks);
+        });
         self.regs().user().modify(|_, w| {
             w.usr_miso_highpart().clear_bit();
             w.usr_mosi_highpart().clear_bit();
@@ -211,14 +219,6 @@ impl Driver {
             w.usr_dummy_idle().set_bit();
             w.usr_addr().clear_bit();
             w.usr_command().clear_bit()
-        });
-
-        crate::soc::clocks::ClockTree::with(|clocks| {
-            self.info.clock_instance.configure_function_clock(
-                clocks,
-                crate::soc::clocks::SpiFunctionClockConfig::default(),
-            );
-            self.info.clock_instance.request_function_clock(clocks);
         });
 
         version::init(self);
@@ -261,10 +261,7 @@ impl Driver {
                 .clock_instance
                 .configure_function_clock(clocks, config.clock_source);
 
-            // TODO: release should return whether the clock was released
-            self.info.clock_instance.release_function_clock(clocks);
             self.regs().clock().write(|w| unsafe { w.bits(raw) });
-            self.info.clock_instance.request_function_clock(clocks);
         });
 
         self.set_bit_order(config.read_bit_order, config.write_bit_order);
@@ -619,20 +616,6 @@ impl Driver {
             w.usr_addr().bit(!address.is_none());
             w.usr_command().bit(!cmd.is_none())
         });
-
-        // FIXME why is clock config even here?
-        #[cfg(spi_master_version = "3")]
-        reg_block.clk_gate().modify(|_, w| {
-            w.clk_en().set_bit();
-            w.mst_clk_active().set_bit();
-            w.mst_clk_sel().set_bit()
-        });
-
-        #[cfg(soc_has_pcr)]
-        // use default clock source
-        crate::peripherals::PCR::regs()
-            .spi2_clkm_conf()
-            .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(1) });
 
         version::setup_half_duplex(self);
 
