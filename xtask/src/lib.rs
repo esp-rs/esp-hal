@@ -1105,3 +1105,77 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
 
     Ok(packages)
 }
+
+struct ScriptContext {
+    all_symbols: Vec<String>,
+}
+
+struct ChipFilterEval<'a> {
+    all_symbols: &'a [String],
+    chip_symbols: Vec<String>,
+}
+
+impl ScriptContext {
+    fn symbol_to_ident(s: &String) -> Option<String> {
+        s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+            .then_some(s.replace(".", "_"))
+    }
+
+    pub fn new() -> Self {
+        let possible_symbols = Chip::list_of_possible_symbols()
+            .iter()
+            .filter_map(|(sym, values)| {
+                if values.is_none() {
+                    Self::symbol_to_ident(sym)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            all_symbols: possible_symbols,
+        }
+    }
+
+    pub fn for_chip(&self, chip: Chip) -> ChipFilterEval<'_> {
+        self.for_config(&Config::for_chip(&chip))
+    }
+
+    pub fn for_config(&self, config: &Config) -> ChipFilterEval<'_> {
+        let chip_symbols = config
+            .all()
+            .iter()
+            .filter_map(Self::symbol_to_ident)
+            .collect::<Vec<_>>();
+
+        ChipFilterEval {
+            all_symbols: &self.all_symbols,
+            chip_symbols,
+        }
+    }
+}
+
+impl ChipFilterEval<'_> {
+    pub fn evaluate<'s>(&'s mut self, expr: &'s str) -> anyhow::Result<bool> {
+        let mut ctx = somni_expr::Context::new();
+
+        // All known symbols are initially false
+        for sym in self.all_symbols.iter() {
+            ctx.add_variable(sym, false);
+        }
+
+        // All defined symbols for this chip are true
+        for sym in self.chip_symbols.iter() {
+            ctx.add_variable(sym, true);
+        }
+
+        match ctx.evaluate::<bool>(expr) {
+            Ok(result) => Ok(result),
+            Err(err) => {
+                Err(anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression"))
+            }
+        }
+    }
+}
