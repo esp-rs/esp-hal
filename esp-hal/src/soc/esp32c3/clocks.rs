@@ -429,6 +429,12 @@ fn update_apb_frequency(freq: Rate) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
+// PLL_D2
+
+fn enable_pll_d2_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Fixed tap from PLL_160M; enable is handled via request_pll_160m.
+}
+
 // PLL_80M
 
 fn enable_pll_80m_impl(_clocks: &mut ClockTree, _en: bool) {

@@ -15,17 +15,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32s2 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    // I2S uses the 160 MHz PLL tap, derived from either supported PLL frequency.
-    match clocks::pll_clk_frequency() {
-        320_000_000 => 320_000_000 / 2,
-        480_000_000 => 480_000_000 / 3,
-        _ => unreachable!(),
-    }
-}
-
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]

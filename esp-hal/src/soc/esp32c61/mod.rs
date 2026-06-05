@@ -13,12 +13,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c61 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_f160m_frequency()
-}
-
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.
     // FIXME: this is a temporary workaround until we have a proper solution for TEE security modes.

@@ -995,18 +995,17 @@ impl SpiInstance {
 impl I2sInstance {
     // I2S_TX_CLOCK
 
-    fn i2s_regs(self) -> &'static crate::pac::i2s0::RegisterBlock {
-        match self {
-            I2sInstance::I2s0 => I2S0::regs(),
-            I2sInstance::I2s1 => I2S1::regs(),
-        }
-    }
-
     fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        self.i2s_regs().tx_clkm_conf().modify(|_, w| {
-            w.clk_en().bit(en);
-            w.tx_clk_active().bit(en)
-        });
+        match self {
+            I2sInstance::I2s0 => I2S0::regs().tx_clkm_conf().modify(|_, w| {
+                w.clk_en().bit(en);
+                w.tx_clk_active().bit(en)
+            }),
+            I2sInstance::I2s1 => I2S1::regs().tx_clkm_conf().modify(|_, w| {
+                w.clk_en().bit(en);
+                w.tx_clk_active().bit(en)
+            }),
+        };
     }
 
     fn configure_tx_clock_impl(
@@ -1015,21 +1014,32 @@ impl I2sInstance {
         _old_config: Option<I2sTxClockConfig>,
         new_config: I2sTxClockConfig,
     ) {
-        self.i2s_regs().tx_clkm_conf().modify(|_, w| unsafe {
-            w.tx_clk_sel().bits(match new_config {
-                I2sTxClockConfig::XtalClk => 0,
-                I2sTxClockConfig::PllD2 => 1,
-                I2sTxClockConfig::Pll160m => 2,
-            })
-        });
+        let sel = match new_config {
+            I2sTxClockConfig::XtalClk => 0,
+            I2sTxClockConfig::PllD2 => 1,
+            I2sTxClockConfig::Pll160m => 2,
+        };
+        match self {
+            I2sInstance::I2s0 => I2S0::regs()
+                .tx_clkm_conf()
+                .modify(|_, w| unsafe { w.tx_clk_sel().bits(sel) }),
+            I2sInstance::I2s1 => I2S1::regs()
+                .tx_clkm_conf()
+                .modify(|_, w| unsafe { w.tx_clk_sel().bits(sel) }),
+        };
     }
 
     // I2S_RX_CLOCK
 
     fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        self.i2s_regs()
-            .rx_clkm_conf()
-            .modify(|_, w| w.rx_clk_active().bit(en));
+        match self {
+            I2sInstance::I2s0 => I2S0::regs()
+                .rx_clkm_conf()
+                .modify(|_, w| w.rx_clk_active().bit(en)),
+            I2sInstance::I2s1 => I2S1::regs()
+                .rx_clkm_conf()
+                .modify(|_, w| w.rx_clk_active().bit(en)),
+        };
     }
 
     fn configure_rx_clock_impl(
@@ -1038,12 +1048,18 @@ impl I2sInstance {
         _old_config: Option<I2sRxClockConfig>,
         new_config: I2sRxClockConfig,
     ) {
-        self.i2s_regs().rx_clkm_conf().modify(|_, w| unsafe {
-            w.rx_clk_sel().bits(match new_config {
-                I2sRxClockConfig::XtalClk => 0,
-                I2sRxClockConfig::PllD2 => 1,
-                I2sRxClockConfig::Pll160m => 2,
-            })
-        });
+        let sel = match new_config {
+            I2sRxClockConfig::XtalClk => 0,
+            I2sRxClockConfig::PllD2 => 1,
+            I2sRxClockConfig::Pll160m => 2,
+        };
+        match self {
+            I2sInstance::I2s0 => I2S0::regs()
+                .rx_clkm_conf()
+                .modify(|_, w| unsafe { w.rx_clk_sel().bits(sel) }),
+            I2sInstance::I2s1 => I2S1::regs()
+                .rx_clkm_conf()
+                .modify(|_, w| unsafe { w.rx_clk_sel().bits(sel) }),
+        };
     }
 }

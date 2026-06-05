@@ -886,7 +886,7 @@ impl I2sInstance {
         self,
         _clocks: &mut ClockTree,
         _old_config: Option<I2sFunctionClockConfig>,
-        new_config: I2sFunctionClockConfig,
+        _new_config: I2sFunctionClockConfig,
     ) {
         // Selects PLL_F160M_CLK
         // TODO: APLL
