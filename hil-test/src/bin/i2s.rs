@@ -214,6 +214,7 @@ mod tests {
         .unwrap();
 
         let (din, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(din.clone());
 
         let i2s_tx = i2s
             .i2s_tx
@@ -313,6 +314,15 @@ mod tests {
                 break;
             }
         }
+
+        // test that stop works for streaming transfers
+        let _ = tx_transfer.stop();
+        let _ = rx_transfer.stop();
+
+        // check that at least TX actually stopped emitting pulses
+        counter.clear();
+        esp_hal::delay::Delay::new().delay_millis(20);
+        counter.check(0);
     }
 
     #[test]
