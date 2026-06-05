@@ -141,8 +141,9 @@ sudo reboot
 3. Write the tests
 4. Document any necessary physical connections on boards connected to self-hosted runners
 5. Add a header in the test stating which targets support the given tests. The `//% CHIP_FILTER:`
-   line is a boolean expression evaluated per chip, where a symbol is either a chip name or a cfg
-   name (exactly as it appears in `#[cfg(...)]`). It supports `&&`, `||`, `!` and parentheses, so you
+   line is a boolean expression evaluated per chip, where a symbol is either a chip name, a boolean
+   cfg name (exactly as it appears in `#[cfg(...)]`), or a key-value cfg name that can be compared
+   with `==` / `!=` and a quoted string. It supports `&&`, `||`, `!` and parentheses, so you
    can do any of the following:
 ```rust
 //! Test Name
@@ -159,6 +160,9 @@ sudo reboot
 
 // Combine capabilities and group with parentheses:
 //% CHIP_FILTER: adc_driver_supported && (esp32c6 || esp32h2)
+
+// Filter by a key-value cfg symbol (when a boolean flag is not enough):
+//% CHIP_FILTER: riscv && interrupt_controller != "clic"
 ```
 If the test is supported by all the targets, you can omit the header. See [`xtask/README.md`](../xtask/README.md) for the full description of the metadata keys.
 

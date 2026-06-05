@@ -13,36 +13,36 @@ license = "MIT OR Apache-2.0"
 [package.metadata.espressif]
 semver-checked = true
 doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
-    { if = 'chip_has("wifi_driver_supported")', features = ["wifi", "wifi-eap", "esp-now", "sniffer"] },
-    { if = 'chip_has("wifi_driver_supported") && chip_has("wifi_csi_supported")', features = ["csi"] },
-    { if = 'chip_has("bt_driver_supported")', features = ["ble"] },
-    { if = 'chip_has("ieee802154_driver_supported")', features = ["ieee802154", "__docs_build"] },
-    { if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")', features = ["coex"] },
-    { if = 'chip_has("wifi_driver_supported") || chip_has("bt_driver_supported") || chip_has("ieee802154_driver_supported")', features = ["unstable"] },
+    { if = 'wifi_driver_supported', features = ["wifi", "wifi-eap", "esp-now", "sniffer"] },
+    { if = 'wifi_driver_supported && wifi_csi_supported', features = ["csi"] },
+    { if = 'bt_driver_supported', features = ["ble"] },
+    { if = 'ieee802154_driver_supported', features = ["ieee802154", "__docs_build"] },
+    { if = 'wifi_driver_supported && bt_driver_supported', features = ["coex"] },
+    { if = 'wifi_driver_supported || bt_driver_supported || ieee802154_driver_supported', features = ["unstable"] },
 ] }
 # Semver guarantees cover only the stable API, so the `unstable` feature is left OFF: the
 # `instability_disable_unstable_docs` escape (set in `build_doc_json`) then drops all
 # `#[instability::unstable]` items from the baseline. `wifi` is the only radio feature that
 # does not pull in `unstable`.
 semver-config = { features = ["esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
-    { if = 'chip_has("wifi_driver_supported")', features = ["wifi"] },
+    { if = 'wifi_driver_supported', features = ["wifi"] },
 ] }
 check-configs = [
     { features = ["esp-hal/rt"] },
     { features = ["esp-hal/rt", "defmt"] },
-    { features = ["esp-hal/rt", "wifi"], if = 'chip_has("wifi_driver_supported")' },
+    { features = ["esp-hal/rt", "wifi"], if = 'wifi_driver_supported' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'chip_has("wifi_driver_supported") && chip_has("xtensa")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'chip_has("wifi_driver_supported")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt_driver_supported")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154_driver_supported")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'wifi_driver_supported && xtensa' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'wifi_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'bt_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'ieee802154_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'wifi_driver_supported && bt_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'wifi_driver_supported' },
 ]
 clippy-configs = [
     { features = ["esp-hal/rt"] },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "wifi-eap", "unstable"], if = 'chip_has("wifi_driver_supported")', append = [
-        { features = ["ble"], if = 'chip_has("bt_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "wifi-eap", "unstable"], if = 'wifi_driver_supported', append = [
+        { features = ["ble"], if = 'bt_driver_supported' },
     ] },
 ]
 

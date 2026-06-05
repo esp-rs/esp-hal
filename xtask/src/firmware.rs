@@ -6,11 +6,11 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
-use esp_metadata::{Chip, Config};
+use esp_metadata::Chip;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
-use crate::windows_safe_path;
+use crate::{ScriptContext, windows_safe_path};
 
 /// A single, configured example (or test).
 #[derive(Debug, Clone)]
@@ -198,47 +198,16 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 }
 
 /// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
-/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
+/// cfg symbols, key-value cfg symbols, and chip names, e.g. `cfg_symbol && !esp32`,
+/// `esp32c6 || esp32h2`, or `interrupt_controller != "clic"`).
 fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
-    fn symbol_to_ident(s: &String) -> Option<String> {
-        s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
-            .then_some(s.replace(".", "_"))
-    }
-
-    let possible_symbols = Chip::list_of_possible_symbols()
-        .iter()
-        .filter_map(|(sym, values)| {
-            if values.is_none() {
-                symbol_to_ident(sym)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+    let script_ctx = ScriptContext::new();
 
     let mut chips = Vec::new();
     for chip in Chip::iter() {
-        let config = Config::for_chip(&chip);
-        let chip_symbols = config
-            .all()
-            .iter()
-            .filter_map(symbol_to_ident)
-            .collect::<Vec<_>>();
+        let mut ctx = script_ctx.for_chip(chip);
 
-        let mut ctx = somni_expr::Context::new();
-
-        // All known symbols are initially false
-        for sym in possible_symbols.iter() {
-            ctx.add_variable(sym.as_str(), false);
-        }
-
-        // All defined symbols for this chip are true
-        for sym in chip_symbols.iter() {
-            ctx.add_variable(sym.as_str(), true);
-        }
-
-        let selected = ctx.evaluate::<bool>(expr).map_err(|err| {
+        let selected = ctx.evaluate(expr).map_err(|err| {
             anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression")
         })?;
         if selected {

@@ -77,7 +77,8 @@ The following metadata keys can be used:
 A boolean expression that selects which chips the test or example is built for. If the line is
 missing, the file is built for all known chips. A symbol in the expression is either a cfg name
 (exactly as it appears in `#[cfg(...)]`, e.g. `i2c_master_driver_supported` or
-`dma_can_access_psram`) or a chip name (e.g. `esp32`).
+`dma_can_access_psram`), a key-value cfg name (e.g. `interrupt_controller`), or a chip name
+(e.g. `esp32`).
 
 Prefer a capability cfg flag over an explicit chip list: it describes *why* a chip is supported and
 automatically picks up new chips that gain the capability. Only fall back to chip names when no cfg
@@ -98,8 +99,21 @@ capability flag does not exist:
 //% CHIP_FILTER: esp32c6 || esp32h2
 ```
 
-The expression is evaluated with [`somni`](https://crates.io/crates/somni-expr): `xtask` wraps each
-bare symbol into a `chip_has("symbol")` call and evaluates it per chip.
+Some cfg symbols carry a string value rather than being simply present or absent (for example,
+`#[cfg(interrupt_controller = "clic")]`). These can be compared with `==` and `!=` using quoted
+string literals:
+
+```
+//% CHIP_FILTER: riscv && interrupt_controller != "clic"
+//% CHIP_FILTER: interrupt_controller == "plic"
+```
+
+Chips that do not define a key-value symbol are treated as having an empty string value.
+
+The expression is evaluated with [`somni`](https://crates.io/crates/somni-expr). `xtask` turns each
+boolean cfg symbol into a `true`/`false` variable and each key-value cfg symbol into a string
+variable, then evaluates the expression per chip. If a symbol does not exist, it causes an
+evaluation error.
 
 This key is a filter. If a named configuration contains an expression, the named line overwrites the
 unnamed line for that configuration. If multiple lines specify the same configuration, the latter one
