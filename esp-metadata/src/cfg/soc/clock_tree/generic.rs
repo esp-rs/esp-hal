@@ -449,7 +449,9 @@ impl ClockTreeNodeType for Generic {
     fn has_configures(&self) -> bool {
         self.params.values().any(|param| {
             if let NodeParameter::Source(variants) = param {
-                variants.iter().any(|variant| !variant.configures.is_empty())
+                variants
+                    .iter()
+                    .any(|variant| !variant.configures.is_empty())
             } else {
                 false
             }

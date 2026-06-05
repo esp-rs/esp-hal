@@ -539,8 +539,7 @@ impl Info {
         ClockTree::with(|clocks| {
             let clock = self.clock_instance;
 
-            let clk =
-                clocks::UartInstance::function_clock_source_frequency(config.clock_source);
+            let clk = clocks::UartInstance::function_clock_source_frequency(config.clock_source);
 
             // The UART baud rate clock divider is, depending on the device, either a
             // 20.4 bit, or a 12.4 bit divider.

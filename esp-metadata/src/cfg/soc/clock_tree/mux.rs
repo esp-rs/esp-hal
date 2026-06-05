@@ -142,7 +142,9 @@ impl ClockTreeNodeType for Multiplexer {
     }
 
     fn has_configures(&self) -> bool {
-        self.variants.iter().any(|variant| !variant.configures.is_empty())
+        self.variants
+            .iter()
+            .any(|variant| !variant.configures.is_empty())
     }
 
     fn node_source_frequency_impl(
