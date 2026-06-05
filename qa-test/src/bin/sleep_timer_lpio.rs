@@ -6,7 +6,7 @@
 //! The following wiring is assumed for ESP32-H2:
 //! - ext1 wakeup pin => GPIO9 (low level) / GPIO10 (high level)
 
-//% CHIPS: esp32c6 esp32h2
+//% CHIP_FILTER: esp32c6 || esp32h2
 
 #![no_std]
 #![no_main]
@@ -37,8 +37,8 @@ fn main() -> ! {
 
     let mut rtc = Rtc::new(peripherals.LPWR);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c6")] {
+    cfg_select! {
+        feature = "esp32c6" => {
             use esp_hal::gpio::{Input, InputConfig, Pull};
 
             let mut pin_low = peripherals.GPIO2;
@@ -48,7 +48,8 @@ fn main() -> ! {
                 InputConfig::default().with_pull(Pull::None),
             );
             core::mem::drop(input);
-        } else if #[cfg(feature = "esp32h2")] {
+        }
+        feature = "esp32h2" => {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
             let mut pin_high = peripherals.GPIO10;
         }

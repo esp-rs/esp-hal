@@ -82,7 +82,7 @@ peripherals = [
     # { name = "SLCHOST" }, TODO: add PAC manually later
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -99,19 +99,6 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true  },
-    { name = "MEM2MEM0", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM2", virtual = true },
-    { name = "MEM2MEM3", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM6", virtual = true },
-    { name = "MEM2MEM7", virtual = true },
-    { name = "MEM2MEM8", virtual = true },
-    { name = "MEM2MEM9", virtual = true },
-    { name = "MEM2MEM10", virtual = true },
-    { name = "MEM2MEM11", virtual = true },
-
     { name = "PSRAM", virtual = true },
 ]
 
@@ -194,7 +181,13 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
-
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",      outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F160M", outputs = "PLL_F160M" },
+            { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
     { name = "clk_en_template", value = "{{default_clk_en_template}}" },
@@ -209,7 +202,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" }},
-    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "Spi2" },
 
@@ -236,6 +229,7 @@ timg_has_divcnt_rst = true
 
 [device.gpio]
 version = 2
+has_input_sync = true
 support_status = "partial"
 gpio_function = 1
 constant_0_input = 0x60
@@ -377,33 +371,19 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
-supports_mem2mem = true
 max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
     { name = "AHB_GDMA", drivers = ["sha", "spi_master", "i2s"], peripheral_instances = [
-        { name = "MEM2MEM0",  dma_id = 0 },
         { name = "SPI2",      dma_id = 1 },
-        { name = "MEM2MEM1",  dma_id = 2 },
         { name = "I2S0",      dma_id = 3 },
-        { name = "MEM2MEM2",  dma_id = 4 },
-        { name = "MEM2MEM3",  dma_id = 5 },
-        { name = "MEM2MEM4",  dma_id = 6 },
         { name = "SHA",       dma_id = 7 },
-        { name = "MEM2MEM5",  dma_id = 9 },
-        { name = "MEM2MEM6",  dma_id = 10 },
-        { name = "MEM2MEM7",  dma_id = 11 },
-        { name = "MEM2MEM8",  dma_id = 12 },
-        { name = "MEM2MEM9",  dma_id = 13 },
-        { name = "MEM2MEM10", dma_id = 14 },
-        { name = "MEM2MEM11", dma_id = 15 },
     ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 4, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+        { name = "DMA_CH1", mem2mem = true, mem2mem_id = 5, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
     ] },
 ]
 

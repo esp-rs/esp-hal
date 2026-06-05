@@ -1,10 +1,9 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
 //! The following wiring is assumed:
-//! - SCLK => GPIO42
-//! - MISO => (looped back to MOSI via the GPIO MUX)
-//! - MOSI => GPIO48
-//! - CS   => GPIO38
+//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5)
+//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5)
+//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5)
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -12,6 +11,8 @@
 //! This example transfers data via SPI.
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
+
+//% CHIP_FILTER: dma_can_access_psram && !esp32p4
 
 #![no_std]
 #![no_main]
@@ -59,10 +60,16 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let sclk = peripherals.GPIO42;
-    let mosi = peripherals.GPIO48;
+    let (sclk, mosi, cs) = cfg_select! {
+        feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+        _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+    };
     let miso = unsafe { mosi.clone_unchecked() };
-    let cs = peripherals.GPIO38;
+
+    let dma_channel = cfg_select! {
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        _ => peripherals.DMA_CH0,
+    };
 
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
@@ -96,7 +103,7 @@ fn main() -> ! {
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(peripherals.DMA_CH0);
+    .with_dma(dma_channel);
 
     delay.delay_millis(100); // delay to let the above messages display
 

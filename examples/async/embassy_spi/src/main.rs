@@ -12,6 +12,8 @@
 //! MOSI => GPIO4
 //! CS   => GPIO5
 
+//% CHIP_FILTER: spi_master_supports_dma
+
 #![no_std]
 #![no_main]
 
@@ -48,13 +50,11 @@ async fn main(_spawner: Spawner) {
     let mosi = peripherals.GPIO4;
     let cs = peripherals.GPIO5;
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let dma_channel = peripherals.DMA_SPI2;
-        } else {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
+        feature = "esp32p4" => peripherals.DMA_AXI_CH0,
+        _ => peripherals.DMA_CH0,
+    };
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();

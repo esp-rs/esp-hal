@@ -3,7 +3,7 @@
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: i2s_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -23,10 +23,11 @@ mod tests {
         time::Rate,
     };
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+    cfg_select! {
+        any(esp32, esp32s2) => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-        } else {
+        }
+        _ => {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
         }
     }
@@ -102,15 +103,23 @@ mod tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_I2S0;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                peripherals.DMA_I2S0
+            },
+            _ => {
+                peripherals.DMA_CH0
+            },
+        };
 
+        #[cfg(not(esp32c5))]
         let (_, dout) = hil_test::common_test_pins!(peripherals);
+
+        // there are some random pulses counted on ESP32-C5 in our HIL setup
+        // with the common test pin, so just use a fixed GPIO pin which is not used for anything
+        // else in this test on that chip in the hope it will fix it
+        #[cfg(esp32c5)]
+        let dout = peripherals.GPIO6;
 
         Context {
             dout: dout.degrade(),
@@ -205,6 +214,7 @@ mod tests {
         .unwrap();
 
         let (din, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(din.clone());
 
         let i2s_tx = i2s
             .i2s_tx
@@ -304,6 +314,15 @@ mod tests {
                 break;
             }
         }
+
+        // test that stop works for streaming transfers
+        let _ = tx_transfer.stop();
+        let _ = rx_transfer.stop();
+
+        // check that at least TX actually stopped emitting pulses
+        counter.clear();
+        esp_hal::delay::Delay::new().delay_millis(20);
+        counter.check(0);
     }
 
     #[test]
@@ -351,10 +370,10 @@ mod tests {
     }
 
     #[test]
-    fn test_i2s_read_one_shot(ctx: Context) {
+    fn test_i2s_read_one_shot_multiple(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -370,38 +389,43 @@ mod tests {
         // check was received correctly
         let (din, ws) = unsafe { ctx.dout.split() };
 
-        let i2s_rx = i2s
+        let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(ws)
             .with_din(din)
             .build();
 
-        let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-        let (res, _, done_rx) = rx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for _ in 0..10 {
+            let rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+            let (res, i2s_rx_back, done_rx) = rx_transfer.wait();
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-        assert!(done_rx.number_of_received_bytes() != 0);
+            assert!(done_rx.number_of_received_bytes() != 0);
 
-        let mut tmp = [0u8; 8000];
-        let read = done_rx.read_received_data(&mut tmp);
+            let mut tmp = [0u8; 8000];
+            let read = done_rx.read_received_data(&mut tmp);
 
-        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
-        // less than the buffer size, but it should never be zero if the transfer completed
-        // successfully.
-        assert!(read != 0);
+            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
+            // be less than the buffer size, but it should never be zero if the transfer
+            // completed successfully.
+            assert!(read != 0);
 
-        let l = read - read % 4;
-        for chunk in tmp[..l].chunks(4) {
-            assert_eq!(chunk, [1, 0, 254, 255]);
+            let l = read - read % 4;
+            for chunk in tmp[..l].chunks(4) {
+                assert_eq!(chunk, [1, 0, 254, 255]);
+            }
+
+            i2s_rx = i2s_rx_back;
+            rx_buffer = done_rx;
         }
     }
 
     #[test]
-    async fn test_i2s_read_one_shot_async(ctx: Context) {
+    async fn test_i2s_read_one_shot_multiple_async(ctx: Context) {
         let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -418,40 +442,45 @@ mod tests {
         // check was received correctly
         let (din, ws) = unsafe { ctx.dout.split() };
 
-        let i2s_rx = i2s
+        let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(ws)
             .with_din(din)
             .build();
 
-        let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
-        rx_transfer.wait_for_done_async().await.unwrap();
-        assert_eq!(rx_transfer.is_done(), true);
-        let (res, _, done_rx) = rx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        for _ in 0..10 {
+            let mut rx_transfer = i2s_rx.read(rx_buffer).unwrap();
+            rx_transfer.wait_for_done_async().await.unwrap();
+            assert_eq!(rx_transfer.is_done(), true);
+            let (res, i2s_rx_back, done_rx) = rx_transfer.wait_async().await;
+            assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
 
-        assert!(done_rx.number_of_received_bytes() != 0);
+            assert!(done_rx.number_of_received_bytes() != 0);
 
-        let mut tmp = [0u8; 8000];
-        let read = done_rx.read_received_data(&mut tmp);
+            let mut tmp = [0u8; 8000];
+            let read = done_rx.read_received_data(&mut tmp);
 
-        // I2S RX might not fill each buffer for every descriptor - so the read byte count might be
-        // less than the buffer size, but it should never be zero if the transfer completed
-        // successfully.
-        assert!(read != 0);
+            // I2S RX might not fill each buffer for every descriptor - so the read byte count might
+            // be less than the buffer size, but it should never be zero if the transfer
+            // completed successfully.
+            assert!(read != 0);
 
-        let l = read - read % 4;
-        for chunk in tmp[..l].chunks(4) {
-            assert_eq!(chunk, [1, 0, 254, 255]);
+            let l = read - read % 4;
+            for chunk in tmp[..l].chunks(4) {
+                assert_eq!(chunk, [1, 0, 254, 255]);
+            }
+
+            i2s_rx = i2s_rx_back;
+            rx_buffer = done_rx;
         }
     }
 
-    // We don't actually check the output but just make sure the write completes.
-    // On supported chips we could use PCNT to verify at least the expected clock edges or similar.
+    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
+    // write completes.
     #[test]
     fn test_i2s_write_one_shot(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
         let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
 
@@ -465,23 +494,31 @@ mod tests {
         )
         .unwrap();
 
+        let (other, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(other);
+
         let i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
-            .with_dout(ctx.dout)
+            .with_dout(dout)
             .build();
 
+        counter.clear();
+        counter.check(0);
+
         let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+        esp_hal::delay::Delay::new().delay_millis(500);
         let (res, _, _done_tx) = tx_transfer.wait();
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
+        counter.check(8000);
     }
 
-    // We don't actually check the output but just make sure the write completes.
-    // On supported chips we could use PCNT to verify at least the expected clock edges or similar.
+    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
+    // write completes.
     #[test]
     async fn test_i2s_write_one_shot_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
+        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
         let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
         let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
 
@@ -496,18 +533,115 @@ mod tests {
         .unwrap()
         .into_async();
 
+        let (other, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(other);
+
         let i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
-            .with_dout(ctx.dout)
+            .with_dout(dout)
             .build();
+
+        counter.clear();
+        counter.check(0);
 
         let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
         tx_transfer.wait_for_done_async().await.unwrap();
         assert_eq!(tx_transfer.is_done(), true);
         let (res, _, _done_tx) = tx_transfer.wait_async().await;
-        assert!(res.is_ok(), "I2S read transfer failed: {:?}", res.err());
+        assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
+        counter.check(8000);
+    }
+
+    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
+    // write completes.
+    #[test]
+    async fn test_i2s_write_one_shot_multiple(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap();
+
+        let (other, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(other);
+
+        let mut i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(dout)
+            .build();
+
+        counter.clear();
+        counter.check(0);
+
+        let mut compare = 4;
+        for _ in 0..10 {
+            let tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+            let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait();
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
+            counter.check(compare);
+            compare += 4;
+
+            tx_buffer = tx_buffer_back;
+            i2s_tx = i2s_tx_back;
+        }
+    }
+
+    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
+    // write completes.
+    #[test]
+    async fn test_i2s_write_one_shot_multiple_async(ctx: Context) {
+        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
+        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
+        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+
+        let i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap()
+        .into_async();
+
+        let (other, dout) = unsafe { ctx.dout.split() };
+        let mut counter = super::EdgeCounter::new(other);
+
+        let mut i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(dout)
+            .build();
+
+        counter.clear();
+        counter.check(0);
+
+        let mut compare = 4;
+        for _ in 0..10 {
+            let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
+            tx_transfer.wait_for_done_async().await.unwrap();
+            assert_eq!(tx_transfer.is_done(), true);
+            let (res, i2s_tx_back, tx_buffer_back) = tx_transfer.wait_async().await;
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
+            counter.check(compare);
+            compare += 4;
+            tx_buffer = tx_buffer_back;
+            i2s_tx = i2s_tx_back;
+        }
     }
 }
 
@@ -567,4 +701,58 @@ mod parallel_tests {
             .unwrap();
         xfer.wait_for_done().await.unwrap();
     }
+}
+
+struct EdgeCounter<'a> {
+    #[cfg(pcnt_driver_supported)]
+    unit: esp_hal::pcnt::unit::Unit<'a, 0>,
+
+    phantom: core::marker::PhantomData<&'a ()>,
+}
+
+#[cfg(pcnt_driver_supported)]
+impl<'a> EdgeCounter<'a> {
+    fn new<'i>(input: impl esp_hal::gpio::interconnect::PeripheralInput<'i>) -> Self {
+        let pcnt = esp_hal::pcnt::Pcnt::new(unsafe { esp_hal::peripherals::PCNT::steal() });
+        let unit = pcnt.unit0;
+        unit.channel0.set_edge_signal(input);
+        unit.channel0.set_input_mode(
+            esp_hal::pcnt::channel::EdgeMode::Hold,
+            esp_hal::pcnt::channel::EdgeMode::Increment,
+        );
+        unit.clear();
+
+        Self {
+            unit,
+            phantom: Default::default(),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.unit.clear();
+    }
+
+    fn count(&self) -> i32 {
+        self.unit.counter.get() as i32
+    }
+
+    fn check(&self, expected: i32) {
+        let count = self.count();
+        assert_eq!(count, expected, "Edge count does not match expected value");
+    }
+}
+
+#[cfg(not(pcnt_driver_supported))]
+impl<'a> EdgeCounter<'a> {
+    fn new<'i>(_input: impl esp_hal::gpio::interconnect::PeripheralInput<'i>) -> Self {
+        Self {
+            phantom: Default::default(),
+        }
+    }
+
+    fn clear(&mut self) {
+        // NOOP
+    }
+
+    fn check(&self, _expected: i32) {}
 }

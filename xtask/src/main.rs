@@ -779,6 +779,20 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 test: None,
                 toolchain: None,
                 timings: false,
+                package: "hil-test".to_string(),
+            },
+            CargoAction::Build(Some(target_path.join("tests"))),
+        )?;
+
+        tests(
+            workspace,
+            TestsArgs {
+                chip: args.chip,
+                repeat: 1,
+                test: None,
+                toolchain: None,
+                timings: false,
+                package: "hil-test-radio".to_string(),
             },
             CargoAction::Build(Some(target_path.join("tests"))),
         )

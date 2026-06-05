@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-cfg-if = "1"
 embassy-executor = "0.10.0"
 embassy-sync = "0.8"
 embedded-io-async = "0.7.0"
@@ -73,6 +72,12 @@ esp32s3 = [
     "esp-bootloader-esp-idf/esp32s3",
     "esp-rtos/esp32s3",
     "esp-hal/esp32s3",
+]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-rtos/esp32p4",
+    "esp-hal/esp32p4",
 ]
 
 [profile.release]

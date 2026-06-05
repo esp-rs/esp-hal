@@ -14,12 +14,11 @@ permissions:
 
 jobs:
   no-changelog-edits:
-    # Release PRs (labelled `release-pr`) and PRs where the author is taking
-    # full manual control of the changelog (`manual-changelog`) legitimately
-    # modify CHANGELOG.md — skip this check for them.
+    # PRs where the author is taking full manual control of the changelog
+    # (`manual-changelog`, applied to release PRs) legitimately modify
+    # CHANGELOG.md — skip this check for them.
     if: |
       !github.event.pull_request.draft &&
-      !contains(github.event.pull_request.labels.*.name, 'release-pr') &&
       !contains(github.event.pull_request.labels.*.name, 'manual-changelog')
     runs-on: ubuntu-latest
     steps:

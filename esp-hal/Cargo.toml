@@ -14,21 +14,21 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 [package.metadata.espressif]
 semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
-    { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
-    { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
+    { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
+    { if = 'bt_driver_supported', features = ["__bluetooth"] },
 ] }
 check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
-    { features = ["unstable", "rt", "__usb_otg"],   if = 'chip_has("usb_otg_driver_supported")' },
-    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
+    { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
-        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
-        { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
+        { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
+        { if = 'bt_driver_supported', features = ["__bluetooth"] },
     ] },
 ]
 
@@ -111,7 +111,7 @@ esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = 
 esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
 esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
 esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
-esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5a07030bbe72d57f82314a26ec42b7f93e03bd1d" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }

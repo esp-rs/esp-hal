@@ -28,7 +28,10 @@ impl AhbGdmaTxChannel<'_> {
 impl RegisterAccess for AhbGdmaTxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+        Some(PeripheralGuard::new_with(
+            Peripheral::AhbGdma,
+            init_dma_racey,
+        ))
     }
 
     fn reset(&self) {
@@ -227,7 +230,10 @@ impl AhbGdmaRxChannel<'_> {
 impl RegisterAccess for AhbGdmaRxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        Some(PeripheralGuard::new_with(Peripheral::Dma, init_dma_racey))
+        Some(PeripheralGuard::new_with(
+            Peripheral::AhbGdma,
+            init_dma_racey,
+        ))
     }
 
     fn reset(&self) {
@@ -298,6 +304,7 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for AhbGdmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool) {
         self.ch()
             .in_conf0()

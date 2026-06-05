@@ -1,6 +1,7 @@
 //! SPI Half Duplex Write Test
 
-//% CHIPS: esp32s3
+// P4 excluded: its PCNT is `not_supported`, and this test verifies writes via PCNT.
+//% CHIP_FILTER: dma_can_access_psram && !esp32p4
 //% FEATURES: unstable esp-alloc
 
 #![no_std]
@@ -60,7 +61,10 @@ mod tests {
 
         let pcnt = Pcnt::new(peripherals.PCNT);
 
-        let dma_channel = peripherals.DMA_CH0;
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+        };
 
         let mut mosi = Flex::new(mosi);
         mosi.set_input_enable(true);

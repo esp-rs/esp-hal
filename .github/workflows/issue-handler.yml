@@ -5,9 +5,105 @@ on:
     types:
       - opened
 
+permissions:
+  issues: write
+
 jobs:
+  auto-label:
+    name: Auto-label issue from title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const rules = [
+              [/linker scripts/i, "Area: linker scripts"],
+              [/low power/i, "Area: low power"],
+              [/\bbug\b/i, "bug"],
+
+              [/\besp32(?![-_ ]?(?:c2|c3|c5|c6|c61|h2|p4|s2|s3)\b)\b/i, "chip:esp32"],
+              [/\besp32[-_ ]?c2\b/i, "chip:esp32c2"],
+              [/\besp32[-_ ]?c3\b/i, "chip:esp32c3"],
+              [/\besp32[-_ ]?c5\b/i, "chip:esp32c5"],
+              [/\besp32[-_ ]?c6\b/i, "chip:esp32c6"],
+              [/\besp32[-_ ]?c61\b/i, "chip:esp32c61"],
+              [/\besp32[-_ ]?h2\b/i, "chip:esp32h2"],
+              [/\besp32[-_ ]?p4\b/i, "chip:esp32p4"],
+              [/\besp32[-_ ]?s2\b/i, "chip:esp32s2"],
+              [/\besp32[-_ ]?s3\b/i, "chip:esp32s3"],
+
+              [/\bci\b/i, "ci"],
+              [/documentation/i, "documentation"],
+              [/feature request/i, "feature request"],
+              [/\brtos\b/i, "package: rtos-*"],
+
+              [/\besp[-_ ]alloc\b/i, "package:esp-alloc"],
+              [/\besp[-_ ]backtrace\b/i, "package:esp-backtrace"],
+              [/bootloader/i, "package:esp-bootloader-esp-idf"],
+              [/\besp[-_]?config\b/i, "package:esp-config"],
+              [/embassy/i, "package:esp-hal-embassy"],
+              [/procmacros/i, "package:esp-hal-procmacros"],
+              [/esp-ieee802154/i, "package:esp-ieee802154"],
+              [/esp-lp-hal/i, "package:esp-lp-hal"],
+              [/metadata/i, "package:esp-metadata"],
+              [/println/i, "package:esp-println"],
+              [/\b(?:radio|esp[-_ ]?radio|wi[-_ ]?fi|ble|bluetooth|esp[-_ ]?now)\b/i, "package:esp-radio"],
+              [/riscv-rt/i, "package:esp-riscv-rt"],
+              [/esp-rom-sys/i, "package:esp-rom-sys"],
+              [/storage/i, "package:esp-storage"],
+              [/xtensa-lx-rt/i, "package:xtensa-lx-rt"],
+              [/xtensa-lx(?!-rt)/i, "package:xtensa-lx"],
+
+              [/performance/i, "performance"],
+
+              [/\badc\b/i, "peripheral:adc"],
+              [/\baes\b/i, "peripheral:aes"],
+              [/\bdac\b/i, "peripheral:dac"],
+              [/\bdma\b/i, "peripheral:dma"],
+              [/ethernet/i, "peripheral:ethernet"],
+              [/\bgpio\b/i, "peripheral:gpio"],
+              [/\bi2c\b/i, "peripheral:i2c"],
+              [/\bi2s\b/i, "peripheral:i2s"],
+              [/interrupt/i, "peripheral:interrupt"],
+              [/lcd_cam/i, "peripheral:lcd_cam"],
+              [/ledc/i, "peripheral:ledc"],
+              [/mcpwm/i, "peripheral:mcpwm"],
+              [/parl_io/i, "peripheral:parl_io"],
+              [/psram/i, "peripheral:psram"],
+              [/\brmt\b/i, "peripheral:rmt"],
+              [/\brng\b/i, "peripheral:rng"],
+              [/\brsa\b/i, "peripheral:rsa"],
+              [/sdmmc/i, "peripheral:sdmmc"],
+              [/\bsha\b/i, "peripheral:sha"],
+              [/\bspi\b/i, "peripheral:spi"],
+              [/systimer/i, "peripheral:systimer"],
+              [/\btimer\b/i, "peripheral:timer"],
+              [/touch/i, "peripheral:touch"],
+              [/twai/i, "peripheral:twai"],
+              [/uart/i, "peripheral:uart"],
+              [/\busb\b/i, "peripheral:usb"],
+              [/\b(?:watchdog(?: timer)?|wdt)\b/i, "peripheral:wdt"],
+            ];
+            const labels = [...new Set(
+              rules
+                .filter(([regex]) => regex.test(context.payload.issue.title))
+                .map(([, label]) => label)
+            )];
+
+            if (labels.length === 0) {
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels,
+            });
+
   add-to-project:
     name: Add issue to project
+    if: github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@v0.5.0

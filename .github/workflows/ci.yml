@@ -91,9 +91,11 @@ jobs:
           BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
           HIL=true; CHANGELOG=true; SEMVER=true
 
+          # `skip-ci-non-code-change` only skips building/testing; API checks (semver) still run.
+          # Use the dedicated `skip-semver-checks` label to skip semver checks.
           if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
             BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
-            HIL=false; SEMVER=false
+            HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
           if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
@@ -488,11 +490,11 @@ jobs:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/xtask
 
-      - name: Build tests
+      - name: Build hil-test tests
         run: |
           for chip in esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4; do
             if cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
-              echo "Building ALL tests for $chip"
+              echo "Building ALL hil-test tests for $chip"
               cargo xtask build tests "$chip"
             else
               echo "Skipping $chip: not supported by this ref's xtask"
@@ -504,6 +506,29 @@ jobs:
           name: hil-tests
           path: target/tests/
           if-no-files-found: error
+
+      # Build radio HIL tests (hil-test-radio).  Chips for which the radio
+      # package has no applicable binaries produce no output and are silently
+      # skipped via `if-no-files-found: ignore`.
+      - name: Reset tests output directory for radio build
+        run: rm -rf target/tests
+
+      - name: Build hil-test-radio tests
+        run: |
+          for chip in esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2; do
+            if cargo xtask build tests "$chip" hil-test-radio --help >/dev/null 2>&1; then
+              echo "Building ALL hil-test-radio tests for $chip"
+              cargo xtask build tests "$chip" hil-test-radio
+            else
+              echo "Skipping $chip: not supported by this ref's xtask"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: hil-tests-radio
+          path: target/tests/
+          if-no-files-found: ignore
 
   # Device runs — not gated by ci-result.
   hil-run:
@@ -547,6 +572,53 @@ jobs:
           rm -rf tests/ || true
           rm -f xtask || true
 
+  # Radio HIL device runs — wifi/BT capable chips on dedicated radio runners.
+  # Not gated by ci-result for the same reason hil-run is excluded.
+  hil-run-radio:
+    needs: hil-build
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - soc: esp32c6
+            runner: esp32c6-radio
+            host: aarch64
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hil-tests-radio
+          path: tests/
+        continue-on-error: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No radio tests for ${{ matrix.target.soc }} in this run; skipping."
+          fi
+
+      - name: Run Radio Tests
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
+          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests/ || true
+          rm -f xtask || true
+
   # --------------------------------------------------------------------------
   # Gate job for branch protection
   #
@@ -554,8 +626,9 @@ jobs:
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
   #
-  # NOTE: hil-run is intentionally excluded — device tests should not block
-  # the merge queue.  hil-build IS included so we gate on test compilation.
+  # NOTE: hil-run and hil-run-radio are intentionally excluded — device tests
+  # should not block the merge queue.  hil-build IS included so we gate on
+  # test compilation.
   ci-result:
     if: always()
     needs:

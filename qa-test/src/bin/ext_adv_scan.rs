@@ -9,7 +9,7 @@
 //! Not supported on ESP32 since this feature needs BLE 5.0+ (and ESP32 is 4.2)
 
 //% FEATURES: esp-radio esp-radio/ble esp-hal/unstable
-//% CHIPS: esp32s3 esp32h2 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61
+//% CHIP_FILTER: bt_driver_supported && !esp32
 
 #![no_std]
 #![no_main]

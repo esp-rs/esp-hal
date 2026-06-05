@@ -1,7 +1,5 @@
 use enumset::{EnumSet, EnumSetType};
 
-#[cfg(dma_kind = "gdma")]
-use crate::dma::DmaPriority;
 use crate::{
     asynch::AtomicWaker,
     dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
@@ -15,6 +13,10 @@ for_each_dma_engine! {
     ("AHB_GDMA") => {
         mod gdma;
         pub use gdma::*;
+    };
+    ("AXI_GDMA") => {
+        mod axi_gdma;
+        pub use axi_gdma::*;
     };
     ("COPY_DMA") => {
         mod copy;
@@ -35,10 +37,7 @@ for_each_dma_engine! {
 }
 
 /// Implemented by peripheral singletons that can be used with a DMA engine.
-pub trait DmaEligiblePeripheral {
-    /// The erased DMA channel type for the engine this peripheral belongs to.
-    type ErasedChannel<'a>: DmaChannel;
-
+pub trait DmaEligiblePeripheral<D: DmaChannel> {
     /// Returns the `DmaPeripheral` ID for runtime compatibility checks.
     fn dma_peripheral(&self) -> DmaPeripheral;
 }
@@ -49,7 +48,7 @@ for_each_peripheral! {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
-        pub struct DmaPeripheral(pub u8);
+        pub struct DmaPeripheral(pub(crate) u8);
         impl DmaPeripheral {
             $(
                 #[doc = concat!("DMA accesses ", stringify!($name))]
@@ -58,9 +57,7 @@ for_each_peripheral! {
         }
 
         $(
-            impl DmaEligiblePeripheral for crate::peripherals::$peri<'_> {
-                type ErasedChannel<'a> = $any_ch<'a>;
-
+            impl<'d> DmaEligiblePeripheral<$any_ch<'d>> for crate::peripherals::$peri<'d> {
                 fn dma_peripheral(&self) -> DmaPeripheral {
                     DmaPeripheral::$peri
                 }
@@ -87,8 +84,8 @@ pub trait RegisterAccess: Sealed {
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.
-    #[cfg(dma_kind = "gdma")]
-    fn set_priority(&self, priority: DmaPriority);
+    #[cfg(dma_max_priority_is_set)]
+    fn set_priority(&self, priority: crate::dma::DmaPriority);
 
     /// Select a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
@@ -129,7 +126,7 @@ pub trait RegisterAccess: Sealed {
 
 #[doc(hidden)]
 pub trait RxRegisterAccess: RegisterAccess {
-    #[cfg(dma_kind = "gdma")]
+    #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, value: bool);
 
     fn peripheral_interrupt(&self) -> Option<Interrupt>;

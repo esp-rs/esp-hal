@@ -64,14 +64,11 @@ macro_rules! property {
     ("assist_debug.has_region_monitor") => {
         false
     };
-    ("dma.kind") => {
-        "gdma"
-    };
-    ("dma.supports_mem2mem") => {
+    ("dma.mem2mem_requires_peripheral") => {
         false
     };
     ("dma.can_access_psram") => {
-        false
+        true
     };
     ("dma.ext_mem_configurable_block_size") => {
         false
@@ -116,6 +113,9 @@ macro_rules! property {
         stringify!(3)
     };
     ("gpio.has_bank_1") => {
+        true
+    };
+    ("gpio.has_input_sync") => {
         true
     };
     ("gpio.gpio_function") => {
@@ -185,7 +185,7 @@ macro_rules! property {
         false
     };
     ("i2c_master.has_arbitration_en") => {
-        false
+        true
     };
     ("i2c_master.has_tx_fifo_watermark") => {
         false
@@ -316,6 +316,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(20000000)
     };
+    ("soc.internal_memory_cached") => {
+        true
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };
@@ -431,7 +434,8 @@ macro_rules! for_each_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
-        _for_each_inner_dma_engine!((all("AHB_GDMA")));
+        _for_each_inner_dma_engine!(("AXI_GDMA"));
+        _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA")));
     };
 }
 #[macro_export]
@@ -442,23 +446,39 @@ macro_rules! for_each_dma_channel {
         => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2));
         _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
+        _for_each_inner_dma_channel!(("AXI_GDMA", any_channel = AxiGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES,
-        SHA])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in =
-        AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES,
-        SHA])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in =
-        AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [SPI2, SPI3, AES,
+        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = []));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in =
+        AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1, compatible = []));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in =
+        AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = []));
+        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in =
+        AXI_PDMA_IN_CH0, interrupt_out = AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES,
+        SHA])); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1, 1, interrupt_in =
+        AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES,
+        SHA])); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
+        AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [SPI2, SPI3, AES,
         SHA])); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0), ("AHB_GDMA",
-        DMA_CH1), ("AHB_GDMA", DMA_CH2)));
+        DMA_CH1), ("AHB_GDMA", DMA_CH2), ("AXI_GDMA", DMA_AXI_CH0), ("AXI_GDMA",
+        DMA_AXI_CH1), ("AXI_GDMA", DMA_AXI_CH2)));
         _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
-        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
+        AhbGdmaChannel), ("AXI_GDMA", any_channel = AxiGdmaChannel)));
+        _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES,
-        SHA]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = AHB_PDMA_IN_CH1, interrupt_out =
-        AHB_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES, SHA]), ("AHB_GDMA", DMA_CH2, 2,
-        interrupt_in = AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible =
-        [SPI2, SPI3, AES, SHA])));
+        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = []), ("AHB_GDMA",
+        DMA_CH1, 1, interrupt_in = AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1,
+        compatible = []), ("AHB_GDMA", DMA_CH2, 2, interrupt_in = AHB_PDMA_IN_CH2,
+        interrupt_out = AHB_PDMA_OUT_CH2, compatible = []), ("AXI_GDMA", DMA_AXI_CH0, 0,
+        interrupt_in = AXI_PDMA_IN_CH0, interrupt_out = AXI_PDMA_OUT_CH0, compatible =
+        [SPI2, SPI3, AES, SHA]), ("AXI_GDMA", DMA_AXI_CH1, 1, interrupt_in =
+        AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES,
+        SHA]), ("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in = AXI_PDMA_IN_CH2, interrupt_out
+        = AXI_PDMA_OUT_CH2, compatible = [SPI2, SPI3, AES, SHA])));
     };
 }
 #[macro_export]
@@ -466,32 +486,60 @@ macro_rules! for_each_dma_channel {
 macro_rules! for_each_dma_channel_peri_pair {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        DMA_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
-        SPI3)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI3));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI3));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
-        AhbGdmaChannel, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        any_channel = AhbGdmaChannel, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        SHA)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
-        SPI2), ("AHB_GDMA", DMA_CH0, SPI3), ("AHB_GDMA", DMA_CH0, AES), ("AHB_GDMA",
-        DMA_CH0, SHA), ("AHB_GDMA", DMA_CH1, SPI2), ("AHB_GDMA", DMA_CH1, SPI3),
-        ("AHB_GDMA", DMA_CH1, AES), ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH2,
-        SPI2), ("AHB_GDMA", DMA_CH2, SPI3), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA",
-        DMA_CH2, SHA))); _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA",
-        any_channel = AhbGdmaChannel, SPI2), ("AHB_GDMA", any_channel = AhbGdmaChannel,
-        SPI3), ("AHB_GDMA", any_channel = AhbGdmaChannel, AES), ("AHB_GDMA", any_channel
-        = AhbGdmaChannel, SHA)));
+        ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH0, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH0, AES)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH0, SHA)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH1, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH1, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH1, AES)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH1, SHA)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH2, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH2, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH2, AES)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        DMA_AXI_CH2, SHA)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        any_channel = AxiGdmaChannel, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel = AxiGdmaChannel,
+        SPI3)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel =
+        AxiGdmaChannel, AES)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        any_channel = AxiGdmaChannel, SHA));
+        _for_each_inner_dma_channel_peri_pair!((channels("AXI_GDMA", DMA_AXI_CH0, SPI2),
+        ("AXI_GDMA", DMA_AXI_CH0, SPI3), ("AXI_GDMA", DMA_AXI_CH0, AES), ("AXI_GDMA",
+        DMA_AXI_CH0, SHA), ("AXI_GDMA", DMA_AXI_CH1, SPI2), ("AXI_GDMA", DMA_AXI_CH1,
+        SPI3), ("AXI_GDMA", DMA_AXI_CH1, AES), ("AXI_GDMA", DMA_AXI_CH1, SHA),
+        ("AXI_GDMA", DMA_AXI_CH2, SPI2), ("AXI_GDMA", DMA_AXI_CH2, SPI3), ("AXI_GDMA",
+        DMA_AXI_CH2, AES), ("AXI_GDMA", DMA_AXI_CH2, SHA)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("AXI_GDMA", any_channel =
+        AxiGdmaChannel, SPI2), ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI3),
+        ("AXI_GDMA", any_channel = AxiGdmaChannel, AES), ("AXI_GDMA", any_channel =
+        AxiGdmaChannel, SHA)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH1, 11)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH2, 12));
+        _for_each_inner_mem2mem_channel!(("AXI_GDMA", AxiGdma, AxiGdmaChannel,
+        DMA_AXI_CH0, 6)); _for_each_inner_mem2mem_channel!(("AXI_GDMA", AxiGdma,
+        AxiGdmaChannel, DMA_AXI_CH1, 7)); _for_each_inner_mem2mem_channel!(("AXI_GDMA",
+        AxiGdma, AxiGdmaChannel, DMA_AXI_CH2, 8));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, 1, 11, 2,
+        12)); _for_each_inner_mem2mem_channel!(("AXI_GDMA", AxiGdma, AxiGdmaChannel, 0,
+        6, 1, 7, 2, 8)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel)); _for_each_inner_mem2mem_channel!(("AXI_GDMA", AxiGdma,
+        AxiGdmaChannel)); _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH1, 11), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2, 12),
+        ("AXI_GDMA", AxiGdma, AxiGdmaChannel, DMA_AXI_CH0, 6), ("AXI_GDMA", AxiGdma,
+        AxiGdmaChannel, DMA_AXI_CH1, 7), ("AXI_GDMA", AxiGdma, AxiGdmaChannel,
+        DMA_AXI_CH2, 8))); _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, 1, 11, 2, 12), ("AXI_GDMA", AxiGdma, AxiGdmaChannel, 0, 6, 1, 7,
+        2, 8))); _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel), ("AXI_GDMA", AxiGdma, AxiGdmaChannel)));
     };
 }
 #[macro_export]
@@ -499,7 +547,7 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! with_aes_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_aes_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_aes_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+        => {} } _with_inner_aes_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
     };
 }
 #[macro_export]
@@ -507,7 +555,15 @@ macro_rules! with_aes_dma_engine {
 macro_rules! with_sha_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_sha_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_sha_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+        => {} } _with_inner_sha_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_spi_master_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_master_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
     };
 }
 #[macro_export]
@@ -1229,6 +1285,22 @@ macro_rules! for_each_sdm_channel {
 ///         todo!()
 ///     }
 /// }
+/// impl SpiInstance {
+///     // SPI_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<SpiFunctionClockConfig>,
+///         _new_config: SpiFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl I2cInstance {
 ///     // I2C_FUNCTION_CLOCK
 ///
@@ -1262,6 +1334,12 @@ macro_rules! define_clock_tree_types {
             Uart2 = 2,
             Uart3 = 3,
             Uart4 = 4,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiInstance {
+            Spi2 = 0,
+            Spi3 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1527,6 +1605,18 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
+        /// The list of clock signals that the `SPI2_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiFunctionClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+            /// Selects `SPLL_CLK`.
+            Spll,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cFunctionClockSclk {
@@ -1580,6 +1670,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 5],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 5],
+            spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
             cpll_clk_refcount: u32,
             spll_clk_refcount: u32,
@@ -1601,6 +1692,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 5],
             uart_baud_rate_generator_refcount: [u32; 5],
+            spi_function_clock_refcount: [u32; 2],
             i2c_function_clock_refcount: [u32; 2],
         }
         impl ClockTree {
@@ -1696,6 +1788,14 @@ macro_rules! define_clock_tree_types {
             pub fn uart4_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart4 as usize]
             }
+            /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
+            pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi2 as usize]
+            }
+            /// Returns the current configuration of the SPI3_FUNCTION_CLOCK clock tree node
+            pub fn spi3_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi3 as usize]
+            }
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
@@ -1719,6 +1819,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 5],
                 uart_baud_rate_generator: [None; 5],
+                spi_function_clock: [None; 2],
                 i2c_function_clock: [None; 2],
                 cpll_clk_refcount: 0,
                 spll_clk_refcount: 0,
@@ -1740,6 +1841,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 5],
                 uart_baud_rate_generator_refcount: [0; 5],
+                spi_function_clock_refcount: [0; 2],
                 i2c_function_clock_refcount: [0; 2],
             });
         static CPU_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1766,6 +1868,8 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 5];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 5] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 5];
+        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
@@ -2684,6 +2788,81 @@ macro_rules! define_clock_tree_types {
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl SpiInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: SpiFunctionClockConfig,
+            ) {
+                let old_selector = clocks.spi_function_clock[self as usize].replace(new_selector);
+                refresh_spi_function_clock_downstream(clocks, self);
+                if clocks.spi_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                            SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<SpiFunctionClockConfig> {
+                clocks.spi_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                        SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: SpiFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
+                    SpiFunctionClockConfig::Spll => spll_clk_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+        }
         impl I2cInstance {
             pub fn configure_function_clock(
                 self,
@@ -2925,6 +3104,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
+            if let Some(config) = clocks.spi_function_clock[instance as usize] {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
         fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
             if let Some(config) = clocks.i2c_function_clock[instance as usize] {
                 I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
@@ -2951,12 +3138,10 @@ macro_rules! implement_peripheral_clocks {
             Adc,
             /// AES peripheral clock signal
             Aes,
-            /// AHB_PDMA peripheral clock signal
-            AhbPdma,
-            /// AXI_PDMA peripheral clock signal
-            AxiPdma,
-            /// DMA peripheral clock signal
-            Dma,
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
+            /// AXI_GDMA peripheral clock signal
+            AxiGdma,
             /// DS peripheral clock signal
             Ds,
             /// ECC peripheral clock signal
@@ -2965,8 +3150,6 @@ macro_rules! implement_peripheral_clocks {
             Ecdsa,
             /// EMAC peripheral clock signal
             Emac,
-            /// GDMA peripheral clock signal
-            Gdma,
             /// GPIO_SD peripheral clock signal
             GpioSd,
             /// HMAC peripheral clock signal
@@ -3037,6 +3220,8 @@ macro_rules! implement_peripheral_clocks {
             UsbFs,
             /// USB_HS peripheral clock signal
             UsbHs,
+            /// VDMA peripheral clock signal
+            Vdma,
         }
         impl Peripheral {
             const KEEP_ENABLED: &[Peripheral] = &[
@@ -3050,14 +3235,12 @@ macro_rules! implement_peripheral_clocks {
             const ALL: &[Self] = &[
                 Self::Adc,
                 Self::Aes,
-                Self::AhbPdma,
-                Self::AxiPdma,
-                Self::Dma,
+                Self::AhbGdma,
+                Self::AxiGdma,
                 Self::Ds,
                 Self::Ecc,
                 Self::Ecdsa,
                 Self::Emac,
-                Self::Gdma,
                 Self::GpioSd,
                 Self::Hmac,
                 Self::I2c0,
@@ -3093,6 +3276,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::UsbDevice,
                 Self::UsbFs,
                 Self::UsbHs,
+                Self::Vdma,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -3107,20 +3291,15 @@ macro_rules! implement_peripheral_clocks {
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
                 }
-                Peripheral::AhbPdma => {
+                Peripheral::AhbGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
                 }
-                Peripheral::AxiPdma => {
+                Peripheral::AxiGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.axi_pdma_sys_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .soc_clk_ctrl1()
-                        .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3141,11 +3320,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.emac_sys_clk_en().bit(enable));
-                }
-                Peripheral::Gdma => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .soc_clk_ctrl1()
-                        .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
                 }
                 Peripheral::GpioSd => {
                     crate::peripherals::GPIO_SD::regs()
@@ -3351,6 +3525,11 @@ macro_rules! implement_peripheral_clocks {
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.usb_otg20_sys_clk_en().bit(enable));
                 }
+                Peripheral::Vdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl1()
+                        .modify(|_, w| w.gdma_sys_clk_en().bit(enable));
+                }
             }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
@@ -3365,20 +3544,15 @@ macro_rules! implement_peripheral_clocks {
                         .hp_rst_en2()
                         .modify(|_, w| w.rst_en_aes().bit(reset));
                 }
-                Peripheral::AhbPdma => {
+                Peripheral::AhbGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en1()
                         .modify(|_, w| w.rst_en_ahb_pdma().bit(reset));
                 }
-                Peripheral::AxiPdma => {
+                Peripheral::AxiGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en1()
                         .modify(|_, w| w.rst_en_axi_pdma().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .hp_rst_en1()
-                        .modify(|_, w| w.rst_en_ahb_pdma().bit(reset));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3397,11 +3571,6 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::Emac => {
                     let _ = reset;
-                }
-                Peripheral::Gdma => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .hp_rst_en0()
-                        .modify(|_, w| w.rst_en_gdma().bit(reset));
                 }
                 Peripheral::GpioSd => {
                     let _ = reset;
@@ -3599,6 +3768,11 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::UsbHs => {
                     let _ = reset;
+                }
+                Peripheral::Vdma => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en0()
+                        .modify(|_, w| w.rst_en_gdma().bit(reset));
                 }
             }
         }
@@ -3920,14 +4094,28 @@ macro_rules! for_each_peripheral {
         virtual(AHB_PDMA_IN_CH2 : { bind_dma_in_interrupt, enable_dma_in_interrupt,
         disable_dma_in_interrupt }, AHB_PDMA_OUT_CH2 : { bind_dma_out_interrupt,
         enable_dma_out_interrupt, disable_dma_out_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
-        GPIO_SD <= GPIO_SD() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
-        HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DMA_AXI_CH0 peripheral singleton"] DMA_AXI_CH0 <= virtual(AXI_PDMA_IN_CH0 : {
+        bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
+        AXI_PDMA_OUT_CH0 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
+        disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
+        peri_type #[doc = "DMA_AXI_CH1 peripheral singleton"] DMA_AXI_CH1 <=
+        virtual(AXI_PDMA_IN_CH1 : { bind_dma_in_interrupt, enable_dma_in_interrupt,
+        disable_dma_in_interrupt }, AXI_PDMA_OUT_CH1 : { bind_dma_out_interrupt,
+        enable_dma_out_interrupt, disable_dma_out_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DMA_AXI_CH2 peripheral singleton"] DMA_AXI_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
+        bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
+        AXI_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
+        disable_dma_out_interrupt }) (unstable))); _for_each_inner_peripheral!((@
+        peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
+        GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
+        SYSTEM <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "RNG peripheral singleton"] RNG <= LP_SYS() (unstable)));
@@ -3990,13 +4178,14 @@ macro_rules! for_each_peripheral {
         #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA peripheral singleton"] DMA
         <= AHB_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ETH peripheral singleton"] ETH <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
+        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
+        EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
+        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LEDC peripheral singleton"]
@@ -4064,6 +4253,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
         _for_each_inner_peripheral!((DMA_CH1(unstable)));
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH0(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH1(unstable)));
+        _for_each_inner_peripheral!((DMA_AXI_CH2(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
@@ -4097,6 +4289,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TWAI2(unstable)));
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
+        _for_each_inner_peripheral!((AXI_GDMA(unstable)));
         _for_each_inner_peripheral!((ETH(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((SDHOST(unstable)));
@@ -4114,10 +4307,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_HS(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
-        _for_each_inner_peripheral!((SPI2, Spi2, 1, AhbGdmaChannel));
-        _for_each_inner_peripheral!((SPI3, Spi3, 2, AhbGdmaChannel));
-        _for_each_inner_peripheral!((AES, Aes, 4, AhbGdmaChannel));
-        _for_each_inner_peripheral!((SHA, Sha, 5, AhbGdmaChannel));
+        _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
+        _for_each_inner_peripheral!((SPI3, Spi3, 2, AxiGdmaChannel));
+        _for_each_inner_peripheral!((AES, Aes, 4, AxiGdmaChannel));
+        _for_each_inner_peripheral!((SHA, Sha, 5, AxiGdmaChannel));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
@@ -4251,6 +4444,18 @@ macro_rules! for_each_peripheral {
         bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
         AHB_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
         disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
+        "DMA_AXI_CH0 peripheral singleton"] DMA_AXI_CH0 <= virtual(AXI_PDMA_IN_CH0 : {
+        bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
+        AXI_PDMA_OUT_CH0 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
+        disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
+        "DMA_AXI_CH1 peripheral singleton"] DMA_AXI_CH1 <= virtual(AXI_PDMA_IN_CH1 : {
+        bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
+        AXI_PDMA_OUT_CH1 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
+        disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
+        "DMA_AXI_CH2 peripheral singleton"] DMA_AXI_CH2 <= virtual(AXI_PDMA_IN_CH2 : {
+        bind_dma_in_interrupt, enable_dma_in_interrupt, disable_dma_in_interrupt },
+        AXI_PDMA_OUT_CH2 : { bind_dma_out_interrupt, enable_dma_out_interrupt,
+        disable_dma_out_interrupt }) (unstable)), (@ peri_type #[doc =
         "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc =
         "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
         "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD() (unstable)), (@ peri_type
@@ -4302,14 +4507,15 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@ peri_type
         #[doc = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type
-        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type
-        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@
-        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC()
-        (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE
-        <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type #[doc
-        = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
+        #[doc = "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@
+        peri_type #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@
+        peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA()
+        (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
+        EMAC_MAC() (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"]
+        USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type
+        #[doc = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(PWM0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
@@ -4343,23 +4549,25 @@ macro_rules! for_each_peripheral {
         (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42),
         (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50),
         (GPIO51), (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (DMA_CH2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (SYSTEM(unstable)),
-        (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (RNG(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (DMA_CH2(unstable)), (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)),
+        (DMA_AXI_CH2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
+        (SYSTEM(unstable)), (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)),
+        (RNG(unstable)), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
         (LP_I2C_ANA_MST(unstable)), (CLIC(unstable)), (IO_MUX(unstable)),
         (LP_AON(unstable)), (LP_AON_CLKRST(unstable)), (LP_SYS(unstable)),
         (LP_WDT(unstable)), (LPWR(unstable)), (PMU(unstable)), (SYSTIMER(unstable)),
         (TIMG0(unstable)), (TIMG1(unstable)), (UART0(unstable)), (UART1(unstable)),
         (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI2), (SPI3),
         (I2C0(unstable)), (I2C1(unstable)), (TWAI0(unstable)), (TWAI1(unstable)),
-        (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (ETH(unstable)),
-        (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
-        (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
-        (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
-        (USB_FS(unstable)), (USB_HS(unstable)), (SW_INTERRUPT(unstable)),
-        (CPU_CTRL(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1,
-        AhbGdmaChannel), (SPI3, Spi3, 2, AhbGdmaChannel), (AES, Aes, 4, AhbGdmaChannel),
-        (SHA, Sha, 5, AhbGdmaChannel)));
+        (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (AXI_GDMA(unstable)),
+        (ETH(unstable)), (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)),
+        (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)),
+        (ADC(unstable)), (AES(unstable)), (SHA(unstable)), (RSA(unstable)),
+        (ECC(unstable)), (USB_FS(unstable)), (USB_HS(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
+        Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (SHA, Sha, 5,
+        AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

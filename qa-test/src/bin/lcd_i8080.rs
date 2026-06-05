@@ -17,7 +17,7 @@
 //! - D6        => GPIO16
 //! - D7        => GPIO15
 
-//% CHIPS: esp32s3
+//% CHIP_FILTER: camera_driver_supported
 
 #![no_std]
 #![no_main]

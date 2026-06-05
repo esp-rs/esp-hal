@@ -313,6 +313,9 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
 }
 
 impl RxRegisterAccess for CopyDmaRxChannel<'_> {
+    #[cfg(dma_supports_mem2mem)]
+    fn set_mem2mem_mode(&self, _value: bool) {}
+
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         None
     }

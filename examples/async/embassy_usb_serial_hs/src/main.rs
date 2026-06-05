@@ -5,6 +5,8 @@
 //! The example uses the HS USB port of the ESP32-P4.
 //! This port uses dedicated pins, not GPIOs.
 
+//% CHIP_FILTER: usb_otg_hs_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -52,13 +54,6 @@ async fn main(_spawner: Spawner) {
     config.manufacturer = Some("Espressif");
     config.product = Some("USB-serial example");
     config.serial_number = Some("12345678");
-
-    // Required for windows compatibility.
-    // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
-    config.device_class = 0xEF;
-    config.device_sub_class = 0x02;
-    config.device_protocol = 0x01;
-    config.composite_with_iads = true;
 
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.

@@ -154,7 +154,6 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_radio_config_table.md"))]
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
-#![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),

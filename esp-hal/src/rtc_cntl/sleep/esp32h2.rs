@@ -9,7 +9,14 @@ use crate::{
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
-    soc::clocks::{ClockTree, CpuClkConfig, HpRootClkConfig, TimgCalibrationClockConfig},
+    soc::clocks::{
+        self,
+        ClockTree,
+        CpuClkConfig,
+        HpRootClkConfig,
+        LpSlowClkConfig,
+        TimgCalibrationClockConfig,
+    },
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -685,7 +692,13 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_cpu(true);
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
-            self.pd_flags.set_pd_xtal32k(true);
+            let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
+                matches!(
+                    clocks::lp_slow_clk_config(clocks),
+                    Some(LpSlowClkConfig::Xtal32k)
+                )
+            });
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         } else if self.need_pd_top {
             self.pd_flags.set_pd_top(false);
         }

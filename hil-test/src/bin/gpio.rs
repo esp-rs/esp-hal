@@ -1,6 +1,6 @@
 //! GPIO Test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4 esp32s2 esp32s3
+//% CHIP_FILTER: gpio_driver_supported
 //% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
 
@@ -11,8 +11,8 @@
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
+cfg_select! {
+    feature = "unstable" => {
         use core::cell::RefCell;
         use critical_section::Mutex;
         use embassy_time::{Duration, Timer};
@@ -28,12 +28,14 @@ cfg_if::cfg_if! {
         static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
         static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
     }
+    _ => {}
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(all(multi_core, feature = "unstable"))] {
+cfg_select! {
+    all(multi_core, feature = "unstable") => {
         use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
     }
+    _ => {}
 }
 
 #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
@@ -655,7 +657,6 @@ mod tests {
 
         // output_dedicated.set_level(Level::Low);
         assert_eq!(input_dedicated.level(), Level::Low);
-        #[cfg(not(esp32s3))]
         assert_eq!(output_dedicated.output_level(), Level::Low);
         output_dedicated.set_level(Level::High);
         #[cfg(esp32s2)]
@@ -666,12 +667,11 @@ mod tests {
             core::arch::asm!("nop");
         }
         assert_eq!(input_dedicated.level(), Level::High);
-        #[cfg(not(esp32s3))]
         assert_eq!(output_dedicated.output_level(), Level::High);
     }
 
     #[test]
-    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable", not(esp32s3)))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpios_output_levels(ctx: Context) {
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
         let mut output_dedicated =
@@ -754,7 +754,6 @@ mod tests {
 
         assert_eq!(input_dedicated.level(), Level::Low);
         assert_eq!(input_bundle.levels(), 0);
-        #[cfg(not(esp32s3))]
         assert_eq!(output_bundle.output_levels(), 0);
 
         output_bundle.set_high(1);
@@ -768,7 +767,6 @@ mod tests {
         }
         assert_eq!(input_dedicated.level(), Level::High);
         assert_eq!(input_bundle.levels(), 1);
-        #[cfg(not(esp32s3))]
         assert_eq!(output_bundle.output_levels(), 1);
     }
 

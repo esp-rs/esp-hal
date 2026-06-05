@@ -1,6 +1,6 @@
 //! SPI Full Duplex test suite.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: spi_master_driver_supported
 //% FEATURES(unstable): esp-alloc unstable
 //% FEATURES(stable):
 
@@ -19,8 +19,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
+cfg_select! {
+    feature = "unstable" => {
         use esp_hal::peripherals::SPI2;
         use esp_hal::spi::master::{Address, Command, DataMode};
 
@@ -41,16 +41,21 @@ cfg_if::cfg_if! {
         #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
         use esp_hal::Async;
     }
+    _ => {}
 }
 
 #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-cfg_if::cfg_if! {
-    if #[cfg(dma_kind = "pdma")] {
-        type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
-    } else {
-        type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
-    }
-}
+type DmaChannel<'a> = cfg_select! {
+    spi_master_dma_engine = "SPI_DMA" => {
+        esp_hal::peripherals::DMA_SPI2<'a>
+    },
+    spi_master_dma_engine = "AHB_GDMA" => {
+        esp_hal::peripherals::DMA_CH0<'a>
+    },
+    spi_master_dma_engine = "AXI_GDMA" => {
+        esp_hal::peripherals::DMA_AXI_CH0<'a>
+    },
+};
 
 struct Context {
     spi: Spi<'static, Blocking>,
@@ -220,18 +225,23 @@ mod tests {
         let sclk_input = Input::new(sclk_input, Default::default());
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                peripherals.DMA_SPI2
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                peripherals.DMA_CH0
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                peripherals.DMA_AXI_CH0
+            },
+        };
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_supports_dma, feature = "unstable"))] {
+        cfg_select! {
+            all(spi_master_supports_dma, feature = "unstable") => {
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-            } else {
+            }
+            _ => {
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
                 static mut RX_BUFFER: [u8; 4096] = [0; 4096];
 
@@ -251,11 +261,8 @@ mod tests {
         .with_miso(miso)
         .with_mosi(mosi);
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "unstable")] {
-                #[cfg(pcnt_driver_supported)]
-                let pcnt = Pcnt::new(peripherals.PCNT);
-
+        cfg_select! {
+            feature = "unstable" => {
                 Context {
                     spi,
                     rx_buffer,
@@ -270,9 +277,10 @@ mod tests {
                     #[cfg(spi_master_supports_dma)]
                     tx_descriptors,
                     #[cfg(pcnt_driver_supported)]
-                    pcnt_unit: pcnt.unit0,
+                    pcnt_unit: Pcnt::new(peripherals.PCNT).unit0,
                 }
-            } else {
+            }
+            _ => {
                 Context {
                     spi,
                     rx_buffer,
@@ -1201,15 +1209,7 @@ mod tests {
     fn test_clock_calculation_accuracy(mut ctx: Context) {
         let lowest = if cfg!(esp32h2) { 78048 } else { 78125 };
 
-        let f_mst = if cfg!(esp32c2) {
-            40_000_000
-        } else if cfg!(esp32h2) {
-            48_000_000
-        } else if cfg!(esp32c5) {
-            80_000_000 // pre-divided by 2
-        } else {
-            80_000_000
-        };
+        let f_mst = esp_hal::clock::ll::SpiInstance::Spi2.function_clock_frequency();
         let inputs = [lowest, 100_000, 1_000_000, f_mst];
         let expected_outputs = [lowest, 100_000, 1_000_000, f_mst];
 

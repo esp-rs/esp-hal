@@ -68,7 +68,7 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -197,6 +197,12 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "PLL_80M", outputs = "PLL_80M" },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -211,7 +217,7 @@ clocks = { system_clocks = { clock_tree = [
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
     { name = "Tsens", template_params = { reg_group = "en1" } },
-    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
     { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
     { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
     { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
@@ -265,9 +271,8 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
-supports_mem2mem = true
+mem2mem_requires_peripheral = true
 max_priority = 9
 engines = [
     { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"], peripheral_instances = [
@@ -286,6 +291,7 @@ engines = [
 
 [device.gpio]
 version = 2
+has_input_sync = true
 support_status = "supported"
 gpio_function = 1
 constant_0_input = 0x1f

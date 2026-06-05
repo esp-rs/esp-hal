@@ -343,9 +343,9 @@ driver_configs![
         driver: dma,
         name: "DMA",
         properties: {
-            kind: String,
+            /// When true, memory-to-memory setup requires a real DMA peripheral (e.g. ESP32-C3/S3).
             #[serde(default)]
-            supports_mem2mem: bool,
+            mem2mem_requires_peripheral: bool,
             #[serde(default)]
             can_access_psram: bool,
             #[serde(default)]
@@ -408,6 +408,8 @@ driver_configs![
             version: u32,
             #[serde(default)]
             has_bank_1: bool,
+            #[serde(default)]
+            has_input_sync: bool,
             gpio_function: u32,
             constant_0_input: u32,
             constant_1_input: u32,
@@ -679,6 +681,8 @@ driver_configs![
             cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
+            #[serde(default)]
+            internal_memory_cached: bool,
             #[serde(flatten)]
             config: SocConfig,
         }

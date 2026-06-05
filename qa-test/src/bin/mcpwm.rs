@@ -5,7 +5,7 @@
 //!
 //! The signal will be output to the pin assigned to `pin`. (GPIO0)
 
-//% CHIPS: esp32 esp32c6 esp32h2 esp32s3
+//% CHIP_FILTER: mcpwm_driver_supported
 
 #![no_std]
 #![no_main]
@@ -25,15 +25,10 @@ fn main() -> ! {
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
     let pin = peripherals.GPIO0;
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32h2")] {
-            let clock_cfg =
-                PeripheralClockConfig::with_frequency(Rate::from_mhz(40)).unwrap();
-        } else if #[cfg(not(feature = "esp32h2"))] {
-            let clock_cfg =
-                PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
-        }
-    }
+    let clock_cfg = cfg_select! {
+        feature = "esp32h2" => PeripheralClockConfig::with_frequency(Rate::from_mhz(40)).unwrap(),
+        _ => PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap(),
+    };
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
     mcpwm.operator0.set_timer(&mcpwm.timer0);

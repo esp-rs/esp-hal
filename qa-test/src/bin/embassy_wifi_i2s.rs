@@ -1,5 +1,5 @@
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIP_FILTER: wifi_driver_supported && i2s_driver_supported
 
 #![no_std]
 #![no_main]

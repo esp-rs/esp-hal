@@ -1,9 +1,9 @@
 //! Crypto hardware tests
 
-//% CHIPS(quad): esp32s2 esp32s3
 // ESP32 has no AES-DMA, no point in setting up PSRAM
-// TODO: enable PSRAM for ESP32-C5, C61, P4
-//% CHIPS(no_psram): esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4
+// TODO: validate and enable PSRAM on ESP32-C5 and ESP32-P4, then drop the exclusions below.
+//% CHIP_FILTER(quad):     dma_can_access_psram && !esp32c5 && !esp32p4
+//% CHIP_FILTER(no_psram): !dma_can_access_psram || esp32c5 || esp32p4
 
 //% FEATURES: unstable esp-alloc/nightly
 
@@ -12,6 +12,9 @@
 
 use hil_test as _;
 
+// Macros are only used by some driver modules (e.g. ECC), so the import is unused on chips
+// that don't compile those modules.
+#[allow(unused_imports)]
 #[macro_use]
 extern crate esp_metadata_generated;
 

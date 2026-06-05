@@ -511,7 +511,7 @@ pub mod dma {
         }
 
         fn reset_dma_before_usr_cmd(&self) {
-            #[cfg(dma_kind = "gdma")]
+            #[cfg(not(any(esp32, esp32s2)))]
             self.regs().dma_conf().modify(|_, w| {
                 w.rx_afifo_rst().set_bit();
                 w.buf_afifo_rst().set_bit();
@@ -520,54 +520,50 @@ pub mod dma {
         }
 
         fn enable_dma(&self) {
-            #[cfg(dma_kind = "gdma")]
-            self.regs().dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit();
-                w.rx_eof_en().clear_bit()
-            });
-
-            #[cfg(dma_kind = "pdma")]
-            {
-                fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
-                    reg_block.dma_conf().modify(|_, w| {
+            cfg_select! {
+                any(esp32, esp32s2) => {
+                    use crate::RegisterToggle;
+                    self.regs().dma_conf().toggle(|w, bit| {
                         w.in_rst().bit(bit);
                         w.out_rst().bit(bit);
                         w.ahbm_fifo_rst().bit(bit);
+                        #[cfg(esp32s2)]
+                        w.dma_infifo_full_clr().bit(bit);
                         w.ahbm_rst().bit(bit)
                     });
-
-                    #[cfg(esp32s2)]
-                    reg_block
-                        .dma_conf()
-                        .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+                },
+                _ => {
+                    self.regs().dma_conf().modify(|_, w| {
+                        w.dma_tx_ena().set_bit();
+                        w.dma_rx_ena().set_bit();
+                        w.rx_eof_en().clear_bit()
+                    });
                 }
-                set_rst_bit(self.regs(), true);
-                set_rst_bit(self.regs(), false);
             }
         }
 
         fn clear_dma_interrupts(&self) {
-            #[cfg(dma_kind = "gdma")]
             self.regs().dma_int_clr().write(|w| {
-                w.dma_infifo_full_err().clear_bit_by_one();
-                w.dma_outfifo_empty_err().clear_bit_by_one();
-                w.trans_done().clear_bit_by_one();
-                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-            });
-
-            #[cfg(dma_kind = "pdma")]
-            self.regs().dma_int_clr().write(|w| {
-                w.inlink_dscr_empty().clear_bit_by_one();
-                w.outlink_dscr_error().clear_bit_by_one();
-                w.inlink_dscr_error().clear_bit_by_one();
-                w.in_done().clear_bit_by_one();
-                w.in_err_eof().clear_bit_by_one();
-                w.in_suc_eof().clear_bit_by_one();
-                w.out_done().clear_bit_by_one();
-                w.out_eof().clear_bit_by_one();
-                w.out_total_eof().clear_bit_by_one()
+                cfg_select! {
+                    any(esp32, esp32s2) => {
+                        w.inlink_dscr_empty().clear_bit_by_one();
+                        w.outlink_dscr_error().clear_bit_by_one();
+                        w.inlink_dscr_error().clear_bit_by_one();
+                        w.in_done().clear_bit_by_one();
+                        w.in_err_eof().clear_bit_by_one();
+                        w.in_suc_eof().clear_bit_by_one();
+                        w.out_done().clear_bit_by_one();
+                        w.out_eof().clear_bit_by_one();
+                        w.out_total_eof().clear_bit_by_one()
+                    },
+                    _ => {
+                        w.dma_infifo_full_err().clear_bit_by_one();
+                        w.dma_outfifo_empty_err().clear_bit_by_one();
+                        w.trans_done().clear_bit_by_one();
+                        w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                        w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                    }
+                }
             });
         }
     }
@@ -777,27 +773,32 @@ impl Info {
 
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
-        #[cfg(dma_kind = "pdma")]
-        {
-            self.regs().slave().read().trans_done().bit_is_clear()
-        }
-        #[cfg(dma_kind = "gdma")]
-        {
-            self.regs().dma_int_raw().read().trans_done().bit_is_clear()
-        }
+        let reg = cfg_select! {
+            any(esp32, esp32s2) => {
+                self.regs().slave()
+            },
+            _ => {
+                self.regs().dma_int_raw()
+            }
+        };
+        reg.read().trans_done().bit_is_clear()
     }
 
     // Clear the transaction-done interrupt flag so flush() can work properly.
     #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
-        #[cfg(dma_kind = "pdma")]
-        self.regs()
-            .slave()
-            .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(dma_kind = "gdma")]
-        self.regs()
-            .dma_int_clr()
-            .write(|w| w.trans_done().clear_bit_by_one());
+        cfg_select! {
+            any(esp32, esp32s2) => {
+                self.regs()
+                    .slave()
+                    .modify(|_, w| w.trans_done().clear_bit());
+            },
+            _ => {
+                self.regs()
+                    .dma_int_clr()
+                    .write(|w| w.trans_done().clear_bit_by_one());
+            }
+        }
     }
 }
 
@@ -844,9 +845,7 @@ with_spi_slave_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
         use crate::dma::DmaEligiblePeripheral;
 
-        impl DmaEligiblePeripheral for AnySpi<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnySpi<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, spi => { spi.dma_peripheral() })
             }

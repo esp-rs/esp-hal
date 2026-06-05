@@ -435,7 +435,7 @@ impl Driver<'_> {
         *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
     }
 
-    fn init_master(&self) {
+    fn init_master(&self, config: &Config) {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
@@ -446,8 +446,11 @@ impl Driver<'_> {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
 
+            w.sample_scl_level()
+                .bit(config.scl_sample_level == Level::Low);
+
             #[cfg(i2c_master_has_arbitration_en)]
-            w.arbitration_en().clear_bit();
+            w.arbitration_en().bit(config.bus_arbitration);
 
             #[cfg(i2c_master_version = "2")]
             w.ref_always_on().set_bit();
@@ -460,7 +463,7 @@ impl Driver<'_> {
     /// Configures the I2C peripheral with the specified frequency, clocks, and
     /// optional timeout.
     pub(super) fn setup(&self, config: &Config) -> Result<(), ConfigError> {
-        self.init_master();
+        self.init_master(config);
 
         // Configure filter
         // FIXME if we ever change this we need to adapt `set_frequency` for ESP32

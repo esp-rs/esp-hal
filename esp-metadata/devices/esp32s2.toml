@@ -71,8 +71,8 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA"  }, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA"  }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, stable = true, clock_group = "SPI" },
     { name = "SYSCON" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
@@ -203,6 +203,11 @@ clocks = { system_clocks = { clock_tree = [
             { name = "REF_TICK", outputs = "REF_TICK" },
         ] } },
     ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "APB", outputs = "APB_CLK", default = true },
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -288,8 +293,6 @@ instances = [
 
 [device.dma]
 support_status = "partial"
-kind = "pdma"
-supports_mem2mem = true
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
@@ -302,18 +305,23 @@ engines = [
     ] },
     { name = "I2S_DMA", drivers = ["i2s"], peripheral_instances = [
         { name = "I2S0", dma_id = 0 },
-    ], channels = [{ name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] }] },
+    ], channels = [
+        { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] },
+    ] },
     { name = "CRYPTO_DMA", drivers = ["aes", "sha"], peripheral_instances = [
         { name = "AES", dma_id = 0 },
         { name = "SHA", dma_id = 1 },
     ], channels = [{ name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA", compatible_with = ["AES", "SHA"] }] },
-    { name = "COPY_DMA", channels = [{ name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true }] },
+    { name = "COPY_DMA", channels = [
+        { name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true, mem2mem_id = 0 },
+    ] },
 ]
 
 [device.gpio]
 version = 2
 support_status = "supported"
 has_bank_1 = true
+has_input_sync = true
 gpio_function = 1
 constant_0_input = 0x3c
 constant_1_input = 0x38

@@ -15,11 +15,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed a crash when using advanced BLE scanning on certain chips (C6,H2,C5,C61) (#5458)
-- Fixed minor issues (#5490, #5495, #5499)
 
 ### Removed
 
+
+## [v1.0.0-beta.0] - 2026-06-03
+
+### Added
+
+- `Interface::station()`, `Interface::try_station()`, `Interface::access_point()`, and `Interface::try_access_point()` singleton constructors. (#5480)
+- `WifiController::esp_now()` and `WifiController::sniffer()` methods to create ESP-NOW and sniffer instances tied to the controller's lifetime. (#5480)
+- `Drop` impl for `Sniffer` that disables promiscuous mode and unregisters the callback. (#5480)
+
+### Changed
+
+- `esp_radio::wifi::new()` is now `esp_radio::wifi::WifiController::new()`. (#5605)
+- `ConnectedStationInfo` renamed to `sta::ConnectedInfo` and moved to the `sta` module. (#5605)
+- `DisconnectedStationInfo` renamed to `sta::DisconnectedInfo` and moved to the `sta` module. (#5605)
+- `AccessPointStationConnectedInfo` renamed to `ap::ConnectedInfo` and moved to the `ap` module. (#5605)
+- `AccessPointStationDisconnectedInfo` renamed to `ap::DisconnectedInfo` and moved to the `ap` module. (#5605)
+- `AccessPointStationEventInfo` renamed to `ap::EventInfo` and moved to the `ap` module. (#5605)
+- `AccessPointConfig::max_connections` and `AccessPointConfig::dtim_period` setters are now gated behind the `unstable` feature. (#5605)
+- `WifiController::new()` now returns `WifiController` instead of `(WifiController, Interfaces)`. (#5480)
+- `Interface` no longer has a lifetime parameter and is no longer `Clone`/`Copy` (singleton semantics). (#5480)
+
+### Fixed
+
+- Fixed a crash when using advanced BLE scanning on certain chips (C6,H2,C5,C61) (#5458)
+- Fixed minor issues (#5490, #5495, #5499)
+- Read the 802.15.4 AR (ack-request) bit and frame-version from the correct FCF octet. They were read one octet too high, misclassifying ack-required frames and breaking ACK handling for fragmented frames. (#5650)
+- Correctly use BTBB_REG_RST (#5498)
+
+### Removed
+
+- The `Interfaces` struct; interfaces and sub-peripherals are now created independently. (#5480)
 
 ## [v0.18.0] - 2026-04-16
 
@@ -451,4 +480,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...esp-radio-v0.18.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...HEAD
+[v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...esp-radio-v1.0.0-beta.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.0...HEAD

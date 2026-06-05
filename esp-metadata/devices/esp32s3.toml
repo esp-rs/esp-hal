@@ -82,8 +82,8 @@ peripherals = [
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true },
-    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
@@ -221,6 +221,12 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL", outputs = "XTAL_CLK", default = true },
+            { name = "APB",  outputs = "APB_CLK" }, # PLL_F80M?
+        ] },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -239,7 +245,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
     { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
     { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
-    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
     { name = "SdioHost", template_params = { reg_group = "en1" } },
     { name = "LcdCam", template_params = { reg_group = "en1" } },
     { name = "Uart2", template_params = { reg_group = "en1" } },
@@ -298,10 +304,9 @@ has_region_monitor = true
 
 [device.dma]
 support_status = "partial"
-kind = "gdma"
 gdma_version = 1
 separate_in_out_interrupts = true
-supports_mem2mem = true
+mem2mem_requires_peripheral = true
 max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
@@ -330,6 +335,7 @@ engines = [
 version = 2
 support_status = "supported"
 has_bank_1 = true
+has_input_sync = true
 gpio_function = 1
 constant_0_input = 0x3c
 constant_1_input = 0x38

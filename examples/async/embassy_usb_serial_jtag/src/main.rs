@@ -2,6 +2,8 @@
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
+//% CHIP_FILTER: usb_serial_jtag_driver_supported
+
 #![no_std]
 #![no_main]
 

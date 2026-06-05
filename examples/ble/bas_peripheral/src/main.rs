@@ -1,5 +1,7 @@
 //! A bluetooth battery service example built using Embassy and trouBLE.
 
+//% CHIP_FILTER: bt_driver_supported
+
 #![no_std]
 #![no_main]
 

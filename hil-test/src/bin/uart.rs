@@ -1,6 +1,6 @@
 //! UART Test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: uart_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -168,17 +168,12 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c2)] {
-                let fastest_clock_source = ClockSource::PllF40m;
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61))] {
-                let fastest_clock_source = ClockSource::PllF80m;
-            } else if #[cfg(esp32h2)] {
-                let fastest_clock_source = ClockSource::PllF48m;
-            } else {
-                let fastest_clock_source = ClockSource::Apb;
-            }
-        }
+        let fastest_clock_source = cfg_select! {
+            esp32c2 => ClockSource::PllF40m,
+            any(esp32c5, esp32c6, esp32c61, esp32p4) => ClockSource::PllF80m,
+            esp32h2 => ClockSource::PllF48m,
+            _ => ClockSource::Apb,
+        };
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]
@@ -260,7 +255,6 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        rx.enable_break_detection();
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
@@ -277,7 +271,6 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        rx.enable_break_detection();
         for _ in 0..3 {
             tx.send_break(100);
             assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
@@ -288,8 +281,6 @@ mod tests {
     fn test_break_detection_interleaved(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
@@ -314,8 +305,6 @@ mod tests {
     fn test_break_detection_with_data(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
@@ -354,8 +343,6 @@ mod tests {
     fn test_break_detection_preserves_data(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        rx.enable_break_detection();
 
         // Send data, flush to ensure transmission, then send break
         tx.write(&[0x01, 0x02, 0x03, 0x04]).unwrap();
@@ -534,7 +521,7 @@ mod async_tx_rx {
         join::join,
         select::{Either, select},
     };
-    use embassy_time::{Duration, Timer};
+    use embassy_time::{Delay, Duration, Timer};
     use embedded_io_async::Write;
     use esp_hal::{
         Async,
@@ -580,6 +567,16 @@ mod async_tx_rx {
         let _ = ctx.rx.read_async(&mut read).await;
 
         assert_eq!(read, byte);
+    }
+
+    #[test]
+    async fn test_break_detection(mut ctx: Context) {
+        let mut delay = Delay;
+
+        join(ctx.rx.wait_for_break_async(), async {
+            ctx.tx.send_break_async(&mut delay, 100).await;
+        })
+        .await;
     }
 
     #[test]

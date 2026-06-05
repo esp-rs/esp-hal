@@ -1,5 +1,6 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
+use anyhow::{Result, bail, ensure};
 use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -13,8 +14,12 @@ pub struct DmaChannelDef {
     pub name: String,
     /// Whether this channel supports memory-to-memory transfers.
     #[serde(default)]
-    #[expect(unused)]
     pub mem2mem: bool,
+    /// GDMA peripheral selector for memory-to-memory on this channel (dummy slot).
+    /// Required when `mem2mem = true` and the device has `mem2mem_requires_peripheral = false`.
+    /// Must not be set when `mem2mem_requires_peripheral = true`.
+    #[serde(default)]
+    pub mem2mem_id: Option<u32>,
     /// PAC peripheral type backing this channel's register block.
     /// When absent the singleton is virtual (GDMA channels).
     /// When present the singleton maps to the given PAC type (PDMA channels).
@@ -66,6 +71,44 @@ pub struct DmaEngineDef {
 #[serde(transparent)]
 pub struct DmaEngines(pub Vec<DmaEngineDef>);
 
+impl DmaEngines {
+    pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
+        for engine in &self.0 {
+            let mut seen_ids = std::collections::HashSet::new();
+            for channel in &engine.channels {
+                if !channel.mem2mem {
+                    ensure!(
+                        channel.mem2mem_id.is_none(),
+                        "DMA channel '{}': mem2mem_id is only valid when mem2mem = true",
+                        channel.name
+                    );
+                    continue;
+                }
+
+                match (requires_peripheral, channel.mem2mem_id) {
+                    (true, Some(id)) => bail!(
+                        "DMA channel '{}': mem2mem_id = {id} is forbidden when mem2mem_requires_peripheral is true",
+                        channel.name
+                    ),
+                    (false, None) => bail!(
+                        "DMA channel '{}': mem2mem_id is required when mem2mem_requires_peripheral is false",
+                        channel.name
+                    ),
+                    (false, Some(id)) => {
+                        ensure!(
+                            seen_ids.insert(id),
+                            "DMA channel '{}': duplicate mem2mem_id {id}",
+                            channel.name
+                        );
+                    }
+                    (true, None) => {}
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl GenericProperty for DmaEngines {
     fn cfgs(&self) -> Option<Vec<String>> {
         let mut cfgs: Vec<String> = self
@@ -75,12 +118,22 @@ impl GenericProperty for DmaEngines {
             .map(|ch| format!("soc_has_{}", ch.name.to_lowercase()))
             .collect();
 
+        if self
+            .0
+            .iter()
+            .flat_map(|e| e.channels.iter())
+            .any(|ch| ch.mem2mem)
+        {
+            cfgs.push("dma.supports_mem2mem".to_string());
+        }
+
         // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
         let mut seen = std::collections::HashSet::new();
         for engine in &self.0 {
             for driver in &engine.drivers {
                 if seen.insert(driver.clone()) {
                     cfgs.push(format!("{}.supports_dma", driver));
+                    cfgs.push(format!("{}_dma_engine = \"{}\"", driver, engine.name));
                 }
             }
         }
@@ -98,6 +151,12 @@ impl GenericProperty for DmaEngines {
         // If the list is empty (GDMA), this contains nothing.
         let mut dma_pairs = vec![];
         let mut dma_any_pairs = vec![];
+        let mut mem2mem_channels = vec![];
+        let mut mem2mem_engines = vec![];
+        let mut mem2mem_engine_seen = HashSet::new();
+        // Per-engine (hardware channel index, mem2mem peripheral id) for type-erased channels.
+        let mut mem2mem_erased_by_engine: BTreeMap<&str, Vec<(TokenStream, TokenStream)>> =
+            BTreeMap::new();
         // Accumulates engine name tokens per driver, in engine declaration order.
         let mut driver_engines: BTreeMap<&str, Vec<proc_macro2::TokenStream>> = BTreeMap::new();
 
@@ -131,6 +190,23 @@ impl GenericProperty for DmaEngines {
             for (idx, channel) in engine.channels.iter().enumerate() {
                 let idx = number(idx);
                 let ch = quote::format_ident!("{}", channel.name);
+
+                if channel.mem2mem {
+                    let mem2mem_id = number(channel.mem2mem_id.unwrap_or(0));
+                    let variant = format_ident!(
+                        "{}",
+                        engine.name.from_case(Case::Snake).to_case(Case::Pascal)
+                    );
+                    mem2mem_channels
+                        .push(quote! { #engine_name, #variant, #any_channel, #ch, #mem2mem_id });
+                    mem2mem_erased_by_engine
+                        .entry(engine_name)
+                        .or_default()
+                        .push((idx.clone(), mem2mem_id));
+                    if mem2mem_engine_seen.insert(engine_name) {
+                        mem2mem_engines.push(quote! { #engine_name, #variant, #any_channel });
+                    }
+                }
 
                 engine_channels.push(quote! { #engine_name, #ch });
 
@@ -206,6 +282,34 @@ impl GenericProperty for DmaEngines {
             &[("channels", &dma_pairs), ("any_channels", &dma_any_pairs)],
         );
 
+        let mem2mem_erased = mem2mem_erased_by_engine
+            .iter()
+            .filter(|(engine_name, _)| **engine_name != "COPY_DMA")
+            .map(|(engine_name, arms)| {
+                let variant = format_ident!(
+                    "{}",
+                    engine_name.from_case(Case::Snake).to_case(Case::Pascal)
+                );
+                let any_channel = format_ident!("{variant}Channel");
+                let engine_name = *engine_name;
+                let (hws, ids): (Vec<_>, Vec<_>) = arms.iter().cloned().unzip();
+                quote! { #engine_name, #variant, #any_channel, #( #hws, #ids ),* }
+            })
+            .collect::<Vec<_>>();
+
+        let mem2mem_channel_macro = if !mem2mem_channels.is_empty() {
+            Some(generate_for_each_macro(
+                "mem2mem_channel",
+                &[
+                    ("channels", &mem2mem_channels),
+                    ("erased", &mem2mem_erased),
+                    ("engines", &mem2mem_engines),
+                ],
+            ))
+        } else {
+            None
+        };
+
         // One with_{driver}_dma_engine! macro per driver that has DMA support.
         // Each driver uses exactly one engine; assert that invariant here.
         let driver_engine_macros: Vec<_> = driver_engines
@@ -225,6 +329,7 @@ impl GenericProperty for DmaEngines {
             #dma_engines_macro
             #dma_channel_macro
             #dma_pairs_macro
+            #mem2mem_channel_macro
             #(#driver_engine_macros)*
         })
     }

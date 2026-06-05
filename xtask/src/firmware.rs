@@ -10,7 +10,7 @@ use esp_metadata::Chip;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
-use crate::windows_safe_path;
+use crate::{ScriptContext, windows_safe_path};
 
 /// A single, configured example (or test).
 #[derive(Debug, Clone)]
@@ -21,6 +21,8 @@ pub struct Metadata {
     features: Vec<String>,
     tag: Option<String>,
     description: Option<String>,
+    harness_firmware: Option<String>,
+    support_firmware: bool,
     env_vars: HashMap<String, String>,
     cargo_config: Vec<String>,
 }
@@ -93,6 +95,16 @@ impl Metadata {
         self.description.clone()
     }
 
+    /// Optional support firmware binary to run on a second target.
+    pub fn harness_firmware(&self) -> Option<&str> {
+        self.harness_firmware.as_deref()
+    }
+
+    /// True if this artifact is support firmware and should not run as a DUT test.
+    pub fn is_support_firmware(&self) -> bool {
+        self.support_firmware
+    }
+
     /// Check if the example matches the given filter.
     pub fn matches(&self, filter: Option<&str>) -> bool {
         let Some(filter) = filter else {
@@ -117,6 +129,8 @@ pub struct Configuration {
     features: Vec<String>,
     esp_config: HashMap<String, String>,
     tag: Option<String>,
+    harness_firmware: Option<String>,
+    support_firmware: Option<bool>,
 }
 
 struct ConfigurationCollector<'a> {
@@ -183,6 +197,26 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     })
 }
 
+/// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
+/// cfg symbols, key-value cfg symbols, and chip names, e.g. `cfg_symbol && !esp32`,
+/// `esp32c6 || esp32h2`, or `interrupt_controller != "clic"`).
+fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
+    let script_ctx = ScriptContext::new();
+
+    let mut chips = Vec::new();
+    for chip in Chip::iter() {
+        let mut ctx = script_ctx.for_chip(chip);
+
+        let selected = ctx.evaluate(expr).map_err(|err| {
+            anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression")
+        })?;
+        if selected {
+            chips.push(chip);
+        }
+    }
+    Ok(chips)
+}
+
 /// Load all examples at the given path, and parse their metadata.
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
@@ -228,13 +262,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             };
 
             match meta_line.key.as_str() {
-                // A list of chips that can run the example using the current configuration.
-                "CHIPS" => {
-                    let chips = meta_line
-                        .value
-                        .split_ascii_whitespace()
-                        .map(|s| Chip::from_str(s, false).unwrap())
-                        .collect::<Vec<_>>();
+                "CHIP_FILTER" => {
+                    let chips = parse_chips(meta_line.value.as_str())?;
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
                 // A list of cargo `--config` configurations.
@@ -274,6 +303,18 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 "TAG" => {
                     relevant_metadata.apply(|meta| meta.tag = Some(meta_line.value.to_string()));
                 }
+                // Optional support firmware binary that must run on another target.
+                "HARNESS-FIRMWARE" => {
+                    relevant_metadata
+                        .apply(|meta| meta.harness_firmware = Some(meta_line.value.to_string()));
+                }
+                // Mark this artifact as support firmware (not a DUT test).
+                "SUPPORT-FIRMWARE" | "TEST-SUPPORT-FIRMWARE" => {
+                    let support = parse_bool(&meta_line.value).with_context(|| {
+                        format!("{} metadata must be true/false", meta_line.key.as_str())
+                    })?;
+                    relevant_metadata.apply(|meta| meta.support_firmware = Some(support));
+                }
                 key => log::warn!("Unrecognized metadata key '{key}', ignoring"),
             }
         }
@@ -288,6 +329,16 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Tag is an ID, inherit if empty
             if meta.tag.is_none() {
                 meta.tag = all_configuration.tag.clone();
+            }
+
+            // Harness firmware is a selector, inherit if empty
+            if meta.harness_firmware.is_none() {
+                meta.harness_firmware = all_configuration.harness_firmware.clone();
+            }
+
+            // Support firmware marker inherits if not explicitly set.
+            if meta.support_firmware.is_none() {
+                meta.support_firmware = all_configuration.support_firmware;
             }
 
             // Other values are merged
@@ -320,6 +371,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     configuration_name: configuration.name.clone(),
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
+                    harness_firmware: configuration.harness_firmware.clone(),
+                    support_firmware: configuration.support_firmware.unwrap_or(false),
                     env_vars: configuration.esp_config.clone(),
                     cargo_config: configuration.cargo_config.clone(),
                 })
@@ -336,6 +389,37 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
 #[derive(Debug, Deserialize)]
 struct CargoToml {
     features: HashMap<String, Vec<String>>,
+}
+
+/// Parse the chip set from `//% CHIP_FILTER:` annotations in a source file.
+/// Returns `None` if the annotation is not present.
+fn parse_chips_from_annotation(
+    text: &str,
+) -> anyhow::Result<Option<std::collections::HashSet<Chip>>> {
+    let mut found = false;
+    let mut chips: Vec<Chip> = Chip::iter().collect();
+
+    for (line_no, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("//%"))
+    {
+        let meta = parse_meta_line(line)
+            .with_context(|| format!("Failed to parse line {}", line_no + 1))?;
+        match meta.key.as_str() {
+            "CHIP_FILTER" => {
+                found = true;
+                chips = parse_chips(meta.value.as_str())?;
+            }
+            _ => {}
+        }
+    }
+
+    if !found {
+        return Ok(None);
+    }
+
+    Ok(Some(chips.into_iter().collect()))
 }
 
 /// Load all examples by finding all packages in the given path, and parsing their metadata.
@@ -360,10 +444,35 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let toml = fs::read_to_string(&cargo_toml_path)?;
         let toml: CargoToml = toml_edit::de::from_str(&toml)?;
 
-        let chips = toml
+        let cargo_chips: Vec<Chip> = toml
             .features
             .keys()
-            .filter_map(|chip| Chip::from_str(&chip, true).ok());
+            .filter_map(|k| Chip::from_str(k, true).ok())
+            .collect();
+
+        let chips_from_annotations = parse_chips_from_annotation(&text).with_context(|| {
+            format!("Failed to parse annotations in {}", main_rs_path.display())
+        })?;
+
+        // If the annotation requires chips that are not declared in Cargo.toml, bail.
+        if let Some(ref required) = chips_from_annotations {
+            let missing = required
+                .iter()
+                .filter(|c| !cargo_chips.contains(c))
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                anyhow::bail!(
+                    "{}: chips {missing:?} are required by the annotation but missing from Cargo.toml",
+                    package_path.display()
+                );
+            }
+        }
+
+        let chips = cargo_chips.into_iter().filter(|c| {
+            chips_from_annotations
+                .as_ref()
+                .map_or(true, |set| set.contains(c))
+        });
 
         for chip in chips {
             examples.push(Metadata {
@@ -373,6 +482,8 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
                 features: vec![],
                 tag: None,
                 description: description.clone(),
+                harness_firmware: None,
+                support_firmware: false,
                 env_vars: HashMap::new(),
                 cargo_config: Vec::new(),
             });
@@ -380,6 +491,23 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     }
 
     Ok(examples)
+}
+
+/// Find the metadata entry for an artifact/test name.
+pub fn find_test_by_name<'a>(tests: &'a [Metadata], name: &str) -> Option<&'a Metadata> {
+    tests.iter().find(|test| {
+        test.binary_name() == name
+            || test.output_file_name() == name
+            || test.name_with_configuration() == name
+    })
+}
+
+fn parse_bool(value: &str) -> Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => bail!("invalid boolean value: {value}"),
+    }
 }
 
 fn parse_description(text: &str) -> Option<String> {

@@ -1,5 +1,4 @@
 use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
-use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
@@ -7,14 +6,9 @@ use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
     let bus_freq = clock_config.frequency.as_hz();
-    let sclk = clock_config.clock_source;
-    let clock = driver.info.clock_instance;
 
     // ESP32 I2C is hardwired to APB; configure_function_clock is a no-op.
-    let source_clk = ClockTree::with(|clocks| {
-        clock.configure_function_clock(clocks, I2cFunctionClockConfig::new(sclk));
-        clock.function_clock_config_frequency(clocks, I2cFunctionClockConfig::new(sclk))
-    });
+    let source_clk = driver.info.clock_instance.function_clock_frequency();
 
     let half_cycle: u32 = source_clk / bus_freq / 2;
     let scl_low = half_cycle;

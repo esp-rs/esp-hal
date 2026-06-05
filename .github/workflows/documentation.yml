@@ -28,7 +28,7 @@ env:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     # required for this step, as stdout is captured by `hal-xtask release tag-releases`
     env:
       RUST_LOG: off
@@ -78,7 +78,7 @@ jobs:
 
   build:
     needs: setup
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     strategy:
       fail-fast: true
       matrix:
@@ -134,7 +134,7 @@ jobs:
   assemble:
     needs: [setup, build]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
 
     steps:
       # Check out the sources, the xtask reads package versions from the Cargo.toml files
@@ -178,7 +178,7 @@ jobs:
           overwrite: true
   docsrs:
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     steps:
       - uses: dtolnay/rust-toolchain@v1
         with:

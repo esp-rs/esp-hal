@@ -2,7 +2,10 @@
 //!
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
-//% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
+// This test measures interrupt latency using CSRs, which only exist on the older RISC-V cores (C2,
+// C3, C6, H2), the newer CLIC-based cores (C5, C61, P4) don't have them, so accessing the CSRs
+// there traps. Exclude them.
+//% CHIP_FILTER: riscv && interrupt_controller != "clic"
 //% FEATURES: unstable
 
 #![no_std]
@@ -15,7 +18,6 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{
         self,
-        CpuInterrupt,
         Priority,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
@@ -77,13 +79,10 @@ mod tests {
         let peripherals = esp_hal::init(config);
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
-                let cpu_intr = &peripherals.INTPRI;
-            } else {
-                let cpu_intr = &peripherals.SYSTEM;
-            }
-        }
+        let cpu_intr = cfg_select! {
+            soc_has_intpri => &peripherals.INTPRI,
+            _ => &peripherals.SYSTEM,
+        };
 
         let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu(0) as *const _ as u32;
         unsafe {
@@ -139,12 +138,13 @@ mod tests {
         defmt::info!("Performance counter: {}", perf_counter);
 
         // TODO c3/c2 values should be adjusted to catch smaller regressions
-        cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
-            assert!(perf_counter < 400);
-        } else {
-            assert!(perf_counter < 155);
+        cfg_select! {
+            any(feature = "esp32c3", feature = "esp32c2") => {
+                assert!(perf_counter < 400);
+            }
+            _ => {
+                assert!(perf_counter < 155);
+            }
         }
-    }
     }
 }

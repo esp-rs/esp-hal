@@ -326,7 +326,6 @@ impl I2cInstance {
         _old_config: Option<I2cFunctionClockConfig>,
         new_config: I2cFunctionClockConfig,
     ) {
-        // clk_src_sel: 0 = XTAL, 1 = RC_FAST
         let rc_fast = matches!(new_config.sclk, I2cFunctionClockSclk::RcFast);
         match self {
             I2cInstance::I2c0 => {
@@ -375,6 +374,37 @@ impl TimgInstance {
         _new_config: TimgWdtClockConfig,
     ) {
         // TODO: Configure TIMG WDT clock source
+    }
+}
+
+impl SpiInstance {
+    // SPI_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // SPI clock gates are managed by the peripheral clock infrastructure in system.rs.
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SpiFunctionClockConfig>,
+        new_config: SpiFunctionClockConfig,
+    ) {
+        let source = match new_config {
+            SpiFunctionClockConfig::Xtal => 0,
+            SpiFunctionClockConfig::RcFast => 1,
+            // SDIO_PLL0
+            // APLL
+            SpiFunctionClockConfig::Spll => 4,
+        };
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl116()
+            .modify(|_, w| unsafe {
+                match self {
+                    Self::Spi2 => w.gpspi2_clk_src_sel().bits(source),
+                    Self::Spi3 => w.gpspi3_clk_src_sel().bits(source),
+                }
+            });
     }
 }
 

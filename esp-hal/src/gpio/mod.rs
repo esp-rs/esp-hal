@@ -941,6 +941,26 @@ impl<'d> Output<'d> {
     }
 }
 
+/// Configures the clock edge used in one of the two input synchronization stages to synchronize the
+/// GPIO input signal to the system clock, reducing metastability.
+///
+/// See [`InputConfig::with_input_sync_stage1`] and
+/// [`InputConfig::with_input_sync_stage2`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[cfg(gpio_has_input_sync)]
+pub enum InputSync {
+    /// Stage is disabled; the signal passes through without latching (hardware
+    /// default).
+    #[default]
+    Disabled     = 0,
+    /// Stage latches on the falling edge of the GPIO clock.
+    NegativeEdge = 1,
+    /// Stage latches on the rising edge of the GPIO clock.
+    PositiveEdge = 2,
+}
+
 /// Input pin configuration.
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
@@ -948,11 +968,31 @@ impl<'d> Output<'d> {
 pub struct InputConfig {
     /// Initial pull of the pin.
     pull: Pull,
+
+    /// First input synchronization stage.
+    ///
+    /// Default value: [`InputSync::Disabled`].
+    #[cfg(gpio_has_input_sync)]
+    #[builder_lite(unstable)]
+    input_sync_stage1: InputSync,
+
+    /// Second input synchronization stage.
+    ///
+    /// Default value: [`InputSync::Disabled`].
+    #[cfg(gpio_has_input_sync)]
+    #[builder_lite(unstable)]
+    input_sync_stage2: InputSync,
 }
 
 impl Default for InputConfig {
     fn default() -> Self {
-        Self { pull: Pull::None }
+        Self {
+            pull: Pull::None,
+            #[cfg(gpio_has_input_sync)]
+            input_sync_stage1: Default::default(),
+            #[cfg(gpio_has_input_sync)]
+            input_sync_stage2: Default::default(),
+        }
     }
 }
 
@@ -1814,6 +1854,16 @@ impl<'lt> AnyPin<'lt> {
         io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
             w.fun_wpu().bit(pull_up)
+        });
+
+        #[cfg(gpio_has_input_sync)]
+        self.with_gpio_lock(|| {
+            GPIO::regs()
+                .pin(self.number() as usize)
+                .modify(|_, w| unsafe {
+                    w.sync1_bypass().bits(config.input_sync_stage1 as u8);
+                    w.sync2_bypass().bits(config.input_sync_stage2 as u8)
+                });
         });
     }
 

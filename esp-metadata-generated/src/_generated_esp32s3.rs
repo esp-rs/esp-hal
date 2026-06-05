@@ -79,10 +79,7 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
-    ("dma.kind") => {
-        "gdma"
-    };
-    ("dma.supports_mem2mem") => {
+    ("dma.mem2mem_requires_peripheral") => {
         true
     };
     ("dma.can_access_psram") => {
@@ -113,6 +110,9 @@ macro_rules! property {
         stringify!(2)
     };
     ("gpio.has_bank_1") => {
+        true
+    };
+    ("gpio.has_input_sync") => {
         true
     };
     ("gpio.gpio_function") => {
@@ -366,6 +366,9 @@ macro_rules! property {
     };
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
+    };
+    ("soc.internal_memory_cached") => {
+        false
     };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)
@@ -659,6 +662,29 @@ macro_rules! for_each_dma_channel_peri_pair {
         AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
         ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC), ("AHB_GDMA", any_channel
         = AhbGdmaChannel, RMT)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH1, 0));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2,
+        0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH3, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH4, 0)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel));
+        _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH0, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH1, 0), ("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH2, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel,
+        DMA_CH3, 0), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH4, 0)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
+        0, 1, 0, 2, 0, 3, 0, 4, 0)));
+        _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma, AhbGdmaChannel)));
     };
 }
 #[macro_export]
@@ -1332,6 +1358,22 @@ macro_rules! for_each_sdm_channel {
 ///         todo!()
 ///     }
 /// }
+/// impl SpiInstance {
+///     // SPI_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<SpiFunctionClockConfig>,
+///         _new_config: SpiFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl TimgInstance {
 ///     // TIMG_FUNCTION_CLOCK
 ///
@@ -1413,6 +1455,12 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RmtInstance {
             Rmt = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiInstance {
+            Spi2 = 0,
+            Spi3 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1671,6 +1719,16 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL_CLK`.
             XtalClk,
         }
+        /// The list of clock signals that the `SPI2_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpiFunctionClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `APB_CLK`.
+            Apb,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1793,6 +1851,7 @@ macro_rules! define_clock_tree_types {
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
             mcpwm_function_clock: [Option<McpwmFunctionClockConfig>; 2],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
+            spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 3],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 3],
@@ -1812,6 +1871,7 @@ macro_rules! define_clock_tree_types {
             i2c_function_clock_refcount: [u32; 2],
             mcpwm_function_clock_refcount: [u32; 2],
             rmt_sclk_refcount: [u32; 1],
+            spi_function_clock_refcount: [u32; 2],
             timg_function_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 3],
             uart_baud_rate_generator_refcount: [u32; 3],
@@ -1894,6 +1954,14 @@ macro_rules! define_clock_tree_types {
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
                 self.rmt_sclk[RmtInstance::Rmt as usize]
             }
+            /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
+            pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi2 as usize]
+            }
+            /// Returns the current configuration of the SPI3_FUNCTION_CLOCK clock tree node
+            pub fn spi3_function_clock(&self) -> Option<SpiFunctionClockConfig> {
+                self.spi_function_clock[SpiInstance::Spi3 as usize]
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<TimgFunctionClockConfig> {
                 self.timg_function_clock[TimgInstance::Timg0 as usize]
@@ -1957,6 +2025,7 @@ macro_rules! define_clock_tree_types {
                 i2c_function_clock: [None; 2],
                 mcpwm_function_clock: [None; 2],
                 rmt_sclk: [None; 1],
+                spi_function_clock: [None; 2],
                 timg_function_clock: [None; 2],
                 uart_function_clock: [None; 3],
                 uart_baud_rate_generator: [None; 3],
@@ -1976,6 +2045,7 @@ macro_rules! define_clock_tree_types {
                 i2c_function_clock_refcount: [0; 2],
                 mcpwm_function_clock_refcount: [0; 2],
                 rmt_sclk_refcount: [0; 1],
+                spi_function_clock_refcount: [0; 2],
                 timg_function_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 3],
                 uart_baud_rate_generator_refcount: [0; 3],
@@ -2015,6 +2085,8 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
@@ -2969,6 +3041,76 @@ macro_rules! define_clock_tree_types {
                 RMT_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl SpiInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: SpiFunctionClockConfig,
+            ) {
+                let old_selector = clocks.spi_function_clock[self as usize].replace(new_selector);
+                refresh_spi_function_clock_downstream(clocks, self);
+                if clocks.spi_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Apb => request_apb_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            SpiFunctionClockConfig::Apb => release_apb_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<SpiFunctionClockConfig> {
+                clocks.spi_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Apb => request_apb_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        SpiFunctionClockConfig::Apb => release_apb_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: SpiFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    SpiFunctionClockConfig::Apb => apb_clk_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+        }
         impl TimgInstance {
             pub fn configure_function_clock(
                 self,
@@ -3303,6 +3445,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [RmtInstance::Rmt] {
                 refresh_rmt_sclk_downstream(clocks, child_instance);
             }
+            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
             }
@@ -3421,6 +3566,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [RmtInstance::Rmt] {
                 refresh_rmt_sclk_downstream(clocks, child_instance);
             }
+            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
             }
@@ -3458,6 +3606,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.rmt_sclk[instance as usize] {
                 RMT_SCLK_FREQ_CACHE[instance as usize].store(
                     instance.sclk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
+            if let Some(config) = clocks.spi_function_clock[instance as usize] {
+                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    instance.function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -3506,12 +3662,12 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AES peripheral clock signal
             Aes,
+            /// AHB_GDMA peripheral clock signal
+            AhbGdma,
             /// APB_SAR_ADC peripheral clock signal
             ApbSarAdc,
             /// DEDICATED_GPIO peripheral clock signal
             DedicatedGpio,
-            /// DMA peripheral clock signal
-            Dma,
             /// DS peripheral clock signal
             Ds,
             /// GPIO_SD peripheral clock signal
@@ -3584,9 +3740,9 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
+                Self::AhbGdma,
                 Self::ApbSarAdc,
                 Self::DedicatedGpio,
-                Self::Dma,
                 Self::Ds,
                 Self::GpioSd,
                 Self::Hmac,
@@ -3626,6 +3782,11 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en1()
                         .modify(|_, w| w.crypto_aes_clk_en().bit(enable));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en1()
+                        .modify(|_, w| w.dma_clk_en().bit(enable));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
@@ -3635,11 +3796,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .cpu_peri_clk_en()
                         .modify(|_, w| w.dedicated_gpio_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.dma_clk_en().bit(enable));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
@@ -3803,6 +3959,11 @@ macro_rules! implement_peripheral_clocks {
                         .perip_rst_en1()
                         .modify(|_, w| w.crypto_aes_rst().bit(reset));
                 }
+                Peripheral::AhbGdma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en1()
+                        .modify(|_, w| w.dma_rst().bit(reset));
+                }
                 Peripheral::ApbSarAdc => {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
@@ -3812,11 +3973,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .cpu_peri_rst_en()
                         .modify(|_, w| w.dedicated_gpio_rst().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.dma_rst().bit(reset));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()

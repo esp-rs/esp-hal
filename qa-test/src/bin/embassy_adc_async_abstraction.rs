@@ -4,7 +4,7 @@
 //! PINS
 //! GPIO4 for ADC1
 
-//% CHIPS: esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
+//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3
 
 #![no_std]
 #![no_main]

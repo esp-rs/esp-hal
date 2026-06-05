@@ -1,7 +1,7 @@
 //! Check that the print-logs-from-driver feature works and doesn't crash
 //! when wifi driver blobs emit log messages.
 
-//% CHIPS: esp32 esp32s2 esp32s3
+//% CHIP_FILTER: xtensa && wifi_driver_supported
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% FEATURES: esp-radio/print-logs-from-driver
 

@@ -3,7 +3,7 @@
 //! code.
 //!
 //! Reproduction and regression test for a sneaky issue.
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: timergroup_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -507,15 +507,12 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-                let dma_channel1 = peripherals.DMA_SPI2;
-                let dma_channel2 = peripherals.DMA_SPI3;
-            } else {
-                let dma_channel1 = peripherals.DMA_CH0;
-                let dma_channel2 = peripherals.DMA_CH1;
+        let (dma_channel1, dma_channel2) = cfg_select! {
+            any(feature = "esp32", feature = "esp32s2") => {
+                (peripherals.DMA_SPI2, peripherals.DMA_SPI3)
             }
-        }
+            _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
+        };
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -599,13 +596,17 @@ mod interrupt_spi_dma {
             system::{Cpu, CpuControl, Stack},
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
-            } else {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
-            }
-        }
+        type DmaChannel<'a> = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                esp_hal::peripherals::DMA_SPI2<'a>
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                esp_hal::peripherals::DMA_CH0<'a>
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                esp_hal::peripherals::DMA_AXI_CH0<'a>
+            },
+        };
 
         const BUFFER_SIZE: usize = 256;
 
@@ -650,13 +651,17 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                peripherals.DMA_SPI2
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                peripherals.DMA_CH0
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                peripherals.DMA_AXI_CH0
+            },
+        };
 
         let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 

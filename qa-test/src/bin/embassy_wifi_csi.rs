@@ -1,8 +1,7 @@
 //! CSI Example
 //!
 //! Set SSID and PASSWORD env variable before running this example.
-
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32c61 esp32s2 esp32s3
+//% CHIP_FILTER: wifi_csi_supported
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/csi esp-radio/unstable esp-hal/unstable
 
 #![no_std]

@@ -414,15 +414,8 @@ impl Address {
 }
 
 /// SPI clock source.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub enum ClockSource {
-    /// Use the APB clock.
-    Apb,
-    // #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    // Xtal,
-}
+pub use crate::soc::clocks::SpiFunctionClockConfig as ClockSource;
 
 /// SPI peripheral configuration
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
@@ -480,7 +473,7 @@ impl Default for Config {
         let mut this = Config {
             reg: Ok(0),
             frequency: Rate::from_mhz(1),
-            clock_source: ClockSource::Apb,
+            clock_source: ClockSource::default(),
             mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
             write_bit_order: BitOrder::MsbFirst,
@@ -512,11 +505,19 @@ impl Config {
     }
 
     fn clock_source_freq_hz(&self) -> Rate {
-        // FIXME: take clock source into account
-        Rate::from_hz(crate::soc::spi_master_clock_source_frequency())
+        let freq = crate::soc::clocks::ClockTree::with(|clocks| {
+            // The specific instance (Spi2) does not matter here,
+            // because we query a source clock frequency.
+            // TODO: should config_frequency should not take `self` in general?
+            crate::soc::clocks::SpiInstance::Spi2
+                .function_clock_config_frequency(clocks, self.clock_source)
+        });
+
+        Rate::from_hz(freq)
     }
 
     fn recalculate(&self) -> Result<u32, ConfigError> {
+        // TODO: model peripheral-side clock divider, allow the user to directly configure it
         // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
         let source_freq = self.clock_source_freq_hz();
 
@@ -1490,9 +1491,7 @@ with_spi_master_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
         use crate::dma::DmaEligiblePeripheral;
 
-        impl DmaEligiblePeripheral for AnySpi<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnySpi<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, spi => { spi.dma_peripheral() })
             }
