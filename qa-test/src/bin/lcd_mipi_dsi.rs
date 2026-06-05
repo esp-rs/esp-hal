@@ -76,12 +76,14 @@ fn main() -> ! {
     let mut bus = MipiDsi::new(
         peripherals.MIPI_DSI,
         peripherals.VDMA_CH0,
-        Config {
-            num_data_lanes: DataLanes::_2,
-            lane_bit_rate_mbps: 1000.0,
-            phy_pll_refclk: MipiDsiPhyPllRefclkConfig::new(MipiDsiPhyPllRefclkSclk::Xtal, 0),
-            force_clock_lane_hs: false,
-        },
+        Config::default()
+            .with_num_data_lanes(DataLanes::_2)
+            .with_lane_bit_rate_mbps(1000.0)
+            .with_phy_pll_refclk(MipiDsiPhyPllRefclkConfig::new(
+                MipiDsiPhyPllRefclkSclk::Xtal,
+                0,
+            ))
+            .with_force_clock_lane_hs(false),
     )
     .expect("MipiDsi init failed");
 

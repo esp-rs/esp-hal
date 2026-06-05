@@ -198,6 +198,11 @@ impl Drop for DsiDpi<'_> {
         }
         interrupt::disable(Cpu::current(), Interrupt::DMA);
 
+        // Disable the VDMA channel itself.
+        let shift = channel_id as u32;
+        let val: u32 = 0x0100 << shift; // ch_en_we only (clears ch_en)
+        unsafe { VDMA::regs().chen0().write(|w| w.bits(val)) };
+
         MIPI_DSI_BRIDGE::regs()
             .dpi_misc_config()
             .modify(|_, w| w.dpi_en().clear_bit());

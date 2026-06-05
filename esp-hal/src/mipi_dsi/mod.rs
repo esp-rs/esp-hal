@@ -16,13 +16,14 @@
 //! let bus = MipiDsi::new(
 //!     peripherals.MIPI_DSI,
 //!     peripherals.VDMA_CH0,
-//!     Config {
-//!         num_data_lanes: DataLanes::_2,
-//!         lane_bit_rate_mbps: 500.0,
-//!         // XTAL as reference, divider = 1 (div_num register = 0)
-//!         phy_pll_refclk: MipiDsiPhyPllRefclkConfig::new(MipiDsiPhyPllRefclkSclk::Xtal, 0),
-//!         force_clock_lane_hs: false,
-//!     },
+//!     Config::default()
+//!         .with_num_data_lanes(DataLanes::_2)
+//!         .with_lane_bit_rate_mbps(500.0)
+//!         .with_phy_pll_refclk(MipiDsiPhyPllRefclkConfig::new(
+//!             MipiDsiPhyPllRefclkSclk::Xtal, // XTAL as reference
+//!             0,                             // divider = 1 (div_num register = 0)
+//!         ))
+//!         .with_force_clock_lane_hs(false),
 //! )
 //! .unwrap();
 //! # {after_snippet}
@@ -35,6 +36,7 @@ pub(crate) mod vdma;
 use core::marker::PhantomData;
 
 use dpi::DsiDpi;
+use procmacros::BuilderLite;
 pub use vdma::VdmaDmaChannel;
 
 use crate::{
@@ -58,29 +60,34 @@ const ESCAPE_CLOCK_FREQ_MHZ: f32 = 18.0;
 // ── Public types ──────────────────────────────────────────────────────────────
 
 /// Number of MIPI D-PHY data lanes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DataLanes {
     /// 1 data lane.
     _1 = 1,
+
     /// 2 data lanes.
     _2 = 2,
 }
 
 /// Bus-level configuration.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// Number of active D-PHY data lanes.
-    pub num_data_lanes: DataLanes,
+    num_data_lanes: DataLanes,
+
     /// Lane bit rate in Mbps (80–1500).
-    pub lane_bit_rate_mbps: f32,
+    lane_bit_rate_mbps: f32,
+
     /// PLL reference clock source for the D-PHY.
     ///
     /// APLL is not yet modelled in the clock tree and cannot be selected here.
-    pub phy_pll_refclk: MipiDsiPhyPllRefclkConfig,
+    phy_pll_refclk: MipiDsiPhyPllRefclkConfig,
+
     /// Keep the clock lane continuously in HS mode (`true`) or use auto mode
     /// where the DSI host manages HS↔LP transitions (`false`).
-    pub force_clock_lane_hs: bool,
+    force_clock_lane_hs: bool,
 }
 
 impl Default for Config {
@@ -97,9 +104,11 @@ impl Default for Config {
 /// Configuration error.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum ConfigError {
     /// Lane bit rate is outside the 80–1500 Mbps range.
     InvalidLaneBitRate,
+
     /// No valid PLL M/N solution found for the requested bit rate.
     PllNoSolution,
 }
@@ -133,10 +142,7 @@ impl Drop for DphyGuard<'_> {
 pub struct MipiDsi<'d> {
     pub(crate) guard: DphyGuard<'d>,
     /// Actual lane bit rate after PLL rounding (MHz).
-    #[allow(dead_code)]
     pub(crate) lane_bit_rate_mbps: f32,
-    #[allow(dead_code)]
-    pub(crate) num_data_lanes: DataLanes,
 }
 
 impl<'d> MipiDsi<'d> {
@@ -303,7 +309,6 @@ impl<'d> MipiDsi<'d> {
         Ok(Self {
             guard: dphy_guard,
             lane_bit_rate_mbps: actual_rate,
-            num_data_lanes: config.num_data_lanes,
         })
     }
 
