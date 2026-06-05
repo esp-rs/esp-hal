@@ -287,7 +287,7 @@ macro_rules! property {
         false
     };
     ("rng.is_lp_sys") => {
-        false
+        true
     };
     ("sleep.light_sleep") => {
         false
@@ -3308,7 +3308,7 @@ macro_rules! for_each_peripheral {
         "PCR peripheral singleton"] PCR <= PCR() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PMU peripheral singleton"] PMU
         <= PMU() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
+        "RNG peripheral singleton"] RNG <= LPPERI() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
         <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3608,7 +3608,7 @@ macro_rules! for_each_peripheral {
         MODEM_SYSCON() (unstable)), (@ peri_type #[doc = "PAU peripheral singleton"] PAU
         <= PAU() (unstable)), (@ peri_type #[doc = "PCR peripheral singleton"] PCR <=
         PCR() (unstable)), (@ peri_type #[doc = "PMU peripheral singleton"] PMU <= PMU()
-        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG()
+        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= LPPERI()
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()

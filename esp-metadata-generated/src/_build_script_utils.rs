@@ -2027,6 +2027,7 @@ impl Chip {
                     "rmt_has_rx_wrap",
                     "rmt_has_rx_demodulation",
                     "rng_apb_cycle_wait_num=\"16\"",
+                    "rng_is_lp_sys",
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -2296,6 +2297,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_rx_wrap",
                     "cargo:rustc-cfg=rmt_has_rx_demodulation",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
+                    "cargo:rustc-cfg=rng_is_lp_sys",
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -2722,6 +2724,7 @@ impl Chip {
                     "rmt_has_rx_demodulation",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rng_trng_supported",
+                    "rng_is_lp_sys",
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -3014,6 +3017,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_rx_demodulation",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rng_trng_supported",
+                    "cargo:rustc-cfg=rng_is_lp_sys",
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -3380,6 +3384,7 @@ impl Chip {
                     "phy_combo_module",
                     "psram_extmem_origin=\"1107296256\"",
                     "rng_apb_cycle_wait_num=\"16\"",
+                    "rng_is_lp_sys",
                     "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
@@ -3586,6 +3591,7 @@ impl Chip {
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
+                    "cargo:rustc-cfg=rng_is_lp_sys",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
@@ -6842,6 +6848,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(i2s_clock_configured_by_pcr)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
+    println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_branch_predictor)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f12m)");
@@ -6920,7 +6927,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch2)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
-    println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spll_clk)");
