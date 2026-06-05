@@ -543,12 +543,16 @@ macro_rules! for_each_dma_channel_peri_pair {
 macro_rules! for_each_mem2mem_channel {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("COPY_DMA", CopyDma,
-        CopyDmaChannel, DMA_COPY, 0)); _for_each_inner_mem2mem_channel!(("COPY_DMA",
-        CopyDma, CopyDmaChannel)); _for_each_inner_mem2mem_channel!((channels("COPY_DMA",
-        CopyDma, CopyDmaChannel, DMA_COPY, 0)));
-        _for_each_inner_mem2mem_channel!((erased));
-        _for_each_inner_mem2mem_channel!((engines("COPY_DMA", CopyDma, CopyDmaChannel)));
+        tt) => {} } _for_each_inner_mem2mem_channel!(("CRYPTO_DMA", CryptoDma,
+        CryptoDmaChannel, DMA_CRYPTO, 0)); _for_each_inner_mem2mem_channel!(("COPY_DMA",
+        CopyDma, CopyDmaChannel, DMA_COPY, 0));
+        _for_each_inner_mem2mem_channel!(("CRYPTO_DMA", CryptoDma, CryptoDmaChannel));
+        _for_each_inner_mem2mem_channel!(("COPY_DMA", CopyDma, CopyDmaChannel));
+        _for_each_inner_mem2mem_channel!((channels("CRYPTO_DMA", CryptoDma,
+        CryptoDmaChannel, DMA_CRYPTO, 0), ("COPY_DMA", CopyDma, CopyDmaChannel, DMA_COPY,
+        0))); _for_each_inner_mem2mem_channel!((erased));
+        _for_each_inner_mem2mem_channel!((engines("CRYPTO_DMA", CryptoDma,
+        CryptoDmaChannel), ("COPY_DMA", CopyDma, CopyDmaChannel)));
     };
 }
 #[macro_export]
