@@ -2276,9 +2276,7 @@ mod chip_specific {
         source: ClockSource,
         frequency: Rate,
     ) -> Result<(u8, Rate), ConfigError> {
-        let src_clock = clocks::ClockTree::with(|clocks| {
-            Rate::from_hz(clocks::RmtInstance::Rmt.sclk_config_frequency(clocks, source))
-        });
+        let src_clock = Rate::from_hz(clocks::RmtInstance::sclk_source_frequency(source));
 
         if frequency > src_clock {
             return Err(ConfigError::UnreachableTargetFrequency);
@@ -2812,9 +2810,7 @@ mod chip_specific {
         source: ClockSource,
         frequency: Rate,
     ) -> Result<(u8, Rate), ConfigError> {
-        let source_frequency = clocks::ClockTree::with(|clocks| {
-            Rate::from_hz(clocks::RmtInstance::Rmt.sclk_config_frequency(clocks, source))
-        });
+        let source_frequency = Rate::from_hz(clocks::RmtInstance::sclk_source_frequency(source));
 
         if frequency != source_frequency {
             return Err(ConfigError::UnreachableTargetFrequency);
