@@ -1,22 +1,12 @@
 name: HIL
 
-run-name: >
-  ${{ inputs.pr_number != '' &&
-      format(
-        'HIL for PR #{0} ({1}{2}{3})',
-        inputs.pr_number,
-        inputs.chips,
-        inputs.tests != '' && format('; tests: {0}', inputs.tests) || '',
-        inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || ''
-      ) ||
-
-      format(
-        'HIL ({0}{1}{2})',
-        inputs.chips,
-        inputs.tests != '' && format('; tests: {0}', inputs.tests) || '',
-        inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || ''
-      )
-  }}
+run-name: >-
+  ${{ format('{0}{1}',
+      inputs.pr_number != '' &&
+        format('HIL for PR #{0} ({1}{2}{3})', inputs.pr_number, inputs.chips, inputs.tests != '' && format('; tests: {0}', inputs.tests) || '', inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || '') ||
+        format('HIL ({0}{1}{2})', inputs.chips, inputs.tests != '' && format('; tests: {0}', inputs.tests) || '', inputs.package != '' && inputs.package != 'all' && format('; package: {0}', inputs.package) || ''),
+      inputs.distinct_id != '' && format(' [dispatch-id: {0}]', inputs.distinct_id) || ''
+  ) }}
 
 on:
   workflow_call:
@@ -35,6 +25,17 @@ on:
         required: false
         type: string
         default: "all"
+      # Not used by the workflow_call path, but referenced in run-name; declared
+      # here (with empty defaults) so that expression is well-defined for both
+      # triggers.
+      pr_number:
+        required: false
+        type: string
+        default: ""
+      distinct_id:
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       repository:
@@ -60,6 +61,10 @@ on:
       package:
         description: '"hil-test", "hil-test-radio", or "all"'
         default: "all"
+      distinct_id:
+        description: "Correlation marker set by the dispatcher; do not set manually"
+        required: false
+        default: ""
 
 env:
   CARGO_TERM_COLOR: always
