@@ -2096,6 +2096,7 @@ where
         // Setting err_wr_mask stops uart from storing data when data is wrong according
         // to reference manual
         self.regs().conf0().modify(|_, w| w.err_wr_mask().set_bit());
+        sync_regs(self.regs());
 
         crate::rom::ets_delay_us(15);
 
