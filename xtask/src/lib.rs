@@ -257,29 +257,15 @@ impl Package {
     }
 
     fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
-        let mut eval_context = somni_expr::Context::new();
-        let possible_symbols = Chip::list_of_possible_symbols();
-        eval_context.add_function("chip_has", move |symbol: &str| {
-            assert!(
-                possible_symbols.contains_key(symbol),
-                "Unknown chip symbol: {symbol}",
-            );
-            config
-                .all()
-                .iter()
-                .any(|sym| sym.replace('.', "_") == symbol)
-        });
-        eval_context.add_variable("chip", config.name());
+        let script_ctx = ScriptContext::new();
+        let mut ctx = script_ctx.for_config(config);
 
         if let Some(condition) = table.get("if") {
             let Some(expr) = condition.as_str() else {
                 panic!("`if` condition must be a string.");
             };
 
-            if !eval_context
-                .evaluate::<bool>(expr)
-                .expect("Failed to evaluate expression")
-            {
+            if !ctx.evaluate(expr).expect("Failed to evaluate expression") {
                 return None;
             }
         }

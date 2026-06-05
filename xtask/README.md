@@ -98,8 +98,9 @@ capability flag does not exist:
 //% CHIP_FILTER: esp32c6 || esp32h2
 ```
 
-The expression is evaluated with [`somni`](https://crates.io/crates/somni-expr): `xtask` wraps each
-bare symbol into a `chip_has("symbol")` call and evaluates it per chip.
+The expression is evaluated with [`somni`](https://crates.io/crates/somni-expr). `xtask` turns each
+bare symbol into a boolean variable and evaluates it per chip. If a symbol does not exist, it
+causes an evaluation error.
 
 This key is a filter. If a named configuration contains an expression, the named line overwrites the
 unnamed line for that configuration. If multiple lines specify the same configuration, the latter one
