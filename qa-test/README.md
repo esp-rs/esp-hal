@@ -4,7 +4,7 @@ This package contains a number of binary applications intended for manual/qualit
 
 Each device has its own unique set of peripherals, and as such not every test will run on every device. We recommend building and flashing the tests using the `xtask` method documented below, which will greatly simplify the process.
 
-To check if a device is compatible with a given test, check the metadata comments above the imports, which describe the supported devices following the `//% CHIP_FILTER:` designator. If this metadata is not present, then the test will work on any device supported by `esp-hal`.
+To check if a device is compatible with a given test, check the metadata comments above the imports, which describe the supported devices following the `//% CHIP_FILTER:` designator. The expression can use boolean cfg symbols, key-value cfg comparisons (e.g. `interrupt_controller != "clic"`), and chip names — see [`xtask/README.md`](../xtask/README.md) for details. If this metadata is not present, then the test will work on any device supported by `esp-hal`.
 
 As previously stated, we use the [cargo-xtask] pattern for automation. Commands invoking this tool must be run from the root of the repository.
 

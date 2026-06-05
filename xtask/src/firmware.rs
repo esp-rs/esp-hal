@@ -198,7 +198,8 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 }
 
 /// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
-/// cfg symbols and chip names, e.g. `cfg_symbol && !esp32` or `esp32c6 || esp32h2`).
+/// cfg symbols, key-value cfg symbols, and chip names, e.g. `cfg_symbol && !esp32`,
+/// `esp32c6 || esp32h2`, or `interrupt_controller != "clic"`).
 fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
     let script_ctx = ScriptContext::new();
 

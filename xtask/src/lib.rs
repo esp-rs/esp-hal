@@ -1094,22 +1094,25 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
 
 struct ScriptContext {
     all_symbols: Vec<String>,
+    all_kv_symbols: Vec<String>,
 }
 
 struct ChipFilterEval<'a> {
     all_symbols: &'a [String],
+    all_kv_symbols: &'a [String],
     chip_symbols: Vec<String>,
+    chip_kv_values: Vec<(String, String)>,
 }
 
 impl ScriptContext {
-    fn symbol_to_ident(s: &String) -> Option<String> {
+    fn symbol_to_ident(s: &str) -> Option<String> {
         s.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
             .then_some(s.replace(".", "_"))
     }
 
     pub fn new() -> Self {
-        let possible_symbols = Chip::list_of_possible_symbols()
+        let all_symbols = Chip::list_of_possible_symbols()
             .iter()
             .filter_map(|(sym, values)| {
                 if values.is_none() {
@@ -1119,9 +1122,20 @@ impl ScriptContext {
                 }
             })
             .collect::<Vec<_>>();
+        let all_kv_symbols = Chip::list_of_possible_symbols()
+            .iter()
+            .filter_map(|(sym, values)| {
+                if values.is_some() {
+                    Self::symbol_to_ident(sym)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
         Self {
-            all_symbols: possible_symbols,
+            all_symbols,
+            all_kv_symbols,
         }
     }
 
@@ -1133,12 +1147,28 @@ impl ScriptContext {
         let chip_symbols = config
             .all()
             .iter()
-            .filter_map(Self::symbol_to_ident)
+            .filter_map(|s| Self::symbol_to_ident(s))
+            .collect::<Vec<_>>();
+        let chip_kv_values = config
+            .all()
+            .iter()
+            .filter_map(|sym| {
+                if sym.contains('"') {
+                    let (k, v) = sym.split_once('=')?;
+                    let k = Self::symbol_to_ident(k.trim())?;
+                    let v = v.trim().trim_matches('"');
+                    Some((k.to_string(), v.to_string()))
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         ChipFilterEval {
             all_symbols: &self.all_symbols,
+            all_kv_symbols: &self.all_kv_symbols,
             chip_symbols,
+            chip_kv_values,
         }
     }
 }
@@ -1151,10 +1181,17 @@ impl ChipFilterEval<'_> {
         for sym in self.all_symbols.iter() {
             ctx.add_variable(sym, false);
         }
+        for sym in self.all_kv_symbols.iter() {
+            // empty string is not a valid value, chips that don't define the symbol won't match
+            ctx.add_variable(sym, "");
+        }
 
         // All defined symbols for this chip are true
         for sym in self.chip_symbols.iter() {
             ctx.add_variable(sym, true);
+        }
+        for (k, v) in self.chip_kv_values.iter() {
+            ctx.add_variable(k, v.as_str());
         }
 
         match ctx.evaluate::<bool>(expr) {
