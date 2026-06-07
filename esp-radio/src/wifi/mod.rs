@@ -1484,7 +1484,7 @@ impl Bandwidth {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i32,
+    pub rssi: i8,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1523,7 +1523,7 @@ pub struct RxControlInfo {
     /// if modem sleep or light sleep is not enabled.
     pub timestamp: Instant,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i32,
+    pub noise_floor: i8,
     /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
     /// antenna 1.
     pub ant: u32,
@@ -1542,7 +1542,7 @@ pub struct RxControlInfo {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i32,
+    pub rssi: i8,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1568,7 +1568,7 @@ pub struct RxControlInfo {
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i32,
+    pub noise_floor: i8,
     /// Indicates if this is a group-addressed frame.
     pub is_group: u32,
     /// End state of the packet reception.
@@ -1595,7 +1595,7 @@ pub struct RxControlInfo {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i32,
+    pub rssi: i8,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1619,7 +1619,7 @@ pub struct RxControlInfo {
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i32,
+    pub noise_floor: i8,
     /// Indicates if this is a group-addressed frame.
     pub is_group: u32,
     /// End state of the packet reception.
@@ -1639,6 +1639,13 @@ pub struct RxControlInfo {
 
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 impl RxControlInfo {
+    // Signed bitfields are broken in rust-bindgen, see
+    // https://github.com/esp-rs/esp-wifi-sys/issues/482.
+    // Casting through u8 makes the intended 8-bit truncation explicit before sign extension.
+    const fn sign_extend_i8_bitfield(value: i32) -> i8 {
+        value as u8 as i8
+    }
+
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
     ///
     /// # Safety
@@ -1648,7 +1655,7 @@ impl RxControlInfo {
         #[cfg(wifi_mac_version = "1")]
         let rx_control_info = unsafe {
             RxControlInfo {
-                rssi: (*rx_cntl).rssi(),
+                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
                 rate: (*rx_cntl).rate(),
                 sig_mode: (*rx_cntl).sig_mode(),
                 mcs: (*rx_cntl).mcs(),
@@ -1665,7 +1672,7 @@ impl RxControlInfo {
                     (*rx_cntl).secondary_channel(),
                 ),
                 timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
-                noise_floor: (*rx_cntl).noise_floor(),
+                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
                 ant: (*rx_cntl).ant(),
                 sig_len: (*rx_cntl).sig_len(),
                 rx_state: (*rx_cntl).rx_state(),
@@ -1674,7 +1681,7 @@ impl RxControlInfo {
         #[cfg(wifi_mac_version = "2")]
         let rx_control_info = unsafe {
             RxControlInfo {
-                rssi: (*rx_cntl).rssi(),
+                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
                 rate: (*rx_cntl).rate(),
                 sig_len: (*rx_cntl).sig_len(),
                 rx_state: (*rx_cntl).rx_state(),
@@ -1686,7 +1693,7 @@ impl RxControlInfo {
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
                 secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
-                noise_floor: (*rx_cntl).noise_floor() as _,
+                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
                 is_group: (*rx_cntl).is_group(),
                 rxend_state: (*rx_cntl).rxend_state(),
                 rxmatch3: (*rx_cntl).rxmatch3(),
@@ -1699,7 +1706,7 @@ impl RxControlInfo {
         #[cfg(wifi_mac_version = "3")]
         let rx_control_info = unsafe {
             RxControlInfo {
-                rssi: (*rx_cntl).rssi(),
+                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
                 rate: (*rx_cntl).rate(),
                 sig_len: (*rx_cntl).sig_len(),
                 rx_state: (*rx_cntl).rx_state(),
@@ -1710,7 +1717,7 @@ impl RxControlInfo {
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
                 secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
-                noise_floor: (*rx_cntl).noise_floor() as _,
+                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
                 is_group: (*rx_cntl).is_group(),
                 rxend_state: (*rx_cntl).rxend_state(),
                 rxmatch3: (*rx_cntl).rxmatch3(),
@@ -1723,6 +1730,15 @@ impl RxControlInfo {
         rx_control_info
     }
 }
+
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+const _: () = {
+    assert!(RxControlInfo::sign_extend_i8_bitfield(0) == 0);
+    assert!(RxControlInfo::sign_extend_i8_bitfield(42) == 42);
+    assert!(RxControlInfo::sign_extend_i8_bitfield(217) == -39);
+    assert!(RxControlInfo::sign_extend_i8_bitfield(160) == -96);
+    assert!(RxControlInfo::sign_extend_i8_bitfield(255) == -1);
+};
 
 #[doc(hidden)]
 /// This token is deliberately hidden to avoid polluting the crate namespace with these typically
