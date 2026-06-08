@@ -555,6 +555,7 @@ macro_rules! for_each_dma_channel {
         I2S1, LCD_CAM, AES, SHA, APB_SARADC, RMT]), ("AHB_GDMA", DMA_CH4, 4, interrupt_in
         = DMA_IN_CH4, interrupt_out = DMA_OUT_CH4, compatible = [SPI2, SPI3, UHCI0, I2S0,
         I2S1, LCD_CAM, AES, SHA, APB_SARADC, RMT])));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]

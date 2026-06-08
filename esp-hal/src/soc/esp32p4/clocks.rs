@@ -439,6 +439,95 @@ fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here.
 }
 
+impl MipiDsiInstance {
+    // MIPI_DSI_DPI_CLK
+    // HP_SYS_CLKRST.peri_clk_ctrl03: mipi_dsi_dpiclk_{src_sel,div_num,en}
+
+    fn enable_dpi_clk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| w.mipi_dsi_dpiclk_en().bit(en));
+    }
+
+    fn configure_dpi_clk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<MipiDsiDpiClkConfig>,
+        new_config: MipiDsiDpiClkConfig,
+    ) {
+        // Register values: 0 = XTAL, 1 = PLL_F240M, 2 = PLL_F160M.
+        let src_sel = match new_config.sclk() {
+            MipiDsiDpiClkSclk::Xtal => 0,
+            MipiDsiDpiClkSclk::PllF240m => 1,
+            MipiDsiDpiClkSclk::PllF160m => 2,
+        };
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| unsafe {
+                w.mipi_dsi_dpiclk_src_sel().bits(src_sel);
+                w.mipi_dsi_dpiclk_div_num().bits(new_config.div_num() as u8)
+            });
+    }
+
+    // MIPI_DSI_PHY_PLL_REFCLK
+    // HP_SYS_CLKRST.peri_clk_ctrl03: mipi_dsi_dphy_pll_refclk_{src_sel,div_num,en}
+
+    fn enable_phy_pll_refclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| w.mipi_dsi_dphy_pll_refclk_en().bit(en));
+    }
+
+    fn configure_phy_pll_refclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<MipiDsiPhyPllRefclkConfig>,
+        new_config: MipiDsiPhyPllRefclkConfig,
+    ) {
+        // Hardware register: 0=XTAL, 1=APLL (not modelled), 2=CPLL, 3=SPLL, 4=MPLL.
+        let src_sel = match new_config.sclk() {
+            MipiDsiPhyPllRefclkSclk::Xtal => 0u8,
+            MipiDsiPhyPllRefclkSclk::Cpll => 2,
+            MipiDsiPhyPllRefclkSclk::Spll => 3,
+            MipiDsiPhyPllRefclkSclk::Mpll => 4,
+        };
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| unsafe {
+                w.mipi_dsi_dphy_pll_refclk_src_sel().bits(src_sel);
+                w.mipi_dsi_dphy_pll_refclk_div_num()
+                    .bits(new_config.div_num() as u8)
+            });
+    }
+
+    // MIPI_DSI_PHY_CFG_CLK
+    // HP_SYS_CLKRST.peri_clk_ctrl02: mipi_dsi_dphy_clk_src_sel
+    // HP_SYS_CLKRST.peri_clk_ctrl03: mipi_dsi_dphy_cfg_clk_en
+
+    fn enable_phy_cfg_clk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl03()
+            .modify(|_, w| w.mipi_dsi_dphy_cfg_clk_en().bit(en));
+    }
+
+    fn configure_phy_cfg_clk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<MipiDsiPhyCfgClkConfig>,
+        new_config: MipiDsiPhyCfgClkConfig,
+    ) {
+        // Register values: 0 = PLL_F20M, 1 = RC_FAST, 2 = PLL_F25M.
+        let src_sel = match new_config {
+            MipiDsiPhyCfgClkConfig::PllF20m => 0,
+            MipiDsiPhyCfgClkConfig::RcFast => 1,
+            MipiDsiPhyCfgClkConfig::PllF25m => 2,
+        };
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl02()
+            .modify(|_, w| unsafe { w.mipi_dsi_dphy_clk_src_sel().bits(src_sel) });
+    }
+}
+
 fn configure_timg_calibration_clock_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<TimgCalibrationClockConfig>,

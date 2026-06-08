@@ -481,6 +481,7 @@ macro_rules! for_each_dma_channel {
         compatible = [SPI3]), ("I2S_DMA", DMA_I2S0, 0, interrupt = I2S0, compatible =
         [I2S0]), ("I2S_DMA", DMA_I2S1, 1, interrupt = I2S1, compatible = [I2S1])));
         _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]

@@ -411,6 +411,7 @@ macro_rules! for_each_dma_channel {
         DMA_CH0))); _for_each_inner_dma_channel!((separate_any_type));
         _for_each_inner_dma_channel!((shared("AHB_GDMA", DMA_CH0, 0, interrupt = DMA_CH0,
         compatible = [SPI2, SHA]))); _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]
