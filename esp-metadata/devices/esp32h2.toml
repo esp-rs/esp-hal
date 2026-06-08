@@ -256,6 +256,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ecdsa" },
     #{ name = "Iomux" },
     #{ name = "MemMonitor" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Trace0", template_params = { peripheral = "trace" } },
     #{ name = "Assist" },
     #{ name = "Cache" },
@@ -602,7 +603,10 @@ support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
+clock_sources = ["xtal", "pll_f48m"]
+default_clock_source = "pll_f48m"
 
 [device.ecdsa]
 support_status = { status = "not_supported", issue = 5444 }

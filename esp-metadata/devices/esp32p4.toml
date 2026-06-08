@@ -235,6 +235,7 @@ clocks = { system_clocks = { clock_tree = [
     # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
     { name = "Ledc",   template_params = { default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ledc" } },
     { name = "Pcnt",   template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "pcnt_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pcnt" } },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Mcpwm0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm0" } },
     { name = "Mcpwm1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm1" } },
     # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.
@@ -286,6 +287,7 @@ peripherals = [
     # Minimal set for esp-hal compilation
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
+    { name = "GPIO_SD" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "HP_SYS" },
     { name = "HP_SYS_CLKRST" },
@@ -530,7 +532,10 @@ support_status = "not_supported"  # SDIO host
 [device.sd_slave]
 support_status = "not_supported"
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 8
+clock_sources = ["xtal", "pll_f80m"]
+default_clock_source = "pll_f80m"
 [device.sleep]
 support_status = "not_supported"  # PMU eco5 sleep -- placeholder TODO in esp-hal
 [device.spi_slave]

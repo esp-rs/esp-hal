@@ -102,7 +102,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDIO host                 | ❌    |          |          |          |          |           |          | ❌       |          | ❌       |
 | SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          | ❌       |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |
+| SDM                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
@@ -130,7 +130,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [884]: https://github.com/esp-rs/esp-hal/issues/884
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
 [1909]: https://github.com/esp-rs/esp-hal/issues/1909
-[2370]: https://github.com/esp-rs/esp-hal/issues/2370
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155

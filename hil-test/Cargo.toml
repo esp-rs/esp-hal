@@ -67,6 +67,11 @@ harness           = false
 required-features = ["embassy", "esp-alloc"]
 
 [[bin]]
+name              = "sdm"
+harness           = false
+required-features = ["unstable"]
+
+[[bin]]
 name              = "spi_full_duplex"
 harness           = false
 

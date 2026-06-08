@@ -6,6 +6,7 @@ pub(crate) mod i2c_master;
 pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
+pub(crate) mod sdm;
 pub(crate) mod sha;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
@@ -20,6 +21,7 @@ pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
+pub(crate) use sdm::*;
 pub(crate) use sha::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
@@ -649,7 +651,15 @@ driver_configs![
     SdmProperties {
         driver: sdm,
         name: "SDM",
-        properties: {}
+        properties: {
+            /// Number of sigma-delta channels.
+            channel_count: SdmChannels,
+            /// Supported source clocks for the shared SDM/IO_MUX clock.
+            #[serde(default)]
+            clock_sources: Vec<String>,
+            /// Default source clock for the shared SDM/IO_MUX clock.
+            default_clock_source: String,
+        }
     },
     SleepProperties {
         driver: sleep,

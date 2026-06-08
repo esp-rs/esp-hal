@@ -268,6 +268,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.sigmadelta_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
@@ -669,7 +670,10 @@ support_status = { status = "not_supported", issue = 5164 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
+clock_sources = ["xtal", "pll_f80m"]
+default_clock_source = "pll_f80m"
 
 [device.lp_uart]
 support_status = { status = "not_supported", issue = 5155 }

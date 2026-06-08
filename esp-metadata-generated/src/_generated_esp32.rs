@@ -310,6 +310,15 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sdm.channel_count") => {
+        8
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(8)
+    };
+    ("sdm.default_clock_source") => {
+        "apb"
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -641,6 +650,22 @@ macro_rules! for_each_sha_algorithm {
         "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
         (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
         "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((4, GPIO_SD4)); _for_each_inner_sdm_channel!((5,
+        GPIO_SD5)); _for_each_inner_sdm_channel!((6, GPIO_SD6));
+        _for_each_inner_sdm_channel!((7, GPIO_SD7));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3), (4, GPIO_SD4), (5, GPIO_SD5), (6, GPIO_SD6), (7,
+        GPIO_SD7)));
     };
 }
 #[macro_export]
@@ -3531,6 +3556,8 @@ macro_rules! implement_peripheral_clocks {
             Aes,
             /// EMAC peripheral clock signal
             Emac,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// I2C_EXT0 peripheral clock signal
             I2cExt0,
             /// I2C_EXT1 peripheral clock signal
@@ -3584,6 +3611,7 @@ macro_rules! implement_peripheral_clocks {
             const ALL: &[Self] = &[
                 Self::Aes,
                 Self::Emac,
+                Self::GpioSd,
                 Self::I2cExt0,
                 Self::I2cExt1,
                 Self::I2s0,
@@ -3620,6 +3648,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .wifi_clk_en()
                         .modify(|_, w| w.emac_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    let _ = enable;
                 }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -3749,6 +3780,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .wifi_rst_en()
                         .modify(|_, w| w.emac_rst().bit(reset));
+                }
+                Peripheral::GpioSd => {
+                    let _ = reset;
                 }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()

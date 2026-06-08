@@ -307,6 +307,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ledc" },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "let _ = enable;", rst_template = "let _ = reset;" } },
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
@@ -849,7 +850,10 @@ support_status = "partial"
 algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 8
+clock_sources = ["apb"]
+default_clock_source = "apb"
 
 [device.spi_master]
 version = 1

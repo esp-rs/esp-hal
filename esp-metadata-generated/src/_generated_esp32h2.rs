@@ -346,6 +346,15 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(384)
     };
+    ("sdm.channel_count") => {
+        4
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(4)
+    };
+    ("sdm.default_clock_source") => {
+        "pll_f48m"
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -1072,6 +1081,18 @@ macro_rules! for_each_sha_algorithm {
         "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
         (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
         2)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3)));
     };
 }
 #[macro_export]
@@ -3523,6 +3544,8 @@ macro_rules! implement_peripheral_clocks {
             Ecdsa,
             /// ETM peripheral clock signal
             Etm,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// HMAC peripheral clock signal
             Hmac,
             /// I2C_EXT0 peripheral clock signal
@@ -3580,6 +3603,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecc,
                 Self::Ecdsa,
                 Self::Etm,
+                Self::GpioSd,
                 Self::Hmac,
                 Self::I2cExt0,
                 Self::I2cExt1,
@@ -3640,6 +3664,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .etm_conf()
                         .modify(|_, w| w.etm_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    crate::peripherals::GPIO_SD::regs()
+                        .clock_gate()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                    crate::peripherals::GPIO_SD::regs()
+                        .sigmadelta_misc()
+                        .modify(|_, w| w.function_clk_en().bit(enable));
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()
@@ -3796,6 +3828,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .etm_conf()
                         .modify(|_, w| w.etm_rst_en().bit(reset));
+                }
+                Peripheral::GpioSd => {
+                    let _ = reset;
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()
