@@ -1207,15 +1207,19 @@ mod tests {
     #[test]
     #[cfg(feature = "unstable")] // Needed for register access
     fn test_clock_calculation_accuracy(mut ctx: Context) {
-        let lowest = if cfg!(esp32h2) { 78048 } else { 78125 };
-
-        let f_mst = esp_hal::clock::ll::SpiInstance::Spi2.function_clock_frequency();
-        let inputs = [lowest, 100_000, 1_000_000, f_mst];
-        let expected_outputs = [lowest, 100_000, 1_000_000, f_mst];
-
-        for (input, expectation) in inputs.into_iter().zip(expected_outputs.into_iter()) {
+        #[track_caller]
+        fn assert_frequency_roundtrips(
+            ctx: &mut Context,
+            source: SpiFunctionClockConfig,
+            input: u32,
+        ) {
+            let f_mst = SpiInstance::function_clock_source_frequency(source);
             ctx.spi
-                .apply_config(&Config::default().with_frequency(Rate::from_hz(input)))
+                .apply_config(
+                    &Config::default()
+                        .with_frequency(Rate::from_hz(input))
+                        .with_clock_source(source),
+                )
                 .unwrap();
 
             // Read back effective SCLK
@@ -1223,12 +1227,51 @@ mod tests {
 
             let clock = spi2.register_block().clock().read();
 
-            let n = clock.clkcnt_n().bits() as u32;
-            let pre = clock.clkdiv_pre().bits() as u32;
+            let n = clock.clkcnt_n().bits() as u32 + 1;
+            let pre = clock.clkdiv_pre().bits() as u32 + 1;
 
-            let actual = f_mst / ((n + 1) * (pre + 1));
+            let actual = f_mst / (n * pre);
 
-            assert_eq!(actual, expectation);
+            assert_eq!(
+                actual, input,
+                "source: {:?} ({}), n={}, pre={}",
+                source, f_mst, n, pre
+            );
         }
+
+        fn check_typical_values(ctx: &mut Context, source: SpiFunctionClockConfig) {
+            let f_min = SpiInstance::function_clock_source_frequency(source) / 1024;
+            assert_frequency_roundtrips(ctx, source, f_min);
+            assert_frequency_roundtrips(
+                ctx,
+                source,
+                SpiInstance::function_clock_source_frequency(source),
+            );
+
+            if f_min < 100_000 {
+                assert_frequency_roundtrips(ctx, source, 100_000);
+            }
+            assert_frequency_roundtrips(ctx, source, 1_000_000);
+            assert_frequency_roundtrips(ctx, source, 2_000_000);
+        }
+
+        use esp_hal::clock::ll::{SpiFunctionClockConfig, SpiInstance};
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::Apb);
+        #[cfg(not(any(esp32, esp32s2)))]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::Xtal);
+        #[cfg(esp32c2)]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll40m);
+        #[cfg(esp32h2)]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF48m);
+        #[cfg(esp32c3)]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll80m);
+        #[cfg(esp32c6)]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF80m);
+        #[cfg(esp32c5)]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF120m);
+        #[cfg(any(esp32c5, esp32c61))]
+        check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF160m);
     }
 }
