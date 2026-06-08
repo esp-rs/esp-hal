@@ -199,10 +199,14 @@ impl GenericProperty for DmaEngines {
                     );
                     mem2mem_channels
                         .push(quote! { #engine_name, #variant, #any_channel, #ch, #mem2mem_id });
-                    mem2mem_erased_by_engine
-                        .entry(engine_name)
-                        .or_default()
-                        .push((idx.clone(), mem2mem_id));
+                    // CRYPTO_DMA and COPY_DMA alias their any-channel type to the singleton
+                    // peripheral type; an erased impl would conflict with the singleton impl.
+                    if !matches!(engine_name, "CRYPTO_DMA" | "COPY_DMA") {
+                        mem2mem_erased_by_engine
+                            .entry(engine_name)
+                            .or_default()
+                            .push((idx.clone(), mem2mem_id));
+                    }
                     if mem2mem_engine_seen.insert(engine_name) {
                         mem2mem_engines.push(quote! { #engine_name, #variant, #any_channel });
                     }
@@ -284,7 +288,6 @@ impl GenericProperty for DmaEngines {
 
         let mem2mem_erased = mem2mem_erased_by_engine
             .iter()
-            .filter(|(engine_name, _)| **engine_name != "COPY_DMA")
             .map(|(engine_name, arms)| {
                 let variant = format_ident!(
                     "{}",
