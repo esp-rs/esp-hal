@@ -871,6 +871,7 @@ deep_sleep = true
 [device.mcpwm]
 [device.pcnt]
 [device.sd_host]
+support_status = "not_supported"
 [device.twai]
 [device.usb_otg]
 [device.usb_serial_jtag]
@@ -884,6 +885,7 @@ octal_spi = true
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]
+support_status = "not_supported"
 [device.ulp_riscv]
 [device.lp_timer]
 
