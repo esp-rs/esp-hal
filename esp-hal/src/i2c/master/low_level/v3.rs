@@ -1,5 +1,5 @@
 use super::{Config, ConfigError, Driver, RegisterBlock, configure_clock};
-use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
+use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig, I2cInstance};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
@@ -10,10 +10,9 @@ pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Resul
     let sclk = clock_config.clock_source;
     let clock = driver.info.clock_instance;
 
-    ClockTree::with(|clocks| {
-        let source_clk =
-            clock.function_clock_config_frequency(clocks, I2cFunctionClockConfig::new(sclk, 0));
+    let source_clk = I2cInstance::function_clock_source_frequency(sclk);
 
+    ClockTree::with(|clocks| {
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
 
         clock.configure_function_clock(clocks, I2cFunctionClockConfig::new(sclk, clkm_div - 1));

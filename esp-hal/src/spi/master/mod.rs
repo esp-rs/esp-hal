@@ -505,15 +505,9 @@ impl Config {
     }
 
     fn clock_source_freq_hz(&self) -> Rate {
-        let freq = crate::soc::clocks::ClockTree::with(|clocks| {
-            // The specific instance (Spi2) does not matter here,
-            // because we query a source clock frequency.
-            // TODO: should config_frequency should not take `self` in general?
-            crate::soc::clocks::SpiInstance::Spi2
-                .function_clock_config_frequency(clocks, self.clock_source)
-        });
-
-        Rate::from_hz(freq)
+        Rate::from_hz(
+            crate::soc::clocks::SpiInstance::function_clock_source_frequency(self.clock_source),
+        )
     }
 
     fn recalculate(&self) -> Result<u32, ConfigError> {

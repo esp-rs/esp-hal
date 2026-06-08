@@ -9,7 +9,12 @@ use somni_parser::ast;
 
 use crate::cfg::{
     ClockTreeNodeInstance,
-    clock_tree::{ClockTreeNodeType, ConfiguresExpression, ValidationContext},
+    clock_tree::{
+        ClockTreeNodeType,
+        ConfiguresExpression,
+        SourceFrequencySignature,
+        ValidationContext,
+    },
     soc::ProcessedClockData,
 };
 
@@ -136,10 +141,50 @@ impl ClockTreeNodeType for Multiplexer {
         self.impl_config_apply_function(instance, tree)
     }
 
+    fn has_configures(&self) -> bool {
+        self.variants
+            .iter()
+            .any(|variant| !variant.configures.is_empty())
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        if self.has_configures() {
+            return SourceFrequencySignature::Skip;
+        }
+
+        let ty_name = instance.config_type_name();
+        let mut variant_frequencies = Vec::with_capacity(self.variants.len());
+        let mut variants = Vec::with_capacity(self.variants.len());
+        for variant in &self.variants {
+            let name = variant.config_enum_variant_name();
+            let upstream_node = instance.resolve_node(tree, &variant.outputs);
+            let Some(frequency) = upstream_node.try_frequency_call() else {
+                return SourceFrequencySignature::Skip;
+            };
+            variants.push(quote! { #ty_name::#name });
+            variant_frequencies.push(frequency);
+        }
+
+        SourceFrequencySignature::Selector {
+            param_type: quote! { #ty_name },
+            param_name: format_ident!("source"),
+            body: quote! {
+                match source {
+                    #(#variants => #variant_frequencies,)*
+                }
+            },
+        }
+    }
+
     fn node_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        _frequency_receiver: &[TokenStream],
     ) -> TokenStream {
         let ty_name = instance.config_type_name();
         let variants = self
