@@ -1,0 +1,15 @@
+crate: esp-sync
+
+options:
+  - name: min-chip-revision
+    description: "The minimum chip revision the application targets, in format:
+      major * 100 + minor. On ESP32-P4, revisions below v3.0 (< 300) lack the `mintthresh`
+      CSR (writing 0x347 traps illegal-instruction), so the Zcmp critical-section workaround
+      is disabled there. Defaults to 300 (v3.0) on ESP32-P4 — set it to your silicon
+      revision (e.g. 100 for v1.0) on older parts. Keep in sync with the esp-hal option of
+      the same name. Mirrors ESP-IDF `CONFIG_ESP32P4_SELECTS_REV_LESS_V3`."
+    default:
+      - value: 300
+        if: 'chip == "esp32p4"'
+      - value: 0
+    active: 'chip == "esp32p4"'

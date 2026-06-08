@@ -593,6 +593,17 @@ pub(crate) mod rt {
 
         cfg_if::cfg_if! {
             if #[cfg(interrupt_controller = "clic")] {
+                // On the pre-v3 ESP32-P4 non-standard CLIC, `mintstatus.mil` (CSR 0x346) does
+                // not match the slot's `ctl` level encoding, so `current_runlevel()` is
+                // unreliable; since `should_handle()` requires `cpu_interrupt.level() ==
+                // runlevel`, a wrong runlevel drops the interrupt and a level-triggered source
+                // is never cleared (interrupt storm). Dispatch off the serviced interrupt's own
+                // ctl-derived level instead — this matches how IDF's CLIC handler dispatches,
+                // off the cause (`mcause & VECTORS_MCAUSE_REASON_MASK`) rather than `mintstatus`
+                // (ESP-IDF components/riscv/vectors.S `_interrupt_handler`).
+                #[cfg(esp32p4_rev_lt_v3)]
+                let prio = cpu_intr.level() as u8;
+                #[cfg(not(esp32p4_rev_lt_v3))]
                 let prio = cpu_int::current_runlevel();
                 let mcause = riscv::register::mcause::read();
             } else {

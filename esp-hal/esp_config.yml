@@ -185,8 +185,14 @@ options:
     active: 'chip == "esp32p4"'
 
   - name: min-chip-revision
-    description: "The minimum chip revision required for the application to run, in format: major * 100 + minor."
+    description: "The minimum chip revision required for the application to run, in format:
+      major * 100 + minor. On ESP32-P4 this also selects the CLIC variant: revisions below
+      v3.0 (< 300) use the non-standard CLIC (memory-mapped interrupt threshold, mintstatus
+      at 0x346); v3.0+ uses the standard CLIC. Defaults to 300 (v3.0) on ESP32-P4 — set it
+      to your silicon revision (e.g. 100 for v1.0, 103 for v1.3) on older parts."
     default:
+      - value: 300
+        if: 'chip == "esp32p4"'
       - value: 0
 
   - name: use_rwdata_ld_hook

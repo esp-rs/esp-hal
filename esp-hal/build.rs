@@ -57,6 +57,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Failed to read esp_config.yml for esp-hal");
     let cfg = generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
+    // Pre-v3.0 ESP32-P4 silicon uses a non-standard CLIC (memory-mapped interrupt
+    // threshold, no `mintthresh` CSR, `mintstatus` at 0x346). Derive a cfg from the
+    // configured minimum chip revision so the relevant paths are selected at compile time
+    // — runtime detection can't be used here, as the wrong CSR access traps and the chip
+    // revision isn't known until after init.
+    println!("cargo:rustc-check-cfg=cfg(esp32p4_rev_lt_v3)");
+    if chip.name() == "esp32p4" {
+        let min_rev = cfg
+            .iter()
+            .find(|(k, _)| k.to_ascii_lowercase().ends_with("min_chip_revision"))
+            .map(|(_, v)| v.as_integer())
+            .unwrap_or(0);
+        if min_rev < 300 {
+            println!("cargo:rustc-cfg=esp32p4_rev_lt_v3");
+        }
+    }
+
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 

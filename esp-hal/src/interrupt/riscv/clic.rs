@@ -68,7 +68,7 @@ pub(super) fn change_current_runlevel(level: RunLevel) -> u8 {
 
     // All machine mode pending interrupts with levels less than or equal
     // to the effective threshold level are not allowed to preempt the execution.
-    unsafe { mintthresh::write(prio_to_bits(level) as usize) };
+    unsafe { intthresh::write(prio_to_bits(level) as usize) };
 
     current_runlevel
 }
@@ -79,11 +79,11 @@ pub(crate) fn mil() -> usize {
 }
 
 pub(super) fn current_runlevel() -> u8 {
-    let mintthresh = mintthresh::read();
+    let thresh = intthresh::read();
 
     let mil = mil();
 
-    let level = mil.max(mintthresh);
+    let level = mil.max(thresh);
 
     bits_to_prio(level)
 }
@@ -105,9 +105,40 @@ fn bits_to_prio(bits: usize) -> u8 {
     }
 }
 
-mod mintthresh {
+/// Interrupt-level threshold (the level below which interrupts are masked).
+///
+/// Standard CLIC (incl. ESP32-P4 v3.0+) uses the `mintthresh` CSR (0x347). Pre-v3
+/// ESP32-P4's non-standard CLIC has no such CSR (0x347 traps illegal-instruction);
+/// the threshold is the memory-mapped `CLIC_INT_THRESH_REG`, upper 8 bits. Selected by
+/// the `esp32p4-rev-lt-v3` esp-config option (mirrors IDF
+/// `CONFIG_ESP32P4_SELECTS_REV_LESS_V3`); the memory-mapped path mirrors IDF
+/// `rv_utils_{get,restore}_interrupt_threshold` under `!INTTHRESH_STANDARD`.
+#[cfg(not(esp32p4_rev_lt_v3))]
+mod intthresh {
     riscv::read_csr_as_usize!(0x347);
     riscv::write_csr_as_usize!(0x347);
+}
+
+#[cfg(esp32p4_rev_lt_v3)]
+mod intthresh {
+    // CLIC_INT_THRESH_REG = DR_REG_CLIC_BASE (0x2080_0000) + 0x8, threshold in the top
+    // byte (CLIC_CPU_INT_THRESH_S = 24). The CLIC region is CPU-local, so this fixed
+    // address always targets the current core.
+    const CLIC_INT_THRESH_REG: *mut u32 = 0x2080_0008 as *mut u32;
+    const THRESH_SHIFT: u32 = 24;
+
+    #[inline]
+    pub fn read() -> usize {
+        let v = unsafe { CLIC_INT_THRESH_REG.read_volatile() };
+        ((v >> THRESH_SHIFT) & 0xff) as usize
+    }
+
+    #[inline]
+    pub unsafe fn write(val: usize) {
+        unsafe { CLIC_INT_THRESH_REG.write_volatile(((val as u32) & 0xff) << THRESH_SHIFT) };
+        // Read back so the write lands before the caller re-enables mstatus.mie (per IDF).
+        let _ = unsafe { CLIC_INT_THRESH_REG.read_volatile() };
+    }
 }
 
 mod mintstatus {
@@ -117,9 +148,19 @@ mod mintstatus {
                 ::core::assert!($($tt)*)
             };
         }
+    // Standard CLIC places `mintstatus` at 0xFB1; pre-v3 ESP32-P4's non-standard CLIC
+    // at 0x346. (On the non-standard CLIC the 0x346 `mil` reads inconsistently with the
+    // slot ctl encoding, so `handle_interrupts` does not rely on it — see riscv.rs.)
+    #[cfg(not(esp32p4_rev_lt_v3))]
     riscv::read_only_csr! {
         /// `mintstatus` register
         Mintstatus: 0xfb1,
+        mask: usize::MAX,
+    }
+    #[cfg(esp32p4_rev_lt_v3)]
+    riscv::read_only_csr! {
+        /// `mintstatus` register (non-standard ESP32-P4 CLIC address)
+        Mintstatus: 0x346,
         mask: usize::MAX,
     }
     riscv::read_only_csr_field! {
