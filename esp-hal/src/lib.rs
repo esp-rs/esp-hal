@@ -611,6 +611,7 @@ pub mod __macro_implementation {
     #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
+    pub use static_cell;
     #[cfg(feature = "rt")]
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::entry as __entry;
