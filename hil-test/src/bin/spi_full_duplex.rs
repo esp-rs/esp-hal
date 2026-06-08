@@ -1228,7 +1228,15 @@ mod tests {
 
             let actual = f_mst / ((n + 1) * (pre + 1));
 
-            assert_eq!(actual, expectation);
+            assert_eq!(
+                actual,
+                expectation,
+                "source: {}, input: {}, n={}, pre={}",
+                f_mst,
+                input,
+                n + 1,
+                pre + 1
+            );
         }
     }
 }
