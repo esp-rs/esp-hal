@@ -28,7 +28,7 @@ jobs:
       github.event.label.name == 'trusted-author'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -90,7 +90,7 @@ jobs:
       startsWith(github.event.comment.body, '/trust ')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -145,7 +145,7 @@ jobs:
       startsWith(github.event.comment.body, '/revoke ')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -248,7 +248,7 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -309,7 +309,7 @@ jobs:
     if: needs.hil-quick.outputs.run_id != '' && needs.hil-quick.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -339,7 +339,7 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -400,7 +400,7 @@ jobs:
     if: needs.hil-full.outputs.run_id != '' && needs.hil-full.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -434,7 +434,7 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -519,7 +519,7 @@ jobs:
     if: needs.hil-chips.outputs.run_id != '' && needs.hil-chips.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
@@ -597,7 +597,7 @@ jobs:
       startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # for `require`
+      - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
