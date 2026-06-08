@@ -1,6 +1,7 @@
 //! UART Test
 
-//% CHIP_FILTER: uart_driver_supported
+// FIXME: ESP32-P4's UART driver still needs some work.
+//% CHIP_FILTER: uart_driver_supported && !esp32p4
 //% FEATURES: unstable embassy
 
 #![no_std]

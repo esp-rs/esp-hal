@@ -535,6 +535,11 @@ driver_configs![
         name: "MCPWM",
         properties: {}
     },
+    MipiDsiProperties {
+        driver: mipi_dsi,
+        name: "MIPI-DSI",
+        properties: {}
+    },
     ParlIoProperties {
         driver: parl_io,
         name: "PARL_IO",

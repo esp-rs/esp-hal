@@ -72,6 +72,16 @@ pub(crate) struct Function {
     pub implementation: TokenStream,
 }
 
+pub(crate) enum SourceFrequencySignature {
+    Skip,
+    Parameterless(TokenStream),
+    Selector {
+        param_type: TokenStream,
+        param_name: Ident,
+        body: TokenStream,
+    },
+}
+
 pub(crate) struct ClockNodeFunctions {
     pub impl_type: Option<Ident>,
 
@@ -81,6 +91,7 @@ pub(crate) struct ClockNodeFunctions {
     pub current_config: Function,
 
     pub frequency: Function,
+    pub source_frequency: Function,
     pub hal_functions: Vec<TokenStream>,
 }
 
@@ -91,6 +102,7 @@ impl ClockNodeFunctions {
         let apply_impl = &self.apply_config.implementation;
         let current_config_impl = &self.current_config.implementation;
         let frequency_impl = &self.frequency.implementation;
+        let source_frequency_impl = &self.source_frequency.implementation;
 
         quote! {
             #apply_impl
@@ -98,6 +110,7 @@ impl ClockNodeFunctions {
             #request_impl
             #release_impl
             #frequency_impl
+            #source_frequency_impl
         }
     }
 }
@@ -345,7 +358,31 @@ pub(crate) trait ClockTreeNodeType: Any {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        frequency_receiver: &[TokenStream],
     ) -> TokenStream;
+
+    /// Returns true when `config_frequency` must take an `instance` parameter because its
+    /// frequency formula reads a per-instance upstream node's cached frequency.
+    fn config_frequency_needs_instance(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> bool {
+        false
+    }
+
+    fn has_configures(&self) -> bool {
+        false
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        let _ = (instance, tree);
+        SourceFrequencySignature::Skip
+    }
 
     /// Returns the documentation for the clock configuration, which will be placed on the
     /// `ClockConfig` field.

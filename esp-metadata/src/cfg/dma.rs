@@ -142,8 +142,11 @@ impl GenericProperty for DmaEngines {
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        // DMA channel information split into three lists based on interrupt signals
+        let mut no_own_interrupt = vec![];
         let mut shared = vec![];
         let mut split = vec![];
+
         let mut engines = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
@@ -199,10 +202,14 @@ impl GenericProperty for DmaEngines {
                     );
                     mem2mem_channels
                         .push(quote! { #engine_name, #variant, #any_channel, #ch, #mem2mem_id });
-                    mem2mem_erased_by_engine
-                        .entry(engine_name)
-                        .or_default()
-                        .push((idx.clone(), mem2mem_id));
+                    // CRYPTO_DMA and COPY_DMA alias their any-channel type to the singleton
+                    // peripheral type; an erased impl would conflict with the singleton impl.
+                    if !matches!(engine_name, "CRYPTO_DMA" | "COPY_DMA") {
+                        mem2mem_erased_by_engine
+                            .entry(engine_name)
+                            .or_default()
+                            .push((idx.clone(), mem2mem_id));
+                    }
                     if mem2mem_engine_seen.insert(engine_name) {
                         mem2mem_engines.push(quote! { #engine_name, #variant, #any_channel });
                     }
@@ -246,7 +253,9 @@ impl GenericProperty for DmaEngines {
                         );
                     }
                     (None, None, None) => {
-                        // No interrupt info – skip
+                        no_own_interrupt.push(
+                            quote! { #engine_name, #ch, #idx, compatible = [#(#compatible_peris),*] },
+                        );
                     }
                     _ => {
                         panic!(
@@ -267,6 +276,7 @@ impl GenericProperty for DmaEngines {
                     ("separate_any_type", &engine_any_channels),
                     ("shared", &shared),
                     ("split", &split),
+                    ("no_own_interrupt", &no_own_interrupt),
                 ],
             ))
         } else {
@@ -284,7 +294,6 @@ impl GenericProperty for DmaEngines {
 
         let mem2mem_erased = mem2mem_erased_by_engine
             .iter()
-            .filter(|(engine_name, _)| **engine_name != "COPY_DMA")
             .map(|(engine_name, arms)| {
                 let variant = format_ident!(
                     "{}",

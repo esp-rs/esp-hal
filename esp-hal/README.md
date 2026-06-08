@@ -89,6 +89,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | LP I2C master             |       |          |          | ⚒️      | ⚒️      |           |          | ❌       |          |          |
 | LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |           |          | ❌       |          |          |
 | MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      |           | ⚒️      | ❌       |          | ⚒️      |
+| MIPI-DSI                  |       |          |          |          |          |           |          | ⚒️      |          |          |
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |

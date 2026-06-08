@@ -10,6 +10,11 @@ pub(super) fn abort_transfer(driver: &Driver) {
     driver.configure_datalen(1, 1);
 }
 
+pub(super) fn enable_peripheral_clock(_driver: &Driver) {
+    // The PAC places a clock gate register to the same address that would be SPI_W17_REG.
+    // I don't believe it.
+}
+
 pub(super) fn init(driver: &Driver) {
     driver.regs().ctrl().modify(|_, w| {
         w.q_pol().clear_bit();

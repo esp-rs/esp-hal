@@ -42,6 +42,7 @@ use crate::{
             ClockTreeNodeType,
             Expression,
             RejectExpression,
+            SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
             human_readable_frequency,
@@ -125,6 +126,7 @@ impl ClockTreeNodeType for Source {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        _frequency_receiver: &[TokenStream],
     ) -> TokenStream {
         if self.values.is_some() {
             quote! { config.value() }
@@ -345,8 +347,22 @@ impl ClockTreeNodeType for DerivedClockSource {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        frequency_receiver: &[TokenStream],
     ) -> TokenStream {
-        self.source_options.node_frequency_impl(instance, tree)
+        self.source_options
+            .node_frequency_impl(instance, tree, frequency_receiver)
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        let upstream_node = instance.resolve_node(tree, &self.from);
+        let Some(body) = upstream_node.try_frequency_call() else {
+            return SourceFrequencySignature::Skip;
+        };
+        SourceFrequencySignature::Parameterless(body)
     }
 
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {

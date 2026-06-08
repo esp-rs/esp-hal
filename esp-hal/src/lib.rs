@@ -294,7 +294,15 @@ pub mod gpio;
 #[cfg(i2c_master_driver_supported)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(feature = "unstable", any(hmac_driver_supported, sha_driver_supported)))]
+#[cfg(all(
+    feature = "unstable",
+    any(
+        hmac_driver_supported,
+        sha_driver_supported,
+        ethernet_driver_supported,
+        mipi_dsi_driver_supported
+    )
+))]
 mod reg_access;
 #[cfg(rng_driver_supported)]
 pub mod rng;
@@ -405,6 +413,8 @@ unstable_driver! {
     pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
+    #[cfg(mipi_dsi_driver_supported)]
+    pub mod mipi_dsi;
 }
 
 /// State of the CPU saved when entering exception or interrupt
@@ -613,6 +623,7 @@ pub mod __macro_implementation {
     #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
+    pub use static_cell;
     #[cfg(feature = "rt")]
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::entry as __entry;

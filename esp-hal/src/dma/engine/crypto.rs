@@ -364,9 +364,7 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
 impl RxRegisterAccess for CryptoDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, en: bool) {
-        if en {
-            unimplemented!("Crypto DMA mem2mem mode is not supported on this chip");
-        }
+        self.regs().conf().modify(|_, w| w.mem_trans_en().bit(en));
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {

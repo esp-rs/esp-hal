@@ -421,7 +421,7 @@ jobs:
     secrets: inherit
 
   # --------------------------------------------------------------------------
-  # HIL — build gates CI, device runs do not.
+  # HIL — hil-build gates compilation; hil-gate gates device runs (≥50% rule).
 
   hil-build:
     needs: calculate
@@ -530,7 +530,7 @@ jobs:
           path: target/tests/
           if-no-files-found: ignore
 
-  # Device runs — not gated by ci-result.
+  # Device runs — aggregated by hil-gate (see below).
   hil-run:
     needs: hil-build
     runs-on:
@@ -573,7 +573,7 @@ jobs:
           rm -f xtask || true
 
   # Radio HIL device runs — wifi/BT capable chips on dedicated radio runners.
-  # Not gated by ci-result for the same reason hil-run is excluded.
+  # Not gated by hil-gate or ci-result.
   hil-run-radio:
     needs: hil-build
     runs-on:
@@ -619,6 +619,28 @@ jobs:
           rm -rf tests/ || true
           rm -f xtask || true
 
+  # Merge gate for hil-run matrix legs.  Blocks when ≥50% of legs that actually
+  # ran tests failed or were cancelled.  Skipped legs (no ELFs for that chip)
+  # are excluded.  hil-run-radio is not part of this gate.
+  hil-gate:
+    needs: [hil-build, hil-run]
+    if: >
+      always() &&
+      needs.hil-build.result == 'success' &&
+      needs.hil-run.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Evaluate hil-run results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { evaluateHilGate } = require('./.github/scripts/hil-gate.js');
+            await evaluateHilGate({ github, context, core });
+
   # --------------------------------------------------------------------------
   # Gate job for branch protection
   #
@@ -626,9 +648,8 @@ jobs:
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
   #
-  # NOTE: hil-run and hil-run-radio are intentionally excluded — device tests
-  # should not block the merge queue.  hil-build IS included so we gate on
-  # test compilation.
+  # hil-build gates test compilation.  hil-gate gates device runs when ≥50% of
+  # executed hil-run matrix legs fail.  hil-run-radio is informational only.
   ci-result:
     if: always()
     needs:
@@ -640,6 +661,7 @@ jobs:
       - changelog
       - semver-check
       - hil-build
+      - hil-gate
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
