@@ -55,7 +55,7 @@ cpu_has_csr_pc = false
 internal_memory_cached = true
 
 # Clock tree for ESP32-P4 (eco5 / chip revision v3.x)
-# 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)
+# 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (500MHz, PSRAM/media)
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },

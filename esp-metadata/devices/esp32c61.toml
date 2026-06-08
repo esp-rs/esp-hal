@@ -103,8 +103,8 @@ peripherals = [
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
-    { name = "XTAL_CLK",    type = "source", values = "40",     output = "VALUE * 1_000_000", always_on = true },
-    { name = "RC_FAST_CLK", type = "source",                    output = "17_500_000" },
+    { name = "XTAL_CLK",    type = "source", values = "40",      output = "VALUE * 1_000_000", always_on = true },
+    { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000" },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
 
     # Low-speed clocks
