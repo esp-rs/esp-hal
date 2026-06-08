@@ -227,8 +227,10 @@ impl<'d> DsiDpi<'d> {
         // upstream PLL reference count is maintained correctly.
         let (_dpi_clk_config, real_dpi_mhz) = ClockTree::with(|clocks| {
             // Obtain source frequency (div_num = 0 → no division applied yet).
-            let src_hz = MipiDsiInstance::MipiDsi
-                .dpi_clk_config_frequency(clocks, MipiDsiDpiClkConfig::new(config.dpi_clk_src, 0));
+            let src_hz = MipiDsiInstance::dpi_clk_config_frequency(
+                clocks,
+                MipiDsiDpiClkConfig::new(config.dpi_clk_src, 0),
+            );
             let src_mhz = src_hz as f32 / 1_000_000.0;
             let div = ((src_mhz / config.pixel_clock_mhz) + 0.5) as u32;
             let div = div.max(1);

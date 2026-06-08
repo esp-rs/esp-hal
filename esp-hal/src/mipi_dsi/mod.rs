@@ -186,7 +186,7 @@ impl<'d> MipiDsi<'d> {
             MipiDsiInstance::MipiDsi.configure_phy_pll_refclk(clocks, config.phy_pll_refclk);
             MipiDsiInstance::MipiDsi.request_phy_pll_refclk(clocks);
 
-            MipiDsiInstance::MipiDsi.phy_pll_refclk_config_frequency(clocks, config.phy_pll_refclk)
+            MipiDsiInstance::phy_pll_refclk_config_frequency(clocks, config.phy_pll_refclk)
         });
         let ref_freq_mhz = ref_freq_hz as f32 / 1_000_000.0;
 

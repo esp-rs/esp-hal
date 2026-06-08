@@ -3243,7 +3243,6 @@ macro_rules! define_clock_tree_types {
             }
             #[allow(unused_variables)]
             pub fn dpi_clk_config_frequency(
-                self,
                 clocks: &mut ClockTree,
                 config: MipiDsiDpiClkConfig,
             ) -> u32 {
@@ -3256,6 +3255,13 @@ macro_rules! define_clock_tree_types {
             pub fn dpi_clk_frequency(self) -> u32 {
                 MIPI_DSI_DPI_CLK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn dpi_clk_source_frequency(sclk: MipiDsiDpiClkSclk) -> u32 {
+                match sclk {
+                    MipiDsiDpiClkSclk::Xtal => xtal_clk_frequency(),
+                    MipiDsiDpiClkSclk::PllF240m => pll_f240m_frequency(),
+                    MipiDsiDpiClkSclk::PllF160m => pll_f160m_frequency(),
+                }
             }
             pub fn configure_phy_pll_refclk(
                 self,
@@ -3322,7 +3328,6 @@ macro_rules! define_clock_tree_types {
             }
             #[allow(unused_variables)]
             pub fn phy_pll_refclk_config_frequency(
-                self,
                 clocks: &mut ClockTree,
                 config: MipiDsiPhyPllRefclkConfig,
             ) -> u32 {
@@ -3336,6 +3341,14 @@ macro_rules! define_clock_tree_types {
             pub fn phy_pll_refclk_frequency(self) -> u32 {
                 MIPI_DSI_PHY_PLL_REFCLK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn phy_pll_refclk_source_frequency(sclk: MipiDsiPhyPllRefclkSclk) -> u32 {
+                match sclk {
+                    MipiDsiPhyPllRefclkSclk::Xtal => xtal_clk_frequency(),
+                    MipiDsiPhyPllRefclkSclk::Cpll => cpll_clk_frequency(),
+                    MipiDsiPhyPllRefclkSclk::Spll => spll_clk_frequency(),
+                    MipiDsiPhyPllRefclkSclk::Mpll => mpll_clk_frequency(),
+                }
             }
             pub fn configure_phy_cfg_clk(
                 self,
@@ -3398,7 +3411,6 @@ macro_rules! define_clock_tree_types {
             }
             #[allow(unused_variables)]
             pub fn phy_cfg_clk_config_frequency(
-                self,
                 clocks: &mut ClockTree,
                 config: MipiDsiPhyCfgClkConfig,
             ) -> u32 {
@@ -3411,6 +3423,13 @@ macro_rules! define_clock_tree_types {
             pub fn phy_cfg_clk_frequency(self) -> u32 {
                 MIPI_DSI_PHY_CFG_CLK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn phy_cfg_clk_source_frequency(source: MipiDsiPhyCfgClkConfig) -> u32 {
+                match source {
+                    MipiDsiPhyCfgClkConfig::PllF20m => pll_f20m_frequency(),
+                    MipiDsiPhyCfgClkConfig::RcFast => rc_fast_clk_frequency(),
+                    MipiDsiPhyCfgClkConfig::PllF25m => pll_f25m_frequency(),
+                }
             }
         }
         /// Clock tree configuration.
@@ -3603,7 +3622,7 @@ macro_rules! define_clock_tree_types {
         fn refresh_mipi_dsi_dpi_clk_downstream(clocks: &mut ClockTree, instance: MipiDsiInstance) {
             if let Some(config) = clocks.mipi_dsi_dpi_clk[instance as usize] {
                 MIPI_DSI_DPI_CLK_FREQ_CACHE[instance as usize].store(
-                    instance.dpi_clk_config_frequency(clocks, config),
+                    MipiDsiInstance::dpi_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -3614,7 +3633,7 @@ macro_rules! define_clock_tree_types {
         ) {
             if let Some(config) = clocks.mipi_dsi_phy_pll_refclk[instance as usize] {
                 MIPI_DSI_PHY_PLL_REFCLK_FREQ_CACHE[instance as usize].store(
-                    instance.phy_pll_refclk_config_frequency(clocks, config),
+                    MipiDsiInstance::phy_pll_refclk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -3625,7 +3644,7 @@ macro_rules! define_clock_tree_types {
         ) {
             if let Some(config) = clocks.mipi_dsi_phy_cfg_clk[instance as usize] {
                 MIPI_DSI_PHY_CFG_CLK_FREQ_CACHE[instance as usize].store(
-                    instance.phy_cfg_clk_config_frequency(clocks, config),
+                    MipiDsiInstance::phy_cfg_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
