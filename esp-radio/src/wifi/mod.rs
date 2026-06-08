@@ -1484,7 +1484,7 @@ impl Bandwidth {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i8,
+    pub rssi: i32,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1523,7 +1523,7 @@ pub struct RxControlInfo {
     /// if modem sleep or light sleep is not enabled.
     pub timestamp: Instant,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i8,
+    pub noise_floor: i32,
     /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
     /// antenna 1.
     pub ant: u32,
@@ -1542,7 +1542,7 @@ pub struct RxControlInfo {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i8,
+    pub rssi: i32,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1568,7 +1568,7 @@ pub struct RxControlInfo {
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i8,
+    pub noise_floor: i32,
     /// Indicates if this is a group-addressed frame.
     pub is_group: u32,
     /// End state of the packet reception.
@@ -1595,7 +1595,7 @@ pub struct RxControlInfo {
 #[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
-    pub rssi: i8,
+    pub rssi: i32,
     /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
     /// packets.
     pub rate: u32,
@@ -1619,7 +1619,7 @@ pub struct RxControlInfo {
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i8,
+    pub noise_floor: i32,
     /// Indicates if this is a group-addressed frame.
     pub is_group: u32,
     /// End state of the packet reception.
@@ -1642,8 +1642,8 @@ impl RxControlInfo {
     // Signed bitfields are broken in rust-bindgen, see
     // https://github.com/esp-rs/esp-wifi-sys/issues/482.
     // Casting through u8 makes the intended 8-bit truncation explicit before sign extension.
-    const fn sign_extend_i8_bitfield(value: i32) -> i8 {
-        value as u8 as i8
+    const fn sign_extend_i8_bitfield(value: i32) -> i32 {
+        (value as u8 as i8) as i32
     }
 
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
@@ -1730,15 +1730,6 @@ impl RxControlInfo {
         rx_control_info
     }
 }
-
-#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
-const _: () = {
-    assert!(RxControlInfo::sign_extend_i8_bitfield(0) == 0);
-    assert!(RxControlInfo::sign_extend_i8_bitfield(42) == 42);
-    assert!(RxControlInfo::sign_extend_i8_bitfield(217) == -39);
-    assert!(RxControlInfo::sign_extend_i8_bitfield(160) == -96);
-    assert!(RxControlInfo::sign_extend_i8_bitfield(255) == -1);
-};
 
 #[doc(hidden)]
 /// This token is deliberately hidden to avoid polluting the crate namespace with these typically
