@@ -7,6 +7,12 @@ use core::{
 
 #[cfg(feature = "unstable")]
 use embedded_hal::spi::{ErrorType, SpiBus};
+<<<<<<< HEAD
+=======
+use enumset::EnumSet;
+#[cfg(place_spi_master_driver_in_ram)]
+use procmacros::ram;
+>>>>>>> 2c57b119 (fix: Missing import when building with SPI driver in RAM (#5585))
 
 use super::*;
 use crate::{
