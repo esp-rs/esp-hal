@@ -367,12 +367,6 @@ macro_rules! property {
     ("soc.cpu_csr_prv_mode", str) => {
         stringify!(3088)
     };
-    ("soc.rc_fast_clk_default") => {
-        8500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(8500000)
-    };
     ("soc.internal_memory_cached") => {
         false
     };

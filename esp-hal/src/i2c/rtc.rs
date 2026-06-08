@@ -82,8 +82,6 @@ use crate::{
     peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
 };
 
-const RC_FAST_CLK: u32 = property!("soc.rc_fast_clk_default");
-
 /// Trait representing the RTC_I2C SDA pin.
 pub trait Sda: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
@@ -691,16 +689,17 @@ impl Timing {
     }
 }
 
-const fn clock_from_micros(micros: u64) -> u32 {
+fn clock_from_micros(micros: u64) -> u32 {
     duration_to_clock(Duration::from_micros(micros))
 }
 
-const fn clock_from_nanos(nanos: u64) -> u32 {
+fn clock_from_nanos(nanos: u64) -> u32 {
     duration_to_clock(Duration::from_nanos(nanos))
 }
 
-const fn duration_to_clock(value: Duration) -> u32 {
-    ((value.as_nanos() * RC_FAST_CLK as u128) / 1_000_000_000) as u32
+fn duration_to_clock(value: Duration) -> u32 {
+    ((value.as_nanos() * crate::soc::clocks::rc_fast_clk_frequency() as u128) / 1_000_000_000)
+        as u32
 }
 
 /// A generic I2C Command

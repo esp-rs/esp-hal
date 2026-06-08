@@ -368,8 +368,6 @@ impl Chip {
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_multi_core_enabled",
-                    "soc_rc_fast_clk_default=\"8500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_apll_clk",
@@ -587,8 +585,6 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
@@ -922,8 +918,6 @@ impl Chip {
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_cpu_has_csr_pc",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -1095,8 +1089,6 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -1431,8 +1423,6 @@ impl Chip {
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_cpu_has_csr_pc",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -1661,8 +1651,6 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -2033,8 +2021,6 @@ impl Chip {
                     "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -2302,8 +2288,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -2730,8 +2714,6 @@ impl Chip {
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_csr_prv_mode=\"3088\"",
                     "soc_cpu_csr_prv_mode_is_set",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -3022,8 +3004,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -3383,8 +3363,6 @@ impl Chip {
                     "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_rc_fast_clk",
                     "soc_has_clock_node_pll_clk",
@@ -3589,8 +3567,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
@@ -3993,8 +3969,6 @@ impl Chip {
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_csr_prv_mode=\"3088\"",
                     "soc_cpu_csr_prv_mode_is_set",
-                    "soc_rc_fast_clk_default=\"8500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_f96m_clk",
                     "soc_has_clock_node_pll_f64m_clk",
@@ -4252,8 +4226,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f96m_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f64m_clk",
@@ -4554,8 +4526,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "soc_cpu_has_branch_predictor",
                     "soc_multi_core_enabled",
-                    "soc_rc_fast_clk_default=\"20000000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_internal_memory_cached",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_cpll_clk",
@@ -4751,8 +4721,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"20000000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_internal_memory_cached",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpll_clk",
@@ -5229,8 +5197,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"512\"",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
-                    "soc_rc_fast_clk_default=\"8500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_apll_clk",
@@ -5467,8 +5433,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
@@ -5936,8 +5900,6 @@ impl Chip {
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_multi_core_enabled",
-                    "soc_rc_fast_clk_default=\"17500000\"",
-                    "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -6213,8 +6175,6 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
-                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -6660,7 +6620,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(sleep_light_sleep)");
     println!("cargo:rustc-check-cfg=cfg(sleep_deep_sleep)");
     println!("cargo:rustc-check-cfg=cfg(soc_multi_core_enabled)");
-    println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apll_clk)");
@@ -7019,10 +6978,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rsa_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_size_increment, values(\"512\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
-    println!(
-        "cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default, \
-         values(\"8500000\",\"17500000\",\"20000000\"))"
-    );
     println!("cargo:rustc-check-cfg=cfg(spi_master_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(spi_master_fifo_size, values(\"64\",\"72\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
