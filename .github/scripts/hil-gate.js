@@ -19,7 +19,11 @@ function classifyMatrixJob(job) {
   if (conclusion === "success") {
     return { kind: "passed" };
   }
-  if (conclusion === "failure" || conclusion === "cancelled") {
+  if (
+    conclusion === "failure" ||
+    conclusion === "cancelled" ||
+    conclusion === null
+  ) {
     return { kind: "failed" };
   }
 
