@@ -44,8 +44,8 @@
 //!
 //! If WiFi connections fail, especially on boards with a small or low-quality antenna or when the
 //! device is placed inside an enclosure, the TX power may need to be increased. The default
-//! maximum TX power is 20 (5dBm) on the 0.25dBm scale used by [`WifiController::set_max_tx_power`].
-//! Try increasing it if connections are unreliable.
+//! maximum TX power is 20 (5dBm) on the 0.25dBm scale used by `WifiController::set_max_tx_power`
+//! (requires the `unstable` feature). Try increasing it if connections are unreliable.
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
