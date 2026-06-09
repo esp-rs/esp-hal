@@ -130,19 +130,20 @@ jobs:
       HOST_IP: 1.1.1.1
 
     strategy:
-      fail-fast: false
       matrix:
         # load-blance runners a bit
         group:
-          - xtensa
-          - riscv
+          - chips: [esp32, esp32s2, esp32s3]
+            toolchain: esp
+          - chips: [esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4]
+            toolchain: stable
 
     steps:
       - uses: actions/checkout@v6
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: matrix.group.toolchain == 'esp'
         with:
           version: 1.96.0.0
 
@@ -159,27 +160,16 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa
-        if: matrix.group == 'xtensa'
+      - name: Build and Check
         shell: bash
+        env:
+          CHIPS: ${{ join(matrix.group.chips, ' ') }}
+          TOOLCHAIN: ${{ matrix.group.toolchain }}
         run: |
           # lints and docs are checked separately
-          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-
-      - name: Build and Check RISC-V
-        if: matrix.group == 'riscv'
-        shell: bash
-        run: |
-          # lints and docs are checked separately
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32p4 --toolchain stable --no-lint --no-docs
+          for chip in $CHIPS; do
+            cargo xcheck ci "$chip" --toolchain "$TOOLCHAIN" --no-lint --no-docs
+          done
 
   extras:
     needs: calculate
