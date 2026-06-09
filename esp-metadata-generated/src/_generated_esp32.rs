@@ -1767,10 +1767,6 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static MCPWM_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static REF_TICK_XTAL_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1781,10 +1777,6 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static REF_TICK_PLL_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static REF_TICK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
@@ -2823,13 +2815,10 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: I2cFunctionClockConfig,
             ) -> u32 {
-                match config.sclk {
-                    I2cFunctionClockSclk::Apb => apb_clk_frequency(),
-                }
+                apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                I2C_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                apb_clk_frequency()
             }
             pub fn function_clock_source_frequency(sclk: I2cFunctionClockSclk) -> u32 {
                 match sclk {
@@ -2889,8 +2878,7 @@ macro_rules! define_clock_tree_types {
                 pll_f160m_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                MCPWM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                pll_f160m_clk_frequency()
             }
             pub fn function_clock_source_frequency(source: McpwmFunctionClockConfig) -> u32 {
                 match source {
@@ -3010,8 +2998,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                apb_clk_frequency()
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
                 match source {
@@ -3127,8 +3114,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3366,21 +3352,8 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             instance: McpwmInstance,
         ) {
-            if let Some(config) = clocks.mcpwm_function_clock[instance as usize] {
-                MCPWM_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    McpwmInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -3445,22 +3418,8 @@ macro_rules! define_clock_tree_types {
             }
             refresh_ref_tick_downstream(clocks);
         }
-        fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
-            if let Some(config) = clocks.i2c_function_clock[instance as usize] {
-                I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    I2cInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
-        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
-            if let Some(config) = clocks.spi_function_clock[instance as usize] {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    SpiInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {}
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {}
         fn refresh_ref_tick_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.ref_tick {
                 REF_TICK_FREQ_CACHE.store(

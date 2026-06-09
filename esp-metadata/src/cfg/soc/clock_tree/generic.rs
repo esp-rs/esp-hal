@@ -515,6 +515,38 @@ impl ClockTreeNodeType for Generic {
             .any(|node| node.properties.receiver.is_some())
     }
 
+    fn skips_frequency_cache(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> bool {
+        if self.config_frequency_needs_instance(instance, tree) {
+            return false;
+        }
+
+        // Pass-through to a single upstream node (e.g. UART::MEM_CLOCK → UART_MEM_CLK).
+        if self.params.is_empty() {
+            let mut upstream_nodes = Vec::new();
+            self.output.visit_variables(|var| {
+                if self.params.get(var).is_none() {
+                    upstream_nodes.push(var);
+                }
+            });
+
+            return upstream_nodes.len() == 1 && self.output.source.trim() == upstream_nodes[0];
+        }
+
+        // Single-variant source mux with pass-through output (e.g. I2C::FUNCTION_CLOCK → sclk).
+        if self.params.len() == 1 {
+            let (param_name, param) = self.params.iter().next().unwrap();
+            if let NodeParameter::Source(variants) = param {
+                return variants.len() == 1 && self.output.source.trim() == param_name;
+            }
+        }
+
+        false
+    }
+
     fn node_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -528,6 +560,10 @@ impl ClockTreeNodeType for Generic {
         let source_frequency_tokens = match self.upstream_clocks() {
             ClockSource::Fixed(input) => {
                 let source_node = instance.resolve_node(tree, &input);
+                source_node.frequency_call_with_receiver(frequency_receiver)
+            }
+            ClockSource::Mux(inputs) if inputs.len() == 1 => {
+                let source_node = instance.resolve_node(tree, &inputs[0].outputs);
                 source_node.frequency_call_with_receiver(frequency_receiver)
             }
             ClockSource::Mux(inputs) => {

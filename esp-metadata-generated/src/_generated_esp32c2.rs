@@ -1610,8 +1610,6 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -2921,8 +2919,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3204,14 +3201,7 @@ macro_rules! define_clock_tree_types {
             }
             refresh_uart_baud_rate_generator_downstream(clocks, instance);
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_uart_baud_rate_generator_downstream(
             clocks: &mut ClockTree,
             instance: UartInstance,
