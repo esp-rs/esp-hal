@@ -2,7 +2,7 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{fmt::Write, sync::OnceLock};
+use std::{fmt::Write, path::Path, sync::OnceLock};
 
 use anyhow::{Context, Result, bail, ensure};
 use cfg::PeriConfig;
@@ -18,21 +18,33 @@ use crate::{
     support_status::SupportStatusLevel,
 };
 
-macro_rules! include_toml {
-    (Config, $file:expr) => {{
-        static LOADED_TOML: OnceLock<Config> = OnceLock::new();
-        LOADED_TOML.get_or_init(|| {
-            let config: Config = basic_toml::from_str(include_str!($file))
-                .with_context(|| format!("Failed to load device configuration: {}", $file))
-                .unwrap();
+fn load_device_config(relative_path: &str) -> Config {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_path);
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read device configuration: {}", path.display()))
+        .unwrap();
 
-            config
-                .validate()
-                .with_context(|| format!("Failed to validate device configuration: {}", $file))
-                .unwrap();
+    let config: Config = basic_toml::from_str(&content)
+        .with_context(|| format!("Failed to parse device configuration: {}", path.display()))
+        .unwrap();
 
-            config
+    config
+        .validate()
+        .with_context(|| {
+            format!(
+                "Failed to validate device configuration: {}",
+                path.display()
+            )
         })
+        .unwrap();
+
+    config
+}
+
+macro_rules! cached_device_config {
+    ($file:literal) => {{
+        static LOADED_TOML: OnceLock<Config> = OnceLock::new();
+        LOADED_TOML.get_or_init(|| load_device_config($file))
     }};
 }
 
@@ -354,16 +366,16 @@ impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => include_toml!(Config, "../devices/esp32.toml"),
-            Chip::Esp32c2 => include_toml!(Config, "../devices/esp32c2.toml"),
-            Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
-            Chip::Esp32c5 => include_toml!(Config, "../devices/esp32c5.toml"),
-            Chip::Esp32c6 => include_toml!(Config, "../devices/esp32c6.toml"),
-            Chip::Esp32c61 => include_toml!(Config, "../devices/esp32c61.toml"),
-            Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
-            Chip::Esp32p4 => include_toml!(Config, "../devices/esp32p4.toml"),
-            Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
-            Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
+            Chip::Esp32 => cached_device_config!("devices/esp32.toml"),
+            Chip::Esp32c2 => cached_device_config!("devices/esp32c2.toml"),
+            Chip::Esp32c3 => cached_device_config!("devices/esp32c3.toml"),
+            Chip::Esp32c5 => cached_device_config!("devices/esp32c5.toml"),
+            Chip::Esp32c6 => cached_device_config!("devices/esp32c6.toml"),
+            Chip::Esp32c61 => cached_device_config!("devices/esp32c61.toml"),
+            Chip::Esp32h2 => cached_device_config!("devices/esp32h2.toml"),
+            Chip::Esp32p4 => cached_device_config!("devices/esp32p4.toml"),
+            Chip::Esp32s2 => cached_device_config!("devices/esp32s2.toml"),
+            Chip::Esp32s3 => cached_device_config!("devices/esp32s3.toml"),
         }
     }
 
