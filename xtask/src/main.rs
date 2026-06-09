@@ -402,7 +402,9 @@ fn lint_package(
     let path = workspace.join(package.to_string());
     let features = &check_config.features;
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("clippy")
+        .manifest_path(path.join("Cargo.toml"));
 
     if !package.build_on_host(features) {
         if chip.is_xtensa() {
@@ -440,8 +442,7 @@ fn lint_package(
     builder.add_env_var("DEFMT_LOG", "trace");
 
     let command = CargoCommandBatcher::build_one_for_cargo(&builder);
-    command
-        .run(false)
+    xtask::cargo::run_with_env(&command.command, &path, command.env_vars, false)
         .with_context(|| format!("Failed to run `cargo clippy` in {}", path.display()))?;
 
     Ok(())

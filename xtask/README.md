@@ -62,7 +62,7 @@ single backport package, and forces Patch bumps. No `--allow-non-main` needed.
 
 Published crates can list CI check, clippy, documentation, and semver cases under
 `[package.metadata.espressif]` in their `Cargo.toml`. Each case is one inline table; `features`
-is required, `env` is optional:
+and `env` are both optional:
 
 ```toml
 [package.metadata.espressif]
