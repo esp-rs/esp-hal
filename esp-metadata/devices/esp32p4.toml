@@ -56,12 +56,13 @@ cpu_has_csr_pc = false
 rc_fast_clk_default = 20_000_000
 internal_memory_cached = true
 
-# Clock tree for ESP32-P4 (eco5 / chip revision v3.x)
+# Clock tree for ESP32-P4. CPLL tops out at 360 MHz on pre-v3.0 silicon and 400 MHz on v3.0+.
 # 3 PLLs: CPLL (CPU, 360/400MHz), SPLL (480MHz, peripherals), MPLL (400MHz, PSRAM/media)
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
-    { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # eco5 default 400MHz
+    # CPLL: 400 MHz on v3.0+ silicon, 360 MHz on pre-v3.0 (`esp32p4_rev_lt_v3`); see rtc_cntl
+    { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000", output-overrides = { esp32p4_rev_lt_v3 = "360_000_000" } },
     { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480_000_000" }, # System PLL
     { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500_000_000" }, # Media PLL
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },

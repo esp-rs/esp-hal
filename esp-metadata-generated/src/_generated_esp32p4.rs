@@ -2065,7 +2065,16 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn cpll_clk_frequency() -> u32 {
-            400000000
+            {
+                #[cfg(esp32p4_rev_lt_v3)]
+                {
+                    360000000
+                }
+                #[cfg(not(any(esp32p4_rev_lt_v3)))]
+                {
+                    400000000
+                }
+            }
         }
         pub fn cpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()

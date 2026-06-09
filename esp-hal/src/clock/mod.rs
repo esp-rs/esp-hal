@@ -104,7 +104,7 @@ impl CpuClock {
             } else if #[cfg(esp32h2)] {
                 Self::_96MHz
             } else if #[cfg(esp32p4)] {
-                Self::_400MHz
+                Self::MAX
             } else {
                 Self::_240MHz
             }

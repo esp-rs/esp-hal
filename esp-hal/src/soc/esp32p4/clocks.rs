@@ -1,6 +1,6 @@
-//! Clock tree for ESP32-P4X (chip revision v3.x / eco5).
+//! Clock tree for ESP32-P4.
 //!
-//! CPLL: 400 MHz (eco5 default), 360 MHz (conservative)
+//! CPLL: 400 MHz on v3.0+ silicon, 360 MHz on pre-v3.0 (`esp32p4_rev_lt_v3`)
 //! SPLL: 480 MHz (peripheral clocks)
 //! MPLL: 400 MHz (PSRAM, media)
 //! XTAL: 40 MHz
@@ -27,56 +27,82 @@ use crate::{
 define_clock_tree_types!();
 
 /// CPU clock frequency presets for ESP32-P4.
+///
+/// The CPU runs off the CPLL, which tops out at 360 MHz on pre-v3.0 silicon and 400 MHz on
+/// v3.0+ (see [`super`] clock tree). The three presets are CPLL/1, CPLL/2 and CPLL/4, so the
+/// available frequencies track the CPLL base accordingly.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum CpuClock {
-    /// 400 MHz CPU clock (eco5 / v3.x maximum)
-    /// CPLL -> CPU_ROOT -> CPU/1, APB divider /4 = 100MHz
+    /// 400 MHz CPU clock (CPLL/1; v3.0+ maximum).
+    #[cfg(not(esp32p4_rev_lt_v3))]
     _400MHz = 400,
+    /// 360 MHz CPU clock (CPLL/1; pre-v3.0 maximum).
+    #[cfg(esp32p4_rev_lt_v3)]
+    _360MHz = 360,
 
-    /// 200 MHz CPU clock (low power)
-    /// CPLL -> CPU_ROOT -> CPU/2, APB /2 = 100MHz
+    /// 200 MHz CPU clock (CPLL/2).
+    #[cfg(not(esp32p4_rev_lt_v3))]
     _200MHz = 200,
+    /// 180 MHz CPU clock (CPLL/2).
+    #[cfg(esp32p4_rev_lt_v3)]
+    _180MHz = 180,
 
-    /// 100 MHz CPU clock (ultra low power)
-    /// CPLL -> CPU_ROOT -> CPU/4, APB /1 = 100MHz
+    /// 100 MHz CPU clock (CPLL/4), default.
+    #[cfg(not(esp32p4_rev_lt_v3))]
     #[default]
     _100MHz = 100,
+    /// 90 MHz CPU clock (CPLL/4), default.
+    #[cfg(esp32p4_rev_lt_v3)]
+    #[default]
+    _90MHz  = 90,
 }
 
 impl CpuClock {
-    // Preset: 400 MHz CPU, 100 MHz APB
-    const PRESET_400: ClockConfig = ClockConfig {
+    // Highest preset (CPLL/1): 400 MHz on v3.0+, 360 MHz on pre-v3.0.
+    pub(crate) const MAX: Self = {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32p4_rev_lt_v3)] { Self::_360MHz } else { Self::_400MHz }
+        }
+    };
+
+    // Dividers are identical for the 360 and 400 MHz CPLL: the constraint is MEM_CLK <= 200,
+    // APB_CLK <= 100 MHz, satisfied by the same divider tree in both cases (cf. ESP-IDF
+    // `rtc_clk_cpu_freq_to_cpll_mhz`):
+    // https://github.com/espressif/esp-idf/blob/de7baafb265625d66fd0af4ed4761a9c5b200bde/components/esp_hw_support/port/esp32p4/rtc_clk.c#L224
+
+    // CPLL/1 (max CPU), MEM CPLL/2, APB CPLL/4.
+    const PRESET_DIV1: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 400 MHz
-        mem_clk: Some(MemClkConfig::new(1)), // /2 = 200 MHz
-        sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
-        apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(0)), // /1
+        mem_clk: Some(MemClkConfig::new(1)), // /2
+        sys_clk: Some(SysClkConfig::new(0)), // /1
+        apb_clk: Some(ApbClkConfig::new(1)), // /2
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
     };
 
-    // TODO: 360 MHz preset
-
-    const PRESET_200: ClockConfig = ClockConfig {
+    // CPLL/2 (CPU), APB CPLL/4.
+    const PRESET_DIV2: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(1)), // /2 = 200 MHz
-        mem_clk: Some(MemClkConfig::new(0)), // /1 = 200 MHz
-        sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
-        apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(1)), // /2
+        mem_clk: Some(MemClkConfig::new(0)), // /1
+        sys_clk: Some(SysClkConfig::new(0)), // /1
+        apb_clk: Some(ApbClkConfig::new(1)), // /2
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
     };
 
-    const PRESET_100: ClockConfig = ClockConfig {
+    // CPLL/4 (CPU), all downstream /1.
+    const PRESET_DIV4: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
-        cpu_clk: Some(CpuClkConfig::new(3)), // /4 = 100 MHz
-        mem_clk: Some(MemClkConfig::new(0)), // /1 = 100 MHz
-        sys_clk: Some(SysClkConfig::new(0)), // /1 = 100 MHz
-        apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
+        cpu_clk: Some(CpuClkConfig::new(3)), // /4
+        mem_clk: Some(MemClkConfig::new(0)), // /1
+        sys_clk: Some(SysClkConfig::new(0)), // /1
+        apb_clk: Some(ApbClkConfig::new(0)), // /1
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -86,9 +112,18 @@ impl CpuClock {
 impl From<CpuClock> for ClockConfig {
     fn from(value: CpuClock) -> ClockConfig {
         match value {
-            CpuClock::_400MHz => CpuClock::PRESET_400,
-            CpuClock::_200MHz => CpuClock::PRESET_200,
-            CpuClock::_100MHz => CpuClock::PRESET_100,
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            CpuClock::_400MHz => CpuClock::PRESET_DIV1,
+            #[cfg(esp32p4_rev_lt_v3)]
+            CpuClock::_360MHz => CpuClock::PRESET_DIV1,
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            CpuClock::_200MHz => CpuClock::PRESET_DIV2,
+            #[cfg(esp32p4_rev_lt_v3)]
+            CpuClock::_180MHz => CpuClock::PRESET_DIV2,
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            CpuClock::_100MHz => CpuClock::PRESET_DIV4,
+            #[cfg(esp32p4_rev_lt_v3)]
+            CpuClock::_90MHz => CpuClock::PRESET_DIV4,
         }
     }
 }
@@ -102,9 +137,18 @@ impl Default for ClockConfig {
 impl ClockConfig {
     pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
         match self {
-            v if v == CpuClock::PRESET_400 => Some(CpuClock::_400MHz),
-            v if v == CpuClock::PRESET_200 => Some(CpuClock::_200MHz),
-            v if v == CpuClock::PRESET_100 => Some(CpuClock::_100MHz),
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            v if v == CpuClock::PRESET_DIV1 => Some(CpuClock::_400MHz),
+            #[cfg(esp32p4_rev_lt_v3)]
+            v if v == CpuClock::PRESET_DIV1 => Some(CpuClock::_360MHz),
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            v if v == CpuClock::PRESET_DIV2 => Some(CpuClock::_200MHz),
+            #[cfg(esp32p4_rev_lt_v3)]
+            v if v == CpuClock::PRESET_DIV2 => Some(CpuClock::_180MHz),
+            #[cfg(not(esp32p4_rev_lt_v3))]
+            v if v == CpuClock::PRESET_DIV4 => Some(CpuClock::_100MHz),
+            #[cfg(esp32p4_rev_lt_v3)]
+            v if v == CpuClock::PRESET_DIV4 => Some(CpuClock::_90MHz),
             _ => None,
         }
     }

@@ -160,17 +160,21 @@ pub(crate) fn init() {
         w.force_dcdc_switch_pd().bit(false)
     });
 
-    // 7. Enable CPLL (400 MHz) and SPLL (480 MHz)
-    cpll_configure(400);
+    // 7. Enable CPLL and SPLL (480 MHz). Pre-v3.0 silicon is qualified for a 360 MHz maximum CPU
+    //    clock (CPLL 360 MHz); v3.0+ raises this to 400 MHz. ESP-IDF makes the same split via
+    //    `CONFIG_ESP32P4_SELECTS_REV_LESS_V3`:
+    //    https://github.com/espressif/esp-idf/blob/de7baafb265625d66fd0af4ed4761a9c5b200bde/components/esp_hw_support/port/esp32p4/rtc_clk.c#L320
+    cpll_configure(if cfg!(esp32p4_rev_lt_v3) { 360 } else { 400 });
     spll_configure(480);
 
-    // 8. Set CPU divider to 1 (400 MHz CPU), MEM divider 2, APB divider 2
+    // 8. Set CPU divider to 1 (max CPU clock: 360 MHz pre-v3.0, 400 MHz v3.0+), MEM divider 2, APB
+    //    divider 2
     // Set CPU divider: cpu_clk_div_num = divider - 1 = 0
     // Ref: HP_SYS_CLKRST.root_clk_ctrl0.reg_cpu_clk_div_num
     HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| unsafe {
-            w.cpu_clk_div_num().bits(0); // CPU: /1 = 400 MHz
+            w.cpu_clk_div_num().bits(0); // CPU: /1 (= CPLL: 360 MHz pre-v3.0, 400 MHz v3.0+)
             w.cpu_clk_div_numerator().bits(0);
             w.cpu_clk_div_denominator().bits(0)
         });
@@ -196,7 +200,6 @@ pub(crate) fn init() {
 
 /// Configure CPLL for the given frequency (360 or 400 MHz).
 ///
-/// eco5 (v3.x) uses different I2C register values than eco4 (v1.x).
 /// Ref: TRM v0.5 Ch 12 -- CPLL configuration
 fn cpll_configure(freq_mhz: u32) {
     // 1. Enable CPLL power PMU.imm_hp_ck_power: tie_high_xpd_pll, tie_high_xpd_pll_i2c Note: PAC
@@ -212,12 +215,15 @@ fn cpll_configure(freq_mhz: u32) {
     // Note: this field may not exist in eco4 PAC; use direct bit write if needed
     // For now, the PLL is enabled via xpd_pll above.
 
-    // 2. Configure CPLL via I2C analog registers
-    // eco5 values (v3.x): div7_0 = 10 (400MHz), 9 (360MHz) with 40MHz XTAL
+    // 2. Configure CPLL via I2C analog registers (40 MHz XTAL).
+    // `div7_0` encoding is revision-dependent: pre-production v0.x samples use 6/5,
+    // all shipped silicon (v1.0+) uses 10/9 -- bits 2 and 3 are swapped between the two.
+    // Only v1.0+ is supported here. Ref: ESP-IDF `clk_ll_cpll_set_config`:
+    // https://github.com/espressif/esp-idf/blob/de7baafb265625d66fd0af4ed4761a9c5b200bde/components/esp_hal_clock/esp32p4/include/hal/clk_tree_ll.h#L375
     let div7_0: u8 = match freq_mhz {
-        400 => 10, // eco5: 400 MHz
-        360 => 9,  // eco5: 360 MHz
-        _ => 10,   // default to 400 MHz
+        400 => 10, // 400 MHz (v3.0+)
+        360 => 9,  // 360 MHz (pre-v3.0)
+        _ => 10,
     };
 
     // OC_REF_DIV + DCHGP: (oc_enb_fcal << 7) | (dchgp << 4) | div_ref = 0x50

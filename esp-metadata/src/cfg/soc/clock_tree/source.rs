@@ -72,6 +72,13 @@ pub struct Source {
     values: Option<ValuesExpression>,
 
     output: OutputExpression,
+
+    /// Per-`cfg` overrides for `output`. Each key is a `cfg` predicate; when it is active the
+    /// corresponding expression replaces `output`. Used for sources whose fixed frequency
+    /// depends on a build-time selection, e.g. the ESP32-P4 CPLL runs at 360 MHz on pre-v3.0
+    /// silicon (`esp32p4_rev_lt_v3`) and 400 MHz otherwise. The overrides must be constant.
+    #[serde(default, rename = "output-overrides")]
+    output_overrides: std::collections::BTreeMap<String, OutputExpression>,
 }
 
 impl ClockTreeNodeType for Source {
@@ -130,8 +137,36 @@ impl ClockTreeNodeType for Source {
     ) -> TokenStream {
         if self.values.is_some() {
             quote! { config.value() }
-        } else {
+        } else if self.output_overrides.is_empty() {
             self.output.0.to_rust(HashMap::new(), instance, tree)
+        } else {
+            // Emit one `#[cfg]`-gated arm per override plus a default arm for the remaining
+            // case. Exactly one survives cfg evaluation and becomes the block's tail
+            // expression. `cfg` predicates are taken verbatim from the override keys.
+            let predicates: Vec<TokenStream> = self
+                .output_overrides
+                .keys()
+                .map(|cfg| {
+                    cfg.parse()
+                        .expect("invalid cfg predicate in output-overrides")
+                })
+                .collect();
+            let arms = self
+                .output_overrides
+                .values()
+                .zip(&predicates)
+                .map(|(expr, pred)| {
+                    let value = expr.0.to_rust(HashMap::new(), instance, tree);
+                    quote! { #[cfg(#pred)] { #value } }
+                });
+            let default = self.output.0.to_rust(HashMap::new(), instance, tree);
+            quote! {
+                {
+                    #(#arms)*
+                    #[cfg(not(any(#(#predicates),*)))]
+                    { #default }
+                }
+            }
         }
     }
 
