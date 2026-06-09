@@ -37,6 +37,15 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all
 //! configuration keys apply.
+//!
+//! ## Troubleshooting
+//!
+//! ### Connection failures on boards with a weak antenna or in a poor RF environment
+//!
+//! If WiFi connections fail, especially on boards with a small or low-quality antenna or when the
+//! device is placed inside an enclosure, the TX power may need to be increased. The default
+//! maximum TX power is 20 (5dBm) on the 0.25dBm scale used by [`WifiController::set_max_tx_power`].
+//! Try increasing it if connections are unreliable.
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
@@ -2081,6 +2090,8 @@ impl CountryInfo {
             // TODO: these may be valid defaults, but they should be configurable.
             schan: 1,
             nchan: 13,
+            // 20 on the 0.25dBm scale (5dBm). Can be overridden via
+            // WifiController::set_max_tx_power. See https://github.com/esp-rs/esp-hal/issues/5631#issuecomment-4634839995
             max_tx_power: 20,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
 
@@ -2801,7 +2812,11 @@ ignored."
 
     /// Set maximum transmitting power after WiFi start.
     ///
-    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. The default is
+    /// 20 (5dBm). If WiFi connections are unreliable or you are experiencing problems connecting to
+    /// the AP, especially on boards with a weak or low-quality antenna, try increasing this
+    /// value. See the [module-level troubleshooting section](self#troubleshooting) for more
+    /// details.
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
