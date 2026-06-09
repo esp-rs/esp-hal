@@ -263,6 +263,26 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         for (reg, op) in self.regs().z_mem_iter().zip(outbuf.iter_mut()) {
             *op = reg.read().bits();
         }
+
+        #[cfg(clear_crypto_secrets)]
+        self.clear_secrets();
+    }
+
+    /// Removes the operands and intermediate results from the peripheral.
+    #[cfg(clear_crypto_secrets)]
+    fn clear_secrets(&self) {
+        for reg in self.regs().x_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().y_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().z_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().m_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
     }
 
     fn read_results(&mut self, outbuf: &mut [u32]) {

@@ -199,5 +199,13 @@ options:
     default:
       - value: false
 
+  - name: clear-crypto-secrets
+    description: "Clear secret material (keys, exponents, intermediate results) from
+      the crypto accelerator registers after each operation. Disabling
+      this leaves secret material in the peripheral until a subsequent operation
+      overwrites it."
+    default:
+      - value: true
+
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
