@@ -119,6 +119,7 @@ pub(crate) fn build_doc_json(
     let mut cargo_builder = CargoArgsBuilder::default()
         .toolchain("esp")
         .subcommand("rustdoc")
+        .manifest_path(package_path.join("Cargo.toml"))
         .features(&features)
         .target(chip.target())
         .arg("-Zunstable-options")
@@ -139,8 +140,8 @@ pub(crate) fn build_doc_json(
 
     let command = CargoCommandBatcher::build_one_for_cargo(&cargo_builder);
     log::debug!("{command:#?}");
-    command
-        .run(false)
-        .with_context(|| format!("Failed to run `cargo rustdoc` with {command:?}",))?;
+    let cargo_command = command.command.clone();
+    crate::cargo::run_with_env(&command.command, package_path, command.env_vars, false)
+        .with_context(|| format!("Failed to run `cargo rustdoc` with {cargo_command:?}",))?;
     Ok(current_path)
 }
