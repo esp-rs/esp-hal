@@ -10,7 +10,7 @@ embassy-executor = "0.10.0"
 embassy-time = "0.5.0"
 embassy-futures = "0.1"
 embassy-net = { version = "0.9.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
-embassy-sync = "0.8.0"
+embassy-sync = "0.7.0" # TODO: update to 0.8 once trouble supports it
 embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
 embedded-io-async = "0.7.0"
