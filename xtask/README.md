@@ -58,6 +58,55 @@ The standard `plan` → `execute-plan` → `publish-plan` → `post-release` flo
 works from a backport branch — the tooling auto-detects it, scopes to the
 single backport package, and forces Patch bumps. No `--allow-non-main` needed.
 
+## Package `check-configs` / `clippy-configs` / `semver-config` metadata
+
+Published crates can list CI check, clippy, and semver cases under
+`[package.metadata.espressif]` in their `Cargo.toml`. Each case is one inline table with
+**required** `features` and `env` keys:
+
+```toml
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    {
+        features = ["unstable", "rt"],
+        env = {
+            ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = "generic"
+        }
+    },
+    { features = ["unstable", "rt"], append = [
+        { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
+    ] },
+]
+clippy-configs = [
+    { features = ["unstable", "rt"] },
+]
+semver-config = {
+    features = ["unstable", "rt"],
+    env = {},
+    append = [
+        { if = 'wifi_driver_supported', features = ["wifi"] },
+    ],
+}
+```
+
+- `features` — cargo features to enable for that case (same as before).
+- `env` — inline table of environment variables passed to the cargo invocation.
+  Mainly used for `esp-config` options (`ESP_*` variables). Use an empty table when no
+  overrides are needed.
+- `if` — optional somni expression; the whole case is skipped when the condition is false.
+- `append` — optional list of partial inline tables. Matching rows add more `features` and/or
+  `env` entries. Append rows may specify only `features` or only `env`.
+
+`check-configs` and `clippy-configs` are arrays of cases. `semver-config` is a single inline
+table (one API surface per chip for semver baselines).
+
+`cargo xtask check-packages` reads `check-configs`; `cargo xtask lint-packages` reads
+`clippy-configs`; semver checks read `semver-config`. If `check-configs` is absent, a single
+default case with no features and no env overrides is used. `CI`, `DEFMT_LOG`, and `ESP_LOG`
+(check only) are always set by xtask and override duplicate keys from metadata. Semver checks
+always set `RUSTDOCFLAGS` and override duplicate keys from `semver-config`.
+
 ## Test/example metadata use
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the

@@ -8,7 +8,11 @@ use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::{Chip, Config};
 
-use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
+use crate::{
+    Package,
+    cargo::{CargoArgsBuilder, CargoCommandBatcher},
+    commands::checker::download_baselines,
+};
 
 /// Return the minimum required bump for the next release.
 /// Even if nothing changed this will be [ReleaseType::Patch]
@@ -100,23 +104,19 @@ pub(crate) fn build_doc_json(
 
     let chip_config = Config::for_chip(chip);
 
-    let semver_feature = package.semver_feature_rules(&chip_config);
-    features.extend(semver_feature);
+    let semver_config = package.semver_config_rules(&chip_config);
+    features.extend(semver_config.features.clone());
 
     log::info!(
-        "Building doc json for {} with features: {:?}",
+        "Building doc json for {} with features: {:?}, env: {:?}",
         package,
-        features
+        features,
+        semver_config.env
     );
-
-    let envs = vec![(
-        "RUSTDOCFLAGS",
-        "--cfg docsrs --cfg not_really_docsrs --cfg semver_checks",
-    )];
 
     // always use `esp` toolchain so we don't have to deal with potentially
     // different versions of the doc-json
-    let cargo_builder = CargoArgsBuilder::default()
+    let mut cargo_builder = CargoArgsBuilder::default()
         .toolchain("esp")
         .subcommand("rustdoc")
         .features(&features)
@@ -128,9 +128,19 @@ pub(crate) fn build_doc_json(
         .arg("--output-format=json")
         .arg("-Zbuild-std=alloc,core")
         .arg("--config=host.rustflags=[\"--cfg=instability_disable_unstable_docs\"]");
-    let cargo_args = cargo_builder.build();
-    log::debug!("{cargo_args:#?}");
-    crate::cargo::run_with_env(&cargo_args, package_path, envs, false)
-        .with_context(|| format!("Failed to run `cargo rustdoc` with {cargo_args:?}",))?;
+
+    for (key, value) in &semver_config.env {
+        cargo_builder.add_env_var(key, value);
+    }
+    cargo_builder.add_env_var(
+        "RUSTDOCFLAGS",
+        "--cfg docsrs --cfg not_really_docsrs --cfg semver_checks",
+    );
+
+    let command = CargoCommandBatcher::build_one_for_cargo(&cargo_builder);
+    log::debug!("{command:#?}");
+    command
+        .run(false)
+        .with_context(|| format!("Failed to run `cargo rustdoc` with {command:?}",))?;
     Ok(current_path)
 }

@@ -24,9 +24,12 @@ doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-a
 # `instability_disable_unstable_docs` escape (set in `build_doc_json`) then drops all
 # `#[instability::unstable]` items from the baseline. `wifi` is the only radio feature that
 # does not pull in `unstable`.
-semver-config = { features = ["esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
-    { if = 'wifi_driver_supported', features = ["wifi"] },
-] }
+semver-config = {
+    features = ["esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"],
+    append = [
+        { if = 'wifi_driver_supported', features = ["wifi"] },
+    ],
+}
 check-configs = [
     { features = ["esp-hal/rt"] },
     { features = ["esp-hal/rt", "defmt"] },

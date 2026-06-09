@@ -56,6 +56,13 @@ inventory::collect!(McpToolRegistration);
 #[cfg(feature = "semver-checks")]
 pub mod semver_check;
 
+/// One `check-configs` or `clippy-configs` case from `[package.metadata.espressif]`.
+#[derive(Debug, Clone, Default)]
+pub struct CheckConfig {
+    pub features: Vec<String>,
+    pub env: HashMap<String, String>,
+}
+
 #[derive(
     Debug,
     Clone,
@@ -256,6 +263,38 @@ impl Package {
         }
     }
 
+    fn parse_required_features(table: &InlineTable) -> Vec<String> {
+        let mut features = Vec::new();
+        if let Some(config_features) = table.get("features") {
+            let Value::Array(config_features) = config_features else {
+                panic!("features must be an array.");
+            };
+
+            for feature in config_features {
+                let feature = feature.as_str().expect("features must be strings.");
+                features.push(feature.to_owned());
+            }
+        }
+
+        features
+    }
+
+    fn parse_env_table(table: &InlineTable) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+        if let Some(env_value) = table.get("env") {
+            let Value::InlineTable(env_table) = env_value else {
+                panic!("env must be an inline table.");
+            };
+
+            for (key, value) in env_table.iter() {
+                let value = value.as_str().expect("env values must be strings.");
+                env.insert(key.to_string(), value.to_owned());
+            }
+        }
+
+        env
+    }
+
     fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
         let script_ctx = ScriptContext::new();
         let mut ctx = script_ctx.for_config(config);
@@ -270,20 +309,84 @@ impl Package {
             }
         }
 
-        let Some(config_features) = table.get("features") else {
-            panic!("Missing features array.");
-        };
-        let Value::Array(config_features) = config_features else {
-            panic!("features must be an array.");
-        };
+        Some(Self::parse_required_features(table))
+    }
 
-        let mut features = Vec::new();
-        for feature in config_features {
-            let feature = feature.as_str().expect("features must be strings.");
-            features.push(feature.to_owned());
+    fn parse_conditional_append(
+        table: &InlineTable,
+        config: &Config,
+    ) -> Option<(Option<Vec<String>>, Option<HashMap<String, String>>)> {
+        let script_ctx = ScriptContext::new();
+        let mut ctx = script_ctx.for_config(config);
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !ctx.evaluate(expr).expect("Failed to evaluate expression") {
+                return None;
+            }
         }
 
-        Some(features)
+        let features = if table.contains_key("features") {
+            Some(Self::parse_required_features(table))
+        } else {
+            None
+        };
+
+        let env = if table.contains_key("env") {
+            Some(Self::parse_env_table(table))
+        } else {
+            None
+        };
+
+        if features.is_none() && env.is_none() {
+            panic!("append items must specify at least one of `features` or `env`.");
+        }
+
+        Some((features, env))
+    }
+
+    fn parse_config_set(table: &InlineTable, config: &Config) -> Option<CheckConfig> {
+        let script_ctx = ScriptContext::new();
+        let mut ctx = script_ctx.for_config(config);
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !ctx.evaluate(expr).expect("Failed to evaluate expression") {
+                return None;
+            }
+        }
+
+        let mut features = Self::parse_required_features(table);
+        let mut env = Self::parse_env_table(table);
+
+        if let Some(conditionals) = table.get("append") {
+            let Value::Array(conditionals) = conditionals else {
+                panic!("append must be an array.");
+            };
+            for cond in conditionals {
+                let Value::InlineTable(cond_table) = cond else {
+                    panic!("append items must be inline tables.");
+                };
+                if let Some((append_features, append_env)) =
+                    Self::parse_conditional_append(cond_table, config)
+                {
+                    if let Some(append_features) = append_features {
+                        features.extend(append_features);
+                    }
+                    if let Some(append_env) = append_env {
+                        env.extend(append_env);
+                    }
+                }
+            }
+        }
+
+        Some(CheckConfig { features, env })
     }
 
     fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
@@ -374,42 +477,90 @@ impl Package {
         features
     }
 
-    /// Given a device config, return the features which should be enabled for
-    /// semver checking of this package.
     #[cfg(feature = "semver-checks")]
-    pub fn semver_feature_rules(&self, config: &Config) -> Vec<String> {
-        let feature_sets = self
-            .feature_rules_from_metadata(config, "semver-config", false)
-            .unwrap_or_default();
+    fn single_config_rule_from_metadata(
+        &self,
+        config: &Config,
+        metadata_key: &str,
+    ) -> Option<CheckConfig> {
+        let toml = self.toml();
 
-        let features: Vec<String> = feature_sets.into_iter().flatten().collect();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get(metadata_key)
+        {
+            let Item::Value(Value::InlineTable(table)) = config_meta else {
+                panic!("'{}' must be an inline table.", metadata_key);
+            };
 
-        log::debug!("Semver features for package '{}': {:?}", self, features);
-        features
-    }
-
-    /// Additional feature rules to test subsets of features for a package.
-    pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = self
-            .feature_rules_from_metadata(config, "check-configs", true)
-            .unwrap_or_default();
-
-        // Add the default "no features" case if nothing was specified
-        if cases.is_empty() {
-            cases.push(vec![]);
+            return Self::parse_config_set(table, config);
         }
 
-        log::debug!("Check features for package '{}': {:?}", self, cases);
+        None
+    }
+
+    /// Configuration for semver checking of this package.
+    #[cfg(feature = "semver-checks")]
+    pub fn semver_config_rules(&self, config: &Config) -> CheckConfig {
+        let config = self
+            .single_config_rule_from_metadata(config, "semver-config")
+            .unwrap_or_default();
+
+        log::debug!("Semver config for package '{}': {:?}", self, config);
+        config
+    }
+
+    fn config_rules_from_metadata(
+        &self,
+        config: &Config,
+        metadata_key: &str,
+    ) -> Option<Vec<CheckConfig>> {
+        let toml = self.toml();
+        let mut cases = Vec::new();
+
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get(metadata_key)
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "'{}' must be an array of tables. {:?}",
+                    metadata_key, config_meta
+                );
+            };
+
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("'{}' items must be inline tables.", metadata_key);
+                };
+                if let Some(case) = Self::parse_config_set(table, config) {
+                    cases.push(case);
+                }
+            }
+        }
+
+        if cases.is_empty() { None } else { Some(cases) }
+    }
+
+    /// Check configurations to compile for this package in CI.
+    pub fn check_config_rules(&self, config: &Config) -> Vec<CheckConfig> {
+        let mut cases = self
+            .config_rules_from_metadata(config, "check-configs")
+            .unwrap_or_default();
+
+        if cases.is_empty() {
+            cases.push(CheckConfig::default());
+        }
+
+        log::debug!("Check configs for package '{}': {:?}", self, cases);
         cases
     }
 
-    /// Additional feature rules to test subsets of features for a package.
-    pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+    /// Clippy configurations to run for this package in CI.
+    pub fn lint_config_rules(&self, config: &Config) -> Vec<CheckConfig> {
         let cases = self
-            .feature_rules_from_metadata(config, "clippy-configs", true)
+            .config_rules_from_metadata(config, "clippy-configs")
             .unwrap_or_default();
 
-        log::debug!("Check features for package '{}': {:?}", self, cases);
+        log::debug!("Clippy configs for package '{}': {:?}", self, cases);
         cases
     }
 
