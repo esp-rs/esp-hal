@@ -295,23 +295,6 @@ impl Package {
         env
     }
 
-    fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
-        let script_ctx = ScriptContext::new();
-        let mut ctx = script_ctx.for_config(config);
-
-        if let Some(condition) = table.get("if") {
-            let Some(expr) = condition.as_str() else {
-                panic!("`if` condition must be a string.");
-            };
-
-            if !ctx.evaluate(expr).expect("Failed to evaluate expression") {
-                return None;
-            }
-        }
-
-        Some(Self::parse_required_features(table))
-    }
-
     fn parse_conditional_append(
         table: &InlineTable,
         config: &Config,
@@ -389,95 +372,6 @@ impl Package {
         Some(CheckConfig { features, env })
     }
 
-    fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
-        // Base features. If their condition is not met, the whole item is ignored.
-        let mut features = Self::parse_conditional_features(table, config)?;
-
-        if let Some(conditionals) = table.get("append") {
-            // Optional features. If their conditions are met, they are appended to the base
-            // features.
-            let Value::Array(conditionals) = conditionals else {
-                panic!("append must be an array.");
-            };
-            for cond in conditionals {
-                let Value::InlineTable(cond_table) = cond else {
-                    panic!("append items must be inline tables.");
-                };
-                if let Some(cond_features) = Self::parse_conditional_features(cond_table, config) {
-                    features.extend(cond_features);
-                }
-            }
-        };
-
-        Some(features)
-    }
-
-    /// Common function to get feature rules from metadata.
-    fn feature_rules_from_metadata(
-        &self,
-        config: &Config,
-        metadata_key: &str,
-        is_array: bool,
-    ) -> Option<Vec<Vec<String>>> {
-        let toml = self.toml();
-        let mut cases = Vec::new();
-
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(config_meta) = metadata.get(metadata_key)
-        {
-            if is_array {
-                let Item::Value(Value::Array(tables)) = config_meta else {
-                    panic!(
-                        "'{}' must be an array of tables. {:?}",
-                        metadata_key, config_meta
-                    );
-                };
-
-                for table in tables {
-                    let Value::InlineTable(table) = table else {
-                        panic!("'{}' items must be inline tables.", metadata_key);
-                    };
-                    if let Some(features) = Self::parse_feature_set(table, config) {
-                        cases.push(features);
-                    }
-                }
-            } else {
-                let Item::Value(Value::InlineTable(table)) = config_meta else {
-                    panic!("'{}' must be an inline table.", metadata_key);
-                };
-
-                if let Some(features) = Self::parse_feature_set(table, config) {
-                    cases.push(features);
-                }
-            }
-        }
-
-        if cases.is_empty() { None } else { Some(cases) }
-    }
-
-    /// Given a device config, return the features which should be enabled for
-    /// this package.
-    ///
-    /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
-    /// one feature set is supported. If the `doc-config` table is not found, this function returns
-    /// `None`. This differs from specifying an empty set of features, which returns `Some(empty
-    /// vector)`.
-    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
-    // chip-specific features.
-    pub fn doc_feature_rules(&self, config: &Config) -> Option<Vec<String>> {
-        if *self == Self::Examples {
-            return None;
-        }
-
-        let features = self
-            .feature_rules_from_metadata(config, "doc-config", false)
-            .and_then(|mut vec_of_vecs| vec_of_vecs.pop());
-
-        log::debug!("Doc features for package '{}': {:?}", self, features);
-        features
-    }
-
-    #[cfg(feature = "semver-checks")]
     fn single_config_rule_from_metadata(
         &self,
         config: &Config,
@@ -496,6 +390,23 @@ impl Package {
         }
 
         None
+    }
+
+    /// Documentation build configuration for this package.
+    ///
+    /// If the `doc-config` table is not found, this function returns `None`. This differs from
+    /// specifying an empty set of features, which returns `Some` with empty `features` and `env`.
+    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
+    // chip-specific features.
+    pub fn doc_config_rules(&self, config: &Config) -> Option<CheckConfig> {
+        if *self == Self::Examples {
+            return None;
+        }
+
+        let config = self.single_config_rule_from_metadata(config, "doc-config");
+
+        log::debug!("Doc config for package '{}': {:?}", self, config);
+        config
     }
 
     /// Configuration for semver checking of this package.
