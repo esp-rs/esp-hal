@@ -82,6 +82,12 @@ mod tests {
         f(buf.into_view());
     }
 
+    #[init]
+    fn init() {
+        // Ensures that watchdogs are disabled
+        let _ = esp_hal::init(Default::default());
+    }
+
     #[test]
     fn test_dma_rx_stream_buf_new() {
         let buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);

@@ -693,10 +693,13 @@ macro_rules! dma_descriptors_impl {
         const COUNT: usize =
             $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
-        static mut DESCRIPTORS: [$crate::dma::DmaDescriptor; COUNT] =
-            [$crate::dma::DmaDescriptor::EMPTY; COUNT];
+        static DESCRIPTORS: $crate::__macro_implementation::static_cell::ConstStaticCell<
+            [$crate::dma::DmaDescriptor; COUNT],
+        > = $crate::__macro_implementation::static_cell::ConstStaticCell::new(
+            [$crate::dma::DmaDescriptor::EMPTY; COUNT],
+        );
 
-        unsafe { &mut DESCRIPTORS }
+        DESCRIPTORS.take()
     }};
 }
 

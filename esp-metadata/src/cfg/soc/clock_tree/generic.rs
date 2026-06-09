@@ -22,6 +22,7 @@ use crate::{
             ConfiguresExpression,
             Expression,
             RejectExpression,
+            SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
             expr_compiler::ExprCompiler,
@@ -445,10 +446,80 @@ impl ClockTreeNodeType for Generic {
         }
     }
 
+    fn has_configures(&self) -> bool {
+        self.params.values().any(|param| {
+            if let NodeParameter::Source(variants) = param {
+                variants
+                    .iter()
+                    .any(|variant| !variant.configures.is_empty())
+            } else {
+                false
+            }
+        })
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        if self.has_configures() {
+            return SourceFrequencySignature::Skip;
+        }
+
+        let source_param_name = self.clock_source_parameter();
+        match self.upstream_clocks() {
+            ClockSource::Fixed(input) => {
+                let source_node = instance.resolve_node(tree, input);
+                let Some(body) = source_node.try_frequency_call() else {
+                    return SourceFrequencySignature::Skip;
+                };
+                SourceFrequencySignature::Parameterless(body)
+            }
+            ClockSource::Mux(inputs) => {
+                let ty_name = self.param_type_name(instance, source_param_name);
+                let param_name = format_ident!("{source_param_name}");
+
+                let mut variants = Vec::with_capacity(inputs.len());
+                let mut variant_frequencies = Vec::with_capacity(inputs.len());
+                for variant in inputs {
+                    let name = variant.config_enum_variant_name();
+                    let source_node = instance.resolve_node(tree, &variant.outputs);
+                    let Some(frequency) = source_node.try_frequency_call() else {
+                        return SourceFrequencySignature::Skip;
+                    };
+                    variants.push(quote! { #ty_name::#name });
+                    variant_frequencies.push(frequency);
+                }
+
+                SourceFrequencySignature::Selector {
+                    param_type: quote! { #ty_name },
+                    param_name: param_name.clone(),
+                    body: quote! {
+                        match #param_name {
+                            #(#variants => #variant_frequencies,)*
+                        }
+                    },
+                }
+            }
+        }
+    }
+
+    fn config_frequency_needs_instance(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> bool {
+        self.upstream_source_nodes(instance, tree)
+            .into_iter()
+            .any(|node| node.properties.receiver.is_some())
+    }
+
     fn node_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        frequency_receiver: &[TokenStream],
     ) -> TokenStream {
         let mut variables = HashMap::new();
 
@@ -457,15 +528,7 @@ impl ClockTreeNodeType for Generic {
         let source_frequency_tokens = match self.upstream_clocks() {
             ClockSource::Fixed(input) => {
                 let source_node = instance.resolve_node(tree, &input);
-                let source_receiver = source_node.properties.receiver();
-                let freq_fn = source_node.frequency_function_name();
-                quote! { #(#source_receiver.)* #freq_fn() }
-            }
-            ClockSource::Mux(input) if input.len() == 1 => {
-                let source_node = instance.resolve_node(tree, &input[0].outputs);
-                let source_receiver = source_node.properties.receiver();
-                let freq_fn = source_node.frequency_function_name();
-                quote! { #(#source_receiver.)* #freq_fn() }
+                source_node.frequency_call_with_receiver(frequency_receiver)
             }
             ClockSource::Mux(inputs) => {
                 let ty_name = self.param_type_name(instance, source_param_name);
@@ -476,12 +539,10 @@ impl ClockTreeNodeType for Generic {
                     .map(|variant| {
                         let name = variant.config_enum_variant_name();
                         let source_node = instance.resolve_node(tree, &variant.outputs);
-                        let frequency_fn = source_node.frequency_function_name();
-                        let source_receiver = source_node.properties.receiver();
 
                         (
                             quote! { #ty_name::#name },
-                            quote! { #(#source_receiver.)* #frequency_fn() },
+                            source_node.frequency_call_with_receiver(frequency_receiver),
                         )
                     })
                     .unzip::<_, _, Vec<_>, Vec<_>>();
@@ -688,6 +749,20 @@ impl ClockSource<'_> {
 }
 
 impl Generic {
+    fn upstream_source_nodes<'a>(
+        &'a self,
+        instance: &'a ClockTreeNodeInstance,
+        tree: &'a ProcessedClockData,
+    ) -> Vec<&'a ClockTreeNodeInstance> {
+        match self.upstream_clocks() {
+            ClockSource::Fixed(input) => vec![instance.resolve_node(tree, &input)],
+            ClockSource::Mux(inputs) => inputs
+                .iter()
+                .map(|variant| instance.resolve_node(tree, &variant.outputs))
+                .collect(),
+        }
+    }
+
     fn upstream_clocks(&self) -> ClockSource<'_> {
         let input_name = self.clock_source_parameter();
 
@@ -720,9 +795,7 @@ impl Generic {
     ) -> TokenStream {
         let single_source = match self.upstream_clocks() {
             ClockSource::Fixed(name) => name,
-            ClockSource::Mux(mux) if mux.len() == 1 => &mux.first().unwrap().outputs,
             ClockSource::Mux(mux_inputs) => {
-                // Multiple options, generate a match expression
                 let param = self.clock_source_parameter();
                 let ty_name = self.param_type_name(instance, param);
                 let request_upstream_branches = mux_inputs.iter().map(|variant| {

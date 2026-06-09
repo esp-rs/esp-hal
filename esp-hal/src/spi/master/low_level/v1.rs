@@ -14,6 +14,8 @@ pub(super) fn abort_transfer(driver: &Driver) {
     driver.regs().slave().toggle(|w, en| w.mode().bit(en));
 }
 
+pub(super) fn enable_peripheral_clock(_driver: &Driver) {}
+
 pub(super) fn init(driver: &Driver) {
     driver.regs().ctrl().modify(|_, w| w.wp().clear_bit());
 }

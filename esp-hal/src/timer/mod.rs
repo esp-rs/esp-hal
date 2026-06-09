@@ -163,11 +163,11 @@ impl<'d> OneShotTimer<'d, Blocking> {
     }
 }
 
-impl OneShotTimer<'_, Async> {
+impl<'d> OneShotTimer<'d, Async> {
     /// Converts the driver to [`Blocking`] mode.
-    pub fn into_blocking(self) -> Self {
+    pub fn into_blocking(self) -> OneShotTimer<'d, Blocking> {
         crate::interrupt::disable(Cpu::current(), self.inner.peripheral_interrupt());
-        Self {
+        OneShotTimer {
             inner: self.inner,
             _ph: PhantomData,
         }

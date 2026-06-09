@@ -971,16 +971,7 @@ impl I2cInstance {
 impl SpiInstance {
     // SPI_FUNCTION_CLOCK
 
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let regs = match self {
-            SpiInstance::Spi2 => SPI2::regs(),
-            SpiInstance::Spi3 => SPI3::regs(),
-        };
-        regs.clk_gate().modify(|_, w| {
-            w.clk_en().bit(en);
-            w.mst_clk_active().bit(en)
-        });
-    }
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
 
     fn configure_function_clock_impl(
         self,

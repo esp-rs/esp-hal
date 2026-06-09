@@ -2,7 +2,10 @@
 //!
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
-//% CHIP_FILTER: riscv
+// This test measures interrupt latency using CSRs, which only exist on the older RISC-V cores (C2,
+// C3, C6, H2), the newer CLIC-based cores (C5, C61, P4) don't have them, so accessing the CSRs
+// there traps. Exclude them.
+//% CHIP_FILTER: riscv && interrupt_controller != "clic"
 //% FEATURES: unstable
 
 #![no_std]

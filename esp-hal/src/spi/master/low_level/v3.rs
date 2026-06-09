@@ -10,6 +10,13 @@ pub(super) fn abort_transfer(driver: &Driver) {
     driver.configure_datalen(1, 1);
 }
 
+pub(super) fn enable_peripheral_clock(driver: &Driver) {
+    driver.regs().clk_gate().modify(|_, w| {
+        w.clk_en().set_bit();
+        w.mst_clk_active().set_bit()
+    });
+}
+
 pub(super) fn init(driver: &Driver) {
     driver.regs().ctrl().modify(|_, w| {
         w.q_pol().clear_bit();

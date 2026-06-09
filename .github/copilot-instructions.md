@@ -41,7 +41,7 @@ Tests and examples use `//% KEY: value` comments to control xtask builds (full d
 
 | Annotation | Purpose | Example |
 |------------|---------|---------|
-| `//% CHIP_FILTER:` | Boolean expression selecting chips; prefer a capability cfg flag over a chip list | `//% CHIP_FILTER: spi_slave_supports_dma && !esp32` |
+| `//% CHIP_FILTER:` | Boolean expression selecting chips; prefer a capability cfg flag over a chip list; key-value cfg symbols support `==` / `!=` with quoted strings | `//% CHIP_FILTER: riscv && interrupt_controller != "clic"` |
 | `//% FEATURES:` | Enable cargo features | `//% FEATURES: unstable embassy` |
 | `//% ENV:` | Set environment variables | `//% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4` |
 | `//% CARGO-CONFIG:` | Cargo `--config` passthrough | `//% CARGO-CONFIG: ...` |

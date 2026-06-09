@@ -310,7 +310,9 @@ engines = [
     { name = "CRYPTO_DMA", drivers = ["aes", "sha"], peripheral_instances = [
         { name = "AES", dma_id = 0 },
         { name = "SHA", dma_id = 1 },
-    ], channels = [{ name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA", compatible_with = ["AES", "SHA"] }] },
+    ], channels = [
+        { name = "DMA_CRYPTO", pac = "CRYPTO_DMA", interrupt = "CRYPTO_DMA", compatible_with = ["AES", "SHA"], mem2mem = true, mem2mem_id = 0 }
+    ] },
     { name = "COPY_DMA", channels = [
         { name = "DMA_COPY", pac = "COPY_DMA", interrupt = "DMA_COPY", mem2mem = true, mem2mem_id = 0 },
     ] },

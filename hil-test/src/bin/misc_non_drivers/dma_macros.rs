@@ -18,6 +18,12 @@ mod tests {
     #[allow(unused_imports)]
     use defmt::*;
 
+    #[init]
+    fn init() {
+        // Ensures that watchdogs are disabled
+        let _ = esp_hal::init(Default::default());
+    }
+
     #[test]
     fn test_dma_descriptors_same_size() {
         use esp_hal::dma::CHUNK_SIZE;
@@ -208,5 +214,16 @@ mod tests {
         check(esp_hal::dma_tx_buffer!(TX_SIZE + 1), TX_SIZE + 1);
         check(esp_hal::dma_tx_buffer!(TX_SIZE + 2), TX_SIZE + 2);
         check(esp_hal::dma_tx_buffer!(TX_SIZE + 3), TX_SIZE + 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_dma_macro_can_only_be_called_once() {
+        fn alloc_buffer() -> esp_hal::dma::DmaTxBuf {
+            esp_hal::dma_tx_buffer!(5).unwrap()
+        }
+
+        alloc_buffer();
+        alloc_buffer();
     }
 }

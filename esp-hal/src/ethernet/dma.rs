@@ -18,10 +18,11 @@
 //! On ESP32 (no write-back cache) a compiler fence alone is sufficient.
 
 use core::{
-    cell::UnsafeCell,
     mem::{align_of, offset_of, size_of},
     sync::atomic::{Ordering, fence},
 };
+
+use crate::reg_access::VolatileCell;
 
 // ── Cache helpers ────────────────────────────────────────────────────────────
 //
@@ -104,40 +105,6 @@ pub const RDES0_LS: u32 = 1 << 8;
 pub const RDES1_BUF1_SIZE_MASK: u32 = 0x1fff;
 /// RX second-address-chained bit.
 pub const RDES1_CHAINED: u32 = 1 << 14;
-
-// ── VolatileCell ────────────────────────────────────────────────────────────
-
-/// An interior-mutable cell that always performs volatile reads and writes.
-///
-/// This ensures that the compiler never caches descriptor field values in
-/// registers, which is necessary because both the CPU and the DMA engine
-/// update descriptor words concurrently.
-#[repr(transparent)]
-pub struct VolatileCell<T: Copy>(UnsafeCell<T>);
-
-impl<T: Copy> VolatileCell<T> {
-    /// Creates a new `VolatileCell` with the given initial value.
-    pub const fn new(v: T) -> Self {
-        Self(UnsafeCell::new(v))
-    }
-
-    /// Reads the cell value using a volatile load.
-    #[inline]
-    pub fn get(&self) -> T {
-        unsafe { self.0.get().read_volatile() }
-    }
-
-    /// Writes `v` to the cell using a volatile store.
-    #[inline]
-    pub fn set(&self, v: T) {
-        unsafe { self.0.get().write_volatile(v) }
-    }
-}
-
-// SAFETY: The descriptor rings are only ever accessed from one execution
-// context at a time (guarded at the `Ethernet` driver level).
-unsafe impl<T: Copy + Send> Send for VolatileCell<T> {}
-unsafe impl<T: Copy + Sync> Sync for VolatileCell<T> {}
 
 // ── Descriptor types ────────────────────────────────────────────────────────
 

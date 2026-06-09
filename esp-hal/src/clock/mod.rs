@@ -205,6 +205,10 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         clocks::request_pll_clk(clocks);
         #[cfg(soc_has_clock_node_pll_f96m_clk)]
         clocks::request_pll_f96m_clk(clocks);
+        #[cfg(soc_has_clock_node_pll_f120m)]
+        clocks::request_pll_f120m(clocks);
+        #[cfg(soc_has_clock_node_pll_f160m)]
+        clocks::request_pll_f160m(clocks);
         #[cfg(soc_has_clock_node_pll_f240m)]
         clocks::request_pll_f240m(clocks);
         #[cfg(soc_has_clock_node_rc_fast_div_clk)]

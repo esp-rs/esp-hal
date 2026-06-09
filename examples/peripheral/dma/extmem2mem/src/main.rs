@@ -1,7 +1,6 @@
 //! Uses DMA to copy psram to internal memory.
 
-//% CHIP_FILTER: dma_can_access_psram && dma_supports_mem2mem && !esp32s2
-// FIXME: ESP32-S2 CopyDMA is not an EDMA - CryptoDMA or SpiDMA should work, maybe?
+//% CHIP_FILTER: dma_can_access_psram && dma_supports_mem2mem
 
 #![no_std]
 #![no_main]
@@ -60,6 +59,7 @@ fn main() -> ! {
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let mem2mem = cfg_select! {
+        feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_CRYPTO),
         feature = "esp32s3" => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
         feature = "esp32p4" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
         _ => Mem2Mem::new(peripherals.DMA_CH0),
@@ -70,7 +70,11 @@ fn main() -> ! {
             rx_descriptors,
             tx_descriptors,
             BurstConfig {
-                external_memory: ExternalBurstConfig::Size64,
+                external_memory: if cfg!(feature = "esp32s2") {
+                    ExternalBurstConfig::Size32
+                } else {
+                    ExternalBurstConfig::Size64
+                },
                 internal_memory: Default::default(),
             },
         )
