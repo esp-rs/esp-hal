@@ -554,7 +554,7 @@ key_length = { options = [
 ] }
 
 [device.sha]
-support_status = "not_supported"
+support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.psram]
