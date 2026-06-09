@@ -281,10 +281,10 @@ macro_rules! property {
         stringify!(32)
     };
     ("rsa.memory_size_bytes") => {
-        384
+        512
     };
     ("rsa.memory_size_bytes", str) => {
-        stringify!(384)
+        stringify!(512)
     };
     ("sleep.light_sleep") => {
         false
@@ -922,6 +922,38 @@ macro_rules! for_each_rsa_exponentiation {
         _for_each_inner_rsa_exponentiation!((3008));
         _for_each_inner_rsa_exponentiation!((3040));
         _for_each_inner_rsa_exponentiation!((3072));
+        _for_each_inner_rsa_exponentiation!((3104));
+        _for_each_inner_rsa_exponentiation!((3136));
+        _for_each_inner_rsa_exponentiation!((3168));
+        _for_each_inner_rsa_exponentiation!((3200));
+        _for_each_inner_rsa_exponentiation!((3232));
+        _for_each_inner_rsa_exponentiation!((3264));
+        _for_each_inner_rsa_exponentiation!((3296));
+        _for_each_inner_rsa_exponentiation!((3328));
+        _for_each_inner_rsa_exponentiation!((3360));
+        _for_each_inner_rsa_exponentiation!((3392));
+        _for_each_inner_rsa_exponentiation!((3424));
+        _for_each_inner_rsa_exponentiation!((3456));
+        _for_each_inner_rsa_exponentiation!((3488));
+        _for_each_inner_rsa_exponentiation!((3520));
+        _for_each_inner_rsa_exponentiation!((3552));
+        _for_each_inner_rsa_exponentiation!((3584));
+        _for_each_inner_rsa_exponentiation!((3616));
+        _for_each_inner_rsa_exponentiation!((3648));
+        _for_each_inner_rsa_exponentiation!((3680));
+        _for_each_inner_rsa_exponentiation!((3712));
+        _for_each_inner_rsa_exponentiation!((3744));
+        _for_each_inner_rsa_exponentiation!((3776));
+        _for_each_inner_rsa_exponentiation!((3808));
+        _for_each_inner_rsa_exponentiation!((3840));
+        _for_each_inner_rsa_exponentiation!((3872));
+        _for_each_inner_rsa_exponentiation!((3904));
+        _for_each_inner_rsa_exponentiation!((3936));
+        _for_each_inner_rsa_exponentiation!((3968));
+        _for_each_inner_rsa_exponentiation!((4000));
+        _for_each_inner_rsa_exponentiation!((4032));
+        _for_each_inner_rsa_exponentiation!((4064));
+        _for_each_inner_rsa_exponentiation!((4096));
         _for_each_inner_rsa_exponentiation!((all(32), (64), (96), (128), (160), (192),
         (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
         (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
@@ -931,7 +963,10 @@ macro_rules! for_each_rsa_exponentiation {
         (1888), (1920), (1952), (1984), (2016), (2048), (2080), (2112), (2144), (2176),
         (2208), (2240), (2272), (2304), (2336), (2368), (2400), (2432), (2464), (2496),
         (2528), (2560), (2592), (2624), (2656), (2688), (2720), (2752), (2784), (2816),
-        (2848), (2880), (2912), (2944), (2976), (3008), (3040), (3072)));
+        (2848), (2880), (2912), (2944), (2976), (3008), (3040), (3072), (3104), (3136),
+        (3168), (3200), (3232), (3264), (3296), (3328), (3360), (3392), (3424), (3456),
+        (3488), (3520), (3552), (3584), (3616), (3648), (3680), (3712), (3744), (3776),
+        (3808), (3840), (3872), (3904), (3936), (3968), (4000), (4032), (4064), (4096)));
     };
 }
 #[macro_export]
@@ -987,11 +1022,29 @@ macro_rules! for_each_rsa_multiplication {
         _for_each_inner_rsa_multiplication!((1472));
         _for_each_inner_rsa_multiplication!((1504));
         _for_each_inner_rsa_multiplication!((1536));
+        _for_each_inner_rsa_multiplication!((1568));
+        _for_each_inner_rsa_multiplication!((1600));
+        _for_each_inner_rsa_multiplication!((1632));
+        _for_each_inner_rsa_multiplication!((1664));
+        _for_each_inner_rsa_multiplication!((1696));
+        _for_each_inner_rsa_multiplication!((1728));
+        _for_each_inner_rsa_multiplication!((1760));
+        _for_each_inner_rsa_multiplication!((1792));
+        _for_each_inner_rsa_multiplication!((1824));
+        _for_each_inner_rsa_multiplication!((1856));
+        _for_each_inner_rsa_multiplication!((1888));
+        _for_each_inner_rsa_multiplication!((1920));
+        _for_each_inner_rsa_multiplication!((1952));
+        _for_each_inner_rsa_multiplication!((1984));
+        _for_each_inner_rsa_multiplication!((2016));
+        _for_each_inner_rsa_multiplication!((2048));
         _for_each_inner_rsa_multiplication!((all(32), (64), (96), (128), (160), (192),
         (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
         (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
         (928), (960), (992), (1024), (1056), (1088), (1120), (1152), (1184), (1216),
-        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536)));
+        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536),
+        (1568), (1600), (1632), (1664), (1696), (1728), (1760), (1792), (1824), (1856),
+        (1888), (1920), (1952), (1984), (2016), (2048)));
     };
 }
 #[macro_export]
@@ -1005,11 +1058,20 @@ macro_rules! for_each_sha_algorithm {
         (insecure_against : "length extension"), 1));
         _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
         (insecure_against : "length extension"), 2));
+        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
+        (insecure_against :), 3)); _for_each_inner_sha_algorithm!((Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4));
+        _for_each_inner_sha_algorithm!((Sha512_224, "SHA-512/224"(sizes : 128, 28, 16)
+        (insecure_against :), 5)); _for_each_inner_sha_algorithm!((Sha512_256,
+        "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6));
         _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
         (insecure_against : "collision", "length extension"), 0), (Sha224,
         "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
         (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
-        2)));
+        2), (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 3), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4),
+        (Sha512_224, "SHA-512/224"(sizes : 128, 28, 16) (insecure_against :), 5),
+        (Sha512_256, "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6)));
     };
 }
 #[macro_export]

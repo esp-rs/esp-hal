@@ -545,27 +545,27 @@ support_status = "not_supported"
 support_status = "not_supported"  # LP-core RISC-V (formerly "swd"/"lp_core")
 
 [device.aes]
-support_status = "not_supported"
+support_status = "partial"
 has_split_text_registers = true
 endianness_configurable = false
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
     { bits = 256, encrypt_mode = 2, decrypt_mode = 6 },
 ] }
 
 [device.sha]
-support_status = "not_supported"
-algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
+support_status = "partial"
+algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.psram]
 extmem_origin = 0x4800_0000
 
 [device.rsa]
 version = 3
-support_status = "not_supported"
+support_status = "partial"
 size_increment = 32
-memory_size_bytes = 384
-# TODO: complete with esp-idf ecc_ll.h and later version of TRM 0.5
+memory_size_bytes = 512
 
 [device.usb_otg]
 fifo_depth_words = 200
