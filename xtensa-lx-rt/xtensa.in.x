@@ -20,7 +20,9 @@ SECTIONS {
     . = ALIGN (4);
     _text_start = ABSOLUTE(.);
     . = ALIGN (4);
-    *(.literal .text .literal.* .text.*)
+    /* Xtensa L32R requires literals before code. */
+    *(.literal .literal.*)
+    *(.text .text.*)
     _text_end = ABSOLUTE(.);
     _etext = .;
   } > ROTEXT
@@ -61,7 +63,9 @@ SECTIONS {
   .rwtext : ALIGN(4)
   {
     . = ALIGN (4);
-    *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+    /* Xtensa L32R requires literals before code. */
+    *(.rwtext.literal .rwtext.literal.*)
+    *(.rwtext .rwtext.*)
   } > RWTEXT
 
  /* must be last segment using RWTEXT */

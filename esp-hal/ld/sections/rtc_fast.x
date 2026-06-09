@@ -3,7 +3,9 @@
 SECTIONS {
   .rtc_fast.text : {
    . = ALIGN(4);
-   *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
+   /* Xtensa L32R requires literals before code (see comment in `text.x`). */
+   *(.rtc_fast.literal .rtc_fast.literal.*)
+   *(.rtc_fast.text .rtc_fast.text.*)
    . = ALIGN(4);
   } > RTC_FAST_RWTEXT AT > RODATA
 
