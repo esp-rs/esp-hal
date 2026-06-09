@@ -44,7 +44,6 @@ jobs:
       run-docs: ${{ steps.decide.outputs.run-docs }}
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
       run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
-      run-extras: ${{ steps.decide.outputs.run-extras }}
       run-hil: ${{ steps.decide.outputs.run-hil }}
       run-changelog: ${{ steps.decide.outputs.run-changelog }}
       run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
@@ -88,13 +87,13 @@ jobs:
         env:
           LABELS: ${{ steps.labels.outputs.labels }}
         run: |
-          BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
+          BUILD=true; DOCS=true; MSRV=true; HOST=true
           HIL=true; CHANGELOG=true; SEMVER=true
 
           # `skip-ci-non-code-change` only skips building/testing; API checks (semver) still run.
           # Use the dedicated `skip-semver-checks` label to skip semver checks.
           if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
-            BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
+            BUILD=false; DOCS=false; MSRV=false; HOST=false
             HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
@@ -105,14 +104,13 @@ jobs:
             "run-docs=$DOCS" \
             "run-msrv=$MSRV" \
             "run-host-tests=$HOST" \
-            "run-extras=$EXTRAS" \
             "run-hil=$HIL" \
             "run-changelog=$CHANGELOG" \
             "run-semver-check=$SEMVER"; do
             echo "$pair" >> "$GITHUB_OUTPUT"
           done
 
-          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST extras=$EXTRAS hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
 
   # --------------------------------------------------------------------------
   # Build Packages
@@ -170,29 +168,6 @@ jobs:
           for chip in $CHIPS; do
             cargo xcheck ci "$chip" --toolchain "$TOOLCHAIN" --no-lint --no-docs
           done
-
-  extras:
-    needs: calculate
-    if: needs.calculate.outputs.run-extras == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      # Install dependencies for building the extra crates on ubuntu
-      - name: Install dependencies
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
-      # Build the extra crates
-      - name: Build the bench-server
-        run: cd extras/bench-server && cargo build
-      - name: Build esp-wifishark
-        run: cd extras/esp-wifishark && cargo build
-      - name: Build ieee802154-sniffer
-        run: cd extras/ieee802154-sniffer && cargo build
 
   docs:
     needs: calculate
@@ -363,6 +338,18 @@ jobs:
             examples
             extras
             xtask
+
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+      # Build the extra crates
+      - name: Build the bench-server
+        run: cd extras/bench-server && cargo build
+      - name: Build esp-wifishark
+        run: cd extras/esp-wifishark && cargo build
+      - name: Build ieee802154-sniffer
+        run: cd extras/ieee802154-sniffer && cargo build
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
@@ -650,7 +637,6 @@ jobs:
       - docs
       - msrv
       - host-tests
-      - extras
       - changelog
       - semver-check
       - hil-build
