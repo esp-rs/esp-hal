@@ -32,8 +32,6 @@ symbols = [
 ]
 
 [device.soc]
-rc_fast_clk_default = 8_500_000
-
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
