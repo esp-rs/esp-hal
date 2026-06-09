@@ -422,18 +422,18 @@ pub(crate) fn enable_wifi_power_domain() {
     // subsystems in their previous state.
     #[cfg(esp32c2)]
     {
-        const WIFIBB_RST: u32 = 1 << 0;
-        const FE_RST: u32 = 1 << 1;
-        const WIFIMAC_RST: u32 = 1 << 2;
-        const BLE_RPA_RST: u32 = 1 << 27;
-        const MODEM_RESET: u32 = WIFIBB_RST | FE_RST | WIFIMAC_RST | BLE_RPA_RST;
-
-        regs!(APB_CTRL)
-            .wifi_rst_en()
-            .modify(|r, w| unsafe { w.bits(r.bits() | MODEM_RESET) });
-        regs!(APB_CTRL)
-            .wifi_rst_en()
-            .modify(|r, w| unsafe { w.bits(r.bits() & !MODEM_RESET) });
+        regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
+            w.wifibb_rst().set_bit();
+            w.fe_rst().set_bit();
+            w.mac_rst().set_bit();
+            w.ble_rpa_rst().set_bit()
+        });
+        regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
+            w.wifibb_rst().clear_bit();
+            w.fe_rst().clear_bit();
+            w.mac_rst().clear_bit();
+            w.ble_rpa_rst().clear_bit()
+        });
     }
 }
 

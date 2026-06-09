@@ -1,8 +1,11 @@
 //! Alternating Wi-Fi / BLE radio stress test
 //!
 //! https://github.com/esp-rs/esp-hal/pull/5670
+//!
+//! The easiest way to reproduce the crash is to press Ctrl+R during the Wi-Fi phase.
+//! In the next iteration, when it enters the BLE phase, it should crash immediately.
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/ble esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32s3
+//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported && !esp32c2 && !esp32c61
 
 #![no_std]
 #![no_main]
@@ -30,10 +33,38 @@ use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-/// Iteration counter, retained across software resets via persistent RTC RAM.
-/// Zeroed once on the initial (power-on) boot, then preserved thereafter.
+/// Iteration counter, retained across software resets.
+///
+/// Most chips keep it in persistent RTC fast RAM: zeroed once on the initial
+/// (power-on) boot, then preserved thereafter. The ESP32-C2 has no RTC fast RAM,
+/// so it stashes the counter in an otherwise-unused RTC_CNTL scratch register
+/// (`STORE6`), which likewise survives a software reset and is cleared only on
+/// power-on reset.
+#[cfg(not(feature = "esp32c2"))]
 #[ram(unstable(rtc_fast, persistent))]
 static mut ITERATION: u32 = 0;
+
+#[cfg(not(feature = "esp32c2"))]
+fn load_iteration() -> u32 {
+    unsafe { ITERATION }
+}
+
+#[cfg(not(feature = "esp32c2"))]
+fn store_iteration(value: u32) {
+    unsafe { ITERATION = value };
+}
+
+#[cfg(feature = "esp32c2")]
+fn load_iteration() -> u32 {
+    esp_hal::peripherals::LPWR::regs().store6().read().bits()
+}
+
+#[cfg(feature = "esp32c2")]
+fn store_iteration(value: u32) {
+    esp_hal::peripherals::LPWR::regs()
+        .store6()
+        .write(|w| unsafe { w.bits(value) });
+}
 
 const AP_SSID: &str = "esp-handoff";
 
@@ -88,8 +119,8 @@ async fn main(_s: Spawner) -> ! {
 
     // Read the iteration left behind by the previous boot, then bump it so the
     // next boot (after our software reset) runs the other radio.
-    let iteration = unsafe { ITERATION };
-    unsafe { ITERATION = iteration.wrapping_add(1) };
+    let iteration = load_iteration();
+    store_iteration(iteration.wrapping_add(1));
 
     let wifi_phase = iteration % 2 == 0;
 
