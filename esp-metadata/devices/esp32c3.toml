@@ -414,7 +414,7 @@ output_signals = [
     { name = "GPIO_SD2",         id = 57 },
     { name = "GPIO_SD3",         id = 58 },
     { name = "I2SO_SD1",         id = 59 },
-    { name = "FSPICLK"    ,      id = 63 },
+    { name = "FSPICLK",          id = 63 },
     { name = "FSPIQ",            id = 64 },
     { name = "FSPID",            id = 65 },
     { name = "FSPIHD",           id = 66 },

@@ -30,6 +30,7 @@ semver-config = { features = ["esp-hal/rt", "esp-alloc/global-allocator", "procm
 check-configs = [
     { features = ["esp-hal/rt"] },
     { features = ["esp-hal/rt", "defmt"] },
+    { features = ["esp-hal/rt", "defmt"], env = { ESP_RADIO_CONFIG_DUMP_PACKETS = "true" } },
     { features = ["esp-hal/rt", "wifi"], if = 'wifi_driver_supported' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'wifi_driver_supported && xtensa' },
