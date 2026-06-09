@@ -4477,6 +4477,7 @@ impl Chip {
                     "rom_md5_bsd",
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
+                    "aes_driver_supported",
                     "dma_driver_supported",
                     "ecc_driver_supported",
                     "ethernet_driver_supported",
@@ -4486,6 +4487,7 @@ impl Chip {
                     "mipi_dsi_driver_supported",
                     "psram_driver_supported",
                     "rng_driver_supported",
+                    "rsa_driver_supported",
                     "sha_driver_supported",
                     "soc_driver_supported",
                     "spi_master_driver_supported",
@@ -4506,6 +4508,13 @@ impl Chip {
                     "uart_uart2",
                     "uart_uart3",
                     "uart_uart4",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
+                    "aes_dma_mode_gcm",
                     "aes_has_split_text_registers",
                     "dma_can_access_psram",
                     "dma_separate_in_out_interrupts",
@@ -4569,7 +4578,7 @@ impl Chip {
                     "rng_is_lp_sys",
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
-                    "rsa_memory_size_bytes=\"384\"",
+                    "rsa_memory_size_bytes=\"512\"",
                     "soc_cpu_has_branch_predictor",
                     "soc_multi_core_enabled",
                     "soc_rc_fast_clk_default=\"20000000\"",
@@ -4689,6 +4698,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
+                    "cargo:rustc-cfg=aes_driver_supported",
                     "cargo:rustc-cfg=dma_driver_supported",
                     "cargo:rustc-cfg=ecc_driver_supported",
                     "cargo:rustc-cfg=ethernet_driver_supported",
@@ -4698,6 +4708,7 @@ impl Chip {
                     "cargo:rustc-cfg=mipi_dsi_driver_supported",
                     "cargo:rustc-cfg=psram_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
+                    "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
@@ -4718,6 +4729,13 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart2",
                     "cargo:rustc-cfg=uart_uart3",
                     "cargo:rustc-cfg=uart_uart4",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_dma_mode_gcm",
                     "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=dma_can_access_psram",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
@@ -4781,7 +4799,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_is_lp_sys",
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
-                    "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"20000000\"",
@@ -6958,6 +6976,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart3)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart4)");
+    println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_axi_ch2)");
@@ -6987,7 +7006,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
-    println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
     println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");

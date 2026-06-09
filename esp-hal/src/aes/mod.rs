@@ -690,6 +690,7 @@ pub mod dma {
     #[procmacros::doc_replace(
         "dma_channel" => {
             cfg(esp32s2) => "DMA_CRYPTO",
+            cfg(esp32p4) => "DMA_AXI_CH0",
             _ => "DMA_CH0"
         }
     )]
@@ -761,6 +762,7 @@ pub mod dma {
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]
@@ -793,6 +795,7 @@ pub mod dma {
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]
