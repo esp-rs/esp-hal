@@ -62,9 +62,9 @@ SECTIONS {
       GNU ld and LLD disagree on the semantics of `. = <const>` inside an
       output section — GNU ld treats it as section-relative while LLD treats
       it as absolute — so this script avoids any bare-constant location
-      counter assignments. The gap before DoubleExceptionVector and the
-      trailing pad to 0x400 are expressed with `. = . + N`, which behaves
-      identically in both linkers.
+      counter assignments. The gap before DoubleExceptionVector is expressed
+      with `. = . + N` and the trailing pad with `. = ALIGN(0x400)`, both of
+      which behave identically in both linkers.
     */
     _init_start = ABSOLUTE(.);
     KEEP(*(.WindowOverflow4.text));
@@ -85,6 +85,12 @@ SECTIONS {
        (ends at 0x380) and the DoubleExceptionVector slot at 0x3C0. */
     . = . + 0x40;
     KEEP(*(.DoubleExceptionVector.text));
+    /* SUBALIGN(0x40) no longer enforces a per-slot size limit the way the old
+       explicit `. = 0xNN` assignments did, so guard against a vector stub
+       growing past its slot and pushing the table beyond the 0x400-byte
+       vectors_seg. Without this a too-large table would silently round up to
+       0x800 below instead of failing the link. */
+    ASSERT(ABSOLUTE(.) - _init_start <= 0x400, "Xtensa vector table overflowed its 0x400-byte segment");
     /* Pad the vector table to fill the whole vectors_seg (0x400) so it stays
        contiguous with iram_seg and loads as a single image segment. ALIGN is
        section-relative in both GNU ld and LLD. */

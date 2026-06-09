@@ -206,10 +206,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
+      # Install the Rust toolchain for Xtensa devices. Keep this in sync with
+      # the `esp-hal` build job above so the LLD linking test exercises the
+      # same compiler as the rest of CI.
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.95.0.0
+          version: 1.96.0.0
 
       - name: Build hello_world with LLD
         working-directory: examples/hello_world
