@@ -515,15 +515,13 @@ impl Config {
         // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
         let source_freq = self.clock_source_freq_hz();
 
-        let reg_val: u32;
-        let duty_cycle = 128;
-
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
         if self.frequency > ((source_freq / 4) * 3) {
-            // Using APB frequency directly will give us the best result here.
-            reg_val = 1 << 31;
+            // Using source frequency directly will give us the best result here.
+            // Set the SPI_CLK_EQU_SYSCLK bit.
+            Ok(1 << 31)
         } else {
             // For best duty cycle resolution, we want n to be as close to 32 as
             // possible, but we also need a pre/n combo that gets us as close as
@@ -532,59 +530,46 @@ impl Config {
             // between pre/n combos that give the same result, use the one with the
             // higher n.
 
-            let mut pre: i32;
-            let mut bestn: i32 = -1;
-            let mut bestpre: i32 = -1;
-            let mut besterr: i32 = 0;
-            let mut errval: i32;
+            let mut best_n: u32 = 2;
+            let mut best_pre: u32 = 0;
+            let mut best_err: u32 = u32::MAX;
 
-            let target_freq_hz = self.frequency.as_hz() as i32;
-            let source_freq_hz = source_freq.as_hz() as i32;
+            let target_freq_hz = self.frequency.as_hz();
+            let source_freq_hz = source_freq.as_hz();
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
 
             for n in 2..=64 {
-                // Effectively, this does:
-                // pre = round((APB_CLK_FREQ / n) / frequency)
+                let pre = (source_freq_hz / n).div_ceil(target_freq_hz).clamp(1, 16);
 
-                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
+                let errval = (source_freq_hz / (pre * n)).abs_diff(target_freq_hz);
+                if errval <= best_err {
+                    best_err = errval;
+                    best_n = n;
+                    best_pre = pre;
 
-                if pre <= 0 {
-                    pre = 1;
-                }
-
-                if pre > 16 {
-                    pre = 16;
-                }
-
-                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
-                if bestn == -1 || errval <= besterr {
-                    besterr = errval;
-                    bestn = n;
-                    bestpre = pre;
+                    if errval == 0 {
+                        break;
+                    }
                 }
             }
 
-            let n: i32 = bestn;
-            pre = bestpre;
-            let l: i32 = n;
+            // n = SPI_CLKCNT_N + 1
+            let n = best_n;
+            // pre = SPI_CLKDIV_PRE + 1
+            let pre = best_pre;
+            // In master mode, L == N
+            let l = n;
 
-            // Effectively, this does:
-            // h = round((duty_cycle * n) / 256)
+            // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
+            let h = (n / 2).max(1);
 
-            let mut h: i32 = (duty_cycle * n + 127) / 256;
-            if h <= 0 {
-                h = 1;
-            }
-
-            reg_val = (l as u32 - 1)
-                | ((h as u32 - 1) << 6)
-                | ((n as u32 - 1) << 12)
-                | ((pre as u32 - 1) << 18);
+            Ok((l - 1) // SPI_CLKCNT_L
+                | ((h - 1) << 6) // SPI_CLKCNT_H
+                | ((n - 1) << 12) // SPI_CLKCNT_N
+                | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
         }
-
-        Ok(reg_val)
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
