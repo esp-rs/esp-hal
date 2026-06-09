@@ -92,7 +92,7 @@ peripherals = [
     { name = "PLIC_MX" },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
-    { name = "RNG" },
+    { name = "RNG", pac = "LP_PERI" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLCHOST" },
@@ -753,6 +753,7 @@ support_status = { status = "not_supported", issue = 884 }
 support_status = "partial"
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
+is_lp_sys = true
 
 [device.sleep]
 support_status = "partial"

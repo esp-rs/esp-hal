@@ -97,7 +97,7 @@ peripherals = [
     # { name = "PSRAM_MEM_MONITOR" },
     { name = "PVT_MONITOR", pac = "PVT" },
     { name = "RMT", clock_group = "RMT" },
-    { name = "RNG" },
+    { name = "RNG", pac = "LPPERI" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLC" },
@@ -683,6 +683,7 @@ fifo_size = 16
 support_status = "partial"
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
+is_lp_sys = true
 
 ## Radio
 [device.wifi]

@@ -76,7 +76,7 @@ peripherals = [
     { name = "PAU" },
     { name = "PCR" },
     { name = "PMU" },
-    { name = "RNG" },
+    { name = "RNG", pac = "LPPERI" },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLC" },
     # { name = "SLCHOST" }, TODO: add PAC manually later
@@ -431,6 +431,7 @@ support_status = { status = "not_supported", issue = 5424 }
 support_status = "partial"
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
+is_lp_sys = true
 
 [device.uart]
 support_status = "supported"
