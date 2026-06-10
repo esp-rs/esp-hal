@@ -22,6 +22,7 @@ check-configs = [
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_PLACE_ANON_IN_RAM = "true", ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM = "true", ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM = "true" } },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_CLEAR_CRYPTO_SECRETS = "false" } },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
 ]
