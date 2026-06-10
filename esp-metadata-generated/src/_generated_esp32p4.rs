@@ -417,15 +417,17 @@ macro_rules! for_each_dma_engine {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
         _for_each_inner_dma_engine!(("AXI_GDMA")); _for_each_inner_dma_engine!(("VDMA"));
-        _for_each_inner_dma_engine!(("AHB_GDMA", priorities = [(Priority0, 0),
-        (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4), (Priority5,
-        5)])); _for_each_inner_dma_engine!(("AXI_GDMA", priorities = [(Priority0, 0),
-        (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4), (Priority5,
-        5)])); _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA"), ("VDMA")));
-        _for_each_inner_dma_engine!((priorities("AHB_GDMA", priorities = [(Priority0, 0),
-        (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4), (Priority5, 5)]),
-        ("AXI_GDMA", priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2),
-        (Priority3, 3), (Priority4, 4), (Priority5, 5)])));
+        _for_each_inner_dma_engine!(("AHB_GDMA", priority = AhbGdmaPriority, priorities =
+        [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4),
+        (Priority5, 5)])); _for_each_inner_dma_engine!(("AXI_GDMA", priority =
+        AxiGdmaPriority, priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2),
+        (Priority3, 3), (Priority4, 4), (Priority5, 5)]));
+        _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA"), ("VDMA")));
+        _for_each_inner_dma_engine!((priorities("AHB_GDMA", priority = AhbGdmaPriority,
+        priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3),
+        (Priority4, 4), (Priority5, 5)]), ("AXI_GDMA", priority = AxiGdmaPriority,
+        priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3),
+        (Priority4, 4), (Priority5, 5)])));
     };
 }
 #[macro_export]
