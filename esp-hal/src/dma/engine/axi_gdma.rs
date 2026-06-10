@@ -547,8 +547,8 @@ for_each_dma_channel! {
 }
 
 for_each_dma_engine! {
-    ("AXI_GDMA", priorities = [$(($variant:ident, $level:literal)),*]) => {
-        impl_priority_type!("AXI_GDMA", AxiGdmaPriority, [$(($variant, $level)),*]);
+    ("AXI_GDMA", priority = $priority:ident, priorities = [$(($variant:ident, $level:literal)),*]) => {
+        impl_priority_type!("AXI_GDMA", $priority, [$(($variant, $level)),*]);
     };
 }
 

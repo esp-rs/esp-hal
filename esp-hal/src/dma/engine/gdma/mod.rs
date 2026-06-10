@@ -238,8 +238,8 @@ for_each_dma_channel! {
 }
 
 for_each_dma_engine! {
-    ("AHB_GDMA", priorities = [$(($variant:ident, $level:literal)),*]) => {
-        impl_priority_type!("AHB_GDMA", AhbGdmaPriority, [$(($variant, $level)),*]);
+    ("AHB_GDMA", priority = $priority:ident, priorities = [$(($variant:ident, $level:literal)),*]) => {
+        impl_priority_type!("AHB_GDMA", $priority, [$(($variant, $level)),*]);
     };
 }
 

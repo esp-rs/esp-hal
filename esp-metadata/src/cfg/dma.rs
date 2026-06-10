@@ -229,13 +229,17 @@ impl GenericProperty for DmaEngines {
             engines.push(quote! { #engine_name });
 
             if let Some(max) = engine.max_priority {
+                let priority_type = format_ident!(
+                    "{}Priority",
+                    engine.name.from_case(Case::Snake).to_case(Case::Pascal)
+                );
                 let priority_variants = (0..=max).map(|n| {
                     let variant = format_ident!("Priority{n}");
                     let level = number(n);
                     quote! { (#variant, #level) }
                 });
                 engines_with_priorities.push(quote! {
-                    #engine_name, priorities = [#(#priority_variants),*]
+                    #engine_name, priority = #priority_type, priorities = [#(#priority_variants),*]
                 });
             }
 

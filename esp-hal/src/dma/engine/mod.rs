@@ -261,7 +261,7 @@ pub(crate) use impl_channel_common;
 macro_rules! impl_priority_type {
     ($engine:literal, $ty:ident, [$(($variant:ident, $level:literal)),*]) => {
         #[doc = concat!("DMA channel priority levels for the ", $engine, " engine.")]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum $ty {
             $(
