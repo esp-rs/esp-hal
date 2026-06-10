@@ -277,7 +277,9 @@ impl Iterator for InterruptStatusIterator {
 
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
     cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
+        if #[cfg(not(feature = "rt"))] {
+            panic!("Interrupt vector table is only available with the rt feature");
+        } else if #[cfg(xtensa)] {
             &pac::__INTERRUPTS[interrupt as usize]
         } else {
             &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
