@@ -476,7 +476,7 @@ macro_rules! for_each_dma_engine {
         _for_each_inner_dma_engine!(("CRYPTO_DMA"));
         _for_each_inner_dma_engine!(("COPY_DMA"));
         _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA"), ("CRYPTO_DMA"),
-        ("COPY_DMA")));
+        ("COPY_DMA"))); _for_each_inner_dma_engine!((priorities));
     };
 }
 #[macro_export]

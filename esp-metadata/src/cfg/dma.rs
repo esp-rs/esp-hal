@@ -52,6 +52,9 @@ pub struct DmaPeripheralInstance {
     pub dma_id: u32,
 }
 
+/// DMA engines that expose configurable channel priority through esp-hal.
+const PRIORITY_CAPABLE_ENGINES: &[&str] = &["AHB_GDMA", "AXI_GDMA"];
+
 /// A single DMA engine with its channels.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -59,6 +62,7 @@ pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
 
+    /// Maximum configurable channel priority level (inclusive), when supported.
     #[serde(default)]
     pub max_priority: Option<u32>,
 
@@ -90,6 +94,21 @@ pub struct DmaEngineDef {
 pub struct DmaEngines(pub Vec<DmaEngineDef>);
 
 impl DmaEngines {
+    pub(crate) fn validate_max_priority(&self) -> Result<()> {
+        for engine in &self.0 {
+            let requires = PRIORITY_CAPABLE_ENGINES.contains(&engine.name.as_str());
+            match (requires, engine.max_priority) {
+                (true, None) => bail!("DMA engine '{}': max_priority is required", engine.name),
+                (false, Some(max)) => bail!(
+                    "DMA engine '{}': max_priority = {max} is not supported",
+                    engine.name
+                ),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_mem2mem(&self, requires_peripheral: bool) -> Result<()> {
         for engine in &self.0 {
             let mut seen_ids = std::collections::HashSet::new();
@@ -149,6 +168,13 @@ impl GenericProperty for DmaEngines {
             cfgs.push("dma.supports_mem2mem".to_string());
         }
 
+        for engine in &self.0 {
+            if engine.max_priority.is_some() {
+                let prefix = engine.name.to_ascii_lowercase();
+                cfgs.push(format!("{prefix}_max_priority_is_set"));
+            }
+        }
+
         // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
         let mut seen = std::collections::HashSet::new();
         for engine in &self.0 {
@@ -182,6 +208,7 @@ impl GenericProperty for DmaEngines {
         let mut split = vec![];
 
         let mut engines = vec![];
+        let mut engines_with_priorities = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
         // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
@@ -200,6 +227,17 @@ impl GenericProperty for DmaEngines {
         for engine in self.0.iter() {
             let engine_name = engine.name.as_str();
             engines.push(quote! { #engine_name });
+
+            if let Some(max) = engine.max_priority {
+                let priority_variants = (0..=max).map(|n| {
+                    let variant = format_ident!("Priority{n}");
+                    let level = number(n);
+                    quote! { (#variant, #level) }
+                });
+                engines_with_priorities.push(quote! {
+                    #engine_name, priorities = [#(#priority_variants),*]
+                });
+            }
 
             let channel = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
             let any_channel = format_ident!("{channel}Channel");
@@ -317,7 +355,10 @@ impl GenericProperty for DmaEngines {
             None
         };
 
-        let dma_engines_macro = generate_for_each_macro("dma_engine", &[("all", &engines)]);
+        let dma_engines_macro = generate_for_each_macro(
+            "dma_engine",
+            &[("all", &engines), ("priorities", &engines_with_priorities)],
+        );
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
         // unconditionally. On GDMA chips it expands to nothing.

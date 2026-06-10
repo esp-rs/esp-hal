@@ -50,12 +50,6 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
-    }
-
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .out_peri_sel()
@@ -100,6 +94,17 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
+    }
+}
+
+#[cfg(ahb_gdma_max_priority_is_set)]
+impl PriorityRegisterAccess for AhbGdmaTxChannel<'_> {
+    type Priority = AhbGdmaPriority;
+
+    fn set_priority(&self, priority: Self::Priority) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(priority.into()) });
     }
 }
 
@@ -252,12 +257,6 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
-    }
-
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .in_peri_sel()
@@ -300,6 +299,17 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
+    }
+}
+
+#[cfg(ahb_gdma_max_priority_is_set)]
+impl PriorityRegisterAccess for AhbGdmaRxChannel<'_> {
+    type Priority = AhbGdmaPriority;
+
+    fn set_priority(&self, priority: Self::Priority) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(priority.into()) });
     }
 }
 

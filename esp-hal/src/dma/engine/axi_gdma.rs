@@ -138,12 +138,6 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
-    }
-
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .out_peri_sel()
@@ -188,6 +182,17 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
+    }
+}
+
+#[cfg(axi_gdma_max_priority_is_set)]
+impl PriorityRegisterAccess for AxiGdmaTxChannel<'_> {
+    type Priority = AxiGdmaPriority;
+
+    fn set_priority(&self, priority: Self::Priority) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(priority.into()) });
     }
 }
 
@@ -328,12 +333,6 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
     }
 
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
-    }
-
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .in_peri_sel()
@@ -378,6 +377,17 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
+    }
+}
+
+#[cfg(axi_gdma_max_priority_is_set)]
+impl PriorityRegisterAccess for AxiGdmaRxChannel<'_> {
+    type Priority = AxiGdmaPriority;
+
+    fn set_priority(&self, priority: Self::Priority) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(priority.into()) });
     }
 }
 
@@ -533,6 +543,12 @@ macro_rules! impl_channel {
 for_each_dma_channel! {
     ("AXI_GDMA", $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
         impl_channel!($ch, $num, $interrupt_in, $interrupt_out, compatible = [$($compatible),*]);
+    };
+}
+
+for_each_dma_engine! {
+    ("AXI_GDMA", priorities = [$(($variant:ident, $level:literal)),*]) => {
+        impl_priority_type!("AXI_GDMA", AxiGdmaPriority, [$(($variant, $level)),*]);
     };
 }
 
