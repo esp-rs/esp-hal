@@ -349,6 +349,7 @@ jobs:
       - name: Run Radio Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
+        timeout-minutes: 3
         run: |
           [ -f ~/setup.sh ] && source ~/setup.sh
 
