@@ -937,6 +937,9 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                 &package_path,
             );
         }
+        Package::EspMetadata => {
+            return cargo::run(&cmd.clone().subcommand("test").build(), &package_path);
+        }
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",
             package,
