@@ -46,12 +46,17 @@ Examples:
 Runs **only chosen** HIL tests for selected chip(-s) or matrix.
 
 Examples:
+
 - `/hil quick --test rmt`
 - `/hil esp32 esp32c6 --tests rmt, i2c`
+- `/hil esp32c6 hil-test-radio`
+- `/hil esp32c6 hil-test-radio --tests wifi`
 
 Both `--test` and `--tests` will work.
 
-Please note that e.g. `/hil esp32s2 --test esp_radio::wifi_controller::tests::test_scan_doesnt_leak` will not work the same as running a specific test via `xtask`, because we use the `xtask` subcommand “run elfs” to run HIL tests in CI. Consequently, the command will be accepted by the bot, but the entire binary file will be run (in the case above, the entire `wifi_controller` test). 
+Please note that e.g. `/hil esp32s2 --test esp_radio::wifi_controller::tests::test_scan_doesnt_leak` will not work the same as running a specific test via `xtask`, because we use the `xtask` subcommand “run elfs” to run HIL tests in CI. Consequently, the command will be accepted by the bot, but the entire binary file will be run (in the case above, the entire `wifi_controller` test).
+
+By default, `/hil` commands run the `hil-test` package. Include `hil-test-radio` in the comment body to run the radio HIL package instead.
 
 ### `/test-size`
 
