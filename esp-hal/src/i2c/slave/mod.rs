@@ -233,7 +233,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     }
 }
 
-impl<'d> I2cSlave<'d, Blocking> {
+impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// Listens for a request from the master.
     ///
     /// If the master writes to the slave, this method reads data into the provided
@@ -257,55 +257,9 @@ impl<'d> I2cSlave<'d, Blocking> {
 
         let mut bytes_read = 0;
         loop {
-            let ints = regs.int_raw().read();
-
             self.driver().check_errors()?;
-
-            if ints.slave_stretch().bit_is_set() {
-                let cause = regs.sr().read().stretch_cause().bits();
-                match cause {
-                    0 => {
-                        let rw = regs.sr().read().slave_rw().bit_is_set();
-                        if rw {
-                            regs.int_clr()
-                                .write(|w| w.slave_stretch().clear_bit_by_one());
-                            return Ok(Command::Read);
-                        } else {
-                            regs.scl_stretch_conf()
-                                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                            regs.int_clr()
-                                .write(|w| w.slave_stretch().clear_bit_by_one());
-                        }
-                    }
-                    2 => {
-                        while regs.sr().read().rxfifo_cnt().bits() > 0 && bytes_read < buffer.len()
-                        {
-                            buffer[bytes_read] = regs.data().read().fifo_rdata().bits();
-                            bytes_read += 1;
-                        }
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
-                    _ => {
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
-                }
-            }
-
-            while regs.sr().read().rxfifo_cnt().bits() > 0 && bytes_read < buffer.len() {
-                buffer[bytes_read] = regs.data().read().fifo_rdata().bits();
-                bytes_read += 1;
-            }
-
-            if ints.trans_complete().bit_is_set() {
-                regs.int_clr()
-                    .write(|w| w.trans_complete().clear_bit_by_one());
-                return Ok(Command::Write(bytes_read));
+            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+                return res;
             }
         }
     }
@@ -329,66 +283,12 @@ impl<'d> I2cSlave<'d, Blocking> {
         self.driver().update_registers();
 
         loop {
-            let ints = regs.int_raw().read();
-
             self.driver().check_errors()?;
-
-            if ints.trans_complete().bit_is_set() || ints.nack().bit_is_set() {
-                let is_nack = ints.nack().bit_is_set();
-                regs.int_clr().write(|w| {
-                    w.trans_complete().clear_bit_by_one();
-                    w.nack().clear_bit_by_one()
-                });
-                if is_nack {
-                    self.driver().reset_fifo();
-                    self.driver().reset_fsm();
-                }
-
-                if bytes_written > buffer.len() {
-                    return Ok(ReadStatus::NeedMoreBytes);
-                } else if bytes_written < buffer.len() {
-                    let rem = (buffer.len() - bytes_written) as u16;
-                    return Ok(ReadStatus::LeftoverBytes(rem));
-                } else {
-                    return Ok(ReadStatus::Done);
-                }
-            }
-
-            if ints.slave_stretch().bit_is_set() {
-                let cause = regs.sr().read().stretch_cause().bits();
-                if cause == 1 {
-                    if bytes_written < buffer.len() {
-                        let txfifo_cnt = regs.sr().read().txfifo_cnt().bits() as usize;
-                        let free = FIFO_SIZE - txfifo_cnt;
-                        let to_write = core::cmp::min(buffer.len() - bytes_written, free);
-                        for i in 0..to_write {
-                            regs.data().write(|w| unsafe {
-                                w.fifo_rdata().bits(buffer[bytes_written + i])
-                            });
-                        }
-                        bytes_written += to_write;
-
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        self.driver().update_registers();
-                    } else {
-                        regs.data().write(|w| unsafe { w.fifo_rdata().bits(0xFF) });
-                        bytes_written += 1;
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        self.driver().update_registers();
-                    }
-                } else {
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.driver().update_registers();
-                }
+            if let Some(res) = self
+                .driver()
+                .respond_to_read_step(buffer, &mut bytes_written)
+            {
+                return res;
             }
         }
     }
@@ -396,7 +296,7 @@ impl<'d> I2cSlave<'d, Blocking> {
 
 impl<'d> I2cSlave<'d, Async> {
     /// Listens for a request from the master asynchronously.
-    pub async fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
+    pub async fn listen_async(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
@@ -415,60 +315,14 @@ impl<'d> I2cSlave<'d, Async> {
         let mut bytes_read = 0;
         loop {
             I2cSlaveFuture::new(regs, state, Event::SlaveStretch | Event::TransComplete).await?;
-
-            let ints = regs.int_raw().read();
-
-            if ints.slave_stretch().bit_is_set() {
-                let cause = regs.sr().read().stretch_cause().bits();
-                match cause {
-                    0 => {
-                        let rw = regs.sr().read().slave_rw().bit_is_set();
-                        if rw {
-                            regs.int_clr()
-                                .write(|w| w.slave_stretch().clear_bit_by_one());
-                            return Ok(Command::Read);
-                        } else {
-                            regs.scl_stretch_conf()
-                                .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                            regs.int_clr()
-                                .write(|w| w.slave_stretch().clear_bit_by_one());
-                        }
-                    }
-                    2 => {
-                        while regs.sr().read().rxfifo_cnt().bits() > 0 && bytes_read < buffer.len()
-                        {
-                            buffer[bytes_read] = regs.data().read().fifo_rdata().bits();
-                            bytes_read += 1;
-                        }
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
-                    _ => {
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                    }
-                }
-            }
-
-            while regs.sr().read().rxfifo_cnt().bits() > 0 && bytes_read < buffer.len() {
-                buffer[bytes_read] = regs.data().read().fifo_rdata().bits();
-                bytes_read += 1;
-            }
-
-            if ints.trans_complete().bit_is_set() {
-                regs.int_clr()
-                    .write(|w| w.trans_complete().clear_bit_by_one());
-                return Ok(Command::Write(bytes_read));
+            if let Some(res) = self.driver().listen_step(buffer, &mut bytes_read) {
+                return res;
             }
         }
     }
 
     /// Responds to a master read request asynchronously.
-    pub async fn respond_to_read(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
+    pub async fn respond_to_read_async(&mut self, buffer: &[u8]) -> Result<ReadStatus, Error> {
         let regs = self.driver().info.regs();
         let state = self.i2c.state();
 
@@ -492,71 +346,17 @@ impl<'d> I2cSlave<'d, Async> {
             )
             .await?;
 
-            let ints = regs.int_raw().read();
-
-            if ints.trans_complete().bit_is_set() || ints.nack().bit_is_set() {
-                let is_nack = ints.nack().bit_is_set();
-                regs.int_clr().write(|w| {
-                    w.trans_complete().clear_bit_by_one();
-                    w.nack().clear_bit_by_one()
-                });
-                if is_nack {
-                    self.driver().reset_fifo();
-                    self.driver().reset_fsm();
-                }
-
-                if bytes_written > buffer.len() {
-                    return Ok(ReadStatus::NeedMoreBytes);
-                } else if bytes_written < buffer.len() {
-                    let rem = (buffer.len() - bytes_written) as u16;
-                    return Ok(ReadStatus::LeftoverBytes(rem));
-                } else {
-                    return Ok(ReadStatus::Done);
-                }
-            }
-
-            if ints.slave_stretch().bit_is_set() {
-                let cause = regs.sr().read().stretch_cause().bits();
-                if cause == 1 {
-                    if bytes_written < buffer.len() {
-                        let txfifo_cnt = regs.sr().read().txfifo_cnt().bits() as usize;
-                        let free = FIFO_SIZE - txfifo_cnt;
-                        let to_write = core::cmp::min(buffer.len() - bytes_written, free);
-                        for i in 0..to_write {
-                            regs.data().write(|w| unsafe {
-                                w.fifo_rdata().bits(buffer[bytes_written + i])
-                            });
-                        }
-                        bytes_written += to_write;
-
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        self.driver().update_registers();
-                    } else {
-                        regs.data().write(|w| unsafe { w.fifo_rdata().bits(0xFF) });
-                        bytes_written += 1;
-                        regs.scl_stretch_conf()
-                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                        regs.int_clr()
-                            .write(|w| w.slave_stretch().clear_bit_by_one());
-                        self.driver().update_registers();
-                    }
-                } else {
-                    regs.scl_stretch_conf()
-                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
-                    regs.int_clr()
-                        .write(|w| w.slave_stretch().clear_bit_by_one());
-                    self.driver().update_registers();
-                }
+            if let Some(res) = self
+                .driver()
+                .respond_to_read_step(buffer, &mut bytes_written)
+            {
+                return res;
             }
         }
     }
 }
 
-impl private::Sealed for I2cSlave<'_, Blocking> {}
-impl private::Sealed for I2cSlave<'_, Async> {}
+impl<Dm: DriverMode> private::Sealed for I2cSlave<'_, Dm> {}
 
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -863,6 +663,131 @@ impl Driver<'_> {
             return Err(Error::Timeout);
         }
         Ok(())
+    }
+
+    fn listen_step(
+        &self,
+        buffer: &mut [u8],
+        bytes_read: &mut usize,
+    ) -> Option<Result<Command, Error>> {
+        let regs = self.regs();
+        let ints = regs.int_raw().read();
+
+        if ints.slave_stretch().bit_is_set() {
+            let cause = regs.sr().read().stretch_cause().bits();
+            match cause {
+                0 => {
+                    let rw = regs.sr().read().slave_rw().bit_is_set();
+                    if rw {
+                        regs.int_clr()
+                            .write(|w| w.slave_stretch().clear_bit_by_one());
+                        return Some(Ok(Command::Read));
+                    } else {
+                        regs.scl_stretch_conf()
+                            .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                        regs.int_clr()
+                            .write(|w| w.slave_stretch().clear_bit_by_one());
+                    }
+                }
+                2 => {
+                    while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
+                        buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
+                        *bytes_read += 1;
+                    }
+                    regs.scl_stretch_conf()
+                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                    regs.int_clr()
+                        .write(|w| w.slave_stretch().clear_bit_by_one());
+                }
+                _ => {
+                    regs.scl_stretch_conf()
+                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                    regs.int_clr()
+                        .write(|w| w.slave_stretch().clear_bit_by_one());
+                }
+            }
+        }
+
+        while regs.sr().read().rxfifo_cnt().bits() > 0 && *bytes_read < buffer.len() {
+            buffer[*bytes_read] = regs.data().read().fifo_rdata().bits();
+            *bytes_read += 1;
+        }
+
+        if ints.trans_complete().bit_is_set() {
+            regs.int_clr()
+                .write(|w| w.trans_complete().clear_bit_by_one());
+            return Some(Ok(Command::Write(*bytes_read)));
+        }
+
+        None
+    }
+
+    fn respond_to_read_step(
+        &self,
+        buffer: &[u8],
+        bytes_written: &mut usize,
+    ) -> Option<Result<ReadStatus, Error>> {
+        let regs = self.regs();
+        let ints = regs.int_raw().read();
+
+        if ints.trans_complete().bit_is_set() || ints.nack().bit_is_set() {
+            let is_nack = ints.nack().bit_is_set();
+            regs.int_clr().write(|w| {
+                w.trans_complete().clear_bit_by_one();
+                w.nack().clear_bit_by_one()
+            });
+            if is_nack {
+                self.reset_fifo();
+                self.reset_fsm();
+            }
+
+            if *bytes_written > buffer.len() {
+                return Some(Ok(ReadStatus::NeedMoreBytes));
+            } else if *bytes_written < buffer.len() {
+                let rem = (buffer.len() - *bytes_written) as u16;
+                return Some(Ok(ReadStatus::LeftoverBytes(rem)));
+            } else {
+                return Some(Ok(ReadStatus::Done));
+            }
+        }
+
+        if ints.slave_stretch().bit_is_set() {
+            let cause = regs.sr().read().stretch_cause().bits();
+            if cause == 1 {
+                if *bytes_written < buffer.len() {
+                    let txfifo_cnt = regs.sr().read().txfifo_cnt().bits() as usize;
+                    let free = FIFO_SIZE - txfifo_cnt;
+                    let to_write = core::cmp::min(buffer.len() - *bytes_written, free);
+                    for i in 0..to_write {
+                        regs.data()
+                            .write(|w| unsafe { w.fifo_rdata().bits(buffer[*bytes_written + i]) });
+                    }
+                    *bytes_written += to_write;
+
+                    regs.scl_stretch_conf()
+                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                    regs.int_clr()
+                        .write(|w| w.slave_stretch().clear_bit_by_one());
+                    self.update_registers();
+                } else {
+                    regs.data().write(|w| unsafe { w.fifo_rdata().bits(0xFF) });
+                    *bytes_written += 1;
+                    regs.scl_stretch_conf()
+                        .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                    regs.int_clr()
+                        .write(|w| w.slave_stretch().clear_bit_by_one());
+                    self.update_registers();
+                }
+            } else {
+                regs.scl_stretch_conf()
+                    .modify(|_, w| w.slave_scl_stretch_clr().set_bit());
+                regs.int_clr()
+                    .write(|w| w.slave_stretch().clear_bit_by_one());
+                self.update_registers();
+            }
+        }
+
+        None
     }
 }
 
