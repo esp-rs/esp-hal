@@ -11,6 +11,7 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
+mod include;
 mod support_status;
 
 use crate::{
@@ -19,9 +20,20 @@ use crate::{
 };
 
 fn load_device_config(relative_path: &str) -> Config {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative_path);
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = manifest_dir.join(relative_path);
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Failed to read device configuration: {}", path.display()))
+        .unwrap();
+
+    let devices_dir = manifest_dir.join("devices");
+    let content = include::expand_includes(&content, &path, &devices_dir)
+        .with_context(|| {
+            format!(
+                "Failed to expand includes in device configuration: {}",
+                path.display()
+            )
+        })
         .unwrap();
 
     let config: Config = basic_toml::from_str(&content)
