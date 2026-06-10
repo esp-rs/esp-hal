@@ -1,5 +1,9 @@
 crate: esp-hal
 
+# When adding an option whose non-default value changes the compiled code, set it via `env` in the
+# non-default `check-configs` entry in `Cargo.toml` of an appropriate crate (e.g.
+# `ESP_HAL_CONFIG_<NAME> = "false"`) so CI can check if the crate builds with non-default configurations.
+
 options:
   - name: place-spi-master-driver-in-ram
     description: Places the SPI master driver in RAM for better performance
