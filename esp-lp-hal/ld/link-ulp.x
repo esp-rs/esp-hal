@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* Provides interrupt vector symbols */
+INCLUDE device.x
+
 ENTRY(reset_vector)
 
 CONFIG_ULP_COPROC_RESERVE_MEM = 8 * 1024;
@@ -15,39 +18,43 @@ MEMORY
 
 SECTIONS
 {
-    . = ORIGIN(ram);
+  . = ORIGIN(ram);
 
-    .text :
-    {
-        *(.text.vectors) /* Default reset vector must link to offset 0x0 */
+  .text :
+  {
+    /* Power-on-reset must be placed at address 0x0 */
+    KEEP(*(.reset));
+    /* ULP will jump to 0x10 when an interrupt trap occurs */
+    . = ALIGN(0x10);
+    KEEP(*(.trap));
+    KEEP(*(.init));
+    KEEP(*(.init.rust));
+    KEEP(*(.trap.rust));
+    *(.text .text.*)
+  } >ram
 
-        KEEP(*(.init));
-        KEEP(*(.init.rust));         
-        *(.text)
-        *(.text*)
-    } >ram
+  .rodata ALIGN(4):
+  {
+    *(.rodata)
+    *(.rodata*)
+  } >ram
 
-    .rodata ALIGN(4):
-    {
-        *(.rodata)
-        *(.rodata*)
-    } > ram
+  .data ALIGN(4):
+  {
+    PROVIDE(__global_pointer$ = . + 0x800);
+    *(.data)
+    *(.data*)
+    *(.sdata)
+    *(.sdata*)
+  } >ram
 
-    .data ALIGN(4):
-    {
-        *(.data)
-        *(.data*)
-        *(.sdata)
-        *(.sdata*)
-    } > ram
+  .bss ALIGN(4):
+  {
+    *(.bss)
+    *(.bss*)
+    *(.sbss)
+    *(.sbss*)
+  } >ram
 
-    .bss ALIGN(4) :
-    {
-        *(.bss)
-        *(.bss*)
-        *(.sbss)
-        *(.sbss*)
-    } >ram
-
-    __stack_top = ORIGIN(ram) + LENGTH(ram);
+  __stack_top = ORIGIN(ram) + LENGTH(ram);
 }

@@ -51,6 +51,8 @@ pub enum UlpCoreWakeupSource {
     /// Wakeup after the ULP Timer has elapsed.
     /// The actual period between wake-ups is affected by the runtime duration of the ULP program.
     Timer(UlpCoreTimerCycles),
+    /// Wakeup on GPIO state
+    Gpio,
 }
 
 /// ULP Timer cycles are clocked at a rate of approximately 17.5MHz / 32768  = ~534 Hz.
@@ -103,7 +105,7 @@ impl<'d> UlpCore<'d> {
 
     /// Stops the ULP core.
     pub fn stop(&mut self) {
-        ulp_stop();
+        ulp_halt();
     }
 
     /// Runs the ULP core with the specified wakeup source.
@@ -112,28 +114,61 @@ impl<'d> UlpCore<'d> {
     }
 }
 
-fn ulp_stop() {
+fn ulp_timer_resume() {
+    let rtc_cntl = LPWR::regs();
+    rtc_cntl
+        .ulp_cp_timer()
+        .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
+}
+
+fn ulp_timer_stop() {
     let rtc_cntl = LPWR::regs();
     rtc_cntl
         .ulp_cp_timer()
         .modify(|_, w| w.ulp_cp_slp_timer_en().clear_bit());
+}
 
+fn ulp_timer_period(cycles: u32) {
+    let rtc_cntl = LPWR::regs();
+    rtc_cntl
+        .ulp_cp_timer_1()
+        .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles << 8) });
+    rtc_cntl
+        .ulp_cp_ctrl()
+        .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
+}
+
+fn ulp_halt() {
+    ulp_timer_stop();
+    let rtc_cntl = LPWR::regs();
     // suspends the ulp operation
     rtc_cntl
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_done().set_bit());
-
     // Resets the processor
     rtc_cntl
         .cocpu_ctrl()
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
+}
+
+fn ulp_reset() {
+    let rtc_cntl = LPWR::regs();
+
+    rtc_cntl.cocpu_ctrl().write(|w| {
+        w.cocpu_shut().clear_bit();
+        w.cocpu_done().clear_bit();
+        w.cocpu_shut_reset_en().clear_bit()
+    });
 
     crate::rom::ets_delay_us(20);
 
-    // above doesn't seem to halt the ULP core - this will
-    rtc_cntl
-        .cocpu_ctrl()
-        .modify(|_, w| w.cocpu_clkgate_en().clear_bit());
+    rtc_cntl.cocpu_ctrl().write(|w| {
+        w.cocpu_shut().set_bit();
+        w.cocpu_done().set_bit();
+        w.cocpu_shut_reset_en().set_bit()
+    });
+
+    crate::rom::ets_delay_us(20);
 }
 
 fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
@@ -194,34 +229,26 @@ fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
             .ulp_cp()
             .clear_bit_by_one()
     });
-
-    rtc_cntl
-        .cocpu_ctrl()
-        .modify(|_, w| w.cocpu_clkgate_en().set_bit());
 }
 
 fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
     // ESP-IDF source: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_riscv.c#L87
-    fn configure_timer(cycles: u32) {
-        LPWR::regs()
-            .ulp_cp_timer_1()
-            .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles << 8) });
-        // enable the timer
-        LPWR::regs()
-            .ulp_cp_ctrl()
-            .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
-        LPWR::regs()
-            .ulp_cp_timer()
-            .modify(|_, w| w.ulp_cp_slp_timer_en().set_bit());
-    }
+
     match wakeup_src {
         UlpCoreWakeupSource::HpCpu => {
             // wake-up immediately
-            configure_timer(0);
+            ulp_timer_period(0);
+            ulp_timer_resume();
         }
         UlpCoreWakeupSource::Timer(sleep_cycles) => {
             // configure timer duration
-            configure_timer(sleep_cycles.cycles());
+            ulp_timer_period(sleep_cycles.cycles());
+            ulp_timer_resume();
+        }
+        UlpCoreWakeupSource::Gpio => {
+            LPWR::regs()
+                .ulp_cp_timer()
+                .write(|w| w.ulp_cp_gpio_wakeup_ena().set_bit());
         }
     }
 }
