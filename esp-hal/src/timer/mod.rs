@@ -356,9 +356,7 @@ impl<'d> PeriodicTimer<'d, Blocking> {
             _ph: PhantomData,
         }
     }
-}
 
-impl<'d> PeriodicTimer<'d, Blocking> {
     /// Converts the driver to [`Async`] mode.
     pub fn into_async(self) -> PeriodicTimer<'d, Async> {
         let handler = self.inner.async_interrupt_handler();
