@@ -118,6 +118,10 @@ from the bitlength of the prime fields of the curve."]
                     ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
                         curve.size_check([$($input),*])?;
 
+                        // Wipe any secrets left over from the previous operation before loading the new operands.
+                        #[cfg(clear_crypto_secrets)]
+                        self.info().clear_secrets();
+
                         paste::paste! {
                             $(
                                 self.info().write_mem(self.info().[<$input _mem>](), $input);
@@ -657,6 +661,29 @@ impl Info {
         self.read_mem(self.qz_mem(), qz);
     }
 
+    /// Clears all peripheral memory blocks
+    #[cfg(clear_crypto_secrets)]
+    fn clear_secrets(&self) {
+        self.zero_mem(self.k_mem());
+        self.zero_mem(self.px_mem());
+        self.zero_mem(self.py_mem());
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            self.zero_mem(self.qx_mem());
+            self.zero_mem(self.qy_mem());
+            self.zero_mem(self.qz_mem());
+        }
+    }
+
+    #[cfg(clear_crypto_secrets)]
+    fn zero_mem(&self, mut word_ptr: *mut u32) {
+        for _ in 0..(MEM_BLOCK_SIZE / 4) {
+            unsafe { word_ptr.write_volatile(0) };
+            word_ptr = word_ptr.wrapping_add(1);
+        }
+    }
+
     fn is_busy(&self) -> bool {
         self.regs.mult_conf().read().start().bit_is_set()
     }
@@ -1134,6 +1161,9 @@ impl<'d> EccBackend<'d> {
 
         item.point_verification_result = driver.info().check_point_verification_result().is_ok();
 
+        #[cfg(clear_crypto_secrets)]
+        driver.info().clear_secrets();
+
         Poll::Ready(Status::Completed)
     }
 
@@ -1142,6 +1172,11 @@ impl<'d> EccBackend<'d> {
             unreachable!()
         };
         driver.reset();
+
+        // The operands may have already been written to the peripheral.
+        #[cfg(clear_crypto_secrets)]
+        driver.info().clear_secrets();
+
         item.cancelled = true;
     }
 
