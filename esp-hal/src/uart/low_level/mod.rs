@@ -833,5 +833,9 @@ impl Drop for UartClockGuard<'_> {
             clock.release_baud_rate_generator(clocks);
             clock.release_function_clock(clocks);
         });
+
+        if self.uart.info().clock_instance == clocks::UartInstance::Uart0 {
+            crate::system::ensure_uart0_sclk_enabled();
+        }
     }
 }

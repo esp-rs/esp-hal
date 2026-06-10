@@ -368,6 +368,7 @@ pub enum SleepSource {
 /// ```
 #[inline]
 pub fn software_reset() -> ! {
+    ensure_uart0_sclk_enabled();
     #[cfg(esp32p4)]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
@@ -377,7 +378,30 @@ pub fn software_reset() -> ! {
 #[instability::unstable]
 #[inline]
 pub fn software_reset_cpu(cpu: Cpu) {
+    ensure_uart0_sclk_enabled();
     crate::rom::software_reset_cpu(cpu as u32)
+}
+
+/// Enable UART0's source clock for boot ROM compatibility.
+///
+/// On some chips, resetting or waking up while UART0's source clock is disabled
+/// can prevent the boot ROM from starting correctly.
+#[inline(always)]
+pub(crate) fn ensure_uart0_sclk_enabled() {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+            crate::peripherals::UART0::regs().clk_conf().modify(|_, w| {
+                w.sclk_en().set_bit();
+                w.rx_sclk_en().set_bit();
+                w.tx_sclk_en().set_bit()
+            });
+        } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            crate::peripherals::PCR::regs()
+                .uart(0)
+                .clk_conf()
+                .modify(|_, w| w.sclk_en().set_bit());
+        }
+    }
 }
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
