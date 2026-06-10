@@ -832,11 +832,6 @@ impl Drop for UartClockGuard<'_> {
             clock.release_mem_clock(clocks);
             clock.release_baud_rate_generator(clocks);
             clock.release_function_clock(clocks);
-
-            #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
-            if clock == clocks::UartInstance::Uart0 {
-                clocks::UartInstance::keep_uart0_sclk_enabled(clocks);
-            }
         });
     }
 }

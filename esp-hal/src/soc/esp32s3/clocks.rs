@@ -863,36 +863,9 @@ impl TimgInstance {
 }
 
 impl UartInstance {
-    pub(crate) fn keep_uart0_sclk_enabled(clocks: &mut ClockTree) {
-        let uart = UartInstance::Uart0;
-
-        if uart.function_clock_config(clocks).is_none() {
-            uart.configure_function_clock(
-                clocks,
-                UartFunctionClockConfig::new(
-                    Default::default(),
-                    #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
-                    0,
-                ),
-            );
-        }
-
-        if clocks.uart_function_clock_refcount[uart as usize] == 0 {
-            uart.request_function_clock(clocks);
-        } else {
-            uart.enable_function_clock_impl(clocks, true);
-        }
-    }
-
     // UART_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        if self == UartInstance::Uart0 && !en {
-            // Disabling this prevents the device from booting.
-            // TODO: https://github.com/esp-rs/esp-hal/issues/4952
-            return;
-        }
-
         let regs = match self {
             UartInstance::Uart0 => UART0::regs(),
             UartInstance::Uart1 => UART1::regs(),

@@ -400,7 +400,7 @@ impl<'d> Rtc<'d> {
 
         config.apply();
 
-        crate::system::ensure_uart0_sclk_enabled();
+        let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
     }
