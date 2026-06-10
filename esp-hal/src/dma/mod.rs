@@ -895,37 +895,6 @@ impl From<DmaBufError> for DmaError {
     }
 }
 
-/// DMA Priorities
-#[cfg(dma_max_priority_is_set)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaPriority {
-    /// The lowest priority level (Priority 0).
-    Priority0 = 0,
-    /// Priority level 1.
-    Priority1 = 1,
-    /// Priority level 2.
-    Priority2 = 2,
-    /// Priority level 3.
-    Priority3 = 3,
-    /// Priority level 4.
-    Priority4 = 4,
-    /// Priority level 5.
-    Priority5 = 5,
-    /// Priority level 6.
-    #[cfg(dma_max_priority = "9")]
-    Priority6 = 6,
-    /// Priority level 7.
-    #[cfg(dma_max_priority = "9")]
-    Priority7 = 7,
-    /// Priority level 8.
-    #[cfg(dma_max_priority = "9")]
-    Priority8 = 8,
-    /// Priority level 9.
-    #[cfg(dma_max_priority = "9")]
-    Priority9 = 9,
-}
-
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
@@ -1265,9 +1234,11 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
+    /// Configure the channel priority.
+    pub fn set_priority(&mut self, priority: CH::Priority)
+    where
+        CH: PriorityRegisterAccess,
+    {
         self.rx_impl.set_priority(priority);
     }
 
@@ -1485,16 +1456,18 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
+    /// Configure the channel priority.
+    pub fn set_priority(&mut self, priority: CH::Priority)
+    where
+        CH: PriorityRegisterAccess,
+    {
+        self.tx_impl.set_priority(priority);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[allow(dead_code)]
     pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.tx_impl.runtime_ensure_compatible(peripheral);
-    }
-
-    /// Configure the channel priority.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx_impl.set_priority(priority);
     }
 
     fn do_prepare(
@@ -1694,13 +1667,6 @@ where
         }
     }
 
-    /// Configure the channel priorities.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx.set_priority(priority);
-        self.rx.set_priority(priority);
-    }
-
     /// Converts a blocking channel to an async channel.
     pub fn into_async(self) -> Channel<Async, CH> {
         Channel {
@@ -1710,11 +1676,21 @@ where
     }
 }
 
-impl<CH, Dm> Channel<Dm, CH>
+impl<Dm, CH> Channel<Dm, CH>
 where
-    CH: DmaChannel,
     Dm: DriverMode,
+    CH: DmaChannel,
 {
+    /// Configure the channel priorities.
+    pub fn set_priority(&mut self, priority: <CH::Rx as PriorityRegisterAccess>::Priority)
+    where
+        CH::Rx: PriorityRegisterAccess,
+        CH::Tx: PriorityRegisterAccess<Priority = <CH::Rx as PriorityRegisterAccess>::Priority>,
+    {
+        self.tx.set_priority(priority);
+        self.rx.set_priority(priority);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[instability::unstable]
     pub fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {

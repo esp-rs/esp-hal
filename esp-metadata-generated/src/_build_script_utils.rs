@@ -877,6 +877,7 @@ impl Chip {
                     "dma_gdma_version_is_set",
                     "soc_has_dma_ch0",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "sha_supports_dma",
                     "sha_dma_engine = \"AHB_GDMA\"",
                     "spi_master_supports_dma",
@@ -1048,6 +1049,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=sha_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -1359,6 +1361,7 @@ impl Chip {
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -1587,6 +1590,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -1943,6 +1947,7 @@ impl Chip {
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -2211,6 +2216,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -2639,6 +2645,7 @@ impl Chip {
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -2930,6 +2937,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -3311,6 +3319,7 @@ impl Chip {
                     "soc_has_dma_ch0",
                     "soc_has_dma_ch1",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "sha_supports_dma",
                     "sha_dma_engine = \"AHB_GDMA\"",
                     "spi_master_supports_dma",
@@ -3517,6 +3526,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=sha_supports_dma",
                     "cargo:rustc-cfg=sha_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -3899,6 +3909,7 @@ impl Chip {
                     "soc_has_dma_ch1",
                     "soc_has_dma_ch2",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -4156,6 +4167,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch1",
                     "cargo:rustc-cfg=soc_has_dma_ch2",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -4504,6 +4516,8 @@ impl Chip {
                     "soc_has_vdma_ch2",
                     "soc_has_vdma_ch3",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
+                    "axi_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AXI_GDMA\"",
                     "sha_supports_dma",
@@ -4723,6 +4737,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_vdma_ch2",
                     "cargo:rustc-cfg=soc_has_vdma_ch3",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
+                    "cargo:rustc-cfg=axi_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AXI_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -5883,6 +5899,7 @@ impl Chip {
                     "soc_has_dma_ch3",
                     "soc_has_dma_ch4",
                     "dma_supports_mem2mem",
+                    "ahb_gdma_max_priority_is_set",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -6158,6 +6175,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch3",
                     "cargo:rustc-cfg=soc_has_dma_ch4",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -6744,6 +6762,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch0)");
     println!("cargo:rustc-check-cfg=cfg(dma_supports_mem2mem)");
+    println!("cargo:rustc-check-cfg=cfg(ahb_gdma_max_priority_is_set)");
     println!("cargo:rustc-check-cfg=cfg(sha_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority_is_set)");
     println!("cargo:rustc-check-cfg=cfg(ecc_zero_extend_writes)");
@@ -6945,6 +6964,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch3)");
+    println!("cargo:rustc-check-cfg=cfg(axi_gdma_max_priority_is_set)");
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");

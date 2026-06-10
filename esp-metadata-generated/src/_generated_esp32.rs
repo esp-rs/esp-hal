@@ -444,6 +444,7 @@ macro_rules! for_each_dma_engine {
         => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
         _for_each_inner_dma_engine!(("I2S_DMA"));
         _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA")));
+        _for_each_inner_dma_engine!((priorities));
     };
 }
 #[macro_export]

@@ -82,11 +82,6 @@ pub trait RegisterAccess: Sealed {
     /// descriptors in internal RAM.
     fn set_descr_burst_mode(&self, burst_mode: bool);
 
-    /// The priority of the channel. The larger the value, the higher the
-    /// priority.
-    #[cfg(dma_max_priority_is_set)]
-    fn set_priority(&self, priority: crate::dma::DmaPriority);
-
     /// Select a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
 
@@ -122,6 +117,15 @@ pub trait RegisterAccess: Sealed {
             peripheral.0
         );
     }
+}
+
+/// Implemented by register access types whose engine supports channel priority.
+pub trait PriorityRegisterAccess: RegisterAccess {
+    /// Engine-specific DMA channel priority.
+    type Priority: Copy;
+
+    /// Set the channel priority. The larger the value, the higher the priority.
+    fn set_priority(&self, priority: Self::Priority);
 }
 
 #[doc(hidden)]
@@ -252,3 +256,32 @@ macro_rules! impl_channel_common {
     };
 }
 pub(crate) use impl_channel_common;
+
+#[allow(unused)]
+macro_rules! impl_priority_type {
+    ($engine:literal, $ty:ident, [$(($variant:ident, $level:literal)),*]) => {
+        #[doc = concat!("DMA channel priority levels for the ", $engine, " engine.")]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum $ty {
+            $(
+                #[doc = concat!("Priority level ", $level, ".")]
+                $variant = $level,
+            )*
+        }
+
+        impl Default for $ty {
+            fn default() -> Self {
+                Self::Priority0
+            }
+        }
+
+        impl From<$ty> for u8 {
+            fn from(value: $ty) -> Self {
+                value as Self
+            }
+        }
+    };
+}
+#[allow(unused)]
+pub(crate) use impl_priority_type;

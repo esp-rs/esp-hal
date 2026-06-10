@@ -498,7 +498,13 @@ macro_rules! for_each_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
+        _for_each_inner_dma_engine!(("AHB_GDMA", priorities = [(Priority0, 0),
+        (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4), (Priority5, 5),
+        (Priority6, 6), (Priority7, 7), (Priority8, 8), (Priority9, 9)]));
         _for_each_inner_dma_engine!((all("AHB_GDMA")));
+        _for_each_inner_dma_engine!((priorities("AHB_GDMA", priorities = [(Priority0, 0),
+        (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4), (Priority5, 5),
+        (Priority6, 6), (Priority7, 7), (Priority8, 8), (Priority9, 9)])));
     };
 }
 #[macro_export]
