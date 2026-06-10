@@ -795,12 +795,27 @@ impl I2sInstance {
         _old_config: Option<I2sTxClockConfig>,
         new_config: I2sTxClockConfig,
     ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        I2S0::regs().tx_clkm_div_conf().modify(|_, w| unsafe {
+            w.tx_clkm_div_x().bits(x);
+            w.tx_clkm_div_y().bits(y);
+            w.tx_clkm_div_yn1().bit(yn1);
+            w.tx_clkm_div_z().bits(z)
+        });
+
         I2S0::regs().tx_clkm_conf().modify(|_, w| unsafe {
-            w.tx_clk_sel().bits(match new_config {
-                I2sTxClockConfig::XtalClk => 0,
-                I2sTxClockConfig::PllD2 => 1,
-                I2sTxClockConfig::Pll160m => 2,
-            })
+            w.tx_clk_sel().bits(match new_config.sclk {
+                I2sTxClockSclk::XtalClk => 0,
+                I2sTxClockSclk::PllD2 => 1,
+                I2sTxClockSclk::Pll160m => 2,
+            });
+            w.tx_clkm_div_num().bits(new_config.div_num as u8)
+        });
+
+        I2S0::regs().tx_conf1().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8)
         });
     }
 
@@ -818,12 +833,28 @@ impl I2sInstance {
         _old_config: Option<I2sRxClockConfig>,
         new_config: I2sRxClockConfig,
     ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        I2S0::regs().rx_clkm_div_conf().modify(|_, w| unsafe {
+            w.rx_clkm_div_x().bits(x);
+            w.rx_clkm_div_y().bits(y);
+            w.rx_clkm_div_yn1().bit(yn1);
+            w.rx_clkm_div_z().bits(z)
+        });
+
         I2S0::regs().rx_clkm_conf().modify(|_, w| unsafe {
-            w.rx_clk_sel().bits(match new_config {
-                I2sRxClockConfig::XtalClk => 0,
-                I2sRxClockConfig::PllD2 => 1,
-                I2sRxClockConfig::Pll160m => 2,
-            })
+            w.rx_clk_sel().bits(match new_config.sclk {
+                I2sRxClockSclk::XtalClk => 0,
+                I2sRxClockSclk::PllD2 => 1,
+                I2sRxClockSclk::Pll160m => 2,
+            });
+            w.rx_clkm_div_num().bits(new_config.div_num as u8);
+            w.mclk_sel().bit(true)
+        });
+
+        I2S0::regs().rx_conf1().modify(|_, w| unsafe {
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
         });
     }
 }

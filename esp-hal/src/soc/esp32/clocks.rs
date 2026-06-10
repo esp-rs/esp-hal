@@ -886,12 +886,24 @@ impl I2sInstance {
         self,
         _clocks: &mut ClockTree,
         _old_config: Option<I2sFunctionClockConfig>,
-        _new_config: I2sFunctionClockConfig,
+        new_config: I2sFunctionClockConfig,
     ) {
-        // Selects PLL_F160M_CLK
-        // TODO: APLL
-        self.i2s_regs()
-            .clkm_conf()
-            .modify(|_, w| w.clka_ena().clear_bit());
+        let div_a = if new_config.div_b == 0 {
+            0
+        } else {
+            new_config.div_a
+        };
+
+        self.i2s_regs().clkm_conf().modify(|_, w| unsafe {
+            w.clka_ena().clear_bit();
+            w.clkm_div_num().bits(new_config.div_num as u8);
+            w.clkm_div_a().bits(div_a as u8);
+            w.clkm_div_b().bits(new_config.div_b as u8)
+        });
+
+        self.i2s_regs().sample_rate_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8);
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
     }
 }

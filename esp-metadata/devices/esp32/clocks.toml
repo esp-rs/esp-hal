@@ -167,9 +167,9 @@ system_clocks = { clock_tree = [
         ] },
     ] },
     { group = "I2S", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + div_b / div_a) / bck_div_num", params = { sclk = [
             { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true },
-        ] },
+        ], div_num = "2 .. 256", div_a = "1 .. 65", div_b = "0 .. 64", bck_div_num = "2 .. 64" } },
     ] },
 ] }
 

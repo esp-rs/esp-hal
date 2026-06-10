@@ -349,6 +349,18 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 1048575)
     };
+    ("clock_tree.i2s.function_clock.div_num") => {
+        (2, 255)
+    };
+    ("clock_tree.i2s.function_clock.div_a") => {
+        (1, 64)
+    };
+    ("clock_tree.i2s.function_clock.div_b") => {
+        (0, 63)
+    };
+    ("clock_tree.i2s.function_clock.bck_div_num") => {
+        (2, 63)
+    };
     ("spi_master.version") => {
         2
     };
@@ -1619,13 +1631,87 @@ macro_rules! define_clock_tree_types {
                 self.sclk
             }
         }
-        /// The list of clock signals that the `I2S0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum I2sFunctionClockConfig {
+        pub enum I2sFunctionClockSclk {
             #[default]
             /// Selects `PLL_F160M_CLK`.
             PllF160m,
+        }
+        /// Configures the `I2S0_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = sclk / (div_num + div_b / div_a) / bck_div_num`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct I2sFunctionClockConfig {
+            sclk: I2sFunctionClockSclk,
+            div_num: u32,
+            div_a: u32,
+            div_b: u32,
+            bck_div_num: u32,
+        }
+        impl I2sFunctionClockConfig {
+            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (2 ..= 255).
+            ///
+            /// Panics if the div_a value is outside the
+            /// valid range (1 ..= 64).
+            ///
+            /// Panics if the div_b value is outside the
+            /// valid range (0 ..= 63).
+            ///
+            /// Panics if the bck_div_num value is outside the
+            /// valid range (2 ..= 63).
+            pub const fn new(
+                sclk: I2sFunctionClockSclk,
+                div_num: u32,
+                div_a: u32,
+                div_b: u32,
+                bck_div_num: u32,
+            ) -> Self {
+                ::core::assert!(
+                    div_num >= 2 && div_num <= 255,
+                    "`I2S0_FUNCTION_CLOCK` div_num must be between 2 and 255 (inclusive)."
+                );
+                ::core::assert!(
+                    div_a >= 1 && div_a <= 64,
+                    "`I2S0_FUNCTION_CLOCK` div_a must be between 1 and 64 (inclusive)."
+                );
+                ::core::assert!(
+                    div_b <= 63,
+                    "`I2S0_FUNCTION_CLOCK` div_b must be between 0 and 63 (inclusive)."
+                );
+                ::core::assert!(
+                    bck_div_num >= 2 && bck_div_num <= 63,
+                    "`I2S0_FUNCTION_CLOCK` bck_div_num must be between 2 and 63 (inclusive)."
+                );
+                Self {
+                    sclk,
+                    div_num,
+                    div_a,
+                    div_b,
+                    bck_div_num,
+                }
+            }
+            fn sclk(self) -> I2sFunctionClockSclk {
+                self.sclk
+            }
+            fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
+            fn div_a(self) -> u32 {
+                self.div_a as u32
+            }
+            fn div_b(self) -> u32 {
+                self.div_b as u32
+            }
+            fn bck_div_num(self) -> u32 {
+                self.bck_div_num as u32
+            }
         }
         /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1969,6 +2055,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        static I2S_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static REF_TICK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -2965,19 +3053,11 @@ macro_rules! define_clock_tree_types {
             pub fn configure_function_clock(
                 self,
                 clocks: &mut ClockTree,
-                new_selector: I2sFunctionClockConfig,
+                config: I2sFunctionClockConfig,
             ) {
-                let old_selector = clocks.i2s_function_clock[self as usize].replace(new_selector);
+                let old_config = clocks.i2s_function_clock[self as usize].replace(config);
                 refresh_i2s_function_clock_downstream(clocks, self);
-                if clocks.i2s_function_clock_refcount[self as usize] > 0 {
-                    request_pll_f160m_clk(clocks);
-                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        release_pll_f160m_clk(clocks);
-                    }
-                } else {
-                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
-                }
+                self.configure_function_clock_impl(clocks, old_config, config);
             }
             pub fn function_clock_config(
                 self,
@@ -2990,7 +3070,9 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2s_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    request_pll_f160m_clk(clocks);
+                    match unwrap!(clocks.i2s_function_clock[self as usize]).sclk {
+                        I2sFunctionClockSclk::PllF160m => request_pll_f160m_clk(clocks),
+                    }
                     self.enable_function_clock_impl(clocks, true);
                 }
             }
@@ -3000,7 +3082,9 @@ macro_rules! define_clock_tree_types {
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
-                    release_pll_f160m_clk(clocks);
+                    match unwrap!(clocks.i2s_function_clock[self as usize]).sclk {
+                        I2sFunctionClockSclk::PllF160m => release_pll_f160m_clk(clocks),
+                    }
                 }
             }
             #[allow(unused_variables)]
@@ -3008,14 +3092,17 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: I2sFunctionClockConfig,
             ) -> u32 {
-                pll_f160m_clk_frequency()
+                ((pll_f160m_clk_frequency()
+                    / (config.div_num() + (config.div_b() / config.div_a())))
+                    / config.bck_div_num())
             }
             pub fn function_clock_frequency(self) -> u32 {
-                pll_f160m_clk_frequency()
+                I2S_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn function_clock_source_frequency(source: I2sFunctionClockConfig) -> u32 {
-                match source {
-                    I2sFunctionClockConfig::PllF160m => pll_f160m_clk_frequency(),
+            pub fn function_clock_source_frequency(sclk: I2sFunctionClockSclk) -> u32 {
+                match sclk {
+                    I2sFunctionClockSclk::PllF160m => pll_f160m_clk_frequency(),
                 }
             }
         }
@@ -3577,7 +3664,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_i2s_function_clock_downstream(clocks: &mut ClockTree, instance: I2sInstance) {}
+        fn refresh_i2s_function_clock_downstream(clocks: &mut ClockTree, instance: I2sInstance) {
+            if let Some(config) = clocks.i2s_function_clock[instance as usize] {
+                I2S_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    I2sInstance::function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
         fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {

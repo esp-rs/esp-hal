@@ -8,6 +8,9 @@ use procmacros::ram;
 pub use self::implementation::*;
 use crate::efuse::ChipRevision;
 
+#[cfg(i2s_driver_supported)]
+pub(crate) mod i2s_clock_registers;
+
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3/mod.rs")]

@@ -825,10 +825,24 @@ impl I2sInstance {
         _old_config: Option<I2sFunctionClockConfig>,
         new_config: I2sFunctionClockConfig,
     ) {
+        let div_a = if new_config.div_b == 0 {
+            0
+        } else {
+            new_config.div_a
+        };
+
         I2S0::regs().clkm_conf().modify(|_, w| unsafe {
-            w.clk_sel().bits(match new_config {
-                I2sFunctionClockConfig::PllF160m => 2,
-            })
+            w.clk_sel().bits(match new_config.sclk {
+                I2sFunctionClockSclk::PllF160m => 2,
+            });
+            w.clkm_div_num().bits(new_config.div_num as u8);
+            w.clkm_div_a().bits(div_a as u8);
+            w.clkm_div_b().bits(new_config.div_b as u8)
+        });
+
+        I2S0::regs().sample_rate_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8);
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
         });
     }
 }

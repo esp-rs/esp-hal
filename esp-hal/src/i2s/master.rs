@@ -119,11 +119,15 @@ use private::*;
 
 #[cfg(i2s_version = "1")]
 use crate::RegisterToggle;
-#[cfg(i2s_version = "1")]
-pub use crate::soc::clocks::I2sFunctionClockConfig as ClockSource;
-#[cfg(not(i2s_version = "1"))]
-pub use crate::soc::clocks::{I2sRxClockConfig as RxClockSource, I2sTxClockConfig as TxClockSource};
-
+#[cfg(soc_has_clock_node_i2s_function_clock)]
+pub use crate::soc::clocks::{
+    I2sFunctionClockConfig as ClockConfig,
+    I2sFunctionClockSclk as ClockSource,
+};
+#[cfg(soc_has_clock_node_i2s_rx_clock)]
+pub use crate::soc::clocks::{I2sRxClockConfig as RxClockConfig, I2sRxClockSclk as RxClockSource};
+#[cfg(soc_has_clock_node_i2s_tx_clock)]
+pub use crate::soc::clocks::{I2sTxClockConfig as TxClockConfig, I2sTxClockSclk as TxClockSource};
 use crate::{
     Async,
     Blocking,
@@ -782,16 +786,16 @@ pub struct Config {
     data_format: DataFormat,
 
     /// Function clock source
-    #[cfg(i2s_version = "1")]
-    function_clock: crate::soc::clocks::I2sFunctionClockConfig,
+    #[cfg(soc_has_clock_node_i2s_function_clock)]
+    function_clock: ClockSource,
 
     /// TX clock source
-    #[cfg(not(i2s_version = "1"))]
-    tx_clock: crate::soc::clocks::I2sTxClockConfig,
+    #[cfg(soc_has_clock_node_i2s_tx_clock)]
+    tx_clock: TxClockSource,
 
     /// RX clock source
-    #[cfg(not(i2s_version = "1"))]
-    rx_clock: crate::soc::clocks::I2sRxClockConfig,
+    #[cfg(soc_has_clock_node_i2s_rx_clock)]
+    rx_clock: RxClockSource,
 }
 
 impl Config {
@@ -883,7 +887,7 @@ impl Config {
     }
 
     /// Assign the given value to the `endianness` field in both units.
-    #[cfg(not(esp32))]
+    #[cfg(not(i2s_version = "1"))]
     #[must_use]
     pub fn with_endianness(mut self, endianness: Endianness) -> Self {
         self.rx_config.endianness = endianness;
@@ -901,7 +905,7 @@ impl Config {
     }
 
     /// Assign the function clock source.
-    #[cfg(i2s_version = "1")]
+    #[cfg(soc_has_clock_node_i2s_function_clock)]
     #[must_use]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.function_clock = clock_source;
@@ -909,7 +913,7 @@ impl Config {
     }
 
     /// Assign the TX clock source.
-    #[cfg(not(i2s_version = "1"))]
+    #[cfg(soc_has_clock_node_i2s_tx_clock)]
     #[must_use]
     pub fn with_tx_clock_source(mut self, clock_source: TxClockSource) -> Self {
         self.tx_clock = clock_source;
@@ -917,14 +921,14 @@ impl Config {
     }
 
     /// Assign the RX clock source.
-    #[cfg(not(i2s_version = "1"))]
+    #[cfg(soc_has_clock_node_i2s_rx_clock)]
     #[must_use]
     pub fn with_rx_clock_source(mut self, clock_source: RxClockSource) -> Self {
         self.rx_clock = clock_source;
         self
     }
 
-    #[cfg(i2s_version = "1")]
+    #[cfg(soc_has_clock_node_i2s_function_clock)]
     fn calculate_clock(&self, sclk: u32) -> I2sClockDividers {
         I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits(), sclk)
     }
@@ -947,12 +951,13 @@ impl Default for Config {
             sample_rate: Rate::from_hz(44100),
             #[cfg(i2s_version = "1")]
             data_format: DataFormat::Data16Channel16,
-            #[cfg(i2s_version = "1")]
-            function_clock: crate::soc::clocks::I2sFunctionClockConfig::default(),
-            #[cfg(not(i2s_version = "1"))]
-            tx_clock: crate::soc::clocks::I2sTxClockConfig::default(),
-            #[cfg(not(i2s_version = "1"))]
-            rx_clock: crate::soc::clocks::I2sRxClockConfig::default(),
+
+            #[cfg(soc_has_clock_node_i2s_function_clock)]
+            function_clock: ClockSource::default(),
+            #[cfg(soc_has_clock_node_i2s_tx_clock)]
+            tx_clock: TxClockSource::default(),
+            #[cfg(soc_has_clock_node_i2s_rx_clock)]
+            rx_clock: RxClockSource::default(),
         }
     }
 }
@@ -983,7 +988,7 @@ pub struct UnitConfig {
     msb_shift: bool,
 
     /// Byte order of the data
-    #[cfg(not(esp32))]
+    #[cfg(not(i2s_version = "1"))]
     endianness: Endianness,
 
     /// Bit order of the data
@@ -1003,7 +1008,7 @@ impl UnitConfig {
             ws_width: WsWidth::HalfFrame,
             ws_polarity: Polarity::ActiveLow,
             msb_shift: true,
-            #[cfg(not(esp32))]
+            #[cfg(not(i2s_version = "1"))]
             endianness: Endianness::LittleEndian,
             #[cfg(not(i2s_version = "1"))]
             bit_order: BitOrder::MsbFirst,
@@ -1212,7 +1217,7 @@ impl<'d> I2s<'d, Blocking> {
         let peripheral = i2s.peripheral();
         let rx_guard = PeripheralGuard::new(peripheral);
         let tx_guard = PeripheralGuard::new(peripheral);
-        let clock_guard = private::I2sClockGuard::new(crate::i2s::clock_instance_for(peripheral), &config);
+        let clock_guard = private::I2sClockGuard::new(crate::i2s::clock_instance_for(peripheral));
 
         i2s.set_master();
         i2s.configure(&config)?;
@@ -1225,6 +1230,8 @@ impl<'d> I2s<'d, Blocking> {
                 guard: rx_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: config.data_format,
+                #[cfg(soc_has_clock_node_i2s_rx_clock)]
+                rx_clock: config.rx_clock,
             },
             i2s_tx: TxCreator {
                 i2s,
@@ -1232,6 +1239,8 @@ impl<'d> I2s<'d, Blocking> {
                 guard: tx_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: config.data_format,
+                #[cfg(soc_has_clock_node_i2s_tx_clock)]
+                tx_clock: config.tx_clock,
             },
             _clock_guard: clock_guard,
         })
@@ -1246,6 +1255,8 @@ impl<'d> I2s<'d, Blocking> {
                 guard: self.i2s_rx.guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_rx.data_format,
+                #[cfg(soc_has_clock_node_i2s_rx_clock)]
+                rx_clock: self.i2s_rx.rx_clock,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
@@ -1253,6 +1264,8 @@ impl<'d> I2s<'d, Blocking> {
                 guard: self.i2s_tx.guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_tx.data_format,
+                #[cfg(soc_has_clock_node_i2s_tx_clock)]
+                tx_clock: self.i2s_tx.tx_clock,
             },
             _clock_guard: self._clock_guard,
         }
@@ -1362,6 +1375,8 @@ where
     _guard: PeripheralGuard,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
+    #[cfg(soc_has_clock_node_i2s_tx_clock)]
+    tx_clock: TxClockSource,
 }
 
 impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
@@ -1405,13 +1420,13 @@ where
 
     /// Change the I2S Tx unit configuration.
     pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(i2s_version = "1")] {
-                self.i2s.configure_tx(tx_config, self.data_format)
-            } else {
-                self.i2s.configure_tx(tx_config)
-            }
-        }
+        self.i2s.configure_tx(
+            tx_config,
+            #[cfg(i2s_version = "1")]
+            self.data_format,
+            #[cfg(soc_has_clock_node_i2s_tx_clock)]
+            self.tx_clock,
+        )
     }
 }
 
@@ -1423,8 +1438,10 @@ where
     i2s: AnyI2s<'d>,
     rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
     _guard: PeripheralGuard,
-    #[cfg(i2s_version = "1")]
+    #[cfg(not(soc_has_clock_node_i2s_rx_clock))]
     data_format: DataFormat,
+    #[cfg(soc_has_clock_node_i2s_rx_clock)]
+    rx_clock: RxClockSource,
 }
 
 impl<Dm> core::fmt::Debug for I2sRx<'_, Dm>
@@ -1477,13 +1494,13 @@ where
 
     /// Change the I2S Rx unit configuration.
     pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(i2s_version = "1")] {
-                self.i2s.configure_rx(rx_config, self.data_format)
-            } else {
-                self.i2s.configure_rx(rx_config)
-            }
-        }
+        self.i2s.configure_rx(
+            rx_config,
+            #[cfg(i2s_version = "1")]
+            self.data_format,
+            #[cfg(soc_has_clock_node_i2s_rx_clock)]
+            self.rx_clock,
+        )
     }
 }
 
@@ -1499,7 +1516,6 @@ mod private {
     use enumset::EnumSet;
 
     use super::*;
-    use crate::soc::clocks::{ClockTree, I2sInstance};
     #[cfg(not(soc_has_i2s1))]
     use crate::pac::i2s0::RegisterBlock;
     use crate::{
@@ -1515,6 +1531,7 @@ mod private {
         i2s::any::Inner as AnyI2sInner,
         interrupt::InterruptHandler,
         peripherals::I2S0,
+        soc::clocks::{ClockTree, I2sInstance},
     };
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
@@ -1526,35 +1543,100 @@ mod private {
     }
 
     impl I2sClockGuard {
-        pub(crate) fn new(instance: I2sInstance, config: &Config) -> Self {
+        pub(crate) fn new(instance: I2sInstance) -> Self {
             ClockTree::with(|clocks| {
-                cfg_if::cfg_if! {
-                    if #[cfg(i2s_version = "1")] {
-                        instance.configure_function_clock(clocks, config.function_clock);
-                        instance.request_function_clock(clocks);
-                    } else {
-                        instance.configure_tx_clock(clocks, config.tx_clock);
-                        instance.configure_rx_clock(clocks, config.rx_clock);
-                        instance.request_tx_clock(clocks);
-                        instance.request_rx_clock(clocks);
-                    }
+                #[cfg(soc_has_clock_node_i2s_function_clock)]
+                {
+                    instance.configure_function_clock(
+                        clocks,
+                        ClockConfig::new(Default::default(), 2, 1, 0, 2),
+                    );
+                    instance.request_function_clock(clocks);
+                }
+                #[cfg(soc_has_clock_node_i2s_tx_clock)]
+                {
+                    instance.configure_tx_clock(
+                        clocks,
+                        TxClockConfig::new(Default::default(), 2, 1, 0, 1),
+                    );
+                    instance.request_tx_clock(clocks);
+                }
+                #[cfg(soc_has_clock_node_i2s_rx_clock)]
+                {
+                    instance.configure_rx_clock(
+                        clocks,
+                        RxClockConfig::new(Default::default(), 2, 1, 0, 1),
+                    );
+                    instance.request_rx_clock(clocks);
                 }
             });
             Self { instance }
         }
     }
 
+    #[cfg(soc_has_clock_node_i2s_function_clock)]
+    fn function_clock_config(sclk: ClockSource, dividers: I2sClockDividers) -> ClockConfig {
+        let (div_a, div_b) = if dividers.denominator == 0 {
+            (1, 0)
+        } else {
+            (dividers.denominator, dividers.numerator)
+        };
+        ClockConfig::new(
+            sclk,
+            dividers.mclk_divider,
+            div_a,
+            div_b,
+            dividers.bclk_divider,
+        )
+    }
+
+    #[cfg(soc_has_clock_node_i2s_tx_clock)]
+    fn tx_clock_config(sclk: TxClockSource, dividers: I2sClockDividers) -> TxClockConfig {
+        let (div_a, div_b) = if dividers.denominator == 0 {
+            (1, 0)
+        } else {
+            (dividers.denominator, dividers.numerator)
+        };
+        TxClockConfig::new(
+            sclk,
+            dividers.mclk_divider,
+            div_a,
+            div_b,
+            #[cfg(i2s_version = "2")]
+            dividers.bclk_divider.saturating_sub(1),
+            #[cfg(not(i2s_version = "2"))]
+            dividers.bclk_divider,
+        )
+    }
+
+    #[cfg(soc_has_clock_node_i2s_rx_clock)]
+    fn rx_clock_config(sclk: RxClockSource, dividers: I2sClockDividers) -> RxClockConfig {
+        let (div_a, div_b) = if dividers.denominator == 0 {
+            (1, 0)
+        } else {
+            (dividers.denominator, dividers.numerator)
+        };
+        RxClockConfig::new(
+            sclk,
+            dividers.mclk_divider,
+            div_a,
+            div_b,
+            #[cfg(i2s_version = "2")]
+            dividers.bclk_divider.saturating_sub(1),
+            #[cfg(not(i2s_version = "2"))]
+            dividers.bclk_divider,
+        )
+    }
+
     impl Drop for I2sClockGuard {
         fn drop(&mut self) {
             ClockTree::with(|clocks| {
-                cfg_if::cfg_if! {
-                    if #[cfg(i2s_version = "1")] {
-                        self.instance.release_function_clock(clocks);
-                    } else {
-                        self.instance.release_tx_clock(clocks);
-                        self.instance.release_rx_clock(clocks);
-                    }
-                }
+                #[cfg(soc_has_clock_node_i2s_function_clock)]
+                self.instance.release_function_clock(clocks);
+                #[cfg(soc_has_clock_node_i2s_tx_clock)]
+                self.instance.release_tx_clock(clocks);
+                #[cfg(soc_has_clock_node_i2s_rx_clock)]
+                self.instance.release_rx_clock(clocks);
             });
         }
     }
@@ -1568,6 +1650,8 @@ mod private {
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
+        #[cfg(soc_has_clock_node_i2s_tx_clock)]
+        pub(crate) tx_clock: TxClockSource,
     }
 
     impl<'d, Dm> TxCreator<'d, Dm>
@@ -1582,6 +1666,8 @@ mod private {
                 _guard: PeripheralGuard::new(peripheral),
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
+                #[cfg(soc_has_clock_node_i2s_tx_clock)]
+                tx_clock: self.tx_clock,
             }
         }
 
@@ -1628,6 +1714,8 @@ mod private {
         pub(crate) guard: PeripheralGuard,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
+        #[cfg(soc_has_clock_node_i2s_rx_clock)]
+        pub(crate) rx_clock: RxClockSource,
     }
 
     impl<'d, Dm> RxCreator<'d, Dm>
@@ -1642,6 +1730,8 @@ mod private {
                 _guard: PeripheralGuard::new(peripheral),
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
+                #[cfg(soc_has_clock_node_i2s_rx_clock)]
+                rx_clock: self.rx_clock,
             }
         }
 
@@ -1739,29 +1829,20 @@ mod private {
             });
         }
 
-        fn set_clock(&self, clock_settings: I2sClockDividers) {
-            self.regs().clkm_conf().modify(|_, w| unsafe {
-                #[cfg(esp32)]
-                w.clk_en().set_bit();
-                w.clkm_div_num().bits(clock_settings.mclk_divider as u8);
-                w.clkm_div_a().bits(clock_settings.denominator as u8);
-                w.clkm_div_b().bits(clock_settings.numerator as u8)
-            });
-
-            self.regs().sample_rate_conf().modify(|_, w| unsafe {
-                w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
-                w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
-            });
-        }
-
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
             config.validate()?;
 
             self.configure_tx(&config.tx_config, config.data_format)?;
             self.configure_rx(&config.rx_config, config.data_format)?;
 
-            let sclk = self.clock_instance().function_clock_frequency();
-            self.set_clock(config.calculate_clock(sclk));
+            let sclk = I2sInstance::function_clock_source_frequency(config.function_clock);
+            ClockTree::with(|clocks| {
+                let dividers = config.calculate_clock(sclk);
+                self.clock_instance().configure_function_clock(
+                    clocks,
+                    function_clock_config(config.function_clock, dividers),
+                );
+            });
 
             self.regs().sample_rate_conf().modify(|_, w| unsafe {
                 // Having different data formats for each direction would make clock calculations
@@ -1837,7 +1918,7 @@ mod private {
 
             self.regs().conf1().modify(|_, w| w.tx_stop_en().set_bit());
 
-            #[cfg(not(esp32))]
+            #[cfg(not(i2s_version = "1"))]
             self.regs().conf().modify(|_, w| {
                 // Channel configurations other than Stereo should use same data from DMA
                 // for both channels
@@ -1891,7 +1972,7 @@ mod private {
                 w.rx_short_sync().bit(config.ws_width == WsWidth::Bit)
             });
 
-            #[cfg(not(esp32))]
+            #[cfg(not(i2s_version = "1"))]
             self.regs().conf().modify(|_, w| {
                 // Channel configurations other than Stereo should use same data from DMA
                 // for both channels
@@ -2089,131 +2170,11 @@ mod private {
             });
         }
 
-        #[cfg(not(i2s_clock_configured_by_pcr))]
-        fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-            let clkm_div = clock_settings.mclk_dividers();
-
-            self.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-                w.tx_clkm_div_x().bits(clkm_div.x as u16);
-                w.tx_clkm_div_y().bits(clkm_div.y as u16);
-                w.tx_clkm_div_yn1().bit(clkm_div.yn1);
-                w.tx_clkm_div_z().bits(clkm_div.z as u16)
-            });
-
-            self.regs().tx_clkm_conf().modify(|_, w| unsafe {
-                w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
-            });
-
-            #[cfg(i2s_version = "2")]
-            self.regs().tx_conf1().modify(|_, w| unsafe {
-                w.tx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-            #[cfg(i2s_version = "3")]
-            self.regs().tx_conf().modify(|_, w| unsafe {
-                w.tx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-        }
-
-        #[cfg(not(i2s_clock_configured_by_pcr))]
-        fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-            let clkm_div = clock_settings.mclk_dividers();
-
-            self.regs().rx_clkm_div_conf().modify(|_, w| unsafe {
-                w.rx_clkm_div_x().bits(clkm_div.x as u16);
-                w.rx_clkm_div_y().bits(clkm_div.y as u16);
-                w.rx_clkm_div_yn1().bit(clkm_div.yn1);
-                w.rx_clkm_div_z().bits(clkm_div.z as u16)
-            });
-
-            self.regs().rx_clkm_conf().modify(|_, w| unsafe {
-                w.rx_clkm_div_num().bits(clock_settings.mclk_divider as u8);
-                w.mclk_sel().bit(true)
-            });
-
-            #[cfg(i2s_version = "2")]
-            self.regs().rx_conf1().modify(|_, w| unsafe {
-                w.rx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-            #[cfg(i2s_version = "3")]
-            self.regs().rx_conf().modify(|_, w| unsafe {
-                w.rx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-        }
-
-        #[cfg(i2s_clock_configured_by_pcr)]
-        fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-            // I2S clocks are configured via PCR
-            use crate::peripherals::PCR;
-
-            let clkm_div = clock_settings.mclk_dividers();
-
-            PCR::regs().i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-                w.i2s_tx_clkm_div_x().bits(clkm_div.x as u16);
-                w.i2s_tx_clkm_div_y().bits(clkm_div.y as u16);
-                w.i2s_tx_clkm_div_yn1().bit(clkm_div.yn1);
-                w.i2s_tx_clkm_div_z().bits(clkm_div.z as u16)
-            });
-
-            PCR::regs().i2s_tx_clkm_conf().modify(|_, w| unsafe {
-                w.i2s_tx_clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8)
-            });
-
-            #[cfg(i2s_version = "2")]
-            self.regs().tx_conf1().modify(|_, w| unsafe {
-                w.tx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-
-            #[cfg(i2s_version = "3")]
-            self.regs().tx_conf().modify(|_, w| unsafe {
-                w.tx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-        }
-
-        #[cfg(i2s_clock_configured_by_pcr)]
-        fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-            // I2S clocks are configured via PCR
-            use crate::peripherals::PCR;
-
-            let clkm_div = clock_settings.mclk_dividers();
-
-            PCR::regs().i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-                w.i2s_rx_clkm_div_x().bits(clkm_div.x as u16);
-                w.i2s_rx_clkm_div_y().bits(clkm_div.y as u16);
-                w.i2s_rx_clkm_div_yn1().bit(clkm_div.yn1);
-                w.i2s_rx_clkm_div_z().bits(clkm_div.z as u16)
-            });
-
-            PCR::regs().i2s_rx_clkm_conf().modify(|_, w| unsafe {
-                w.i2s_rx_clkm_div_num()
-                    .bits(clock_settings.mclk_divider as u8);
-                w.i2s_mclk_sel().bit(true)
-            });
-
-            #[cfg(i2s_version = "2")]
-            self.regs().rx_conf1().modify(|_, w| unsafe {
-                w.rx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-
-            #[cfg(i2s_version = "3")]
-            self.regs().rx_conf().modify(|_, w| unsafe {
-                w.rx_bck_div_num()
-                    .bits((clock_settings.bclk_divider - 1) as u8)
-            });
-        }
-
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
             config.validate()?;
 
-            self.configure_tx(&config.tx_config)?;
-            self.configure_rx(&config.rx_config)?;
+            self.configure_tx(&config.tx_config, config.tx_clock)?;
+            self.configure_rx(&config.rx_config, config.rx_clock)?;
 
             self.regs()
                 .tx_conf()
@@ -2225,14 +2186,22 @@ mod private {
             Ok(())
         }
 
-        fn configure_tx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
+        fn configure_tx(
+            &self,
+            config: &UnitConfig,
+            tx_clock: TxClockSource,
+        ) -> Result<(), ConfigError> {
             use bitfield::Bit;
 
             config.validate()?;
 
             let ws_width = config.calculate_ws_width()?;
-            let sclk = self.clock_instance().tx_clock_frequency();
-            self.set_tx_clock(config.calculate_clock(sclk));
+            let sclk = I2sInstance::tx_clock_source_frequency(tx_clock);
+            ClockTree::with(|clocks| {
+                let dividers = config.calculate_clock(sclk);
+                self.clock_instance()
+                    .configure_tx_clock(clocks, tx_clock_config(tx_clock, dividers));
+            });
 
             self.regs().tx_conf1().modify(|_, w| unsafe {
                 #[cfg(i2s_version = "2")]
@@ -2292,14 +2261,22 @@ mod private {
             Ok(())
         }
 
-        fn configure_rx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
+        fn configure_rx(
+            &self,
+            config: &UnitConfig,
+            rx_clock: RxClockSource,
+        ) -> Result<(), ConfigError> {
             use bitfield::Bit;
 
             config.validate()?;
 
             let ws_width = config.calculate_ws_width()?;
-            let sclk = self.clock_instance().rx_clock_frequency();
-            self.set_rx_clock(config.calculate_clock(sclk));
+            let sclk = I2sInstance::rx_clock_source_frequency(rx_clock);
+            ClockTree::with(|clocks| {
+                let dividers = config.calculate_clock(sclk);
+                self.clock_instance()
+                    .configure_rx_clock(clocks, rx_clock_config(rx_clock, dividers));
+            });
 
             self.regs().rx_conf1().modify(|_, w| unsafe {
                 #[cfg(i2s_version = "2")]
@@ -2678,14 +2655,6 @@ mod private {
         numerator: u32,
     }
 
-    #[cfg(not(i2s_version = "1"))]
-    pub struct I2sMclkDividers {
-        x: u32,
-        y: u32,
-        z: u32,
-        yn1: bool,
-    }
-
     impl I2sClockDividers {
         pub fn new(sample_rate: Rate, channels: u8, data_bits: u8, sclk: u32) -> I2sClockDividers {
             // this loosely corresponds to `i2s_std_calculate_clock` and
@@ -2702,6 +2671,8 @@ mod private {
             let bclk = rate * channels as u32 * data_bits as u32;
             let mclk = rate * mclk_multiple;
             let bclk_divider = mclk / bclk;
+            #[cfg(not(any(i2s_version = "1", i2s_version = "2")))]
+            let bclk_divider = bclk_divider.saturating_sub(1);
             let mut mclk_divider = sclk / mclk;
 
             let mut ma: u32;
@@ -2747,38 +2718,6 @@ mod private {
                 denominator,
                 numerator,
             }
-        }
-
-        #[cfg(not(i2s_version = "1"))]
-        fn mclk_dividers(&self) -> I2sMclkDividers {
-            let x;
-            let y;
-            let z;
-            let yn1;
-
-            if self.denominator == 0 || self.numerator == 0 {
-                x = 0;
-                y = 0;
-                z = 0;
-                yn1 = true;
-            } else if self.numerator > self.denominator / 2 {
-                x = self
-                    .denominator
-                    .overflowing_div(self.denominator.overflowing_sub(self.numerator).0)
-                    .0
-                    .overflowing_sub(1)
-                    .0;
-                y = self.denominator % (self.denominator.overflowing_sub(self.numerator).0);
-                z = self.denominator.overflowing_sub(self.numerator).0;
-                yn1 = true;
-            } else {
-                x = self.denominator / self.numerator - 1;
-                y = self.denominator % self.numerator;
-                z = self.numerator;
-                yn1 = false;
-            }
-
-            I2sMclkDividers { x, y, z, yn1 }
         }
     }
 }

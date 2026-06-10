@@ -109,7 +109,7 @@ use crate::{
     i2s::AnyI2s,
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
-    soc::clocks::{ClockTree, I2sInstance},
+    soc::clocks::{ClockTree, I2sFunctionClockConfig, I2sFunctionClockSclk, I2sInstance},
     system::PeripheralGuard,
     time::Rate,
 };
@@ -121,7 +121,10 @@ struct I2sClockGuard {
 impl I2sClockGuard {
     fn new(instance: I2sInstance) -> Self {
         ClockTree::with(|clocks| {
-            instance.configure_function_clock(clocks, Default::default());
+            instance.configure_function_clock(
+                clocks,
+                I2sFunctionClockConfig::new(Default::default(), 2, 1, 0, 2),
+            );
             instance.request_function_clock(clocks);
         });
         Self { instance }
@@ -589,25 +592,29 @@ pub trait PrivateInstance: crate::private::Sealed {
         });
     }
 
-    fn set_clock(&self, clock_settings: I2sClockDividers) {
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clk_en().set_bit();
-            w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
-        });
+    fn set_clock(&self, dividers: I2sClockDividers) {
+        let (div_a, div_b) = if dividers.denominator == 0 {
+            (1, 0)
+        } else {
+            (dividers.denominator, dividers.numerator)
+        };
 
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clkm_div_a().bits(clock_settings.denominator as u8);
-            w.clkm_div_b().bits(clock_settings.numerator as u8)
-        });
-
-        self.regs().sample_rate_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
-            w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
+        ClockTree::with(|clocks| {
+            self.clock_instance().configure_function_clock(
+                clocks,
+                I2sFunctionClockConfig::new(
+                    I2sFunctionClockSclk::default(),
+                    dividers.mclk_divider,
+                    div_a,
+                    div_b,
+                    dividers.bclk_divider,
+                ),
+            );
         });
     }
 
     fn setup(&self, frequency: Rate, bits: u8) {
-        let sclk = self.clock_instance().function_clock_frequency();
+        let sclk = I2sInstance::function_clock_source_frequency(I2sFunctionClockSclk::default());
         self.set_clock(calculate_clock(frequency, bits, sclk));
 
         // Initialize I2S dev

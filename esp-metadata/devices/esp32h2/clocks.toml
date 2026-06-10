@@ -109,16 +109,16 @@ system_clocks = { clock_tree = [
         ] },
     ] },
     { group = "I2S", clocks = [
-        { name = "TX_CLOCK", type = "mux", variants = [
+        { name = "TX_CLOCK", type = "generic", output = "sclk / (div_num + div_b / div_a) / (bck_div_num + 1)", params = { sclk = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK" },
             { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
             { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
-        ] },
-        { name = "RX_CLOCK", type = "mux", variants = [
+        ], div_num = "2 .. 256", div_a = "1 .. 65", div_b = "0 .. 64", bck_div_num = "0 .. 64" } },
+        { name = "RX_CLOCK", type = "generic", output = "sclk / (div_num + div_b / div_a) / (bck_div_num + 1)", params = { sclk = [
             { name = "XTAL_CLK", outputs = "XTAL_CLK" },
             { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
             { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
-        ] },
+        ], div_num = "2 .. 256", div_a = "1 .. 65", div_b = "0 .. 64", bck_div_num = "0 .. 64" } },
     ] },
 ] }
 
