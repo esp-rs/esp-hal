@@ -202,6 +202,10 @@ impl Package {
     }
 
     /// Does the package have any host tests?
+    ///
+    /// Returns true when `src/**/*.rs` contains `#[test]`. Packages that return
+    /// true must also have a match arm in [`run_host_tests`]; see `xtask/README.md`
+    /// ("Host tests").
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
         if *self == Package::HilTest || *self == Package::HilTestRadio {
             return false;
@@ -847,6 +851,10 @@ pub fn format_package(
 }
 
 /// Run the host tests for the specified package.
+///
+/// Called by `cargo xtask host-tests` for every package where [`Package::has_host_tests`]
+/// is true. **When adding `#[test]` functions to a package, add a match arm here**
+/// with the correct `cargo test` flags/features. See `xtask/README.md` ("Host tests").
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
     let package_path = workspace.join(package.as_ref());
@@ -936,6 +944,9 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .build(),
                 &package_path,
             );
+        }
+        Package::EspMetadata => {
+            return cargo::run(&cmd.clone().subcommand("test").build(), &package_path);
         }
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",
