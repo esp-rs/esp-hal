@@ -388,20 +388,8 @@ pub fn software_reset_cpu(cpu: Cpu) {
 /// can prevent the boot ROM from starting correctly.
 #[inline(always)]
 pub(crate) fn ensure_uart0_sclk_enabled() {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-            crate::peripherals::UART0::regs().clk_conf().modify(|_, w| {
-                w.sclk_en().set_bit();
-                w.rx_sclk_en().set_bit();
-                w.tx_sclk_en().set_bit()
-            });
-        } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
-            crate::peripherals::PCR::regs()
-                .uart(0)
-                .clk_conf()
-                .modify(|_, w| w.sclk_en().set_bit());
-        }
-    }
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
+    crate::soc::clocks::ClockTree::with(crate::soc::clocks::UartInstance::keep_uart0_sclk_enabled);
 }
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.

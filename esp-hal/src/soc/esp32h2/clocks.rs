@@ -552,15 +552,37 @@ impl TimgInstance {
 }
 
 impl UartInstance {
+    pub(crate) fn keep_uart0_sclk_enabled(clocks: &mut ClockTree) {
+        let uart = UartInstance::Uart0;
+
+        if uart.function_clock_config(clocks).is_none() {
+            uart.configure_function_clock(
+                clocks,
+                UartFunctionClockConfig::new(
+                    Default::default(),
+                    #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
+                    0,
+                ),
+            );
+        }
+
+        if clocks.uart_function_clock_refcount[uart as usize] == 0 {
+            uart.request_function_clock(clocks);
+        } else {
+            uart.enable_function_clock_impl(clocks, true);
+        }
+    }
+
     // UART_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         let uart = match self {
-            UartInstance::Uart0 => {
+            UartInstance::Uart0 if !en => {
                 // At least on revision 0.1 switching SCLK off causes the chip to no longer boot.
                 // TODO: https://github.com/esp-rs/esp-hal/issues/4952
                 return;
             }
+            UartInstance::Uart0 => 0,
             UartInstance::Uart1 => 1,
         };
         PCR::regs()

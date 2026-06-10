@@ -389,11 +389,9 @@ mod tests {
     #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
     fn disable_uart0_sclk() {
         #[cfg(any(esp32c2, esp32c3, esp32s3))]
-        esp_hal::peripherals::UART0::regs().clk_conf().modify(|_, w| {
-            w.sclk_en().clear_bit();
-            w.rx_sclk_en().clear_bit();
-            w.tx_sclk_en().clear_bit()
-        });
+        esp_hal::peripherals::UART0::regs()
+            .clk_conf()
+            .modify(|_, w| w.sclk_en().clear_bit());
 
         #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
         esp_hal::peripherals::PCR::regs()
@@ -406,10 +404,11 @@ mod tests {
     fn uart0_sclk_enabled() -> bool {
         #[cfg(any(esp32c2, esp32c3, esp32s3))]
         {
-            let clk_conf = esp_hal::peripherals::UART0::regs().clk_conf().read();
-            clk_conf.sclk_en().bit_is_set()
-                && clk_conf.rx_sclk_en().bit_is_set()
-                && clk_conf.tx_sclk_en().bit_is_set()
+            esp_hal::peripherals::UART0::regs()
+                .clk_conf()
+                .read()
+                .sclk_en()
+                .bit_is_set()
         }
 
         #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
