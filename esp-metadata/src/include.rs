@@ -5,7 +5,11 @@ use anyhow::{Context, Result, bail, ensure};
 const INCLUDE_PREFIX: &str = "# {include ";
 
 /// Expand `# {include <path>}` markers in `content`, resolving paths relative to `base_path`.
-pub(crate) fn expand_includes(content: &str, base_path: &Path, devices_dir: &Path) -> Result<String> {
+pub(crate) fn expand_includes(
+    content: &str,
+    base_path: &Path,
+    devices_dir: &Path,
+) -> Result<String> {
     let mut chain = vec![normalize_path(base_path)];
     expand_includes_recursive(content, base_path, devices_dir, &mut chain)
 }
@@ -143,8 +147,7 @@ mod tests {
     }
 
     fn devices_dir() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/include")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/include")
     }
 
     #[test]
