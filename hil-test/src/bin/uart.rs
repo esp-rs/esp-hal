@@ -373,6 +373,55 @@ mod tests {
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
+
+    // Regression test for UART0 SCLK being disabled before reset or sleep.
+    // See <https://github.com/esp-rs/esp-hal/issues/4952>.
+    #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+    #[test]
+    fn dropping_uart0_keeps_sclk_enabled(ctx: Context) {
+        disable_uart0_sclk();
+        assert!(!uart0_sclk_enabled());
+
+        drop(ctx.uart0);
+        assert!(uart0_sclk_enabled());
+    }
+
+    #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+    fn disable_uart0_sclk() {
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
+        esp_hal::peripherals::UART0::regs().clk_conf().modify(|_, w| {
+            w.sclk_en().clear_bit();
+            w.rx_sclk_en().clear_bit();
+            w.tx_sclk_en().clear_bit()
+        });
+
+        #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+        esp_hal::peripherals::PCR::regs()
+            .uart(0)
+            .clk_conf()
+            .modify(|_, w| w.sclk_en().clear_bit());
+    }
+
+    #[cfg(any(esp32c3, esp32s3, esp32c6, esp32h2))]
+    fn uart0_sclk_enabled() -> bool {
+        #[cfg(any(esp32c2, esp32c3, esp32s3))]
+        {
+            let clk_conf = esp_hal::peripherals::UART0::regs().clk_conf().read();
+            clk_conf.sclk_en().bit_is_set()
+                && clk_conf.rx_sclk_en().bit_is_set()
+                && clk_conf.tx_sclk_en().bit_is_set()
+        }
+
+        #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+        {
+            esp_hal::peripherals::PCR::regs()
+                .uart(0)
+                .clk_conf()
+                .read()
+                .sclk_en()
+                .bit_is_set()
+        }
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
