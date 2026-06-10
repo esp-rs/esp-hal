@@ -18,7 +18,7 @@ Commands:
   semver-check               Semver Checks
   check-changelog            Check the changelog for packages
   update-chip-support-table  Re-generate the chip support table in the esp-hal README
-  host-tests                 Run host tests for all the packages where they are present
+  host-tests                 Run host tests for packages with registered instructions (see below)
   check-global-symbols       Check global symbols in the compiled `.rlib`
   help                       Print this message or the help of the given subcommand(s)
 
@@ -57,6 +57,80 @@ Ensure bug-fix PRs are cherry-picked to the backport branch first (label with
 The standard `plan` → `execute-plan` → `publish-plan` → `post-release` flow
 works from a backport branch — the tooling auto-detects it, scopes to the
 single backport package, and forces Patch bumps. No `--allow-non-main` needed.
+
+## Host tests
+
+`cargo xtask host-tests` runs host-side unit tests. CI invokes it for every
+package where `Package::has_host_tests` finds a `#[test]` function under
+`src/**/*.rs`.
+
+**Detection is not enough.** Each package with host tests also needs a match arm
+in `run_host_tests` (`xtask/src/lib.rs`). Without it, xtask fails with
+`Instructions for host testing were not provided for: '<package>'` even though
+the tests compile with `cargo test -p <package>`.
+
+When adding host tests to a package:
+
+1. Add the tests (`#[test]` in `src/`, and/or `tests/*.rs` integration tests).
+2. Add a `Package::<Name> => { ... }` arm to `run_host_tests` with the right
+   `cargo test` invocation (features, `--lib`, `--tests`, Miri, etc.). Copy a
+   similar package if unsure.
+3. Verify with `cargo xtask host-tests <package>`.
+
+## Package metadata: `check-configs`, `clippy-configs`, `doc-config`, `semver-config`
+
+Published crates can list CI check, clippy, documentation, and semver cases under
+`[package.metadata.espressif]` in their `Cargo.toml`. Each case is one inline table; `features`
+and `env` are both optional:
+
+```toml
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    {
+        features = ["unstable", "rt"],
+        env = {
+            ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = "generic"
+        },
+    },
+    { features = ["unstable", "rt"], append = [
+        { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
+    ] },
+]
+clippy-configs = [
+    { features = ["unstable", "rt"] },
+]
+doc-config = {
+    features = ["unstable", "rt"],
+    append = [
+        { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
+    ],
+}
+semver-config = {
+    features = ["unstable", "rt"],
+    append = [
+        { if = 'wifi_driver_supported', features = ["wifi"] },
+    ],
+}
+```
+
+- `features` — cargo features to enable for that case (same as before).
+- `env` — optional inline table of environment variables passed to the cargo invocation.
+  Mainly used for `esp-config` options (`ESP_*` variables). Omit when no overrides are needed.
+- `if` — optional somni expression; the whole case is skipped when the condition is false.
+- `append` — optional list of partial inline tables. Matching rows add more `features` and/or
+  `env` entries. Append rows may specify only `features` or only `env`.
+
+`check-configs` and `clippy-configs` are arrays of cases. `doc-config` and `semver-config` are
+single inline tables.
+
+`cargo xtask check-packages` reads `check-configs`; `cargo xtask lint-packages` reads
+`clippy-configs`; documentation builds read `doc-config`; semver checks read `semver-config`. If `check-configs` is absent, a single
+default case with no features and no env overrides is used. `CI`, `DEFMT_LOG`, and `ESP_LOG`
+(check only) are always set by xtask and override duplicate keys from metadata. Documentation
+builds and doc-tests always set `RUSTDOCFLAGS` (and `ESP_HAL_DOCTEST` for doc-tests) and override
+duplicate keys from `doc-config`. Semver checks always set `RUSTDOCFLAGS` and override duplicate
+keys from `semver-config`.
 
 ## Test/example metadata use
 

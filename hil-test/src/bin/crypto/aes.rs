@@ -429,6 +429,7 @@ mod tests {
 
         let dma_channel = cfg_select! {
             esp32s2 => peripherals.DMA_CRYPTO,
+            esp32p4 => peripherals.DMA_AXI_CH0,
             _ => peripherals.DMA_CH0,
         };
 
@@ -604,6 +605,7 @@ mod work_queue_dma_tests {
 
         let dma = cfg_select! {
             esp32s2 => p.DMA_CRYPTO,
+            esp32p4 => p.DMA_AXI_CH0,
             _ => p.DMA_CH0,
         };
 

@@ -24,7 +24,7 @@ on:
         description: '"hil-test", "hil-test-radio", or "all"'
         required: false
         type: string
-        default: "all"
+        default: "hil-test"
       # Not used by the workflow_call path, but referenced in run-name; declared
       # here (with empty defaults) so that expression is well-defined for both
       # triggers.
@@ -60,7 +60,7 @@ on:
         default: ""
       package:
         description: '"hil-test", "hil-test-radio", or "all"'
-        default: "all"
+        default: "hil-test"
       distinct_id:
         description: "Correlation marker set by the dispatcher; do not set manually"
         required: false
@@ -293,6 +293,9 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
+
+          espflash board-info
+
           ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up

@@ -14,10 +14,6 @@
 //! * SHA-384
 //! * SHA-512
 //!
-//! The driver supports two working modes:
-//! * Typical SHA (CPU-driven)
-//! * DMA-SHA (not supported yet)
-//!
 //! It provides functions to update the hash calculation with input data, finish
 //! the hash calculation and retrieve the resulting hash value. The SHA
 //! peripheral on ESP chips can handle large data streams efficiently, making it

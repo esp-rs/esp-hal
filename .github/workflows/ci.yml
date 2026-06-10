@@ -44,7 +44,6 @@ jobs:
       run-docs: ${{ steps.decide.outputs.run-docs }}
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
       run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
-      run-extras: ${{ steps.decide.outputs.run-extras }}
       run-hil: ${{ steps.decide.outputs.run-hil }}
       run-changelog: ${{ steps.decide.outputs.run-changelog }}
       run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
@@ -88,13 +87,13 @@ jobs:
         env:
           LABELS: ${{ steps.labels.outputs.labels }}
         run: |
-          BUILD=true; DOCS=true; MSRV=true; HOST=true; EXTRAS=true
+          BUILD=true; DOCS=true; MSRV=true; HOST=true
           HIL=true; CHANGELOG=true; SEMVER=true
 
           # `skip-ci-non-code-change` only skips building/testing; API checks (semver) still run.
           # Use the dedicated `skip-semver-checks` label to skip semver checks.
           if echo "$LABELS" | grep -qw 'skip-ci-non-code-change'; then
-            BUILD=false; DOCS=false; MSRV=false; HOST=false; EXTRAS=false
+            BUILD=false; DOCS=false; MSRV=false; HOST=false
             HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
@@ -105,14 +104,13 @@ jobs:
             "run-docs=$DOCS" \
             "run-msrv=$MSRV" \
             "run-host-tests=$HOST" \
-            "run-extras=$EXTRAS" \
             "run-hil=$HIL" \
             "run-changelog=$CHANGELOG" \
             "run-semver-check=$SEMVER"; do
             echo "$pair" >> "$GITHUB_OUTPUT"
           done
 
-          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST extras=$EXTRAS hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
 
   # --------------------------------------------------------------------------
   # Build Packages
@@ -130,19 +128,20 @@ jobs:
       HOST_IP: 1.1.1.1
 
     strategy:
-      fail-fast: false
       matrix:
         # load-blance runners a bit
         group:
-          - xtensa
-          - riscv
+          - chips: [esp32, esp32s2, esp32s3, esp32c2, esp32c3]
+            toolchain: esp
+          - chips: [esp32c5, esp32c6, esp32c61, esp32h2, esp32p4]
+            toolchain: stable
 
     steps:
       - uses: actions/checkout@v6
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: matrix.group.toolchain == 'esp'
         with:
           version: 1.96.0.0
 
@@ -159,50 +158,16 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa
-        if: matrix.group == 'xtensa'
+      - name: Build and Check
         shell: bash
+        env:
+          CHIPS: ${{ join(matrix.group.chips, ' ') }}
+          TOOLCHAIN: ${{ matrix.group.toolchain }}
         run: |
           # lints and docs are checked separately
-          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-
-      - name: Build and Check RISC-V
-        if: matrix.group == 'riscv'
-        shell: bash
-        run: |
-          # lints and docs are checked separately
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32p4 --toolchain stable --no-lint --no-docs
-
-  extras:
-    needs: calculate
-    if: needs.calculate.outputs.run-extras == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      # Install dependencies for building the extra crates on ubuntu
-      - name: Install dependencies
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
-      # Build the extra crates
-      - name: Build the bench-server
-        run: cd extras/bench-server && cargo build
-      - name: Build esp-wifishark
-        run: cd extras/esp-wifishark && cargo build
-      - name: Build ieee802154-sniffer
-        run: cd extras/ieee802154-sniffer && cargo build
+          for chip in $CHIPS; do
+            cargo xcheck ci "$chip" --toolchain "$TOOLCHAIN" --no-lint --no-docs
+          done
 
   docs:
     needs: calculate
@@ -373,6 +338,18 @@ jobs:
             examples
             extras
             xtask
+
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+      # Build the extra crates
+      - name: Build the bench-server
+        run: cd extras/bench-server && cargo build
+      - name: Build esp-wifishark
+        run: cd extras/esp-wifishark && cargo build
+      - name: Build ieee802154-sniffer
+        run: cd extras/ieee802154-sniffer && cargo build
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
@@ -611,6 +588,9 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
+
+          espflash board-info
+
           ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
 
       - name: Clean up
@@ -651,13 +631,12 @@ jobs:
   # hil-build gates test compilation.  hil-gate gates device runs when ≥50% of
   # executed hil-run matrix legs fail.  hil-run-radio is informational only.
   ci-result:
-    if: always()
+    if: ${{ !failure() }}
     needs:
       - esp-hal
       - docs
       - msrv
       - host-tests
-      - extras
       - changelog
       - semver-check
       - hil-build

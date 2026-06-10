@@ -18,6 +18,9 @@ check-configs = [
     { features = ["esp-hal/unstable", "esp-radio"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
     { features = ["esp-hal/unstable", "esp-alloc", "embassy"] },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_STACK_POINTER_RANGE_CHECK = "false" } },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_SW_TASK_OVERFLOW_DETECTION = "true", ESP_RTOS_CONFIG_HW_TASK_OVERFLOW_DETECTION = "false" } },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_SW_TASK_OVERFLOW_DETECTION = "true", ESP_RTOS_CONFIG_HW_TASK_OVERFLOW_DETECTION = "true" } },
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "esp-alloc", "defmt", "esp-radio", "embassy"] },

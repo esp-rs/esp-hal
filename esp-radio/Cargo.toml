@@ -30,6 +30,7 @@ semver-config = { features = ["esp-hal/rt", "esp-alloc/global-allocator", "procm
 check-configs = [
     { features = ["esp-hal/rt"] },
     { features = ["esp-hal/rt", "defmt"] },
+    { features = ["esp-hal/rt", "defmt"], env = { ESP_RADIO_CONFIG_DUMP_PACKETS = "true" } },
     { features = ["esp-hal/rt", "wifi"], if = 'wifi_driver_supported' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'wifi_driver_supported && xtensa' },
@@ -90,15 +91,15 @@ esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true }
 esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true }
 esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true }
 
-esp32   = { version = "0.40", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.29", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.32", features = ["critical-section"], optional = true }
-esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.23", features = ["critical-section"], optional = true }
-esp32c61 = { version = "0.3", features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.19", features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.35", features = ["critical-section"], optional = true }
+esp32   = { version = "0.40", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32c2 = { version = "0.29", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32c3 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32c6 = { version = "0.23", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32c61 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32h2 = { version = "0.19", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32s2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
+esp32s3 = { version = "0.35", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "9504df468a04b67b960dc5cc7430788efa257207" }
 
 # Optional dependencies enabling ecosystem features
 embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }
