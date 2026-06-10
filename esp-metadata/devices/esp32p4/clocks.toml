@@ -1,0 +1,216 @@
+system_clocks = { clock_tree = [
+    # High-speed clock sources
+    { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
+    { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # eco5 default 400MHz
+    { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480_000_000" }, # System PLL
+    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500_000_000" }, # Media PLL
+    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
+
+    # Low-speed clocks
+    { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
+    { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
+    { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
+    { name = "RC32K_CLK",    type = "source", output = "32768"   },
+
+    # SPLL divider taps
+    { name = "PLL_F20M",  type = "generic", output = "SPLL_CLK / 24" },
+    { name = "PLL_F80M",  type = "generic", output = "SPLL_CLK / 6"  },
+    { name = "PLL_F120M", type = "generic", output = "SPLL_CLK / 4"  },
+    { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
+    { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
+
+    # MPLL divider taps
+    { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
+    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10"  },
+
+    # XTAL half
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
+
+    # CPU root clock (LP_AON_CLKRST.hp_clk_ctrl.hp_root_clk_src_sel)
+    { name = "CPU_ROOT_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "XTAL_CLK" },
+        { name = "CPLL",    outputs = "CPLL_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+    ] },
+
+    # TODO: model fractional divider parameters
+    # CPU_CLK divider (HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num)
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
+    # MEM_CLK divider
+    { name = "MEM_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
+    # SYS_CLK divider
+    { name = "SYS_CLK", type = "generic", params = { divisor = "0..256" }, output = "MEM_CLK / (divisor + 1)" },
+    # APB_CLK divider
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "SYS_CLK / (divisor + 1)" },
+
+    # LP clocks
+    { name = "LP_FAST_CLK", type = "mux", variants = [
+        { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_D2", outputs = "XTAL_D2_CLK" },
+    ] },
+    { name = "LP_SLOW_CLK", type = "mux", variants = [
+        { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        #{ name = "RC32K",    outputs = "RC32K_CLK" },
+        { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
+    ] },
+
+    # TIMG0-only?
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "MPLL_CLK",        outputs = "MPLL_CLK" },
+        { name = "SPLL_CLK",        outputs = "SPLL_CLK" },
+        { name = "CPLL_CLK",        outputs = "CPLL_CLK" },
+        #{ name = "APLL_CLK",        outputs = "APLL_CLK" },
+        #{ name = "SDIO_PLL0_CLK",   outputs = "SDIO_PLL0_CLK" },
+        #{ name = "SDIO_PLL1_CLK",   outputs = "SDIO_PLL1_CLK" },
+        #{ name = "SDIO_PLL2_CLK",   outputs = "SDIO_PLL2_CLK" },
+        { name = "RC_FAST_CLK",     outputs = "RC_FAST_CLK" },
+        { name = "RC_SLOW_CLK",     outputs = "LP_SLOW_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        #{ name = "PLL_LP_CLK",      outputs = "PLL_LP_CLK" },
+    ] },
+], template_groups = [
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F80M", outputs = "PLL_F80M" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+        ] },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
+    { group = "I2C", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+    ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+            # { name = "SDIO_PLL0", outputs = "SDIO_PLL0_CLK" },
+            # { name = "APLL", outputs = "APLL_CLK" },
+            { name = "SPLL",    outputs = "SPLL_CLK" },
+        ] },
+    ] },
+    # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
+    # because it is not yet modelled in the clock tree.
+    { group = "MIPI_DSI", clocks = [
+        # Pixel clock for the DPI (video) interface
+        { name = "DPI_CLK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",      outputs = "XTAL_CLK",  default = true },
+            { name = "PLL_F240M", outputs = "PLL_F240M" },
+            { name = "PLL_F160M", outputs = "PLL_F160M" },
+        ], div_num = "0 .. 0x100" } },
+        # Reference for the D-PHY internal PLL
+        { name = "PHY_PLL_REFCLK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL", outputs = "XTAL_CLK", default = true },
+            { name = "CPLL", outputs = "CPLL_CLK" },
+            { name = "SPLL", outputs = "SPLL_CLK" },
+            { name = "MPLL", outputs = "MPLL_CLK" },
+        ], div_num = "0 .. 0x100" } },
+        # Low-speed configuration clock for the D-PHY
+        { name = "PHY_CFG_CLK", type = "mux", variants = [
+            { name = "PLL_F20M", outputs = "PLL_F20M",    default = true },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "PLL_F25M", outputs = "PLL_F25M" },
+        ] },
+    ] },
+] }
+
+peripheral_clocks = { templates = [
+    # ESP32-P4 peripheral clock and reset gates -- all live in HP_SYS_CLKRST.
+    # Clock enables: SOC_CLK_CTRL0/1/2 + PERI_CLK_CTRL{21,26}.
+    # Resets:        HP_RST_EN0/1/2.
+    # Each peripheral overrides {{default_clk_en_template}} / {{default_rst_template}}
+    # to select the right shared register + bit field.
+    { name = "clk_en_template",         value = "{{default_clk_en_template}}" },
+    { name = "rst_template",            value = "{{default_rst_template}}" },
+    { name = "default_clk_en_template", value = "let _ = enable;" },
+    { name = "default_rst_template",    value = "let _ = reset;" },
+    # Reusable clock-enable building blocks (composed via {{default_clk_en_template}} = "{{X}}").
+    { name = "sys_clk_template",        value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.{{sys_field}}().bit(enable));" },
+    { name = "apb_clk_template",        value = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.{{apb_field}}().bit(enable));" },
+    { name = "sys_apb_clk_template",    value = "{{sys_clk_template}} {{apb_clk_template}}" },
+    { name = "crypto_clk_template",     value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.crypto_sys_clk_en().bit(enable));" },
+    # Reusable reset building blocks. Reset bit name is supplied via {{rst_field}}.
+    { name = "rst_en0_template",        value = "{{control}}::regs().hp_rst_en0().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "rst_en1_template",        value = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "rst_en2_template",        value = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "control",                 value = "crate::peripherals::HP_SYS_CLKRST" },
+], peripheral_clocks = [
+    # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
+    # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
+    { name = "Uart0", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart0_sys_clk_en", apb_field = "uart0_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart0_core().bit(reset).rst_en_uart0_apb().bit(reset));" }, keep_enabled = true },
+    { name = "Uart1", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart1_sys_clk_en", apb_field = "uart1_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart1_core().bit(reset).rst_en_uart1_apb().bit(reset));" } },
+    { name = "Uart2", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart2_sys_clk_en", apb_field = "uart2_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart2_core().bit(reset).rst_en_uart2_apb().bit(reset));" } },
+    { name = "Uart3", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart3_sys_clk_en", apb_field = "uart3_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart3_core().bit(reset).rst_en_uart3_apb().bit(reset));" } },
+    { name = "Uart4", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart4_sys_clk_en", apb_field = "uart4_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart4_core().bit(reset).rst_en_uart4_apb().bit(reset));" } },
+    # SPI -- sys_clk + apb_clk; reset in HP_RST_EN2.
+    { name = "Spi2", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi2_sys_clk_en", apb_field = "gpspi2_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_spi2" } },
+    { name = "Spi3", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi3_sys_clk_en", apb_field = "gpspi3_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_spi3" } },
+    # I2C master -- apb_clk only; reset in HP_RST_EN1.
+    { name = "I2c0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2c0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_i2c0" } },
+    { name = "I2c1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2c1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_i2c1" } },
+    # I2S -- apb_clk; reset in HP_RST_EN2.
+    { name = "I2s0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s0_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s0_apb" } },
+    { name = "I2s1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s1_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s1_apb" } },
+    { name = "I2s2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "i2s2_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_i2s2_apb" } },
+    # Timers -- Systimer also needs PERI_CLK_CTRL21.systimer_clk_en gate.
+    { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.systimer_apb_clk_en().bit(enable)); {{control}}::regs().peri_clk_ctrl21().modify(|_, w| w.systimer_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_stimer" }, keep_enabled = true },
+    { name = "Timg0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp0" }, keep_enabled = true },
+    { name = "Timg1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_timergrp1" } },
+    # IO MUX -- gated via PERI_CLK_CTRL26; KEEP_ENABLED because GPIO depends on it.
+    { name = "Iomux", template_params = { default_clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_iomux" }, keep_enabled = true },
+    # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
+    { name = "Ledc",   template_params = { default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ledc" } },
+    { name = "Pcnt",   template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "pcnt_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pcnt" } },
+    { name = "Mcpwm0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm0" } },
+    { name = "Mcpwm1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_pwm1" } },
+    # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.
+    { name = "Rmt", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "rmt_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_rmt" } },
+    # TWAI (CAN) -- reset bits named can0/can1/can2 in PAC.
+    { name = "Twai0", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai0_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can0" } },
+    { name = "Twai1", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai1_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can1" } },
+    { name = "Twai2", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "twai2_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_can2" } },
+    # USB -- reset is via LP-domain registers, leave rst as no-op here.
+    { name = "UsbFs",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg11_sys_clk_en" } },
+    { name = "UsbHs",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg20_sys_clk_en" } },
+    { name = "UsbDevice", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "usb_device_apb_clk_en" }, keep_enabled = true },
+    # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
+    { name = "Emac",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "emac_sys_clk_en" } },
+    { name = "Sdmmc", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en" } },
+    { name = "Uhci",  template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_uhci" } },
+    # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
+    { name = "Aes",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_aes" } },
+    { name = "Sha",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_sha" } },
+    { name = "Rsa",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_rsa" } },
+    { name = "Ecc",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecc" } },
+    { name = "Ecdsa", template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecdsa" } },
+    { name = "Hmac",  template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_hmac" } },
+    { name = "Ds",    template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ds" } },
+    # DMA
+    { name = "AhbGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
+    { name = "AxiGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_axi_pdma" } },
+    { name = "Vdma",    template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en",     default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_gdma" } },
+    # ADC.
+    { name = "Adc", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "adc_apb_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_adc" } },
+    # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
+    { name = "ParlIo", template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "parlio_sys_clk_en", apb_field = "parlio_apb_clk_en", default_rst_template = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
+    # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
+    { name = "LcdCam", template_params = { default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_lcdcam" } },
+    # MIPI-DSI -- sys_clk in SOC_CLK_CTRL1; bridge reset in HP_RST_EN0.
+    { name = "MipiDsi", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "dsi_sys_clk_en", default_rst_template = "{{rst_en0_template}}", rst_field = "rst_en_dsi_brg" } },
+] }

@@ -1,0 +1,157 @@
+system_clocks = { clock_tree = [
+    # High-speed clock sources
+    { name = "XTAL_CLK",    type = "source",  values = "40",                          output = "VALUE * 1_000_000", always_on = true },
+    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480", output = "VALUE * 1_000_000" },
+    { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000" },
+
+    # Low-speed clocks
+    { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
+    { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" },
+    { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
+
+    # CPU clock source dividers
+    { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
+        { name = "XTAL",    outputs = "XTAL_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+    ] },
+    { name = "SYSTEM_PRE_DIV",  type = "generic", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    # PLL CLK divider, modeled as a generic derived source because valid divider values depend on the PLL frequency
+    { name = "CPU_PLL_DIV_OUT", type = "derived", from = "PLL_CLK", values = "80, 160", output = "VALUE * 1_000_000" },
+
+    # The meta-switch
+    { name = "CPU_CLK", type = "mux", always_on = true, variants = [
+        # source clock      CPU clock                    additional config (mux = variant name, divider = divisor expression)
+        { name = "XTAL",    outputs = "SYSTEM_PRE_DIV",  configures = [ "APB_CLK = CPU",     "CRYPTO_CLK = CPU",      "SYSTEM_PRE_DIV_IN = XTAL"    ] },
+        { name = "RC_FAST", outputs = "SYSTEM_PRE_DIV",  configures = [ "APB_CLK = CPU",     "CRYPTO_CLK = CPU",      "SYSTEM_PRE_DIV_IN = RC_FAST" ] },
+        { name = "PLL",     outputs = "CPU_PLL_DIV_OUT", configures = [ "APB_CLK = PLL_80M", "CRYPTO_CLK = PLL_160M" ] },
+    ] },
+
+    # CPU-dependent clock signals
+    { name = "PLL_80M",  type = "derived", from = "CPU_CLK", output = "80_000_000"  },
+    { name = "PLL_160M", type = "derived", from = "CPU_CLK", output = "160_000_000" },
+
+    { name = "APB_CLK", type = "mux", variants = [
+        { name = "PLL_80M", outputs = "PLL_80M" },
+        { name = "CPU",     outputs = "CPU_CLK" },
+    ] },
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "PLL_160M", outputs = "PLL_160M" },
+        { name = "CPU",      outputs = "CPU_CLK"  },
+    ] },
+
+    # Low-power clocks
+    { name = "RC_FAST_CLK_DIV_N", type = "generic", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" },
+    { name = "XTAL_DIV_CLK",      type = "generic", output = "XTAL_CLK / 2" },
+    { name = "RTC_SLOW_CLK", type = "mux", variants = [
+        { name = "XTAL32K", outputs = "XTAL32K_CLK" },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
+    ] },
+    { name = "RTC_FAST_CLK", type = "mux", variants = [
+        { name = "XTAL", outputs = "XTAL_DIV_CLK" },
+        { name = "RC",   outputs = "RC_FAST_CLK_DIV_N" },
+    ] },
+
+    # Low-power wireless clock source
+    { name = "LOW_POWER_CLK", type = "mux", variants = [
+        { name = "XTAL",     outputs = "XTAL_CLK" },
+        { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
+    ] },
+
+    # System-wide peripheral clocks
+    { name = "UART_MEM_CLK", type = "mux", variants = [
+        # The actual source clock is unknown, but it also doesn't matter.
+        { name = "XTAL", outputs = "XTAL_CLK", default = true },
+    ] },
+    # There are separate clock muxes for each TIMG instance, but esp-hal only uses one. Only modelling
+    # one makes the HAL code simpler.
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+    ] },
+], template_groups = [
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
+            { name = "APB_CLK",  outputs = "APB_CLK" },
+        ] },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "APB_CLK",  outputs = "APB_CLK", default = true },
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        ] },
+    ] },
+    { group = "RMT", clocks = [
+        { name = "SCLK", type = "mux", variants = [
+            { name = "APB_CLK",     outputs = "APB_CLK", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        ] },
+    ] },
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
+        ], div_num = "0 .. 0x100" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "I2C", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+    ] },
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "PLL_80M", outputs = "PLL_80M" },
+        ] },
+    ] },
+] }
+
+peripheral_clocks = { templates = [
+    # templates
+    { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "rst_template", value = "{{control}}::regs().{{rst_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "reg_group", value = "en0" },
+    { name = "clk_en_register", value = "perip_clk_{{reg_group}}" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_register", value = "perip_rst_{{reg_group}}" },
+    { name = "rst_field", value = "{{peripheral}}_rst" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    { name = "Tsens", template_params = { reg_group = "en1" } },
+    { name = "AhbGdma", template_params = { reg_group = "en1", peripheral = "dma" } },
+    { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
+    { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
+    { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
+    { name = "Sha", template_params = { reg_group = "en1", peripheral = "crypto_sha" } },
+    { name = "Aes", template_params = { reg_group = "en1", peripheral = "crypto_aes" } },
+
+    #{ name = "Adc2Arb" },
+    { name = "Systimer", keep_enabled = true },
+    { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
+    #{ name = "Spi3Dma" },
+    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UsbDevice", keep_enabled = true },
+    { name = "I2s0" },
+    { name = "Twai0", template_params = { peripheral = "twai" } },
+    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
+    { name = "Ledc" },
+    { name = "Rmt" },
+    { name = "Uhci0" },
+    { name = "I2cExt0" },
+    { name = "Spi2" },
+    { name = "Uart1" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    #{ name = "Spi01" },
+    
+    # Radio clocks not modeled here.
+] }

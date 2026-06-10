@@ -378,16 +378,16 @@ impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => cached_device_config!("devices/esp32.toml"),
-            Chip::Esp32c2 => cached_device_config!("devices/esp32c2.toml"),
-            Chip::Esp32c3 => cached_device_config!("devices/esp32c3.toml"),
-            Chip::Esp32c5 => cached_device_config!("devices/esp32c5.toml"),
-            Chip::Esp32c6 => cached_device_config!("devices/esp32c6.toml"),
-            Chip::Esp32c61 => cached_device_config!("devices/esp32c61.toml"),
-            Chip::Esp32h2 => cached_device_config!("devices/esp32h2.toml"),
-            Chip::Esp32p4 => cached_device_config!("devices/esp32p4.toml"),
-            Chip::Esp32s2 => cached_device_config!("devices/esp32s2.toml"),
-            Chip::Esp32s3 => cached_device_config!("devices/esp32s3.toml"),
+            Chip::Esp32 => cached_device_config!("devices/esp32/soc.toml"),
+            Chip::Esp32c2 => cached_device_config!("devices/esp32c2/soc.toml"),
+            Chip::Esp32c3 => cached_device_config!("devices/esp32c3/soc.toml"),
+            Chip::Esp32c5 => cached_device_config!("devices/esp32c5/soc.toml"),
+            Chip::Esp32c6 => cached_device_config!("devices/esp32c6/soc.toml"),
+            Chip::Esp32c61 => cached_device_config!("devices/esp32c61/soc.toml"),
+            Chip::Esp32h2 => cached_device_config!("devices/esp32h2/soc.toml"),
+            Chip::Esp32p4 => cached_device_config!("devices/esp32p4/soc.toml"),
+            Chip::Esp32s2 => cached_device_config!("devices/esp32s2/soc.toml"),
+            Chip::Esp32s3 => cached_device_config!("devices/esp32s3/soc.toml"),
         }
     }
 
