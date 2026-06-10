@@ -5,7 +5,7 @@
 //! The easiest way to reproduce the crash is to press Ctrl+R during the Wi-Fi phase.
 //! In the next iteration, when it enters the BLE phase, it should crash immediately.
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/ble esp-radio/unstable esp-hal/unstable
-//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported && !esp32c2 && !esp32c61
+//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported
 
 #![no_std]
 #![no_main]
@@ -36,34 +36,40 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// Iteration counter, retained across software resets.
 ///
 /// Most chips keep it in persistent RTC fast RAM: zeroed once on the initial
-/// (power-on) boot, then preserved thereafter. The ESP32-C2 has no RTC fast RAM,
-/// so it stashes the counter in an otherwise-unused RTC_CNTL scratch register
-/// (`STORE6`), which likewise survives a software reset and is cleared only on
+/// (power-on) boot, then preserved thereafter. The ESP32-C2 and ESP32-C61 have
+/// no persistent RTC fast RAM, so they stash the counter in an otherwise-unused
+/// always-on scratch register (`STORE6`) - on C2 in `RTC_CNTL`, on C61 in
+/// `LP_AON` - which likewise survives a software reset and is cleared only on
 /// power-on reset.
-#[cfg(not(feature = "esp32c2"))]
+#[cfg(not(any(feature = "esp32c2", feature = "esp32c61")))]
 #[ram(unstable(rtc_fast, persistent))]
 static mut ITERATION: u32 = 0;
 
-#[cfg(not(feature = "esp32c2"))]
 fn load_iteration() -> u32 {
-    unsafe { ITERATION }
+    cfg_select! {
+        feature = "esp32c2" => {
+            esp_hal::peripherals::LPWR::regs().store6().read().bits()
+        },
+        feature = "esp32c61" => {
+            esp_hal::peripherals::LP_AON::regs().store6().read().bits()
+        },
+        _ => unsafe { ITERATION },
+    }
 }
-
-#[cfg(not(feature = "esp32c2"))]
 fn store_iteration(value: u32) {
-    unsafe { ITERATION = value };
-}
-
-#[cfg(feature = "esp32c2")]
-fn load_iteration() -> u32 {
-    esp_hal::peripherals::LPWR::regs().store6().read().bits()
-}
-
-#[cfg(feature = "esp32c2")]
-fn store_iteration(value: u32) {
-    esp_hal::peripherals::LPWR::regs()
-        .store6()
-        .write(|w| unsafe { w.bits(value) });
+    cfg_select! {
+        feature = "esp32c2" => {
+            esp_hal::peripherals::LPWR::regs()
+                .store6()
+                .write(|w| unsafe { w.bits(value) });
+        },
+        feature = "esp32c61" => {
+            esp_hal::peripherals::LP_AON::regs()
+                .store6()
+                .write(|w| unsafe { w.bits(value) });
+        },
+        _ => unsafe { ITERATION = value },
+    }
 }
 
 const AP_SSID: &str = "esp-handoff";
@@ -92,15 +98,15 @@ struct BatteryService {
 }
 
 fn init_heap() {
-    #[cfg(feature = "esp32")]
-    {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
-        esp_alloc::heap_allocator!(size: 24 * 1024);
-    }
-    #[cfg(not(feature = "esp32"))]
-    {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
-        esp_alloc::heap_allocator!(size: 64 * 1024);
+    cfg_select! {
+        feature = "esp32" => {
+            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
+            esp_alloc::heap_allocator!(size: 24 * 1024);
+        },
+        _ => {
+            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+            esp_alloc::heap_allocator!(size: 64 * 1024);
+        },
     }
 }
 
