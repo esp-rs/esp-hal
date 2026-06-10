@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .contains("rust-analyzer");
 
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_slave_i2c1)");
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && (level == "0" || level == "1")
     {
