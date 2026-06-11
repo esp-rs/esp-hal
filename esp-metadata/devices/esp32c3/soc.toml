@@ -118,20 +118,25 @@ has_region_monitor = true
 support_status = "partial"
 gdma_version = 1
 mem2mem_requires_peripheral = true
-max_priority = 9
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"], peripheral_instances = [
-        { name = "SPI2", dma_id = 0 },
-        { name = "UHCI0", dma_id = 2 },
-        { name = "I2S0", dma_id = 3 },
-        { name = "AES", dma_id = 6 },
-        { name = "SHA", dma_id = 7 },
-        { name = "APB_SARADC", dma_id = 8 },
-    ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
-        { name = "DMA_CH1", mem2mem = true, interrupt = "DMA_CH1" },
-        { name = "DMA_CH2", mem2mem = true, interrupt = "DMA_CH2" },
-    ] },
+    {
+        name = "AHB_GDMA",
+        max_priority = 9,
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"],
+        peripheral_instances = [
+            { name = "SPI2", dma_id = 0 },
+            { name = "UHCI0", dma_id = 2 },
+            { name = "I2S0", dma_id = 3 },
+            { name = "AES", dma_id = 6 },
+            { name = "SHA", dma_id = 7 },
+            { name = "APB_SARADC", dma_id = 8 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, interrupt = "DMA_CH0" },
+            { name = "DMA_CH1", mem2mem = true, interrupt = "DMA_CH1" },
+            { name = "DMA_CH2", mem2mem = true, interrupt = "DMA_CH2" },
+        ]
+    },
 ]
 
 [device.gpio]

@@ -36,7 +36,7 @@ fn load_device_config(relative_path: &str) -> Config {
         })
         .unwrap();
 
-    let config: Config = basic_toml::from_str(&content)
+    let config: Config = toml::from_str(&content)
         .with_context(|| format!("Failed to parse device configuration: {}", path.display()))
         .unwrap();
 
@@ -949,11 +949,15 @@ pub fn generate_build_script_utils() -> TokenStream {
                     .map(|pin| {
                         let num = number(pin.pin);
                         let limitations = pin.limitations().into_iter().map(|limitation| {
-                            TokenStream::from_str(
-                                &basic_toml::to_string(&limitation)
-                                    .expect("Serializing limitations should be infallible"),
+                            let mut value = String::new();
+                            serde::Serialize::serialize(
+                                &limitation,
+                                toml::ser::ValueSerializer::new(&mut value),
                             )
-                            .expect("Valid TOML string can be re-parsed as Rust strings")
+                            .expect("Serializing limitations should be infallible");
+
+                            TokenStream::from_str(&value)
+                                .expect("Valid TOML string can be re-parsed as Rust strings")
                         });
                         quote! {
                             PinInfo {

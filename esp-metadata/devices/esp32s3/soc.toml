@@ -139,28 +139,33 @@ support_status = "partial"
 gdma_version = 1
 separate_in_out_interrupts = true
 mem2mem_requires_peripheral = true
-max_priority = 9
 can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
-    { name = "AHB_GDMA", drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"], peripheral_instances = [
-        { name = "SPI2",       dma_id = 0 },
-        { name = "SPI3",       dma_id = 1 },
-        { name = "UHCI0",      dma_id = 2 },
-        { name = "I2S0",       dma_id = 3 },
-        { name = "I2S1",       dma_id = 4 },
-        { name = "LCD_CAM",    dma_id = 5 },
-        { name = "AES",        dma_id = 6 },
-        { name = "SHA",        dma_id = 7 },
-        { name = "APB_SARADC", dma_id = 8 },
-        { name = "RMT",        dma_id = 9 },
-    ], channels = [
-        { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
-        { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
-        { name = "DMA_CH3", mem2mem = true, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
-        { name = "DMA_CH4", mem2mem = true, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
-    ] },
+    {
+        name = "AHB_GDMA",
+        max_priority = 9,
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"],
+        peripheral_instances = [
+            { name = "SPI2",       dma_id = 0 },
+            { name = "SPI3",       dma_id = 1 },
+            { name = "UHCI0",      dma_id = 2 },
+            { name = "I2S0",       dma_id = 3 },
+            { name = "I2S1",       dma_id = 4 },
+            { name = "LCD_CAM",    dma_id = 5 },
+            { name = "AES",        dma_id = 6 },
+            { name = "SHA",        dma_id = 7 },
+            { name = "APB_SARADC", dma_id = 8 },
+            { name = "RMT",        dma_id = 9 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+            { name = "DMA_CH3", mem2mem = true, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+            { name = "DMA_CH4", mem2mem = true, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+        ]
+    },
 ]
 
 [device.gpio]

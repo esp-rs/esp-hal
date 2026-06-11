@@ -351,8 +351,6 @@ driver_configs![
             #[serde(default)]
             separate_in_out_interrupts: bool,
             #[serde(default)]
-            max_priority: Option<u32>,
-            #[serde(default)]
             gdma_version: Option<u32>,
             #[serde(default)]
             engines: DmaEngines,

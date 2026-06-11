@@ -85,12 +85,6 @@ macro_rules! property {
     ("dma.separate_in_out_interrupts") => {
         true
     };
-    ("dma.max_priority") => {
-        5
-    };
-    ("dma.max_priority", str) => {
-        stringify!(5)
-    };
     ("dma.gdma_version") => {
         2
     };

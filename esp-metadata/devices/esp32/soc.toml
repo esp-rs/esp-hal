@@ -130,20 +130,30 @@ instances = [
 [device.dma]
 support_status = "partial"
 engines = [
-    { name = "SPI_DMA", drivers = ["spi_master", "spi_slave"], peripheral_instances = [
-        { name = "SPI2", dma_id = 0 },
-        { name = "SPI3", dma_id = 1 },
-    ], channels = [
-        { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
-        { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
-    ] },
-    { name = "I2S_DMA", drivers = ["i2s"], peripheral_instances = [
-        { name = "I2S0", dma_id = 0 },
-        { name = "I2S1", dma_id = 1 },
-    ], channels = [
-        { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] },
-        { name = "DMA_I2S1", pac = "I2S1", interrupt = "I2S1", compatible_with = ["I2S1"] },
-    ] },
+    {
+        name = "SPI_DMA",
+        drivers = ["spi_master", "spi_slave"],
+        peripheral_instances = [
+            { name = "SPI2", dma_id = 0 },
+            { name = "SPI3", dma_id = 1 },
+        ],
+        channels = [
+            { name = "DMA_SPI2", pac = "SPI2", interrupt = "SPI2_DMA", compatible_with = ["SPI2"] },
+            { name = "DMA_SPI3", pac = "SPI3", interrupt = "SPI3_DMA", compatible_with = ["SPI3"] },
+        ]
+    },
+    {
+        name = "I2S_DMA",
+        drivers = ["i2s"],
+        peripheral_instances = [
+            { name = "I2S0", dma_id = 0 },
+            { name = "I2S1", dma_id = 1 },
+        ],
+        channels = [
+            { name = "DMA_I2S0", pac = "I2S0", interrupt = "I2S0", compatible_with = ["I2S0"] },
+            { name = "DMA_I2S1", pac = "I2S1", interrupt = "I2S1", compatible_with = ["I2S1"] },
+        ]
+    }
 ]
 
 [device.gpio]

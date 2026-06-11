@@ -91,14 +91,19 @@ has_sp_monitor = true
 [device.dma]
 support_status = "partial"
 gdma_version = 1
-max_priority = 9
 engines = [
-    { name = "AHB_GDMA", drivers = ["sha", "spi_master", "spi_slave"], peripheral_instances = [
-        { name = "SPI2", dma_id = 0 },
-        { name = "SHA", dma_id = 7 },
-    ], channels = [
-        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 2, interrupt = "DMA_CH0" }, # 2 is UHCI - not supported on chip, but DMA peripheral exists
-    ] },
+    {
+        name = "AHB_GDMA",
+        max_priority = 9,
+        drivers = ["sha", "spi_master", "spi_slave"],
+        peripheral_instances = [
+            { name = "SPI2", dma_id = 0 },
+            { name = "SHA", dma_id = 7 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 2, interrupt = "DMA_CH0" }, # 2 is UHCI - not supported on chip, but DMA peripheral exists
+        ]
+    },
 ]
 
 [device.ecc]
