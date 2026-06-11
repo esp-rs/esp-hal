@@ -1,9 +1,9 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
 //! The following wiring is assumed:
-//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5)
-//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5)
-//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5)
+//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5, c61)
+//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5, c61)
+//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5, c61)
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
