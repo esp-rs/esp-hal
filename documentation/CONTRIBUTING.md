@@ -88,6 +88,7 @@ Further steps that can (or should) be taken in testing:
 * Using [xtask], build examples for the specified chip.
 * When documentation or doctests change, run `cargo xtask build documentation` and `cargo xtask run doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and `--chips` (for documentation builds) to specify the target chip(s).
 * Run the [HIL] tests locally if changes have been made to them.
+* Run host-side unit tests with `cargo xtask host-tests` (or `cargo xtask host-tests <package>`). When adding `#[test]` functions to a package for the first time, also add a match arm for that package in `run_host_tests` in `xtask/src/lib.rs` — see [xtask/README.md#host-tests].
 
 For detailed instructions on how to use our HIL tests with comment commands, see the [HIL guide].
 

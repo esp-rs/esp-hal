@@ -216,6 +216,12 @@ impl<'d> Aes<'d> {
         }
     }
 
+    /// Clears all key registers, no key material should be left in the peripheral.
+    #[cfg(clear_crypto_secrets)]
+    fn clear_key(&mut self) {
+        self.write_key(&[0; 32]);
+    }
+
     fn write_block(&mut self, block: &[u8]) {
         for (i, word) in read_words(block).enumerate() {
             cfg_if::cfg_if! {
@@ -256,6 +262,11 @@ impl<'d> Aes<'d> {
         self.start();
         while !(self.is_idle()) {}
         self.read_block(block);
+
+        // The `key` is dropped, but the hardware retains a copy in the key registers, clear them
+        // too.
+        #[cfg(clear_crypto_secrets)]
+        self.clear_key();
     }
 
     /// Encrypts the given buffer with the given key.
@@ -321,6 +332,9 @@ impl<'d> Aes<'d> {
                 }
             }
         }
+
+        #[cfg(clear_crypto_secrets)]
+        self.clear_key();
     }
 }
 
@@ -690,6 +704,7 @@ pub mod dma {
     #[procmacros::doc_replace(
         "dma_channel" => {
             cfg(esp32s2) => "DMA_CRYPTO",
+            cfg(esp32p4) => "DMA_AXI_CH0",
             _ => "DMA_CH0"
         }
     )]
@@ -761,6 +776,7 @@ pub mod dma {
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]
@@ -793,6 +809,7 @@ pub mod dma {
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]

@@ -91,7 +91,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     }
 
     // Packages that have doc features are documented. We run doc-tests for these, and only these.
-    let Some(mut features) = package.doc_feature_rules(&esp_metadata::Config::for_chip(&chip))
+    let Some(mut doc_config) = package.doc_config_rules(&esp_metadata::Config::for_chip(&chip))
     else {
         log::info!("Skipping undocumented package {package}.");
         return Ok(true);
@@ -101,8 +101,9 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
     if package.has_chip_features() {
-        features.push(chip.to_string());
+        doc_config.features.push(chip.to_string());
     }
+    let features = &doc_config.features;
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
@@ -115,25 +116,27 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     // Build up an array of command-line arguments to pass to `cargo`:
-    let builder = CargoArgsBuilder::default()
+    let mut builder = CargoArgsBuilder::default()
         .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
         .arg("-Zbuild-std=core,alloc,panic_abort")
         .target(target)
-        .features(&features)
+        .features(features)
         .arg("--release");
 
-    let args = builder.build();
-    log::debug!("{args:#?}");
+    for (key, value) in &doc_config.env {
+        builder.add_env_var(key, value);
+    }
+    builder.add_env_var("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs");
+    builder.add_env_var("ESP_HAL_DOCTEST", "1");
 
-    let envs = vec![
-        ("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs"),
-        ("ESP_HAL_DOCTEST", "1"),
-    ];
+    let command = crate::cargo::CargoCommandBatcher::build_one_for_cargo(&builder);
+    log::debug!("{command:#?}");
 
-    // Execute `cargo doc` from the package root:
-    let success = crate::cargo::run_with_env(&args, &package_path, envs, false).is_ok();
+    let success =
+        crate::cargo::run_with_env(&command.command, &package_path, command.env_vars, false)
+            .is_ok();
     Ok(success)
 }
 

@@ -7,6 +7,7 @@ description   = "Metadata for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-metadata/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
+publish       = false
 
 [package.metadata.espressif]
 forever-unstable = true

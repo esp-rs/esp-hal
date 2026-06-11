@@ -212,6 +212,10 @@ impl ClockTreeNodeInstance {
         self.node.config_frequency_needs_instance(self, tree)
     }
 
+    fn skips_frequency_cache(&self, tree: &ProcessedClockData) -> bool {
+        self.node.skips_frequency_cache(self, tree)
+    }
+
     fn emits_config_type(&self, tree: &ProcessedClockData) -> bool {
         self.is_configurable()
             || matches!(
@@ -562,7 +566,26 @@ impl ClockTreeNodeInstance {
 
             frequency: Function {
                 _name: frequency_function_name.to_string(),
-                implementation: if self.is_configurable() {
+                implementation: if self.is_configurable() && self.skips_frequency_cache(tree) {
+                    let live_frequency_impl =
+                        self.node_frequency_impl(tree, config_frequency_receiver.as_slice());
+                    let config_fn_self = needs_instance.then_some(quote! { self }).into_iter();
+
+                    quote! {
+                        #[allow(unused_variables)]
+                        pub fn #config_frequency_function_name(
+                            #(#config_fn_self,)*
+                            clocks: &mut ClockTree,
+                            config: #ty_name,
+                        ) -> u32 {
+                            #frequency_function_impl
+                        }
+
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
+                            #live_frequency_impl
+                        }
+                    }
+                } else if self.is_configurable() {
                     let cache_name = self.freq_cache_static_name();
                     let cache_load = if self.properties.receiver.is_some() {
                         quote! { #cache_name[self as usize].load(::core::sync::atomic::Ordering::Acquire) }
@@ -880,7 +903,7 @@ impl SystemClocks {
             let Some(node) = tree.try_get_node(&node_name) else {
                 continue;
             };
-            if !node.is_configurable() {
+            if !node.is_configurable() || node.skips_frequency_cache(tree) {
                 continue;
             }
 

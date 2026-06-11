@@ -1,5 +1,9 @@
 crate: esp-hal
 
+# When adding an option whose non-default value changes the compiled code, set it via `env` in the
+# non-default `check-configs` entry in `Cargo.toml` of an appropriate crate (e.g.
+# `ESP_HAL_CONFIG_<NAME> = "false"`) so CI can check if the crate builds with non-default configurations.
+
 options:
   - name: place-spi-master-driver-in-ram
     description: Places the SPI master driver in RAM for better performance
@@ -198,6 +202,14 @@ options:
     description: Include 'rwtext_hook.x'
     default:
       - value: false
+
+  - name: clear-crypto-secrets
+    description: "Clear secret material (keys, exponents, intermediate results) from
+      the crypto accelerator registers after each operation. Disabling
+      this leaves secret material in the peripheral until a subsequent operation
+      overwrites it."
+    default:
+      - value: true
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

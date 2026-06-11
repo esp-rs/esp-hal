@@ -180,6 +180,14 @@ impl ClockTreeNodeType for Multiplexer {
         }
     }
 
+    fn skips_frequency_cache(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> bool {
+        self.variants.len() == 1
+    }
+
     fn node_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,

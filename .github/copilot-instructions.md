@@ -108,7 +108,7 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 3. `cargo xtask update-metadata --check` — if metadata changed
 4. `cargo xtask check-changelog` — add changelog entry if API changed
 5. Build affected examples/tests for relevant chips
-6. `cargo xtask host-tests` — if host-side code changed
+6. `cargo xtask host-tests` — if host-side code changed; when adding `#[test]` to a package for the first time, register it in `run_host_tests` (`xtask/src/lib.rs`)
 
 ## Key references
 

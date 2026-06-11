@@ -331,12 +331,6 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         false
     };
-    ("soc.rc_fast_clk_default") => {
-        8500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(8500000)
-    };
     ("soc.internal_memory_cached") => {
         false
     };
@@ -516,6 +510,7 @@ macro_rules! for_each_dma_channel {
         compatible = [I2S0]), ("CRYPTO_DMA", DMA_CRYPTO, 0, interrupt = CRYPTO_DMA,
         compatible = [AES, SHA]), ("COPY_DMA", DMA_COPY, 0, interrupt = DMA_COPY,
         compatible = []))); _for_each_inner_dma_channel!((split));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]
@@ -1931,8 +1926,6 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static REF_TICK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1941,8 +1934,6 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
-        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
@@ -3021,8 +3012,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                apb_clk_frequency()
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
                 match source {
@@ -3263,8 +3253,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3466,14 +3455,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -3530,14 +3512,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
-            if let Some(config) = clocks.spi_function_clock[instance as usize] {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    SpiInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {}
         fn refresh_timg_function_clock_downstream(clocks: &mut ClockTree, instance: TimgInstance) {
             if let Some(config) = clocks.timg_function_clock[instance as usize] {
                 TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(

@@ -142,8 +142,11 @@ impl GenericProperty for DmaEngines {
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        // DMA channel information split into three lists based on interrupt signals
+        let mut no_own_interrupt = vec![];
         let mut shared = vec![];
         let mut split = vec![];
+
         let mut engines = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
@@ -250,7 +253,9 @@ impl GenericProperty for DmaEngines {
                         );
                     }
                     (None, None, None) => {
-                        // No interrupt info – skip
+                        no_own_interrupt.push(
+                            quote! { #engine_name, #ch, #idx, compatible = [#(#compatible_peris),*] },
+                        );
                     }
                     _ => {
                         panic!(
@@ -271,6 +276,7 @@ impl GenericProperty for DmaEngines {
                     ("separate_any_type", &engine_any_channels),
                     ("shared", &shared),
                     ("split", &split),
+                    ("no_own_interrupt", &no_own_interrupt),
                 ],
             ))
         } else {

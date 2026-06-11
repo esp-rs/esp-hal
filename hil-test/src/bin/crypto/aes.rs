@@ -367,36 +367,37 @@ mod tests {
             dma_buffers,
         };
 
+        struct Context<'a> {
+            aes: AesDma<'a>,
+            output: DmaRxBuf,
+            input: DmaTxBuf,
+        }
+
         fn test_aes_ecb<const K: usize>(
-            mut aes: AesDma<'_>,
+            mut ctx: Context<'_>,
             plaintext: [u8; 16],
             ciphertext: [u8; 16],
-        ) -> AesDma<'_>
+        ) -> Context<'_>
         where
             Key: From<[u8; K]>,
         {
             use esp_hal::aes::dma::DmaCipherState;
 
-            const DMA_BUFFER_SIZE: usize = 16;
-
-            let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-            let mut output = DmaRxBuf::new(rx_descriptors, output).unwrap();
-            let mut input = DmaTxBuf::new(tx_descriptors, input).unwrap();
-
             // Encrypt
-            input.as_mut_slice().copy_from_slice(&plaintext);
-            let transfer = aes
+            ctx.input.as_mut_slice().copy_from_slice(&plaintext);
+            let transfer = ctx
+                .aes
                 .process(
                     1,
-                    output,
-                    input,
+                    ctx.output,
+                    ctx.input,
                     Operation::Encrypt,
                     &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, input) = transfer.wait();
+            let (aes, output, mut input) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), ciphertext);
 
             // Decrypt
@@ -412,33 +413,42 @@ mod tests {
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, _) = transfer.wait();
+            let (aes, output, input) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), plaintext);
 
-            aes
+            Context { aes, output, input }
         }
+
+        const DMA_BUFFER_SIZE: usize = 16;
+
+        let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+        let output = DmaRxBuf::new(rx_descriptors, output).unwrap();
+        let input = DmaTxBuf::new(tx_descriptors, input).unwrap();
+
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
         let dma_channel = cfg_select! {
             esp32s2 => peripherals.DMA_CRYPTO,
+            esp32p4 => peripherals.DMA_AXI_CH0,
             _ => peripherals.DMA_CH0,
         };
 
         let aes = Aes::new(peripherals.AES).with_dma(dma_channel);
+        let ctx = Context { aes, output, input };
 
-        let aes = test_aes_ecb::<16>(
-            aes,
+        let ctx = test_aes_ecb::<16>(
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
         );
         #[cfg(esp32s2)]
-        let aes = test_aes_ecb::<24>(
-            aes,
+        let ctx = test_aes_ecb::<24>(
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_192[0..16].try_into().unwrap(),
         );
         let _ = test_aes_ecb::<32>(
-            aes,
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_256[0..16].try_into().unwrap(),
         );
@@ -595,6 +605,7 @@ mod work_queue_dma_tests {
 
         let dma = cfg_select! {
             esp32s2 => p.DMA_CRYPTO,
+            esp32p4 => p.DMA_AXI_CH0,
             _ => p.DMA_CH0,
         };
 

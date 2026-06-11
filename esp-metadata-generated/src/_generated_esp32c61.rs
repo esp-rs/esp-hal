@@ -287,7 +287,7 @@ macro_rules! property {
         false
     };
     ("rng.is_lp_sys") => {
-        false
+        true
     };
     ("sleep.light_sleep") => {
         false
@@ -309,12 +309,6 @@ macro_rules! property {
     };
     ("soc.cpu_csr_prv_mode", str) => {
         stringify!(2064)
-    };
-    ("soc.rc_fast_clk_default") => {
-        17500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(17500000)
     };
     ("soc.internal_memory_cached") => {
         false
@@ -464,6 +458,7 @@ macro_rules! for_each_dma_channel {
         DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI2, I2S0, SHA]),
         ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1,
         compatible = [SPI2, I2S0, SHA])));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]
@@ -3402,7 +3397,7 @@ macro_rules! for_each_peripheral {
         "PCR peripheral singleton"] PCR <= PCR() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PMU peripheral singleton"] PMU
         <= PMU() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
+        "RNG peripheral singleton"] RNG <= LPPERI() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
         <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3702,7 +3697,7 @@ macro_rules! for_each_peripheral {
         MODEM_SYSCON() (unstable)), (@ peri_type #[doc = "PAU peripheral singleton"] PAU
         <= PAU() (unstable)), (@ peri_type #[doc = "PCR peripheral singleton"] PCR <=
         PCR() (unstable)), (@ peri_type #[doc = "PMU peripheral singleton"] PMU <= PMU()
-        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG()
+        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= LPPERI()
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()

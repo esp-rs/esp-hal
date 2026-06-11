@@ -352,12 +352,6 @@ macro_rules! property {
     ("soc.multi_core_enabled") => {
         true
     };
-    ("soc.rc_fast_clk_default") => {
-        17500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(17500000)
-    };
     ("soc.internal_memory_cached") => {
         false
     };
@@ -555,6 +549,7 @@ macro_rules! for_each_dma_channel {
         I2S1, LCD_CAM, AES, SHA, APB_SARADC, RMT]), ("AHB_GDMA", DMA_CH4, 4, interrupt_in
         = DMA_IN_CH4, interrupt_out = DMA_OUT_CH4, compatible = [SPI2, SPI3, UHCI0, I2S0,
         I2S1, LCD_CAM, AES, SHA, APB_SARADC, RMT])));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]
@@ -2058,14 +2053,10 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CRYPTO_PWM_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static MCPWM_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
@@ -3037,8 +3028,7 @@ macro_rules! define_clock_tree_types {
                 crypto_pwm_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                MCPWM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                crypto_pwm_clk_frequency()
             }
             pub fn function_clock_source_frequency(source: McpwmFunctionClockConfig) -> u32 {
                 match source {
@@ -3428,8 +3418,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3639,14 +3628,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -3686,12 +3668,6 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             instance: McpwmInstance,
         ) {
-            if let Some(config) = clocks.mcpwm_function_clock[instance as usize] {
-                MCPWM_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    McpwmInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
         }
         fn refresh_rmt_sclk_downstream(clocks: &mut ClockTree, instance: RmtInstance) {
             if let Some(config) = clocks.rmt_sclk[instance as usize] {
