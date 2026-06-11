@@ -55,6 +55,8 @@ pub struct DmaPeripheralInstance {
 pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
+    #[serde(default)]
+    pub max_priority: Option<u32>,
     /// Driver config names whose peripherals can use this engine
     /// (e.g. `"aes"`, `"sha"`, `"spi_master"`, `"spi_slave"`, `"rmt"`).
     #[serde(default)]
@@ -107,6 +109,10 @@ impl DmaEngines {
         }
         Ok(())
     }
+
+    fn max_priority(&self) -> Option<u32> {
+        self.0.iter().flat_map(|e| e.max_priority).max()
+    }
 }
 
 impl GenericProperty for DmaEngines {
@@ -136,6 +142,12 @@ impl GenericProperty for DmaEngines {
                     cfgs.push(format!("{}_dma_engine = \"{}\"", driver, engine.name));
                 }
             }
+        }
+
+        // TODO: temporary
+        if let Some(max_priority) = self.max_priority() {
+            cfgs.push(format!("dma.max_priority=\"{}\"", max_priority));
+            cfgs.push("dma.max_priority_is_set".to_string());
         }
 
         Some(cfgs)

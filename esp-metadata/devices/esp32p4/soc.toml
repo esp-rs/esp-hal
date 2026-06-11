@@ -205,37 +205,53 @@ has_arbitration_en = true
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
-max_priority = 5
 can_access_psram = true
 engines = [
-    { name = "AHB_GDMA", drivers = [], peripheral_instances = [
-        # I3C, UHCI, I2S, ADC, RMT
-    ], channels = [
-        { name = "DMA_CH0",interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
-        { name = "DMA_CH2", mem2mem = true, mem2mem_id = 12, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
-    ] },
-    { name = "AXI_GDMA", drivers = ["aes", "sha", "spi_master"], peripheral_instances = [
-        # LCD_CAM
-        { name = "SPI2", dma_id = 1 },
-        { name = "SPI3", dma_id = 2 },
-        # PARL_IO
-        { name = "AES",  dma_id = 4 },
-        { name = "SHA",  dma_id = 5 },
-    ], channels = [
-        { name = "DMA_AXI_CH0", mem2mem = true, mem2mem_id = 6, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
-        { name = "DMA_AXI_CH1", mem2mem = true, mem2mem_id = 7, interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" },
-        { name = "DMA_AXI_CH2", mem2mem = true, mem2mem_id = 8, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
-    ] },
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        drivers = [],
+        peripheral_instances = [
+            # I3C, UHCI, I2S, ADC, RMT
+        ],
+        channels = [
+            { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, mem2mem_id = 12, interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
+        ]
+    },
+    {
+        name = "AXI_GDMA",
+        max_priority = 5,
+        drivers = ["aes", "sha", "spi_master"],
+        peripheral_instances = [
+            # LCD_CAM
+            { name = "SPI2", dma_id = 1 },
+            { name = "SPI3", dma_id = 2 },
+            # PARL_IO
+            { name = "AES",  dma_id = 4 },
+            { name = "SHA",  dma_id = 5 },
+        ],
+        channels = [
+            { name = "DMA_AXI_CH0", mem2mem = true, mem2mem_id = 6, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
+            { name = "DMA_AXI_CH1", mem2mem = true, mem2mem_id = 7, interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" },
+            { name = "DMA_AXI_CH2", mem2mem = true, mem2mem_id = 8, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
+        ]
+    },
     # DW-GDMA / VDMA: used for MIPI-DSI video streaming (mem → DSI bridge FIFO).
     # All 4 channels share the single DMA interrupt; interrupt binding is managed
     # by the MIPI-DSI driver directly rather than through the standard DMA traits.
-    { name = "VDMA", drivers = ["mipi_dsi"], peripheral_instances = [], channels = [
-        { name = "VDMA_CH0" },
-        { name = "VDMA_CH1" },
-        { name = "VDMA_CH2" },
-        { name = "VDMA_CH3" },
-    ] },
+    {
+        name = "VDMA",
+        drivers = ["mipi_dsi"],
+        peripheral_instances = [],
+        channels = [
+            { name = "VDMA_CH0" },
+            { name = "VDMA_CH1" },
+            { name = "VDMA_CH2" },
+            { name = "VDMA_CH3" },
+        ]
+    },
 ]
 
 # TODO: Check later with PAC and TRM both
