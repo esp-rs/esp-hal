@@ -12,7 +12,7 @@
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
 
-//% CHIP_FILTER: dma_can_access_psram && !esp32p4
+//% CHIP_FILTER: dma_can_access_psram
 
 #![no_std]
 #![no_main]
@@ -68,6 +68,7 @@ fn main() -> ! {
 
     let dma_channel = cfg_select! {
         feature = "esp32s2" => peripherals.DMA_SPI2,
+        feature = "esp32p4" => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 
