@@ -368,6 +368,7 @@ pub enum SleepSource {
 /// ```
 #[inline]
 pub fn software_reset() -> ! {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
     #[cfg(esp32p4)]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
@@ -377,8 +378,66 @@ pub fn software_reset() -> ! {
 #[instability::unstable]
 #[inline]
 pub fn software_reset_cpu(cpu: Cpu) {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
     crate::rom::software_reset_cpu(cpu as u32)
 }
+
+/// Guard for a temporary UART0 source-clock request.
+///
+/// Drops its request when dropped. If no request was needed, this is a no-op.
+#[must_use = "dropping the guard releases the UART0 source clock"]
+pub(crate) struct Uart0SclkGuard {
+    release: bool,
+}
+
+impl Drop for Uart0SclkGuard {
+    fn drop(&mut self) {
+        if self.release {
+            release_uart0_sclk();
+        }
+    }
+}
+
+/// Ensure UART0's source clock stays enabled for boot ROM compatibility.
+///
+/// On some chips, resetting or waking up while UART0's source clock is disabled
+/// can prevent the boot ROM from starting correctly. This only requests the
+/// clock when UART0 already has a function-clock configuration; otherwise the
+/// returned guard is a no-op.
+#[inline(always)]
+pub(crate) fn ensure_uart0_sclk_enabled() -> Uart0SclkGuard {
+    Uart0SclkGuard {
+        release: request_uart0_sclk(),
+    }
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn request_uart0_sclk() -> bool {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        let uart = crate::soc::clocks::UartInstance::Uart0;
+        if uart.function_clock_config(clocks).is_some() {
+            uart.request_function_clock(clocks);
+            true
+        } else {
+            false
+        }
+    })
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn request_uart0_sclk() -> bool {
+    false
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn release_uart0_sclk() {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        crate::soc::clocks::UartInstance::Uart0.release_function_clock(clocks);
+    });
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn release_uart0_sclk() {}
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
 /// Returns `None` if the reset reason cannot be determined.

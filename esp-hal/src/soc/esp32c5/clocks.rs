@@ -644,11 +644,7 @@ impl UartInstance {
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         let uart = match self {
-            UartInstance::Uart0 => {
-                // Disabling this prevents the device from booting
-                // TODO: https://github.com/esp-rs/esp-hal/issues/4952
-                return;
-            }
+            UartInstance::Uart0 => 0,
             UartInstance::Uart1 => 1,
         };
         PCR::regs()
