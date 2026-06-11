@@ -71,9 +71,9 @@ options:
 - name: esp_idf_version
   description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
   default:
-    - if: 'chip == "esp32c6"'
+    - if: 'esp32c6'
       value: '"esp32c6"'
-    - if: 'chip == "esp32"'
+    - if: 'esp32'
       value: '"other"'
   active: true
 
@@ -86,7 +86,7 @@ options:
     - if: true
       value: 32768
   stability: Unstable
-  active: 'chip == "esp32c6"'
+  active: 'esp32c6'
 
 checks:
   - 'ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET >= 32768'
