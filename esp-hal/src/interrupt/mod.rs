@@ -276,11 +276,26 @@ impl Iterator for InterruptStatusIterator {
 // Peripheral interrupt API.
 
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            &pac::__INTERRUPTS[interrupt as usize]
-        } else {
-            &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
+    unsafe extern "Rust" {
+        #[cfg(xtensa)]
+        static __INTERRUPTS: pac::Vector;
+        #[cfg(riscv)]
+        static __EXTERNAL_INTERRUPTS: pac::Vector;
+    }
+
+    // SAFETY: Interrupt numbers are guaranteed to be valid and in range because we use the
+    // Interrupt enum, which is generated from the list of valid peripheral interrupts in the PAC.
+    unsafe {
+        cfg_select! {
+            xtensa => {
+                (&__INTERRUPTS as *const pac::Vector).add(interrupt as usize).as_ref_unchecked()
+            },
+            riscv => {
+                (&__EXTERNAL_INTERRUPTS as *const pac::Vector).add(interrupt as usize).as_ref_unchecked()
+            },
+            _ => {
+                compile_error!("Unsupported architecture");
+            }
         }
     }
 }

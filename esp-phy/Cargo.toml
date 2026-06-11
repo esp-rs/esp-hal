@@ -44,15 +44,15 @@ esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true }
 esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true }
 esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true }
 
-esp32   = { version = "0.40", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.29", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.32", features = ["critical-section"], optional = true }
-esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.23", features = ["critical-section"], optional = true }
-esp32c61 = { version = "0.3", features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.19", features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.35", features = ["critical-section"], optional = true }
+esp32   = { version = "0.40", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32c2 = { version = "0.29", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32c3 = { version = "0.32", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32c6 = { version = "0.23", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32c61 = { version = "0.3", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32h2 = { version = "0.19", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32s2 = { version = "0.31", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
+esp32s3 = { version = "0.35", features = ["critical-section"], optional = true , git = "https://github.com/esp-rs/esp-pacs", rev = "48b6dece6" }
 
 embassy-sync = "0.8"
 
