@@ -411,7 +411,7 @@ pub(crate) fn ensure_uart0_sclk_enabled() -> Uart0SclkGuard {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
+#[cfg(soc_has_clock_node_uart_function_clock)]
 fn request_uart0_sclk() -> bool {
     crate::soc::clocks::ClockTree::with(|clocks| {
         let uart = crate::soc::clocks::UartInstance::Uart0;
@@ -424,19 +424,19 @@ fn request_uart0_sclk() -> bool {
     })
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3)))]
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
 fn request_uart0_sclk() -> bool {
     false
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
+#[cfg(soc_has_clock_node_uart_function_clock)]
 fn release_uart0_sclk() {
     crate::soc::clocks::ClockTree::with(|clocks| {
         crate::soc::clocks::UartInstance::Uart0.release_function_clock(clocks);
     });
 }
 
-#[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3)))]
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
 fn release_uart0_sclk() {}
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
