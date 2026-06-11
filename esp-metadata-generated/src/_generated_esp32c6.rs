@@ -92,10 +92,10 @@ macro_rules! property {
         true
     };
     ("dma.max_priority") => {
-        9
+        5
     };
     ("dma.max_priority", str) => {
-        stringify!(9)
+        stringify!(5)
     };
     ("dma.gdma_version") => {
         1
