@@ -121,6 +121,7 @@ mem2mem_requires_peripheral = true
 engines = [
     {
         name = "AHB_GDMA",
+        internal_ram_burst_sizes = [0, 4],
         max_priority = 9,
         drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s"],
         peripheral_instances = [

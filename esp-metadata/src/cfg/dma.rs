@@ -55,15 +55,28 @@ pub struct DmaPeripheralInstance {
 pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
+
     #[serde(default)]
     pub max_priority: Option<u32>,
+
+    /// Configurable internal RAM burst sizes, when they differ from external RAM.
+    #[serde(default)]
+    #[expect(dead_code)]
+    pub internal_ram_burst_sizes: Vec<u32>,
+
+    /// Configurable burst sizes, when supported. Implies `can_access_psram = true`.
+    #[serde(default)]
+    pub burst_sizes: Vec<u32>,
+
     /// Driver config names whose peripherals can use this engine
     /// (e.g. `"aes"`, `"sha"`, `"spi_master"`, `"spi_slave"`, `"rmt"`).
     #[serde(default)]
     pub drivers: Vec<String>,
+
     /// DMA-capable peripheral instances for this engine, with their selector IDs.
     #[serde(default)]
     pub peripheral_instances: Vec<DmaPeripheralInstance>,
+
     /// The channels belonging to this engine.
     pub channels: Vec<DmaChannelDef>,
 }
@@ -142,6 +155,12 @@ impl GenericProperty for DmaEngines {
                     cfgs.push(format!("{}_dma_engine = \"{}\"", driver, engine.name));
                 }
             }
+        }
+
+        if self.0.iter().any(|engine| !engine.burst_sizes.is_empty()) {
+            // TODO: this symbol encodes whether _any_ engine can access PSRAM
+            // and can be used to enable relevant API.
+            cfgs.push("dma.can_access_psram".to_string());
         }
 
         // TODO: temporary

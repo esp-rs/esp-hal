@@ -94,6 +94,7 @@ gdma_version = 1
 engines = [
     {
         name = "AHB_GDMA",
+        internal_ram_burst_sizes = [0, 4],
         max_priority = 9,
         drivers = ["sha", "spi_master", "spi_slave"],
         peripheral_instances = [

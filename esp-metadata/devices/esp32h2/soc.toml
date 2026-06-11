@@ -132,6 +132,7 @@ separate_in_out_interrupts = true
 engines = [
     {
         name = "AHB_GDMA",
+        internal_ram_burst_sizes = [0, 4],
         max_priority = 5,
         drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s", "parl_io"],
         peripheral_instances = [
