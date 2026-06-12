@@ -1,10 +1,8 @@
 use enumset::{EnumSet, EnumSetType};
 
-#[cfg(dma_can_access_psram)]
-use crate::dma::{ExternalBurstConfig, InternalBurstConfig};
 use crate::{
     asynch::AtomicWaker,
-    dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
+    dma::{DmaRxInterrupt, DmaTxInterrupt},
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     private::{Internal, Sealed},
@@ -68,22 +66,12 @@ for_each_peripheral! {
     };
 }
 
-/// Exposes a channel `Config`'s burst ceilings to [`RegisterAccess::prepare_burst`].
-///
-/// Reports the largest burst length (bytes) for internal- and external-memory
-/// transfers; `0` means burst disabled.
-#[doc(hidden)]
-pub trait DmaBurstConfig {
-    /// Returns `(internal_ceiling, external_ceiling)` in bytes.
-    fn burst_ceilings(&self) -> (usize, usize);
-}
-
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
     /// Engine-specific channel configuration.
     ///
     /// Exposes only the configuration knobs (and values) this engine supports.
-    type Config: Default + Clone + core::fmt::Debug + DmaBurstConfig;
+    type Config: Default + Clone + core::fmt::Debug;
 
     /// Apply the configuration to this channel half.
     ///
@@ -91,57 +79,19 @@ pub trait RegisterAccess: Sealed {
     /// There is no `config()` getter and no partial/read-modify-write update path.
     fn apply_config(&self, config: &Self::Config);
 
-    /// Negotiates and programs the per-transfer burst for this channel half.
+    /// Programs the per-transfer burst for this channel half.
     ///
-    /// The effective burst is the smaller of the channel's configured ceiling
-    /// and the buffer's `max_alignment`, clamped to each region's hardware floor.
-    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize) {
-        let (internal_ceiling, external_ceiling) = config.burst_ceilings();
-        #[cfg(not(dma_can_access_psram))]
-        let _ = external_ceiling;
-
-        let internal_enabled = internal_ceiling.min(max_alignment) >= 4;
-
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
-                let effective_external = external_ceiling.min(max_alignment);
-                let external_memory = if effective_external >= 64 {
-                    ExternalBurstConfig::Size64
-                } else if effective_external >= 32 {
-                    ExternalBurstConfig::Size32
-                } else {
-                    ExternalBurstConfig::Size16
-                };
-                let internal_memory = if internal_enabled {
-                    InternalBurstConfig::Enabled
-                } else {
-                    InternalBurstConfig::Disabled
-                };
-                let burst = BurstConfig { external_memory, internal_memory };
-
-                #[cfg(dma_ext_mem_configurable_block_size)]
-                self.set_ext_mem_block_size(external_memory.into());
-            } else {
-                let burst = if internal_enabled {
-                    BurstConfig::Enabled
-                } else {
-                    BurstConfig::Disabled
-                };
-            }
-        }
-
-        self.set_burst_mode(burst);
-    }
+    /// Negotiates the configured burst ceiling(s) in `config` against the
+    /// buffer's guaranteed `max_alignment`. `accesses_psram` selects the
+    /// relevant burst on engines that configure internal and external RAM
+    /// independently. Infallible: buffers are validated at construction.
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool);
 
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
     /// Reset the state machine of the channel and FIFO pointer.
     fn reset(&self);
-
-    /// Enable/Disable INCR burst transfer for channel reading
-    /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: BurstConfig);
 
     /// Enable/Disable burst transfer for channel reading
     /// descriptors in internal RAM.
@@ -165,9 +115,6 @@ pub trait RegisterAccess: Sealed {
     /// Configure the bit to enable checking the owner attribute of the
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize);
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
@@ -368,6 +315,26 @@ macro_rules! impl_burst_type {
                     Self::$first => $first_bytes,
                     $( Self::$variant => $bytes, )*
                 }
+            }
+
+            /// Negotiates the effective burst: the largest supported variant
+            /// not exceeding this configured ceiling nor `max_alignment`.
+            ///
+            /// Falls back to the smallest supported burst if none fit. The
+            /// result's discriminant (`as u8`) doubles as the hardware
+            /// block-size register encoding where applicable.
+            #[allow(dead_code)]
+            pub(crate) const fn negotiate(self, max_alignment: usize) -> Self {
+                let ceiling = self.bytes();
+                let budget = if ceiling < max_alignment { ceiling } else { max_alignment };
+                #[allow(unused_mut)]
+                let mut selected = Self::$first;
+                $(
+                    if $bytes <= budget {
+                        selected = Self::$variant;
+                    }
+                )*
+                selected
             }
         }
 

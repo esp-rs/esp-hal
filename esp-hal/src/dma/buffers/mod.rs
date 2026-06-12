@@ -240,13 +240,6 @@ const fn max(a: usize, b: usize) -> usize {
     if a > b { a } else { b }
 }
 
-#[cfg(dma_can_access_psram)]
-impl BurstConfig {
-    pub(super) fn is_burst_enabled(self) -> bool {
-        self.internal_memory.is_burst_enabled()
-    }
-}
-
 const fn chunk_size_for_alignment(alignment: usize) -> usize {
     // DMA descriptors have a 12-bit field for the size/length of the buffer they
     // point at. As there is no such thing as 0-byte alignment, this means the

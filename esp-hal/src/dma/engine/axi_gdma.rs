@@ -123,12 +123,6 @@ pub struct AxiGdmaConfig {
     burst: AxiGdmaBurst,
 }
 
-impl crate::dma::DmaBurstConfig for AxiGdmaConfig {
-    fn burst_ceilings(&self) -> (usize, usize) {
-        (self.burst.bytes(), self.burst.bytes())
-    }
-}
-
 for_each_dma_engine! {
     ("AXI_GDMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
         impl_burst_type!($bt, [$(($v, $b)),*]);
@@ -163,8 +157,15 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, _accesses_psram: bool) {
+        // `out_burst_size_sel`: 0..=4 select 8/16/32/64/128-byte bursts, which is
+        // exactly the negotiated burst's discriminant. Burst is always enabled and
+        // shared between internal and external RAM.
+        let burst_size_sel = config.burst.negotiate(max_alignment) as u8;
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| unsafe { w.out_burst_size_sel().bits(burst_size_sel) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -355,8 +356,15 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, _accesses_psram: bool) {
+        // `in_burst_size_sel`: 0..=4 select 8/16/32/64/128-byte bursts, which is
+        // exactly the negotiated burst's discriminant. Burst is always enabled and
+        // shared between internal and external RAM.
+        let burst_size_sel = config.burst.negotiate(max_alignment) as u8;
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| unsafe { w.in_burst_size_sel().bits(burst_size_sel) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()

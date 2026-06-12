@@ -5,9 +5,7 @@ use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
         DmaChannel,
-        DmaExtMemBKSize,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -89,13 +87,6 @@ impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 #[non_exhaustive]
 pub struct CopyDmaConfig {}
 
-impl crate::dma::DmaBurstConfig for CopyDmaConfig {
-    fn burst_ceilings(&self) -> (usize, usize) {
-        // COPY_DMA has no burst knob; report "disabled" for both regions.
-        (0, 0)
-    }
-}
-
 impl RegisterAccess for CopyDmaTxChannel<'_> {
     type Config = CopyDmaConfig;
 
@@ -110,7 +101,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, _config: &Self::Config, _max_alignment: usize, _accesses_psram: bool) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -142,11 +133,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
     }
 
     #[cfg(dma_can_access_psram)]
@@ -286,7 +272,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, _config: &Self::Config, _max_alignment: usize, _accesses_psram: bool) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -320,10 +306,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         }
     }
 
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
-    }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
