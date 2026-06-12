@@ -106,6 +106,17 @@ impl<'d> DmaChannel for AhbGdmaChannel<'d> {
     }
 }
 
+/// Configuration for an AHB GDMA channel half.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AhbGdmaConfig {
+    /// Channel priority.
+    ///
+    /// The default value is `Priority0`.
+    priority: AhbGdmaPriority,
+}
+
 /// An arbitrary GDMA RX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

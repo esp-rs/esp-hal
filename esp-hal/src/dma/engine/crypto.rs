@@ -82,7 +82,16 @@ impl CryptoDmaTxChannel<'_> {
 impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
 impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
+/// Configuration for a CRYPTO DMA channel half.
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct CryptoDmaConfig {}
+
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
+    type Config = CryptoDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CryptoDma))
@@ -281,6 +290,10 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CryptoDmaRxChannel<'_> {
+    type Config = CryptoDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CryptoDma))

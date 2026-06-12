@@ -109,6 +109,17 @@ impl<'d> From<AxiGdmaChannel<'d>> for AxiGdmaTxChannel<'d> {
     }
 }
 
+/// Configuration for an AXI GDMA channel half.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AxiGdmaConfig {
+    /// Channel priority.
+    ///
+    /// The default value is `Priority0`.
+    priority: AxiGdmaPriority,
+}
+
 impl AxiGdmaTxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::axi_dma::OUT_CH {
@@ -117,6 +128,14 @@ impl AxiGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaTxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -182,17 +201,6 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
-    }
-}
-
-#[cfg(axi_gdma_max_priority_is_set)]
-impl PriorityRegisterAccess for AxiGdmaTxChannel<'_> {
-    type Priority = AxiGdmaPriority;
-
-    fn set_priority(&self, priority: Self::Priority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority.into()) });
     }
 }
 
@@ -312,6 +320,14 @@ impl AxiGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaRxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -377,17 +393,6 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
-    }
-}
-
-#[cfg(axi_gdma_max_priority_is_set)]
-impl PriorityRegisterAccess for AxiGdmaRxChannel<'_> {
-    type Priority = AxiGdmaPriority;
-
-    fn set_priority(&self, priority: Self::Priority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority.into()) });
     }
 }
 

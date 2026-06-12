@@ -1888,36 +1888,18 @@ with_spi_master_dma_engine! {
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
 
-        // This is how we can check if the engine supports priority arbitration
-        for_each_dma_engine! {
-            ($engine, priority = $priority:ident, priorities = $_:tt) => {
-                /// Priority level for the SPI master DMA channel.
-                pub type SpiMasterDmaPriority = crate::dma::$priority;
+        /// DMA channel configuration for the SPI master driver.
+        ///
+        /// This is the underlying DMA channel's own configuration type; the RX
+        /// and TX halves (with their engine-specific knobs, e.g. priority) are
+        /// configured independently via its `rx` / `tx` fields.
+        pub type DmaConfig<'d> = crate::dma::DmaChannelConfig<SpiMasterErased<'d>>;
 
-                /// DMA channel configuration.
-                #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
-                #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-                #[non_exhaustive]
-                pub struct DmaConfig {
-                    /// DMA RX channel priority.
-                    ///
-                    /// The default value is `Priority0`.
-                    rx_ch_priority: SpiMasterDmaPriority,
-
-                    /// DMA TX channel priority.
-                    ///
-                    /// The default value is `Priority0`.
-                    tx_ch_priority: SpiMasterDmaPriority,
-                }
-
-                impl<'d, Dm: DriverMode> SpiDma<'d, Dm> {
-                    /// Updates DMA channel configuration.
-                    pub fn apply_dma_config(&mut self, config: &DmaConfig) {
-                        self.channel.rx.set_priority(config.rx_ch_priority);
-                        self.channel.tx.set_priority(config.tx_ch_priority);
-                    }
-                }
-            };
+        impl<'d, Dm: DriverMode> SpiDma<'d, Dm> {
+            /// Updates DMA channel configuration.
+            pub fn apply_dma_config(&mut self, config: &DmaConfig<'d>) {
+                self.channel.apply_config(config);
+            }
         }
     };
 }

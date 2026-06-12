@@ -77,7 +77,16 @@ impl SpiDmaTxChannel<'_> {
 impl crate::private::Sealed for SpiDmaTxChannel<'_> {}
 impl DmaTxChannel for SpiDmaTxChannel<'_> {}
 
+/// Configuration for a SPI DMA channel half.
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct SpiDmaConfig {}
+
 impl RegisterAccess for SpiDmaTxChannel<'_> {
+    type Config = SpiDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         cfg_if::cfg_if! {
@@ -276,6 +285,10 @@ impl InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for SpiDmaRxChannel<'_> {
+    type Config = SpiDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         cfg_if::cfg_if! {

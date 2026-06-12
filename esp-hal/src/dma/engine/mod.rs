@@ -20,19 +20,19 @@ for_each_dma_engine! {
     };
     ("COPY_DMA") => {
         mod copy;
-        pub use copy::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
+        pub use copy::{CopyDmaChannel, CopyDmaConfig, CopyDmaRxChannel, CopyDmaTxChannel};
     };
     ("CRYPTO_DMA") => {
         mod crypto;
-        pub use crypto::{CryptoDmaChannel, CryptoDmaRxChannel, CryptoDmaTxChannel};
+        pub use crypto::{CryptoDmaChannel, CryptoDmaConfig, CryptoDmaRxChannel, CryptoDmaTxChannel};
     };
     ("I2S_DMA") => {
         mod i2s;
-        pub use i2s::{I2sDmaChannel, I2sDmaRxChannel, I2sDmaTxChannel};
+        pub use i2s::{I2sDmaChannel, I2sDmaConfig, I2sDmaRxChannel, I2sDmaTxChannel};
     };
     ("SPI_DMA") => {
         mod spi;
-        pub use spi::{SpiDmaChannel, SpiDmaRxChannel, SpiDmaTxChannel};
+        pub use spi::{SpiDmaChannel, SpiDmaConfig, SpiDmaRxChannel, SpiDmaTxChannel};
     };
 }
 
@@ -68,6 +68,17 @@ for_each_peripheral! {
 
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
+    /// Engine-specific channel configuration.
+    ///
+    /// Exposes only the configuration knobs (and values) this engine supports.
+    type Config: Default + Clone + core::fmt::Debug;
+
+    /// Apply the configuration to this channel half.
+    ///
+    /// Write-only and total: the caller always supplies a complete `Config`.
+    /// There is no `config()` getter and no partial/read-modify-write update path.
+    fn apply_config(&self, config: &Self::Config);
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
@@ -117,15 +128,6 @@ pub trait RegisterAccess: Sealed {
             peripheral.0
         );
     }
-}
-
-/// Implemented by register access types whose engine supports channel priority.
-pub trait PriorityRegisterAccess: RegisterAccess {
-    /// Engine-specific DMA channel priority.
-    type Priority: Copy;
-
-    /// Set the channel priority. The larger the value, the higher the priority.
-    fn set_priority(&self, priority: Self::Priority);
 }
 
 #[doc(hidden)]

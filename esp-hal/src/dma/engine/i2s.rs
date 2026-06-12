@@ -77,7 +77,16 @@ impl I2sDmaTxChannel<'_> {
 impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
 impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
+/// Configuration for an I2S DMA channel half.
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct I2sDmaConfig {}
+
 impl RegisterAccess for I2sDmaTxChannel<'_> {
+    type Config = I2sDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         None
@@ -266,6 +275,10 @@ impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for I2sDmaRxChannel<'_> {
+    type Config = I2sDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         None

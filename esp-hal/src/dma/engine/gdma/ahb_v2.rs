@@ -26,6 +26,14 @@ impl AhbGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaTxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -94,17 +102,6 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
-    }
-}
-
-#[cfg(ahb_gdma_max_priority_is_set)]
-impl PriorityRegisterAccess for AhbGdmaTxChannel<'_> {
-    type Priority = AhbGdmaPriority;
-
-    fn set_priority(&self, priority: Self::Priority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority.into()) });
     }
 }
 
@@ -233,6 +230,14 @@ impl AhbGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaRxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -299,17 +304,6 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
 
     fn compatible_peripherals(&self) -> &[u8] {
         self.0.info.compatible_peripherals
-    }
-}
-
-#[cfg(ahb_gdma_max_priority_is_set)]
-impl PriorityRegisterAccess for AhbGdmaRxChannel<'_> {
-    type Priority = AhbGdmaPriority;
-
-    fn set_priority(&self, priority: Self::Priority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority.into()) });
     }
 }
 
