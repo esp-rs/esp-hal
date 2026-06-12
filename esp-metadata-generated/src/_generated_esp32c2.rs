@@ -385,11 +385,14 @@ macro_rules! for_each_dma_engine {
         _for_each_inner_dma_engine!(("AHB_GDMA", priority = AhbGdmaPriority, priorities =
         [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3), (Priority4, 4),
         (Priority5, 5), (Priority6, 6), (Priority7, 7), (Priority8, 8), (Priority9,
-        9)])); _for_each_inner_dma_engine!((all("AHB_GDMA")));
+        9)])); _for_each_inner_dma_engine!(("AHB_GDMA", single, burst = AhbGdmaBurst,
+        bursts = [(Disabled, 0), (Size4, 4)]));
+        _for_each_inner_dma_engine!((all("AHB_GDMA")));
         _for_each_inner_dma_engine!((priorities("AHB_GDMA", priority = AhbGdmaPriority,
         priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3),
         (Priority4, 4), (Priority5, 5), (Priority6, 6), (Priority7, 7), (Priority8, 8),
-        (Priority9, 9)])));
+        (Priority9, 9)]))); _for_each_inner_dma_engine!((bursts("AHB_GDMA", single, burst
+        = AhbGdmaBurst, bursts = [(Disabled, 0), (Size4, 4)])));
     };
 }
 #[macro_export]

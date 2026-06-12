@@ -422,12 +422,20 @@ macro_rules! for_each_dma_engine {
         (Priority5, 5)])); _for_each_inner_dma_engine!(("AXI_GDMA", priority =
         AxiGdmaPriority, priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2),
         (Priority3, 3), (Priority4, 4), (Priority5, 5)]));
+        _for_each_inner_dma_engine!(("AHB_GDMA", single, burst = AhbGdmaBurst, bursts =
+        [(Disabled, 0), (Size4, 4), (Size16, 16), (Size32, 32)]));
+        _for_each_inner_dma_engine!(("AXI_GDMA", single, burst = AxiGdmaBurst, bursts =
+        [(Size8, 8), (Size16, 16), (Size32, 32), (Size64, 64), (Size128, 128)]));
         _for_each_inner_dma_engine!((all("AHB_GDMA"), ("AXI_GDMA"), ("VDMA")));
         _for_each_inner_dma_engine!((priorities("AHB_GDMA", priority = AhbGdmaPriority,
         priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3),
         (Priority4, 4), (Priority5, 5)]), ("AXI_GDMA", priority = AxiGdmaPriority,
         priorities = [(Priority0, 0), (Priority1, 1), (Priority2, 2), (Priority3, 3),
         (Priority4, 4), (Priority5, 5)])));
+        _for_each_inner_dma_engine!((bursts("AHB_GDMA", single, burst = AhbGdmaBurst,
+        bursts = [(Disabled, 0), (Size4, 4), (Size16, 16), (Size32, 32)]), ("AXI_GDMA",
+        single, burst = AxiGdmaBurst, bursts = [(Size8, 8), (Size16, 16), (Size32, 32),
+        (Size64, 64), (Size128, 128)])));
     };
 }
 #[macro_export]

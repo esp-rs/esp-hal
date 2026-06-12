@@ -15,6 +15,7 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
+        impl_burst_type,
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
@@ -78,9 +79,45 @@ impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
 impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
 /// Configuration for an I2S DMA channel half.
-#[derive(Debug, Default, Clone)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct I2sDmaConfig {}
+pub struct I2sDmaConfig {
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(i2s_dma_separate_burst)]
+    internal_burst: I2sDmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(i2s_dma_separate_burst)]
+    external_burst: I2sDmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(i2s_dma_separate_burst))]
+    burst: I2sDmaBurst,
+}
+
+impl crate::dma::DmaBurstConfig for I2sDmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        cfg_if::cfg_if! {
+            if #[cfg(i2s_dma_separate_burst)] {
+                (self.internal_burst.bytes(), self.external_burst.bytes())
+            } else {
+                (self.burst.bytes(), self.burst.bytes())
+            }
+        }
+    }
+}
+
+for_each_dma_engine! {
+    ("I2S_DMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("I2S_DMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
+}
 
 impl RegisterAccess for I2sDmaTxChannel<'_> {
     type Config = I2sDmaConfig;

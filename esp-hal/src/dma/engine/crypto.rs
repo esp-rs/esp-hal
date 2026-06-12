@@ -18,6 +18,7 @@ use crate::{
         RxRegisterAccess,
         TxRegisterAccess,
         asynch,
+        impl_burst_type,
     },
     interrupt::InterruptHandler,
     peripherals::{DMA_CRYPTO, Interrupt},
@@ -83,9 +84,45 @@ impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
 impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
 /// Configuration for a CRYPTO DMA channel half.
-#[derive(Debug, Default, Clone)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct CryptoDmaConfig {}
+pub struct CryptoDmaConfig {
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(crypto_dma_separate_burst)]
+    internal_burst: CryptoDmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(crypto_dma_separate_burst)]
+    external_burst: CryptoDmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(crypto_dma_separate_burst))]
+    burst: CryptoDmaBurst,
+}
+
+impl crate::dma::DmaBurstConfig for CryptoDmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        cfg_if::cfg_if! {
+            if #[cfg(crypto_dma_separate_burst)] {
+                (self.internal_burst.bytes(), self.external_burst.bytes())
+            } else {
+                (self.burst.bytes(), self.burst.bytes())
+            }
+        }
+    }
+}
+
+for_each_dma_engine! {
+    ("CRYPTO_DMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("CRYPTO_DMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
+}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
     type Config = CryptoDmaConfig;

@@ -1154,6 +1154,10 @@ where
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: CH,
+    /// Last-applied channel configuration. The burst ceiling stored here is
+    /// re-applied on every transfer (registers do not survive `reset()`), and
+    /// the value is carried across blocking/async conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1180,6 +1184,7 @@ where
 
         Self {
             rx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1193,6 +1198,7 @@ where
         self.rx_impl.set_async(true);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1223,6 +1229,7 @@ where
         self.rx_impl.set_async(false);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1236,6 +1243,7 @@ where
 {
     /// Applies a complete configuration to this channel half.
     pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
         self.rx_impl.apply_config(config);
     }
 
@@ -1254,10 +1262,8 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
         self.rx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.rx_impl.set_burst_mode(preparation.burst_transfer);
+            .prepare_burst(&self.config, preparation.max_alignment);
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
@@ -1379,6 +1385,10 @@ where
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: CH,
+    /// Last-applied channel configuration. The burst ceiling stored here is
+    /// re-applied on every transfer (registers do not survive `reset()`), and
+    /// the value is carried across blocking/async conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1399,6 +1409,7 @@ where
         tx_impl.set_async(false);
         Self {
             tx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1412,6 +1423,7 @@ where
         self.tx_impl.set_async(true);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1442,6 +1454,7 @@ where
         self.tx_impl.set_async(false);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1455,6 +1468,7 @@ where
 {
     /// Applies a complete configuration to this channel half.
     pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
         self.tx_impl.apply_config(config);
     }
 
@@ -1479,10 +1493,8 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
         self.tx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.tx_impl.set_burst_mode(preparation.burst_transfer);
+            .prepare_burst(&self.config, preparation.max_alignment);
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl

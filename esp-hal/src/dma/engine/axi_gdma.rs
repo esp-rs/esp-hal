@@ -118,6 +118,21 @@ pub struct AxiGdmaConfig {
     ///
     /// The default value is `Priority0`.
     priority: AxiGdmaPriority,
+
+    /// Maximum burst length (applies to internal and external RAM alike).
+    burst: AxiGdmaBurst,
+}
+
+impl crate::dma::DmaBurstConfig for AxiGdmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        (self.burst.bytes(), self.burst.bytes())
+    }
+}
+
+for_each_dma_engine! {
+    ("AXI_GDMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
 }
 
 impl AxiGdmaTxChannel<'_> {

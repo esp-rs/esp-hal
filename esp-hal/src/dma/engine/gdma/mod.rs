@@ -115,6 +115,31 @@ pub struct AhbGdmaConfig {
     ///
     /// The default value is `Priority0`.
     priority: AhbGdmaPriority,
+
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(ahb_gdma_separate_burst)]
+    internal_burst: AhbGdmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(ahb_gdma_separate_burst)]
+    external_burst: AhbGdmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(ahb_gdma_separate_burst))]
+    burst: AhbGdmaBurst,
+}
+
+impl crate::dma::DmaBurstConfig for AhbGdmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        cfg_if::cfg_if! {
+            if #[cfg(ahb_gdma_separate_burst)] {
+                (self.internal_burst.bytes(), self.external_burst.bytes())
+            } else {
+                (self.burst.bytes(), self.burst.bytes())
+            }
+        }
+    }
 }
 
 /// An arbitrary GDMA RX channel
@@ -251,6 +276,16 @@ for_each_dma_channel! {
 for_each_dma_engine! {
     ("AHB_GDMA", priority = $priority:ident, priorities = [$(($variant:ident, $level:literal)),*]) => {
         impl_priority_type!("AHB_GDMA", $priority, [$(($variant, $level)),*]);
+    };
+}
+
+for_each_dma_engine! {
+    ("AHB_GDMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("AHB_GDMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
     };
 }
 

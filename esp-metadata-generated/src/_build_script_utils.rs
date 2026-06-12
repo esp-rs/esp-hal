@@ -5212,6 +5212,9 @@ impl Chip {
                     "soc_has_dma_crypto",
                     "soc_has_dma_copy",
                     "dma_supports_mem2mem",
+                    "spi_dma_separate_burst",
+                    "i2s_dma_separate_burst",
+                    "crypto_dma_separate_burst",
                     "spi_master_supports_dma",
                     "spi_master_dma_engine = \"SPI_DMA\"",
                     "spi_slave_supports_dma",
@@ -5448,6 +5451,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_crypto",
                     "cargo:rustc-cfg=soc_has_dma_copy",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=spi_dma_separate_burst",
+                    "cargo:rustc-cfg=i2s_dma_separate_burst",
+                    "cargo:rustc-cfg=crypto_dma_separate_burst",
                     "cargo:rustc-cfg=spi_master_supports_dma",
                     "cargo:rustc-cfg=spi_master_dma_engine = \"SPI_DMA\"",
                     "cargo:rustc-cfg=spi_slave_supports_dma",
@@ -5900,6 +5906,7 @@ impl Chip {
                     "soc_has_dma_ch4",
                     "dma_supports_mem2mem",
                     "ahb_gdma_max_priority_is_set",
+                    "ahb_gdma_separate_burst",
                     "aes_supports_dma",
                     "aes_dma_engine = \"AHB_GDMA\"",
                     "sha_supports_dma",
@@ -6176,6 +6183,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dma_ch4",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=ahb_gdma_max_priority_is_set",
+                    "cargo:rustc-cfg=ahb_gdma_separate_burst",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine = \"AHB_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -6991,6 +6999,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_crypto)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_copy)");
+    println!("cargo:rustc-check-cfg=cfg(spi_dma_separate_burst)");
+    println!("cargo:rustc-check-cfg=cfg(i2s_dma_separate_burst)");
+    println!("cargo:rustc-check-cfg=cfg(crypto_dma_separate_burst)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");
@@ -7001,6 +7012,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(camera_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
+    println!("cargo:rustc-check-cfg=cfg(ahb_gdma_separate_burst)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(lcd_cam_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");

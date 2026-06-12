@@ -475,8 +475,26 @@ macro_rules! for_each_dma_engine {
         _for_each_inner_dma_engine!(("I2S_DMA"));
         _for_each_inner_dma_engine!(("CRYPTO_DMA"));
         _for_each_inner_dma_engine!(("COPY_DMA"));
-        _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA"), ("CRYPTO_DMA"),
+        _for_each_inner_dma_engine!(("SPI_DMA", separate, internal = SpiDmaInternalBurst,
+        internal_bursts = [(Disabled, 0), (Size4, 4)], external = SpiDmaExternalBurst,
+        external_bursts = [(Size16, 16), (Size32, 32), (Size64, 64)]));
+        _for_each_inner_dma_engine!(("I2S_DMA", separate, internal = I2sDmaInternalBurst,
+        internal_bursts = [(Disabled, 0), (Size4, 4)], external = I2sDmaExternalBurst,
+        external_bursts = [(Size16, 16), (Size32, 32), (Size64, 64)]));
+        _for_each_inner_dma_engine!(("CRYPTO_DMA", separate, internal =
+        CryptoDmaInternalBurst, internal_bursts = [(Disabled, 0), (Size4, 4)], external =
+        CryptoDmaExternalBurst, external_bursts = [(Size16, 16), (Size32, 32), (Size64,
+        64)])); _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA"), ("CRYPTO_DMA"),
         ("COPY_DMA"))); _for_each_inner_dma_engine!((priorities));
+        _for_each_inner_dma_engine!((bursts("SPI_DMA", separate, internal =
+        SpiDmaInternalBurst, internal_bursts = [(Disabled, 0), (Size4, 4)], external =
+        SpiDmaExternalBurst, external_bursts = [(Size16, 16), (Size32, 32), (Size64,
+        64)]), ("I2S_DMA", separate, internal = I2sDmaInternalBurst, internal_bursts =
+        [(Disabled, 0), (Size4, 4)], external = I2sDmaExternalBurst, external_bursts =
+        [(Size16, 16), (Size32, 32), (Size64, 64)]), ("CRYPTO_DMA", separate, internal =
+        CryptoDmaInternalBurst, internal_bursts = [(Disabled, 0), (Size4, 4)], external =
+        CryptoDmaExternalBurst, external_bursts = [(Size16, 16), (Size32, 32), (Size64,
+        64)])));
     };
 }
 #[macro_export]

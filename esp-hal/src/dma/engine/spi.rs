@@ -15,6 +15,7 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
+        impl_burst_type,
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
@@ -78,9 +79,45 @@ impl crate::private::Sealed for SpiDmaTxChannel<'_> {}
 impl DmaTxChannel for SpiDmaTxChannel<'_> {}
 
 /// Configuration for a SPI DMA channel half.
-#[derive(Debug, Default, Clone)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct SpiDmaConfig {}
+pub struct SpiDmaConfig {
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(spi_dma_separate_burst)]
+    internal_burst: SpiDmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(spi_dma_separate_burst)]
+    external_burst: SpiDmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(spi_dma_separate_burst))]
+    burst: SpiDmaBurst,
+}
+
+impl crate::dma::DmaBurstConfig for SpiDmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        cfg_if::cfg_if! {
+            if #[cfg(spi_dma_separate_burst)] {
+                (self.internal_burst.bytes(), self.external_burst.bytes())
+            } else {
+                (self.burst.bytes(), self.burst.bytes())
+            }
+        }
+    }
+}
+
+for_each_dma_engine! {
+    ("SPI_DMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("SPI_DMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
+}
 
 impl RegisterAccess for SpiDmaTxChannel<'_> {
     type Config = SpiDmaConfig;
