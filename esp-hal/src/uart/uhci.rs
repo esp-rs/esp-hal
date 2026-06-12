@@ -16,13 +16,11 @@
 //!     main,
 //!     rom::software_reset,
 //!     uart,
-//!     uart::{RxConfig, Uart, uhci, uhci::Uhci},
+//!     uart::{RxConfig, Uart, uhci::Uhci},
 //! };
 //!
 //! #[main]
 //! fn main() -> ! {
-//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//!     let peripherals = esp_hal::init(config);
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
 //!
@@ -36,7 +34,7 @@
 //!         .with_rx(peripherals.GPIO3);
 //!
 //!     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
-//!     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+//!     let mut dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 //!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
@@ -47,37 +45,48 @@
 //!     uhci.apply_tx_config(&uart::uhci::TxConfig::default())
 //!         .unwrap();
 //!
-//!     let config = uart::Config::default()
-//!         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
-//!         .with_baudrate(9600);
-//!     uhci.set_uart_config(&config).unwrap();
+//!     // Execute same code with two different baudrates
+//!     for baudrate in [9600, 19200] {
+//!         // Apply config/baudrate to Uhci
+//!         let config = uart::Config::default()
+//!             .with_rx(RxConfig::default().with_fifo_full_threshold(64))
+//!             .with_baudrate(baudrate);
+//!         uhci.set_uart_config(&config).unwrap();
 //!
-//!     let (uhci_rx, uhci_tx) = uhci.split();
-//!     // Waiting for message
-//!     let transfer = uhci_rx
-//!         .read(dma_rx)
-//!         .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-//!     let (err, _uhci_rx, dma_rx) = transfer.wait();
-//!     err.unwrap();
+//!         // Split Uhci into rx and tx instances
+//!         let (mut uhci_rx, mut uhci_tx) = uhci.split();
 //!
-//!     let received = dma_rx.number_of_received_bytes();
-//!     // println!("Received dma bytes: {}", received);
+//!         // Waiting for message
+//!         let transfer = uhci_rx
+//!             .read(dma_rx)
+//!             .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+//!         let err;
+//!         (err, uhci_rx, dma_rx) = transfer.wait();
+//!         err.unwrap();
 //!
-//!     let rec_slice = &dma_rx.as_slice()[0..received];
-//!     if received > 0 {
-//!         match core::str::from_utf8(&rec_slice) {
-//!             Ok(x) => {
-//!                 // println!("Received DMA message: \"{}\"", x);
-//!                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
-//!                 dma_tx.set_length(received);
-//!                 let transfer = uhci_tx
-//!                     .write(dma_tx)
-//!                     .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-//!                 let (err, _uhci, _dma_tx) = transfer.wait();
-//!                 err.unwrap();
+//!         let received = dma_rx.number_of_received_bytes();
+//!         // println!("Received dma bytes: {}", received);
+//!
+//!         let rec_slice = &dma_rx.as_slice()[0..received];
+//!         if received > 0 {
+//!             match core::str::from_utf8(&rec_slice) {
+//!                 Ok(_) => {
+//!                     // println!("Received DMA message: \"{}\"", x);
+//!                     dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
+//!                     dma_tx.set_length(received);
+//!                     let transfer = uhci_tx
+//!                         .write(dma_tx)
+//!                         .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+//!                     let err;
+//!                     (err, uhci_tx, dma_tx) = transfer.wait();
+//!                     err.unwrap();
+//!                 }
+//!                 Err(x) => panic!("Error string: {}", x),
 //!             }
-//!             Err(x) => panic!("Error string: {}", x),
 //!         }
+//!
+//!         // Join rx and tx back
+//!         uhci = Uhci::join(uhci_rx, uhci_tx);
 //!     }
 //!     software_reset()
 //! }
@@ -361,9 +370,25 @@ where
                 uhci_per: self.uhci_per,
                 uart_tx,
                 channel_tx: self.channel.tx,
-                _guard: self._guard.clone(),
+                _guard: self._guard,
             },
         )
+    }
+
+    /// Join the UhciRx and UhciTx into a Uhci instance
+    ///
+    /// This function panics if the transmitter and receiver are not from the
+    /// same UART instance.
+    pub fn join(rx: UhciRx<'d, Dm>, tx: UhciTx<'d, Dm>) -> Self {
+        Self {
+            uart: Uart::join(rx.uart_rx, tx.uart_tx),
+            uhci_per: tx.uhci_per,
+            channel: Channel {
+                rx: rx.channel_rx,
+                tx: tx.channel_tx,
+            },
+            _guard: tx._guard,
+        }
     }
 
     /// Sets the config to the UHCI peripheral, Rx part

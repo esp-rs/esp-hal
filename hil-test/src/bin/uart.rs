@@ -373,6 +373,38 @@ mod tests {
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
+
+    #[test]
+    fn test_split_join_send_receive(ctx: Context) {
+        let uart = ctx.uart1.with_tx(ctx.tx).with_rx(ctx.rx);
+
+        // Split UART
+        let (mut rx, mut tx) = uart.split();
+
+        // Send and receive byte
+        tx.write(&[0x42]).unwrap();
+        let mut byte = [0u8; 1];
+        rx.read(&mut byte).unwrap();
+        assert_eq!(byte[0], 0x42);
+
+        // Join UART
+        let mut uart = Uart::join(rx, tx);
+
+        // Send and receive byte
+        uart.write(&[0x43]).unwrap();
+        let mut byte = [0u8; 1];
+        uart.read(&mut byte).unwrap();
+        assert_eq!(byte[0], 0x43);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_join_different_uarts(ctx: Context) {
+        let tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        let _joined = Uart::join(rx, tx);
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
@@ -1067,6 +1099,61 @@ mod uhci {
 
             uhci_rx_opt = Some(uhci_rx);
             uhci_tx_opt = Some(uhci_tx);
+            dma_rx_opt = Some(dma_rx);
+            dma_tx_opt = Some(dma_tx);
+        }
+    }
+
+    #[test]
+    fn test_split_join_send_receive(ctx: Context) {
+        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+        let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
+        let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
+            .unwrap()
+            .with_tx(tx)
+            .with_rx(rx);
+        let mut uhci = Uhci::new(uart, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
+        uhci.apply_rx_config(&uart::uhci::RxConfig::default().with_chunk_limit(DMA_BUFFER_SIZE))
+            .unwrap();
+        uhci.apply_tx_config(&uart::uhci::TxConfig::default())
+            .unwrap();
+        uhci.set_uart_config(&uart::Config::default().with_baudrate(BAUDRATE))
+            .unwrap();
+
+        let mut uhci_opt = Some(uhci);
+        let mut dma_rx_opt = Some(ctx.dma_rx);
+        let mut dma_tx_opt = Some(ctx.dma_tx);
+
+        for _ in 0..LOOP_COUNT {
+            let (uhci_rx, uhci_tx) = uhci_opt.take().unwrap().split();
+            let dma_rx = dma_rx_opt.take().unwrap();
+            let mut dma_tx = dma_tx_opt.take().unwrap();
+
+            dma_tx.as_mut_slice()[0..SHORT_TEST_STRING.len()]
+                .copy_from_slice(&SHORT_TEST_STRING.as_bytes());
+            dma_tx.set_length(SHORT_TEST_STRING.len());
+
+            let transfer_rx = uhci_rx
+                .read(dma_rx)
+                .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+            let transfer_tx = uhci_tx
+                .write(dma_tx)
+                .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+            let (res, uhci_tx, dma_tx) = transfer_tx.wait();
+            res.unwrap();
+            let (res, uhci_rx, dma_rx) = transfer_rx.wait();
+            res.unwrap();
+
+            assert_eq!(
+                &dma_rx.as_slice()[0..dma_rx.number_of_received_bytes()],
+                SHORT_TEST_STRING.as_bytes()
+            );
+
+            uhci_opt = Some(Uhci::join(uhci_rx, uhci_tx));
             dma_rx_opt = Some(dma_rx);
             dma_tx_opt = Some(dma_tx);
         }

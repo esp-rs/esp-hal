@@ -50,7 +50,7 @@ crate::unstable_driver! {
 mod compat;
 mod low_level;
 
-use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
+use core::{marker::PhantomData, mem::discriminant, sync::atomic::Ordering, task::Poll};
 
 use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
@@ -2012,6 +2012,41 @@ where
     #[instability::unstable]
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
         (self.rx, self.tx)
+    }
+
+    #[procmacros::doc_replace]
+    /// Join the UART transmitter and receiver into a single instance
+    ///
+    /// This allows to go back to an UART instance after splitting it into
+    /// separate transmitter and receiver components.
+    ///
+    /// This function panics if the transmitter and receiver are not from the
+    /// same UART instance.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    ///
+    /// // The UART can be split into separate Transmit and Receive components:
+    /// let (rx, tx) = uart.split();
+    ///
+    /// // These components can then later be joined back together:
+    /// let _uart = Uart::join(rx, tx);
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn join(rx: UartRx<'d, Dm>, tx: UartTx<'d, Dm>) -> Self {
+        // Check if rx and tx are from the same UART instance
+        if discriminant(&rx.uart.0) != discriminant(&tx.uart.0) {
+            panic!("attempted to join different UART instances");
+        }
+
+        Self { rx, tx }
     }
 
     /// Reads and clears errors set by received data.
