@@ -381,7 +381,7 @@ pub(crate) fn enable_pmp() {
 
         // 3. Configure the PMP settings
         unsafe {
-            modify_pmp_config(start_idx, 0x00 | 1 << 7); // Off, no permissions, locked
+            modify_pmp_config(start_idx, /* 0b00 | */ 1 << 7); // Off, no permissions, locked
             modify_pmp_config(end_idx, 0b01 << 3 | 1 << 7 | permission); // TOR, locked
         }
 
