@@ -54,7 +54,7 @@ pub fn rtc_calib_version() -> u8 {
 pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
     let version = rtc_calib_version();
 
-    if version > 4 {
+    if version != 1 {
         return None;
     }
 
@@ -99,18 +99,28 @@ pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
 /// See: <https://github.com/espressif/esp-idf/blob/17a2461297076481858b7f76482676a521cc727a/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
 pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    let version = rtc_calib_version();
+
+    if version != 1 {
+        return None;
+    }
+
     let cal_code: u16 = super::read_field_le(match atten {
         Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
         Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
         Attenuation::_6dB => ADC1_HI_DOUT_ATTEN2,
         Attenuation::_11dB => ADC1_HI_DOUT_ATTEN3,
     });
-    let cal_code: u16 = if atten == Attenuation::_6dB {
-        2970 + cal_code
+
+    // ESP-IDF sign-extends the 10-bit field on bit 9 before adding the offset.
+    // Without this, cal_codes with bit 9 set produce 500+ digi-counts of gain error.
+    let signed = if cal_code & (1 << 9) != 0 {
+        -((cal_code & !(1 << 9)) as i32)
     } else {
-        2900 + cal_code
+        cal_code as i32
     };
-    Some(cal_code)
+    let chk_offset: i32 = if atten == Attenuation::_6dB { 2970 } else { 2900 };
+    Some((chk_offset + signed) as u16)
 }
 
 /// Returns the major hardware revision

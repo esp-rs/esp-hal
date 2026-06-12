@@ -17,11 +17,38 @@ pub(super) const NUM_ATTENS: usize = 10;
 
 cfg_if::cfg_if! {
     if #[cfg(esp32s3)] {
-        const ADC_VAL_MASK: u16 = 0xfff;
-        const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
+        /// Mask covering the 12-bit conversion result on ESP32-S3.
+        ///
+        /// `sar_meas{1,2}_ctrl2.meas_data_sar` is a 16-bit field that also
+        /// contains arbiter / validity flag bits in the high bits; reads must
+        /// be masked to the actual converter width to avoid garbage readings
+        /// (especially on ADC2, where the arbiter sets flags when Wi-Fi takes
+        /// over).
+        const ADC_VAL_MASK: u16 = 0x0fff;
+    } else if #[cfg(esp32s2)] {
+        /// Mask covering the 13-bit conversion result on ESP32-S2.
+        const ADC_VAL_MASK: u16 = 0x1fff;
     }
 }
+
+#[cfg(esp32s3)]
+const ADC_CAL_CNT_MAX: u16 = 32;
+
+/// Sentinel value for [`CalibrationAccess::ADC_CAL_CHANNEL`]. The xtensa
+/// calibration routine never uses this as a channel index — instead it calls
+/// [`RegisterAccess::disable_channels`] (matching ESP-IDF's
+/// `adc_oneshot_ll_disable_channel`) and writes the calibration attenuation
+/// to channel 0's atten slot, since the RTC controller auto-selects channel 0's
+/// attenuation when all channels are disabled.
+#[cfg(esp32s3)]
+const ADC_CAL_CHANNEL: u16 = 15;
+
+/// Attenuation slot the RTC controller falls back to when no channels are
+/// enabled. ESP-IDF's `cal_setup` writes the calibration attenuation here.
+/// Referenced from the generic `adc_calibrate` body, so it has to be in
+/// scope for any `RegisterAccess` impl — not just chips that actually
+/// implement `CalibrationAccess`.
+const CAL_ATTEN_CHANNEL: usize = 0;
 
 impl<ADCX> AdcConfig<ADCX>
 where
@@ -38,9 +65,17 @@ where
 
         ADCX::enable_vdef(true);
 
-        // Start sampling
-        ADCX::set_en_pad(ADCX::ADC_CAL_CHANNEL as u8);
-        ADCX::set_attenuation(ADCX::ADC_CAL_CHANNEL as usize, atten as u8);
+        // Match ESP-IDF's `cal_setup` in components/hal/adc_hal_common.c:
+        //
+        //     adc_oneshot_ll_disable_channel(adc_n);          // sar_en_pad = 0
+        //     adc_oneshot_ll_set_atten(adc_n, 0, atten);      // channel 0's atten
+        //
+        // The IDF comment notes: "When controlled by RTC controller, when all
+        // channels are disabled, HW auto selects channel0 atten param." So the
+        // literal `0` here is a hardware-defined fallback slot, not an arbitrary
+        // channel choice.
+        ADCX::disable_channels();
+        ADCX::set_attenuation(CAL_ATTEN_CHANNEL, atten as u8);
 
         // Connect calibration source
         ADCX::connect_cal(source, true);
@@ -85,6 +120,12 @@ pub trait RegisterAccess {
     fn set_en_pad_force();
 
     fn set_en_pad(channel: u8);
+
+    /// Disable all channels on this ADC unit (write `sar_en_pad = 0`).
+    ///
+    /// Used by the calibration setup to detach the SAR from any external pad.
+    /// Equivalent to ESP-IDF's `adc_oneshot_ll_disable_channel`.
+    fn disable_channels();
 
     fn clear_start_sample();
 
@@ -140,6 +181,12 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .modify(|_, w| unsafe { w.sar1_en_pad().bits(1 << channel) });
     }
 
+    fn disable_channels() {
+        SENS::regs()
+            .sar_meas1_ctrl2()
+            .modify(|_, w| unsafe { w.sar1_en_pad().bits(0) });
+    }
+
     fn clear_start_sample() {
         SENS::regs()
             .sar_meas1_ctrl2()
@@ -161,11 +208,15 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 
     fn read_data() -> u16 {
+        // The data field is 16 bits wide but only `ADC_VAL_MASK` of it carries
+        // the conversion result; the upper bits are arbiter / validity flags
+        // (see comment on `ADC_VAL_MASK`).
         SENS::regs()
             .sar_meas1_ctrl2()
             .read()
             .meas1_data_sar()
             .bits()
+            & ADC_VAL_MASK
     }
 
     #[cfg(any(esp32s2, esp32s3))]
@@ -250,6 +301,12 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .modify(|_, w| unsafe { w.sar2_en_pad().bits(1 << channel) });
     }
 
+    fn disable_channels() {
+        SENS::regs()
+            .sar_meas2_ctrl2()
+            .modify(|_, w| unsafe { w.sar2_en_pad().bits(0) });
+    }
+
     fn clear_start_sample() {
         SENS::regs()
             .sar_meas2_ctrl2()
@@ -271,11 +328,15 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 
     fn read_data() -> u16 {
+        // ADC2 specifically can return non-zero flag bits in the upper bits
+        // when the arbiter takes over for Wi-Fi; an unmasked read produces
+        // huge bogus values. See comment on `ADC_VAL_MASK`.
         SENS::regs()
             .sar_meas2_ctrl2()
             .read()
             .meas2_data_sar()
             .bits()
+            & ADC_VAL_MASK
     }
 
     #[cfg(any(esp32s2, esp32s3))]

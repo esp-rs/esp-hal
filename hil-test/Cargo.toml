@@ -8,6 +8,11 @@ publish = false
 name = "hil_test"
 
 [[bin]]
+name              = "adc"
+harness           = false
+required-features = ["unstable"]
+
+[[bin]]
 name              = "alloc_psram"
 harness           = false
 
