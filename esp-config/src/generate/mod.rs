@@ -212,15 +212,17 @@ pub fn evaluate_yaml_config(
                     eval_ctx.add_variable(symbol, false);
                 }
             }
-        } else {
-            eval_ctx.add_variable(c.name(), true);
-            for symbol in c.all_symbols() {
-                if let Some((key, value)) = symbol.split_once('=') {
-                    let value = value.trim().trim_matches('"');
-                    eval_ctx.add_variable(key.trim(), value);
-                } else {
-                    eval_ctx.add_variable(symbol, true);
-                }
+        }
+    }
+
+    if let Some(c) = chip {
+        eval_ctx.add_variable(c.name(), true);
+        for symbol in c.all_symbols() {
+            if let Some((key, value)) = symbol.split_once('=') {
+                let value = value.trim().trim_matches('"');
+                eval_ctx.add_variable(key.trim(), value);
+            } else {
+                eval_ctx.add_variable(symbol, true);
             }
         }
     }

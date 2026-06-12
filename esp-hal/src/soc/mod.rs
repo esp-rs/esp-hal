@@ -332,6 +332,206 @@ pub(crate) fn setup_trap_section_protection() {
     }
 }
 
+#[cfg(all(feature = "rt", enable_pmp, riscv))]
+pub(crate) fn enable_pmp() {
+    use core::arch::asm;
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum PmpError {
+        NoFreeEntries,
+        InvalidRange,
+    }
+
+    unsafe fn pmp_add_tor_region(
+        start_addr: u32,
+        end_addr: u32,
+        permission: u8,
+    ) -> Result<(), PmpError> {
+        if start_addr >= end_addr {
+            return Err(PmpError::InvalidRange);
+        }
+
+        const MAX_PMP_ENTRIES: usize = 16;
+        let mut free_idx = None;
+
+        // 1. Find two consecutive unpopulated PMP entries
+        for i in 1..MAX_PMP_ENTRIES {
+            unsafe {
+                if is_pmp_entry_free(i - 1) && is_pmp_entry_free(i) {
+                    free_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        let idx = free_idx.ok_or(PmpError::NoFreeEntries)?;
+        let start_idx = idx - 1;
+        let end_idx = idx;
+
+        // 2. Write the addresses to pmpaddr registers
+        // For TOR: pmpaddr[idx-1] = start_bits, pmpaddr[idx] = end_bits
+        // PMP addresses shift physical addresses down by 2 bits (34-bit physical address support)
+        let pmpaddr_start = start_addr >> 2;
+        let pmpaddr_end = end_addr >> 2;
+
+        unsafe {
+            write_pmpaddr(start_idx, pmpaddr_start);
+            write_pmpaddr(end_idx, pmpaddr_end);
+        }
+
+        // 3. Configure the PMP settings
+        unsafe {
+            modify_pmp_config(start_idx, /* 0b00 | */ 1 << 7); // Off, no permissions, locked
+            modify_pmp_config(end_idx, 0b01 << 3 | 1 << 7 | permission); // TOR, locked
+        }
+
+        // 4. Flush instruction cache / pipeline to ensure PMP takes effect immediately
+        unsafe {
+            asm!("fence", "fence.i", options(nostack));
+        }
+
+        Ok(())
+    }
+
+    /// Returns true if a PMP entry is unlocked and disabled (address matching OFF).
+    unsafe fn is_pmp_entry_free(idx: usize) -> bool {
+        let cfg_reg = idx / 4;
+        let byte_offset = idx % 4;
+
+        let cfg_val = unsafe { read_pmpcfg(cfg_reg) };
+        let entry_cfg = (cfg_val >> (byte_offset * 8)) & 0xFF;
+
+        // Unlocked and no permissions or address-matching mode configured.
+        (entry_cfg & 0x9F) == 0
+    }
+
+    /// Helper to read pmpcfgX registers dynamically
+    unsafe fn read_pmpcfg(reg: usize) -> u32 {
+        let mut val: u32;
+        unsafe {
+            match reg {
+                0 => asm!("csrr {}, pmpcfg0", out(reg) val),
+                1 => asm!("csrr {}, pmpcfg1", out(reg) val),
+                2 => asm!("csrr {}, pmpcfg2", out(reg) val),
+                3 => asm!("csrr {}, pmpcfg3", out(reg) val),
+                _ => panic!("Invalid PMP config register"),
+            }
+        }
+        val
+    }
+
+    /// Helper to write to a dynamically chosen pmpcfgX register byte slot
+    unsafe fn modify_pmp_config(idx: usize, byte_cfg: u8) {
+        let reg = idx / 4;
+        let byte_offset = idx % 4;
+        let bit_shift = byte_offset * 8;
+
+        let mut current_val = unsafe { read_pmpcfg(reg) };
+        // Clear old configuration byte
+        current_val &= !(0xFF << bit_shift);
+        // Set new configuration byte
+        current_val |= (byte_cfg as u32) << bit_shift;
+
+        unsafe {
+            match reg {
+                0 => asm!("csrw pmpcfg0, {}", in(reg) current_val),
+                1 => asm!("csrw pmpcfg1, {}", in(reg) current_val),
+                2 => asm!("csrw pmpcfg2, {}", in(reg) current_val),
+                3 => asm!("csrw pmpcfg3, {}", in(reg) current_val),
+                _ => panic!("Invalid PMP config register"),
+            }
+        }
+    }
+
+    /// Helper to write to a pmpaddrX register
+    unsafe fn write_pmpaddr(idx: usize, val: u32) {
+        unsafe {
+            match idx {
+                0 => asm!("csrw pmpaddr0, {}", in(reg) val),
+                1 => asm!("csrw pmpaddr1, {}", in(reg) val),
+                2 => asm!("csrw pmpaddr2, {}", in(reg) val),
+                3 => asm!("csrw pmpaddr3, {}", in(reg) val),
+                4 => asm!("csrw pmpaddr4, {}", in(reg) val),
+                5 => asm!("csrw pmpaddr5, {}", in(reg) val),
+                6 => asm!("csrw pmpaddr6, {}", in(reg) val),
+                7 => asm!("csrw pmpaddr7, {}", in(reg) val),
+                8 => asm!("csrw pmpaddr8, {}", in(reg) val),
+                9 => asm!("csrw pmpaddr9, {}", in(reg) val),
+                10 => asm!("csrw pmpaddr10, {}", in(reg) val),
+                11 => asm!("csrw pmpaddr11, {}", in(reg) val),
+                12 => asm!("csrw pmpaddr12, {}", in(reg) val),
+                13 => asm!("csrw pmpaddr13, {}", in(reg) val),
+                14 => asm!("csrw pmpaddr14, {}", in(reg) val),
+                15 => asm!("csrw pmpaddr15, {}", in(reg) val),
+                _ => panic!("Invalid PMP address register index"),
+            }
+        }
+    }
+
+    // protect .rwtext
+    unsafe {
+        unsafe extern "C" {
+            static _rwtext_start: u32;
+            static _rwtext_end: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_rwtext_start as *const _ as u32,
+            &_rwtext_end as *const _ as u32,
+            0b101, // X-R
+        )
+        .is_ok()
+        {
+            debug!("PMP write protection enabled for .rwtext");
+        } else {
+            debug!("Unable to enable PMP for .rwtext");
+        }
+    }
+
+    // protect .stack
+    unsafe {
+        unsafe extern "C" {
+            static _stack_end_cpu0: u32;
+            static _stack_start_cpu0: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_stack_end_cpu0 as *const _ as u32,
+            &_stack_start_cpu0 as *const _ as u32,
+            0b011, // -WR
+        )
+        .is_ok()
+        {
+            debug!("PMP execute protection enabled for .stack");
+        } else {
+            debug!("Unable to enable PMP for .stack");
+        }
+    }
+
+    // protect data
+    unsafe {
+        unsafe extern "C" {
+            static _data_start: u32;
+            static _noinit_end: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_data_start as *const _ as u32,
+            &_noinit_end as *const _ as u32,
+            0b011, // -WR
+        )
+        .is_ok()
+        {
+            debug!("PMP execute protection enabled for data");
+        } else {
+            debug!("Unable to enable PMP for data");
+        }
+    }
+}
+
 static CHIP_REVISION: AtomicU32 = AtomicU32::new(0);
 const LOADED: u32 = 1 << 31;
 const MAX_REVISION: ChipRevision = ChipRevision::from_packed(0xFFFF);
