@@ -76,10 +76,11 @@ pub struct Config {
     address: I2cAddress,
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    /// Creates a new I2C slave configuration with the specified address.
+    pub fn new(address: impl Into<I2cAddress>) -> Self {
         Config {
-            address: I2cAddress::SevenBit(0x55),
+            address: address.into(),
         }
     }
 }

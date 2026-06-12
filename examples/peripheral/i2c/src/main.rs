@@ -29,13 +29,10 @@ fn main() -> ! {
     let scl = peripherals.GPIO3;
 
     // Create a new I2C slave instance on I2C0 with address 0x55
-    let mut i2c_slave = I2cSlave::new(
-        peripherals.I2C0,
-        SlaveConfig::default(), // default address is 0x55
-    )
-    .unwrap()
-    .with_sda(sda)
-    .with_scl(scl);
+    let mut i2c_slave = I2cSlave::new(peripherals.I2C0, SlaveConfig::new(0x55))
+        .unwrap()
+        .with_sda(sda)
+        .with_scl(scl);
 
     esp_println::println!("I2C Slave listening on address 0x55...");
 
