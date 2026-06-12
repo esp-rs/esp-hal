@@ -12,7 +12,6 @@ use crate::{
     Blocking,
     DriverMode,
     dma::{
-        BurstConfig,
         Channel,
         ChannelRx,
         ChannelTx,
@@ -280,9 +279,8 @@ impl<'d> Mem2Mem<'d, Blocking> {
         self,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
-        config: BurstConfig,
     ) -> Result<SimpleMem2Mem<'d, Blocking>, DmaError> {
-        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
+        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors)
     }
 }
 
@@ -595,7 +593,6 @@ where
     Dm: DriverMode,
 {
     state: State<'d, Dm>,
-    config: BurstConfig,
 }
 
 enum State<'d, Dm: DriverMode> {
@@ -620,14 +617,12 @@ where
         mem2mem: Mem2Mem<'d, Dm>,
         rx_descriptors: &'d mut [DmaDescriptor],
         tx_descriptors: &'d mut [DmaDescriptor],
-        config: BurstConfig,
     ) -> Result<Self, DmaError> {
         if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
             return Err(DmaError::OutOfDescriptors);
         }
         Ok(Self {
             state: State::Idle(mem2mem, rx_descriptors, tx_descriptors),
-            config,
         })
     }
 }
@@ -648,6 +643,13 @@ where
             panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
         };
 
+        // Save the descriptors' raw parts to restore the idle state if buffer
+        // creation fails (the constructors consume them on error).
+        let rx_desc_ptr = rx_descriptors.as_mut_ptr();
+        let rx_desc_len = rx_descriptors.len();
+        let tx_desc_ptr = tx_descriptors.as_mut_ptr();
+        let tx_desc_len = tx_descriptors.len();
+
         // Raise these buffers to 'static. This is not safe, bad things will happen if
         // the user calls core::mem::forget on SimpleMem2MemTransfer. This is
         // just the unfortunate consequence of doing DMA without enforcing
@@ -656,20 +658,25 @@ where
             unsafe { core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len()) };
         let tx_buffer =
             unsafe { core::slice::from_raw_parts_mut(tx_buffer.as_ptr() as _, tx_buffer.len()) };
-        let rx_descriptors = unsafe {
-            core::slice::from_raw_parts_mut(rx_descriptors.as_mut_ptr(), rx_descriptors.len())
-        };
-        let tx_descriptors = unsafe {
-            core::slice::from_raw_parts_mut(tx_descriptors.as_mut_ptr(), tx_descriptors.len())
-        };
+        let rx_descriptors = unsafe { core::slice::from_raw_parts_mut(rx_desc_ptr, rx_desc_len) };
+        let tx_descriptors = unsafe { core::slice::from_raw_parts_mut(tx_desc_ptr, tx_desc_len) };
 
         // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM
         // and every other chip.
 
-        let dma_rx_buf = unwrap!(
-            DmaRxBuf::new_with_config(rx_descriptors, rx_buffer, self.config),
-            "There's no way to get the descriptors back yet"
-        );
+        // Loosest (region-default) alignment; surface a validation error instead
+        // of panicking if the buffers don't satisfy even that.
+        let dma_rx_buf = match DmaRxBuf::new(rx_descriptors, rx_buffer) {
+            Ok(buf) => buf,
+            Err(err) => {
+                let rx_descriptors =
+                    unsafe { core::slice::from_raw_parts_mut(rx_desc_ptr, rx_desc_len) };
+                let tx_descriptors =
+                    unsafe { core::slice::from_raw_parts_mut(tx_desc_ptr, tx_desc_len) };
+                self.state = State::Idle(mem2mem, rx_descriptors, tx_descriptors);
+                return Err(err.into());
+            }
+        };
 
         let rx = match mem2mem.rx.receive(dma_rx_buf) {
             Ok(rx) => rx,
@@ -684,10 +691,21 @@ where
             }
         };
 
-        let dma_tx_buf = unwrap!(
-            DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, self.config),
-            "There's no way to get the descriptors back yet"
-        );
+        let dma_tx_buf = match DmaTxBuf::new(tx_descriptors, tx_buffer) {
+            Ok(buf) => buf,
+            Err(err) => {
+                let (rx, buf) = rx.stop();
+                let (rx_descriptors, _rx_buffer) = buf.split();
+                let tx_descriptors =
+                    unsafe { core::slice::from_raw_parts_mut(tx_desc_ptr, tx_desc_len) };
+                self.state = State::Idle(
+                    Mem2Mem { rx, tx: mem2mem.tx },
+                    rx_descriptors,
+                    tx_descriptors,
+                );
+                return Err(err.into());
+            }
+        };
 
         let tx = match mem2mem.tx.send(dma_tx_buf) {
             Ok(tx) => tx,

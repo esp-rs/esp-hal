@@ -106,6 +106,56 @@ impl<'d> DmaChannel for AhbGdmaChannel<'d> {
     }
 }
 
+/// Configuration for an AHB GDMA channel half.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AhbGdmaConfig {
+    /// Channel priority.
+    ///
+    /// The default value is `Priority0`.
+    priority: AhbGdmaPriority,
+
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(ahb_gdma_separate_burst)]
+    internal_burst: AhbGdmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(ahb_gdma_separate_burst)]
+    external_burst: AhbGdmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(ahb_gdma_separate_burst))]
+    burst: AhbGdmaBurst,
+}
+
+/// Whether data burst should be enabled for the burst negotiated from the
+/// config and the buffer alignment. On engines with independent internal and
+/// external burst configuration, `accesses_psram` selects which one applies.
+fn data_burst_enabled(config: &AhbGdmaConfig, max_alignment: usize, accesses_psram: bool) -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(ahb_gdma_separate_burst)] {
+            let bytes = if accesses_psram {
+                config.external_burst.negotiate(max_alignment).bytes()
+            } else {
+                config.internal_burst.negotiate(max_alignment).bytes()
+            };
+            bytes != 0
+        } else {
+            let _ = accesses_psram;
+            config.burst.negotiate(max_alignment).bytes() != 0
+        }
+    }
+}
+
+/// External-memory block-size register encoding for the negotiated external
+/// burst.
+#[cfg(dma_ext_mem_configurable_block_size)]
+fn ext_mem_block_size(config: &AhbGdmaConfig, max_alignment: usize) -> u8 {
+    config.external_burst.negotiate(max_alignment) as u8
+}
+
 /// An arbitrary GDMA RX channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -234,6 +284,22 @@ for_each_dma_channel! {
     };
     ("AHB_GDMA", $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
         impl_channel!($ch, $num, $interrupt_in, $interrupt_out, compatible = [$($compatible),*]);
+    };
+}
+
+for_each_dma_engine! {
+    ("AHB_GDMA", priority = $priority:ident, priorities = [$(($variant:ident, $level:literal)),*]) => {
+        impl_priority_type!("AHB_GDMA", $priority, [$(($variant, $level)),*]);
+    };
+}
+
+for_each_dma_engine! {
+    ("AHB_GDMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("AHB_GDMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
     };
 }
 

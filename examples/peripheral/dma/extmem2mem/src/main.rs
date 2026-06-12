@@ -12,7 +12,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
+    dma::Mem2Mem,
     dma_descriptors_chunk_size,
     main,
     time::Duration,
@@ -66,18 +66,7 @@ fn main() -> ! {
     };
 
     let mut mem2mem = mem2mem
-        .with_descriptors(
-            rx_descriptors,
-            tx_descriptors,
-            BurstConfig {
-                external_memory: if cfg!(feature = "esp32s2") {
-                    ExternalBurstConfig::Size32
-                } else {
-                    ExternalBurstConfig::Size64
-                },
-                internal_memory: Default::default(),
-            },
-        )
+        .with_descriptors(rx_descriptors, tx_descriptors)
         .unwrap();
 
     for i in 0..core::mem::size_of_val(extram_buffer) {

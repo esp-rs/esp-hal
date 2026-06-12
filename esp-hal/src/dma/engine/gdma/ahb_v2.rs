@@ -13,6 +13,17 @@ cfg_if::cfg_if! {
     }
 }
 
+/// `*_data_burst_mode_sel` encoding for the negotiated burst:
+/// 0 = single (≤4 B), 1 = INCR4 (16 B), 2 = INCR8 (32 B), 3 = INCR16 (64 B).
+fn data_burst_mode_sel(config: &AhbGdmaConfig, max_alignment: usize) -> u8 {
+    match config.burst.negotiate(max_alignment).bytes() {
+        16 => 1,
+        32 => 2,
+        64 => 3,
+        _ => 0,
+    }
+}
+
 impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
     pub(super) fn ch(&self) -> &gdma_pac::ch::CH {
@@ -26,6 +37,14 @@ impl AhbGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaTxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -38,22 +57,19 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.ch()
-            .out_conf0()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool) {
+        let burst_enabled = data_burst_enabled(config, max_alignment, accesses_psram);
+        let mode_sel = data_burst_mode_sel(config, max_alignment);
+        self.ch().out_conf0().modify(|_, w| {
+            w.out_data_burst_en().bit(burst_enabled);
+            unsafe { w.out_data_burst_mode_sel().bits(mode_sel) }
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
             .out_conf0()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {
@@ -228,6 +244,14 @@ impl AhbGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AhbGdmaRxChannel<'_> {
+    type Config = AhbGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -240,22 +264,19 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
-        self.ch()
-            .in_conf0()
-            .modify(|_, w| w.in_data_burst_en().bit(burst_mode.is_burst_enabled()));
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool) {
+        let burst_enabled = data_burst_enabled(config, max_alignment, accesses_psram);
+        let mode_sel = data_burst_mode_sel(config, max_alignment);
+        self.ch().in_conf0().modify(|_, w| {
+            w.in_data_burst_en().bit(burst_enabled);
+            unsafe { w.in_data_burst_mode_sel().bits(mode_sel) }
+        });
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
             .in_conf0()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {

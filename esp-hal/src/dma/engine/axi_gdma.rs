@@ -109,6 +109,26 @@ impl<'d> From<AxiGdmaChannel<'d>> for AxiGdmaTxChannel<'d> {
     }
 }
 
+/// Configuration for an AXI GDMA channel half.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AxiGdmaConfig {
+    /// Channel priority.
+    ///
+    /// The default value is `Priority0`.
+    priority: AxiGdmaPriority,
+
+    /// Maximum burst length (applies to internal and external RAM alike).
+    burst: AxiGdmaBurst,
+}
+
+for_each_dma_engine! {
+    ("AXI_GDMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
+}
+
 impl AxiGdmaTxChannel<'_> {
     #[inline(always)]
     fn ch(&self) -> &pac::axi_dma::OUT_CH {
@@ -117,6 +137,14 @@ impl AxiGdmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaTxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .out_pri()
+            .write(|w| unsafe { w.tx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -129,19 +157,20 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, _accesses_psram: bool) {
+        // `out_burst_size_sel`: 0..=4 select 8/16/32/64/128-byte bursts, which is
+        // exactly the negotiated burst's discriminant. Burst is always enabled and
+        // shared between internal and external RAM.
+        let burst_size_sel = config.burst.negotiate(max_alignment) as u8;
+        self.ch()
+            .out_conf0()
+            .modify(|_, w| unsafe { w.out_burst_size_sel().bits(burst_size_sel) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
             .out_conf0()
             .modify(|_, w| w.outdscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .out_pri()
-            .write(|w| unsafe { w.tx_pri().bits(priority as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {
@@ -307,6 +336,14 @@ impl AxiGdmaRxChannel<'_> {
 }
 
 impl RegisterAccess for AxiGdmaRxChannel<'_> {
+    type Config = AxiGdmaConfig;
+
+    fn apply_config(&self, config: &Self::Config) {
+        self.ch()
+            .in_pri()
+            .write(|w| unsafe { w.rx_pri().bits(config.priority.into()) });
+    }
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new_with(
@@ -319,19 +356,20 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, _accesses_psram: bool) {
+        // `in_burst_size_sel`: 0..=4 select 8/16/32/64/128-byte bursts, which is
+        // exactly the negotiated burst's discriminant. Burst is always enabled and
+        // shared between internal and external RAM.
+        let burst_size_sel = config.burst.negotiate(max_alignment) as u8;
+        self.ch()
+            .in_conf0()
+            .modify(|_, w| unsafe { w.in_burst_size_sel().bits(burst_size_sel) });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
             .in_conf0()
             .modify(|_, w| w.indscr_burst_en().bit(burst_mode));
-    }
-
-    fn set_priority(&self, priority: DmaPriority) {
-        self.ch()
-            .in_pri()
-            .write(|w| unsafe { w.rx_pri().bits(priority as u8) });
     }
 
     fn set_peripheral(&self, peripheral: u8) {
@@ -533,6 +571,12 @@ macro_rules! impl_channel {
 for_each_dma_channel! {
     ("AXI_GDMA", $ch:ident, $num:literal, interrupt_in = $interrupt_in:ident, interrupt_out = $interrupt_out:ident, compatible = [$($compatible:ident),*]) => {
         impl_channel!($ch, $num, $interrupt_in, $interrupt_out, compatible = [$($compatible),*]);
+    };
+}
+
+for_each_dma_engine! {
+    ("AXI_GDMA", priority = $priority:ident, priorities = [$(($variant:ident, $level:literal)),*]) => {
+        impl_priority_type!("AXI_GDMA", $priority, [$(($variant, $level)),*]);
     };
 }
 

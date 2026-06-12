@@ -702,7 +702,7 @@ macro_rules! dma_buffers_impl {
     ($size:expr, is_circular = $circular:tt) => {
         $crate::dma_buffers_impl!(
             $size,
-            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size(),
+            $crate::dma::max_compatible_chunk_size(),
             is_circular = $circular
         );
     };
@@ -893,37 +893,6 @@ impl From<DmaBufError> for DmaError {
             DmaBufError::BufferTooSmall => DmaError::BufferTooSmall,
         }
     }
-}
-
-/// DMA Priorities
-#[cfg(dma_max_priority_is_set)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaPriority {
-    /// The lowest priority level (Priority 0).
-    Priority0 = 0,
-    /// Priority level 1.
-    Priority1 = 1,
-    /// Priority level 2.
-    Priority2 = 2,
-    /// Priority level 3.
-    Priority3 = 3,
-    /// Priority level 4.
-    Priority4 = 4,
-    /// Priority level 5.
-    Priority5 = 5,
-    /// Priority level 6.
-    #[cfg(dma_max_priority = "9")]
-    Priority6 = 6,
-    /// Priority level 7.
-    #[cfg(dma_max_priority = "9")]
-    Priority7 = 7,
-    /// Priority level 8.
-    #[cfg(dma_max_priority = "9")]
-    Priority8 = 8,
-    /// Priority level 9.
-    #[cfg(dma_max_priority = "9")]
-    Priority9 = 9,
 }
 
 /// The owner bit of a DMA descriptor.
@@ -1153,29 +1122,6 @@ impl<'a> DescriptorSet<'a> {
     }
 }
 
-/// Block size for transfers to/from PSRAM
-#[cfg(dma_ext_mem_configurable_block_size)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DmaExtMemBKSize {
-    /// External memory block size of 16 bytes.
-    Size16 = 0,
-    /// External memory block size of 32 bytes.
-    Size32 = 1,
-    /// External memory block size of 64 bytes.
-    Size64 = 2,
-}
-
-#[cfg(dma_ext_mem_configurable_block_size)]
-impl From<ExternalBurstConfig> for DmaExtMemBKSize {
-    fn from(size: ExternalBurstConfig) -> Self {
-        match size {
-            ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
-            ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
-            ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
-        }
-    }
-}
-
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1185,6 +1131,10 @@ where
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: CH,
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1211,6 +1161,7 @@ where
 
         Self {
             rx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1224,6 +1175,7 @@ where
         self.rx_impl.set_async(true);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1254,6 +1206,7 @@ where
         self.rx_impl.set_async(false);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1265,10 +1218,10 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.rx_impl.set_priority(priority);
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
+        self.rx_impl.apply_config(config);
     }
 
     fn do_prepare(
@@ -1276,8 +1229,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::In);
-
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1286,10 +1237,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.rx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.rx_impl.set_burst_mode(preparation.burst_transfer);
+        self.rx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
@@ -1411,6 +1366,10 @@ where
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: CH,
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1431,6 +1390,7 @@ where
         tx_impl.set_async(false);
         Self {
             tx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1444,6 +1404,7 @@ where
         self.tx_impl.set_async(true);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1474,6 +1435,7 @@ where
         self.tx_impl.set_async(false);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1485,16 +1447,16 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
+        self.tx_impl.apply_config(config);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[allow(dead_code)]
     pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.tx_impl.runtime_ensure_compatible(peripheral);
-    }
-
-    /// Configure the channel priority.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx_impl.set_priority(priority);
     }
 
     fn do_prepare(
@@ -1502,8 +1464,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::Out);
-
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1512,10 +1472,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.tx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.tx_impl.set_burst_mode(preparation.burst_transfer);
+        self.tx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl
@@ -1616,6 +1580,46 @@ where
     }
 }
 
+/// Configuration for a full DMA channel (both halves).
+///
+/// Composes the per-half engine configurations, so the RX and TX halves can be
+/// configured independently (e.g. with different priorities) in a single value
+/// passed to [`Channel::apply_config`].
+pub struct DmaChannelConfig<CH: DmaChannel> {
+    /// Configuration for the RX (receive) half.
+    pub rx: <CH::Rx as RegisterAccess>::Config,
+    /// Configuration for the TX (transmit) half.
+    pub tx: <CH::Tx as RegisterAccess>::Config,
+}
+
+// Manual impls: deriving would wrongly require `CH: Default`/`Clone`/`Debug`.
+impl<CH: DmaChannel> Default for DmaChannelConfig<CH> {
+    fn default() -> Self {
+        Self {
+            rx: Default::default(),
+            tx: Default::default(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> Clone for DmaChannelConfig<CH> {
+    fn clone(&self) -> Self {
+        Self {
+            rx: self.rx.clone(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> core::fmt::Debug for DmaChannelConfig<CH> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DmaChannelConfig")
+            .field("rx", &self.rx)
+            .field("tx", &self.tx)
+            .finish()
+    }
+}
+
 /// DMA Channel
 #[non_exhaustive]
 pub struct Channel<Dm, CH>
@@ -1694,13 +1698,6 @@ where
         }
     }
 
-    /// Configure the channel priorities.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx.set_priority(priority);
-        self.rx.set_priority(priority);
-    }
-
     /// Converts a blocking channel to an async channel.
     pub fn into_async(self) -> Channel<Async, CH> {
         Channel {
@@ -1710,11 +1707,20 @@ where
     }
 }
 
-impl<CH, Dm> Channel<Dm, CH>
+impl<Dm, CH> Channel<Dm, CH>
 where
-    CH: DmaChannel,
     Dm: DriverMode,
+    CH: DmaChannel,
 {
+    /// Applies a complete configuration to both halves of the channel.
+    ///
+    /// The RX and TX halves can be configured independently via the `rx` and
+    /// `tx` fields of [`DmaChannelConfig`].
+    pub fn apply_config(&mut self, config: &DmaChannelConfig<CH>) {
+        self.rx.apply_config(&config.rx);
+        self.tx.apply_config(&config.tx);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[instability::unstable]
     pub fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {

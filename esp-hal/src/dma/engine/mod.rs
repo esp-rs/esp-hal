@@ -2,7 +2,7 @@ use enumset::{EnumSet, EnumSetType};
 
 use crate::{
     asynch::AtomicWaker,
-    dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
+    dma::{DmaRxInterrupt, DmaTxInterrupt},
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     private::{Internal, Sealed},
@@ -20,19 +20,19 @@ for_each_dma_engine! {
     };
     ("COPY_DMA") => {
         mod copy;
-        pub use copy::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
+        pub use copy::*;
     };
     ("CRYPTO_DMA") => {
         mod crypto;
-        pub use crypto::{CryptoDmaChannel, CryptoDmaRxChannel, CryptoDmaTxChannel};
+        pub use crypto::*;
     };
     ("I2S_DMA") => {
         mod i2s;
-        pub use i2s::{I2sDmaChannel, I2sDmaRxChannel, I2sDmaTxChannel};
+        pub use i2s::*;
     };
     ("SPI_DMA") => {
         mod spi;
-        pub use spi::{SpiDmaChannel, SpiDmaRxChannel, SpiDmaTxChannel};
+        pub use spi::*;
     };
 }
 
@@ -68,24 +68,34 @@ for_each_peripheral! {
 
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
+    /// Engine-specific channel configuration.
+    ///
+    /// Exposes only the configuration knobs (and values) this engine supports.
+    type Config: Default + Clone + core::fmt::Debug;
+
+    /// Apply the configuration to this channel half.
+    ///
+    /// Write-only and total: the caller always supplies a complete `Config`.
+    /// There is no `config()` getter and no partial/read-modify-write update path.
+    fn apply_config(&self, config: &Self::Config);
+
+    /// Programs the per-transfer burst for this channel half.
+    ///
+    /// Negotiates the configured burst ceiling(s) in `config` against the
+    /// buffer's guaranteed `max_alignment`. `accesses_psram` selects the
+    /// relevant burst on engines that configure internal and external RAM
+    /// independently. Infallible: buffers are validated at construction.
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool);
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
     /// Reset the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
-    /// Enable/Disable INCR burst transfer for channel reading
-    /// accessing data in internal RAM.
-    fn set_burst_mode(&self, burst_mode: BurstConfig);
-
     /// Enable/Disable burst transfer for channel reading
     /// descriptors in internal RAM.
     fn set_descr_burst_mode(&self, burst_mode: bool);
-
-    /// The priority of the channel. The larger the value, the higher the
-    /// priority.
-    #[cfg(dma_max_priority_is_set)]
-    fn set_priority(&self, priority: crate::dma::DmaPriority);
 
     /// Select a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
@@ -105,9 +115,6 @@ pub trait RegisterAccess: Sealed {
     /// Configure the bit to enable checking the owner attribute of the
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize);
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool;
@@ -252,3 +259,93 @@ macro_rules! impl_channel_common {
     };
 }
 pub(crate) use impl_channel_common;
+
+#[allow(unused)]
+macro_rules! impl_priority_type {
+    ($engine:literal, $ty:ident, [$(($variant:ident, $level:literal)),*]) => {
+        #[doc = concat!("DMA channel priority levels for the ", $engine, " engine.")]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum $ty {
+            $(
+                #[doc = concat!("Priority level ", $level, ".")]
+                $variant = $level,
+            )*
+        }
+
+        impl Default for $ty {
+            fn default() -> Self {
+                Self::Priority0
+            }
+        }
+
+        impl From<$ty> for u8 {
+            fn from(value: $ty) -> Self {
+                value as Self
+            }
+        }
+    };
+}
+#[allow(unused)]
+pub(crate) use impl_priority_type;
+
+#[allow(unused)]
+macro_rules! impl_burst_type {
+    ($ty:ident, [($first:ident, $first_bytes:literal) $(, ($variant:ident, $bytes:literal))*]) => {
+        #[doc = concat!("DMA burst length options usable with the `", stringify!($ty), "` channel config.")]
+        ///
+        /// Each variant is a maximum burst length in bytes; `Disabled` (where
+        /// present) turns burst off. The effective burst is negotiated against
+        /// the buffer alignment at transfer setup.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum $ty {
+            #[doc = concat!($first_bytes, "-byte burst.")]
+            $first,
+            $(
+                #[doc = concat!($bytes, "-byte burst.")]
+                $variant,
+            )*
+        }
+
+        impl $ty {
+            /// The burst length in bytes (`0` means burst disabled).
+            pub const fn bytes(self) -> usize {
+                match self {
+                    Self::$first => $first_bytes,
+                    $( Self::$variant => $bytes, )*
+                }
+            }
+
+            /// Negotiates the effective burst: the largest supported variant
+            /// not exceeding this configured ceiling nor `max_alignment`.
+            ///
+            /// Falls back to the smallest supported burst if none fit. The
+            /// result's discriminant (`as u8`) doubles as the hardware
+            /// block-size register encoding where applicable.
+            #[allow(dead_code)]
+            pub(crate) const fn negotiate(self, max_alignment: usize) -> Self {
+                let ceiling = self.bytes();
+                let budget = if ceiling < max_alignment { ceiling } else { max_alignment };
+                #[allow(unused_mut)]
+                let mut selected = Self::$first;
+                $(
+                    if $bytes <= budget {
+                        selected = Self::$variant;
+                    }
+                )*
+                selected
+            }
+        }
+
+        impl Default for $ty {
+            fn default() -> Self {
+                // Sizes are listed ascending: the first variant is burst
+                // disabled, or the minimum burst where it can't be disabled.
+                Self::$first
+            }
+        }
+    };
+}
+#[allow(unused)]
+pub(crate) use impl_burst_type;

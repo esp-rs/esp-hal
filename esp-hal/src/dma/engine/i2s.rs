@@ -5,7 +5,6 @@ use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
         DmaChannel,
         DmaRxChannel,
         DmaRxInterrupt,
@@ -15,6 +14,7 @@ use crate::{
         RegisterAccess,
         RxRegisterAccess,
         TxRegisterAccess,
+        impl_burst_type,
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
@@ -77,7 +77,66 @@ impl I2sDmaTxChannel<'_> {
 impl crate::private::Sealed for I2sDmaTxChannel<'_> {}
 impl DmaTxChannel for I2sDmaTxChannel<'_> {}
 
+/// Configuration for an I2S DMA channel half.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct I2sDmaConfig {
+    /// Maximum burst length for internal-RAM transfers.
+    #[cfg(i2s_dma_separate_burst)]
+    internal_burst: I2sDmaInternalBurst,
+
+    /// Maximum burst length (block size) for external-RAM (PSRAM) transfers.
+    #[cfg(i2s_dma_separate_burst)]
+    external_burst: I2sDmaExternalBurst,
+
+    /// Maximum burst length for transfers (applies to both internal and
+    /// external RAM, which share the same burst configuration on this chip).
+    #[cfg(not(i2s_dma_separate_burst))]
+    burst: I2sDmaBurst,
+}
+
+/// Whether data burst should be enabled for the burst negotiated from the
+/// config and the buffer alignment. On engines with independent internal and
+/// external burst configuration, `accesses_psram` selects which one applies.
+fn data_burst_enabled(config: &I2sDmaConfig, max_alignment: usize, accesses_psram: bool) -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(i2s_dma_separate_burst)] {
+            let bytes = if accesses_psram {
+                config.external_burst.negotiate(max_alignment).bytes()
+            } else {
+                config.internal_burst.negotiate(max_alignment).bytes()
+            };
+            bytes != 0
+        } else {
+            let _ = accesses_psram;
+            config.burst.negotiate(max_alignment).bytes() != 0
+        }
+    }
+}
+
+/// External-memory block-size register encoding for the negotiated external
+/// burst.
+#[cfg(dma_ext_mem_configurable_block_size)]
+fn ext_mem_block_size(config: &I2sDmaConfig, max_alignment: usize) -> u8 {
+    config.external_burst.negotiate(max_alignment) as u8
+}
+
+for_each_dma_engine! {
+    ("I2S_DMA", separate, internal = $it:ident, internal_bursts = [$(($iv:ident, $ib:literal)),*], external = $et:ident, external_bursts = [$(($ev:ident, $eb:literal)),*]) => {
+        impl_burst_type!($it, [$(($iv, $ib)),*]);
+        impl_burst_type!($et, [$(($ev, $eb)),*]);
+    };
+    ("I2S_DMA", single, burst = $bt:ident, bursts = [$(($v:ident, $b:literal)),*]) => {
+        impl_burst_type!($bt, [$(($v, $b)),*]);
+    };
+}
+
 impl RegisterAccess for I2sDmaTxChannel<'_> {
+    type Config = I2sDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         None
@@ -87,10 +146,17 @@ impl RegisterAccess for I2sDmaTxChannel<'_> {
         self.regs().lc_conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool) {
+        #[cfg(dma_ext_mem_configurable_block_size)]
+        self.regs().lc_conf().modify(|_, w| unsafe {
+            w.ext_mem_bk_size()
+                .bits(ext_mem_block_size(config, max_alignment))
+        });
+
+        let burst_enabled = data_burst_enabled(config, max_alignment, accesses_psram);
         self.regs()
             .lc_conf()
-            .modify(|_, w| w.out_data_burst_en().bit(burst_mode.is_burst_enabled()));
+            .modify(|_, w| w.out_data_burst_en().bit(burst_enabled));
     }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
@@ -127,13 +193,6 @@ impl RegisterAccess for I2sDmaTxChannel<'_> {
         self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
-        self.regs()
-            .lc_conf()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]
@@ -266,6 +325,10 @@ impl InterruptAccess<DmaTxInterrupt> for I2sDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for I2sDmaRxChannel<'_> {
+    type Config = I2sDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         None
@@ -275,7 +338,18 @@ impl RegisterAccess for I2sDmaRxChannel<'_> {
         self.regs().lc_conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize, accesses_psram: bool) {
+        // PDMA configures the burst enable on the OUT path; the IN half only sets
+        // the external-memory block size, where that is configurable.
+        let _ = accesses_psram;
+        #[cfg(dma_ext_mem_configurable_block_size)]
+        self.regs().lc_conf().modify(|_, w| unsafe {
+            w.ext_mem_bk_size()
+                .bits(ext_mem_block_size(config, max_alignment))
+        });
+        #[cfg(not(dma_ext_mem_configurable_block_size))]
+        let _ = (config, max_alignment);
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.regs()
@@ -311,13 +385,6 @@ impl RegisterAccess for I2sDmaRxChannel<'_> {
         self.regs()
             .lc_conf()
             .modify(|_, w| w.check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
-        self.regs()
-            .lc_conf()
-            .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(dma_can_access_psram)]

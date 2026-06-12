@@ -5,9 +5,7 @@ use crate::{
     RegisterToggle,
     asynch::AtomicWaker,
     dma::{
-        BurstConfig,
         DmaChannel,
-        DmaExtMemBKSize,
         DmaRxChannel,
         DmaRxInterrupt,
         DmaTxChannel,
@@ -81,7 +79,19 @@ impl CopyDmaTxChannel<'_> {
 impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
+/// Configuration for a COPY DMA channel half.
+///
+/// COPY_DMA is a mem2mem-only engine with no configurable options, so this is
+/// empty. It is never exposed as a driver-facing configuration surface.
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct CopyDmaConfig {}
+
 impl RegisterAccess for CopyDmaTxChannel<'_> {
+    type Config = CopyDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))
@@ -91,7 +101,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.out_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, _config: &Self::Config, _max_alignment: usize, _accesses_psram: bool) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -123,11 +133,6 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
         if check_owner == Some(true) {
             panic!("Copy DMA does not support checking descriptor ownership");
         }
-    }
-
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
     }
 
     #[cfg(dma_can_access_psram)]
@@ -254,6 +259,10 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
+    type Config = CopyDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))
@@ -263,7 +272,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         self.regs().conf().toggle(|w, bit| w.in_rst().bit(bit));
     }
 
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn prepare_burst(&self, _config: &Self::Config, _max_alignment: usize, _accesses_psram: bool) {}
 
     fn set_descr_burst_mode(&self, _burst_mode: bool) {}
 
@@ -297,10 +306,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         }
     }
 
-    #[cfg(dma_ext_mem_configurable_block_size)]
-    fn set_ext_mem_block_size(&self, _size: DmaExtMemBKSize) {
-        // not supported
-    }
 
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {

@@ -1895,5 +1895,19 @@ with_spi_master_dma_engine! {
 
         // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
         type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+
+        /// DMA channel configuration for the SPI master driver.
+        ///
+        /// This is the underlying DMA channel's own configuration type; the RX
+        /// and TX halves (with their engine-specific knobs, e.g. priority) are
+        /// configured independently via its `rx` / `tx` fields.
+        pub type DmaConfig<'d> = crate::dma::DmaChannelConfig<SpiMasterErased<'d>>;
+
+        impl<'d, Dm: DriverMode> SpiDma<'d, Dm> {
+            /// Updates DMA channel configuration.
+            pub fn apply_dma_config(&mut self, config: &DmaConfig<'d>) {
+                self.channel.apply_config(config);
+            }
+        }
     };
 }

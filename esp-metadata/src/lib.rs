@@ -420,6 +420,7 @@ impl Config {
         }
 
         if let Some(dma) = self.device.peri_config.dma.as_ref() {
+            dma.engines.validate_max_priority()?;
             dma.engines
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
         }
@@ -903,7 +904,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
                 //     }
                 // }
                 // ```
-                #(  #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
+                #( #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }
