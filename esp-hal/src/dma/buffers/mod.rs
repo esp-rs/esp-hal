@@ -8,7 +8,10 @@ use core::{
 use super::*;
 use crate::soc::is_slice_in_dram;
 #[cfg(dma_can_access_psram)]
-use crate::soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address};
+use crate::{
+    dma::InternalMemoryBuffer,
+    soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address},
+};
 
 pub(crate) mod scoped;
 pub(crate) use scoped::*;
@@ -2134,8 +2137,8 @@ const BUF_LEN: usize = 16 + 2 * (MIN_LAST_DMA_LEN - 1); // 2x makes aligning sho
 /// the CPU back to PSRAM.
 #[cfg(dma_can_access_psram)]
 pub(crate) struct ManualWritebackBuffer {
+    buffer: InternalMemoryBuffer<BUF_LEN>,
     dst_address: NonNull<u8>,
-    buffer: [u8; BUF_LEN],
     n_bytes: u8,
 }
 
@@ -2144,8 +2147,8 @@ impl ManualWritebackBuffer {
     pub fn new(ptr: NonNull<[u8]>) -> Self {
         assert!(ptr.len() <= BUF_LEN);
         Self {
+            buffer: InternalMemoryBuffer::new(),
             dst_address: ptr.cast(),
-            buffer: [0; BUF_LEN],
             n_bytes: ptr.len() as u8,
         }
     }
@@ -2156,15 +2159,15 @@ impl ManualWritebackBuffer {
             // Invalidate the cache lines covering the alignment buffer so the CPU
             // reads the fresh DMA data rather than the stale zeros from new().
             #[cfg(soc_internal_memory_cached)]
-            crate::soc::cache_invalidate_addr(self.buffer.as_ptr() as u32, BUF_LEN as u32);
+            crate::soc::cache_invalidate_addr(self.buffer_ptr() as u32, BUF_LEN as u32);
 
             self.dst_address
                 .as_ptr()
-                .copy_from(self.buffer.as_ptr(), self.n_bytes as usize);
+                .copy_from(self.buffer_ptr().cast_const(), self.n_bytes as usize);
         }
     }
 
     pub fn buffer_ptr(&self) -> *mut u8 {
-        self.buffer.as_ptr().cast_mut()
+        self.buffer.get() as *const [u8] as *mut u8
     }
 }

@@ -536,30 +536,6 @@ macro_rules! dma_circular_descriptors {
     };
 }
 
-/// Declares a DMA buffer with a specific size, aligned to 4 bytes
-#[doc(hidden)]
-#[macro_export]
-macro_rules! declare_aligned_dma_buffer {
-    ($name:ident, $size:expr) => {
-        // ESP32 requires word alignment for DMA buffers.
-        // ESP32-S2 technically supports byte-aligned DMA buffers, but the
-        // transfer ends up writing out of bounds.
-        // if the buffer's length is 2 or 3 (mod 4).
-        static mut $name: [u32; ($size as usize).div_ceil(4)] = [0; ($size as usize).div_ceil(4)];
-    };
-}
-
-/// Turns the potentially oversized static `u32`` array reference into a
-/// correctly sized `u8` one
-#[doc(hidden)]
-#[macro_export]
-macro_rules! as_mut_byte_array {
-    ($name:expr, $size:expr) => {
-        unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
-    };
-}
-pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
-
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
@@ -651,6 +627,53 @@ macro_rules! dma_circular_descriptors_chunk_size {
     };
 }
 
+// ESP32-P4 internal memory is cached, enforce alignment to avoid memory
+// corruption. Technically only needed for IN buffers and descriptor lists.
+#[cfg_attr(soc_internal_memory_cached, repr(C, align(64)))] // dcache cache line
+#[doc(hidden)]
+pub struct InternalMemoryCachelineAligned<T>(T);
+
+impl<T> InternalMemoryCachelineAligned<T> {
+    pub const fn new(init: T) -> Self {
+        Self(init)
+    }
+
+    pub const fn get(&self) -> &T {
+        &self.0
+    }
+
+    pub const fn get_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+// ESP32 requires word alignment for DMA buffers.
+// ESP32-S2 technically supports byte-aligned DMA buffers, but the
+// transfer ends up writing out of bounds.
+#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(4)))]
+#[doc(hidden)]
+pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
+
+impl<const N: usize> Default for InternalMemoryBuffer<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const N: usize> InternalMemoryBuffer<N> {
+    pub const fn new() -> Self {
+        Self(InternalMemoryCachelineAligned::new([0u8; N]))
+    }
+
+    pub const fn get(&self) -> &[u8] {
+        self.0.get()
+    }
+
+    pub const fn get_mut(&mut self) -> &mut [u8] {
+        self.0.get_mut()
+    }
+}
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_buffers_impl {
@@ -661,11 +684,16 @@ macro_rules! dma_buffers_impl {
     }};
 
     ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
-        $crate::declare_aligned_dma_buffer!(BUFFER, $size);
-
         unsafe {
             (
-                $crate::dma::as_mut_byte_array!(BUFFER, $size),
+                {
+                    #[allow(unused_braces)]
+                    static mut BUFFER: $crate::dma::InternalMemoryBuffer<{ $size }> =
+                        $crate::dma::InternalMemoryBuffer::new();
+                    // SAFETY: The ConstStaticCell in the descriptor part ensures there will only
+                    // be a single mutable reference to this buffer.
+                    unsafe { BUFFER.get_mut() }
+                },
                 $crate::dma_descriptors_impl!($size, $chunk_size, is_circular = $circular),
             )
         }
@@ -690,16 +718,21 @@ macro_rules! dma_descriptors_impl {
     }};
 
     ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+        use $crate::{
+            __macro_implementation::static_cell::ConstStaticCell,
+            dma::{DmaDescriptor, InternalMemoryCachelineAligned},
+        };
+
         const COUNT: usize =
             $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
-        static DESCRIPTORS: $crate::__macro_implementation::static_cell::ConstStaticCell<
-            [$crate::dma::DmaDescriptor; COUNT],
-        > = $crate::__macro_implementation::static_cell::ConstStaticCell::new(
-            [$crate::dma::DmaDescriptor::EMPTY; COUNT],
-        );
+        static DESCRIPTORS: ConstStaticCell<
+            InternalMemoryCachelineAligned<[DmaDescriptor; COUNT]>,
+        > = ConstStaticCell::new(InternalMemoryCachelineAligned::new(
+            [DmaDescriptor::EMPTY; COUNT],
+        ));
 
-        DESCRIPTORS.take()
+        DESCRIPTORS.take().get_mut()
     }};
 }
 

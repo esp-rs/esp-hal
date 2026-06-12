@@ -26,6 +26,7 @@ use crate::{
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
+        InternalMemoryCachelineAligned,
         NoBuffer,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
@@ -270,22 +271,30 @@ impl<'d> SpiDma<'d, Blocking> {
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
 
-        static mut TX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-            [[DmaDescriptor::EMPTY]; SPI_NUM];
-        static mut RX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-            [[DmaDescriptor::EMPTY]; SPI_NUM];
+        static mut TX_DESCRIPTORS: InternalMemoryCachelineAligned<[DmaDescriptor; SPI_NUM]> =
+            InternalMemoryCachelineAligned::new([DmaDescriptor::EMPTY; SPI_NUM]);
+        static mut RX_DESCRIPTORS: InternalMemoryCachelineAligned<[DmaDescriptor; SPI_NUM]> =
+            InternalMemoryCachelineAligned::new([DmaDescriptor::EMPTY; SPI_NUM]);
 
-        let rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
+        let tx_buffer = cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => {{
+                use crate::dma::InternalMemoryBuffer;
+                static mut BUFFERS: [InternalMemoryBuffer<4>; SPI_NUM] = [const { InternalMemoryBuffer::new() }; SPI_NUM];
+                unsafe { BUFFERS[id].get_mut() }
+            }}
+            _ => &mut []
+        };
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
-                static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
-                let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
-                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
-            } else {
-                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
-            }
-        }
+        #[allow(static_mut_refs)]
+        let rx_buffer = unwrap!(DmaRxBuf::new(
+            core::slice::from_mut(unsafe { &mut (RX_DESCRIPTORS.get_mut()[id]) }),
+            &mut []
+        ));
+        #[allow(static_mut_refs)]
+        let tx_buffer = unwrap!(DmaTxBuf::new(
+            core::slice::from_mut(unsafe { &mut (TX_DESCRIPTORS.get_mut()[id]) }),
+            tx_buffer
+        ));
 
         // The buffers must be set up when creating the driver.
         unsafe { (&mut *state.tx_buffer.get()).write(tx_buffer.into_scoped()) };
@@ -685,6 +694,7 @@ impl<'a> MaybeCopyTxBuf<'a> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum MaybeCopyRxBuf<'a> {
     Copy(&'a mut ScopedDmaRxBuf<'static>),
     Direct {
