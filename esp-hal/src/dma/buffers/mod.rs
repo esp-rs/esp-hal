@@ -254,6 +254,41 @@ const fn chunk_size_for_alignment(alignment: usize) -> usize {
     4096 - alignment
 }
 
+/// Data cache line size of cached *internal* memory, in bytes, or `0` if
+/// internal memory is not accessed through a cache.
+const INTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
+    // ESP32-P4: L1 data cache line size.
+    // FIXME: add uncached address range?
+    soc_internal_memory_cached => 64,
+    _ => 1,
+};
+
+/// Data cache line size of cached *external* (PSRAM) memory, in bytes.
+///
+/// On the ESP32-S2/S3 this follows the `data-cache-line-size` esp-config option.
+#[cfg(dma_can_access_psram)]
+const EXTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
+    data_cache_line_size_64b => 64,
+    data_cache_line_size_32b => 32,
+    data_cache_line_size_16b => 16,
+    // TODO(esp32p4): PSRAM is cached through the L2 cache, whose line size is
+    // configurable (64 or 128 bytes) and is not encoded anywhere yet. Assume the
+    // larger, always-safe value until the L2 line size is available.
+    _ => 128,
+};
+
+/// The cache line size (in bytes) of the memory `buffer` lives in, or `0` if it
+/// is not accessed through a cache. DMA receive buffers must be aligned to this.
+fn cache_line_size_for(buffer: &[u8]) -> usize {
+    #[cfg(dma_can_access_psram)]
+    if is_valid_psram_address(buffer.as_ptr() as usize) {
+        return EXTERNAL_MEMORY_CACHE_LINE_SIZE;
+    }
+
+    let _ = buffer;
+    INTERNAL_MEMORY_CACHE_LINE_SIZE
+}
+
 /// The strictest *mandatory* alignment for a buffer in this memory region and
 /// transfer direction, *excluding* burst.
 ///
@@ -265,24 +300,21 @@ const fn chunk_size_for_alignment(alignment: usize) -> usize {
 fn region_alignment(buffer: &[u8], direction: TransferDirection) -> usize {
     let alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(direction);
 
-    cfg_if::cfg_if! {
-        if #[cfg(dma_can_access_psram)] {
-            let mut alignment = alignment;
-            if is_valid_psram_address(buffer.as_ptr() as usize) {
-                alignment = max(alignment, ExternalBurstConfig::DEFAULT.min_psram_alignment(direction));
-            }
-            alignment
-        } else {
-            let _ = buffer;
-            alignment
-        }
+    #[cfg(dma_can_access_psram)]
+    if is_valid_psram_address(buffer.as_ptr() as usize) {
+        return max(
+            alignment,
+            ExternalBurstConfig::DEFAULT.min_psram_alignment(direction),
+        );
     }
+
+    alignment
 }
 
 /// The alignment a buffer actually guarantees, given a caller-requested
 /// alignment: the larger of the request and the region's mandatory floor.
 fn effective_alignment(buffer: &[u8], direction: TransferDirection, requested: usize) -> usize {
-    max(requested.max(1), region_alignment(buffer, direction))
+    max(requested, region_alignment(buffer, direction))
 }
 
 /// An alignment that is compatible with any DMA channel in any direction.
@@ -353,6 +385,17 @@ fn ensure_buffer_compatible(
     }
 
     ensure_buffer_aligned(buffer, direction, alignment)?;
+
+    // A receive buffer in cached memory is invalidated after the transfer. The
+    // hardware/ROM rounds the invalidated range out to whole cache lines, so a
+    // buffer whose start is not cache-line aligned would also discard cached data
+    // belonging to a neighbouring allocation. Reject such buffers up front.
+    if direction == TransferDirection::In {
+        let cache_line_size = cache_line_size_for(buffer);
+        if !(buffer.as_ptr() as usize).is_multiple_of(cache_line_size) {
+            return Err(DmaBufError::InvalidAlignment(DmaAlignmentError::Address));
+        }
+    }
 
     Ok(())
 }
@@ -798,7 +841,7 @@ impl DmaRxTxBuf {
         };
 
         let capacity = buf.capacity();
-        buf.configure(alignment, capacity)?;
+        buf.configure(alignment.max(1), capacity)?;
 
         Ok(buf)
     }
@@ -1065,7 +1108,10 @@ impl DmaRxStreamBuf {
             last_descriptor.set_size(size);
         }
 
-        Ok(Self { descriptors, buffer })
+        Ok(Self {
+            descriptors,
+            buffer,
+        })
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -1706,8 +1752,7 @@ impl DmaLoopBuf {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        if buffer.len()
-            > chunk_size_for_alignment(region_alignment(buffer, TransferDirection::Out))
+        if buffer.len() > chunk_size_for_alignment(region_alignment(buffer, TransferDirection::Out))
         {
             return Err(DmaBufError::InsufficientDescriptors);
         }
