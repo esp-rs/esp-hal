@@ -192,37 +192,54 @@ pub struct InterruptStatus {
 }
 
 impl InterruptStatus {
+    /// Get status of a particular peripheral interrupt
+    #[instability::unstable]
+    #[inline]
+    pub fn is_pending(interrupt: Interrupt) -> bool {
+        let word = (interrupt as usize) / 32;
+        let bit = (interrupt as usize) % 32;
+        let mut status_word = 0;
+        for cpu in Cpu::all() {
+            status_word |= Self::interrupt_status_word(cpu, word);
+        }
+        (status_word & (1 << bit)) != 0
+    }
+
+    #[inline]
+    fn interrupt_status_word(cpu: Cpu, word: usize) -> u32 {
+        match cpu {
+            Cpu::ProCpu => {
+                #[cfg(esp32p4)]
+                if word == 4 {
+                    // Discontiguous, cannot be part of the standard status array
+                    return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                }
+                INTERRUPT_CORE0::regs()
+                    .core_0_intr_status(word)
+                    .read()
+                    .bits()
+            }
+            #[cfg(multi_core)]
+            Cpu::AppCpu => {
+                #[cfg(esp32p4)]
+                if word == 4 {
+                    // Discontiguous, cannot be part of the standard status array
+                    return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                }
+                INTERRUPT_CORE1::regs()
+                    .core_1_intr_status(word)
+                    .read()
+                    .bits()
+            }
+        }
+    }
+
     /// Get status of peripheral interrupts
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
-        match Cpu::current() {
-            Cpu::ProCpu => InterruptStatus {
-                status: core::array::from_fn(|idx| {
-                    #[cfg(esp32p4)]
-                    if idx == 4 {
-                        // Discontiguous, cannot be part of the standard status array
-                        return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
-                    }
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_status(idx)
-                        .read()
-                        .bits()
-                }),
-            },
-            #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus {
-                status: core::array::from_fn(|idx| {
-                    #[cfg(esp32p4)]
-                    if idx == 4 {
-                        // Discontiguous, cannot be part of the standard status array
-                        return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
-                    }
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_status(idx)
-                        .read()
-                        .bits()
-                }),
-            },
+        let cpu = Cpu::current();
+        InterruptStatus {
+            status: core::array::from_fn(|word| Self::interrupt_status_word(cpu, word)),
         }
     }
 
