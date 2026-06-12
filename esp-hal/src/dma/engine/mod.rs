@@ -1,5 +1,7 @@
 use enumset::{EnumSet, EnumSetType};
 
+#[cfg(dma_can_access_psram)]
+use crate::dma::{ExternalBurstConfig, InternalBurstConfig};
 use crate::{
     asynch::AtomicWaker,
     dma::{BurstConfig, DmaRxInterrupt, DmaTxInterrupt},
@@ -8,8 +10,6 @@ use crate::{
     private::{Internal, Sealed},
     system::PeripheralGuard,
 };
-#[cfg(dma_can_access_psram)]
-use crate::dma::{ExternalBurstConfig, InternalBurstConfig};
 
 for_each_dma_engine! {
     ("AHB_GDMA") => {
@@ -68,12 +68,10 @@ for_each_peripheral! {
     };
 }
 
-/// Exposes a channel `Config`'s burst ceilings to the engine-agnostic
-/// negotiation in [`RegisterAccess::prepare_burst`].
+/// Exposes a channel `Config`'s burst ceilings to [`RegisterAccess::prepare_burst`].
 ///
-/// Implemented by every engine `Config`. Reports the largest burst length (in
-/// bytes) the channel may use for internal- and external-memory transfers
-/// respectively. A `0` ceiling means "burst disabled".
+/// Reports the largest burst length (bytes) for internal- and external-memory
+/// transfers; `0` means burst disabled.
 #[doc(hidden)]
 pub trait DmaBurstConfig {
     /// Returns `(internal_ceiling, external_ceiling)` in bytes.
@@ -95,11 +93,8 @@ pub trait RegisterAccess: Sealed {
 
     /// Negotiates and programs the per-transfer burst for this channel half.
     ///
-    /// The channel's stored `Config` provides per-region burst ceilings; the
-    /// buffer's `max_alignment` is the largest alignment it can guarantee. The
-    /// effective burst is the smaller of the two, clamped to each region's
-    /// hardware floor. This is engine-agnostic and feeds the existing
-    /// `set_burst_mode` / `set_ext_mem_block_size` register writers.
+    /// The effective burst is the smaller of the channel's configured ceiling
+    /// and the buffer's `max_alignment`, clamped to each region's hardware floor.
     fn prepare_burst(&self, config: &Self::Config, max_alignment: usize) {
         let (internal_ceiling, external_ceiling) = config.burst_ceilings();
         #[cfg(not(dma_can_access_psram))]
@@ -378,9 +373,8 @@ macro_rules! impl_burst_type {
 
         impl Default for $ty {
             fn default() -> Self {
-                // Metadata lists sizes ascending, so the first variant is the
-                // neutral default: burst disabled where the engine can disable
-                // it, otherwise the minimum (floor) burst.
+                // Sizes are listed ascending: the first variant is burst
+                // disabled, or the minimum burst where it can't be disabled.
                 Self::$first
             }
         }

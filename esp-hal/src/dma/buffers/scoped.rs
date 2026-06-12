@@ -167,7 +167,6 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 
         Preparation {
             start: self.descriptors.head(),
-            direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             max_alignment: self.alignment,
@@ -378,7 +377,6 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
 
         Preparation {
             start: self.descriptors.head(),
-            direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             max_alignment: self.alignment,
