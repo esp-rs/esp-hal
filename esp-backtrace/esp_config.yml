@@ -18,4 +18,4 @@ options:
             - "8K"
             - "16K"
             - "32K"
-    active: 'chip == "esp32c2" || chip == "esp32c3" || chip == "esp32c6" || chip == "esp32h2"'
+    active: "esp32c2 || esp32c3 || esp32c6 || esp32h2"
