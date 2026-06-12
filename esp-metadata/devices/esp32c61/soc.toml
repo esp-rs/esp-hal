@@ -111,7 +111,6 @@ support_status = { status = "not_supported", issue = 5422 }
 support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
-software_interrupt_delay = 24 # CPU speed dependent
 controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 } }
 
 [device.timergroup]

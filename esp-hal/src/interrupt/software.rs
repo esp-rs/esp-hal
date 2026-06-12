@@ -107,30 +107,42 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
     }
 
     /// Trigger this software-interrupt
+    #[crate::ram]
     pub fn raise(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_intpri)] {
-                let regs = crate::peripherals::INTPRI::regs();
-            } else {
-                let regs = crate::peripherals::SYSTEM::regs();
+        let regs = cfg_select! {
+            soc_has_intpri => crate::peripherals::INTPRI::regs(),
+            _ => crate::peripherals::SYSTEM::regs(),
+        };
+        let reg = regs.cpu_intr_from_cpu(NUM as usize);
+
+        cfg_select! {
+            xtensa => {
+                reg.write(|w| w.cpu_intr().set_bit());
+                // Read back to ensure the write is completed.
+                _ = reg.read();
+            },
+            _ => {
+                crate::interrupt::free(|| {
+                    reg.write(|w| w.cpu_intr().set_bit());
+                    // Wait for the interrupt to actually take effect.
+                    while !self.is_pending() {}
+                });
             }
         }
-        let reg;
+    }
 
+    #[cfg(riscv)]
+    fn is_pending(&self) -> bool {
+        let interrupt;
         for_each_sw_interrupt! {
-            (all $( ($n:literal, $i:ident, $f:ident) ),*) => {
-                reg = match NUM {
-                    $($n => regs.cpu_intr_from_cpu($n),)*
+            (all $( ($n:literal, $interrupt_name:ident, $f:ident) ),*) => {
+                interrupt = match NUM {
+                    $($n => Interrupt::$interrupt_name,)*
                     _ => unreachable!(),
                 };
             };
         }
-
-        reg.write(|w| w.cpu_intr().set_bit());
-        _ = reg.read(); // Read back to ensure the write is completed.
-
-        // Insert enough delay to ensure the interrupt is fired before returning.
-        sw_interrupt_delay!();
+        crate::interrupt::InterruptStatus::is_pending(interrupt)
     }
 
     /// Resets this software-interrupt
