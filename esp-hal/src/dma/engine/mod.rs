@@ -8,6 +8,8 @@ use crate::{
     private::{Internal, Sealed},
     system::PeripheralGuard,
 };
+#[cfg(dma_can_access_psram)]
+use crate::dma::{ExternalBurstConfig, InternalBurstConfig};
 
 for_each_dma_engine! {
     ("AHB_GDMA") => {
@@ -20,19 +22,19 @@ for_each_dma_engine! {
     };
     ("COPY_DMA") => {
         mod copy;
-        pub use copy::{CopyDmaChannel, CopyDmaConfig, CopyDmaRxChannel, CopyDmaTxChannel};
+        pub use copy::*;
     };
     ("CRYPTO_DMA") => {
         mod crypto;
-        pub use crypto::{CryptoDmaChannel, CryptoDmaConfig, CryptoDmaRxChannel, CryptoDmaTxChannel};
+        pub use crypto::*;
     };
     ("I2S_DMA") => {
         mod i2s;
-        pub use i2s::{I2sDmaChannel, I2sDmaConfig, I2sDmaRxChannel, I2sDmaTxChannel};
+        pub use i2s::*;
     };
     ("SPI_DMA") => {
         mod spi;
-        pub use spi::{SpiDmaChannel, SpiDmaConfig, SpiDmaRxChannel, SpiDmaTxChannel};
+        pub use spi::*;
     };
 }
 
@@ -66,18 +68,75 @@ for_each_peripheral! {
     };
 }
 
+/// Exposes a channel `Config`'s burst ceilings to the engine-agnostic
+/// negotiation in [`RegisterAccess::prepare_burst`].
+///
+/// Implemented by every engine `Config`. Reports the largest burst length (in
+/// bytes) the channel may use for internal- and external-memory transfers
+/// respectively. A `0` ceiling means "burst disabled".
+#[doc(hidden)]
+pub trait DmaBurstConfig {
+    /// Returns `(internal_ceiling, external_ceiling)` in bytes.
+    fn burst_ceilings(&self) -> (usize, usize);
+}
+
 #[doc(hidden)]
 pub trait RegisterAccess: Sealed {
     /// Engine-specific channel configuration.
     ///
     /// Exposes only the configuration knobs (and values) this engine supports.
-    type Config: Default + Clone + core::fmt::Debug;
+    type Config: Default + Clone + core::fmt::Debug + DmaBurstConfig;
 
     /// Apply the configuration to this channel half.
     ///
     /// Write-only and total: the caller always supplies a complete `Config`.
     /// There is no `config()` getter and no partial/read-modify-write update path.
     fn apply_config(&self, config: &Self::Config);
+
+    /// Negotiates and programs the per-transfer burst for this channel half.
+    ///
+    /// The channel's stored `Config` provides per-region burst ceilings; the
+    /// buffer's `max_alignment` is the largest alignment it can guarantee. The
+    /// effective burst is the smaller of the two, clamped to each region's
+    /// hardware floor. This is engine-agnostic and feeds the existing
+    /// `set_burst_mode` / `set_ext_mem_block_size` register writers.
+    fn prepare_burst(&self, config: &Self::Config, max_alignment: usize) {
+        let (internal_ceiling, external_ceiling) = config.burst_ceilings();
+        #[cfg(not(dma_can_access_psram))]
+        let _ = external_ceiling;
+
+        let internal_enabled = internal_ceiling.min(max_alignment) >= 4;
+
+        cfg_if::cfg_if! {
+            if #[cfg(dma_can_access_psram)] {
+                let effective_external = external_ceiling.min(max_alignment);
+                let external_memory = if effective_external >= 64 {
+                    ExternalBurstConfig::Size64
+                } else if effective_external >= 32 {
+                    ExternalBurstConfig::Size32
+                } else {
+                    ExternalBurstConfig::Size16
+                };
+                let internal_memory = if internal_enabled {
+                    InternalBurstConfig::Enabled
+                } else {
+                    InternalBurstConfig::Disabled
+                };
+                let burst = BurstConfig { external_memory, internal_memory };
+
+                #[cfg(dma_ext_mem_configurable_block_size)]
+                self.set_ext_mem_block_size(external_memory.into());
+            } else {
+                let burst = if internal_enabled {
+                    BurstConfig::Enabled
+                } else {
+                    BurstConfig::Disabled
+                };
+            }
+        }
+
+        self.set_burst_mode(burst);
+    }
 
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
@@ -287,3 +346,45 @@ macro_rules! impl_priority_type {
 }
 #[allow(unused)]
 pub(crate) use impl_priority_type;
+
+#[allow(unused)]
+macro_rules! impl_burst_type {
+    ($ty:ident, [($first:ident, $first_bytes:literal) $(, ($variant:ident, $bytes:literal))*]) => {
+        #[doc = concat!("DMA burst length options usable with the `", stringify!($ty), "` channel config.")]
+        ///
+        /// Each variant is a maximum burst length in bytes; `Disabled` (where
+        /// present) turns burst off. The effective burst is negotiated against
+        /// the buffer alignment at transfer setup.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum $ty {
+            #[doc = concat!($first_bytes, "-byte burst.")]
+            $first,
+            $(
+                #[doc = concat!($bytes, "-byte burst.")]
+                $variant,
+            )*
+        }
+
+        impl $ty {
+            /// The burst length in bytes (`0` means burst disabled).
+            pub const fn bytes(self) -> usize {
+                match self {
+                    Self::$first => $first_bytes,
+                    $( Self::$variant => $bytes, )*
+                }
+            }
+        }
+
+        impl Default for $ty {
+            fn default() -> Self {
+                // Metadata lists sizes ascending, so the first variant is the
+                // neutral default: burst disabled where the engine can disable
+                // it, otherwise the minimum (floor) burst.
+                Self::$first
+            }
+        }
+    };
+}
+#[allow(unused)]
+pub(crate) use impl_burst_type;

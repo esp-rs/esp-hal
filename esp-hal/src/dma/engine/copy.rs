@@ -89,6 +89,13 @@ impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 #[non_exhaustive]
 pub struct CopyDmaConfig {}
 
+impl crate::dma::DmaBurstConfig for CopyDmaConfig {
+    fn burst_ceilings(&self) -> (usize, usize) {
+        // COPY_DMA has no burst knob; report "disabled" for both regions.
+        (0, 0)
+    }
+}
+
 impl RegisterAccess for CopyDmaTxChannel<'_> {
     type Config = CopyDmaConfig;
 

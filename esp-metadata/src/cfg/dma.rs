@@ -67,8 +67,8 @@ pub struct DmaEngineDef {
     pub max_priority: Option<u32>,
 
     /// Configurable internal RAM burst sizes, when they differ from external RAM.
+    /// `0` means "burst disabled"; non-zero values are byte burst lengths.
     #[serde(default)]
-    #[expect(dead_code)]
     pub internal_ram_burst_sizes: Vec<u32>,
 
     /// Configurable burst sizes, when supported. Implies `can_access_psram = true`.
@@ -173,6 +173,14 @@ impl GenericProperty for DmaEngines {
                 let prefix = engine.name.to_ascii_lowercase();
                 cfgs.push(format!("{prefix}_max_priority_is_set"));
             }
+
+            // When internal-RAM burst sizes are listed *and* (external) burst
+            // sizes are listed, the engine exposes independent internal/external
+            // burst configuration; its `Config` carries separate fields.
+            if !engine.internal_ram_burst_sizes.is_empty() && !engine.burst_sizes.is_empty() {
+                let prefix = engine.name.to_ascii_lowercase();
+                cfgs.push(format!("{prefix}_separate_burst"));
+            }
         }
 
         // Emit a DMA-support cfg symbol for each unique driver listed in any engine.
@@ -209,6 +217,7 @@ impl GenericProperty for DmaEngines {
 
         let mut engines = vec![];
         let mut engines_with_priorities = vec![];
+        let mut engines_with_bursts = vec![];
         let mut engine_channels = vec![];
         let mut engine_any_channels = vec![];
         // One entry per (channel, peripheral) pair from DMA `compatible_with` lists.
@@ -240,6 +249,61 @@ impl GenericProperty for DmaEngines {
                 });
                 engines_with_priorities.push(quote! {
                     #engine_name, priority = #priority_type, priorities = [#(#priority_variants),*]
+                });
+            }
+
+            // Channel-level burst capability used for the per-engine `*Burst`
+            // ceiling enum(s) and the `do_prepare` burst negotiation.
+            //
+            // A burst list is a set of byte lengths the channel may be set to.
+            // A `0` entry means the engine has a burst-enable bit (burst can be
+            // disabled); its absence means burst is always on (the minimum size
+            // is the floor).
+            //
+            // When *both* an internal-RAM list and a (external) burst list are
+            // present, the engine exposes them independently: two enums
+            // (`*InternalBurst` / `*ExternalBurst`) and two `Config` fields.
+            // When only one list is present there is no internal/external
+            // distinction, so a single `*Burst` enum / `burst` field is emitted
+            // (it applies to both regions). Engines with no burst knob at all
+            // (e.g. COPY_DMA) produce no entry.
+            let pascal = engine.name.from_case(Case::Snake).to_case(Case::Pascal);
+            let burst_variants = |sizes: &[u32]| {
+                sizes
+                    .iter()
+                    .map(|&n| {
+                        let variant = if n == 0 {
+                            format_ident!("Disabled")
+                        } else {
+                            format_ident!("Size{n}")
+                        };
+                        let bytes = number(n);
+                        quote! { (#variant, #bytes) }
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let has_internal = !engine.internal_ram_burst_sizes.is_empty();
+            let has_external = !engine.burst_sizes.is_empty();
+            if has_internal && has_external {
+                let int_ty = format_ident!("{pascal}InternalBurst");
+                let ext_ty = format_ident!("{pascal}ExternalBurst");
+                let int_variants = burst_variants(&engine.internal_ram_burst_sizes);
+                let ext_variants = burst_variants(&engine.burst_sizes);
+                engines_with_bursts.push(quote! {
+                    #engine_name, separate,
+                    internal = #int_ty, internal_bursts = [#(#int_variants),*],
+                    external = #ext_ty, external_bursts = [#(#ext_variants),*]
+                });
+            } else if has_internal || has_external {
+                let burst_type = format_ident!("{pascal}Burst");
+                let sizes = if has_internal {
+                    &engine.internal_ram_burst_sizes
+                } else {
+                    &engine.burst_sizes
+                };
+                let variants = burst_variants(sizes);
+                engines_with_bursts.push(quote! {
+                    #engine_name, single, burst = #burst_type, bursts = [#(#variants),*]
                 });
             }
 
@@ -361,7 +425,11 @@ impl GenericProperty for DmaEngines {
 
         let dma_engines_macro = generate_for_each_macro(
             "dma_engine",
-            &[("all", &engines), ("priorities", &engines_with_priorities)],
+            &[
+                ("all", &engines),
+                ("priorities", &engines_with_priorities),
+                ("bursts", &engines_with_bursts),
+            ],
         );
 
         // Always emit for_each_dma_channel_peri_pair! so drivers can call it
