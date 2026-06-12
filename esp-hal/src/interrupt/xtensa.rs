@@ -1,5 +1,6 @@
 //! Interrupt handling
 
+#[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
 
 use crate::{

@@ -109,25 +109,26 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
     /// Trigger this software-interrupt
     #[crate::ram]
     pub fn raise(&self) {
-        crate::interrupt::free(|| {
-            let regs = cfg_select! {
-                soc_has_intpri => crate::peripherals::INTPRI::regs(),
-                _ => crate::peripherals::SYSTEM::regs(),
-            };
-            let reg = regs.cpu_intr_from_cpu(NUM as usize);
-            reg.write(|w| w.cpu_intr().set_bit());
+        let regs = cfg_select! {
+            soc_has_intpri => crate::peripherals::INTPRI::regs(),
+            _ => crate::peripherals::SYSTEM::regs(),
+        };
+        let reg = regs.cpu_intr_from_cpu(NUM as usize);
 
-            cfg_select! {
-                xtensa => {
-                    // Read back to ensure the write is completed.
-                    _ = reg.read();
-                },
-                _ => {
+        cfg_select! {
+            xtensa => {
+                reg.write(|w| w.cpu_intr().set_bit());
+                // Read back to ensure the write is completed.
+                _ = reg.read();
+            },
+            _ => {
+                crate::interrupt::free(|| {
+                    reg.write(|w| w.cpu_intr().set_bit());
                     // Wait for the interrupt to actually take effect.
                     while !self.is_pending() {}
-                },
+                });
             }
-        });
+        }
     }
 
     #[cfg(riscv)]
