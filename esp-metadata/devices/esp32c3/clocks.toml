@@ -2,6 +2,7 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "40",                          output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480", output = "VALUE * 1_000_000" },
+    { name = "PLL_D2",      type = "generic", output = "PLL_CLK / 2" },
     { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000" },
 
     # Low-speed clocks
@@ -110,6 +111,18 @@ system_clocks = { clock_tree = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
             { name = "PLL_80M", outputs = "PLL_80M" },
         ] },
+    ] },
+    { group = "I2S", clocks = [
+        { name = "TX_CLOCK", type = "generic", output = "sclk / (div_num + div_b / div_a) / (bck_div_num + 1)", params = { sclk = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_D2",   outputs = "PLL_D2" },
+            { name = "PLL_160M", outputs = "PLL_160M", default = true },
+        ], div_num = "2 .. 256", div_a = "1 .. 65", div_b = "0 .. 64", bck_div_num = "0 .. 64" } },
+        { name = "RX_CLOCK", type = "generic", output = "sclk / (div_num + div_b / div_a) / (bck_div_num + 1)", params = { sclk = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "PLL_D2",   outputs = "PLL_D2" },
+            { name = "PLL_160M", outputs = "PLL_160M", default = true },
+        ], div_num = "2 .. 256", div_a = "1 .. 65", div_b = "0 .. 64", bck_div_num = "0 .. 64" } },
     ] },
 ] }
 

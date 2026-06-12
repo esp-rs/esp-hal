@@ -18,7 +18,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{I2C_ANA_MST, I2C0, I2C1, I2S0, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -225,6 +225,12 @@ fn configure_pll_clk_impl(
 ) {
     // Nothing to do. The PLL may still be powered down. We'll configure it in
     // `enable_pll_clk_impl`.
+}
+
+// PLL_F160M_CLK
+
+fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Fixed tap from PLL_CLK; enable is handled via request_pll_clk.
 }
 
 // APLL_CLK
@@ -801,5 +807,42 @@ impl SpiInstance {
         _new_config: SpiFunctionClockConfig,
     ) {
         // ESP32-S2 SPI is hardwired to APB; no clock source selection register.
+    }
+}
+
+impl I2sInstance {
+    // I2S_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs()
+            .clkm_conf()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sFunctionClockConfig>,
+        new_config: I2sFunctionClockConfig,
+    ) {
+        let div_a = if new_config.div_b == 0 {
+            0
+        } else {
+            new_config.div_a
+        };
+
+        I2S0::regs().clkm_conf().modify(|_, w| unsafe {
+            w.clk_sel().bits(match new_config.sclk {
+                I2sFunctionClockSclk::PllF160m => 2,
+            });
+            w.clkm_div_num().bits(new_config.div_num as u8);
+            w.clkm_div_a().bits(div_a as u8);
+            w.clkm_div_b().bits(new_config.div_b as u8)
+        });
+
+        I2S0::regs().sample_rate_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8);
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
     }
 }

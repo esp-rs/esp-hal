@@ -21,6 +21,8 @@ use crate::{
         I2C_ANA_MST,
         I2C0,
         I2C1,
+        I2S0,
+        I2S1,
         LPWR,
         RMT,
         SPI2,
@@ -987,5 +989,97 @@ impl SpiInstance {
             w.mst_clk_sel()
                 .bit(matches!(new_config, SpiFunctionClockConfig::Apb))
         });
+    }
+}
+
+impl I2sInstance {
+    fn regs(self) -> &'static crate::pac::i2s1::RegisterBlock {
+        match self {
+            // I2S0 is a superset and we don't touch the specific registers.
+            I2sInstance::I2s0 => unsafe { &*(I2S0::PTR as *const crate::pac::i2s1::RegisterBlock) },
+            I2sInstance::I2s1 => I2S1::regs(),
+        }
+    }
+
+    // I2S_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        self.regs().tx_clkm_conf().modify(|_, w| {
+            w.clk_en().bit(en);
+            w.tx_clk_active().bit(en)
+        });
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sTxClockConfig>,
+        new_config: I2sTxClockConfig,
+    ) {
+        let sel = match new_config.sclk {
+            I2sTxClockSclk::XtalClk => 0,
+            I2sTxClockSclk::PllD2 => 1,
+            I2sTxClockSclk::Pll160m => 2,
+        };
+        let (x, y, z, yn1) = crate::soc::i2s_clock_registers::fractional_mclk_registers(
+            new_config.div_a,
+            new_config.div_b,
+        );
+        let bck = new_config.bck_div_num as u8;
+        let regs = self.regs();
+
+        regs.tx_clkm_div_conf().modify(|_, w| unsafe {
+            w.tx_clkm_div_x().bits(x);
+            w.tx_clkm_div_y().bits(y);
+            w.tx_clkm_div_yn1().bit(yn1);
+            w.tx_clkm_div_z().bits(z)
+        });
+        regs.tx_clkm_conf().modify(|_, w| unsafe {
+            w.tx_clk_sel().bits(sel);
+            w.tx_clkm_div_num().bits(new_config.div_num as u8)
+        });
+        regs.tx_conf1()
+            .modify(|_, w| unsafe { w.tx_bck_div_num().bits(bck) });
+    }
+
+    // I2S_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        self.regs()
+            .rx_clkm_conf()
+            .modify(|_, w| w.rx_clk_active().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sRxClockConfig>,
+        new_config: I2sRxClockConfig,
+    ) {
+        let sel = match new_config.sclk {
+            I2sRxClockSclk::XtalClk => 0,
+            I2sRxClockSclk::PllD2 => 1,
+            I2sRxClockSclk::Pll160m => 2,
+        };
+        let (x, y, z, yn1) = crate::soc::i2s_clock_registers::fractional_mclk_registers(
+            new_config.div_a,
+            new_config.div_b,
+        );
+        let bck = new_config.bck_div_num as u8;
+        let regs = self.regs();
+
+        regs.rx_clkm_div_conf().modify(|_, w| unsafe {
+            w.rx_clkm_div_x().bits(x);
+            w.rx_clkm_div_y().bits(y);
+            w.rx_clkm_div_yn1().bit(yn1);
+            w.rx_clkm_div_z().bits(z)
+        });
+        regs.rx_clkm_conf().modify(|_, w| unsafe {
+            w.rx_clk_sel().bits(sel);
+            w.rx_clkm_div_num().bits(new_config.div_num as u8);
+            w.mclk_sel().bit(true)
+        });
+        regs.rx_conf1()
+            .modify(|_, w| unsafe { w.rx_bck_div_num().bits(bck) });
     }
 }

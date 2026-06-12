@@ -50,7 +50,7 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
     # { name = "IEEE802154" }, # TODO: add PAC manually later
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },

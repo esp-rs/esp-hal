@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, LPWR, SPI2, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{APB_CTRL, I2C_ANA_MST, I2C0, I2S0, LPWR, SPI2, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -429,6 +429,12 @@ fn update_apb_frequency(freq: Rate) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
+// PLL_D2
+
+fn enable_pll_d2_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Fixed tap from PLL_160M; enable is handled via request_pll_160m.
+}
+
 // PLL_80M
 
 fn enable_pll_80m_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -769,6 +775,86 @@ impl SpiInstance {
         SPI2::regs().clk_gate().modify(|_, w| {
             w.mst_clk_sel()
                 .bit(matches!(new_config, SpiFunctionClockConfig::Pll80m))
+        });
+    }
+}
+
+impl I2sInstance {
+    // I2S_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs().tx_clkm_conf().modify(|_, w| {
+            w.clk_en().bit(en);
+            w.tx_clk_active().bit(en)
+        });
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sTxClockConfig>,
+        new_config: I2sTxClockConfig,
+    ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        I2S0::regs().tx_clkm_div_conf().modify(|_, w| unsafe {
+            w.tx_clkm_div_x().bits(x);
+            w.tx_clkm_div_y().bits(y);
+            w.tx_clkm_div_yn1().bit(yn1);
+            w.tx_clkm_div_z().bits(z)
+        });
+
+        I2S0::regs().tx_clkm_conf().modify(|_, w| unsafe {
+            w.tx_clk_sel().bits(match new_config.sclk {
+                I2sTxClockSclk::XtalClk => 0,
+                I2sTxClockSclk::PllD2 => 1,
+                I2sTxClockSclk::Pll160m => 2,
+            });
+            w.tx_clkm_div_num().bits(new_config.div_num as u8)
+        });
+
+        I2S0::regs().tx_conf1().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
+    }
+
+    // I2S_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        I2S0::regs()
+            .rx_clkm_conf()
+            .modify(|_, w| w.rx_clk_active().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sRxClockConfig>,
+        new_config: I2sRxClockConfig,
+    ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        I2S0::regs().rx_clkm_div_conf().modify(|_, w| unsafe {
+            w.rx_clkm_div_x().bits(x);
+            w.rx_clkm_div_y().bits(y);
+            w.rx_clkm_div_yn1().bit(yn1);
+            w.rx_clkm_div_z().bits(z)
+        });
+
+        I2S0::regs().rx_clkm_conf().modify(|_, w| unsafe {
+            w.rx_clk_sel().bits(match new_config.sclk {
+                I2sRxClockSclk::XtalClk => 0,
+                I2sRxClockSclk::PllD2 => 1,
+                I2sRxClockSclk::Pll160m => 2,
+            });
+            w.rx_clkm_div_num().bits(new_config.div_num as u8);
+            w.mclk_sel().bit(true)
+        });
+
+        I2S0::regs().rx_conf1().modify(|_, w| unsafe {
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
         });
     }
 }

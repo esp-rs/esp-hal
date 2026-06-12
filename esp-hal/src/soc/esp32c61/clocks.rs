@@ -14,7 +14,7 @@
 #![allow(missing_docs, reason = "Experimental")]
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, UART0, UART1},
+    peripherals::{I2C_ANA_MST, I2S0, LP_CLKRST, PCR, PMU, UART0, UART1},
     soc::regi2c,
 };
 
@@ -591,5 +591,84 @@ impl SpiInstance {
                 })
             }),
         };
+    }
+}
+
+impl I2sInstance {
+    // I2S_TX_CLOCK
+
+    fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .i2s_tx_clkm_conf()
+            .modify(|_, w| w.i2s_tx_clkm_en().bit(en));
+    }
+
+    fn configure_tx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sTxClockConfig>,
+        new_config: I2sTxClockConfig,
+    ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        PCR::regs().i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
+            w.i2s_tx_clkm_div_x().bits(x);
+            w.i2s_tx_clkm_div_y().bits(y);
+            w.i2s_tx_clkm_div_yn1().bit(yn1);
+            w.i2s_tx_clkm_div_z().bits(z)
+        });
+
+        PCR::regs().i2s_tx_clkm_conf().modify(|_, w| unsafe {
+            w.i2s_tx_clkm_sel().bits(match new_config.sclk {
+                I2sTxClockSclk::XtalClk => 0,
+                I2sTxClockSclk::PllF120m => 1,
+                I2sTxClockSclk::PllF160m => 2,
+            });
+            w.i2s_tx_clkm_div_num().bits(new_config.div_num as u8)
+        });
+
+        I2S0::regs().tx_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
+    }
+
+    // I2S_RX_CLOCK
+
+    fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .i2s_rx_clkm_conf()
+            .modify(|_, w| w.i2s_rx_clkm_en().bit(en));
+    }
+
+    fn configure_rx_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sRxClockConfig>,
+        new_config: I2sRxClockConfig,
+    ) {
+        let (x, y, z, yn1) =
+            crate::soc::i2s_clock_registers::fractional_mclk_registers(new_config.div_a, new_config.div_b);
+
+        PCR::regs().i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
+            w.i2s_rx_clkm_div_x().bits(x);
+            w.i2s_rx_clkm_div_y().bits(y);
+            w.i2s_rx_clkm_div_yn1().bit(yn1);
+            w.i2s_rx_clkm_div_z().bits(z)
+        });
+
+        PCR::regs().i2s_rx_clkm_conf().modify(|_, w| unsafe {
+            w.i2s_rx_clkm_sel().bits(match new_config.sclk {
+                I2sRxClockSclk::XtalClk => 0,
+                I2sRxClockSclk::PllF120m => 1,
+                I2sRxClockSclk::PllF160m => 2,
+            });
+            w.i2s_rx_clkm_div_num().bits(new_config.div_num as u8);
+            w.i2s_mclk_sel().bit(true)
+        });
+
+        I2S0::regs().rx_conf().modify(|_, w| unsafe {
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
     }
 }

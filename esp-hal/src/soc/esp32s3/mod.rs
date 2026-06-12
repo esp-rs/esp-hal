@@ -17,12 +17,6 @@ pub(crate) mod regi2c;
 
 pub use esp32s3 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_160m_frequency()
-}
-
 #[unsafe(link_section = ".rwtext")]
 pub(crate) unsafe fn configure_cpu_caches() {
     // this is just the bare minimum we need to run code from flash

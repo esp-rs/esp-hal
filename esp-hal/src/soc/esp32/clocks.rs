@@ -20,7 +20,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, I2S0, I2S1, LPWR, RMT, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -865,5 +865,45 @@ impl SpiInstance {
         _new_config: SpiFunctionClockConfig,
     ) {
         // ESP32 SPI is hardwired to APB; no clock source selection register.
+    }
+}
+
+impl I2sInstance {
+    // I2S_FUNCTION_CLOCK
+
+    fn i2s_regs(self) -> &'static crate::pac::i2s0::RegisterBlock {
+        match self {
+            I2sInstance::I2s0 => I2S0::regs(),
+            I2sInstance::I2s1 => I2S1::regs(),
+        }
+    }
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2sFunctionClockConfig>,
+        new_config: I2sFunctionClockConfig,
+    ) {
+        let div_a = if new_config.div_b == 0 {
+            0
+        } else {
+            new_config.div_a
+        };
+
+        self.i2s_regs().clkm_conf().modify(|_, w| unsafe {
+            w.clka_ena().clear_bit();
+            w.clkm_div_num().bits(new_config.div_num as u8);
+            w.clkm_div_a().bits(div_a as u8);
+            w.clkm_div_b().bits(new_config.div_b as u8)
+        });
+
+        self.i2s_regs().sample_rate_conf().modify(|_, w| unsafe {
+            w.tx_bck_div_num().bits(new_config.bck_div_num as u8);
+            w.rx_bck_div_num().bits(new_config.bck_div_num as u8)
+        });
     }
 }

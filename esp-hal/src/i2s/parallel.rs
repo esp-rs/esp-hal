@@ -109,9 +109,33 @@ use crate::{
     i2s::AnyI2s,
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
+    soc::clocks::{ClockTree, I2sFunctionClockConfig, I2sFunctionClockSclk, I2sInstance},
     system::PeripheralGuard,
     time::Rate,
 };
+
+struct I2sClockGuard {
+    instance: I2sInstance,
+}
+
+impl I2sClockGuard {
+    fn new(instance: I2sInstance) -> Self {
+        ClockTree::with(|clocks| {
+            instance.configure_function_clock(
+                clocks,
+                I2sFunctionClockConfig::new(Default::default(), 2, 1, 0, 2),
+            );
+            instance.request_function_clock(clocks);
+        });
+        Self { instance }
+    }
+}
+
+impl Drop for I2sClockGuard {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| self.instance.release_function_clock(clocks));
+    }
+}
 
 #[doc(hidden)]
 pub trait TxPins<'d> {
@@ -241,6 +265,7 @@ where
     instance: AnyI2s<'d>,
     tx_channel: ChannelTx<Dm, I2sParallelTxErased<'d>>,
     _guard: PeripheralGuard,
+    _clock_guard: I2sClockGuard,
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
@@ -255,7 +280,9 @@ impl<'d> I2sParallel<'d, Blocking> {
         let i2s = i2s.degrade();
         channel.runtime_ensure_compatible(i2s.dma_peripheral());
 
-        let guard = PeripheralGuard::new(i2s.peripheral());
+        let peripheral = i2s.peripheral();
+        let guard = PeripheralGuard::new(peripheral);
+        let clock_guard = I2sClockGuard::new(crate::i2s::clock_instance_for(peripheral));
 
         // configure the I2S peripheral for parallel mode
         i2s.setup(frequency, pins.bus_width());
@@ -272,6 +299,7 @@ impl<'d> I2sParallel<'d, Blocking> {
             instance: i2s,
             tx_channel: channel,
             _guard: guard,
+            _clock_guard: clock_guard,
         }
     }
 
@@ -281,6 +309,7 @@ impl<'d> I2sParallel<'d, Blocking> {
             instance: self.instance,
             tx_channel: self.tx_channel.into_async(),
             _guard: self._guard,
+            _clock_guard: self._clock_guard,
         }
     }
 }
@@ -292,6 +321,7 @@ impl<'d> I2sParallel<'d, Async> {
             instance: self.instance,
             tx_channel: self.tx_channel.into_blocking(),
             _guard: self._guard,
+            _clock_guard: self._clock_guard,
         }
     }
 }
@@ -418,14 +448,12 @@ pub struct I2sClockDividers {
     pub numerator: u32,
 }
 
-fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
+fn calculate_clock(sample_rate: Rate, data_bits: u8, sclk: u32) -> I2sClockDividers {
     // this loosely corresponds to `i2s_std_calculate_clock` and
     // `i2s_ll_tx_set_mclk` in esp-idf
     //
     // main difference is we are using fixed-point arithmetic here
     // plus adjusted for parallel interface clocking
-
-    let sclk = crate::soc::i2s_sclk_frequency();
 
     let rate = sample_rate.as_hz();
 
@@ -480,6 +508,11 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
 pub trait PrivateInstance: crate::private::Sealed {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
+
+    fn clock_instance(&self) -> I2sInstance {
+        crate::i2s::clock_instance_for(self.peripheral())
+    }
+
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
 
@@ -559,35 +592,30 @@ pub trait PrivateInstance: crate::private::Sealed {
         });
     }
 
-    fn set_clock(&self, clock_settings: I2sClockDividers) {
-        self.regs().clkm_conf().modify(|r, w| unsafe {
-            w.bits(r.bits() | (property!("i2s.default_clock_source") << 21))
-            // select PLL_160M
-        });
+    fn set_clock(&self, dividers: I2sClockDividers) {
+        let (div_a, div_b) = if dividers.denominator == 0 {
+            (1, 0)
+        } else {
+            (dividers.denominator, dividers.numerator)
+        };
 
-        #[cfg(esp32)]
-        self.regs()
-            .clkm_conf()
-            .modify(|_, w| w.clka_ena().clear_bit());
-
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clk_en().set_bit();
-            w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
-        });
-
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clkm_div_a().bits(clock_settings.denominator as u8);
-            w.clkm_div_b().bits(clock_settings.numerator as u8)
-        });
-
-        self.regs().sample_rate_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
-            w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
+        ClockTree::with(|clocks| {
+            self.clock_instance().configure_function_clock(
+                clocks,
+                I2sFunctionClockConfig::new(
+                    I2sFunctionClockSclk::default(),
+                    dividers.mclk_divider,
+                    div_a,
+                    div_b,
+                    dividers.bclk_divider,
+                ),
+            );
         });
     }
 
     fn setup(&self, frequency: Rate, bits: u8) {
-        self.set_clock(calculate_clock(frequency, bits));
+        let sclk = I2sInstance::function_clock_source_frequency(I2sFunctionClockSclk::default());
+        self.set_clock(calculate_clock(frequency, bits, sclk));
 
         // Initialize I2S dev
         self.rx_reset();

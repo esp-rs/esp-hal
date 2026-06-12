@@ -401,6 +401,7 @@ impl Chip {
                     "soc_has_clock_node_uart_baud_rate_generator",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"1\"",
@@ -618,6 +619,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_uart_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"1\"",
@@ -1425,6 +1427,7 @@ impl Chip {
                     "soc_cpu_has_csr_pc",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
+                    "soc_has_clock_node_pll_d2",
                     "soc_has_clock_node_rc_fast_clk",
                     "soc_has_clock_node_xtal32k_clk",
                     "soc_has_clock_node_rc_slow_clk",
@@ -1452,6 +1455,8 @@ impl Chip {
                     "soc_has_clock_node_uart_baud_rate_generator",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -1653,6 +1658,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_d2",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal32k_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_slow_clk",
@@ -1680,6 +1686,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_uart_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -2055,6 +2063,8 @@ impl Chip {
                     "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -2323,6 +2333,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -2754,6 +2766,8 @@ impl Chip {
                     "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -3045,6 +3059,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -3395,6 +3411,8 @@ impl Chip {
                     "soc_has_clock_node_timg_wdt_clock",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -3600,6 +3618,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -4002,6 +4022,8 @@ impl Chip {
                     "soc_has_clock_node_parl_io_tx_clock",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -4259,6 +4281,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_parl_io_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -5253,6 +5277,7 @@ impl Chip {
                     "sleep_deep_sleep",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
+                    "soc_has_clock_node_pll_f160m_clk",
                     "soc_has_clock_node_apll_clk",
                     "soc_has_clock_node_rc_fast_clk",
                     "soc_has_clock_node_cpu_pll_div_in",
@@ -5281,6 +5306,7 @@ impl Chip {
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"2\"",
@@ -5489,6 +5515,7 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_f160m_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_pll_div_in",
@@ -5517,6 +5544,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"2\"",
@@ -5984,6 +6012,8 @@ impl Chip {
                     "soc_has_clock_node_uart_mem_clock",
                     "soc_has_clock_node_i2c_function_clock",
                     "soc_has_clock_node_spi_function_clock",
+                    "soc_has_clock_node_i2s_tx_clock",
+                    "soc_has_clock_node_i2s_rx_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_version=\"3\"",
@@ -6259,6 +6289,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_uart_mem_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_tx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_i2s_rx_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
@@ -6707,6 +6739,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart_baud_rate_generator)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rmt_sclk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spi_function_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_i2s_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
     println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_bit_order_is_bool)");
@@ -6805,8 +6838,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_sync)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_rx_wrap)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_rx_demodulation)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_d2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div_out)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_160m)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_i2s_tx_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_i2s_rx_clock)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_cache)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clint)");
@@ -6982,7 +7018,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(lcd_cam_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(psram_octal_spi)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_d2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_80m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_crypto_pwm_clk)");
     println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
