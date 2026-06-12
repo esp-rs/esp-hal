@@ -332,7 +332,7 @@ pub(crate) fn setup_trap_section_protection() {
     }
 }
 
-#[cfg(all(feature = "rt", enable_pmp))]
+#[cfg(all(feature = "rt", enable_pmp, riscv))]
 pub(crate) fn enable_pmp() {
     use core::arch::asm;
 
@@ -475,6 +475,7 @@ pub(crate) fn enable_pmp() {
             static _rwtext_end: u32;
         }
 
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
         if pmp_add_tor_region(
             &_rwtext_start as *const _ as u32,
             &_rwtext_end as *const _ as u32,
@@ -495,6 +496,7 @@ pub(crate) fn enable_pmp() {
             static _stack_start_cpu0: u32;
         }
 
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
         if pmp_add_tor_region(
             &_stack_end_cpu0 as *const _ as u32,
             &_stack_start_cpu0 as *const _ as u32,
@@ -515,6 +517,7 @@ pub(crate) fn enable_pmp() {
             static _noinit_end: u32;
         }
 
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
         if pmp_add_tor_region(
             &_data_start as *const _ as u32,
             &_noinit_end as *const _ as u32,
