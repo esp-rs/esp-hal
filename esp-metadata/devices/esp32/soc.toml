@@ -132,6 +132,7 @@ support_status = "partial"
 engines = [
     {
         name = "SPI_DMA",
+        internal_ram_burst_sizes = [0, 4],
         drivers = ["spi_master", "spi_slave"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 0 },
@@ -144,6 +145,7 @@ engines = [
     },
     {
         name = "I2S_DMA",
+        internal_ram_burst_sizes = [0, 4],
         drivers = ["i2s"],
         peripheral_instances = [
             { name = "I2S0", dma_id = 0 },

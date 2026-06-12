@@ -139,12 +139,13 @@ support_status = "partial"
 gdma_version = 1
 separate_in_out_interrupts = true
 mem2mem_requires_peripheral = true
-can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 9,
+        internal_ram_burst_sizes = [0, 4],
+        burst_sizes = [16, 32, 64],
         drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"],
         peripheral_instances = [
             { name = "SPI2",       dma_id = 0 },

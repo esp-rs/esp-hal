@@ -271,6 +271,7 @@ engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
+        burst_sizes = [4, 16, 32],
         drivers = ["sha", "spi_master", "i2s"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 1 },

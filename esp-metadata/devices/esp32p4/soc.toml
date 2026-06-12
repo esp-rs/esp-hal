@@ -205,11 +205,11 @@ has_arbitration_en = true
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
-can_access_psram = true
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
+        burst_sizes = [0, 4, 16, 32], # unclear if 64 byte (INCR16) is supported
         drivers = [],
         peripheral_instances = [
             # I3C, UHCI, I2S, ADC, RMT
@@ -223,6 +223,7 @@ engines = [
     {
         name = "AXI_GDMA",
         max_priority = 5,
+        burst_sizes = [8, 16, 32, 64, 128],
         drivers = ["aes", "sha", "spi_master"],
         peripheral_instances = [
             # LCD_CAM

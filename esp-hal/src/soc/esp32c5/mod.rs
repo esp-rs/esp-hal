@@ -44,7 +44,7 @@ pub(crate) fn enable_branch_predictor() {
 
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
+#[crate::ram]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(addr: u32, size: u32);
@@ -57,7 +57,7 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
+#[crate::ram]
 pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);

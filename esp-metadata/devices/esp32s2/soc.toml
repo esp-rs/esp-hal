@@ -126,11 +126,12 @@ instances = [
 
 [device.dma]
 support_status = "partial"
-can_access_psram = true
 ext_mem_configurable_block_size = true
 engines = [
     {
         name = "SPI_DMA",
+        internal_ram_burst_sizes = [0, 4],
+        burst_sizes = [16, 32, 64],
         drivers = ["spi_master", "spi_slave"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 0 },
@@ -143,6 +144,8 @@ engines = [
     },
     {
         name = "I2S_DMA",
+        internal_ram_burst_sizes = [0, 4],
+        burst_sizes = [16, 32, 64],
         drivers = ["i2s"],
         peripheral_instances = [
             { name = "I2S0", dma_id = 0 },
@@ -153,6 +156,8 @@ engines = [
     },
     {
         name = "CRYPTO_DMA",
+        internal_ram_burst_sizes = [0, 4],
+        burst_sizes = [16, 32, 64],
         drivers = ["aes", "sha"],
         peripheral_instances = [
             { name = "AES", dma_id = 0 },
