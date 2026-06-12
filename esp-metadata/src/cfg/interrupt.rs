@@ -7,18 +7,11 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 pub struct SoftwareInterruptProperties {
     #[serde(rename = "software_interrupt_count")]
     count: u32,
-    #[serde(rename = "software_interrupt_delay")]
-    delay: u32,
 }
 
-/// Generates `for_each_sw_interrupt!` which can be used to implement SoftwareInterruptControl, and
-/// `sw_interrupt_delay` which repeats `nop` enough times to ensure the interrupt is fired before
-/// returning.
+/// Generates `for_each_sw_interrupt!` which can be used to implement SoftwareInterruptControl.
 impl GenericProperty for SoftwareInterruptProperties {
     fn macros(&self) -> Option<TokenStream> {
-        let nops =
-            std::iter::repeat(quote! { ::core::arch::asm!("nop"); }).take(self.delay as usize);
-
         let channels = (0..self.count)
             .map(|i| {
                 let idx = number(i);
@@ -33,14 +26,6 @@ impl GenericProperty for SoftwareInterruptProperties {
         Some(quote! {
             #for_each_sw_interrupt
 
-            #[macro_export]
-            macro_rules! sw_interrupt_delay {
-                () => {
-                    unsafe {
-                        #(#nops)*
-                    }
-                };
-            }
         })
     }
 }
