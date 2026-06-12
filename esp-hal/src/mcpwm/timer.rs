@@ -168,7 +168,9 @@ impl TimerClockConfig {
         if target_timer_frequency == 0 || target_freq > clock.frequency {
             return Err(FrequencyError);
         }
-        let prescaler = clock.frequency.as_hz() / target_timer_frequency - 1;
+        let prescaler = (clock.frequency.as_hz() / target_timer_frequency)
+            .checked_sub(1)
+            .ok_or(FrequencyError)?;
         if prescaler > u8::MAX as u32 {
             return Err(FrequencyError);
         }
