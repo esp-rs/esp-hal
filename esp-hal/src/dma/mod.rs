@@ -1234,12 +1234,9 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel priority.
-    pub fn set_priority(&mut self, priority: CH::Priority)
-    where
-        CH: PriorityRegisterAccess,
-    {
-        self.rx_impl.set_priority(priority);
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.rx_impl.apply_config(config);
     }
 
     fn do_prepare(
@@ -1456,12 +1453,9 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
-    /// Configure the channel priority.
-    pub fn set_priority(&mut self, priority: CH::Priority)
-    where
-        CH: PriorityRegisterAccess,
-    {
-        self.tx_impl.set_priority(priority);
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.tx_impl.apply_config(config);
     }
 
     /// Asserts that the channel is compatible with the given peripheral.
@@ -1589,6 +1583,46 @@ where
     }
 }
 
+/// Configuration for a full DMA channel (both halves).
+///
+/// Composes the per-half engine configurations, so the RX and TX halves can be
+/// configured independently (e.g. with different priorities) in a single value
+/// passed to [`Channel::apply_config`].
+pub struct DmaChannelConfig<CH: DmaChannel> {
+    /// Configuration for the RX (receive) half.
+    pub rx: <CH::Rx as RegisterAccess>::Config,
+    /// Configuration for the TX (transmit) half.
+    pub tx: <CH::Tx as RegisterAccess>::Config,
+}
+
+// Manual impls: deriving would wrongly require `CH: Default`/`Clone`/`Debug`.
+impl<CH: DmaChannel> Default for DmaChannelConfig<CH> {
+    fn default() -> Self {
+        Self {
+            rx: Default::default(),
+            tx: Default::default(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> Clone for DmaChannelConfig<CH> {
+    fn clone(&self) -> Self {
+        Self {
+            rx: self.rx.clone(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> core::fmt::Debug for DmaChannelConfig<CH> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DmaChannelConfig")
+            .field("rx", &self.rx)
+            .field("tx", &self.tx)
+            .finish()
+    }
+}
+
 /// DMA Channel
 #[non_exhaustive]
 pub struct Channel<Dm, CH>
@@ -1681,14 +1715,13 @@ where
     Dm: DriverMode,
     CH: DmaChannel,
 {
-    /// Configure the channel priorities.
-    pub fn set_priority(&mut self, priority: <CH::Rx as PriorityRegisterAccess>::Priority)
-    where
-        CH::Rx: PriorityRegisterAccess,
-        CH::Tx: PriorityRegisterAccess<Priority = <CH::Rx as PriorityRegisterAccess>::Priority>,
-    {
-        self.tx.set_priority(priority);
-        self.rx.set_priority(priority);
+    /// Applies a complete configuration to both halves of the channel.
+    ///
+    /// The RX and TX halves can be configured independently via the `rx` and
+    /// `tx` fields of [`DmaChannelConfig`].
+    pub fn apply_config(&mut self, config: &DmaChannelConfig<CH>) {
+        self.rx.apply_config(&config.rx);
+        self.tx.apply_config(&config.tx);
     }
 
     /// Asserts that the channel is compatible with the given peripheral.

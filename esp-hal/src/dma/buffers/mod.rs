@@ -384,6 +384,16 @@ pub struct Preparation {
     #[doc = crate::trm_markdown_link!()]
     pub burst_transfer: BurstConfig,
 
+    /// Maximum alignment (the "burst axis") guaranteed by this buffer's start
+    /// address *and* every descriptor `size`/length field, in bytes.
+    ///
+    /// This is the alignment the buffer chunked itself for; the channel uses it
+    /// to negotiate the effective burst at transfer setup. It does *not* include
+    /// the cache-line requirement (which only constrains the buffer's base and
+    /// length and is handled by the buffer itself), and so is never weakened by
+    /// the burst negotiation.
+    pub max_alignment: usize,
+
     /// Configures the "check owner" feature of the DMA channel.
     ///
     /// Most DMA channels allow software to configure whether the hardware
@@ -900,6 +910,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::Out),
             check_owner: None,
             auto_write_back: false,
         }
@@ -944,6 +955,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::In),
             check_owner: None,
             auto_write_back: true,
         }
@@ -1081,6 +1093,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::In),
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -1503,6 +1516,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::Out),
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -1613,6 +1627,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: BurstConfig::default(),
+            max_alignment: 1,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1651,6 +1666,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             burst_transfer: BurstConfig::default(),
+            max_alignment: 1,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
             // channel does *NOT* check for ownership, otherwise the channel will return an error.
@@ -1728,6 +1744,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
             accesses_psram: false,
             direction: TransferDirection::Out,
             burst_transfer: BurstConfig::default(),
+            max_alignment: BurstConfig::default().min_alignment(self.buffer, TransferDirection::Out),
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
 
@@ -1773,6 +1790,7 @@ impl NoBuffer {
             #[cfg(dma_can_access_psram)]
             accesses_psram: self.0.accesses_psram,
             burst_transfer: self.0.burst_transfer,
+            max_alignment: self.0.max_alignment,
             check_owner: self.0.check_owner,
             auto_write_back: self.0.auto_write_back,
         }
@@ -1874,6 +1892,7 @@ pub(crate) unsafe fn prepare_for_tx(
             start: descriptors.head(),
             direction: TransferDirection::Out,
             burst_transfer: BurstConfig::DEFAULT,
+            max_alignment: alignment,
             check_owner: None,
             auto_write_back: false,
             #[cfg(dma_can_access_psram)]
@@ -1985,6 +2004,7 @@ pub(crate) unsafe fn prepare_for_rx(
             start: descriptors.head(),
             direction: TransferDirection::In,
             burst_transfer: BurstConfig::DEFAULT,
+            max_alignment: 4096 - chunk_size,
             check_owner: None,
             auto_write_back: true,
             #[cfg(dma_can_access_psram)]

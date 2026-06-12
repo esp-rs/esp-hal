@@ -81,7 +81,19 @@ impl CopyDmaTxChannel<'_> {
 impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
+/// Configuration for a COPY DMA channel half.
+///
+/// COPY_DMA is a mem2mem-only engine with no configurable options, so this is
+/// empty. It is never exposed as a driver-facing configuration surface.
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub struct CopyDmaConfig {}
+
 impl RegisterAccess for CopyDmaTxChannel<'_> {
+    type Config = CopyDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))
@@ -254,6 +266,10 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
+    type Config = CopyDmaConfig;
+
+    fn apply_config(&self, _config: &Self::Config) {}
+
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
         Some(PeripheralGuard::new(Peripheral::CopyDma))

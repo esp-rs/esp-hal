@@ -173,6 +173,7 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::Out),
             check_owner: None,
             auto_write_back: false,
         }
@@ -386,6 +387,7 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
+            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::In),
             check_owner: None,
             auto_write_back: true,
         }
