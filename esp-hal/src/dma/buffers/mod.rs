@@ -53,185 +53,57 @@ impl From<DmaAlignmentError> for DmaBufError {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(dma_can_access_psram)] {
-        /// Burst size used when transferring to and from external memory.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum ExternalBurstConfig {
-            /// 16 bytes
-            Size16 = 16,
+/// The mandatory PSRAM alignment for the given direction, *excluding* burst.
+#[cfg(dma_can_access_psram)]
+const fn min_psram_alignment(direction: TransferDirection) -> usize {
+    // S2 TRM: Specifically, size and buffer address pointer in receive descriptors
+    // should be 16-byte, 32-byte or 64-byte aligned. For data frame whose
+    // length is not a multiple of 16 bytes, 32 bytes, or 64 bytes, EDMA adds
+    // padding bytes to the end.
 
-            /// 32 bytes
-            Size32 = 32,
-
-            /// 64 bytes
-            Size64 = 64,
-        }
-
-        impl ExternalBurstConfig {
-            /// The default external memory burst length.
-            pub const DEFAULT: Self = Self::Size16;
-        }
-
-        impl Default for ExternalBurstConfig {
-            fn default() -> Self {
-                Self::DEFAULT
-            }
-        }
-
-        /// Internal memory access burst mode.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum InternalBurstConfig {
-            /// Burst mode is disabled.
-            Disabled,
-
-            /// Burst mode is enabled.
-            Enabled,
-        }
-
-        impl InternalBurstConfig {
-            /// The default internal burst mode configuration.
-            pub const DEFAULT: Self = Self::Disabled;
-        }
-
-        impl Default for InternalBurstConfig {
-            fn default() -> Self {
-                Self::DEFAULT
-            }
-        }
-
-        /// Burst transfer configuration.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct BurstConfig {
-            /// Configures the burst size for PSRAM transfers.
-            ///
-            /// Burst mode is always enabled for PSRAM transfers.
-            pub external_memory: ExternalBurstConfig,
-
-            /// Enables or disables the burst mode for internal memory transfers.
-            ///
-            /// The burst size is not configurable.
-            pub internal_memory: InternalBurstConfig,
-        }
-
-        impl BurstConfig {
-            /// The default burst mode configuration.
-            pub const DEFAULT: Self = Self {
-                external_memory: ExternalBurstConfig::DEFAULT,
-                internal_memory: InternalBurstConfig::DEFAULT,
-            };
-        }
-
-        impl Default for BurstConfig {
-            fn default() -> Self {
-                Self::DEFAULT
-            }
-        }
-
-        impl From<InternalBurstConfig> for BurstConfig {
-            fn from(internal_memory: InternalBurstConfig) -> Self {
-                Self {
-                    external_memory: ExternalBurstConfig::DEFAULT,
-                    internal_memory,
-                }
-            }
-        }
-
-        impl From<ExternalBurstConfig> for BurstConfig {
-            fn from(external_memory: ExternalBurstConfig) -> Self {
-                Self {
-                    external_memory,
-                    internal_memory: InternalBurstConfig::DEFAULT,
-                }
-            }
-        }
+    // S3 TRM: Size and Address for IN transfers must be block aligned. For receive
+    // descriptors, if the data length received are not aligned with block size,
+    // GDMA will pad the data received with 0 until they are aligned to
+    // initiate burst transfer. You can read the length field in receive descriptors
+    // to obtain the length of valid data received
+    if matches!(direction, TransferDirection::In) {
+        16
     } else {
-        /// Burst transfer configuration.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum BurstConfig {
-            /// Burst mode is disabled.
-            Disabled,
+        // S2 TRM: Size, length and buffer address pointer in transmit descriptors are
+        // not necessarily aligned with block size.
 
-            /// Burst mode is enabled.
-            Enabled,
-        }
-
-        impl BurstConfig {
-            /// The default burst mode configuration.
-            pub const DEFAULT: Self = Self::Disabled;
-        }
-
-        impl Default for BurstConfig {
-            fn default() -> Self {
-                Self::DEFAULT
-            }
-        }
-
-        type InternalBurstConfig = BurstConfig;
+        // S3 TRM: Size, length, and buffer address pointer in transmit descriptors do
+        // not need to be aligned.
+        1
     }
 }
 
-#[cfg(dma_can_access_psram)]
-impl ExternalBurstConfig {
-    const fn min_psram_alignment(self, direction: TransferDirection) -> usize {
-        // S2 TRM: Specifically, size and buffer address pointer in receive descriptors
-        // should be 16-byte, 32-byte or 64-byte aligned. For data frame whose
-        // length is not a multiple of 16 bytes, 32 bytes, or 64 bytes, EDMA adds
-        // padding bytes to the end.
-
-        // S3 TRM: Size and Address for IN transfers must be block aligned. For receive
-        // descriptors, if the data length received are not aligned with block size,
-        // GDMA will pad the data received with 0 until they are aligned to
-        // initiate burst transfer. You can read the length field in receive descriptors
-        // to obtain the length of valid data received
-        if matches!(direction, TransferDirection::In) {
-            self as usize
+/// The mandatory internal-RAM (DRAM) alignment for the given direction,
+/// *excluding* burst. Size and address alignment come in pairs on current
+/// hardware.
+const fn min_dram_alignment(direction: TransferDirection) -> usize {
+    if matches!(direction, TransferDirection::In) {
+        // ESP32-S2 technically supports byte-aligned DMA buffers, but the
+        // transfer ends up writing out of bounds.
+        if cfg!(any(esp32, esp32s2)) {
+            // NOTE: The size must be word-aligned.
+            // NOTE: The buffer address must be word-aligned
+            4
         } else {
-            // S2 TRM: Size, length and buffer address pointer in transmit descriptors are
-            // not necessarily aligned with block size.
-
-            // S3 TRM: Size, length, and buffer address pointer in transmit descriptors do
-            // not need to be aligned.
             1
         }
-    }
-}
-
-impl InternalBurstConfig {
-    pub(super) const fn is_burst_enabled(self) -> bool {
-        !matches!(self, Self::Disabled)
-    }
-
-    // Size and address alignment as those come in pairs on current hardware.
-    const fn min_dram_alignment(self, direction: TransferDirection) -> usize {
-        if matches!(direction, TransferDirection::In) {
-            if cfg!(esp32) {
-                // NOTE: The size must be word-aligned.
-                // NOTE: The buffer address must be word-aligned
-                4
-            } else if self.is_burst_enabled() {
-                // As described in "Accessing Internal Memory" paragraphs in the various TRMs.
-                4
-            } else {
-                1
-            }
+    } else {
+        // OUT transfers have no alignment requirements, except for ESP32, which is
+        // described below.
+        if cfg!(esp32) {
+            // SPI DMA: Burst transmission is supported. The data size for
+            // a single transfer must be four bytes aligned.
+            // I2S DMA: Burst transfer is supported. However, unlike the
+            // SPI DMA channels, the data size for a single transfer is
+            // one word, or four bytes.
+            4
         } else {
-            // OUT transfers have no alignment requirements, except for ESP32, which is
-            // described below.
-            if cfg!(esp32) {
-                // SPI DMA: Burst transmission is supported. The data size for
-                // a single transfer must be four bytes aligned.
-                // I2S DMA: Burst transfer is supported. However, unlike the
-                // SPI DMA channels, the data size for a single transfer is
-                // one word, or four bytes.
-                4
-            } else {
-                1
-            }
+            1
         }
     }
 }
@@ -247,51 +119,42 @@ const fn chunk_size_for_alignment(alignment: usize) -> usize {
     4096 - alignment
 }
 
-/// Data cache line size of cached *internal* memory, in bytes, or `1` (i.e. no
-/// alignment requirement) if internal memory is not accessed through a cache.
-const INTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
-    // ESP32-P4: L1 data cache line size.
-    // FIXME: add uncached address range?
-    soc_internal_memory_cached => 64,
-    _ => 1,
-};
-
-/// Data cache line size of cached *external* (PSRAM) memory, in bytes.
-///
-/// On the ESP32-S2/S3 this follows the `data-cache-line-size` esp-config option.
-#[cfg(dma_can_access_psram)]
-const EXTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
-    // TODO(esp32p4): PSRAM is cached through the L2 cache, whose line size is
-    // configurable (64 or 128 bytes) and is not encoded anywhere yet. Assume the
-    // larger, always-safe value until the L2 line size is available.
-    soc_internal_memory_cached => 128,
-    any(esp32c5, esp32c61) => 32, // TODO: metadata-ify
-    _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
-};
-
 /// Cache line size (bytes) of the memory `buffer` lives in. RX buffers must be
 /// aligned to this.
 fn cache_line_size_for(buffer: &[u8]) -> usize {
     #[cfg(dma_can_access_psram)]
     if is_valid_psram_address(buffer.as_ptr() as usize) {
+        const EXTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
+            // TODO(esp32p4): PSRAM is cached through the L2 cache, whose line size is
+            // configurable (64 or 128 bytes) and is not encoded anywhere yet. Assume the
+            // larger, always-safe value until the L2 line size is available.
+            soc_internal_memory_cached => 128,
+            any(esp32c5, esp32c61) => 32, // TODO: metadata-ify
+            _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
+        };
+
         return EXTERNAL_MEMORY_CACHE_LINE_SIZE;
     }
 
     let _ = buffer;
+
+    const INTERNAL_MEMORY_CACHE_LINE_SIZE: usize = cfg_select! {
+        // ESP32-P4: L1 data cache line size.
+        // FIXME: add uncached address range?
+        soc_internal_memory_cached => 64,
+        _ => 1,
+    };
     INTERNAL_MEMORY_CACHE_LINE_SIZE
 }
 
 /// The strictest *mandatory* alignment for a buffer in this memory region and
 /// transfer direction, *excluding* burst.
 fn region_alignment(buffer: &[u8], direction: TransferDirection) -> usize {
-    let alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(direction);
+    let alignment = min_dram_alignment(direction);
 
     #[cfg(dma_can_access_psram)]
     if is_valid_psram_address(buffer.as_ptr() as usize) {
-        return max(
-            alignment,
-            ExternalBurstConfig::DEFAULT.min_psram_alignment(direction),
-        );
+        return max(alignment, min_psram_alignment(direction));
     }
 
     let _ = buffer;
@@ -309,15 +172,12 @@ fn effective_alignment(buffer: &[u8], direction: TransferDirection, requested: u
 /// This is an over-estimation so that a single descriptor array can be safely
 /// used regardless of the transfer direction or memory region.
 pub const fn min_compatible_alignment() -> usize {
-    let in_alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(TransferDirection::In);
-    let out_alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(TransferDirection::Out);
+    let in_alignment = min_dram_alignment(TransferDirection::In);
+    let out_alignment = min_dram_alignment(TransferDirection::Out);
     let alignment = max(in_alignment, out_alignment);
 
     #[cfg(dma_can_access_psram)]
-    let alignment = max(
-        alignment,
-        ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In),
-    );
+    let alignment = max(alignment, min_psram_alignment(TransferDirection::In));
 
     alignment
 }
@@ -2021,7 +1881,7 @@ fn build_descriptor_list_for_psram(
     let data_len = data.len();
     let data_addr = data.addr().get();
 
-    let min_alignment = ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In);
+    let min_alignment = min_psram_alignment(TransferDirection::In);
     let chunk_size = 4096 - min_alignment;
 
     let mut desciptor_iter = DescriptorChainingIter::new(descriptors.descriptors);
