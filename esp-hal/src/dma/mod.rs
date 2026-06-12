@@ -981,29 +981,6 @@ impl<'a> DescriptorSet<'a> {
     }
 }
 
-/// Block size for transfers to/from PSRAM
-#[cfg(dma_ext_mem_configurable_block_size)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DmaExtMemBKSize {
-    /// External memory block size of 16 bytes.
-    Size16 = 0,
-    /// External memory block size of 32 bytes.
-    Size32 = 1,
-    /// External memory block size of 64 bytes.
-    Size64 = 2,
-}
-
-#[cfg(dma_ext_mem_configurable_block_size)]
-impl From<ExternalBurstConfig> for DmaExtMemBKSize {
-    fn from(size: ExternalBurstConfig) -> Self {
-        match size {
-            ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
-            ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
-            ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
-        }
-    }
-}
-
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1119,8 +1096,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        self.rx_impl
-            .prepare_burst(&self.config, preparation.max_alignment);
+        self.rx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
@@ -1348,8 +1331,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        self.tx_impl
-            .prepare_burst(&self.config, preparation.max_alignment);
+        self.tx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl

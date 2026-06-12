@@ -130,16 +130,30 @@ pub struct AhbGdmaConfig {
     burst: AhbGdmaBurst,
 }
 
-impl crate::dma::DmaBurstConfig for AhbGdmaConfig {
-    fn burst_ceilings(&self) -> (usize, usize) {
-        cfg_if::cfg_if! {
-            if #[cfg(ahb_gdma_separate_burst)] {
-                (self.internal_burst.bytes(), self.external_burst.bytes())
+/// Whether data burst should be enabled for the burst negotiated from the
+/// config and the buffer alignment. On engines with independent internal and
+/// external burst configuration, `accesses_psram` selects which one applies.
+fn data_burst_enabled(config: &AhbGdmaConfig, max_alignment: usize, accesses_psram: bool) -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(ahb_gdma_separate_burst)] {
+            let bytes = if accesses_psram {
+                config.external_burst.negotiate(max_alignment).bytes()
             } else {
-                (self.burst.bytes(), self.burst.bytes())
-            }
+                config.internal_burst.negotiate(max_alignment).bytes()
+            };
+            bytes != 0
+        } else {
+            let _ = accesses_psram;
+            config.burst.negotiate(max_alignment).bytes() != 0
         }
     }
+}
+
+/// External-memory block-size register encoding for the negotiated external
+/// burst.
+#[cfg(dma_ext_mem_configurable_block_size)]
+fn ext_mem_block_size(config: &AhbGdmaConfig, max_alignment: usize) -> u8 {
+    config.external_burst.negotiate(max_alignment) as u8
 }
 
 /// An arbitrary GDMA RX channel
