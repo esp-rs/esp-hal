@@ -240,114 +240,121 @@ const fn max(a: usize, b: usize) -> usize {
     if a > b { a } else { b }
 }
 
+#[cfg(dma_can_access_psram)]
 impl BurstConfig {
-    delegate::delegate! {
-        #[cfg(dma_can_access_psram)]
-        to self.internal_memory {
-            pub(super) const fn min_dram_alignment(self, direction: TransferDirection) -> usize;
-            pub(super) fn is_burst_enabled(self) -> bool;
-        }
+    pub(super) fn is_burst_enabled(self) -> bool {
+        self.internal_memory.is_burst_enabled()
     }
+}
 
-    /// Calculates an alignment that is compatible with the current burst
-    /// configuration.
-    ///
-    /// This is an over-estimation so that Descriptors can be safely used with
-    /// any DMA channel in any direction.
-    pub const fn min_compatible_alignment(self) -> usize {
-        let in_alignment = self.min_dram_alignment(TransferDirection::In);
-        let out_alignment = self.min_dram_alignment(TransferDirection::Out);
-        let alignment = max(in_alignment, out_alignment);
+const fn chunk_size_for_alignment(alignment: usize) -> usize {
+    // DMA descriptors have a 12-bit field for the size/length of the buffer they
+    // point at. As there is no such thing as 0-byte alignment, this means the
+    // maximum size is 4095 bytes.
+    4096 - alignment
+}
 
-        #[cfg(dma_can_access_psram)]
-        let alignment = max(alignment, self.external_memory as usize);
+/// The strictest *mandatory* alignment for a buffer in this memory region and
+/// transfer direction, *excluding* burst.
+///
+/// Internal RAM is byte-addressable (word-aligned only on the ESP32), so it
+/// imposes no alignment by itself — burst is what needs alignment, and burst is
+/// optional and negotiated against the buffer at transfer setup. PSRAM receive
+/// transfers, however, must be block-aligned by the hardware, so that floor is
+/// always applied. This is the "usable anywhere" alignment of a default buffer.
+fn region_alignment(buffer: &[u8], direction: TransferDirection) -> usize {
+    let alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(direction);
 
-        alignment
-    }
-
-    const fn chunk_size_for_alignment(alignment: usize) -> usize {
-        // DMA descriptors have a 12-bit field for the size/length of the buffer they
-        // point at. As there is no such thing as 0-byte alignment, this means the
-        // maximum size is 4095 bytes.
-        4096 - alignment
-    }
-
-    /// Calculates a chunk size that is compatible with the current burst
-    /// configuration's alignment requirements.
-    ///
-    /// This is an over-estimation so that Descriptors can be safely used with
-    /// any DMA channel in any direction.
-    pub const fn max_compatible_chunk_size(self) -> usize {
-        Self::chunk_size_for_alignment(self.min_compatible_alignment())
-    }
-
-    fn min_alignment(self, _buffer: &[u8], direction: TransferDirection) -> usize {
-        let alignment = self.min_dram_alignment(direction);
-
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
-                let mut alignment = alignment;
-                if is_valid_psram_address(_buffer.as_ptr() as usize) {
-                    alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
-                }
+    cfg_if::cfg_if! {
+        if #[cfg(dma_can_access_psram)] {
+            let mut alignment = alignment;
+            if is_valid_psram_address(buffer.as_ptr() as usize) {
+                alignment = max(alignment, ExternalBurstConfig::DEFAULT.min_psram_alignment(direction));
             }
+            alignment
+        } else {
+            let _ = buffer;
+            alignment
         }
+    }
+}
 
-        alignment
+/// The alignment a buffer actually guarantees, given a caller-requested
+/// alignment: the larger of the request and the region's mandatory floor.
+fn effective_alignment(buffer: &[u8], direction: TransferDirection, requested: usize) -> usize {
+    max(requested.max(1), region_alignment(buffer, direction))
+}
+
+/// An alignment that is compatible with any DMA channel in any direction.
+///
+/// This is an over-estimation so that a single descriptor array can be safely
+/// used regardless of the transfer direction or memory region.
+pub const fn min_compatible_alignment() -> usize {
+    let in_alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(TransferDirection::In);
+    let out_alignment = InternalBurstConfig::DEFAULT.min_dram_alignment(TransferDirection::Out);
+    let alignment = max(in_alignment, out_alignment);
+
+    #[cfg(dma_can_access_psram)]
+    let alignment = max(
+        alignment,
+        ExternalBurstConfig::DEFAULT.min_psram_alignment(TransferDirection::In),
+    );
+
+    alignment
+}
+
+/// A chunk size that is compatible with any DMA channel in any direction.
+///
+/// This is an over-estimation so that a single descriptor array can be safely
+/// used regardless of the transfer direction or memory region.
+pub const fn max_compatible_chunk_size() -> usize {
+    chunk_size_for_alignment(min_compatible_alignment())
+}
+
+fn ensure_buffer_aligned(
+    buffer: &[u8],
+    direction: TransferDirection,
+    alignment: usize,
+) -> Result<(), DmaAlignmentError> {
+    if !(buffer.as_ptr() as usize).is_multiple_of(alignment) {
+        return Err(DmaAlignmentError::Address);
     }
 
-    // Note: this function ignores address alignment as we assume the buffers are
-    // aligned.
-    fn max_chunk_size_for(self, buffer: &[u8], direction: TransferDirection) -> usize {
-        Self::chunk_size_for_alignment(self.min_alignment(buffer, direction))
+    // NB: the TRMs suggest that buffer length don't need to be aligned, but
+    // for IN transfers, we configure the DMA descriptors' size field, which needs
+    // to be aligned.
+    if direction == TransferDirection::In && !buffer.len().is_multiple_of(alignment) {
+        return Err(DmaAlignmentError::Size);
     }
 
-    fn ensure_buffer_aligned(
-        self,
-        buffer: &[u8],
-        direction: TransferDirection,
-    ) -> Result<(), DmaAlignmentError> {
-        let alignment = self.min_alignment(buffer, direction);
-        if !(buffer.as_ptr() as usize).is_multiple_of(alignment) {
-            return Err(DmaAlignmentError::Address);
-        }
+    Ok(())
+}
 
-        // NB: the TRMs suggest that buffer length don't need to be aligned, but
-        // for IN transfers, we configure the DMA descriptors' size field, which needs
-        // to be aligned.
-        if direction == TransferDirection::In && !buffer.len().is_multiple_of(alignment) {
-            return Err(DmaAlignmentError::Size);
+fn ensure_buffer_compatible(
+    buffer: &[u8],
+    direction: TransferDirection,
+    alignment: usize,
+) -> Result<(), DmaBufError> {
+    if buffer.is_empty() {
+        return Ok(());
+    }
+    // buffer can be either DRAM or PSRAM (if supported)
+    let is_in_dram = is_slice_in_dram(buffer);
+    cfg_if::cfg_if! {
+        if #[cfg(dma_can_access_psram)]{
+            let is_in_psram = is_slice_in_psram(buffer);
+        } else {
+            let is_in_psram = false;
         }
-
-        Ok(())
     }
 
-    fn ensure_buffer_compatible(
-        self,
-        buffer: &[u8],
-        direction: TransferDirection,
-    ) -> Result<(), DmaBufError> {
-        if buffer.is_empty() {
-            return Ok(());
-        }
-        // buffer can be either DRAM or PSRAM (if supported)
-        let is_in_dram = is_slice_in_dram(buffer);
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)]{
-                let is_in_psram = is_slice_in_psram(buffer);
-            } else {
-                let is_in_psram = false;
-            }
-        }
-
-        if !(is_in_dram || is_in_psram) {
-            return Err(DmaBufError::UnsupportedMemoryRegion);
-        }
-
-        self.ensure_buffer_aligned(buffer, direction)?;
-
-        Ok(())
+    if !(is_in_dram || is_in_psram) {
+        return Err(DmaBufError::UnsupportedMemoryRegion);
     }
+
+    ensure_buffer_aligned(buffer, direction, alignment)?;
+
+    Ok(())
 }
 
 /// The direction of the DMA transfer.
@@ -373,16 +380,6 @@ pub struct Preparation {
     /// Must be `true` if any of the DMA descriptors contain data in PSRAM.
     #[cfg(dma_can_access_psram)]
     pub accesses_psram: bool,
-
-    /// Configures the DMA to transfer data in bursts.
-    ///
-    /// The implementation of the buffer must ensure that buffer size
-    /// and alignment in each descriptor is compatible with the burst
-    /// transfer configuration.
-    ///
-    /// For details on alignment requirements, refer to your chip's
-    #[doc = crate::trm_markdown_link!()]
-    pub burst_transfer: BurstConfig,
 
     /// Maximum alignment (the "burst axis") guaranteed by this buffer's start
     /// address *and* every descriptor `size`/length field, in bytes.
@@ -526,28 +523,31 @@ impl DmaTxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        ScopedDmaTxBuf::new_with_config(descriptors, buffer, BurstConfig::default()).map(Self)
+        ScopedDmaTxBuf::new(descriptors, buffer).map(Self)
     }
 
-    /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
+    /// Creates a new [DmaTxBuf] with a caller-chosen minimum alignment.
     ///
-    /// There must be enough descriptors for the provided buffer.
-    /// Depending on alignment requirements, each descriptor can handle at most
-    /// 4095 bytes worth of buffer.
+    /// The buffer's start address (and, for receive buffers, its length) must
+    /// be a multiple of `alignment`, otherwise this fails with
+    /// [DmaBufError::InvalidAlignment]. Larger alignments chunk the buffer into
+    /// smaller descriptors and therefore need more descriptors
+    /// ([DmaBufError::InsufficientDescriptors] otherwise).
+    ///
+    /// The alignment is the *burst axis* only: it is the largest alignment the
+    /// buffer guarantees, against which a channel negotiates its effective burst
+    /// at transfer setup. It does not encode any engine's burst rules. The
+    /// mandatory per-region floor (e.g. PSRAM block size) is always applied, so
+    /// the effective alignment may end up larger than requested.
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
-    pub fn new_with_config(
+    pub fn new_aligned(
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
-        config: impl Into<BurstConfig>,
+        alignment: usize,
     ) -> Result<Self, DmaBufError> {
-        ScopedDmaTxBuf::new_with_config(descriptors, buffer, config).map(Self)
-    }
-
-    /// Configures the DMA to use burst transfers to access this buffer.
-    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
-        self.0.set_burst_config(burst)
+        ScopedDmaTxBuf::new_aligned(descriptors, buffer, alignment).map(Self)
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -638,28 +638,30 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
-        ScopedDmaRxBuf::new_with_config(descriptors, buffer, BurstConfig::default()).map(Self)
+        ScopedDmaRxBuf::new(descriptors, buffer).map(Self)
     }
 
-    /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
+    /// Creates a new [DmaRxBuf] with a caller-chosen minimum alignment.
     ///
-    /// There must be enough descriptors for the provided buffer.
-    /// Depending on alignment requirements, each descriptor can handle at most
-    /// 4092 bytes worth of buffer.
+    /// The buffer's start address and length must be a multiple of `alignment`,
+    /// otherwise this fails with [DmaBufError::InvalidAlignment]. Larger
+    /// alignments chunk the buffer into smaller descriptors and therefore need
+    /// more descriptors ([DmaBufError::InsufficientDescriptors] otherwise).
+    ///
+    /// The alignment is the *burst axis* only: it is the largest alignment the
+    /// buffer guarantees, against which a channel negotiates its effective burst
+    /// at transfer setup. It does not encode any engine's burst rules. The
+    /// mandatory per-region floor (e.g. PSRAM block size) is always applied, so
+    /// the effective alignment may end up larger than requested.
     ///
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
-    pub fn new_with_config(
+    pub fn new_aligned(
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
-        config: impl Into<BurstConfig>,
+        alignment: usize,
     ) -> Result<Self, DmaBufError> {
-        ScopedDmaRxBuf::new_with_config(descriptors, buffer, config).map(Self)
-    }
-
-    /// Configures the DMA to use burst transfers to access this buffer.
-    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
-        self.0.set_burst_config(burst)
+        ScopedDmaRxBuf::new_aligned(descriptors, buffer, alignment).map(Self)
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -753,7 +755,7 @@ pub struct DmaRxTxBuf {
     rx_descriptors: DescriptorSet<'static>,
     tx_descriptors: DescriptorSet<'static>,
     buffer: &'static mut [u8],
-    burst: BurstConfig,
+    alignment: usize,
 }
 
 impl DmaRxTxBuf {
@@ -769,45 +771,54 @@ impl DmaRxTxBuf {
         tx_descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
+        // The buffer is used in both directions, so honour the stricter floor.
+        let alignment = max(
+            region_alignment(buffer, TransferDirection::In),
+            region_alignment(buffer, TransferDirection::Out),
+        );
+        Self::new_aligned(rx_descriptors, tx_descriptors, buffer, alignment)
+    }
+
+    /// Creates a new [DmaRxTxBuf] with a caller-chosen minimum alignment.
+    ///
+    /// See [DmaRxBuf::new_aligned] for the meaning of `alignment`. As the buffer
+    /// is used in both directions, the stricter of the two directions' floors is
+    /// applied.
+    pub fn new_aligned(
+        rx_descriptors: &'static mut [DmaDescriptor],
+        tx_descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+        alignment: usize,
+    ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             rx_descriptors: DescriptorSet::new(rx_descriptors)?,
             tx_descriptors: DescriptorSet::new(tx_descriptors)?,
             buffer,
-            burst: BurstConfig::default(),
+            alignment: 1,
         };
 
         let capacity = buf.capacity();
-        buf.configure(buf.burst, capacity)?;
+        buf.configure(alignment, capacity)?;
 
         Ok(buf)
     }
 
-    fn configure(
-        &mut self,
-        burst: impl Into<BurstConfig>,
-        length: usize,
-    ) -> Result<(), DmaBufError> {
-        let burst = burst.into();
-        self.set_length_fallible(length, burst)?;
+    fn configure(&mut self, alignment: usize, length: usize) -> Result<(), DmaBufError> {
+        // The buffer is shared by both directions, so honour the stricter floor.
+        let alignment = max(
+            effective_alignment(self.buffer, TransferDirection::In, alignment),
+            effective_alignment(self.buffer, TransferDirection::Out, alignment),
+        );
+        self.set_length_fallible(length, alignment)?;
 
-        self.rx_descriptors.link_with_buffer(
-            self.buffer,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::In),
-        )?;
-        self.tx_descriptors.link_with_buffer(
-            self.buffer,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )?;
+        self.rx_descriptors
+            .link_with_buffer(self.buffer, chunk_size_for_alignment(alignment))?;
+        self.tx_descriptors
+            .link_with_buffer(self.buffer, chunk_size_for_alignment(alignment))?;
 
-        self.burst = burst;
+        self.alignment = alignment;
 
         Ok(())
-    }
-
-    /// Configures the DMA to use burst transfers to access this buffer.
-    pub fn set_burst_config(&mut self, burst: BurstConfig) -> Result<(), DmaBufError> {
-        let len = self.len();
-        self.configure(burst, len)
     }
 
     /// Consume the buf, returning the rx descriptors, tx descriptors and
@@ -850,21 +861,17 @@ impl DmaRxTxBuf {
         self.buffer
     }
 
-    fn set_length_fallible(&mut self, len: usize, burst: BurstConfig) -> Result<(), DmaBufError> {
+    fn set_length_fallible(&mut self, len: usize, alignment: usize) -> Result<(), DmaBufError> {
         if len > self.capacity() {
             return Err(DmaBufError::BufferTooSmall);
         }
-        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In)?;
-        burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
+        ensure_buffer_compatible(&self.buffer[..len], TransferDirection::In, alignment)?;
+        ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out, alignment)?;
 
-        self.rx_descriptors.set_rx_length(
-            len,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::In),
-        )?;
-        self.tx_descriptors.set_tx_length(
-            len,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )?;
+        self.rx_descriptors
+            .set_rx_length(len, chunk_size_for_alignment(alignment))?;
+        self.tx_descriptors
+            .set_tx_length(len, chunk_size_for_alignment(alignment))?;
 
         Ok(())
     }
@@ -874,7 +881,7 @@ impl DmaRxTxBuf {
     ///
     /// `len` must be less than or equal to the buffer size.
     pub fn set_length(&mut self, len: usize) {
-        unwrap!(self.set_length_fallible(len, self.burst));
+        unwrap!(self.set_length_fallible(len, self.alignment));
     }
 }
 
@@ -909,8 +916,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
-            burst_transfer: self.burst,
-            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::Out),
+            max_alignment: self.alignment,
             check_owner: None,
             auto_write_back: false,
         }
@@ -954,8 +960,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
-            burst_transfer: self.burst,
-            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::In),
+            max_alignment: self.alignment,
             check_owner: None,
             auto_write_back: true,
         }
@@ -1015,7 +1020,6 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 pub struct DmaRxStreamBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
-    burst: BurstConfig,
 }
 
 impl DmaRxStreamBuf {
@@ -1061,11 +1065,7 @@ impl DmaRxStreamBuf {
             last_descriptor.set_size(size);
         }
 
-        Ok(Self {
-            descriptors,
-            buffer,
-            burst: BurstConfig::default(),
-        })
+        Ok(Self { descriptors, buffer })
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -1092,8 +1092,7 @@ unsafe impl DmaRxBuffer for DmaRxStreamBuf {
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
-            burst_transfer: self.burst,
-            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::In),
+            max_alignment: region_alignment(self.buffer, TransferDirection::In),
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -1318,7 +1317,6 @@ impl DmaRxStreamBufView {
 pub struct DmaTxStreamBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
-    burst: BurstConfig,
     pre_filled: Option<usize>,
     view_descriptor_idx: usize,
     view_descriptor_offset: usize,
@@ -1368,7 +1366,6 @@ impl DmaTxStreamBuf {
         Ok(Self {
             descriptors,
             buffer,
-            burst: Default::default(),
             pre_filled: None,
             view_descriptor_idx: 0,
             view_descriptor_offset: 0,
@@ -1515,8 +1512,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
-            burst_transfer: self.burst,
-            max_alignment: self.burst.min_alignment(self.buffer, TransferDirection::Out),
+            max_alignment: region_alignment(self.buffer, TransferDirection::Out),
 
             // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
             // implementation doesn't rely on the DMA checking for descriptor ownership.
@@ -1626,7 +1622,6 @@ unsafe impl DmaTxBuffer for EmptyBuf {
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
-            burst_transfer: BurstConfig::default(),
             max_alignment: 1,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
@@ -1665,7 +1660,6 @@ unsafe impl DmaRxBuffer for EmptyBuf {
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
-            burst_transfer: BurstConfig::default(),
             max_alignment: 1,
 
             // As we don't give ownership of the descriptor to the DMA, it's important that the DMA
@@ -1712,7 +1706,8 @@ impl DmaLoopBuf {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        if buffer.len() > BurstConfig::default().max_chunk_size_for(buffer, TransferDirection::Out)
+        if buffer.len()
+            > chunk_size_for_alignment(region_alignment(buffer, TransferDirection::Out))
         {
             return Err(DmaBufError::InsufficientDescriptors);
         }
@@ -1743,8 +1738,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
             direction: TransferDirection::Out,
-            burst_transfer: BurstConfig::default(),
-            max_alignment: BurstConfig::default().min_alignment(self.buffer, TransferDirection::Out),
+            max_alignment: region_alignment(self.buffer, TransferDirection::Out),
             // The DMA must not check the owner bit, as it is never set.
             check_owner: Some(false),
 
@@ -1789,7 +1783,6 @@ impl NoBuffer {
             direction: self.0.direction,
             #[cfg(dma_can_access_psram)]
             accesses_psram: self.0.accesses_psram,
-            burst_transfer: self.0.burst_transfer,
             max_alignment: self.0.max_alignment,
             check_owner: self.0.check_owner,
             auto_write_back: self.0.auto_write_back,
@@ -1837,8 +1830,7 @@ pub(crate) unsafe fn prepare_for_tx(
     mut data: NonNull<[u8]>,
     block_size: usize,
 ) -> Result<(NoBuffer, usize), DmaError> {
-    let alignment =
-        BurstConfig::DEFAULT.min_alignment(unsafe { data.as_ref() }, TransferDirection::Out);
+    let alignment = region_alignment(unsafe { data.as_ref() }, TransferDirection::Out);
 
     if !data.addr().get().is_multiple_of(alignment) {
         // ESP32 has word alignment requirement on the TX descriptors, too.
@@ -1891,7 +1883,6 @@ pub(crate) unsafe fn prepare_for_tx(
         NoBuffer(Preparation {
             start: descriptors.head(),
             direction: TransferDirection::Out,
-            burst_transfer: BurstConfig::DEFAULT,
             max_alignment: alignment,
             check_owner: None,
             auto_write_back: false,
@@ -1916,8 +1907,10 @@ pub(crate) unsafe fn prepare_for_rx(
     #[cfg(dma_can_access_psram)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
     mut data: NonNull<[u8]>,
 ) -> (NoBuffer, usize) {
-    let chunk_size =
-        BurstConfig::DEFAULT.max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::In);
+    let chunk_size = chunk_size_for_alignment(region_alignment(
+        unsafe { data.as_ref() },
+        TransferDirection::In,
+    ));
 
     // The data we have to process may not be appropriate for the DMA:
     // - it may be improperly aligned for PSRAM
@@ -2003,7 +1996,6 @@ pub(crate) unsafe fn prepare_for_rx(
         NoBuffer(Preparation {
             start: descriptors.head(),
             direction: TransferDirection::In,
-            burst_transfer: BurstConfig::DEFAULT,
             max_alignment: 4096 - chunk_size,
             check_owner: None,
             auto_write_back: true,

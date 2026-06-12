@@ -22,7 +22,7 @@ extern crate alloc;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    dma::{DmaRxBuf, DmaTxBuf},
     main,
     spi::{
         Mode,
@@ -49,8 +49,8 @@ macro_rules! dma_alloc_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
-const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+const DMA_ALIGNMENT: usize = 64;
+const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT;
 
 #[main]
 fn main() -> ! {
@@ -74,15 +74,14 @@ fn main() -> ! {
 
     let (_, tx_descriptors) =
         esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-    let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
+    let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT);
     info!(
         "TX: {:p} len {} ({} descripters)",
         tx_buffer.as_ptr(),
         tx_buffer.len(),
         tx_descriptors.len()
     );
-    let mut dma_tx_buf =
-        DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
+    let mut dma_tx_buf = DmaTxBuf::new_aligned(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
     let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
     info!(
         "RX: {:p} len {} ({} descripters)",
