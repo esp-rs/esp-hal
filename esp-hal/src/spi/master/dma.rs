@@ -285,12 +285,14 @@ impl<'d> SpiDma<'d, Blocking> {
             _ => &mut []
         };
 
+        #[allow(static_mut_refs)]
         let rx_buffer = unwrap!(DmaRxBuf::new(
-            core::slice::from_mut(unsafe { &mut RX_DESCRIPTORS.get_mut()[id] }),
+            core::slice::from_mut(unsafe { &mut (RX_DESCRIPTORS.get_mut()[id]) }),
             &mut []
         ));
+        #[allow(static_mut_refs)]
         let tx_buffer = unwrap!(DmaTxBuf::new(
-            core::slice::from_mut(unsafe { &mut TX_DESCRIPTORS.get_mut()[id] }),
+            core::slice::from_mut(unsafe { &mut (TX_DESCRIPTORS.get_mut()[id]) }),
             tx_buffer
         ));
 

@@ -629,13 +629,17 @@ macro_rules! dma_circular_descriptors_chunk_size {
 
 // ESP32-P4 internal memory is cached, enforce alignment to avoid memory
 // corruption. Technically only needed for IN buffers and descriptor lists.
-#[cfg_attr(esp32p4, repr(C, align(64)))] // dcache cache line
+#[cfg_attr(soc_internal_memory_cached, repr(C, align(64)))] // dcache cache line
 #[doc(hidden)]
 pub struct InternalMemoryCachelineAligned<T>(T);
 
 impl<T> InternalMemoryCachelineAligned<T> {
     pub const fn new(init: T) -> Self {
         Self(init)
+    }
+
+    pub const fn get(&self) -> &T {
+        &self.0
     }
 
     pub const fn get_mut(&mut self) -> &mut T {
@@ -646,13 +650,17 @@ impl<T> InternalMemoryCachelineAligned<T> {
 // ESP32 requires word alignment for DMA buffers.
 // ESP32-S2 technically supports byte-aligned DMA buffers, but the
 // transfer ends up writing out of bounds.
-#[cfg_attr(not(esp32p4), repr(C, align(4)))]
+#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(4)))]
 #[doc(hidden)]
 pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
 
 impl<const N: usize> InternalMemoryBuffer<N> {
     pub const fn new() -> Self {
         Self(InternalMemoryCachelineAligned::new([0u8; N]))
+    }
+
+    pub const fn get(&self) -> &[u8] {
+        self.0.get()
     }
 
     pub const fn get_mut(&mut self) -> &mut [u8] {
