@@ -215,7 +215,7 @@ options:
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"
     default:
       - value: true
-    active: 'feature("riscv") && chip != "esp32c2" && chip != "esp32c3"'
+    active: 'riscv && !esp32c2 && !esp32c3'
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
