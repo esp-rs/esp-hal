@@ -694,6 +694,7 @@ impl<'a> MaybeCopyTxBuf<'a> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum MaybeCopyRxBuf<'a> {
     Copy(&'a mut ScopedDmaRxBuf<'static>),
     Direct {

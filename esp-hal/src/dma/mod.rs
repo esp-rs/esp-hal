@@ -654,6 +654,12 @@ impl<T> InternalMemoryCachelineAligned<T> {
 #[doc(hidden)]
 pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
 
+impl<const N: usize> Default for InternalMemoryBuffer<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> InternalMemoryBuffer<N> {
     pub const fn new() -> Self {
         Self(InternalMemoryCachelineAligned::new([0u8; N]))
