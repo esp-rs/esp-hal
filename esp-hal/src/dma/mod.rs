@@ -1154,9 +1154,9 @@ where
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: CH,
-    /// Last-applied channel configuration. The burst ceiling stored here is
-    /// re-applied on every transfer (registers do not survive `reset()`), and
-    /// the value is carried across blocking/async conversions.
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
     pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
@@ -1252,8 +1252,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::In);
-
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1385,9 +1383,9 @@ where
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: CH,
-    /// Last-applied channel configuration. The burst ceiling stored here is
-    /// re-applied on every transfer (registers do not survive `reset()`), and
-    /// the value is carried across blocking/async conversions.
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
     pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
@@ -1483,8 +1481,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::Out);
-
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 

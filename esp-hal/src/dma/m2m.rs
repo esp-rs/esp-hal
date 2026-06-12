@@ -643,9 +643,8 @@ where
             panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
         };
 
-        // Remember the descriptor slices' raw parts so we can hand them back into the
-        // idle state if buffer creation fails (the fallible constructors consume them
-        // without returning them on error).
+        // Save the descriptors' raw parts to restore the idle state if buffer
+        // creation fails (the constructors consume them on error).
         let rx_desc_ptr = rx_descriptors.as_mut_ptr();
         let rx_desc_len = rx_descriptors.len();
         let tx_desc_ptr = tx_descriptors.as_mut_ptr();
@@ -659,16 +658,14 @@ where
             unsafe { core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len()) };
         let tx_buffer =
             unsafe { core::slice::from_raw_parts_mut(tx_buffer.as_ptr() as _, tx_buffer.len()) };
-        let rx_descriptors =
-            unsafe { core::slice::from_raw_parts_mut(rx_desc_ptr, rx_desc_len) };
-        let tx_descriptors =
-            unsafe { core::slice::from_raw_parts_mut(tx_desc_ptr, tx_desc_len) };
+        let rx_descriptors = unsafe { core::slice::from_raw_parts_mut(rx_desc_ptr, rx_desc_len) };
+        let tx_descriptors = unsafe { core::slice::from_raw_parts_mut(tx_desc_ptr, tx_desc_len) };
 
         // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM
         // and every other chip.
 
-        // Use the loosest (region-default) alignment. If the caller's buffers don't
-        // even satisfy that, surface the validation error rather than panicking.
+        // Loosest (region-default) alignment; surface a validation error instead
+        // of panicking if the buffers don't satisfy even that.
         let dma_rx_buf = match DmaRxBuf::new(rx_descriptors, rx_buffer) {
             Ok(buf) => buf,
             Err(err) => {
