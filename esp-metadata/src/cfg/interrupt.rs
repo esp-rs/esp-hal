@@ -4,6 +4,7 @@ use quote::{format_ident, quote};
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SoftwareInterruptProperties {
     #[serde(rename = "software_interrupt_count")]
     count: u32,

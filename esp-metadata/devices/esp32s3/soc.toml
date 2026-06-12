@@ -144,8 +144,7 @@ engines = [
     {
         name = "AHB_GDMA",
         max_priority = 9,
-        can_access_psram = true,
-        internal_ram_burst_sizes = [0, 4], # TODO: Verify burst size
+        internal_ram_burst_sizes = [0, 4],
         burst_sizes = [16, 32, 64],
         drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"],
         peripheral_instances = [

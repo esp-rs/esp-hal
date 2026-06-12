@@ -9,6 +9,7 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
 /// A single DMA channel definition.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaChannelDef {
     /// The name of the peripheral singleton for this channel.
     pub name: String,
@@ -43,6 +44,7 @@ pub struct DmaChannelDef {
 
 /// A peripheral instance that can use a DMA engine.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaPeripheralInstance {
     /// The peripheral singleton name (e.g. `"SPI2"`, `"AES"`).
     pub name: String,
@@ -52,6 +54,7 @@ pub struct DmaPeripheralInstance {
 
 /// A single DMA engine with its channels.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
