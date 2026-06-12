@@ -8,7 +8,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, Mem2Mem},
+    dma::Mem2Mem,
     dma_buffers,
     main,
     time::Duration,
@@ -37,7 +37,7 @@ fn main() -> ! {
     };
 
     let mut mem2mem = mem2mem
-        .with_descriptors(rx_descriptors, tx_descriptors, BurstConfig::default())
+        .with_descriptors(rx_descriptors, tx_descriptors)
         .unwrap();
 
     for i in 0..size_of_val(tx_buffer) {

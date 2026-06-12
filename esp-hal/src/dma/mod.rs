@@ -561,7 +561,7 @@ macro_rules! dma_buffers_impl {
     ($size:expr, is_circular = $circular:tt) => {
         $crate::dma_buffers_impl!(
             $size,
-            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size(),
+            $crate::dma::max_compatible_chunk_size(),
             is_circular = $circular
         );
     };
