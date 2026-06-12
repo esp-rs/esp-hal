@@ -590,8 +590,6 @@ jobs:
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
 
-          espflash board-info
-
           ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
 
       - name: Clean up
@@ -632,7 +630,7 @@ jobs:
   # hil-build gates test compilation.  hil-gate gates device runs when ≥50% of
   # executed hil-run matrix legs fail.  hil-run-radio is informational only.
   ci-result:
-    if: ${{ !failure() }}
+    if: ${{ always() }}
     needs:
       - esp-hal
       - docs

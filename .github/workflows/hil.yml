@@ -294,8 +294,6 @@ jobs:
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
 
-          espflash board-info
-
           ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up
