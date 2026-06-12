@@ -27,15 +27,14 @@ extern crate alloc;
 
 fn init_heap() {
     cfg_select! {
-        any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c5, esp32c6, esp32c61, esp32p4) => {
+        esp32h2 => {
+            esp_alloc::heap_allocator!(size: 72 * 1024);
+        }
+        _ => {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 48 * 1024);
         }
-        esp32h2 => {
-            esp_alloc::heap_allocator!(size: 72 * 1024);
-        }
-        _ => {}
     }
 }
 
