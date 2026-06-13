@@ -382,6 +382,7 @@ pub mod dma {
             DmaError,
             DmaRxBuffer,
             DmaTxBuffer,
+            InternalMemoryCachelineAligned,
             NoBuffer,
             prepare_for_rx,
             prepare_for_tx,
@@ -760,8 +761,7 @@ pub mod dma {
 
         #[cfg(dma_can_access_psram)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
-        input_descriptors: [DmaDescriptor; 1],
-        output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
+        descriptors: InternalMemoryCachelineAligned<[DmaDescriptor; OUT_DESCR_COUNT + 1]>,
     }
 
     // The DMA descriptors prevent auto-implementing Sync and Send, but they can be treated as Send
@@ -801,8 +801,9 @@ pub mod dma {
 
                 #[cfg(dma_can_access_psram)]
                 unaligned_data_buffers: [const { None }; 2],
-                input_descriptors: [DmaDescriptor::EMPTY; 1],
-                output_descriptors: [DmaDescriptor::EMPTY; OUT_DESCR_COUNT],
+                descriptors: InternalMemoryCachelineAligned::new(
+                    [DmaDescriptor::EMPTY; OUT_DESCR_COUNT + 1],
+                ),
             }
         }
 
@@ -987,11 +988,12 @@ pub mod dma {
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
             let input_len = work_item.buffers.input.len();
+            let (input_dscr, output_dscr) = self.descriptors.get_mut().split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.
                 unwrap!(prepare_for_tx(
-                    &mut self.input_descriptors,
+                    input_dscr,
                     work_item.buffers.input,
                     BLOCK_SIZE,
                 ))
@@ -1005,7 +1007,7 @@ pub mod dma {
 
             let (output_buffer, rx_data_len) = unsafe {
                 prepare_for_rx(
-                    &mut self.output_descriptors,
+                    output_dscr,
                     #[cfg(dma_can_access_psram)]
                     &mut self.unaligned_data_buffers,
                     // Truncate data based on how much the TX buffer can read.

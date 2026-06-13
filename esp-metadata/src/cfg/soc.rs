@@ -32,6 +32,7 @@ use crate::{
 pub mod clock_tree;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SocConfig {
     #[serde(default)]
     pub peripherals: Vec<PeripheralDef>,
@@ -66,6 +67,7 @@ impl super::GenericProperty for SocConfig {
 
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct MemoryRange {
     pub name: String,
     #[serde(flatten)]
@@ -74,6 +76,7 @@ pub struct MemoryRange {
 
 /// Memory regions.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct MemoryMap {
     pub ranges: Vec<MemoryRange>,
 }
@@ -124,6 +127,7 @@ impl MemoryMap {
 
 /// Represents the clock sources and clock distribution tree in the SoC.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SystemClocks {
     clock_tree: Vec<ClockTreeItem>,
 
@@ -133,6 +137,7 @@ pub struct SystemClocks {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ClockGroup {
     group: String,
     clocks: Vec<ClockTreeItem>,
@@ -1194,6 +1199,7 @@ impl SystemClocks {
 /// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
 /// actual values.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Template {
     /// The name of the template. Other templates can substitute this template's value by using the
     /// `{{name}}` placeholder.
@@ -1212,6 +1218,7 @@ pub struct Template {
 /// `PeripheralClocks`. This way each peripheral clock signal can either simply use the defaults,
 /// or override them with custom values in case they don't fit the scheme for some reason.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PeripheralClock {
     /// The name of the peripheral clock signal. Usually specified as CamelCase. Also determines
     /// the value of the `peripheral` template parameter, by converting the name to snake_case.
@@ -1230,6 +1237,7 @@ pub struct PeripheralClock {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PeripheralClocks {
     pub(crate) templates: Vec<Template>,
     pub(crate) peripheral_clocks: Vec<PeripheralClock>,

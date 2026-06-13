@@ -265,18 +265,24 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 support_status = "partial"
 gdma_version = 2
 separate_in_out_interrupts = true
-max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
 engines = [
-    { name = "AHB_GDMA", drivers = ["sha", "spi_master", "i2s"], peripheral_instances = [
-        { name = "SPI2",      dma_id = 1 },
-        { name = "I2S0",      dma_id = 3 },
-        { name = "SHA",       dma_id = 7 },
-    ], channels = [
-        { name = "DMA_CH0", mem2mem = true, mem2mem_id = 4, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
-        { name = "DMA_CH1", mem2mem = true, mem2mem_id = 5, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
-    ] },
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        burst_sizes = [4, 16, 32],
+        drivers = ["sha", "spi_master", "i2s"],
+        peripheral_instances = [
+            { name = "SPI2", dma_id = 1 },
+            { name = "I2S0", dma_id = 3 },
+            { name = "SHA",  dma_id = 7 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 4, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, mem2mem_id = 5, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+        ]
+    },
 ]
 
 [device.ecc]

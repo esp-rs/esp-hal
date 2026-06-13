@@ -37,6 +37,16 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all
 //! configuration keys apply.
+//!
+//! ## Troubleshooting
+//!
+//! ### Connection failures on boards with a weak antenna or in a poor RF environment
+//!
+//! The default maximum TX power is 20 (5dBm) on the 0.25dBm scale. The optimal value is
+//! board-dependent: if connections are unreliable, try adjusting it via
+//! `WifiController::set_max_tx_power` (requires the `unstable` feature) using a value in the
+//! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
+//! authentication failures on some hardware, so setting it to the maximum is not always better.
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
@@ -2081,7 +2091,10 @@ impl CountryInfo {
             // TODO: these may be valid defaults, but they should be configurable.
             schan: 1,
             nchan: 13,
-            max_tx_power: 20,
+            // This field is output-only: esp_wifi_set_country ignores it. The actual TX power
+            // is controlled exclusively via esp_wifi_set_max_tx_power after WiFi start.
+            // See: https://github.com/espressif/esp-idf/blob/20f5e18/components/esp_wifi/include/esp_wifi_types.h#L46
+            max_tx_power: 0,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
 
             #[cfg(wifi_has_5g)]
@@ -2383,6 +2396,9 @@ impl<'d> WifiController<'d> {
         controller.set_power_saving(PowerSaveMode::default())?;
 
         controller.set_config(&config.initial_config)?;
+
+        // Set a default TX power
+        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(20) })?;
 
         Ok(controller)
     }
@@ -2801,7 +2817,10 @@ ignored."
 
     /// Set maximum transmitting power after WiFi start.
     ///
-    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. The default is
+    /// 20 (5dBm). Values above roughly 65 (~16dBm) have been reported to cause authentication
+    /// failures on some hardware. See the
+    /// [module-level troubleshooting section](self#troubleshooting) for details.
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })

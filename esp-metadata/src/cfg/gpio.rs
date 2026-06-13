@@ -15,6 +15,7 @@ use crate::{
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
 /// These don't get turned into symbols, but are used to generate code.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GpioPinsAndSignals {
     /// The list of GPIO pins and their properties.
     pub pins: Vec<PinConfig>,
@@ -120,6 +121,7 @@ impl std::fmt::Display for PinLimitation {
 
 /// Properties of a single GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
@@ -186,6 +188,7 @@ impl PinConfig {
 /// listed in [device.gpio.input_signals] or [device.gpio.output_signals].
 /// `None` means the pin does not provide the given alternate function.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct FunctionMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -224,6 +227,7 @@ impl FunctionMap {
 
 /// Available analog functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AnalogMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -258,6 +262,7 @@ impl AnalogMap {
 
 /// Available RTC/LP functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct LowPowerMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -298,6 +303,7 @@ impl LowPowerMap {
 /// signal does not have an Alternate Function and must be routed through the
 /// GPIO matrix.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct IoMuxSignal {
     /// The name of the signal.
     pub name: String,

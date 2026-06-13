@@ -219,13 +219,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = run_radio_test_elf(
-                &elf_path,
-                harness_path.as_deref(),
-                120,
-                None,
-                &args.chip.to_string(),
-            ) {
+            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {
@@ -254,13 +248,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = run_radio_test_elf(
-                &elf_path,
-                harness_path.as_deref(),
-                120,
-                None,
-                &args.chip.to_string(),
-            ) {
+            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {

@@ -1,9 +1,9 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
 //! The following wiring is assumed:
-//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5)
-//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5)
-//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5)
+//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5, c61)
+//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5, c61)
+//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5, c61)
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -12,7 +12,7 @@
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
 
-//% CHIP_FILTER: dma_can_access_psram && !esp32p4
+//% CHIP_FILTER: dma_can_access_psram
 
 #![no_std]
 #![no_main]
@@ -68,6 +68,7 @@ fn main() -> ! {
 
     let dma_channel = cfg_select! {
         feature = "esp32s2" => peripherals.DMA_SPI2,
+        feature = "esp32p4" => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 

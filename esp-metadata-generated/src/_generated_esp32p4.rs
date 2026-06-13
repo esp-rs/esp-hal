@@ -67,20 +67,11 @@ macro_rules! property {
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
-    ("dma.can_access_psram") => {
-        true
-    };
     ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
         true
-    };
-    ("dma.max_priority") => {
-        5
-    };
-    ("dma.max_priority", str) => {
-        stringify!(5)
     };
     ("dma.gdma_version") => {
         2

@@ -9,6 +9,7 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
 /// A single DMA channel definition.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaChannelDef {
     /// The name of the peripheral singleton for this channel.
     pub name: String,
@@ -43,6 +44,7 @@ pub struct DmaChannelDef {
 
 /// A peripheral instance that can use a DMA engine.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaPeripheralInstance {
     /// The peripheral singleton name (e.g. `"SPI2"`, `"AES"`).
     pub name: String,
@@ -52,16 +54,32 @@ pub struct DmaPeripheralInstance {
 
 /// A single DMA engine with its channels.
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DmaEngineDef {
     /// The name of the engine (e.g. `"AHB_GDMA"`, `"SPI_DMA"`, `"I2S_DMA"`).
     pub name: String,
+
+    #[serde(default)]
+    pub max_priority: Option<u32>,
+
+    /// Configurable internal RAM burst sizes, when they differ from external RAM.
+    #[serde(default)]
+    #[expect(dead_code)]
+    pub internal_ram_burst_sizes: Vec<u32>,
+
+    /// Configurable burst sizes, when supported. Implies `can_access_psram = true`.
+    #[serde(default)]
+    pub burst_sizes: Vec<u32>,
+
     /// Driver config names whose peripherals can use this engine
     /// (e.g. `"aes"`, `"sha"`, `"spi_master"`, `"spi_slave"`, `"rmt"`).
     #[serde(default)]
     pub drivers: Vec<String>,
+
     /// DMA-capable peripheral instances for this engine, with their selector IDs.
     #[serde(default)]
     pub peripheral_instances: Vec<DmaPeripheralInstance>,
+
     /// The channels belonging to this engine.
     pub channels: Vec<DmaChannelDef>,
 }
@@ -107,6 +125,10 @@ impl DmaEngines {
         }
         Ok(())
     }
+
+    fn max_priority(&self) -> Option<u32> {
+        self.0.iter().flat_map(|e| e.max_priority).max()
+    }
 }
 
 impl GenericProperty for DmaEngines {
@@ -136,6 +158,18 @@ impl GenericProperty for DmaEngines {
                     cfgs.push(format!("{}_dma_engine = \"{}\"", driver, engine.name));
                 }
             }
+        }
+
+        if self.0.iter().any(|engine| !engine.burst_sizes.is_empty()) {
+            // TODO: this symbol encodes whether _any_ engine can access PSRAM
+            // and can be used to enable relevant API.
+            cfgs.push("dma.can_access_psram".to_string());
+        }
+
+        // TODO: temporary
+        if let Some(max_priority) = self.max_priority() {
+            cfgs.push(format!("dma.max_priority=\"{}\"", max_priority));
+            cfgs.push("dma.max_priority_is_set".to_string());
         }
 
         Some(cfgs)
