@@ -12,7 +12,9 @@
 pub mod master;
 
 #[cfg(i2c_slave_driver_supported)]
-pub mod slave;
+crate::unstable_module! {
+    pub mod slave;
+}
 
 #[cfg(soc_has_lp_i2c0)]
 crate::unstable_module! {
