@@ -1310,6 +1310,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "hmac_driver_supported",
                     "i2c_master_driver_supported",
+                    "i2c_slave_driver_supported",
                     "i2s_driver_supported",
                     "interrupts_driver_supported",
                     "io_mux_driver_supported",
@@ -1335,6 +1336,7 @@ impl Chip {
                     "adc_adc1",
                     "adc_adc2",
                     "i2c_master_i2c0",
+                    "i2c_slave_i2c0",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -1538,6 +1540,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=hmac_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
+                    "cargo:rustc-cfg=i2c_slave_driver_supported",
                     "cargo:rustc-cfg=i2s_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=io_mux_driver_supported",
@@ -1563,6 +1566,7 @@ impl Chip {
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
                     "cargo:rustc-cfg=i2c_master_i2c0",
+                    "cargo:rustc-cfg=i2c_slave_i2c0",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -2584,6 +2588,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "hmac_driver_supported",
                     "i2c_master_driver_supported",
+                    "i2c_slave_driver_supported",
                     "i2s_driver_supported",
                     "ieee802154_driver_supported",
                     "interrupts_driver_supported",
@@ -2615,6 +2620,7 @@ impl Chip {
                     "wifi_driver_supported",
                     "adc_adc1",
                     "i2c_master_i2c0",
+                    "i2c_slave_i2c0",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -2875,6 +2881,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=hmac_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
+                    "cargo:rustc-cfg=i2c_slave_driver_supported",
                     "cargo:rustc-cfg=i2s_driver_supported",
                     "cargo:rustc-cfg=ieee802154_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
@@ -2906,6 +2913,7 @@ impl Chip {
                     "cargo:rustc-cfg=wifi_driver_supported",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=i2c_master_i2c0",
+                    "cargo:rustc-cfg=i2c_slave_i2c0",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -6785,8 +6793,10 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_device)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tsens)");
     println!("cargo:rustc-check-cfg=cfg(hmac_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_slave_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(uhci_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_serial_jtag_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_slave_i2c0)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ecb)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cbc)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ofb)");
