@@ -139,6 +139,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Sample machine load/memory/swap for the whole job, to gauge whether the
+      # shared Mac has headroom for additional self-hosted runners.
+      - name: Start runner metrics
+        uses: ./.github/actions/runner-metrics
+        with:
+          mode: start
+
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         if: matrix.group.toolchain == 'esp'
@@ -168,6 +175,13 @@ jobs:
           for chip in $CHIPS; do
             cargo xcheck ci "$chip" --toolchain "$TOOLCHAIN" --no-lint --no-docs
           done
+
+      - name: Report runner metrics
+        if: always()
+        uses: ./.github/actions/runner-metrics
+        with:
+          mode: report
+          name: ${{ matrix.group.toolchain }}
 
   docs:
     needs: calculate

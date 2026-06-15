@@ -1,0 +1,165 @@
+name: Runner metrics
+description: >
+  Sample CPU load / memory / swap on a self-hosted runner during a job, then
+  publish a utilization verdict to the job summary and a CSV+JSON artifact.
+  Used to decide whether the shared machine has headroom for more runners.
+
+inputs:
+  mode:
+    description: '"start" to begin sampling, "report" to stop, summarize and upload.'
+    required: true
+  name:
+    description: Suffix for the uploaded artifact (make it unique per matrix leg).
+    required: false
+    default: ${{ github.job }}
+  interval:
+    description: Seconds between samples.
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    # ----------------------------------------------------------------- start ---
+    - name: Start runner metrics sampler
+      if: ${{ inputs.mode == 'start' }}
+      shell: bash
+      env:
+        RM_INTERVAL: ${{ inputs.interval }}
+      run: |
+        set -e
+        # A unique dir per run: the sampler PID and samples must never collide
+        # with a previous (or concurrent) job on this long-lived machine, or
+        # `report` could read stale data and kill an unrelated process.
+        DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/runner-metrics.XXXXXX")"
+
+        # Static machine facts, captured once.
+        NCPU="$(sysctl -n hw.ncpu)"
+        PCPU="$(sysctl -n hw.physicalcpu 2>/dev/null || echo "$NCPU")"
+        MEM_GB="$(awk -v b="$(sysctl -n hw.memsize)" 'BEGIN{printf "%.1f", b/1024/1024/1024}')"
+        {
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "ncpu=$NCPU"
+          echo "physicalcpu=$PCPU"
+          echo "mem_total_gb=$MEM_GB"
+        } > "$DIR/info.env"
+
+        nohup bash "$GITHUB_ACTION_PATH/sampler.sh" "$DIR" "${RM_INTERVAL:-5}" >/dev/null 2>&1 &
+        echo $! > "$DIR/sampler.pid"
+        disown || true
+
+        echo "RUNNER_METRICS_DIR=$DIR" >> "$GITHUB_ENV"
+        echo "Started runner metrics sampler (pid $(cat "$DIR/sampler.pid"), every ${RM_INTERVAL:-5}s) on ${RUNNER_NAME:-unknown}"
+
+    # ---------------------------------------------------------------- report ---
+    - name: Stop sampler and summarize
+      if: ${{ inputs.mode == 'report' }}
+      id: report
+      shell: bash
+      env:
+        RM_NAME: ${{ inputs.name }}
+      run: |
+        set +e
+        # Only ever act on the dir this job's `start` step created. Without it
+        # there is nothing to report — never fall back to a shared path, which
+        # could hold stale samples or a PID belonging to another process.
+        DIR="${RUNNER_METRICS_DIR:-}"
+        if [ -z "$DIR" ] || [ ! -d "$DIR" ]; then
+          echo "Runner metrics unavailable — the sampler was not started in this job." >> "$GITHUB_STEP_SUMMARY"
+          echo "has_data=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # Stop the background sampler.
+        if [ -f "$DIR/sampler.pid" ]; then
+          kill "$(cat "$DIR/sampler.pid")" 2>/dev/null
+        fi
+
+        CSV="$DIR/samples.csv"
+        if [ ! -f "$CSV" ] || [ "$(wc -l < "$CSV")" -le 1 ]; then
+          echo "No runner metrics samples were collected (job ended before sampling, or sampler failed)." >> "$GITHUB_STEP_SUMMARY"
+          echo "has_data=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # Static facts written by `start`: runner_name, ncpu, physicalcpu,
+        # mem_total_gb. Parse as data — never source this file. It lives under
+        # the runner temp area that other job steps (build.rs, etc.) can write
+        # to, and sourcing would let a tampered file run arbitrary code.
+        info() { awk -F= -v k="$1" '$1==k{sub(/^[^=]*=/,"");print;exit}' "$DIR/info.env" 2>/dev/null; }
+        runner_name="$(info runner_name)"
+        ncpu="$(info ncpu)"
+        physicalcpu="$(info physicalcpu)"
+        mem_total_gb="$(info mem_total_gb)"
+
+        # Coerce the numeric facts so a missing/garbled file can't break the
+        # JSON record or the load math below.
+        case "$ncpu" in ''|*[!0-9]*) ncpu=1 ;; esac
+        [ "$ncpu" -lt 1 ] && ncpu=1
+        case "$physicalcpu" in ''|*[!0-9]*) physicalcpu=0 ;; esac
+        case "$mem_total_gb" in ''|*[!0-9.]*) mem_total_gb=0 ;; esac
+
+        # n avgload maxload avgmem maxmem maxswap duration_s
+        read -r N AVGL MAXL AVGM MAXM MAXS DUR < <(awk -F, '
+          NR>1 {
+            n++;
+            ls+=$2; if($2>lmax)lmax=$2;
+            ms+=$3; if($3>mmax)mmax=$3;
+            if($4>smax)smax=$4;
+            if(n==1)t0=$1; t1=$1;
+          }
+          END {
+            if(n==0){ print "0 0 0 0 0 0 0"; }
+            else printf "%d %.2f %.2f %.1f %.1f %.0f %d", n, ls/n, lmax, ms/n, mmax, smax, t1-t0;
+          }' "$CSV")
+
+        AVGLPC="$(awk -v l="$AVGL" -v c="$ncpu" 'BEGIN{if(c>0)printf "%.0f", l/c*100; else print 0}')"
+        MAXLPC="$(awk -v l="$MAXL" -v c="$ncpu" 'BEGIN{if(c>0)printf "%.0f", l/c*100; else print 0}')"
+        DURMIN="$(awk -v d="$DUR" 'BEGIN{printf "%.1f", d/60}')"
+
+        # Auto-verdict: swap is the unambiguous red flag; otherwise judge by how
+        # close average load got to the core count.
+        if awk -v s="$MAXS" 'BEGIN{exit !(s>100)}'; then
+          VERDICT="⚠️ **Memory-bound** — swap was in use with a single job. Adding runners would make this worse."
+        elif awk -v p="$AVGLPC" 'BEGIN{exit !(p>=85)}'; then
+          VERDICT="🔴 **CPU-saturated** — one job already keeps the cores busy. An extra concurrent runner is unlikely to improve throughput."
+        elif awk -v p="$AVGLPC" 'BEGIN{exit !(p<=60)}'; then
+          VERDICT="🟢 **Headroom available** — sustained load is well below core count and swap is idle. A second runner could overlap idle phases (toolchain install, linking, network)."
+        else
+          VERDICT="🟡 **Moderate utilization** — some headroom, but not large. Collect a few more runs before deciding."
+        fi
+
+        # Machine-readable summary for the future cross-run aggregation script.
+        printf '{"runner":"%s","label":"%s","ncpu":%s,"physicalcpu":%s,"mem_total_gb":%s,"samples":%s,"duration_s":%s,"load_avg":%s,"load_max":%s,"load_avg_pct_core":%s,"load_max_pct_core":%s,"mem_avg_pct":%s,"mem_max_pct":%s,"swap_max_mb":%s,"run_id":"%s","job":"%s"}\n' \
+          "${runner_name:-unknown}" "${RM_NAME:-job}" "$ncpu" "${physicalcpu:-0}" "${mem_total_gb:-0}" \
+          "$N" "$DUR" "$AVGL" "$MAXL" "$AVGLPC" "$MAXLPC" "$AVGM" "$MAXM" "$MAXS" \
+          "${GITHUB_RUN_ID:-0}" "${GITHUB_JOB:-job}" > "$DIR/summary.json"
+
+        # Human-readable job summary.
+        {
+          echo "### 🖥️ Self-hosted runner utilization — \`${runner_name:-unknown}\` (${RM_NAME:-job})"
+          echo ""
+          echo "Monitored **${DURMIN} min** · ${N} samples · **${ncpu}** logical cores (${physicalcpu:-?} physical) · ${mem_total_gb:-?} GB RAM"
+          echo ""
+          echo "| Metric | Avg | Peak |"
+          echo "| --- | ---: | ---: |"
+          echo "| Load (1-min) | ${AVGL} | ${MAXL} |"
+          echo "| Load as % of cores | ${AVGLPC}% | ${MAXLPC}% |"
+          echo "| Memory used | ${AVGM}% | ${MAXM}% |"
+          echo "| Swap used | — | ${MAXS} MB |"
+          echo ""
+          echo "${VERDICT}"
+          echo ""
+          echo "<sub>Load ≈ core count → CPU saturated by one job. Load well below core count with ~0 swap → room for another runner. Monitoring starts after checkout, so very early setup is excluded.</sub>"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        echo "has_data=true" >> "$GITHUB_OUTPUT"
+
+    - name: Upload runner metrics artifact
+      if: ${{ inputs.mode == 'report' && steps.report.outputs.has_data == 'true' }}
+      uses: actions/upload-artifact@v6
+      with:
+        name: runner-metrics-${{ inputs.name }}-${{ github.run_id }}
+        path: ${{ env.RUNNER_METRICS_DIR }}
+        if-no-files-found: ignore
+        overwrite: true
