@@ -6,12 +6,12 @@ use core::{
 };
 
 use super::*;
-use crate::soc::is_slice_in_dram;
 #[cfg(dma_can_access_psram)]
 use crate::{
     dma::aligned::InternalMemoryBuffer,
     soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address},
 };
+use crate::{dma::aligned::InternalMemoryMut, soc::is_slice_in_dram};
 
 pub(crate) mod scoped;
 pub(crate) use scoped::*;
@@ -391,6 +391,16 @@ pub struct DmaTxBuf(ScopedDmaTxBuf<'static>);
 
 impl DmaTxBuf {
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
+    pub fn new_internal_memory(
+        descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        // TODO: TX buffers don't need to be cacheline aligned.
+        buffer: InternalMemoryMut<'static, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        // TODO: this is the stronger guarantee, this should be the callee
+        Self::new(descriptors.into_mut(), buffer.into_mut())
+    }
+
+    /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
     /// Depending on alignment requirements, each descriptor can handle at most
@@ -503,6 +513,15 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 pub struct DmaRxBuf(ScopedDmaRxBuf<'static>);
 
 impl DmaRxBuf {
+    /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
+    pub fn new_internal_memory(
+        descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        buffer: InternalMemoryMut<'static, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        // TODO: this is the stronger guarantee, this should be the callee
+        Self::new(descriptors.into_mut(), buffer.into_mut())
+    }
+
     /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -633,6 +652,20 @@ pub struct DmaRxTxBuf {
 }
 
 impl DmaRxTxBuf {
+    /// Creates a new [DmaRxTxBuf] from some descriptors and a buffer.
+    pub fn new_internal_memory(
+        rx_descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        tx_descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        buffer: InternalMemoryMut<'static, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        // TODO: this is the stronger guarantee, this should be the callee
+        Self::new(
+            rx_descriptors.into_mut(),
+            tx_descriptors.into_mut(),
+            buffer.into_mut(),
+        )
+    }
+
     /// Creates a new [DmaRxTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -895,6 +928,16 @@ pub struct DmaRxStreamBuf {
 }
 
 impl DmaRxStreamBuf {
+    /// Creates a new [DmaRxStreamBuf] evenly distributing the buffer between
+    /// the provided descriptors.
+    pub fn new_internal_memory(
+        descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        buffer: InternalMemoryMut<'static, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        // TODO: this is the stronger guarantee, this should be the callee
+        Self::new(descriptors.into_mut(), buffer.into_mut())
+    }
+
     /// Creates a new [DmaRxStreamBuf] evenly distributing the buffer between
     /// the provided descriptors.
     pub fn new(
@@ -1197,6 +1240,15 @@ pub struct DmaTxStreamBuf {
 }
 
 impl DmaTxStreamBuf {
+    /// Creates a new [DmaTxStreamBuf] from some descriptors and a buffer.
+    pub fn new_internal_memory(
+        descriptors: InternalMemoryMut<'static, [DmaDescriptor]>,
+        buffer: InternalMemoryMut<'static, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        // TODO: this is the stronger guarantee, this should be the callee
+        Self::new(descriptors.into_mut(), buffer.into_mut())
+    }
+
     /// Creates a new [DmaTxStreamBuf] evenly distributing the buffer between
     /// the provided descriptors.
     pub fn new(

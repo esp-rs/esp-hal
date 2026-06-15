@@ -382,8 +382,8 @@ pub mod dma {
             DmaError,
             DmaRxBuffer,
             DmaTxBuffer,
-            InternalMemoryCachelineAligned,
             NoBuffer,
+            aligned::InternalMemory,
             prepare_for_rx,
             prepare_for_tx,
         },
@@ -761,7 +761,7 @@ pub mod dma {
 
         #[cfg(dma_can_access_psram)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
-        descriptors: InternalMemoryCachelineAligned<[DmaDescriptor; OUT_DESCR_COUNT + 1]>,
+        descriptors: InternalMemory<[DmaDescriptor; OUT_DESCR_COUNT + 1]>,
     }
 
     // The DMA descriptors prevent auto-implementing Sync and Send, but they can be treated as Send
@@ -801,9 +801,7 @@ pub mod dma {
 
                 #[cfg(dma_can_access_psram)]
                 unaligned_data_buffers: [const { None }; 2],
-                descriptors: InternalMemoryCachelineAligned::new(
-                    [DmaDescriptor::EMPTY; OUT_DESCR_COUNT + 1],
-                ),
+                descriptors: InternalMemory::new([DmaDescriptor::EMPTY; OUT_DESCR_COUNT + 1]),
             }
         }
 
@@ -988,7 +986,7 @@ pub mod dma {
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
             let input_len = work_item.buffers.input.len();
-            let (input_dscr, output_dscr) = self.descriptors.get_mut().split_at_mut(1);
+            let (input_dscr, output_dscr) = self.descriptors.get_mut().into_mut().split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.

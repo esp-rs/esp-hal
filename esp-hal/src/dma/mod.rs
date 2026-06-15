@@ -66,6 +66,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    dma::aligned::InternalMemoryMut,
     interrupt::InterruptHandler,
     soc::is_slice_in_dram,
     system::{Cpu, PeripheralGuard},
@@ -316,10 +317,10 @@ pub const CHUNK_SIZE: usize = 4092;
 #[macro_export]
 macro_rules! dma_buffers {
     ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE);
     };
     ($size:expr) => {
-        $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_buffers!($size, $size)
     };
 }
 
@@ -344,7 +345,7 @@ macro_rules! dma_circular_buffers {
     };
 
     ($size:expr) => {
-        $crate::dma_circular_buffers_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_circular_buffers!($size, $size)
     };
 }
 
@@ -368,7 +369,7 @@ macro_rules! dma_descriptors {
     };
 
     ($size:expr) => {
-        $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_descriptors!($size, $size)
     };
 }
 
@@ -387,12 +388,10 @@ macro_rules! dma_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
-    ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
-    };
+    ($rx_size:expr, $tx_size:expr) => {{ $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE) }};
 
     ($size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_circular_descriptors!($size, $size)
     };
 }
 
@@ -413,7 +412,16 @@ macro_rules! dma_circular_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx_buf, rx_desc, tx_buf, tx_desc) =
+            $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false);
+        (
+            rx_buf.into_mut(),
+            rx_desc.into_mut(),
+            tx_buf.into_mut(),
+            tx_desc.into_mut(),
+        )
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
@@ -437,7 +445,16 @@ macro_rules! dma_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx_buf, rx_desc, tx_buf, tx_desc) =
+            $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true);
+        (
+            rx_buf.into_mut(),
+            rx_desc.into_mut(),
+            tx_buf.into_mut(),
+            tx_desc.into_mut(),
+        )
+    }};
 
     ($size:expr, $chunk_size:expr) => {{ $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size) }};
 }
@@ -457,7 +474,11 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx, tx) =
+            $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false);
+        (rx.into_mut(), tx.into_mut())
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
@@ -480,7 +501,11 @@ macro_rules! dma_descriptors_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx, tx) =
+            $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true);
+        (rx.into_mut(), tx.into_mut())
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
@@ -542,7 +567,7 @@ macro_rules! dma_descriptors_impl {
         static DESCRIPTORS: ConstStaticCell<InternalMemory<[DmaDescriptor; COUNT]>> =
             ConstStaticCell::new(InternalMemory::new([DmaDescriptor::EMPTY; COUNT]));
 
-        DESCRIPTORS.take().get_mut()
+        DESCRIPTORS.take().get_mut().unsize()
     }};
 }
 
@@ -581,7 +606,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, is_circular = false);
 
-        $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
+        $crate::dma::DmaTxBuf::new_internal_memory(tx_descriptors, tx_buffer)
     }};
 }
 
@@ -611,7 +636,7 @@ macro_rules! dma_rx_stream_buffer {
         let (buffer, descriptors) =
             $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = false);
 
-        $crate::dma::DmaRxStreamBuf::new(descriptors, buffer).unwrap()
+        $crate::dma::DmaRxStreamBuf::new_internal_memory(descriptors, buffer).unwrap()
     }};
 }
 
@@ -641,7 +666,7 @@ macro_rules! dma_tx_stream_buffer {
         let (buffer, descriptors) =
             $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = false);
 
-        $crate::dma::DmaTxStreamBuf::new(descriptors, buffer).unwrap()
+        $crate::dma::DmaTxStreamBuf::new_internal_memory(descriptors, buffer).unwrap()
     }};
 }
 
@@ -666,7 +691,7 @@ macro_rules! dma_loop_buffer {
 
         let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size, is_circular = false);
 
-        $crate::dma::DmaLoopBuf::new(&mut descriptors[0], buffer).unwrap()
+        $crate::dma::DmaLoopBuf::new_internal_memory(&mut descriptors[0], buffer).unwrap()
     }};
 }
 
@@ -741,13 +766,14 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct DescriptorSet<'a> {
-    descriptors: &'a mut [DmaDescriptor],
+    descriptors: InternalMemoryMut<'a, [DmaDescriptor]>,
 }
 
 impl<'a> DescriptorSet<'a> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
     fn new(descriptors: &'a mut [DmaDescriptor]) -> Result<Self, DmaBufError> {
+        // FIXME: we should verify that the size of the slice is also cacheline aligned
         if !is_slice_in_dram(descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
@@ -765,12 +791,14 @@ impl<'a> DescriptorSet<'a> {
     /// The caller must ensure that the descriptors are located in a supported
     /// memory region.
     unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor]) -> Self {
-        Self { descriptors }
+        Self {
+            descriptors: unsafe { InternalMemoryMut::new_unchecked(descriptors) },
+        }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
     fn into_inner(self) -> &'a mut [DmaDescriptor] {
-        self.descriptors
+        self.descriptors.into_mut()
     }
 
     /// Returns a pointer to the first descriptor in the chain.
@@ -814,7 +842,7 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         chunk_size: usize,
     ) -> Result<(), DmaBufError> {
-        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size, false)
+        Self::set_up_buffer_ptrs(buffer, &mut self.descriptors, chunk_size, false)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -826,7 +854,7 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         prepare: fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaBufError> {
-        Self::set_up_descriptors(self.descriptors, len, chunk_size, false, prepare)
+        Self::set_up_descriptors(&mut self.descriptors, len, chunk_size, false, prepare)
     }
 
     /// Prepares descriptors for reading `len` bytes of data.
