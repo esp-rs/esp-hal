@@ -40,7 +40,7 @@ pub enum Run {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
-        description = "Run all ELFs in a folder using probe-rs",
+        description = "Run all ELFs in a folder using probe-rs. Use --elfs binary or binary::test_name to filter which ELFs/tests run.",
         command = "run elfs"
     )
 )]
@@ -51,7 +51,8 @@ pub struct RunElfsArgs {
     pub chip: Chip,
     /// Path to the ELFs.
     pub path: PathBuf,
-    /// Optional list of elfs to execute
+    /// Optional list of ELFs to execute. Use `binary::test_name` to run a single
+    /// embedded-test case inside a matching ELF.
     #[arg(long, value_delimiter = ',')]
     pub elfs: Vec<String>,
 }
@@ -143,12 +144,8 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
 /// Run all (or filtered) ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-    let filters: Vec<String> = args
-        .elfs
-        .iter()
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let filters = parse_elf_filters(&args.elfs)?;
+    let mut filter_matched = vec![false; filters.len()];
 
     let mut elfs = Vec::<(String, PathBuf)>::new();
     for entry in fs::read_dir(&args.path)
@@ -186,12 +183,26 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         let elf_name = elf_name.clone();
         let elf_path = elf_path.clone();
 
-        if !filters.is_empty() && !filters.iter().any(|f| elf_name.to_lowercase().contains(f)) {
+        // Match the ELF against the requested selectors. The part before `::`
+        // selects the binary, the part after is forwarded to the device as an
+        // embedded-test filter (first matching selector wins).
+        let elf_name_lower = elf_name.to_lowercase();
+        let mut matched = false;
+        let mut test_filter = None;
+        for (filter, used) in filters.iter().zip(filter_matched.iter_mut()) {
+            if elf_name_lower.contains(&filter.binary) {
+                *used = true;
+                matched = true;
+                test_filter = test_filter.or(filter.test_filter.as_deref());
+            }
+        }
+
+        if !filters.is_empty() && !matched {
             log::info!(
                 "Skipping test '{}' for '{}' (does not match filters: {:?})",
                 elf_name,
                 args.chip,
-                filters,
+                filters.iter().map(|f| f.raw.as_str()).collect::<Vec<_>>(),
             );
             continue;
         }
@@ -219,7 +230,9 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
+            if let Err(e) =
+                run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
+            {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {
@@ -248,7 +261,9 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None) {
+            if let Err(e) =
+                run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
+            {
                 failed.push(elf_name.clone());
                 log::error!("Radio test '{}' failed: {}", elf_name, e);
             } else {
@@ -258,12 +273,13 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         }
 
         // Use standard probe-rs runner for non-radio tests.
-        let status = Command::new("probe-rs")
-            .arg("run")
-            .arg(&elf_path)
-            .arg("--verify")
-            .status()
-            .context("Failed to execute probe-rs")?;
+        let mut command = Command::new("probe-rs");
+        command.arg("run").arg(&elf_path).arg("--verify");
+        if let Some(test_filter) = test_filter {
+            command.arg(test_filter);
+        }
+
+        let status = command.status().context("Failed to execute probe-rs")?;
 
         log::info!("'{}' done", elf_name);
 
@@ -272,11 +288,64 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         }
     }
 
+    let unmatched = filters
+        .iter()
+        .zip(&filter_matched)
+        .filter(|(_, matched)| !**matched)
+        .map(|(filter, _)| filter.raw.as_str())
+        .collect::<Vec<_>>();
+    if !unmatched.is_empty() {
+        bail!(
+            "ELF selector did not match any artifact: {}",
+            unmatched.join(", ")
+        );
+    }
+
     if !failed.is_empty() {
         bail!("Failed tests: {:?}", failed);
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ElfFilter {
+    raw: String,
+    binary: String,
+    test_filter: Option<String>,
+}
+
+fn parse_elf_filters(raw_filters: &[String]) -> Result<Vec<ElfFilter>> {
+    let mut filters = Vec::new();
+    for raw in raw_filters {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+
+        let (binary, test_filter) = match raw.split_once("::") {
+            Some((binary, test_filter)) => {
+                let test_filter = test_filter.trim();
+                if test_filter.is_empty() {
+                    bail!("Empty test filter in ELF selector '{raw}' is not allowed");
+                }
+                (binary, Some(test_filter.to_string()))
+            }
+            None => (raw, None),
+        };
+
+        let binary = binary.trim().to_lowercase();
+        if binary.is_empty() {
+            bail!("Empty binary filter in ELF selector '{raw}' is not allowed");
+        }
+
+        filters.push(ElfFilter {
+            raw: raw.to_string(),
+            binary,
+            test_filter,
+        });
+    }
+    Ok(filters)
 }
 
 fn load_radio_tests_for_chip(chip: Chip) -> Result<Vec<Metadata>> {
@@ -423,4 +492,47 @@ pub fn run_examples(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn parses_binary_filter() {
+        let filters = parse_elf_filters(&strings(&[" misc_non_drivers "])).unwrap();
+
+        assert_eq!(
+            filters,
+            vec![ElfFilter {
+                raw: "misc_non_drivers".to_string(),
+                binary: "misc_non_drivers".to_string(),
+                test_filter: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_binary_test_filter() {
+        let filters = parse_elf_filters(&strings(&["radio_basic::test_scan_doesnt_leak"])).unwrap();
+
+        assert_eq!(
+            filters,
+            vec![ElfFilter {
+                raw: "radio_basic::test_scan_doesnt_leak".to_string(),
+                binary: "radio_basic".to_string(),
+                test_filter: Some("test_scan_doesnt_leak".to_string()),
+            }]
+        );
+    }
+
+    #[test]
+    fn rejects_empty_binary_or_test_filters() {
+        assert!(parse_elf_filters(&strings(&["::test_name"])).is_err());
+        assert!(parse_elf_filters(&strings(&["misc_non_drivers::"])).is_err());
+    }
 }

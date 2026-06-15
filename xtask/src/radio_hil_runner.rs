@@ -94,6 +94,7 @@ pub fn run_radio_test_elf(
     harness_binary_path: Option<&Path>,
     timeout_secs: u64,
     probes: Option<String>,
+    test_filter: Option<&str>,
 ) -> Result<()> {
     if !dut_binary_path.exists() {
         bail!("DUT binary not found: {}", dut_binary_path.display());
@@ -142,7 +143,7 @@ pub fn run_radio_test_elf(
         None
     };
 
-    let mut dut_child = spawn_probe_run("DUT", dut_binary_path, dut_probe)?;
+    let mut dut_child = spawn_probe_run("DUT", dut_binary_path, dut_probe, test_filter)?;
     let timeout = Duration::from_secs(timeout_secs);
     let start = Instant::now();
     let dut_passed = loop {
@@ -294,14 +295,29 @@ fn runner_env_key(target: &str) -> String {
     )
 }
 
-fn spawn_probe_run(name: &str, binary_path: &Path, probe: &str) -> Result<Child> {
+fn spawn_probe_run(
+    name: &str,
+    binary_path: &Path,
+    probe: &str,
+    test_filter: Option<&str>,
+) -> Result<Child> {
+    let filter_suffix = test_filter
+        .map(|filter| format!(" {filter}"))
+        .unwrap_or_default();
     log::info!(
-        "[{name}] probe-rs run --preverify --probe {probe} {}",
-        binary_path.display()
+        "[{name}] probe-rs run --preverify --probe {probe} {}{}",
+        binary_path.display(),
+        filter_suffix,
     );
-    Command::new("probe-rs")
+    let mut command = Command::new("probe-rs");
+    command
         .args(["run", "--preverify", "--probe", probe])
-        .arg(binary_path)
+        .arg(binary_path);
+    if let Some(test_filter) = test_filter {
+        command.arg(test_filter);
+    }
+
+    command
         .spawn()
         .map_err(|e| anyhow!("[{name}] failed to spawn probe-rs run: {e}"))
 }
