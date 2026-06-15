@@ -1,0 +1,16 @@
+[target.riscv32imac-unknown-none-elf]
+runner = "probe-rs run --chip=esp32c6 --preverify --always-print-stacktrace --no-location"
+
+[env]
+DEFMT_LOG="debug"
+
+[build]
+rustflags = [
+  # Required to obtain backtraces (e.g. when using the "esp-backtrace" crate.)
+  # NOTE: May negatively impact performance of produced code
+  "-C", "force-frame-pointers",
+]
+target = "riscv32imac-unknown-none-elf"
+
+[unstable]
+build-std = ["core"]

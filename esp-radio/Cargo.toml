@@ -106,7 +106,7 @@ embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
 embassy-net-driver-02 = { package = "embassy-net-driver", version = "0.2.0", optional = true }
-bt-hci = { version = "0.8.0", optional = true }
+bt-hci = { version = "0.9.0", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt = { version = "1.0.1", optional = true }
@@ -137,12 +137,12 @@ __has_unstable_feature_enabled = []
 ## - `pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8`
 ## - `pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8`
 ## - `pub extern "C" fn get_free_internal_heap_size() -> usize;`
-## 
+##
 ## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
 esp-alloc = ["dep:esp-alloc"]
 
 ## Outputs logs from the pre-compiled Wi-Fi and BLE driver blobs at info level.
-## 
+##
 ## ⚠️ This feature is considered unstable.
 print-logs-from-driver = [
     "__has_unstable_feature_enabled",

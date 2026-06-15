@@ -39,7 +39,7 @@ impl From<InvalidConfigError> for BleInitError {
 #[instability::unstable]
 pub struct BleConnector<'d> {
     _phy_init_guard: PhyInitGuard<'d>,
-    _device: crate::hal::peripherals::BT<'d>,
+    _device: Option<&'static mut crate::hal::peripherals::BT<'static>>,
     _guard: RadioRefGuard,
 }
 
@@ -52,7 +52,7 @@ impl<'d> BleConnector<'d> {
     /// Create and init a new BLE connector.
     #[instability::unstable]
     pub fn new(
-        device: crate::hal::peripherals::BT<'d>,
+        device: &'static mut crate::hal::peripherals::BT<'static>,
         config: Config,
     ) -> Result<BleConnector<'d>, BleInitError> {
         let _guard = RadioRefGuard::new();
@@ -61,9 +61,25 @@ impl<'d> BleConnector<'d> {
 
         Ok(Self {
             _phy_init_guard: crate::ble::ble_init(&config),
-            _device: device,
+            _device: Some(device),
             _guard,
         })
+    }
+    /// Hacky attempts at reviving BLE on esp32c6
+    pub fn give_us_back_the_peripheral(&mut self) -> &'static mut crate::hal::peripherals::BT<'static> {
+        let device = self._device.take().unwrap();
+        device
+    }
+
+    /// Ble doesn't advertise after light sleep on C6
+    pub fn hacky_ble_reinit() {
+        crate::ble::ble_deinit();
+        crate::ble::ble_init(&crate::ble::Config::default());
+    }
+
+    /// Ble doesn't advertise after light sleep on C6
+    pub fn hacky_ble_deinit() {
+        crate::ble::ble_deinit();
     }
 
     /// Read the next HCI packet from the BLE controller.

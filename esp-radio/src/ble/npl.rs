@@ -1272,6 +1272,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    debug!("-------- Deinitialize BLE");
     #[cfg(rng_trng_supported)]
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()

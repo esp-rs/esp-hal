@@ -1245,7 +1245,7 @@ where
     ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::In);
 
-        debug!("Preparing RX transfer {:?}", preparation);
+        // debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
         #[cfg(dma_can_access_psram)]
@@ -1471,7 +1471,7 @@ where
     ) -> Result<(), DmaError> {
         debug_assert_eq!(preparation.direction, TransferDirection::Out);
 
-        debug!("Preparing TX transfer {:?}", preparation);
+        // debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
         #[cfg(dma_can_access_psram)]
