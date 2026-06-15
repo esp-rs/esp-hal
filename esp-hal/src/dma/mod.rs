@@ -313,37 +313,14 @@ pub const CHUNK_SIZE: usize = 4092;
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers {
     ($rx_size:expr, $tx_size:expr) => {
         $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
     ($size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
-    };
-}
-
-#[procmacros::doc_replace]
-/// Convenience macro to create circular DMA buffers and descriptors.
-///
-/// ## Usage
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::dma_circular_buffers;
-///
-/// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
-/// // and TX the same size.
-/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-///     dma_circular_buffers!(32000, 32000);
-/// # {after_snippet}
-/// ```
-#[macro_export]
-macro_rules! dma_circular_buffers {
-    ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_circular_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
-    };
-
-    ($size:expr) => {
-        $crate::dma_circular_buffers_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
 
@@ -361,6 +338,8 @@ macro_rules! dma_circular_buffers {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors {
     ($rx_size:expr, $tx_size:expr) => {
         $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
@@ -368,30 +347,6 @@ macro_rules! dma_descriptors {
 
     ($size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
-    };
-}
-
-#[procmacros::doc_replace]
-/// Convenience macro to create circular DMA descriptors.
-///
-/// ## Usage
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::dma_circular_descriptors;
-///
-/// // Create RX and TX descriptors for transactions up to 32000
-/// // bytes - passing only one parameter assumes RX and TX are the same size.
-/// let (rx_descriptors, tx_descriptors) = dma_circular_descriptors!(32000, 32000);
-/// # {after_snippet}
-/// ```
-#[macro_export]
-macro_rules! dma_circular_descriptors {
-    ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
-    };
-
-    ($size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
 
@@ -411,34 +366,14 @@ macro_rules! dma_circular_descriptors {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size) }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
     };
-}
-
-#[procmacros::doc_replace]
-/// Convenience macro to create circular DMA buffers and descriptors with
-/// specific chunk size.
-///
-/// ## Usage
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::dma_circular_buffers_chunk_size;
-///
-/// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
-/// // and TX the same size.
-/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
-/// # {after_snippet}
-/// ```
-#[macro_export]
-macro_rules! dma_circular_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
-
-    ($size:expr, $chunk_size:expr) => {{ $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size) }};
 }
 
 #[procmacros::doc_replace]
@@ -455,34 +390,13 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size) }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
-    };
-}
-
-#[procmacros::doc_replace]
-/// Convenience macro to create circular DMA descriptors with specific chunk
-/// size
-///
-/// ## Usage
-/// ```rust,no_run
-/// # {before_snippet}
-/// use esp_hal::dma_circular_descriptors_chunk_size;
-///
-/// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
-/// // only one parameter assumes RX and TX are the same size.
-/// let (rx_descriptors, tx_descriptors) = dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
-/// # {after_snippet}
-/// ```
-#[macro_export]
-macro_rules! dma_circular_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
-
-    ($size:expr, $chunk_size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
     };
 }
 
@@ -535,14 +449,16 @@ impl<const N: usize> InternalMemoryBuffer<N> {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_impl {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
-        let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = $circular);
-        let tx = $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = $circular);
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size);
+        let tx = $crate::dma_buffers_impl!($tx_size, $chunk_size);
         (rx.0, rx.1, tx.0, tx.1)
     }};
 
-    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($size:expr, $chunk_size:expr) => {{
         unsafe {
             (
                 {
@@ -553,37 +469,37 @@ macro_rules! dma_buffers_impl {
                     // be a single mutable reference to this buffer.
                     unsafe { BUFFER.get_mut() }
                 },
-                $crate::dma_descriptors_impl!($size, $chunk_size, is_circular = $circular),
+                $crate::dma_descriptors_impl!($size, $chunk_size),
             )
         }
     }};
 
-    ($size:expr, is_circular = $circular:tt) => {
+    ($size:expr) => {
         $crate::dma_buffers_impl!(
             $size,
-            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size(),
-            is_circular = $circular
+            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size()
         );
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors_impl {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
-        let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size, is_circular = $circular);
-        let tx = $crate::dma_descriptors_impl!($tx_size, $chunk_size, is_circular = $circular);
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size);
+        let tx = $crate::dma_descriptors_impl!($tx_size, $chunk_size);
         (rx, tx)
     }};
 
-    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($size:expr, $chunk_size:expr) => {{
         use $crate::{
             __macro_implementation::static_cell::ConstStaticCell,
             dma::{DmaDescriptor, InternalMemoryCachelineAligned},
         };
 
-        const COUNT: usize =
-            $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
+        const COUNT: usize = $crate::dma_descriptor_count!($size, $chunk_size);
 
         static DESCRIPTORS: ConstStaticCell<
             InternalMemoryCachelineAligned<[DmaDescriptor; COUNT]>,
@@ -597,8 +513,10 @@ macro_rules! dma_descriptors_impl {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptor_count {
-    ($size:expr, $chunk_size:expr, is_circular = $is_circular:tt) => {{
+    ($size:expr, $chunk_size:expr) => {{
         const {
             ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
             ::core::assert!($chunk_size > 0, "chunk size must be > 0");
@@ -608,7 +526,7 @@ macro_rules! dma_descriptor_count {
         if $size == 0 {
             0
         } else {
-            $crate::dma::descriptor_count($size, $chunk_size, $is_circular)
+            $crate::dma::descriptor_count($size, $chunk_size)
         }
     }};
 }
@@ -626,9 +544,11 @@ macro_rules! dma_descriptor_count {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
-        let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, is_circular = false);
+        let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size);
 
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
     }};
@@ -652,13 +572,14 @@ macro_rules! dma_tx_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_rx_stream_buffer {
     ($rx_size:expr) => {
         $crate::dma_rx_stream_buffer!($rx_size, 4095)
     };
     ($rx_size:expr, $chunk_size:expr) => {{
-        let (buffer, descriptors) =
-            $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = false);
+        let (buffer, descriptors) = $crate::dma_buffers_impl!($rx_size, $chunk_size);
 
         $crate::dma::DmaRxStreamBuf::new(descriptors, buffer).unwrap()
     }};
@@ -682,13 +603,14 @@ macro_rules! dma_rx_stream_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_tx_stream_buffer {
     ($tx_size:expr) => {
         $crate::dma_tx_stream_buffer!($tx_size, 4095)
     };
     ($tx_size:expr, $chunk_size:expr) => {{
-        let (buffer, descriptors) =
-            $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = false);
+        let (buffer, descriptors) = $crate::dma_buffers_impl!($tx_size, $chunk_size);
 
         $crate::dma::DmaTxStreamBuf::new(descriptors, buffer).unwrap()
     }};
@@ -706,6 +628,8 @@ macro_rules! dma_tx_stream_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_loop_buffer {
     ($size:expr) => {{
         const {
@@ -713,7 +637,7 @@ macro_rules! dma_loop_buffer {
             ::core::assert!($size > 0, "size must be > 0");
         }
 
-        let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size, is_circular = false);
+        let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size);
 
         $crate::dma::DmaLoopBuf::new(&mut descriptors[0], buffer).unwrap()
     }};
@@ -805,11 +729,7 @@ impl From<u32> for Owner {
 
 /// Computes the number of descriptors required for a given buffer size with
 /// a given chunk size.
-pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular: bool) -> usize {
-    if is_circular && buffer_size <= chunk_size * 2 {
-        return 3;
-    }
-
+pub const fn descriptor_count(buffer_size: usize, chunk_size: usize) -> usize {
     if buffer_size < chunk_size {
         // At least one descriptor is always required.
         return 1;
@@ -894,7 +814,7 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         chunk_size: usize,
     ) -> Result<(), DmaBufError> {
-        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size, false)
+        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -906,7 +826,7 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         prepare: fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaBufError> {
-        Self::set_up_descriptors(self.descriptors, len, chunk_size, false, prepare)
+        Self::set_up_descriptors(self.descriptors, len, chunk_size, prepare)
     }
 
     /// Prepares descriptors for reading `len` bytes of data.
@@ -932,10 +852,9 @@ impl<'a> DescriptorSet<'a> {
         descriptors: &mut [DmaDescriptor],
         len: usize,
         chunk_size: usize,
-        is_circular: bool,
     ) -> Result<&mut [DmaDescriptor], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
-        let required_descriptors = descriptor_count(len, chunk_size, is_circular);
+        let required_descriptors = descriptor_count(len, chunk_size);
         if descriptors.len() < required_descriptors {
             return Err(DmaBufError::InsufficientDescriptors);
         }
@@ -953,18 +872,12 @@ impl<'a> DescriptorSet<'a> {
         descriptors: &mut [DmaDescriptor],
         len: usize,
         chunk_size: usize,
-        is_circular: bool,
         prepare: impl Fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaBufError> {
-        let descriptors =
-            Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
+        let descriptors = Self::descriptors_for_buffer_len(descriptors, len, chunk_size)?;
 
         // Link up the descriptors.
-        let mut next = if is_circular {
-            descriptors.as_mut_ptr()
-        } else {
-            core::ptr::null_mut()
-        };
+        let mut next = core::ptr::null_mut();
         for desc in descriptors.iter_mut().rev() {
             desc.next = next;
             next = desc;
@@ -997,10 +910,8 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         descriptors: &mut [DmaDescriptor],
         chunk_size: usize,
-        is_circular: bool,
     ) -> Result<(), DmaBufError> {
-        let descriptors =
-            Self::descriptors_for_buffer_len(descriptors, buffer.len(), chunk_size, is_circular)?;
+        let descriptors = Self::descriptors_for_buffer_len(descriptors, buffer.len(), chunk_size)?;
 
         let chunks = buffer.chunks_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks) {
