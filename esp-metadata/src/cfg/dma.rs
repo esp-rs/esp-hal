@@ -155,7 +155,7 @@ impl GenericProperty for DmaEngines {
             for driver in &engine.drivers {
                 if seen.insert(driver.clone()) {
                     cfgs.push(format!("{}.supports_dma", driver));
-                    cfgs.push(format!("{}_dma_engine = \"{}\"", driver, engine.name));
+                    cfgs.push(format!("{}_dma_engine=\"{}\"", driver, engine.name));
                 }
             }
         }
