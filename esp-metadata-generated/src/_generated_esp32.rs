@@ -442,8 +442,14 @@ macro_rules! for_each_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_dma_engine!(("SPI_DMA"));
-        _for_each_inner_dma_engine!(("I2S_DMA"));
-        _for_each_inner_dma_engine!((all("SPI_DMA"), ("I2S_DMA")));
+        _for_each_inner_dma_engine!(("I2S_DMA")); _for_each_inner_dma_engine!(("SPI_DMA",
+        single, burst = SpiDmaBurst, bursts = [(Disabled, 0), (Size4, 4)]));
+        _for_each_inner_dma_engine!(("I2S_DMA", single, burst = I2sDmaBurst, bursts =
+        [(Disabled, 0), (Size4, 4)])); _for_each_inner_dma_engine!((all("SPI_DMA"),
+        ("I2S_DMA"))); _for_each_inner_dma_engine!((priorities));
+        _for_each_inner_dma_engine!((bursts("SPI_DMA", single, burst = SpiDmaBurst,
+        bursts = [(Disabled, 0), (Size4, 4)]), ("I2S_DMA", single, burst = I2sDmaBurst,
+        bursts = [(Disabled, 0), (Size4, 4)])));
     };
 }
 #[macro_export]

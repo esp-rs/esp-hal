@@ -66,158 +66,19 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    dma::aligned::InternalMemoryMut,
     interrupt::InterruptHandler,
     soc::is_slice_in_dram,
     system::{Cpu, PeripheralGuard},
 };
 
+pub mod aligned;
 mod buffers;
 #[cfg(dma_supports_mem2mem)]
 mod m2m;
 
 mod engine;
 pub use engine::*;
-
-trait Word: crate::private::Sealed {}
-
-macro_rules! impl_word {
-    ($w:ty) => {
-        impl $crate::private::Sealed for $w {}
-        impl Word for $w {}
-    };
-}
-
-impl_word!(u8);
-impl_word!(u16);
-impl_word!(u32);
-impl_word!(i8);
-impl_word!(i16);
-impl_word!(i32);
-
-impl<W, const S: usize> crate::private::Sealed for [W; S] where W: Word {}
-
-impl<W, const S: usize> crate::private::Sealed for &[W; S] where W: Word {}
-
-impl<W> crate::private::Sealed for &[W] where W: Word {}
-
-impl<W> crate::private::Sealed for &mut [W] where W: Word {}
-
-/// Trait for buffers that can be given to DMA for reading.
-///
-/// # Safety
-///
-/// Once the `read_buffer` method has been called, it is unsafe to call any
-/// `&mut self` methods on this object as long as the returned value is in use
-/// (by DMA).
-pub unsafe trait ReadBuffer {
-    /// Provide a buffer usable for DMA reads.
-    ///
-    /// The return value is:
-    ///
-    /// - pointer to the start of the buffer
-    /// - buffer size in bytes
-    ///
-    /// # Safety
-    ///
-    /// Once this method has been called, it is unsafe to call any `&mut self`
-    /// methods on this object as long as the returned value is in use (by DMA).
-    unsafe fn read_buffer(&self) -> (*const u8, usize);
-}
-
-unsafe impl<W, const S: usize> ReadBuffer for [W; S]
-where
-    W: Word,
-{
-    unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(self))
-    }
-}
-
-unsafe impl<W, const S: usize> ReadBuffer for &[W; S]
-where
-    W: Word,
-{
-    unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
-    }
-}
-
-unsafe impl<W, const S: usize> ReadBuffer for &mut [W; S]
-where
-    W: Word,
-{
-    unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
-    }
-}
-
-unsafe impl<W> ReadBuffer for &[W]
-where
-    W: Word,
-{
-    unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
-    }
-}
-
-unsafe impl<W> ReadBuffer for &mut [W]
-where
-    W: Word,
-{
-    unsafe fn read_buffer(&self) -> (*const u8, usize) {
-        (self.as_ptr() as *const u8, core::mem::size_of_val(*self))
-    }
-}
-
-/// Trait for buffers that can be given to DMA for writing.
-///
-/// # Safety
-///
-/// Once the `write_buffer` method has been called, it is unsafe to call any
-/// `&mut self` methods, except for `write_buffer`, on this object as long as
-/// the returned value is in use (by DMA).
-pub unsafe trait WriteBuffer {
-    /// Provide a buffer usable for DMA writes.
-    ///
-    /// The return value is:
-    ///
-    /// - pointer to the start of the buffer
-    /// - buffer size in bytes
-    ///
-    /// # Safety
-    ///
-    /// Once this method has been called, it is unsafe to call any `&mut self`
-    /// methods, except for `write_buffer`, on this object as long as the
-    /// returned value is in use (by DMA).
-    unsafe fn write_buffer(&mut self) -> (*mut u8, usize);
-}
-
-unsafe impl<W, const S: usize> WriteBuffer for [W; S]
-where
-    W: Word,
-{
-    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(self))
-    }
-}
-
-unsafe impl<W, const S: usize> WriteBuffer for &mut [W; S]
-where
-    W: Word,
-{
-    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(*self))
-    }
-}
-
-unsafe impl<W> WriteBuffer for &mut [W]
-where
-    W: Word,
-{
-    unsafe fn write_buffer(&mut self) -> (*mut u8, usize) {
-        (self.as_mut_ptr() as *mut u8, core::mem::size_of_val(*self))
-    }
-}
 
 bitfield::bitfield! {
     /// DMA descriptor flags.
@@ -456,10 +317,10 @@ pub const CHUNK_SIZE: usize = 4092;
 #[macro_export]
 macro_rules! dma_buffers {
     ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE);
     };
     ($size:expr) => {
-        $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_buffers!($size, $size)
     };
 }
 
@@ -484,7 +345,7 @@ macro_rules! dma_circular_buffers {
     };
 
     ($size:expr) => {
-        $crate::dma_circular_buffers_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_circular_buffers!($size, $size)
     };
 }
 
@@ -508,7 +369,7 @@ macro_rules! dma_descriptors {
     };
 
     ($size:expr) => {
-        $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_descriptors!($size, $size)
     };
 }
 
@@ -527,12 +388,10 @@ macro_rules! dma_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
-    ($rx_size:expr, $tx_size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
-    };
+    ($rx_size:expr, $tx_size:expr) => {{ $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE) }};
 
     ($size:expr) => {
-        $crate::dma_circular_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_circular_descriptors!($size, $size)
     };
 }
 
@@ -553,7 +412,16 @@ macro_rules! dma_circular_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx_buf, rx_desc, tx_buf, tx_desc) =
+            $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false);
+        (
+            rx_buf.into_mut(),
+            rx_desc.into_mut(),
+            tx_buf.into_mut(),
+            tx_desc.into_mut(),
+        )
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
@@ -577,7 +445,16 @@ macro_rules! dma_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx_buf, rx_desc, tx_buf, tx_desc) =
+            $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true);
+        (
+            rx_buf.into_mut(),
+            rx_desc.into_mut(),
+            tx_buf.into_mut(),
+            tx_desc.into_mut(),
+        )
+    }};
 
     ($size:expr, $chunk_size:expr) => {{ $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size) }};
 }
@@ -597,7 +474,11 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx, tx) =
+            $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false);
+        (rx.into_mut(), tx.into_mut())
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
@@ -620,58 +501,15 @@ macro_rules! dma_descriptors_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx, tx) =
+            $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true);
+        (rx.into_mut(), tx.into_mut())
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
     };
-}
-
-// ESP32-P4 internal memory is cached, enforce alignment to avoid memory
-// corruption. Technically only needed for IN buffers and descriptor lists.
-#[cfg_attr(soc_internal_memory_cached, repr(C, align(64)))] // dcache cache line
-#[doc(hidden)]
-pub struct InternalMemoryCachelineAligned<T>(T);
-
-impl<T> InternalMemoryCachelineAligned<T> {
-    pub const fn new(init: T) -> Self {
-        Self(init)
-    }
-
-    pub const fn get(&self) -> &T {
-        &self.0
-    }
-
-    pub const fn get_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
-// ESP32 requires word alignment for DMA buffers.
-// ESP32-S2 technically supports byte-aligned DMA buffers, but the
-// transfer ends up writing out of bounds.
-#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(4)))]
-#[doc(hidden)]
-pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
-
-impl<const N: usize> Default for InternalMemoryBuffer<N> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const N: usize> InternalMemoryBuffer<N> {
-    pub const fn new() -> Self {
-        Self(InternalMemoryCachelineAligned::new([0u8; N]))
-    }
-
-    pub const fn get(&self) -> &[u8] {
-        self.0.get()
-    }
-
-    pub const fn get_mut(&mut self) -> &mut [u8] {
-        self.0.get_mut()
-    }
 }
 
 #[doc(hidden)]
@@ -688,8 +526,8 @@ macro_rules! dma_buffers_impl {
             (
                 {
                     #[allow(unused_braces)]
-                    static mut BUFFER: $crate::dma::InternalMemoryBuffer<{ $size }> =
-                        $crate::dma::InternalMemoryBuffer::new();
+                    static mut BUFFER: $crate::dma::aligned::InternalMemoryBuffer<{ $size }> =
+                        $crate::dma::aligned::InternalMemoryBuffer::new();
                     // SAFETY: The ConstStaticCell in the descriptor part ensures there will only
                     // be a single mutable reference to this buffer.
                     unsafe { BUFFER.get_mut() }
@@ -702,7 +540,7 @@ macro_rules! dma_buffers_impl {
     ($size:expr, is_circular = $circular:tt) => {
         $crate::dma_buffers_impl!(
             $size,
-            $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size(),
+            $crate::dma::max_compatible_chunk_size(),
             is_circular = $circular
         );
     };
@@ -720,19 +558,16 @@ macro_rules! dma_descriptors_impl {
     ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
         use $crate::{
             __macro_implementation::static_cell::ConstStaticCell,
-            dma::{DmaDescriptor, InternalMemoryCachelineAligned},
+            dma::{DmaDescriptor, aligned::InternalMemory},
         };
 
         const COUNT: usize =
             $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
-        static DESCRIPTORS: ConstStaticCell<
-            InternalMemoryCachelineAligned<[DmaDescriptor; COUNT]>,
-        > = ConstStaticCell::new(InternalMemoryCachelineAligned::new(
-            [DmaDescriptor::EMPTY; COUNT],
-        ));
+        static DESCRIPTORS: ConstStaticCell<InternalMemory<[DmaDescriptor; COUNT]>> =
+            ConstStaticCell::new(InternalMemory::new([DmaDescriptor::EMPTY; COUNT]));
 
-        DESCRIPTORS.take().get_mut()
+        DESCRIPTORS.take().get_mut().unsize()
     }};
 }
 
@@ -771,7 +606,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, is_circular = false);
 
-        $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
+        $crate::dma::DmaTxBuf::new_internal_memory(tx_descriptors, tx_buffer)
     }};
 }
 
@@ -801,7 +636,7 @@ macro_rules! dma_rx_stream_buffer {
         let (buffer, descriptors) =
             $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = false);
 
-        $crate::dma::DmaRxStreamBuf::new(descriptors, buffer).unwrap()
+        $crate::dma::DmaRxStreamBuf::new_internal_memory(descriptors, buffer).unwrap()
     }};
 }
 
@@ -831,7 +666,7 @@ macro_rules! dma_tx_stream_buffer {
         let (buffer, descriptors) =
             $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = false);
 
-        $crate::dma::DmaTxStreamBuf::new(descriptors, buffer).unwrap()
+        $crate::dma::DmaTxStreamBuf::new_internal_memory(descriptors, buffer).unwrap()
     }};
 }
 
@@ -856,7 +691,7 @@ macro_rules! dma_loop_buffer {
 
         let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size, is_circular = false);
 
-        $crate::dma::DmaLoopBuf::new(&mut descriptors[0], buffer).unwrap()
+        $crate::dma::DmaLoopBuf::new_internal_memory(&mut descriptors[0], buffer).unwrap()
     }};
 }
 
@@ -895,37 +730,6 @@ impl From<DmaBufError> for DmaError {
     }
 }
 
-/// DMA Priorities
-#[cfg(dma_max_priority_is_set)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaPriority {
-    /// The lowest priority level (Priority 0).
-    Priority0 = 0,
-    /// Priority level 1.
-    Priority1 = 1,
-    /// Priority level 2.
-    Priority2 = 2,
-    /// Priority level 3.
-    Priority3 = 3,
-    /// Priority level 4.
-    Priority4 = 4,
-    /// Priority level 5.
-    Priority5 = 5,
-    /// Priority level 6.
-    #[cfg(dma_max_priority = "9")]
-    Priority6 = 6,
-    /// Priority level 7.
-    #[cfg(dma_max_priority = "9")]
-    Priority7 = 7,
-    /// Priority level 8.
-    #[cfg(dma_max_priority = "9")]
-    Priority8 = 8,
-    /// Priority level 9.
-    #[cfg(dma_max_priority = "9")]
-    Priority9 = 9,
-}
-
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
@@ -962,13 +766,14 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct DescriptorSet<'a> {
-    descriptors: &'a mut [DmaDescriptor],
+    descriptors: InternalMemoryMut<'a, [DmaDescriptor]>,
 }
 
 impl<'a> DescriptorSet<'a> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
     fn new(descriptors: &'a mut [DmaDescriptor]) -> Result<Self, DmaBufError> {
+        // FIXME: we should verify that the size of the slice is also cacheline aligned
         if !is_slice_in_dram(descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
@@ -986,12 +791,14 @@ impl<'a> DescriptorSet<'a> {
     /// The caller must ensure that the descriptors are located in a supported
     /// memory region.
     unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor]) -> Self {
-        Self { descriptors }
+        Self {
+            descriptors: unsafe { InternalMemoryMut::new_unchecked(descriptors) },
+        }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
     fn into_inner(self) -> &'a mut [DmaDescriptor] {
-        self.descriptors
+        self.descriptors.into_mut()
     }
 
     /// Returns a pointer to the first descriptor in the chain.
@@ -1035,7 +842,7 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         chunk_size: usize,
     ) -> Result<(), DmaBufError> {
-        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size, false)
+        Self::set_up_buffer_ptrs(buffer, &mut self.descriptors, chunk_size, false)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -1047,7 +854,7 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         prepare: fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaBufError> {
-        Self::set_up_descriptors(self.descriptors, len, chunk_size, false, prepare)
+        Self::set_up_descriptors(&mut self.descriptors, len, chunk_size, false, prepare)
     }
 
     /// Prepares descriptors for reading `len` bytes of data.
@@ -1153,29 +960,6 @@ impl<'a> DescriptorSet<'a> {
     }
 }
 
-/// Block size for transfers to/from PSRAM
-#[cfg(dma_ext_mem_configurable_block_size)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DmaExtMemBKSize {
-    /// External memory block size of 16 bytes.
-    Size16 = 0,
-    /// External memory block size of 32 bytes.
-    Size32 = 1,
-    /// External memory block size of 64 bytes.
-    Size64 = 2,
-}
-
-#[cfg(dma_ext_mem_configurable_block_size)]
-impl From<ExternalBurstConfig> for DmaExtMemBKSize {
-    fn from(size: ExternalBurstConfig) -> Self {
-        match size {
-            ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
-            ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
-            ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
-        }
-    }
-}
-
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
@@ -1185,6 +969,10 @@ where
     CH: DmaRxChannel,
 {
     pub(crate) rx_impl: CH,
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1211,6 +999,7 @@ where
 
         Self {
             rx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1224,6 +1013,7 @@ where
         self.rx_impl.set_async(true);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1254,6 +1044,7 @@ where
         self.rx_impl.set_async(false);
         ChannelRx {
             rx_impl: self.rx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1265,10 +1056,10 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.rx_impl.set_priority(priority);
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
+        self.rx_impl.apply_config(config);
     }
 
     fn do_prepare(
@@ -1276,8 +1067,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::In);
-
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1286,10 +1075,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.rx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.rx_impl.set_burst_mode(preparation.burst_transfer);
+        self.rx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.rx_impl.set_descr_burst_mode(true);
         self.rx_impl.set_check_owner(preparation.check_owner);
 
@@ -1411,6 +1204,10 @@ where
     CH: DmaTxChannel,
 {
     pub(crate) tx_impl: CH,
+    /// Last-applied channel configuration, re-applied on every transfer (the
+    /// burst registers do not survive `reset()`) and kept across async/blocking
+    /// conversions.
+    pub(crate) config: CH::Config,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: Option<PeripheralGuard>,
 }
@@ -1431,6 +1228,7 @@ where
         tx_impl.set_async(false);
         Self {
             tx_impl,
+            config: CH::Config::default(),
             _phantom: PhantomData,
             _guard,
         }
@@ -1444,6 +1242,7 @@ where
         self.tx_impl.set_async(true);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1474,6 +1273,7 @@ where
         self.tx_impl.set_async(false);
         ChannelTx {
             tx_impl: self.tx_impl,
+            config: self.config,
             _phantom: PhantomData,
             _guard: self._guard,
         }
@@ -1485,16 +1285,16 @@ where
     Dm: DriverMode,
     CH: DmaTxChannel,
 {
+    /// Applies a complete configuration to this channel half.
+    pub fn apply_config(&mut self, config: &CH::Config) {
+        self.config = config.clone();
+        self.tx_impl.apply_config(config);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[allow(dead_code)]
     pub(crate) fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {
         self.tx_impl.runtime_ensure_compatible(peripheral);
-    }
-
-    /// Configure the channel priority.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx_impl.set_priority(priority);
     }
 
     fn do_prepare(
@@ -1502,8 +1302,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::Out);
-
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1512,10 +1310,14 @@ where
             return Err(DmaError::UnsupportedMemoryRegion);
         }
 
-        #[cfg(dma_ext_mem_configurable_block_size)]
-        self.tx_impl
-            .set_ext_mem_block_size(preparation.burst_transfer.external_memory.into());
-        self.tx_impl.set_burst_mode(preparation.burst_transfer);
+        self.tx_impl.prepare_burst(
+            &self.config,
+            preparation.max_alignment,
+            cfg_select! {
+                dma_can_access_psram => preparation.accesses_psram,
+                _ => false,
+            },
+        );
         self.tx_impl.set_descr_burst_mode(true);
         self.tx_impl.set_check_owner(preparation.check_owner);
         self.tx_impl
@@ -1616,6 +1418,46 @@ where
     }
 }
 
+/// Configuration for a full DMA channel (both halves).
+///
+/// Composes the per-half engine configurations, so the RX and TX halves can be
+/// configured independently (e.g. with different priorities) in a single value
+/// passed to [`Channel::apply_config`].
+pub struct DmaChannelConfig<CH: DmaChannel> {
+    /// Configuration for the RX (receive) half.
+    pub rx: <CH::Rx as RegisterAccess>::Config,
+    /// Configuration for the TX (transmit) half.
+    pub tx: <CH::Tx as RegisterAccess>::Config,
+}
+
+// Manual impls: deriving would wrongly require `CH: Default`/`Clone`/`Debug`.
+impl<CH: DmaChannel> Default for DmaChannelConfig<CH> {
+    fn default() -> Self {
+        Self {
+            rx: Default::default(),
+            tx: Default::default(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> Clone for DmaChannelConfig<CH> {
+    fn clone(&self) -> Self {
+        Self {
+            rx: self.rx.clone(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
+impl<CH: DmaChannel> core::fmt::Debug for DmaChannelConfig<CH> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DmaChannelConfig")
+            .field("rx", &self.rx)
+            .field("tx", &self.tx)
+            .finish()
+    }
+}
+
 /// DMA Channel
 #[non_exhaustive]
 pub struct Channel<Dm, CH>
@@ -1694,13 +1536,6 @@ where
         }
     }
 
-    /// Configure the channel priorities.
-    #[cfg(dma_max_priority_is_set)]
-    pub fn set_priority(&mut self, priority: DmaPriority) {
-        self.tx.set_priority(priority);
-        self.rx.set_priority(priority);
-    }
-
     /// Converts a blocking channel to an async channel.
     pub fn into_async(self) -> Channel<Async, CH> {
         Channel {
@@ -1710,11 +1545,20 @@ where
     }
 }
 
-impl<CH, Dm> Channel<Dm, CH>
+impl<Dm, CH> Channel<Dm, CH>
 where
-    CH: DmaChannel,
     Dm: DriverMode,
+    CH: DmaChannel,
 {
+    /// Applies a complete configuration to both halves of the channel.
+    ///
+    /// The RX and TX halves can be configured independently via the `rx` and
+    /// `tx` fields of [`DmaChannelConfig`].
+    pub fn apply_config(&mut self, config: &DmaChannelConfig<CH>) {
+        self.rx.apply_config(&config.rx);
+        self.tx.apply_config(&config.tx);
+    }
+
     /// Asserts that the channel is compatible with the given peripheral.
     #[instability::unstable]
     pub fn runtime_ensure_compatible(&self, peripheral: DmaPeripheral) {

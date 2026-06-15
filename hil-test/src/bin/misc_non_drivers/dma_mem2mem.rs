@@ -32,7 +32,7 @@ mod tests {
 
         let mut mem2mem = ctx
             .mem2mem
-            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
+            .with_descriptors(rx_descriptors, tx_descriptors)
             .unwrap();
 
         for i in 0..core::mem::size_of_val(tx_buffer) {
@@ -48,10 +48,7 @@ mod tests {
     #[test]
     fn test_mem2mem_errors_zero_tx(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(1024, 0);
-        match ctx
-            .mem2mem
-            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
-        {
+        match ctx.mem2mem.with_descriptors(rx_descriptors, tx_descriptors) {
             Err(DmaError::OutOfDescriptors) => (),
             _ => panic!("Expected OutOfDescriptors"),
         }
@@ -60,10 +57,7 @@ mod tests {
     #[test]
     fn test_mem2mem_errors_zero_rx(ctx: Context) {
         let (rx_descriptors, tx_descriptors) = dma_descriptors!(0, 1024);
-        match ctx
-            .mem2mem
-            .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
-        {
+        match ctx.mem2mem.with_descriptors(rx_descriptors, tx_descriptors) {
             Err(DmaError::OutOfDescriptors) => (),
             _ => panic!("Expected OutOfDescriptors"),
         }

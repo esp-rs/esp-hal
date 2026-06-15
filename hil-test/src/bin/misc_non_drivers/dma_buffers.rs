@@ -110,7 +110,7 @@ mod tests {
     fn test_dma_rx_stream_buf_insufficient_descriptors() {
         let (buffer, descriptors) =
             esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2, is_circular = false);
-        match DmaRxStreamBuf::new(descriptors, buffer) {
+        match DmaRxStreamBuf::new_internal_memory(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
         }
@@ -120,7 +120,7 @@ mod tests {
     fn test_dma_tx_stream_buf_insufficient_descriptors() {
         let (buffer, descriptors) =
             esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2, is_circular = false);
-        match DmaTxStreamBuf::new(descriptors, buffer) {
+        match DmaTxStreamBuf::new_internal_memory(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
         }
