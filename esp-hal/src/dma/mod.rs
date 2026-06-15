@@ -454,6 +454,8 @@ pub const CHUNK_SIZE: usize = 4092;
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers {
     ($rx_size:expr, $tx_size:expr) => {
         $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
@@ -477,6 +479,8 @@ macro_rules! dma_buffers {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors {
     ($rx_size:expr, $tx_size:expr) => {
         $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
@@ -503,6 +507,8 @@ macro_rules! dma_descriptors {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size) }};
 
@@ -525,6 +531,8 @@ macro_rules! dma_buffers_chunk_size {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size) }};
 
@@ -582,6 +590,8 @@ impl<const N: usize> InternalMemoryBuffer<N> {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_impl {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size);
@@ -615,6 +625,8 @@ macro_rules! dma_buffers_impl {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors_impl {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size);
@@ -642,6 +654,8 @@ macro_rules! dma_descriptors_impl {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptor_count {
     ($size:expr, $chunk_size:expr) => {{
         const {
@@ -671,6 +685,8 @@ macro_rules! dma_descriptor_count {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size);
@@ -697,6 +713,8 @@ macro_rules! dma_tx_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_rx_stream_buffer {
     ($rx_size:expr) => {
         $crate::dma_rx_stream_buffer!($rx_size, 4095)
@@ -726,6 +744,8 @@ macro_rules! dma_rx_stream_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_tx_stream_buffer {
     ($tx_size:expr) => {
         $crate::dma_tx_stream_buffer!($tx_size, 4095)
@@ -749,6 +769,8 @@ macro_rules! dma_tx_stream_buffer {
 /// # {after_snippet}
 /// ```
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_loop_buffer {
     ($size:expr) => {{
         const {
