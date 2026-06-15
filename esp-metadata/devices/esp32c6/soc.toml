@@ -490,7 +490,10 @@ support_status = "partial"
 fifo_size = 16
 
 [device.i2c_slave]
-support_status = { status = "not_supported", issue = 1909 }
+support_status = "supported"
+instances = [
+    { name = "i2c0" },
+]
 
 [device.interrupts]
 support_status = "partial"
