@@ -101,9 +101,11 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "std"))]
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(any(feature = "std", feature = "esp32p4")))]
 mod rom;
-#[cfg(not(feature = "std"))]
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(any(feature = "std", feature = "esp32p4")))]
 pub(crate) use rom as crypto;
 
 #[cfg(feature = "std")]
