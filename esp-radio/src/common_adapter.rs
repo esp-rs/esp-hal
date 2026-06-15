@@ -374,16 +374,17 @@ pub(crate) fn enable_wifi_power_domain() {
     // but leaves the modem power domain untouched, so without this the radio
     // would inherit whatever state the previously-used radio left.
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2) => {
+        not(wifi_mac_version = "1") => {
             regs!(MODEM_SYSCON).modem_rst_conf().modify(|_, w| {
                 w.rst_fe().set_bit();
                 w.rst_btbb().set_bit();
                 w.rst_btbb_apb().set_bit();
                 w.rst_btmac().set_bit();
                 w.rst_btmac_apb().set_bit();
+                #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().set_bit();
                 cfg_select! {
-                    not(esp32h2) => {
+                    soc_has_wifi => {
                         w.rst_wifibb().set_bit();
                         w.rst_wifimac().set_bit();
                     }
@@ -397,9 +398,10 @@ pub(crate) fn enable_wifi_power_domain() {
                 w.rst_btbb_apb().clear_bit();
                 w.rst_btmac().clear_bit();
                 w.rst_btmac_apb().clear_bit();
+                #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().clear_bit();
                 cfg_select! {
-                    not(esp32h2) => {
+                    soc_has_wifi => {
                         w.rst_wifibb().clear_bit();
                         w.rst_wifimac().clear_bit();
                     }
