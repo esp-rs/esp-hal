@@ -364,7 +364,8 @@ mod tests {
         use esp_hal::{
             aes::dma::AesDma,
             dma::{DmaRxBuf, DmaTxBuf},
-            dma_buffers,
+            dma_rx_buffer,
+            dma_tx_buffer,
         };
 
         struct Context<'a> {
@@ -421,9 +422,8 @@ mod tests {
 
         const DMA_BUFFER_SIZE: usize = 16;
 
-        let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let output = DmaRxBuf::new(rx_descriptors, output).unwrap();
-        let input = DmaTxBuf::new(tx_descriptors, input).unwrap();
+        let input = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let output = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 

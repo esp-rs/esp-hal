@@ -22,7 +22,8 @@ extern crate alloc;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    dma::ExternalBurstConfig,
+    dma_rx_buffer,
     main,
     spi::{
         Mode,
@@ -34,23 +35,30 @@ use log::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-macro_rules! dma_alloc_buffer {
+macro_rules! dma_alloc_tx_buffer {
     ($size:expr, $align:expr) => {{
-        let layout = core::alloc::Layout::from_size_align($size, $align).unwrap();
-        unsafe {
+        let layout = core::alloc::Layout::from_size_align($size, $align as usize).unwrap();
+        let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
                 error!("dma_alloc_buffer: alloc failed");
                 alloc::alloc::handle_alloc_error(layout);
             }
             core::slice::from_raw_parts_mut(ptr, $size)
-        }
+        };
+
+        const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
+        let descriptors = esp_hal::dma_descriptors_impl!($size, DMA_CHUNK_SIZE);
+        esp_hal::dma::DmaTxBuf::new_with_config(
+            descriptors,
+            unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
+            $align,
+        )
     }};
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
 const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
-const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[main]
 fn main() -> ! {
@@ -72,25 +80,8 @@ fn main() -> ! {
         _ => peripherals.DMA_CH0,
     };
 
-    let (_, tx_descriptors) =
-        esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-    let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-    info!(
-        "TX: {:p} len {} ({} descripters)",
-        tx_buffer.as_ptr(),
-        tx_buffer.len(),
-        tx_descriptors.len()
-    );
-    let mut dma_tx_buf =
-        DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
-    let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
-    info!(
-        "RX: {:p} len {} ({} descripters)",
-        rx_buffer.as_ptr(),
-        rx_buffer.len(),
-        rx_descriptors.len()
-    );
-    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
+    let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
     let mut spi = Spi::new(

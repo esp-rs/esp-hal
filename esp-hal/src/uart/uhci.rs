@@ -12,7 +12,8 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     dma::{DmaRxBuf, DmaTxBuf},
-//!     dma_buffers,
+//!     dma_rx_buffer,
+//!     dma_tx_buffer,
 //!     main,
 //!     rom::software_reset,
 //!     uart,
@@ -21,8 +22,6 @@
 //!
 //! #[main]
 //! fn main() -> ! {
-//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//!     let peripherals = esp_hal::init(config);
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
 //!
@@ -35,9 +34,8 @@
 //!         .with_tx(peripherals.GPIO2)
 //!         .with_rx(peripherals.GPIO3);
 //!
-//!     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
-//!     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-//!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+//!     let dma_rx = dma_rx_buffer!(4092).unwrap();
+//!     let mut dma_tx = dma_tx_buffer!(4092).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
 //!     uhci.apply_rx_config(

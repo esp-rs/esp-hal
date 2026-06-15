@@ -26,6 +26,7 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         DmaTxInterrupt,
+        aligned::DmaAlignedMut,
     },
 };
 
@@ -601,8 +602,8 @@ where
 enum State<'d, Dm: DriverMode> {
     Idle(
         Mem2Mem<'d, Dm>,
-        &'d mut [DmaDescriptor],
-        &'d mut [DmaDescriptor],
+        DmaAlignedMut<'d, [DmaDescriptor]>,
+        DmaAlignedMut<'d, [DmaDescriptor]>,
     ),
     Active(
         Mem2MemRxTransfer<'d, DmaRxBuf, Dm>,
@@ -625,6 +626,9 @@ where
         if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
             return Err(DmaError::OutOfDescriptors);
         }
+        let rx_descriptors = unsafe { DmaAlignedMut::new_unchecked(rx_descriptors) };
+        let tx_descriptors = unsafe { DmaAlignedMut::new_unchecked(tx_descriptors) };
+
         Ok(Self {
             state: State::Idle(mem2mem, rx_descriptors, tx_descriptors),
             config,
@@ -642,7 +646,7 @@ where
         rx_buffer: &mut [u8],
         tx_buffer: &[u8],
     ) -> Result<SimpleMem2MemTransfer<'_, 'd, Dm>, DmaError> {
-        let State::Idle(mem2mem, rx_descriptors, tx_descriptors) =
+        let State::Idle(mem2mem, mut rx_descriptors, mut tx_descriptors) =
             core::mem::replace(&mut self.state, State::InUse)
         else {
             panic!("SimpleMem2MemTransfer was forgotten with core::mem::forget or similar");
@@ -652,15 +656,26 @@ where
         // the user calls core::mem::forget on SimpleMem2MemTransfer. This is
         // just the unfortunate consequence of doing DMA without enforcing
         // 'static.
-        let rx_buffer =
-            unsafe { core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len()) };
-        let tx_buffer =
-            unsafe { core::slice::from_raw_parts_mut(tx_buffer.as_ptr() as _, tx_buffer.len()) };
+        let rx_buffer = DmaAlignedMut::new_slice(unsafe {
+            core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len())
+        })?;
+        let tx_buffer = unsafe {
+            DmaAlignedMut::new_unchecked(core::slice::from_raw_parts_mut(
+                tx_buffer.as_ptr() as _,
+                tx_buffer.len(),
+            ))
+        };
         let rx_descriptors = unsafe {
-            core::slice::from_raw_parts_mut(rx_descriptors.as_mut_ptr(), rx_descriptors.len())
+            DmaAlignedMut::new_unchecked(core::slice::from_raw_parts_mut(
+                rx_descriptors.as_mut_ptr(),
+                rx_descriptors.len(),
+            ))
         };
         let tx_descriptors = unsafe {
-            core::slice::from_raw_parts_mut(tx_descriptors.as_mut_ptr(), tx_descriptors.len())
+            DmaAlignedMut::new_unchecked(core::slice::from_raw_parts_mut(
+                tx_descriptors.as_mut_ptr(),
+                tx_descriptors.len(),
+            ))
         };
 
         // Note: The ESP32-S2 insists that RX is started before TX. Contrary to the TRM

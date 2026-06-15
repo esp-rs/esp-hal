@@ -66,11 +66,12 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    dma::aligned::DmaAlignedMut,
     interrupt::InterruptHandler,
-    soc::is_slice_in_dram,
     system::{Cpu, PeripheralGuard},
 };
 
+pub mod aligned;
 mod buffers;
 #[cfg(dma_supports_mem2mem)]
 mod m2m;
@@ -320,7 +321,7 @@ macro_rules! dma_buffers {
         $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
     ($size:expr) => {
-        $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_buffers!($size, $size)
     };
 }
 
@@ -346,7 +347,7 @@ macro_rules! dma_descriptors {
     };
 
     ($size:expr) => {
-        $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
+        $crate::dma_descriptors!($size, $size)
     };
 }
 
@@ -369,7 +370,16 @@ macro_rules! dma_descriptors {
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx_buf, rx_desc, tx_buf, tx_desc) =
+            $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size);
+        (
+            rx_buf.into_mut(),
+            rx_desc.into_mut(),
+            tx_buf.into_mut(),
+            tx_desc.into_mut(),
+        )
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
@@ -393,58 +403,14 @@ macro_rules! dma_buffers_chunk_size {
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size) }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+        let (rx, tx) = $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size);
+        (rx.into_mut(), tx.into_mut())
+    }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
     };
-}
-
-// ESP32-P4 internal memory is cached, enforce alignment to avoid memory
-// corruption. Technically only needed for IN buffers and descriptor lists.
-#[cfg_attr(soc_internal_memory_cached, repr(C, align(64)))] // dcache cache line
-#[doc(hidden)]
-pub struct InternalMemoryCachelineAligned<T>(T);
-
-impl<T> InternalMemoryCachelineAligned<T> {
-    pub const fn new(init: T) -> Self {
-        Self(init)
-    }
-
-    pub const fn get(&self) -> &T {
-        &self.0
-    }
-
-    pub const fn get_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
-// ESP32 requires word alignment for DMA buffers.
-// ESP32-S2 technically supports byte-aligned DMA buffers, but the
-// transfer ends up writing out of bounds.
-#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(4)))]
-#[doc(hidden)]
-pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
-
-impl<const N: usize> Default for InternalMemoryBuffer<N> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const N: usize> InternalMemoryBuffer<N> {
-    pub const fn new() -> Self {
-        Self(InternalMemoryCachelineAligned::new([0u8; N]))
-    }
-
-    pub const fn get(&self) -> &[u8] {
-        self.0.get()
-    }
-
-    pub const fn get_mut(&mut self) -> &mut [u8] {
-        self.0.get_mut()
-    }
 }
 
 #[doc(hidden)]
@@ -463,11 +429,11 @@ macro_rules! dma_buffers_impl {
             (
                 {
                     #[allow(unused_braces)]
-                    static mut BUFFER: $crate::dma::InternalMemoryBuffer<{ $size }> =
-                        $crate::dma::InternalMemoryBuffer::new();
+                    static mut BUFFER: $crate::dma::aligned::InternalMemory<[u8; { $size }]> =
+                        $crate::dma::aligned::InternalMemory::new([0; $size]);
                     // SAFETY: The ConstStaticCell in the descriptor part ensures there will only
                     // be a single mutable reference to this buffer.
-                    unsafe { BUFFER.get_mut() }
+                    unsafe { BUFFER.get_typed_mut().unsize() }
                 },
                 $crate::dma_descriptors_impl!($size, $chunk_size),
             )
@@ -496,18 +462,17 @@ macro_rules! dma_descriptors_impl {
     ($size:expr, $chunk_size:expr) => {{
         use $crate::{
             __macro_implementation::static_cell::ConstStaticCell,
-            dma::{DmaDescriptor, InternalMemoryCachelineAligned},
+            dma::{DmaDescriptor, aligned::InternalMemory},
         };
 
-        const COUNT: usize = $crate::dma_descriptor_count!($size, $chunk_size);
-
+        const __DMA_DESCRIPTOR_COUNT: usize = $crate::dma_descriptor_count!($size, $chunk_size);
         static DESCRIPTORS: ConstStaticCell<
-            InternalMemoryCachelineAligned<[DmaDescriptor; COUNT]>,
-        > = ConstStaticCell::new(InternalMemoryCachelineAligned::new(
-            [DmaDescriptor::EMPTY; COUNT],
+            InternalMemory<[DmaDescriptor; __DMA_DESCRIPTOR_COUNT]>,
+        > = ConstStaticCell::new(InternalMemory::new(
+            [DmaDescriptor::EMPTY; __DMA_DESCRIPTOR_COUNT],
         ));
 
-        DESCRIPTORS.take().get_mut()
+        DESCRIPTORS.take().get_typed_mut().unsize()
     }};
 }
 
@@ -532,6 +497,30 @@ macro_rules! dma_descriptor_count {
 }
 
 #[procmacros::doc_replace]
+/// Convenience macro to create a DmaRxBuf from buffer size. The buffer and
+/// descriptors are statically allocated and used to create the `DmaRxBuf`.
+///
+/// ## Usage
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_hal::dma_rx_buffer;
+///
+/// let rx_buf = dma_rx_buffer!(32000)?;
+/// # {after_snippet}
+/// ```
+#[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+macro_rules! dma_rx_buffer {
+    ($rx_size:expr) => {{
+        let (rx_buffer, rx_descriptors) = $crate::dma_buffers_impl!($rx_size);
+
+        // TODO: this macro should be infallible
+        $crate::dma::DmaRxBuf::new(rx_descriptors, rx_buffer)
+    }};
+}
+
+#[procmacros::doc_replace]
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
@@ -540,7 +529,7 @@ macro_rules! dma_descriptor_count {
 /// # {before_snippet}
 /// use esp_hal::dma_tx_buffer;
 ///
-/// let tx_buf = dma_tx_buffer!(32000);
+/// let tx_buf = dma_tx_buffer!(32000)?;
 /// # {after_snippet}
 /// ```
 #[macro_export]
@@ -550,6 +539,7 @@ macro_rules! dma_tx_buffer {
     ($tx_size:expr) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size);
 
+        // TODO: this macro should be infallible
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
     }};
 }
@@ -639,7 +629,7 @@ macro_rules! dma_loop_buffer {
 
         let (buffer, descriptors) = $crate::dma_buffers_impl!($size, $size);
 
-        $crate::dma::DmaLoopBuf::new(&mut descriptors[0], buffer).unwrap()
+        $crate::dma::DmaLoopBuf::new(descriptors, buffer).unwrap()
     }};
 }
 
@@ -735,26 +725,27 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize) -> usize {
         return 1;
     }
 
+    // TODO: we could round up to cacheline size to reduce memory waste on
+    // soc_internal_memory_cached devices.
     buffer_size.div_ceil(chunk_size)
 }
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct DescriptorSet<'a> {
-    descriptors: &'a mut [DmaDescriptor],
+    descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
 }
 
 impl<'a> DescriptorSet<'a> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
-    fn new(descriptors: &'a mut [DmaDescriptor]) -> Result<Self, DmaBufError> {
-        if !is_slice_in_dram(descriptors) {
+    fn new(descriptors: DmaAlignedMut<'a, [DmaDescriptor]>) -> Result<Self, DmaBufError> {
+        #[cfg(not(esp32p4))] // P4 can read descriptors from PSRAM
+        if !crate::soc::is_slice_in_dram(&descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        descriptors.fill(DmaDescriptor::EMPTY);
-
-        Ok(unsafe { Self::new_unchecked(descriptors) })
+        Ok(unsafe { Self::new_unchecked(descriptors.into_mut()) })
     }
 
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
@@ -765,11 +756,14 @@ impl<'a> DescriptorSet<'a> {
     /// The caller must ensure that the descriptors are located in a supported
     /// memory region.
     unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor]) -> Self {
-        Self { descriptors }
+        descriptors.fill(DmaDescriptor::EMPTY);
+        Self {
+            descriptors: unsafe { DmaAlignedMut::new_unchecked(descriptors) },
+        }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
-    fn into_inner(self) -> &'a mut [DmaDescriptor] {
+    fn into_inner(self) -> DmaAlignedMut<'a, [DmaDescriptor]> {
         self.descriptors
     }
 
@@ -814,7 +808,7 @@ impl<'a> DescriptorSet<'a> {
         buffer: &mut [u8],
         chunk_size: usize,
     ) -> Result<(), DmaBufError> {
-        Self::set_up_buffer_ptrs(buffer, self.descriptors, chunk_size)
+        Self::set_up_buffer_ptrs(buffer, &mut self.descriptors, chunk_size)
     }
 
     /// Prepares descriptors for transferring `len` bytes of data.
@@ -826,7 +820,7 @@ impl<'a> DescriptorSet<'a> {
         chunk_size: usize,
         prepare: fn(&mut DmaDescriptor, usize),
     ) -> Result<(), DmaBufError> {
-        Self::set_up_descriptors(self.descriptors, len, chunk_size, prepare)
+        Self::set_up_descriptors(&mut self.descriptors, len, chunk_size, prepare)
     }
 
     /// Prepares descriptors for reading `len` bytes of data.
@@ -1046,8 +1040,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::In);
-
         debug!("Preparing RX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 
@@ -1272,8 +1264,6 @@ where
         preparation: Preparation,
         peri: DmaPeripheral,
     ) -> Result<(), DmaError> {
-        debug_assert_eq!(preparation.direction, TransferDirection::Out);
-
         debug!("Preparing TX transfer {:?}", preparation);
         trace!("First descriptor {:?}", unsafe { &*preparation.start });
 

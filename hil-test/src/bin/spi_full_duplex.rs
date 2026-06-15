@@ -27,8 +27,10 @@ cfg_select! {
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
             gpio::{Level, NoPin},
-            dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
+            dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, aligned::DmaAlignedMut},
             dma_buffers,
+            dma_rx_buffer,
+            dma_tx_buffer,
             spi::master::SpiDma,
         };
 
@@ -531,9 +533,8 @@ mod tests {
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
@@ -565,9 +566,8 @@ mod tests {
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
@@ -599,8 +599,16 @@ mod tests {
     fn test_symmetric_dma_transfer(ctx: Context) {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
-        let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(
+            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+        )
+        .unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(
+            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
 
         for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
             *v = (i % 255) as u8;
@@ -630,9 +638,8 @@ mod tests {
     fn test_asymmetric_dma_transfer(ctx: Context) {
         const WRITE_SIZE: usize = 4;
         const READ_SIZE: usize = 2;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4, 4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
@@ -689,9 +696,8 @@ mod tests {
         }
 
         // Set up SPI
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         let miso_pulse_counter = set_up_pcnt!(ctx, miso_input);
 
@@ -712,9 +718,8 @@ mod tests {
     #[test]
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(128).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(128).unwrap();
 
         let mut spi = ctx
             .spi
@@ -775,9 +780,8 @@ mod tests {
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
         let mut spi = ctx
             .spi
             .with_dma(ctx.dma_channel)
@@ -819,9 +823,8 @@ mod tests {
     #[test]
     #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
         let mut spi = ctx
             .spi
             .with_dma(ctx.dma_channel)
@@ -870,9 +873,8 @@ mod tests {
             .with_miso(Level::High)
             .with_dma(ctx.dma_channel);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         dma_tx_buf.fill(&[0xde, 0xad, 0xbe, 0xef]);
 
@@ -959,8 +961,16 @@ mod tests {
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
-        let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(
+            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+        )
+        .unwrap();
+        let dma_tx_buf = DmaTxBuf::new(
+            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
 
         let spi = ctx.spi.with_dma(ctx.dma_channel);
 
@@ -977,13 +987,22 @@ mod tests {
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
+
         ctx.spi
             .apply_config(&Config::default().with_frequency(Rate::from_khz(80)))
             .unwrap();
 
         // Set up a large buffer that would trigger a timeout
-        let mut dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+        let mut dma_rx_buf = DmaRxBuf::new(
+            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+        )
+        .unwrap();
+        let mut dma_tx_buf = DmaTxBuf::new(
+            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
 
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
@@ -1015,8 +1034,16 @@ mod tests {
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
         // Set up a large buffer that would trigger a timeout
-        let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(ctx.tx_descriptors, ctx.tx_buffer).unwrap();
+        let dma_rx_buf = DmaRxBuf::new(
+            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+        )
+        .unwrap();
+        let dma_tx_buf = DmaTxBuf::new(
+            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+        )
+        .unwrap();
 
         let spi = ctx.spi.with_dma(ctx.dma_channel).into_async();
 
@@ -1103,9 +1130,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         let mut spi = ctx
             .spi
@@ -1128,9 +1154,8 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         let mut spi = ctx
             .spi
@@ -1190,9 +1215,8 @@ mod tests {
         )
         .unwrap();
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(4).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(4).unwrap();
 
         let mut spi = spi
             .with_dma(ctx.dma_channel)

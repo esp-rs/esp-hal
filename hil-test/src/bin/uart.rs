@@ -914,7 +914,8 @@ mod async_tx_rx_split {
 mod uhci {
     use esp_hal::{
         dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         interrupt::software::SoftwareInterruptControl,
         peripherals::Peripherals,
         timer::timg::TimerGroup,
@@ -942,10 +943,8 @@ mod uhci {
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE as usize);
-        let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx = dma_rx_buffer!(DMA_BUFFER_SIZE as usize).unwrap();
+        let dma_tx = dma_tx_buffer!(DMA_BUFFER_SIZE as usize).unwrap();
 
         Context {
             dma_rx,

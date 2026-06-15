@@ -23,8 +23,8 @@
 
 ```rust, no_run
 # {before_snippet}
-# use esp_hal::dma_buffers;
-# use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
+# use esp_hal::dma_rx_buffer;
+# use esp_hal::dma_tx_buffer;
 # use esp_hal::spi::Mode;
 # use esp_hal::spi::slave::Spi;
 let sclk = peripherals.GPIO0;
@@ -32,9 +32,8 @@ let miso = peripherals.GPIO1;
 let mosi = peripherals.GPIO2;
 let cs = peripherals.GPIO3;
 
-let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+let dma_rx_buf = dma_rx_buffer!(32000).unwrap();
+let dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
     .with_sck(sclk)
     .with_mosi(mosi)

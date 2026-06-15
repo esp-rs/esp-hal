@@ -39,7 +39,7 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::dma::DmaTxBuf;
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::i2s::parallel::{I2sParallel, TxEightBits};
 //!
@@ -61,11 +61,11 @@
 //!     peripherals.GPIO14,
 //! );
 //!
-//! let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, BUFFER_SIZE);
 //! let mut parallel =
 //!     I2sParallel::new(i2s, dma_channel, Rate::from_mhz(1), pins, clock).into_async();
 //!
-//! for (i, data) in tx_buffer.chunks_mut(4).enumerate() {
+//! let mut tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
+//! for (i, data) in tx_buf.as_mut_slice().chunks_mut(4).enumerate() {
 //!     let offset = i * 4;
 //!     // i2s parallel driver expects the buffer to be interleaved
 //!     data[0] = (offset + 2) as u8;
@@ -73,9 +73,6 @@
 //!     data[2] = offset as u8;
 //!     data[3] = (offset + 1) as u8;
 //! }
-//!
-//! let mut tx_buf: DmaTxBuf =
-//!     DmaTxBuf::new(tx_descriptors, tx_buffer).expect("DmaTxBuf::new failed");
 //!
 //! // Sending 256 bytes.
 //! loop {
