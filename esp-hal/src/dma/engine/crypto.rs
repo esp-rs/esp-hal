@@ -103,7 +103,11 @@ pub struct CryptoDmaConfig {
 /// Whether data burst should be enabled for the burst negotiated from the
 /// config and the buffer alignment. On engines with independent internal and
 /// external burst configuration, `accesses_psram` selects which one applies.
-fn data_burst_enabled(config: &CryptoDmaConfig, max_alignment: usize, accesses_psram: bool) -> bool {
+fn data_burst_enabled(
+    config: &CryptoDmaConfig,
+    max_alignment: usize,
+    accesses_psram: bool,
+) -> bool {
     cfg_if::cfg_if! {
         if #[cfg(crypto_dma_separate_burst)] {
             let bytes = if accesses_psram {

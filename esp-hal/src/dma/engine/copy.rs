@@ -306,7 +306,6 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
         }
     }
 
-
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         false

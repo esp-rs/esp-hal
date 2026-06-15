@@ -16,7 +16,7 @@ use procmacros::ram;
 
 use super::*;
 #[cfg(all(spi_master_version = "1", spi_address_workaround))]
-use crate::dma::InternalMemoryBuffer;
+use crate::dma::aligned::InternalMemoryBuffer;
 use crate::{
     RegisterToggle,
     dma::{
@@ -28,11 +28,11 @@ use crate::{
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
-        InternalMemoryCachelineAligned,
         NoBuffer,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
+        aligned::InternalMemory,
         asynch::DmaRxFuture,
         prepare_for_rx,
         prepare_for_tx,
@@ -264,14 +264,14 @@ impl<'d> SpiDma<'d, Blocking> {
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
 
-        let descriptors = unsafe { (&mut *state.descriptors.get()).get_mut() };
+        let descriptors = unsafe { (&mut *state.descriptors.get()).get_mut().into_mut() };
         descriptors.fill(DmaDescriptor::EMPTY);
 
         let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(0);
 
         let tx_buffer = cfg_select! {
             all(spi_master_version = "1", spi_address_workaround) => unsafe {
-                (&mut *state.default_tx_buffer.get()).get_mut()
+                (&mut *state.default_tx_buffer.get()).get_mut().into_mut()
             },
             _ => &mut []
         };
@@ -1790,7 +1790,7 @@ struct DmaState {
     rx_buffer: UnsafeCell<MaybeUninit<ScopedDmaRxBuf<'static>>>,
     tx_buffer: UnsafeCell<MaybeUninit<ScopedDmaTxBuf<'static>>>,
 
-    descriptors: UnsafeCell<InternalMemoryCachelineAligned<[DmaDescriptor; 2]>>,
+    descriptors: UnsafeCell<InternalMemory<[DmaDescriptor; 2]>>,
 
     #[cfg(all(spi_master_version = "1", spi_address_workaround))]
     default_tx_buffer: UnsafeCell<InternalMemoryBuffer<4>>,
@@ -1843,7 +1843,7 @@ for_each_spi_master!(
                                 rx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
 
-                                descriptors: UnsafeCell::new(InternalMemoryCachelineAligned::new([DmaDescriptor::EMPTY; 2])),
+                                descriptors: UnsafeCell::new(InternalMemory::new([DmaDescriptor::EMPTY; 2])),
                                 #[cfg(all(spi_master_version = "1", spi_address_workaround))]
                                 default_tx_buffer: UnsafeCell::new(InternalMemoryBuffer::new()),
                             };

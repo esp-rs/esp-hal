@@ -6,13 +6,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    dma::Mem2Mem,
-    dma_buffers,
-    main,
-    time::Duration,
-};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_buffers, main, time::Duration};
 use log::{error, info};
 
 esp_bootloader_esp_idf::esp_app_desc!();

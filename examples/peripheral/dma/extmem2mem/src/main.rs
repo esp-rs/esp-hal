@@ -10,13 +10,7 @@ extern crate alloc;
 use aligned::{A64, Aligned};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    delay::Delay,
-    dma::Mem2Mem,
-    dma_descriptors_chunk_size,
-    main,
-    time::Duration,
-};
+use esp_hal::{delay::Delay, dma::Mem2Mem, dma_descriptors_chunk_size, main, time::Duration};
 use log::{error, info};
 
 esp_bootloader_esp_idf::esp_app_desc!();

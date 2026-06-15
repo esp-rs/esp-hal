@@ -71,6 +71,7 @@ use crate::{
     system::{Cpu, PeripheralGuard},
 };
 
+pub mod aligned;
 mod buffers;
 #[cfg(dma_supports_mem2mem)]
 mod m2m;
@@ -486,53 +487,6 @@ macro_rules! dma_circular_descriptors_chunk_size {
     };
 }
 
-// ESP32-P4 internal memory is cached, enforce alignment to avoid memory
-// corruption. Technically only needed for IN buffers and descriptor lists.
-#[cfg_attr(soc_internal_memory_cached, repr(C, align(64)))] // dcache cache line
-#[doc(hidden)]
-pub struct InternalMemoryCachelineAligned<T>(T);
-
-impl<T> InternalMemoryCachelineAligned<T> {
-    pub const fn new(init: T) -> Self {
-        Self(init)
-    }
-
-    pub const fn get(&self) -> &T {
-        &self.0
-    }
-
-    pub const fn get_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
-// ESP32 requires word alignment for DMA buffers.
-// ESP32-S2 technically supports byte-aligned DMA buffers, but the
-// transfer ends up writing out of bounds.
-#[cfg_attr(not(soc_internal_memory_cached), repr(C, align(4)))]
-#[doc(hidden)]
-pub struct InternalMemoryBuffer<const N: usize>(InternalMemoryCachelineAligned<[u8; N]>);
-
-impl<const N: usize> Default for InternalMemoryBuffer<N> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const N: usize> InternalMemoryBuffer<N> {
-    pub const fn new() -> Self {
-        Self(InternalMemoryCachelineAligned::new([0u8; N]))
-    }
-
-    pub const fn get(&self) -> &[u8] {
-        self.0.get()
-    }
-
-    pub const fn get_mut(&mut self) -> &mut [u8] {
-        self.0.get_mut()
-    }
-}
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_buffers_impl {
@@ -547,8 +501,8 @@ macro_rules! dma_buffers_impl {
             (
                 {
                     #[allow(unused_braces)]
-                    static mut BUFFER: $crate::dma::InternalMemoryBuffer<{ $size }> =
-                        $crate::dma::InternalMemoryBuffer::new();
+                    static mut BUFFER: $crate::dma::aligned::InternalMemoryBuffer<{ $size }> =
+                        $crate::dma::aligned::InternalMemoryBuffer::new();
                     // SAFETY: The ConstStaticCell in the descriptor part ensures there will only
                     // be a single mutable reference to this buffer.
                     unsafe { BUFFER.get_mut() }
@@ -579,17 +533,14 @@ macro_rules! dma_descriptors_impl {
     ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
         use $crate::{
             __macro_implementation::static_cell::ConstStaticCell,
-            dma::{DmaDescriptor, InternalMemoryCachelineAligned},
+            dma::{DmaDescriptor, aligned::InternalMemory},
         };
 
         const COUNT: usize =
             $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
-        static DESCRIPTORS: ConstStaticCell<
-            InternalMemoryCachelineAligned<[DmaDescriptor; COUNT]>,
-        > = ConstStaticCell::new(InternalMemoryCachelineAligned::new(
-            [DmaDescriptor::EMPTY; COUNT],
-        ));
+        static DESCRIPTORS: ConstStaticCell<InternalMemory<[DmaDescriptor; COUNT]>> =
+            ConstStaticCell::new(InternalMemory::new([DmaDescriptor::EMPTY; COUNT]));
 
         DESCRIPTORS.take().get_mut()
     }};

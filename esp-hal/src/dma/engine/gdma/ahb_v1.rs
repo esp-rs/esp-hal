@@ -337,7 +337,6 @@ impl RegisterAccess for AhbGdmaRxChannel<'_> {
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-
     #[cfg(dma_can_access_psram)]
     fn can_access_psram(&self) -> bool {
         true

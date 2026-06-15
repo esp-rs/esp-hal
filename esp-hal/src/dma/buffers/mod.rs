@@ -9,7 +9,7 @@ use super::*;
 use crate::soc::is_slice_in_dram;
 #[cfg(dma_can_access_psram)]
 use crate::{
-    dma::InternalMemoryBuffer,
+    dma::aligned::InternalMemoryBuffer,
     soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address},
 };
 
