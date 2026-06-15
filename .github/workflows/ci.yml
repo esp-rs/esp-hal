@@ -88,7 +88,13 @@ jobs:
           LABELS: ${{ steps.labels.outputs.labels }}
         run: |
           BUILD=true; DOCS=true; MSRV=true; HOST=true
-          HIL=true; CHANGELOG=true; SEMVER=true
+          CHANGELOG=true; SEMVER=true
+          HIL=false
+
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BUILD=false
+            HIL=true
+          fi
 
           # `skip-ci-non-code-change` only skips building/testing; API checks (semver) still run.
           # Use the dedicated `skip-semver-checks` label to skip semver checks.
@@ -402,9 +408,7 @@ jobs:
 
   hil-build:
     needs: calculate
-    if: >
-      github.event_name == 'merge_group' &&
-      needs.calculate.outputs.run-hil == 'true'
+    if: needs.calculate.outputs.run-hil == 'true'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.chips.outputs.matrix }}
