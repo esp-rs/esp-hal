@@ -118,10 +118,6 @@ from the bitlength of the prime fields of the curve."]
                     ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
                         curve.size_check([$($input),*])?;
 
-                        // Wipe any secrets left over from the previous operation before loading the new operands.
-                        #[cfg(clear_crypto_secrets)]
-                        self.info().clear_secrets();
-
                         paste::paste! {
                             $(
                                 self.info().write_mem(self.info().[<$input _mem>](), $input);
