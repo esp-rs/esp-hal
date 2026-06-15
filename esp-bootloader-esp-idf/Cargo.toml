@@ -37,7 +37,7 @@ esp-hal-procmacros = { version = "0.22.0", path = "../esp-hal-procmacros", featu
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
 embedded-storage = { version = "0.3.1", optional = true }
-esp-storage = { path = "../esp-storage", default-features = false }
+esp-storage = { path = "../esp-storage", default-features = false, optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 
