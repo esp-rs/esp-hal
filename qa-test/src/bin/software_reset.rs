@@ -31,15 +31,18 @@ fn main() -> ! {
     println!("reset reason: {:?}", reason);
 
     match reason {
-        SocResetReason::ChipPowerOn | SocResetReason::CoreUsbUart => {
-            // Fresh start (power-on or flashed via USB): trigger the reset we want to test.
+        SocResetReason::ChipPowerOn => {
+            println!("calling software_reset()...");
+        }
+        // CoreUsbUart is produced when flashing via USB; treat as a fresh start.
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32c2")))]
+        SocResetReason::CoreUsbUart => {
             println!("calling software_reset()...");
         }
         SocResetReason::CoreSw => {
             println!("PASS");
         }
         other => {
-            // Any other reason (e.g. WDT after a hang) means software_reset() failed.
             panic!("software_reset() failed; expected CoreSw, got {:?}", other);
         }
     }
