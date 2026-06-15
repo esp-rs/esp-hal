@@ -105,13 +105,21 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// Provides a "view" into the partition allowing to read/write the
-    /// partition contents by using the given [embedded_storage::Storage] and/or
-    /// [embedded_storage::ReadStorage] implementation.
-    pub fn as_embedded_storage<F>(self, flash: &'a mut F) -> FlashRegion<'a, F>
-    where
-        F: embedded_storage::ReadStorage,
-    {
+    /// partition contents using the given [`esp_storage::FlashStorage`].
+    pub fn as_flash_region<'d>(
+        self,
+        flash: &'a mut esp_storage::FlashStorage<'d>,
+    ) -> FlashRegion<'a, 'd> {
         FlashRegion { raw: self, flash }
+    }
+
+    /// Alias for [`Self::as_flash_region`].
+    #[deprecated(note = "renamed to `as_flash_region`")]
+    pub fn as_embedded_storage<'d>(
+        self,
+        flash: &'a mut esp_storage::FlashStorage<'d>,
+    ) -> FlashRegion<'a, 'd> {
+        self.as_flash_region(flash)
     }
 }
 
@@ -536,10 +544,10 @@ impl TryFrom<u8> for PartitionTablePartitionSubType {
 
 /// Read the partition table.
 ///
-/// Pass an implementation of [embedded_storage::Storage] which can read from
-/// the whole flash and provide storage to read the partition table into.
-pub fn read_partition_table<'a>(
-    flash: &mut impl embedded_storage::Storage,
+/// Pass a [`esp_storage::FlashStorage`] which can read from the whole flash
+/// and provide storage to read the partition table into.
+pub fn read_partition_table<'a, 'd>(
+    flash: &mut esp_storage::FlashStorage<'d>,
     storage: &'a mut [u8],
 ) -> Result<PartitionTable<'a>, Error> {
     flash
@@ -555,12 +563,12 @@ pub fn read_partition_table<'a>(
 /// the partition offset.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct FlashRegion<'a, F> {
+pub struct FlashRegion<'a, 'd> {
     pub(crate) raw: PartitionEntry<'a>,
-    pub(crate) flash: &'a mut F,
+    pub(crate) flash: &'a mut esp_storage::FlashStorage<'d>,
 }
 
-impl<F> FlashRegion<'_, F> {
+impl FlashRegion<'_, '_> {
     /// Returns the size of the partition in bytes.
     pub fn partition_size(&self) -> usize {
         self.raw.len() as _
@@ -573,21 +581,9 @@ impl<F> FlashRegion<'_, F> {
     fn in_range(&self, start: u32, len: usize) -> bool {
         self.range().contains(&start) && (start + len as u32 <= self.range().end)
     }
-}
 
-impl<F> embedded_storage::Region for FlashRegion<'_, F> {
-    fn contains(&self, address: u32) -> bool {
-        self.range().contains(&address)
-    }
-}
-
-impl<F> embedded_storage::ReadStorage for FlashRegion<'_, F>
-where
-    F: embedded_storage::ReadStorage,
-{
-    type Error = Error;
-
-    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+    /// Read bytes from the partition.
+    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
         let address = offset + self.raw.offset();
 
         if !self.in_range(address, bytes.len()) {
@@ -599,16 +595,8 @@ where
             .map_err(|_e| Error::StorageError)
     }
 
-    fn capacity(&self) -> usize {
-        self.partition_size()
-    }
-}
-
-impl<F> embedded_storage::Storage for FlashRegion<'_, F>
-where
-    F: embedded_storage::Storage,
-{
-    fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+    /// Write bytes to the partition.
+    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
         let address = offset + self.raw.offset();
 
         if self.raw.is_read_only() {
@@ -623,53 +611,16 @@ where
             .write(address, bytes)
             .map_err(|_e| Error::StorageError)
     }
-}
 
-impl embedded_storage::nor_flash::NorFlashError for Error {
-    fn kind(&self) -> embedded_storage::nor_flash::NorFlashErrorKind {
-        match self {
-            Error::OutOfBounds => embedded_storage::nor_flash::NorFlashErrorKind::OutOfBounds,
-            _ => embedded_storage::nor_flash::NorFlashErrorKind::Other,
-        }
-    }
-}
-
-impl<F> embedded_storage::nor_flash::ErrorType for FlashRegion<'_, F> {
-    type Error = Error;
-}
-
-impl<F> embedded_storage::nor_flash::ReadNorFlash for FlashRegion<'_, F>
-where
-    F: embedded_storage::nor_flash::ReadNorFlash,
-{
-    const READ_SIZE: usize = F::READ_SIZE;
-
-    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-        let address = offset + self.raw.offset();
-
-        if !self.in_range(address, bytes.len()) {
-            return Err(Error::OutOfBounds);
-        }
-
-        self.flash
-            .read(address, bytes)
-            .map_err(|_e| Error::StorageError)
-    }
-
-    fn capacity(&self) -> usize {
+    /// Returns the size of the partition in bytes.
+    pub fn capacity(&self) -> usize {
         self.partition_size()
     }
-}
 
-impl<F> embedded_storage::nor_flash::NorFlash for FlashRegion<'_, F>
-where
-    F: embedded_storage::nor_flash::NorFlash,
-{
-    const WRITE_SIZE: usize = F::WRITE_SIZE;
-
-    const ERASE_SIZE: usize = F::ERASE_SIZE;
-
-    fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+    /// Erase flash in the partition from `from` up to but not including `to`.
+    ///
+    /// Addresses are relative to the partition start.
+    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let address_from = from + self.raw.offset();
         let address_to = to + self.raw.offset();
 
@@ -689,27 +640,109 @@ where
             .erase(address_from, address_to)
             .map_err(|_e| Error::StorageError)
     }
-
-    fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-        let address = offset + self.raw.offset();
-
-        if self.raw.is_read_only() {
-            return Err(Error::WriteProtected);
-        }
-
-        if !self.in_range(address, bytes.len()) {
-            return Err(Error::OutOfBounds);
-        }
-
-        self.flash
-            .write(address, bytes)
-            .map_err(|_e| Error::StorageError)
-    }
 }
 
-impl<F> embedded_storage::nor_flash::MultiwriteNorFlash for FlashRegion<'_, F> where
-    F: embedded_storage::nor_flash::MultiwriteNorFlash
-{
+#[cfg(feature = "embedded-storage")]
+mod embedded_storage_traits {
+    use ::embedded_storage::{
+        ReadStorage,
+        Region,
+        Storage,
+        nor_flash::{
+            ErrorType,
+            MultiwriteNorFlash,
+            NorFlash,
+            NorFlashError,
+            NorFlashErrorKind,
+            ReadNorFlash,
+        },
+    };
+
+    use super::*;
+
+    impl Region for FlashRegion<'_, '_> {
+        fn contains(&self, address: u32) -> bool {
+            self.range().contains(&address)
+        }
+    }
+
+    impl ReadStorage for FlashRegion<'_, '_> {
+        type Error = Error;
+
+        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+            FlashRegion::read(self, offset, bytes)
+        }
+
+        fn capacity(&self) -> usize {
+            FlashRegion::capacity(self)
+        }
+    }
+
+    impl Storage for FlashRegion<'_, '_> {
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            FlashRegion::write(self, offset, bytes)
+        }
+    }
+
+    impl NorFlashError for Error {
+        fn kind(&self) -> NorFlashErrorKind {
+            match self {
+                Error::OutOfBounds => NorFlashErrorKind::OutOfBounds,
+                _ => NorFlashErrorKind::Other,
+            }
+        }
+    }
+
+    impl ErrorType for FlashRegion<'_, '_> {
+        type Error = Error;
+    }
+
+    impl ReadNorFlash for FlashRegion<'_, '_> {
+        const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
+
+        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+            let address = offset + self.raw.offset();
+
+            if !self.in_range(address, bytes.len()) {
+                return Err(Error::OutOfBounds);
+            }
+
+            self.flash
+                .read_nor(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        }
+
+        fn capacity(&self) -> usize {
+            FlashRegion::capacity(self)
+        }
+    }
+
+    impl NorFlash for FlashRegion<'_, '_> {
+        const WRITE_SIZE: usize = esp_storage::FlashStorage::WRITE_SIZE;
+        const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
+
+        fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+            FlashRegion::erase(self, from, to)
+        }
+
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            let address = offset + self.raw.offset();
+
+            if self.raw.is_read_only() {
+                return Err(Error::WriteProtected);
+            }
+
+            if !self.in_range(address, bytes.len()) {
+                return Err(Error::OutOfBounds);
+            }
+
+            self.flash
+                .write_nor(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        }
+    }
+
+    impl MultiwriteNorFlash for FlashRegion<'_, '_> {}
 }
 
 #[cfg(test)]
@@ -887,46 +920,22 @@ mod tests {
 
 #[cfg(test)]
 mod storage_tests {
-    use embedded_storage::{ReadStorage, Storage};
+    use esp_storage::{Flash, FlashStorage};
 
     use super::*;
 
-    struct MockFlash {
-        data: [u8; 0x10000],
-    }
-
-    impl MockFlash {
-        fn new() -> Self {
-            let mut data = [23u8; 0x10000];
-            data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN as usize]
-                .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
-            Self { data }
-        }
-    }
-
-    impl embedded_storage::Storage for MockFlash {
-        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            self.data[offset as usize..][..bytes.len()].copy_from_slice(bytes);
-            Ok(())
-        }
-    }
-
-    impl embedded_storage::ReadStorage for MockFlash {
-        type Error = crate::partitions::Error;
-        fn read(&mut self, offset: u32, buffer: &mut [u8]) -> Result<(), Self::Error> {
-            let l = buffer.len();
-            buffer[..l].copy_from_slice(&self.data[offset as usize..][..l]);
-            Ok(())
-        }
-
-        fn capacity(&self) -> usize {
-            unimplemented!()
-        }
+    fn test_flash() -> FlashStorage<'static> {
+        let mut flash = FlashStorage::new(Flash::new());
+        let mut data = [23u8; 0x10000];
+        data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN]
+            .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
+        flash.write(0, &data).unwrap();
+        flash
     }
 
     #[test]
     fn can_read_write_all_of_nvs() {
-        let mut storage = MockFlash::new();
+        let mut storage = test_flash();
 
         let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
         let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
@@ -935,7 +944,7 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
         assert_eq!(nvs_partition.raw.offset(), 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);
@@ -944,7 +953,7 @@ mod storage_tests {
         nvs_partition.read(0, &mut buffer).unwrap();
         assert!(buffer.iter().all(|v| *v == 23));
         buffer.fill(42);
-        nvs_partition.write(0, &mut buffer).unwrap();
+        nvs_partition.write(0, &buffer).unwrap();
         let mut buffer = [0u8; 24576];
         nvs_partition.read(0, &mut buffer).unwrap();
         assert!(buffer.iter().all(|v| *v == 42));
@@ -952,7 +961,7 @@ mod storage_tests {
 
     #[test]
     fn cannot_read_write_more_than_partition_size() {
-        let mut storage = MockFlash::new();
+        let mut storage = test_flash();
 
         let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
         let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
@@ -961,7 +970,7 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
         assert_eq!(nvs_partition.raw.offset(), 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);

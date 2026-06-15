@@ -36,7 +36,8 @@ esp-config = { version = "0.7.0", path = "../esp-config" }
 esp-hal-procmacros = { version = "0.22.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
-embedded-storage = "0.3.1"
+embedded-storage = { version = "0.3.1", optional = true }
+esp-storage = { path = "../esp-storage", default-features = false }
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 
@@ -65,31 +66,34 @@ log-04 = ["dep:log-04"]
 defmt = ["dep:defmt"]
 
 # Replace ROM functions with pure Rust implementations, needed for tests.
-std = ["dep:crc", "dep:md-5"]
+std = ["dep:crc", "dep:md-5", "esp-storage/emulation"]
+
+## Implement traits from `embedded-storage` for [`FlashRegion`].
+embedded-storage = ["dep:embedded-storage", "esp-storage/embedded-storage"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2", "esp-hal/esp32c2"]
+esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2", "esp-hal/esp32c2", "esp-storage/esp32c2"]
 ##
-esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3", "esp-hal/esp32c3"]
+esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3", "esp-hal/esp32c3", "esp-storage/esp32c3"]
 ##
-esp32c5   = ["esp-rom-sys/esp32c5", "esp-metadata-generated/esp32c5", "esp-hal/esp32c5"]
+esp32c5   = ["esp-rom-sys/esp32c5", "esp-metadata-generated/esp32c5", "esp-hal/esp32c5", "esp-storage/esp32c5"]
 ##
-esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6", "esp-hal/esp32c6"]
+esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6", "esp-hal/esp32c6", "esp-storage/esp32c6"]
 ##
-esp32c61   = ["esp-rom-sys/esp32c61", "esp-metadata-generated/esp32c61", "esp-hal/esp32c61"]
+esp32c61   = ["esp-rom-sys/esp32c61", "esp-metadata-generated/esp32c61", "esp-hal/esp32c61", "esp-storage/esp32c61"]
 ##
-esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2"]
+esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2", "esp-storage/esp32h2"]
 ##
 esp32p4   = ["esp-rom-sys/esp32p4", "esp-metadata-generated/esp32p4", "esp-hal/esp32p4"]
 ##
-esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32"]
+esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32", "esp-storage/esp32"]
 ##
-esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2"]
+esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2", "esp-storage/esp32s2"]
 ##
-esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/esp32s3"]
+esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/esp32s3", "esp-storage/esp32s3"]
 
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]

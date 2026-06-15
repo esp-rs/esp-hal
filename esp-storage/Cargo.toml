@@ -13,21 +13,23 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.espressif]
 check-configs = [
     { features = [] },
+    { features = ["embedded-storage"] },
     { features = ["critical-section"] },
     { features = ["bytewise-read"] },
-    { features = ["critical-section", "bytewise-read"] },
+    { features = ["embedded-storage", "critical-section"] },
+    { features = ["embedded-storage", "critical-section", "bytewise-read"] },
 ]
-clippy-configs = [{ features = ["critical-section", "bytewise-read"] }]
+clippy-configs = [{ features = ["embedded-storage", "critical-section", "bytewise-read"] }]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6"]
+features       = ["esp32c6", "embedded-storage"]
 
 [lib]
 bench = false
 
 [dependencies]
-embedded-storage = "0.3.1"
+embedded-storage = { version = "0.3.1", optional = true }
 procmacros       = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true}
 
@@ -50,6 +52,9 @@ critical-section = []
 
 ## Bytewise read emulation
 bytewise-read = []
+
+## Implement traits from `embedded-storage` for [`FlashStorage`].
+embedded-storage = ["dep:embedded-storage"]
 
 ## Implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]

@@ -9,7 +9,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_storage::ReadStorage;
 use esp_bootloader_esp_idf::EspAppDesc;
 use esp_storage::FlashStorage;
 use hil_test as _;

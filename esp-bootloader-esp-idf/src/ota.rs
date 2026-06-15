@@ -24,8 +24,6 @@
 //! - read the current slot, change the current slot
 //!
 //! For more details see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html>
-use embedded_storage::{ReadStorage, Storage};
-
 use crate::partitions::{
     AppPartitionSubType,
     DataPartitionSubType,
@@ -145,18 +143,12 @@ impl OtaSelectEntry {
 /// If you are looking for a more high-level way to do this, see [crate::ota_updater::OtaUpdater]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Ota<'a, F>
-where
-    F: embedded_storage::Storage,
-{
-    flash: FlashRegion<'a, F>,
+pub struct Ota<'a, 'd> {
+    flash: FlashRegion<'a, 'd>,
     ota_partition_count: usize,
 }
 
-impl<'a, F> Ota<'a, F>
-where
-    F: embedded_storage::Storage,
-{
+impl<'a, 'd> Ota<'a, 'd> {
     /// Create a [Ota] instance from the given [FlashRegion] and the count of OTA app partitions
     /// (not including "firmware" and "test" partitions)
     ///
@@ -165,7 +157,10 @@ where
     /// doesn't represent a Data/Ota partition or the size is unexpected.
     ///
     /// [Error::InvalidArgument] if the `ota_partition_count` exceeds the maximum or if it's 0.
-    pub fn new(flash: FlashRegion<'a, F>, ota_partition_count: usize) -> Result<Ota<'a, F>, Error> {
+    pub fn new(
+        flash: FlashRegion<'a, 'd>,
+        ota_partition_count: usize,
+    ) -> Result<Ota<'a, 'd>, Error> {
         if ota_partition_count == 0 || ota_partition_count > 16 {
             return Err(Error::InvalidArgument);
         }
@@ -355,32 +350,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use esp_storage::{Flash, FlashStorage};
+
     use super::*;
     use crate::partitions::PartitionEntry;
-
-    struct MockFlash {
-        data: [u8; 0x2000],
-    }
-
-    impl embedded_storage::Storage for MockFlash {
-        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            self.data[offset as usize..][..bytes.len()].copy_from_slice(bytes);
-            Ok(())
-        }
-    }
-
-    impl embedded_storage::ReadStorage for MockFlash {
-        type Error = crate::partitions::Error;
-        fn read(&mut self, offset: u32, buffer: &mut [u8]) -> Result<(), Self::Error> {
-            let l = buffer.len();
-            buffer[..l].copy_from_slice(&self.data[offset as usize..][..l]);
-            Ok(())
-        }
-
-        fn capacity(&self) -> usize {
-            unimplemented!()
-        }
-    }
 
     const PARTITION_RAW: [u8; 32] = [
         0xaa, 0x50, // MAGIC
@@ -417,22 +390,34 @@ mod tests {
         255, 255, 255, 255, 1, 0, 0, 0, 17, 80, 74, 237,
     ];
 
+    fn ota_region<'a>(
+        flash: &'a mut FlashStorage<'static>,
+        binary: &'a mut [u8; 32],
+    ) -> FlashRegion<'a, 'static> {
+        FlashRegion {
+            raw: PartitionEntry { binary },
+            flash,
+        }
+    }
+
+    fn init_ota_flash(flash: &mut FlashStorage<'static>) {
+        flash.erase(0, 0x2000).unwrap();
+    }
+
+    fn read_slot(flash: &mut FlashStorage<'static>, offset: u32) -> [u8; 0x20] {
+        let mut buf = [0u8; 0x20];
+        flash.read(offset, &mut buf).unwrap();
+        buf
+    }
+
     #[test]
     fn test_initial_state_and_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -460,29 +445,20 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::Undefined));
 
-        assert_eq!(SLOT_COUNT_1_UNDEFINED, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_INITIAL, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_1_UNDEFINED);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_INITIAL);
     }
 
     #[test]
     fn test_slot0_valid_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
+        flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
+        flash.write(0x1000, SLOT_INITIAL).unwrap();
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_INITIAL);
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -500,29 +476,20 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::New));
 
-        assert_eq!(SLOT_COUNT_1_VALID, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_1_VALID);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_COUNT_2_NEW);
     }
 
     #[test]
     fn test_slot1_new_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
+        flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
+        flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_COUNT_2_NEW);
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -541,26 +508,18 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::PendingVerify));
 
-        assert_eq!(SLOT_COUNT_3_PENDING, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_3_PENDING);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_COUNT_2_NEW);
     }
 
     #[test]
     fn test_multi_updates() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -615,18 +574,10 @@ mod tests {
     fn test_multi_updates_4_apps() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 4).unwrap();
         assert_eq!(
@@ -700,18 +651,10 @@ mod tests {
     fn test_multi_updates_skip_parts() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mut flash = FlashStorage::new(Flash::new());
+        init_ota_flash(&mut flash);
 
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, &mut binary);
 
         let mut sut = Ota::new(mock_region, 16).unwrap();
         assert_eq!(

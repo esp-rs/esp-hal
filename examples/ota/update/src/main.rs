@@ -34,7 +34,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_storage::Storage;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
