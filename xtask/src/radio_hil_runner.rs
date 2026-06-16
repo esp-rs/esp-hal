@@ -218,7 +218,6 @@ fn spawn_harness_and_wait_until_ready(
     let mut child = Command::new("probe-rs")
         .args(["run", "--preverify", "--probe", probe])
         .arg(binary_path)
-        .env("DEFMT_LOG", "info")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
@@ -311,7 +310,6 @@ fn spawn_probe_run(name: &str, binary_path: &Path, probe: &str) -> Result<Child>
     Command::new("probe-rs")
         .args(["run", "--preverify", "--probe", probe])
         .arg(binary_path)
-        .env("DEFMT_LOG", "info")
         .spawn()
         .map_err(|e| anyhow!("[{name}] failed to spawn probe-rs run: {e}"))
 }

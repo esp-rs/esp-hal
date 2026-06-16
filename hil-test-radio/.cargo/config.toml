@@ -21,7 +21,11 @@ rustflags = [
 ]
 
 [env]
-DEFMT_LOG = "info,embedded_test=warn"
+# `force = true` so this INFO level wins over any `DEFMT_LOG` inherited from the
+# environment (CI exports `DEFMT_LOG=trace` globally). Without it the radio test
+# ELFs are built with trace-level defmt, which floods the USB-JTAG link and
+# causes probe communication failures.
+DEFMT_LOG = { value = "info,embedded_test=warn", force = true }
 
 [unstable]
 build-std = ["core", "alloc"]
