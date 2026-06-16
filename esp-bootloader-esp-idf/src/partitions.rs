@@ -112,15 +112,6 @@ impl<'a> PartitionEntry<'a> {
     ) -> FlashRegion<'a, 'd> {
         FlashRegion { raw: self, flash }
     }
-
-    /// Alias for [`Self::as_flash_region`].
-    #[deprecated(note = "renamed to `as_flash_region`")]
-    pub fn as_embedded_storage<'d>(
-        self,
-        flash: &'a mut esp_storage::FlashStorage<'d>,
-    ) -> FlashRegion<'a, 'd> {
-        self.as_flash_region(flash)
-    }
 }
 
 impl core::fmt::Debug for PartitionEntry<'_> {
