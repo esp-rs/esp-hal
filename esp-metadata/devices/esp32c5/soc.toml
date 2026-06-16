@@ -447,7 +447,6 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
-software_interrupt_delay = 24 # CPU speed dependent
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
 [device.rmt]
