@@ -89,7 +89,7 @@ harness           = false
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 critical-section   = "1"
-defmt              = "1.0.1"
+defmt              = "1.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
