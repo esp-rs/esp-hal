@@ -1,9 +1,8 @@
-// TODO: validate ESP32-C61 radio, then drop the `!esp32c61` exclusions.
 //% CHIP_FILTER(no_wifi):      bt_driver_supported && !wifi_driver_supported
 //% CHIP_FILTER(no_ble):       wifi_driver_supported && !bt_driver_supported
 //% CHIP_FILTER(no_radio):     !wifi_driver_supported && !bt_driver_supported
-//% CHIP_FILTER(has_wifi_ble): wifi_driver_supported && bt_driver_supported && !esp32c61
-//% CHIP_FILTER(stable_wifi):  wifi_driver_supported && !esp32c61
+//% CHIP_FILTER(has_wifi_ble): wifi_driver_supported && bt_driver_supported
+//% CHIP_FILTER(stable_wifi):  wifi_driver_supported
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(no_radio): rtos-radio-driver
