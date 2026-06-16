@@ -656,40 +656,6 @@ mod async_tx_rx {
     }
 
     #[test]
-    async fn read_async_per_call_error_filter_ignores_break_related_errors(ctx: Context) {
-        let mut rx = ctx.rx;
-        let mut tx = ctx.tx;
-        let mut delay = Delay;
-        const PAYLOAD: &[u8] = &[0x55, 0x56, 0x57];
-
-        let read = async {
-            let mut received = [0u8; 16];
-            let mut received_len = 0;
-
-            while !contains_subslice(&received[..received_len], PAYLOAD) {
-                assert!(received_len < received.len());
-                let read = rx
-                    .read_async_with_reported_errors(
-                        &mut received[received_len..],
-                        RxErrorKind::FifoOverflowed,
-                    )
-                    .await
-                    .unwrap();
-                received_len += read;
-            }
-        };
-
-        let write = async {
-            tx.flush_async().await.unwrap();
-            tx.send_break_async(&mut delay, 100).await;
-            tx.write_async(PAYLOAD).await.unwrap();
-            tx.flush_async().await.unwrap();
-        };
-
-        join(read, write).await;
-    }
-
-    #[test]
     async fn write_async_does_not_return_0(mut ctx: Context) {
         let bytes = [0; 200];
 

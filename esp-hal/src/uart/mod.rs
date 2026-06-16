@@ -1107,7 +1107,6 @@ impl<'d> UartRx<'d, Async> {
         minimum: usize,
         max_threshold: usize,
         listen_for_timeout: bool,
-        reported_errors: EnumSet<RxErrorKind>,
     ) -> Result<(), RxError> {
         let current_threshold = self.uart.info().rx_fifo_full_threshold();
 
@@ -1147,7 +1146,7 @@ impl<'d> UartRx<'d, Async> {
 
             let events = UartRxFuture::new(self.uart.reborrow(), events).await;
 
-            let result = rx_event_check_for_error(events, reported_errors);
+            let result = rx_event_check_for_error(events, self.reported_errors);
             if let Err(error) = result {
                 if error == RxError::FifoOverflowed {
                     self.uart.info().rxfifo_reset();
@@ -1182,33 +1181,9 @@ impl<'d> UartRx<'d, Async> {
             return Ok(0);
         }
 
-        self.wait_for_buffered_data(1, buf.len(), true, self.reported_errors)
-            .await?;
+        self.wait_for_buffered_data(1, buf.len(), true).await?;
 
         self.read_buffered(buf)
-    }
-
-    /// Read data asynchronously with a custom set of reported RX errors.
-    ///
-    /// This is the same as [`Self::read_async`], but lets the caller choose
-    /// which RX error conditions should cause this specific read to return an
-    /// error. Error conditions not present in `reported_errors` are cleared and
-    /// ignored for this read.
-    #[instability::unstable]
-    pub async fn read_async_with_reported_errors(
-        &mut self,
-        buf: &mut [u8],
-        reported_errors: impl Into<EnumSet<RxErrorKind>>,
-    ) -> Result<usize, RxError> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-
-        let reported_errors = reported_errors.into();
-        self.wait_for_buffered_data(1, buf.len(), true, reported_errors)
-            .await?;
-
-        self.uart.info().read_buffered(buf, reported_errors)
     }
 
     /// Fill buffer asynchronously.
@@ -1238,7 +1213,7 @@ impl<'d> UartRx<'d, Async> {
             // No point in listening for timeouts, as we're waiting for an exact amount of
             // data. On ESP32 and S2, the timeout interrupt can't be cleared unless the FIFO
             // is empty, so listening could cause an infinite loop here.
-            self.wait_for_buffered_data(buf.len(), buf.len(), false, self.reported_errors)
+            self.wait_for_buffered_data(buf.len(), buf.len(), false)
                 .await?;
 
             let read = self.read_buffered(buf)?;
@@ -1714,23 +1689,6 @@ impl<'d> Uart<'d, Async> {
     /// ```
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
-    }
-
-    /// Read data asynchronously with a custom set of reported RX errors.
-    ///
-    /// This is the same as [`Self::read_async`], but lets the caller choose
-    /// which RX error conditions should cause this specific read to return an
-    /// error. Error conditions not present in `reported_errors` are cleared and
-    /// ignored for this read.
-    #[instability::unstable]
-    pub async fn read_async_with_reported_errors(
-        &mut self,
-        buf: &mut [u8],
-        reported_errors: impl Into<EnumSet<RxErrorKind>>,
-    ) -> Result<usize, RxError> {
-        self.rx
-            .read_async_with_reported_errors(buf, reported_errors)
-            .await
     }
 
     /// Fill buffer asynchronously.
