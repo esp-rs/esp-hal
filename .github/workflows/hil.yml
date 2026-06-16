@@ -280,7 +280,7 @@ jobs:
         id: tests
         run: |
           if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--elfs ${{ inputs.tests }}" >> $GITHUB_OUTPUT
+            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
           else
             echo "value=" >> $GITHUB_OUTPUT
           fi
@@ -339,7 +339,7 @@ jobs:
         id: tests
         run: |
           if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--elfs ${{ inputs.tests }}" >> $GITHUB_OUTPUT
+            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
           else
             echo "value=" >> $GITHUB_OUTPUT
           fi

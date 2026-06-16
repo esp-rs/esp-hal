@@ -40,7 +40,7 @@ pub enum Run {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
-        description = "Run all ELFs in a folder using probe-rs. Use --elfs binary or binary::test_name to filter which ELFs/tests run.",
+        description = "Run all ELFs in a folder using probe-rs. Use --filter binary or binary::test_name to select which ELFs/tests run.",
         command = "run elfs"
     )
 )]
@@ -51,10 +51,11 @@ pub struct RunElfsArgs {
     pub chip: Chip,
     /// Path to the ELFs.
     pub path: PathBuf,
-    /// Optional list of ELFs to execute. Use `binary::test_name` to run a single
-    /// embedded-test case inside a matching ELF.
+    /// List of selectors. Each selector is either a bare binary name
+    /// (runs the whole ELF) or `binary::test_name` (runs only that single
+    /// embedded-test case).
     #[arg(long, value_delimiter = ',')]
-    pub elfs: Vec<String>,
+    pub filter: Vec<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -144,7 +145,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
 /// Run all (or filtered) ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-    let filters = parse_elf_filters(&args.elfs)?;
+    let filters = parse_elf_filters(&args.filter)?;
     let mut filter_matched = vec![false; filters.len()];
 
     let mut elfs = Vec::<(String, PathBuf)>::new();
@@ -183,21 +184,25 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         let elf_name = elf_name.clone();
         let elf_path = elf_path.clone();
 
-        // Match the ELF against the requested selectors. The part before `::`
-        // selects the binary, the part after is forwarded to the device as an
-        // embedded-test filter (first matching selector wins).
         let elf_name_lower = elf_name.to_lowercase();
-        let mut matched = false;
-        let mut test_filter = None;
+        let mut test_filters: Vec<Option<&str>> = Vec::new();
         for (filter, used) in filters.iter().zip(filter_matched.iter_mut()) {
             if elf_name_lower.contains(&filter.binary) {
                 *used = true;
-                matched = true;
-                test_filter = test_filter.or(filter.test_filter.as_deref());
+                if filter.test_filter.is_none() {
+                    // A bare binary selector – run everything; no point
+                    // collecting more specific filters.
+                    test_filters = vec![None];
+                    break;
+                }
+                let tf = filter.test_filter.as_deref();
+                if !test_filters.contains(&tf) {
+                    test_filters.push(tf);
+                }
             }
         }
 
-        if !filters.is_empty() && !matched {
+        if !filters.is_empty() && test_filters.is_empty() {
             log::info!(
                 "Skipping test '{}' for '{}' (does not match filters: {:?})",
                 elf_name,
@@ -207,84 +212,93 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             continue;
         }
 
-        log::info!("Running test '{}' for '{}'", elf_name, args.chip);
+        // When no filters were given, run the ELF once with no test filter.
+        let test_filters: Vec<Option<&str>> = if test_filters.is_empty() {
+            vec![None]
+        } else {
+            test_filters
+        };
 
-        if let Some(entry) = radio_manifest.as_ref().and_then(|m| m.get(&elf_name)) {
-            if entry.support_firmware {
-                log::info!("Skipping support firmware '{}'", elf_name);
+        for test_filter in test_filters {
+            log::info!("Running test '{}' for '{}'", elf_name, args.chip);
+
+            if let Some(entry) = radio_manifest.as_ref().and_then(|m| m.get(&elf_name)) {
+                if entry.support_firmware {
+                    log::info!("Skipping support firmware '{}'", elf_name);
+                    break;
+                }
+
+                let harness_path = entry
+                    .harness
+                    .as_deref()
+                    .and_then(|name| resolve_harness_binary_path(&elfs, name));
+
+                if entry.harness.is_some() && harness_path.is_none() {
+                    failed.push(elf_name.clone());
+                    log::error!(
+                        "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
+                        elf_name,
+                        entry.harness.as_deref().unwrap_or_default(),
+                    );
+                    break;
+                }
+
+                if let Err(e) =
+                    run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
+                {
+                    failed.push(elf_name.clone());
+                    log::error!("Radio test '{}' failed: {}", elf_name, e);
+                } else {
+                    log::info!("'{}' passed", elf_name);
+                }
                 continue;
             }
 
-            let harness_path = entry
-                .harness
-                .as_deref()
-                .and_then(|name| resolve_harness_binary_path(&elfs, name));
+            if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
+                if meta.is_support_firmware() {
+                    log::info!("Skipping support firmware '{}' (metadata)", elf_name);
+                    break;
+                }
 
-            if entry.harness.is_some() && harness_path.is_none() {
-                failed.push(elf_name.clone());
-                log::error!(
-                    "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
-                    elf_name,
-                    entry.harness.as_deref().unwrap_or_default(),
-                );
+                let harness_path = meta
+                    .harness_firmware()
+                    .and_then(|name| resolve_harness_binary_path(&elfs, name));
+
+                if meta.harness_firmware().is_some() && harness_path.is_none() {
+                    failed.push(elf_name.clone());
+                    log::error!(
+                        "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
+                        elf_name,
+                        meta.harness_firmware().unwrap_or_default(),
+                    );
+                    break;
+                }
+
+                if let Err(e) =
+                    run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
+                {
+                    failed.push(elf_name.clone());
+                    log::error!("Radio test '{}' failed: {}", elf_name, e);
+                } else {
+                    log::info!("'{}' passed", elf_name);
+                }
                 continue;
             }
 
-            if let Err(e) =
-                run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
-            {
+            // Use standard probe-rs runner for non-radio tests.
+            let mut command = Command::new("probe-rs");
+            command.arg("run").arg(&elf_path).arg("--verify");
+            if let Some(test_filter) = test_filter {
+                command.arg(test_filter);
+            }
+
+            let status = command.status().context("Failed to execute probe-rs")?;
+
+            log::info!("'{}' done", elf_name);
+
+            if !status.success() {
                 failed.push(elf_name.clone());
-                log::error!("Radio test '{}' failed: {}", elf_name, e);
-            } else {
-                log::info!("'{}' passed", elf_name);
             }
-            continue;
-        }
-
-        if let Some(meta) = firmware::find_test_by_name(&radio_tests, &elf_name) {
-            if meta.is_support_firmware() {
-                log::info!("Skipping support firmware '{}' (metadata)", elf_name);
-                continue;
-            }
-
-            let harness_path = meta
-                .harness_firmware()
-                .and_then(|name| resolve_harness_binary_path(&elfs, name));
-
-            if meta.harness_firmware().is_some() && harness_path.is_none() {
-                failed.push(elf_name.clone());
-                log::error!(
-                    "Radio test '{}' requires harness firmware '{}' but no matching ELF was found",
-                    elf_name,
-                    meta.harness_firmware().unwrap_or_default(),
-                );
-                continue;
-            }
-
-            if let Err(e) =
-                run_radio_test_elf(&elf_path, harness_path.as_deref(), 120, None, test_filter)
-            {
-                failed.push(elf_name.clone());
-                log::error!("Radio test '{}' failed: {}", elf_name, e);
-            } else {
-                log::info!("'{}' passed", elf_name);
-            }
-            continue;
-        }
-
-        // Use standard probe-rs runner for non-radio tests.
-        let mut command = Command::new("probe-rs");
-        command.arg("run").arg(&elf_path).arg("--verify");
-        if let Some(test_filter) = test_filter {
-            command.arg(test_filter);
-        }
-
-        let status = command.status().context("Failed to execute probe-rs")?;
-
-        log::info!("'{}' done", elf_name);
-
-        if !status.success() {
-            failed.push(elf_name);
         }
     }
 
@@ -534,5 +548,27 @@ mod tests {
     fn rejects_empty_binary_or_test_filters() {
         assert!(parse_elf_filters(&strings(&["::test_name"])).is_err());
         assert!(parse_elf_filters(&strings(&["misc_non_drivers::"])).is_err());
+    }
+
+    #[test]
+    fn parses_multiple_test_filters_for_same_binary() {
+        let filters =
+            parse_elf_filters(&strings(&["i2s::i2s_loopback", "i2s::i2s_write_one_shot"])).unwrap();
+
+        assert_eq!(
+            filters,
+            vec![
+                ElfFilter {
+                    raw: "i2s::i2s_loopback".to_string(),
+                    binary: "i2s".to_string(),
+                    test_filter: Some("i2s_loopback".to_string()),
+                },
+                ElfFilter {
+                    raw: "i2s::i2s_write_one_shot".to_string(),
+                    binary: "i2s".to_string(),
+                    test_filter: Some("i2s_write_one_shot".to_string()),
+                },
+            ]
+        );
     }
 }
