@@ -78,7 +78,7 @@ where
                 crate::partitions::DataPartitionSubType::Ota,
             ))?;
         if let Some(ota_part) = ota_part {
-            let ota_part = ota_part.as_embedded_storage(self.flash);
+            let ota_part = ota_part.clone().as_embedded_storage(self.flash);
             let ota = crate::ota::Ota::new(ota_part, self.ota_count)?;
             Ok(ota)
         } else {
@@ -151,6 +151,7 @@ where
             .pt
             .find_partition(crate::partitions::PartitionType::App(next_slot))?
             .ok_or(Error::Invalid)?
+            .clone()
             .as_embedded_storage(self.flash);
 
         Ok((flash_region, next_slot))
