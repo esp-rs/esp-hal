@@ -20,7 +20,7 @@ test  = false
 
 [dependencies]
 document-features = "0.2"
-defmt             = {version = "1.0.1", optional = true}
+defmt             = {version = "1.1", optional = true}
 macros            = { version = "0.5.0", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
 xtensa-lx         = { version = "0.13.0", path = "../xtensa-lx" }
 

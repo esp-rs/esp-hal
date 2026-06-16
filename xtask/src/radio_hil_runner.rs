@@ -203,7 +203,7 @@ const PROBE_LIST_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Spawn `probe-rs run` for the harness, capture its stdout, and block
 /// until the firmware emits its first defmt log line (i.e. flashing is
-/// complete and the support firmware is actually running).  
+/// complete and the support firmware is actually running).
 fn spawn_harness_and_wait_until_ready(
     binary_path: &Path,
     probe: &str,
