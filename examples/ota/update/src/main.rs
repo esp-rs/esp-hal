@@ -90,6 +90,7 @@ fn main() -> ! {
     let button = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
         feature = "esp32c5" => peripherals.GPIO28,
+        feature = "esp32p4" => peripherals.GPIO35,
         _ => peripherals.GPIO9,
     };
 
