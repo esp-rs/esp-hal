@@ -145,7 +145,6 @@ mod tests {
 #[cfg(feature = "esp-storage")]
 #[embedded_test::tests]
 mod storage_tests {
-    use embedded_storage::*;
     use esp_bootloader_esp_idf::partitions;
     use esp_hal::peripherals::FLASH;
     use esp_storage::FlashStorage;
@@ -178,7 +177,7 @@ mod storage_tests {
         ))
         .unwrap()
         .unwrap()
-        .as_embedded_storage(&mut flash)
+        .as_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
 

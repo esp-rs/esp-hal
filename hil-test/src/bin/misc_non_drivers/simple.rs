@@ -146,6 +146,7 @@ mod tests {
         assert_eq!(crc_smbus, 0xf4);
     }
 
+    #[cfg(not(esp32p4))]
     #[test]
     fn test_crc_rom_function() {
         let crc = esp_bootloader_esp_idf::Crc32ForTesting::new();

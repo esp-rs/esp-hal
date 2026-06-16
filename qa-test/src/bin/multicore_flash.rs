@@ -16,7 +16,6 @@
 
 use core::ptr::addr_of_mut;
 
-use embedded_storage::nor_flash::NorFlash;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
@@ -116,7 +115,7 @@ fn flash_access(flash: esp_hal::peripherals::FLASH) {
 
         let mut foo = [0u8; 0x4000];
 
-        let res = flash.write(0x9000, &mut foo);
+        let res = flash.write_nor(0x9000, &foo);
         println!("Writing to flash result: {:?}", res);
     }
 }

@@ -31,7 +31,6 @@ esp-radio = { path = "../esp-radio", features = [
     "unstable",
 ], optional = true }
 esp-storage = { path = "../esp-storage", optional = true }
-embedded-storage = "0.3.1"
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
 static_cell = "2.1.1"

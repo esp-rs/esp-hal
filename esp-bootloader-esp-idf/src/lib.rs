@@ -101,22 +101,30 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "std"))]
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(any(feature = "std", feature = "esp32p4")))]
 mod rom;
-#[cfg(not(feature = "std"))]
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(any(feature = "std", feature = "esp32p4")))]
 pub(crate) use rom as crypto;
 
 #[cfg(feature = "std")]
 mod non_rom;
-#[cfg(embedded_test)]
+#[cfg(all(embedded_test, not(feature = "esp32p4")))]
 pub use crypto::Crc32 as Crc32ForTesting;
 #[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(feature = "esp32p4"))]
 pub mod partitions;
 
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(feature = "esp32p4"))]
 pub mod ota;
 
+// temporary fix - no esp-storage support for P4 yet
+#[cfg(not(feature = "esp32p4"))]
 pub mod ota_updater;
 
 // We run tests on the host which happens to be MacOS machines and mach-o

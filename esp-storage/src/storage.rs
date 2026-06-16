@@ -1,11 +1,10 @@
-use embedded_storage::{ReadStorage, Storage};
-
 use crate::{FlashStorage, FlashStorageError, buffer::FlashSectorBuffer};
 
-impl ReadStorage for FlashStorage<'_> {
-    type Error = FlashStorageError;
-
-    fn read(&mut self, offset: u32, mut bytes: &mut [u8]) -> Result<(), Self::Error> {
+impl FlashStorage<'_> {
+    /// Read bytes from flash.
+    ///
+    /// Unaligned offsets and lengths are supported.
+    pub fn read(&mut self, offset: u32, mut bytes: &mut [u8]) -> Result<(), FlashStorageError> {
         self.check_bounds(offset, bytes.len())?;
 
         let mut data_offset = offset % Self::WORD_SIZE;
@@ -39,13 +38,14 @@ impl ReadStorage for FlashStorage<'_> {
     /// The SPI flash size is configured by writing a field in the software
     /// bootloader image header. This is done during flashing in espflash /
     /// esptool.
-    fn capacity(&self) -> usize {
+    pub fn capacity(&self) -> usize {
         self.capacity
     }
-}
 
-impl Storage for FlashStorage<'_> {
-    fn write(&mut self, offset: u32, mut bytes: &[u8]) -> Result<(), Self::Error> {
+    /// Write bytes to flash.
+    ///
+    /// Performs read-modify-write on affected sectors and erases before writing.
+    pub fn write(&mut self, offset: u32, mut bytes: &[u8]) -> Result<(), FlashStorageError> {
         self.check_bounds(offset, bytes.len())?;
 
         let mut data_offset = offset % Self::SECTOR_SIZE;
@@ -70,5 +70,30 @@ impl Storage for FlashStorage<'_> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "embedded-storage")]
+mod embedded_storage_traits {
+    use ::embedded_storage::{ReadStorage, Storage};
+
+    use super::*;
+
+    impl ReadStorage for FlashStorage<'_> {
+        type Error = FlashStorageError;
+
+        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+            FlashStorage::read(self, offset, bytes)
+        }
+
+        fn capacity(&self) -> usize {
+            FlashStorage::capacity(self)
+        }
+    }
+
+    impl Storage for FlashStorage<'_> {
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            FlashStorage::write(self, offset, bytes)
+        }
     }
 }
