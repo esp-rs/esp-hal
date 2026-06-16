@@ -1,6 +1,6 @@
 //! Allocator and PSRAM-related tests
 
-//% CHIP_FILTER(llff, tlsf): psram_driver_supported
+//% CHIP_FILTER(llff, tlsf): psram_driver_supported && soc_has_flash
 //% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-alloc/nightly esp-storage

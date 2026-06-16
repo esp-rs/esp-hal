@@ -1,6 +1,6 @@
 //! Test we place the app descriptor at the right position in the image and we
 //! can read it
-//% CHIP_FILTER: spi_master_driver_supported
+//% CHIP_FILTER: soc_has_flash
 //% FEATURES: unstable esp-storage
 
 #![no_std]
