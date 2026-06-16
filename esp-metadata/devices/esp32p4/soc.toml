@@ -93,6 +93,8 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART" },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART" },
     { name = "UART4", interrupts = { peri = "UART4" }, clock_group = "UART" },
+    { name = "SPI0" },
+    { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
     { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C" },
@@ -129,6 +131,7 @@ peripherals = [
     { name = "USB_HS", interrupts = { peri = "USB_HS" } },
     { name = "USB_WRAP", hidden = true },
 
+    { name = "FLASH", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "CPU_CTRL", virtual = true },
 ]

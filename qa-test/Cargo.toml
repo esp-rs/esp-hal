@@ -113,6 +113,7 @@ esp32p4 = [
     "esp-hal/esp32p4",
     "esp-rtos/esp32p4",
     "esp-println/esp32p4",
+    "esp-storage?/esp32p4",
 ]
 esp32s2 = [
     "esp-backtrace/esp32s2",

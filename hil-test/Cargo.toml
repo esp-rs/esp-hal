@@ -216,7 +216,8 @@ esp32p4 = [
     "esp-alloc?/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-metadata-generated/esp32p4",
-    "esp-rtos?/esp32p4"
+    "esp-rtos?/esp32p4",
+    "esp-storage?/esp32p4",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
