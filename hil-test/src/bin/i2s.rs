@@ -377,11 +377,8 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let mut rx_buffer = DmaRxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -437,11 +434,8 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let mut rx_buffer = DmaRxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -502,11 +496,7 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let tx_buffer = DmaTxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -548,11 +538,7 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let tx_buffer = DmaTxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -595,11 +581,8 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let mut tx_buffer = DmaTxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -646,11 +629,8 @@ mod tests {
             InternalMemory<[DmaDescriptor; 4]>,
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
-        let mut tx_buffer = DmaTxBuf::new(
-            descr.get_mut().unsize(),
-            buffer.get_mut().unsize(),
-        )
-        .unwrap();
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
