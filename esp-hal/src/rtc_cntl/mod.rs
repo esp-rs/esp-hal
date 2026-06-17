@@ -951,6 +951,22 @@ pub(crate) fn release_wake_lock() {
 /// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
 /// released when the guard is dropped.
 ///
+/// # Wake-lock contract
+///
+/// - **Wake lock held ⇒ the system will not auto-lightsleep.**
+/// - Wakeup is **timer-only** in this version: light sleep is only ever entered
+///   with a timer wake source armed for the next scheduled wakeup. Any code that
+///   needs an asynchronous (non-timer) wakeup — e.g. waiting on a GPIO or
+///   peripheral interrupt — must hold a `WakeLock` for the **entire** duration of
+///   its wait, acquired in thread context *before* the wait begins.
+/// - **Trusting default:** un-instrumented interrupt waits are not detected. If
+///   such a wait does not hold a `WakeLock`, the system may still light-sleep and
+///   the wait will only be serviced at the next timer wakeup (i.e. it may be
+///   delayed).
+/// - Active `wake_locking` peripheral clocks (e.g. UART/SPI/I2C on ESP32-C6) hold
+///   the lock automatically while their function clock is enabled, so drivers
+///   that manage those clocks keep the system awake without manual locking.
+///
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::rtc_cntl::WakeLock;
