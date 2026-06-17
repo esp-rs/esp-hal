@@ -1,5 +1,5 @@
 #[cfg(dma_can_access_psram)]
-use core::ops::Range;
+use core::{mem::MaybeUninit, ops::Range};
 use core::{
     ops::{Deref, DerefMut},
     ptr::{NonNull, null_mut},
@@ -1996,6 +1996,7 @@ fn build_descriptor_list_for_psram(
         let copy_buffer = unwrap!(copy_buffer_iter.next());
         let buffer =
             copy_buffer.insert(ManualWritebackBuffer::new(get_range(data, 0..head_to_copy)));
+        buffer.prepare_for_dma();
 
         let Some(descriptor) = desciptor_iter.next() else {
             return consumed;
@@ -2026,6 +2027,7 @@ fn build_descriptor_list_for_psram(
             data,
             data.len() - tail_to_copy..data.len(),
         )));
+        buffer.prepare_for_dma();
 
         let Some(descriptor) = desciptor_iter.next() else {
             return consumed;
@@ -2091,7 +2093,7 @@ const BUF_LEN: usize = 16 + 2 * (MIN_LAST_DMA_LEN - 1); // 2x makes aligning sho
 /// the CPU back to PSRAM.
 #[cfg(dma_can_access_psram)]
 pub(crate) struct ManualWritebackBuffer {
-    buffer: InternalMemory<[u8; BUF_LEN]>,
+    buffer: InternalMemory<MaybeUninit<[u8; BUF_LEN]>>,
     dst_address: NonNull<u8>,
     n_bytes: u8,
 }
@@ -2101,10 +2103,17 @@ impl ManualWritebackBuffer {
     pub fn new(ptr: NonNull<[u8]>) -> Self {
         assert!(ptr.len() <= BUF_LEN);
         Self {
-            buffer: InternalMemory::new([0; BUF_LEN]),
+            buffer: InternalMemory::new(MaybeUninit::uninit()),
             dst_address: ptr.cast(),
             n_bytes: ptr.len() as u8,
         }
+    }
+
+    pub fn prepare_for_dma(&mut self) {
+        // Ensure our cache line is not dirty. A dirty cacheline
+        // evicted during DMA operation can clobber received data.
+        #[cfg(soc_internal_memory_cached)]
+        self.buffer.get_mut().invalidate();
     }
 
     pub fn write_back(&mut self) {
@@ -2114,7 +2123,7 @@ impl ManualWritebackBuffer {
         #[cfg(soc_internal_memory_cached)]
         self.buffer.get_mut().invalidate();
 
-        let src = self.buffer.get_mut().as_ptr();
+        let src = self.mut_buffer_ptr().cast_const();
         unsafe {
             self.dst_address
                 .as_ptr()
@@ -2123,6 +2132,6 @@ impl ManualWritebackBuffer {
     }
 
     pub fn mut_buffer_ptr(&mut self) -> *mut u8 {
-        self.buffer.get_mut().as_mut_ptr()
+        self.buffer.get_mut().as_mut_ptr().cast::<u8>()
     }
 }
