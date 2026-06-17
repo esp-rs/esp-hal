@@ -433,7 +433,7 @@ macro_rules! dma_buffers_impl {
                         $crate::dma::aligned::InternalMemory::new([0; $size]);
                     // SAFETY: The ConstStaticCell in the descriptor part ensures there will only
                     // be a single mutable reference to this buffer.
-                    unsafe { BUFFER.get_typed_mut().unsize() }
+                    unsafe { BUFFER.get_mut().unsize() }
                 },
                 $crate::dma_descriptors_impl!($size, $chunk_size),
             )
@@ -472,7 +472,7 @@ macro_rules! dma_descriptors_impl {
             [DmaDescriptor::EMPTY; __DMA_DESCRIPTOR_COUNT],
         ));
 
-        DESCRIPTORS.take().get_typed_mut().unsize()
+        DESCRIPTORS.take().get_mut().unsize()
     }};
 }
 

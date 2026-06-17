@@ -1588,7 +1588,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         #[cfg(soc_internal_memory_cached)]
         #[allow(static_mut_refs)]
         unsafe {
-            EMPTY.get_typed_mut().writeback();
+            EMPTY.get_mut().writeback();
         }
 
         Preparation {
@@ -1623,7 +1623,7 @@ unsafe impl DmaRxBuffer for EmptyBuf {
         #[cfg(soc_internal_memory_cached)]
         #[allow(static_mut_refs)]
         unsafe {
-            EMPTY.get_typed_mut().writeback();
+            EMPTY.get_mut().writeback();
         }
 
         Preparation {
@@ -2112,17 +2112,14 @@ impl ManualWritebackBuffer {
         // Invalidate the cache lines covering the alignment buffer so the CPU
         // reads the fresh DMA data rather than the stale zeros from new().
         #[cfg(soc_internal_memory_cached)]
-        self.buffer.get_typed_mut().invalidate();
+        self.buffer.get_mut().invalidate();
 
+        let src = self.buffer.get_mut().as_ptr();
         unsafe {
             self.dst_address
                 .as_ptr()
-                .copy_from(self.buffer_ptr(), self.n_bytes as usize);
+                .copy_from(src, self.n_bytes as usize);
         }
-    }
-
-    pub fn buffer_ptr(&self) -> *const u8 {
-        self.buffer.get().as_ptr()
     }
 
     pub fn mut_buffer_ptr(&mut self) -> *mut u8 {

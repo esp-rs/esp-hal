@@ -378,8 +378,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let mut rx_buffer = DmaRxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 
@@ -438,8 +438,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let mut rx_buffer = DmaRxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 
@@ -503,8 +503,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let tx_buffer = DmaTxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 
@@ -549,8 +549,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let tx_buffer = DmaTxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 
@@ -596,8 +596,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let mut tx_buffer = DmaTxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 
@@ -647,8 +647,8 @@ mod tests {
             InternalMemory::new([DmaDescriptor::EMPTY; 4])
         );
         let mut tx_buffer = DmaTxBuf::new(
-            descr.get_typed_mut().unsize(),
-            buffer.get_typed_mut().unsize(),
+            descr.get_mut().unsize(),
+            buffer.get_mut().unsize(),
         )
         .unwrap();
 

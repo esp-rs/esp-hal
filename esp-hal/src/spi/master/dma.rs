@@ -264,7 +264,7 @@ impl<'d> SpiDma<'d, Blocking> {
         // Safety: The descriptors occupy their own shared cache line and are updated in a
         // synchronised fashion.
         let (tx_descriptors, rx_descriptors) = unsafe {
-            let descriptors = (&mut *state.descriptors.get()).get_mut();
+            let descriptors = (&mut *state.descriptors.get()).get_mut().into_inner();
             descriptors.fill(DmaDescriptor::EMPTY);
             let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
             (
@@ -275,7 +275,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
         let tx_buffer = cfg_select! {
             all(spi_master_version = "1", spi_address_workaround) => unsafe {
-                (&mut *state.default_tx_buffer.get()).get_typed_mut().unsize()
+                (&mut *state.default_tx_buffer.get()).get_mut().unsize()
             },
             _ => unsafe {
                 DmaAlignedMut::new_unchecked(&mut [][..])

@@ -40,21 +40,9 @@ impl<T> InternalMemory<T> {
     ///
     /// Panics if the value is not located at a valid internal RAM address.
     #[instability::unstable]
-    pub fn get_typed_mut(&mut self) -> DmaAlignedMut<'_, T> {
+    pub fn get_mut(&mut self) -> DmaAlignedMut<'_, T> {
         assert!(is_valid_ram_address(&raw const self.0 as usize));
         DmaAlignedMut(&mut self.0)
-    }
-
-    /// Returns a mutable reference to the underlying value.
-    #[instability::unstable]
-    pub fn get(&self) -> &T {
-        &self.0
-    }
-
-    /// Returns a mutable reference to the underlying value.
-    #[instability::unstable]
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.0
     }
 }
 
