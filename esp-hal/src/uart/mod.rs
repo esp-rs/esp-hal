@@ -2014,6 +2014,38 @@ where
         (self.rx, self.tx)
     }
 
+    #[procmacros::doc_replace]
+    /// Split the UART into a borrowed transmitter and receiver
+    ///
+    /// This is particularly useful when having two futures correlating to
+    /// transmitting and receiving, and you want to go back to using the UART
+    /// as a whole later.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    ///
+    /// loop {
+    ///     // The UART can be split into separate Transmit and Receive components:
+    ///     let (rx, tx) = uart.split_borrowed();
+    ///
+    ///     // Each component can be used individually to interact with the UART:
+    ///     tx.write(&[42u8])?;
+    ///     let mut byte = [0u8; 1];
+    ///     rx.read(&mut byte);
+    /// }
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn split_borrowed(&mut self) -> (&mut UartRx<'d, Dm>, &mut UartTx<'d, Dm>) {
+        (&mut self.rx, &mut self.tx)
+    }
+
     /// Reads and clears errors set by received data.
     #[instability::unstable]
     pub fn check_for_rx_errors(&mut self) -> Result<(), RxError> {
