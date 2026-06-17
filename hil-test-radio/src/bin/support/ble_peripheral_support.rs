@@ -2,7 +2,6 @@
 //% SUPPORT-FIRMWARE: true
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/ble esp-radio esp-radio-unstable
-//% FEATURES(has_wifi_ble): esp-radio/defmt defmt
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 
 #![no_std]
@@ -74,7 +73,6 @@ where
     C: Controller,
 {
     let address = Address::random(PERIPHERAL_ADDRESS);
-    defmt::info!("[BLE-SUPPORT] address configured");
 
     let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
     let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
@@ -93,9 +91,7 @@ where
         loop {
             match advertise(&mut peripheral, &server).await {
                 Ok(conn) => {
-                    defmt::info!("[BLE-SUPPORT] connected");
                     gatt_events_task(&server, &conn).await;
-                    defmt::info!("[BLE-SUPPORT] disconnected");
                 }
                 Err(_) => Timer::after(Duration::from_millis(100)).await,
             }
@@ -107,7 +103,6 @@ where
 async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
     loop {
         if runner.run().await.is_err() {
-            defmt::warn!("[BLE-SUPPORT] runner stopped");
             Timer::after(Duration::from_millis(100)).await;
         }
     }
@@ -140,7 +135,7 @@ where
         )
         .await?;
 
-    defmt::info!("[BLE-SUPPORT] advertising");
+    hil_test::signal_harness_ready();
     Ok(advertiser.accept().await?.with_attribute_server(server)?)
 }
 
@@ -153,13 +148,11 @@ async fn gatt_events_task<P: PacketPool>(server: &Server<'_>, conn: &GattConnect
             GattConnectionEvent::Gatt { event } => {
                 if let GattEvent::Read(event) = &event
                     && event.handle() == level.handle
-                {
-                    defmt::info!("[BLE-SUPPORT] battery level read");
-                }
+                {}
 
                 match event.accept() {
                     Ok(reply) => reply.send().await,
-                    Err(_) => defmt::warn!("[BLE-SUPPORT] failed to accept GATT event"),
+                    Err(_) => {}
                 }
             }
             _ => {}
