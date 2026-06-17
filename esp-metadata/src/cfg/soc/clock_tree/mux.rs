@@ -27,6 +27,9 @@ pub struct Multiplexer {
     #[serde(default)]
     always_on: bool,
 
+    #[serde(default)]
+    wake_locking: bool,
+
     // reject: Option<RejectExpression>,
     pub variants: Vec<MultiplexerVariant>,
 }
@@ -38,6 +41,10 @@ impl ClockTreeNodeType for Multiplexer {
 
     fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.wake_locking
     }
 
     fn input_clocks(
