@@ -1082,9 +1082,8 @@ mod qspi_dma {
         let [pin, pin_mirror, _] = ctx.gpios;
         let mut pin_mirror = Output::new(pin_mirror, Level::Low, OutputConfig::default());
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
         let mut spi = ctx
             .spi
             .with_sio0(pin)
@@ -1224,9 +1223,8 @@ mod qspi_dma {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
         let spi = ctx
             .spi
             .with_sio0(mosi)
