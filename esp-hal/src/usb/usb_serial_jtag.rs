@@ -130,6 +130,7 @@ use crate::{
     asynch::AtomicWaker,
     pac::usb_device::RegisterBlock,
     peripherals::USB_DEVICE,
+    rtc_cntl::WakeLock,
     system::{Peripheral, PeripheralClockControl},
 };
 
@@ -146,12 +147,14 @@ pub struct UsbSerialJtag<'d, Dm: DriverMode> {
 pub struct UsbSerialJtagTx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
+    wake_lock: WakeLock,
 }
 
 /// USB Serial/JTAG (Receive)
 pub struct UsbSerialJtagRx<'d, Dm: DriverMode> {
     peripheral: USB_DEVICE<'d>,
     phantom: PhantomData<Dm>,
+    wake_lock: WakeLock,
 }
 
 impl<'d, Dm> UsbSerialJtagTx<'d, Dm>
@@ -162,6 +165,7 @@ where
         Self {
             peripheral,
             phantom: PhantomData,
+            wake_lock: WakeLock::new(),
         }
     }
 
@@ -240,6 +244,7 @@ where
         Self {
             peripheral,
             phantom: PhantomData,
+            wake_lock: WakeLock::new(),
         }
     }
 
@@ -326,10 +331,12 @@ impl<'d> UsbSerialJtag<'d, Blocking> {
             rx: UsbSerialJtagRx {
                 peripheral: self.rx.peripheral,
                 phantom: PhantomData,
+                wake_lock: self.rx.wake_lock,
             },
             tx: UsbSerialJtagTx {
                 peripheral: self.tx.peripheral,
                 phantom: PhantomData,
+                wake_lock: self.tx.wake_lock,
             },
         }
     }
@@ -798,10 +805,12 @@ impl<'d> UsbSerialJtag<'d, Async> {
             rx: UsbSerialJtagRx {
                 peripheral: self.rx.peripheral,
                 phantom: PhantomData,
+                wake_lock: self.rx.wake_lock,
             },
             tx: UsbSerialJtagTx {
                 peripheral: self.tx.peripheral,
                 phantom: PhantomData,
+                wake_lock: self.tx.wake_lock,
             },
         }
     }

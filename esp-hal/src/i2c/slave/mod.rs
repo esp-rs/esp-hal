@@ -41,6 +41,7 @@ use crate::{
     pac::i2c0::RegisterBlock,
     private,
     ram,
+    rtc_cntl::WakeLock,
     system::PeripheralGuard,
 };
 
@@ -373,6 +374,7 @@ struct I2cSlaveFuture<'a> {
     regs: &'a RegisterBlock,
     state: &'a State,
     events: EnumSet<Event>,
+    _wake_lock: WakeLock,
 }
 
 impl<'a> I2cSlaveFuture<'a> {
@@ -396,6 +398,7 @@ impl<'a> I2cSlaveFuture<'a> {
             regs,
             state,
             events,
+            _wake_lock: WakeLock::new(),
         }
     }
 }

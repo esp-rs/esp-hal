@@ -28,6 +28,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt},
+    rtc_cntl::WakeLock,
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -663,12 +664,14 @@ impl Instance for crate::peripherals::ADC2<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct AdcFuture<ADCX: Instance> {
     phantom: PhantomData<ADCX>,
+    _wake_lock: WakeLock,
 }
 
 impl<ADCX: Instance> AdcFuture<ADCX> {
     pub fn new(_self: &super::Adc<'_, ADCX, Async>) -> Self {
         Self {
             phantom: PhantomData,
+            _wake_lock: WakeLock::new(),
         }
     }
 }

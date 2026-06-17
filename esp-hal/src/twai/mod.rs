@@ -1625,6 +1625,7 @@ mod asynch {
     use esp_sync::RawMutex;
 
     use super::*;
+    use crate::rtc_cntl::WakeLock;
 
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
@@ -1670,6 +1671,7 @@ mod asynch {
         twai: AnyTwai<'d>,
         frame: &'f EspTwaiFrame,
         in_flight: bool,
+        _wake_lock: WakeLock,
     }
 
     impl<'d, 'f> TransmitFuture<'d, 'f> {
@@ -1678,6 +1680,7 @@ mod asynch {
                 twai,
                 frame,
                 in_flight: false,
+                _wake_lock: WakeLock::new(),
             }
         }
     }

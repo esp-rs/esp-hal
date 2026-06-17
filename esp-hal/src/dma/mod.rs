@@ -1512,6 +1512,7 @@ pub(crate) mod asynch {
     use enumset::enum_set;
 
     use super::*;
+    use crate::rtc_cntl::WakeLock;
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaTxFuture<'a, CH>
@@ -1521,6 +1522,7 @@ pub(crate) mod asynch {
         pub(crate) tx: &'a mut ChannelTx<Async, CH>,
         success_interrupts: EnumSet<DmaTxInterrupt>,
         failure_interrupts: EnumSet<DmaTxInterrupt>,
+        _wake_lock: WakeLock,
     }
 
     impl<'a, CH> DmaTxFuture<'a, CH>
@@ -1536,6 +1538,7 @@ pub(crate) mod asynch {
                 tx,
                 success_interrupts: enum_set!(DmaTxInterrupt::TotalEof),
                 failure_interrupts: enum_set!(DmaTxInterrupt::DescriptorError),
+                _wake_lock: WakeLock::new(),
             }
         }
 
@@ -1549,6 +1552,7 @@ pub(crate) mod asynch {
                 tx,
                 success_interrupts,
                 failure_interrupts,
+                _wake_lock: WakeLock::new(),
             }
         }
     }
@@ -1604,6 +1608,7 @@ pub(crate) mod asynch {
         pub(crate) rx: &'a mut ChannelRx<Async, CH>,
         success_interrupts: EnumSet<DmaRxInterrupt>,
         failure_interrupts: EnumSet<DmaRxInterrupt>,
+        _wake_lock: WakeLock,
     }
 
     impl<'a, CH> DmaRxFuture<'a, CH>
@@ -1619,6 +1624,7 @@ pub(crate) mod asynch {
                         | DmaRxInterrupt::DescriptorEmpty
                         | DmaRxInterrupt::ErrorEof
                 ),
+                _wake_lock: WakeLock::new(),
             }
         }
 
@@ -1632,6 +1638,7 @@ pub(crate) mod asynch {
                 rx,
                 success_interrupts,
                 failure_interrupts,
+                _wake_lock: WakeLock::new(),
             }
         }
     }
