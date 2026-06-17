@@ -388,6 +388,40 @@ impl<'d> Rtc<'d> {
         self.sleep(&config, wake_sources);
     }
 
+    /// Enters light sleep until `wake_at`, then restores monotonic system time.
+    ///
+    /// On return, [`Instant::now`] reflects the real elapsed time: the systimer,
+    /// which stops during light sleep, is advanced by the time spent asleep as
+    /// measured by the always-running LP timer. Only a timer wake source is armed,
+    /// and the scheduler's pre-armed systimer alarm is left untouched.
+    ///
+    /// Returns immediately without sleeping if `wake_at` is already in the past.
+    ///
+    /// [`Instant::now`]: crate::time::Instant::now
+    #[cfg(sleep_auto_light_sleep)]
+    pub fn light_sleep_until(&mut self, wake_at: crate::time::Instant) {
+        let now = crate::time::Instant::now();
+        if wake_at <= now {
+            return;
+        }
+
+        let before = self.time_since_power_up();
+        let timer = sleep::TimerWakeupSource::new(core::time::Duration::from_micros(
+            (wake_at - now).as_micros(),
+        ));
+        self.sleep_light(&[&timer]);
+        let after = self.time_since_power_up();
+
+        let slept_us = after.as_micros().saturating_sub(before.as_micros());
+        let slept_ticks = crate::timer::systimer::SystemTimer::us_to_ticks(slept_us);
+
+        critical_section::with(|_| unsafe {
+            let unit = crate::timer::systimer::Unit::Unit0;
+            let current = crate::timer::systimer::SystemTimer::unit_value(unit);
+            crate::timer::systimer::SystemTimer::set_unit_value(unit, current + slept_ticks);
+        });
+    }
+
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
     #[cfg(sleep_driver_supported)]
