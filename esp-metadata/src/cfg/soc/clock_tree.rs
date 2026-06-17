@@ -260,6 +260,9 @@ pub(crate) struct ManagementProperties {
     /// This clock node is considered always running.
     pub always_on: bool,
 
+    /// This clock node holds a wake lock while it is enabled.
+    pub wake_locking: bool,
+
     pub receiver: Option<TokenStream>,
     pub accessor: Option<TokenStream>,
 }
@@ -294,6 +297,10 @@ impl ManagementProperties {
 
     pub fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    pub fn wake_locking(&self) -> bool {
+        self.wake_locking
     }
 
     /// For peripheral clocks, returns a receiver expression (`self`).
@@ -339,6 +346,9 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
 
     fn always_on(&self) -> bool {
+        false
+    }
+    fn wake_locking(&self) -> bool {
         false
     }
     fn validate_source_data(

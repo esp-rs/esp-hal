@@ -266,6 +266,10 @@ impl ClockTreeNodeInstance {
         self.node.always_on()
     }
 
+    fn wake_locking(&self) -> bool {
+        self.node.wake_locking()
+    }
+
     fn input_clocks(&self, tree: &ProcessedClockData) -> Vec<String> {
         self.node.input_clocks(self, tree)
     }
@@ -471,6 +475,17 @@ impl ClockTreeNodeInstance {
         let request_trace = log_msg("Requesting");
         let release_trace = log_msg("Releasing");
 
+        let acquire_wake_lock = if self.properties.wake_locking() {
+            quote! { crate::rtc_cntl::acquire_wake_lock(); }
+        } else {
+            quote! {}
+        };
+        let release_wake_lock = if self.properties.wake_locking() {
+            quote! { crate::rtc_cntl::release_wake_lock(); }
+        } else {
+            quote! {}
+        };
+
         let refcount_accessor = self.properties.refcount_accessor();
         ClockNodeFunctions {
             impl_type: if self.properties.receiver.is_some() {
@@ -495,6 +510,7 @@ impl ClockTreeNodeInstance {
                             trace!(#request_trace);
                             if increment_reference_count(&mut #refcount_accessor) {
                                 trace!(#enable_trace);
+                                #acquire_wake_lock
                                 #request_direct_dependencies
                                 #(#receiver.)* #enable_fn_impl_name(clocks, true);
                             }
@@ -530,6 +546,7 @@ impl ClockTreeNodeInstance {
                             trace!(#release_trace);
                             if decrement_reference_count(&mut #refcount_accessor) {
                                 trace!(#disable_trace);
+                                #release_wake_lock
                                 #(#receiver.)* #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
                             }
@@ -1453,6 +1470,7 @@ impl DeviceClocks {
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        wake_locking: false,
                         receiver: None,
                         accessor: None, // System clocks are never collected in an array
                     },
@@ -1511,6 +1529,7 @@ impl DeviceClocks {
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        wake_locking: false,
                         receiver: Some(quote! { self }),
                         accessor: Some(quote! { #instance_ty::#instance_variant as usize }),
                     },
@@ -1603,6 +1622,22 @@ impl DeviceClocks {
                 None
             };
             node.properties.always_on = node.always_on();
+            node.properties.wake_locking = node.wake_locking();
+
+            if node.wake_locking() && !node.properties.refcounted {
+                anyhow::bail!(
+                    "Clock node `{}` is `wake_locking` but not reference-counted; \
+                     it has no enable/disable edges to acquire and release the wake lock.",
+                    node.name_str()
+                );
+            }
+            if node.wake_locking() && node.always_on() {
+                anyhow::bail!(
+                    "Clock node `{}` is both `always_on` and `wake_locking`; \
+                     an always-on clock would pin the wake lock forever.",
+                    node.name_str()
+                );
+            }
 
             if !node.group_template.is_empty() {
                 tree.group_instances
