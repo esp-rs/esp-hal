@@ -123,6 +123,11 @@ impl TimeDriver {
         }
     }
 
+    #[cfg(sleep_auto_light_sleep)]
+    pub(crate) fn next_wakeup(&self) -> u64 {
+        self.timer_queue.next_wakeup()
+    }
+
     /// Force-rearms the alarm timer.
     pub(crate) fn rearm(&mut self, now: u64) {
         self.current_alarm = u64::MAX;

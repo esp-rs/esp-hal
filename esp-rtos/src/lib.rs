@@ -77,6 +77,8 @@ mod fmt;
 
 #[cfg(feature = "esp-radio")]
 mod esp_radio;
+#[cfg(sleep_auto_light_sleep)]
+mod light_sleep;
 mod run_queue;
 mod scheduler;
 mod syscall;
@@ -114,6 +116,8 @@ use esp_hal::{
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::main;
+#[cfg(sleep_auto_light_sleep)]
+pub use light_sleep::auto_light_sleep;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
