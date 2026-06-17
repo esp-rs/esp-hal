@@ -123,6 +123,11 @@ impl TimeDriver {
         }
     }
 
+    #[cfg(sleep_auto_light_sleep)]
+    pub(crate) fn next_wakeup(&self) -> u64 {
+        self.timer_queue.next_wakeup()
+    }
+
     pub(crate) fn handle_alarm(&mut self, now: u64, on_task_ready: impl FnMut(TaskPtr)) {
         if now < self.current_alarm {
             trace!(
