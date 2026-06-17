@@ -421,7 +421,15 @@ impl<'d> Rtc<'d> {
             return;
         }
 
+        let unit = crate::timer::systimer::Unit::Unit0;
+
+        // Latch the systimer value *before* sleeping. The systimer keeps running during
+        // the sleep enter/exit sequences, so we must not advance from the post-wake
+        // value (that would count the enter/exit time twice). Instead we set an absolute
+        // target of `before + slept`, measured by the always-running LP timer.
+        let before_ticks = crate::timer::systimer::SystemTimer::unit_value(unit);
         let before = self.time_since_power_up();
+
         let timer = sleep::TimerWakeupSource::new(core::time::Duration::from_micros(
             (wake_at - now).as_micros(),
         ));
@@ -432,9 +440,7 @@ impl<'d> Rtc<'d> {
         let slept_ticks = crate::timer::systimer::SystemTimer::us_to_ticks(slept_us);
 
         critical_section::with(|_| unsafe {
-            let unit = crate::timer::systimer::Unit::Unit0;
-            let current = crate::timer::systimer::SystemTimer::unit_value(unit);
-            crate::timer::systimer::SystemTimer::set_unit_value(unit, current + slept_ticks);
+            crate::timer::systimer::SystemTimer::set_unit_value(unit, before_ticks + slept_ticks);
         });
     }
 

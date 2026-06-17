@@ -31,8 +31,7 @@ static RTC: NonReentrantMutex<Option<Rtc<'static>>> = NonReentrantMutex::new(Non
 /// - no [`WakeLock`] is held,
 /// - this is the primary core and no second core scheduler is running,
 /// - there is a finite next scheduled wakeup, and
-/// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds
-///   away.
+/// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
 /// If all hold, it calls [`Rtc::light_sleep_until`] for the next wakeup; otherwise
 /// it falls back to `WFI`. The minimum-residency threshold is configurable via the
@@ -40,10 +39,10 @@ static RTC: NonReentrantMutex<Option<Rtc<'static>>> = NonReentrantMutex::new(Non
 ///
 /// # Ownership and limitations
 ///
-/// - This factory takes the `LPWR` peripheral by value: with auto light-sleep
-///   enabled, esp-rtos owns the RTC handle for the lifetime of the program.
-/// - **Single-core only.** On a system with a started second core, the hook
-///   degrades to `WFI` and never puts the chip to sleep.
+/// - This factory takes the `LPWR` peripheral by value: with auto light-sleep enabled, esp-rtos
+///   owns the RTC handle for the lifetime of the program.
+/// - **Single-core only.** On a system with a started second core, the hook degrades to `WFI` and
+///   never puts the chip to sleep.
 /// - Only available on chips that support auto light-sleep (currently ESP32-C6).
 ///
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
@@ -73,7 +72,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return false;
             }
 
-            let Some(time_driver) = scheduler.time_driver.as_ref() else {
+            let Some(time_driver) = scheduler.time_driver.as_mut() else {
                 return false;
             };
             let next_wakeup = time_driver.next_wakeup();
@@ -90,6 +89,11 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 let rtc = slot.as_mut().unwrap();
                 rtc.light_sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
             });
+
+            // The alarm timer was gated during light sleep, so its pre-armed alarm is
+            // stale. Force a re-arm against the restored time base so the tick handler
+            // fires promptly and drains the timer queue.
+            time_driver.rearm(crate::now());
             true
         });
 
