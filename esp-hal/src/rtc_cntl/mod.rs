@@ -933,3 +933,71 @@ pub fn wakeup_cause() -> SleepSource {
 
     SleepSource::Undefined
 }
+
+static WAKE_LOCK_COUNT: portable_atomic::AtomicUsize = portable_atomic::AtomicUsize::new(0);
+
+pub(crate) fn acquire_wake_lock() {
+    WAKE_LOCK_COUNT.fetch_add(1, portable_atomic::Ordering::AcqRel);
+}
+
+pub(crate) fn release_wake_lock() {
+    let previous = WAKE_LOCK_COUNT.fetch_sub(1, portable_atomic::Ordering::AcqRel);
+    debug_assert_ne!(previous, 0, "wake lock counter underflow");
+}
+
+/// A guard that prevents the system from entering automatic light sleep.
+///
+/// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
+/// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
+/// released when the guard is dropped.
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// # use esp_hal::rtc_cntl::WakeLock;
+/// assert!(!WakeLock::is_active());
+/// let lock = WakeLock::new();
+/// assert!(WakeLock::is_active());
+/// let lock2 = lock.clone();
+/// core::mem::drop(lock);
+/// assert!(WakeLock::is_active());
+/// core::mem::drop(lock2);
+/// assert!(!WakeLock::is_active());
+/// # {after_snippet}
+/// ```
+#[instability::unstable]
+pub struct WakeLock(());
+
+#[instability::unstable]
+impl WakeLock {
+    /// Acquires a wake lock, preventing automatic light sleep until it is dropped.
+    pub fn new() -> Self {
+        acquire_wake_lock();
+        Self(())
+    }
+
+    /// Returns `true` if at least one wake lock is currently held.
+    pub fn is_active() -> bool {
+        WAKE_LOCK_COUNT.load(portable_atomic::Ordering::Acquire) != 0
+    }
+}
+
+#[instability::unstable]
+impl Clone for WakeLock {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
+#[instability::unstable]
+impl Default for WakeLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[instability::unstable]
+impl Drop for WakeLock {
+    fn drop(&mut self) {
+        release_wake_lock();
+    }
+}
