@@ -73,7 +73,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return false;
             }
 
-            let Some(time_driver) = scheduler.time_driver.as_ref() else {
+            let Some(time_driver) = scheduler.time_driver.as_mut() else {
                 return false;
             };
             let next_wakeup = time_driver.next_wakeup();
@@ -90,6 +90,11 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 let rtc = slot.as_mut().unwrap();
                 rtc.light_sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
             });
+
+            // The alarm timer was gated during light sleep, so its pre-armed alarm is
+            // stale. Force a re-arm against the restored time base so the tick handler
+            // fires promptly and drains the timer queue.
+            time_driver.rearm_after_wake(crate::now());
             true
         });
 
