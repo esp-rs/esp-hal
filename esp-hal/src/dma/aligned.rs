@@ -124,20 +124,23 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
     fn do_cache_op(&self) -> bool {
         // Do not do cache operations on zero-sized values.
-        let mut do_cache_op = core::mem::size_of_val(self.0) > 0;
+        if core::mem::size_of_val(self.0) == 0 {
+            return false;
+        }
 
+        let mut in_cached_region = false;
         let address = self.0 as *const T as *const () as usize;
 
         #[cfg(soc_internal_memory_cached)]
         {
-            do_cache_op |= is_valid_ram_address(address);
+            in_cached_region |= is_valid_ram_address(address);
         }
         #[cfg(dma_can_access_psram)]
         {
-            do_cache_op |= is_valid_psram_address(address);
+            in_cached_region |= is_valid_psram_address(address);
         }
 
-        do_cache_op
+        in_cached_region
     }
 
     /// Writes back the data from the cache to memory.
