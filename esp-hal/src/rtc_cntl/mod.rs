@@ -404,44 +404,35 @@ impl<'d> Rtc<'d> {
         self.sleep(&config, wake_sources);
     }
 
-    /// Enters light sleep until `wake_at`, then restores monotonic system time.
+    /// Enters light sleep for the provided `duration`, then restores monotonic system time.
     ///
     /// On return, [`Instant::now`] reflects the real elapsed time: the systimer,
     /// which stops during light sleep, is advanced by the time spent asleep as
     /// measured by the always-running LP timer. Only a timer wake source is armed,
     /// and the scheduler's pre-armed systimer alarm is left untouched.
     ///
-    /// Returns immediately without sleeping if `wake_at` is already in the past.
+    /// This function must be called inside a critical section, and other core(s)
+    /// must be idle.
     ///
     /// [`Instant::now`]: crate::time::Instant::now
     #[cfg(sleep_auto_light_sleep)]
-    pub fn light_sleep_until(&mut self, wake_at: crate::time::Instant) {
-        let now = crate::time::Instant::now();
-        if wake_at <= now {
-            return;
-        }
-
-        let unit = crate::timer::systimer::Unit::Unit0;
-
+    pub unsafe fn light_sleep_for(&mut self, duration: crate::time::Duration) {
         // Latch the systimer value *before* sleeping. The systimer keeps running during
         // the sleep enter/exit sequences, so we must not advance from the post-wake
         // value (that would count the enter/exit time twice). Instead we set an absolute
         // target of `before + slept`, measured by the always-running LP timer.
-        let before_ticks = crate::timer::systimer::SystemTimer::unit_value(unit);
+        let before_ticks = crate::time::implem::raw_counter();
         let before = self.time_since_power_up();
 
-        let timer = sleep::TimerWakeupSource::new(core::time::Duration::from_micros(
-            (wake_at - now).as_micros(),
-        ));
+        let timer =
+            sleep::TimerWakeupSource::new(core::time::Duration::from_micros(duration.as_micros()));
         self.sleep_light(&[&timer]);
         let after = self.time_since_power_up();
 
-        let slept_us = after.as_micros().saturating_sub(before.as_micros());
+        let slept_us = after.as_micros().wrapping_sub(before.as_micros());
         let slept_ticks = crate::timer::systimer::SystemTimer::us_to_ticks(slept_us);
 
-        critical_section::with(|_| unsafe {
-            crate::timer::systimer::SystemTimer::set_unit_value(unit, before_ticks + slept_ticks);
-        });
+        unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
     }
 
     /// Enter sleep with the provided `config` and wake with the provided
@@ -974,41 +965,31 @@ pub fn wakeup_cause() -> SleepSource {
     SleepSource::Undefined
 }
 
-static WAKE_LOCK_COUNT: portable_atomic::AtomicUsize = portable_atomic::AtomicUsize::new(0);
+#[cfg(sleep_auto_light_sleep)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize =
+            portable_atomic::AtomicUsize::new(0);
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize;
+        }
+    }
+}
 
 /// A guard that prevents the system from entering automatic light sleep.
 ///
 /// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
 /// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
 /// released when the guard is dropped.
-///
-/// # Wake-lock contract
-///
-/// - **Wake lock held ⇒ the system will not auto-lightsleep.**
-/// - Wakeup is **timer-only** in this version: light sleep is only ever entered with a timer wake
-///   source armed for the next scheduled wakeup. Any code that needs an asynchronous (non-timer)
-///   wakeup — e.g. waiting on a GPIO or peripheral interrupt — must hold a `WakeLock` for the
-///   **entire** duration of its wait, acquired in thread context *before* the wait begins.
-/// - **Trusting default:** un-instrumented interrupt waits are not detected. If such a wait does
-///   not hold a `WakeLock`, the system may still light-sleep and the wait will only be serviced at
-///   the next timer wakeup (i.e. it may be delayed).
-/// - Active `wake_locking` peripheral clocks (e.g. UART/SPI/I2C on ESP32-C6) hold the lock
-///   automatically while their function clock is enabled, so drivers that manage those clocks keep
-///   the system awake without manual locking.
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::rtc_cntl::WakeLock;
-/// assert!(!WakeLock::is_active());
-/// let lock = WakeLock::new();
-/// assert!(WakeLock::is_active());
-/// let lock2 = lock.clone();
-/// core::mem::drop(lock);
-/// assert!(WakeLock::is_active());
-/// core::mem::drop(lock2);
-/// assert!(!WakeLock::is_active());
-/// # {after_snippet}
-/// ```
+#[cfg_attr(
+    not(sleep_auto_light_sleep),
+    doc = r"
+
+Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
+)]
 #[instability::unstable]
 #[non_exhaustive]
 pub struct WakeLock;
@@ -1021,17 +1002,28 @@ impl WakeLock {
     }
 
     pub(crate) fn acquire() {
-        WAKE_LOCK_COUNT.fetch_add(1, portable_atomic::Ordering::AcqRel);
+        #[cfg(sleep_auto_light_sleep)]
+        ESP_HAL_WAKE_LOCK_COUNT.fetch_add(1, portable_atomic::Ordering::AcqRel);
     }
 
     pub(crate) fn release() {
-        let previous = WAKE_LOCK_COUNT.fetch_sub(1, portable_atomic::Ordering::AcqRel);
-        debug_assert_ne!(previous, 0, "wake lock counter underflow");
+        #[cfg(sleep_auto_light_sleep)]
+        {
+            let previous = ESP_HAL_WAKE_LOCK_COUNT.fetch_sub(1, portable_atomic::Ordering::AcqRel);
+            debug_assert_ne!(previous, 0, "wake lock counter underflow");
+        }
     }
 
     /// Returns `true` if at least one wake lock is currently held.
+    #[instability::unstable]
     pub fn is_active() -> bool {
-        WAKE_LOCK_COUNT.load(portable_atomic::Ordering::Acquire) != 0
+        cfg_select! {
+            sleep_auto_light_sleep => {
+                ESP_HAL_WAKE_LOCK_COUNT.load(portable_atomic::Ordering::Acquire)
+                    != 0
+            }
+            _ => true,
+        }
     }
 }
 
@@ -1049,7 +1041,6 @@ impl Default for WakeLock {
     }
 }
 
-#[instability::unstable]
 impl Drop for WakeLock {
     fn drop(&mut self) {
         Self::release();
