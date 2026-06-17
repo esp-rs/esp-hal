@@ -14,15 +14,42 @@ const LIGHT_SLEEP_MIN_US: u64 =
 static RTC: NonReentrantMutex<Option<Rtc<'static>>> = NonReentrantMutex::new(None);
 
 /// Builds an idle hook that automatically enters light sleep when the system is
-/// idle, no [`WakeLock`] is held, and the next scheduled wakeup is far enough in
-/// the future.
+/// idle.
 ///
-/// Pass the returned hook to [`start_with_idle_hook`]. With auto light-sleep
-/// enabled, esp-rtos takes ownership of the RTC peripheral.
+/// Pass the returned hook to [`start_with_idle_hook`]:
 ///
-/// Only available on chips that support auto light-sleep (currently ESP32-C6).
+/// ```rust, ignore
+/// esp_rtos::start_with_idle_hook(
+///     timg0.timer0,
+///     sw_int.software_interrupt0,
+///     esp_rtos::auto_light_sleep(peripherals.LPWR),
+/// );
+/// ```
+///
+/// Each time the scheduler runs out of ready tasks, the hook (with interrupts
+/// disabled) checks that:
+/// - no [`WakeLock`] is held,
+/// - this is the primary core and no second core scheduler is running,
+/// - there is a finite next scheduled wakeup, and
+/// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds
+///   away.
+///
+/// If all hold, it calls [`Rtc::light_sleep_until`] for the next wakeup; otherwise
+/// it falls back to `WFI`. The minimum-residency threshold is configurable via the
+/// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
+///
+/// # Ownership and limitations
+///
+/// - This factory takes the `LPWR` peripheral by value: with auto light-sleep
+///   enabled, esp-rtos owns the RTC handle for the lifetime of the program.
+/// - **Single-core only.** On a system with a started second core, the hook
+///   degrades to `WFI` and never puts the chip to sleep.
+/// - Only available on chips that support auto light-sleep (currently ESP32-C6).
+///
+/// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
+/// [`Rtc::light_sleep_until`]: esp_hal::rtc_cntl::Rtc::light_sleep_until
 pub fn auto_light_sleep(lpwr: LPWR<'static>) -> IdleFn {
     let rtc = Rtc::new(lpwr);
     RTC.with(|slot| *slot = Some(rtc));
