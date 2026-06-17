@@ -107,7 +107,7 @@ embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
 embassy-net-driver-02 = { package = "embassy-net-driver", version = "0.2.0", optional = true }
-bt-hci = { version = "0.8.0", optional = true }
+bt-hci-driver = { version = "0.1.0", git = "https://github.com/bugadani/bt-hci", branch = "hci-driver", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt = { version = "1.1", optional = true, features = ["alloc"] }
@@ -281,7 +281,7 @@ sniffer = ["wifi", "__has_unstable_feature_enabled"]
 ## Enable BLE support.
 ##
 ## ⚠️ This feature is considered unstable.
-ble = ["esp-hal/__bluetooth", "dep:bt-hci", "__has_unstable_feature_enabled"]
+ble = ["esp-hal/__bluetooth", "dep:bt-hci-driver", "__has_unstable_feature_enabled"]
 #DOC_ENDIF
 
 #DOC_IF has("bt_driver_supported") && has("wifi_driver_supported")
@@ -328,7 +328,7 @@ log-04 = [
 defmt = [
     "dep:defmt",
     "esp-hal/defmt",
-    "bt-hci?/defmt",
+    "bt-hci-driver?/defmt",
     "esp-wifi-sys-esp32?/defmt",
     "esp-wifi-sys-esp32c2?/defmt",
     "esp-wifi-sys-esp32c3?/defmt",

@@ -1,21 +1,22 @@
 //! BLE controller
-use core::task::Poll;
+use core::{future::ready, task::Poll};
 
-use bt_hci::{
-    ControllerToHostPacket,
-    FromHciBytes,
-    FromHciBytesError,
-    HostToControllerPacket,
-    WriteHci,
-    transport::{Transport, WithIndicator},
-};
+use bt_hci_driver::{PacketToController, PacketToHost, ReadHciError, Transport};
 use docsplay::Display;
 use esp_phy::PhyInitGuard;
 
 use crate::{
     RadioRefGuard,
     asynch::AtomicWaker,
-    ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
+    ble::{
+        BT_STATE,
+        Config,
+        InvalidConfigError,
+        have_hci_read_data,
+        read_hci,
+        read_next,
+        send_hci,
+    },
 };
 
 #[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -219,8 +220,8 @@ impl embedded_io_async_07::Write for BleConnector<'_> {
     }
 }
 
-impl From<FromHciBytesError> for BleConnectorError {
-    fn from(_e: FromHciBytesError) -> Self {
+impl<E: embedded_io_07::Error> From<ReadHciError<E>> for BleConnectorError {
+    fn from(_e: ReadHciError<E>) -> Self {
         BleConnectorError::Unknown
     }
 }
@@ -245,44 +246,45 @@ impl core::future::Future for HciReadyEventFuture {
     }
 }
 
-fn parse_hci(data: &[u8]) -> Result<Option<ControllerToHostPacket<'_>>, BleConnectorError> {
-    match ControllerToHostPacket::from_hci_bytes_complete(data) {
-        Ok(p) => Ok(Some(p)),
-        Err(e) => {
-            warn!("[hci] error parsing packet: {:?}", e);
-            Err(BleConnectorError::Unknown)
-        }
-    }
-}
-
 impl Transport for BleConnector<'_> {
     /// Read a complete HCI packet into the rx buffer
-    async fn read<'a>(&self, rx: &'a mut [u8]) -> Result<ControllerToHostPacket<'a>, Self::Error> {
-        loop {
-            if !have_hci_read_data() {
-                HciReadyEventFuture.await;
-            }
+    async fn read<'a, P: PacketToHost<'a>>(&self, buf: &'a mut [u8]) -> Result<P, Self::Error> {
+        if !have_hci_read_data() {
+            HciReadyEventFuture.await;
+        }
 
-            // Workaround for borrow checker.
-            // Safety: we only return a reference to x once, if parsing is successful.
-            let rx =
-                unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
-
-            let len = crate::ble::read_next(rx);
-            if let Some(packet) = parse_hci(&rx[..len])? {
-                return Ok(packet);
+        if let Some(packet) = BT_STATE.with(|state| state.rx_queue.pop_front()) {
+            let mut reader = &packet.data[..];
+            let packet = P::read_hci(&mut reader, buf).map_err(|e| {
+                warn!("[hci] error parsing packet: {:?}", e);
+                BleConnectorError::Unknown
+            })?;
+            if !reader.is_empty() {
+                warn!("[hci] packet too long: {} bytes", reader.len());
+                return Err(BleConnectorError::Unknown);
             }
+            Ok(packet)
+        } else {
+            unreachable!()
         }
     }
 
     /// Write a complete HCI packet from the tx buffer
-    async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
-        let mut buf: [u8; 259] = [0; 259];
-        let w = WithIndicator::new(val);
-        let len = w.size();
-        w.write_hci(&mut buf[..])
-            .map_err(|_| BleConnectorError::Unknown)?;
+    fn write<T: PacketToController>(
+        &self,
+        val: &T,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        const MAX_HCI_PACKET_SIZE: usize = 259;
+        let mut buf: [u8; MAX_HCI_PACKET_SIZE] = [0; MAX_HCI_PACKET_SIZE];
+        let mut writer = &mut buf[..];
+        let result = val
+            .write_hci(&mut writer)
+            .map_err(|_| BleConnectorError::Unknown);
+
+        let len = MAX_HCI_PACKET_SIZE - writer.len();
+        // TODO: send_hci should be async
         send_hci(&buf[..len]);
-        Ok(())
+
+        ready(result)
     }
 }

@@ -24,7 +24,7 @@ esp-radio = { path = "../../../esp-radio", features = [
     "unstable",
 ] }
 log = "0.4.27"
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -98,3 +98,7 @@ codegen-units    = 1
 [package.metadata.cargo-machete]
 # static_cell is used indirectly in #[gatt_service] macro.
 ignored = ["embassy-sync", "static_cell"]
+
+[patch.crates-io]
+bt-hci = { git = "https://github.com/bugadani/bt-hci", branch = "hci-driver" }
+bt-hci-driver = { git = "https://github.com/bugadani/bt-hci", branch = "hci-driver" }
