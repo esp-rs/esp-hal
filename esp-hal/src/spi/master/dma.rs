@@ -630,6 +630,111 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
+    /// Half-duplex read.
+    ///
+    /// This performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Because command and address phases cannot be split
+    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// in the configured internal RX copy buffer.
+    #[instability::unstable]
+    pub async fn half_duplex_read_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+
+        if buffer.is_empty() {
+            let rx_buffer = unsafe { NoBuffer(self.spi.dma_state().rx_buffer().prepare()) };
+            self.half_duplex_read_dma_async(data_mode, cmd, address, dummy, 0, rx_buffer)
+                .await?;
+            return Ok(());
+        }
+
+        let operation = DmaOperationKind::for_read(buffer);
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_buffer = match operation {
+            DmaOperationKind::Copied => {
+                MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
+                descriptors: &mut descriptors,
+                #[cfg(dma_can_access_psram)]
+                align_buffer: [const { None }; 2],
+            },
+        };
+
+        let chunk_size = maybe_copy_buffer.chunk_size();
+        if chunk_size == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > chunk_size {
+            return match operation {
+                DmaOperationKind::Copied => Err(Error::from(DmaError::Overflow)),
+                DmaOperationKind::InPlace => Err(Error::MaxDmaTransferSizeExceeded),
+            };
+        }
+
+        let rx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(&mut *buffer)) };
+        self.half_duplex_read_dma_async(data_mode, cmd, address, dummy, buffer.len(), rx_buffer)
+            .await?;
+        maybe_copy_buffer.finish(buffer);
+
+        Ok(())
+    }
+
+    /// Half-duplex write.
+    ///
+    /// This performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Because command and address phases cannot be split
+    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// in the configured internal TX copy buffer.
+    #[instability::unstable]
+    pub async fn half_duplex_write_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+
+        if buffer.is_empty() {
+            let tx_buffer = unsafe { NoBuffer(self.spi.dma_state().tx_buffer().prepare()) };
+            self.half_duplex_write_dma_async(data_mode, cmd, address, dummy, 0, tx_buffer)
+                .await?;
+            return Ok(());
+        }
+
+        let operation = DmaOperationKind::for_write(buffer);
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_buffer = match operation {
+            DmaOperationKind::Copied => {
+                MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyTxBuf::Direct(&mut descriptors),
+        };
+
+        let chunk_size = maybe_copy_buffer.chunk_size();
+        if chunk_size == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > chunk_size {
+            return match operation {
+                DmaOperationKind::Copied => Err(Error::from(DmaError::Overflow)),
+                DmaOperationKind::InPlace => Err(Error::MaxDmaTransferSizeExceeded),
+            };
+        }
+
+        let tx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(buffer)) };
+        self.half_duplex_write_dma_async(data_mode, cmd, address, dummy, buffer.len(), tx_buffer)
+            .await
+    }
+
     async fn transfer_buffers_dma_async(
         &mut self,
         read_bytes: usize,
@@ -640,6 +745,56 @@ impl<'d> SpiDma<'d, Async> {
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         unsafe {
             spi.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
+        }
+        spi.wait_for_idle_async().await;
+        spi.defuse();
+        Ok(())
+    }
+
+    async fn half_duplex_read_dma_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_read: usize,
+        mut rx_buffer: impl DmaRxBuffer,
+    ) -> Result<(), Error> {
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        unsafe {
+            spi.start_half_duplex_read(
+                data_mode,
+                cmd,
+                address,
+                dummy,
+                bytes_to_read,
+                &mut rx_buffer,
+            )?;
+        }
+        spi.wait_for_idle_async().await;
+        spi.defuse();
+        Ok(())
+    }
+
+    async fn half_duplex_write_dma_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_write: usize,
+        mut tx_buffer: impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        unsafe {
+            spi.start_half_duplex_write(
+                data_mode,
+                cmd,
+                address,
+                dummy,
+                bytes_to_write,
+                &mut tx_buffer,
+            )?;
         }
         spi.wait_for_idle_async().await;
         spi.defuse();
@@ -743,6 +898,7 @@ impl<'a> MaybeCopyRxBuf<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
 enum DmaOperationKind {
     /// The entire slice must be copied into the internal buffer first
     Copied,
