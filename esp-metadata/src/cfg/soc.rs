@@ -476,12 +476,12 @@ impl ClockTreeNodeInstance {
         let release_trace = log_msg("Releasing");
 
         let acquire_wake_lock = if self.properties.wake_locking() {
-            quote! { crate::rtc_cntl::acquire_wake_lock(); }
+            quote! { crate::rtc_cntl::WakeLock::acquire(); }
         } else {
             quote! {}
         };
         let release_wake_lock = if self.properties.wake_locking() {
-            quote! { crate::rtc_cntl::release_wake_lock(); }
+            quote! { crate::rtc_cntl::WakeLock::release(); }
         } else {
             quote! {}
         };

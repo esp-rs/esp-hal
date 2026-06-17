@@ -3422,7 +3422,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
                         I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -3435,7 +3435,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
@@ -3502,7 +3502,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.mcpwm_function_clock[self as usize]) {
                         McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
                         McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3517,7 +3517,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.mcpwm_function_clock[self as usize]) {
                         McpwmFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
@@ -3582,7 +3582,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::RX_CLOCK", self);
                 if increment_reference_count(&mut clocks.parl_io_rx_clock_refcount[self as usize]) {
                     trace!("Enabling {:?}::RX_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.parl_io_rx_clock[self as usize]) {
                         ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
                         ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3595,7 +3595,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::RX_CLOCK", self);
                 if decrement_reference_count(&mut clocks.parl_io_rx_clock_refcount[self as usize]) {
                     trace!("Disabling {:?}::RX_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_rx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_rx_clock[self as usize]) {
                         ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3658,7 +3658,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::TX_CLOCK", self);
                 if increment_reference_count(&mut clocks.parl_io_tx_clock_refcount[self as usize]) {
                     trace!("Enabling {:?}::TX_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.parl_io_tx_clock[self as usize]) {
                         ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
                         ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3671,7 +3671,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::TX_CLOCK", self);
                 if decrement_reference_count(&mut clocks.parl_io_tx_clock_refcount[self as usize]) {
                     trace!("Disabling {:?}::TX_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_tx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_tx_clock[self as usize]) {
                         ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -3732,7 +3732,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::SCLK", self);
                 if increment_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Enabling {:?}::SCLK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
                         RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3745,7 +3745,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::SCLK", self);
                 if decrement_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Disabling {:?}::SCLK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_sclk_impl(clocks, false);
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
@@ -3810,7 +3810,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
@@ -3824,7 +3824,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
@@ -4051,7 +4051,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.uart_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::acquire_wake_lock();
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.uart_function_clock[self as usize]).sclk {
                         UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
                         UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -4066,7 +4066,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.uart_function_clock_refcount[self as usize],
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
-                    crate::rtc_cntl::release_wake_lock();
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.uart_function_clock[self as usize]).sclk {
                         UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
