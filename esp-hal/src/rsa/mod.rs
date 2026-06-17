@@ -32,6 +32,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac,
     peripherals::RSA,
+    rtc_cntl::WakeLock,
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
@@ -602,6 +603,7 @@ static SIGNALED: AtomicBool = AtomicBool::new(false);
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RsaFuture<'a, 'd> {
     driver: &'a Rsa<'d, Async>,
+    _wake_lock: WakeLock,
 }
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
@@ -611,7 +613,10 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 
         driver.internal_enable_disable_interrupt(true);
 
-        Self { driver }
+        Self {
+            driver,
+            _wake_lock: WakeLock::new(),
+        }
     }
 
     fn is_done(&self) -> bool {

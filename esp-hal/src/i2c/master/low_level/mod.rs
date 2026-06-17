@@ -1,5 +1,8 @@
 use super::*;
-use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
+use crate::{
+    rtc_cntl::WakeLock,
+    soc::clocks::{ClockTree, I2cFunctionClockConfig},
+};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -13,6 +16,7 @@ pub(super) struct I2cFuture<'a> {
     deadline: Option<Instant>,
     /// True if the Future has been polled to completion.
     finished: bool,
+    _wake_lock: WakeLock,
 }
 
 impl<'a> I2cFuture<'a> {
@@ -52,6 +56,7 @@ impl<'a> I2cFuture<'a> {
             driver,
             deadline,
             finished: false,
+            _wake_lock: WakeLock::new(),
         }
     }
 
