@@ -475,15 +475,13 @@ impl ClockTreeNodeInstance {
         let request_trace = log_msg("Requesting");
         let release_trace = log_msg("Releasing");
 
-        let acquire_wake_lock = if self.properties.wake_locking() {
-            quote! { crate::rtc_cntl::WakeLock::acquire(); }
+        let (acquire_wake_lock, release_wake_lock) = if self.properties.wake_locking() {
+            (
+                quote! { crate::rtc_cntl::WakeLock::acquire(); },
+                quote! { crate::rtc_cntl::WakeLock::release(); },
+            )
         } else {
-            quote! {}
-        };
-        let release_wake_lock = if self.properties.wake_locking() {
-            quote! { crate::rtc_cntl::WakeLock::release(); }
-        } else {
-            quote! {}
+            (quote! {}, quote! {})
         };
 
         let refcount_accessor = self.properties.refcount_accessor();

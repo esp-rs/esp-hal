@@ -774,10 +774,24 @@ pub(crate) mod implem {
 
     #[inline]
     pub(super) fn now() -> Instant {
-        let ticks = SystemTimer::unit_value(Unit::Unit0);
+        let ticks = raw_counter();
 
         let micros = SystemTimer::ticks_to_us(ticks);
 
         Instant::from_ticks(micros)
+    }
+
+    #[inline]
+    pub(crate) fn raw_counter() -> u64 {
+        SystemTimer::unit_value(Unit::Unit0)
+    }
+
+    /// Callers must ensure this function is not called concurrently.
+    #[inline]
+    #[cfg(sleep_auto_light_sleep)]
+    pub(crate) unsafe fn update_counter(counter: u64) {
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit0, counter);
+        }
     }
 }

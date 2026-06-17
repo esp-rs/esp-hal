@@ -1,7 +1,6 @@
-//! Auto light-sleep with esp-rtos (ESP32-C6).
+//! Auto light-sleep with esp-rtos.
 //!
-//! The system is started with [`esp_rtos::auto_light_sleep`] as the idle hook, so
-//! whenever no task is ready and no [`WakeLock`] is held, the chip enters light
+//! Whenever no task is ready and no [`WakeLock`] is held, the chip enters light
 //! sleep until the next scheduled wakeup. `Instant::now()` and `embassy_time`
 //! delays stay continuous across sleep cycles.
 //!
@@ -56,7 +55,7 @@ async fn main(spawner: Spawner) {
     esp_rtos::start_with_idle_hook(
         timg0.timer0,
         sw_int.software_interrupt0,
-        esp_rtos::auto_light_sleep(peripherals.LPWR),
+        esp_rtos::auto_light_sleep(),
     );
 
     spawner.spawn(periodic().unwrap());

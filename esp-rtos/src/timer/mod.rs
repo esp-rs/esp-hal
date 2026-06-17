@@ -128,30 +128,10 @@ impl TimeDriver {
         self.timer_queue.next_wakeup()
     }
 
-    /// Re-arms the alarm timer after light sleep.
-    ///
-    /// The alarm timer is gated during light sleep, so the alarm armed before
-    /// sleeping is stale: it will only fire after the timer counts the full
-    /// remaining duration once clocks resume. Since `next_wakeup` is unchanged,
-    /// [`Self::arm_next_wakeup`] would skip re-arming. This forces a fresh arm for
-    /// the time remaining until `next_wakeup` (clamped to a non-zero timeout) so
-    /// the tick handler runs promptly and drains the queue.
-    #[cfg(sleep_auto_light_sleep)]
-    pub(crate) fn rearm_after_wake(&mut self, now: u64) {
-        let next_wakeup = self.timer_queue.next_wakeup();
-        self.current_alarm = next_wakeup;
-
-        let mut timeout = next_wakeup.saturating_sub(now).clamp(1, (1 << 52) - 1);
-        loop {
-            match self.timer.schedule(Duration::from_micros(timeout)) {
-                Ok(_) => break,
-                Err(esp_hal::timer::Error::InvalidTimeout) if timeout > 1 => {
-                    timeout /= 2;
-                    continue;
-                }
-                Err(e) => panic!("Failed to schedule timer: {:?}", e),
-            }
-        }
+    /// Force-rearms the alarm timer.
+    pub(crate) fn rearm(&mut self, now: u64) {
+        self.current_alarm = u64::MAX;
+        self.arm_next_wakeup(now);
     }
 
     pub(crate) fn handle_alarm(&mut self, now: u64, on_task_ready: impl FnMut(TaskPtr)) {
@@ -324,8 +304,7 @@ extern "C" fn timer_tick_handler() {
         // Re-arm the timer. This should be relatively cheap, and ensures that the timer will keep
         // ticking even if the interrupt doesn't trigger a context switch.
         // FIXME: this SHOULD be relatively cheap, but arming the timer involves u64 division.
-        time_driver.current_alarm = u64::MAX;
-        time_driver.arm_next_wakeup(now);
+        time_driver.rearm(now);
     });
 
     #[cfg(feature = "rtos-trace")]
