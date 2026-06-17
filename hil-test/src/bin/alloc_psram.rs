@@ -1,9 +1,11 @@
 //! Allocator and PSRAM-related tests
 
-//% CHIP_FILTER(llff, tlsf): psram_driver_supported && soc_has_flash
-//% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
-//% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
-//% FEATURES: unstable esp-alloc/nightly esp-storage
+//% CHIP_FILTER(llff, tlsf): psram_driver_supported
+//% CHIP_FILTER(llff_with_storage, tlsf_with_storage): psram_driver_supported && soc_has_flash
+//% ENV(llff, llff_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+//% ENV(tlsf, tlsf_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+//% FEATURES: unstable esp-alloc/nightly
+//% FEATURES(llff_with_storage, tlsf_with_storage): esp-storage
 
 #![no_std]
 #![no_main]
