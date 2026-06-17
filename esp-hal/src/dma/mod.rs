@@ -374,10 +374,10 @@ macro_rules! dma_buffers_chunk_size {
         let (rx_buf, rx_desc, tx_buf, tx_desc) =
             $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size);
         (
-            rx_buf.into_mut(),
-            rx_desc.into_mut(),
-            tx_buf.into_mut(),
-            tx_desc.into_mut(),
+            rx_buf.into_inner(),
+            rx_desc.into_inner(),
+            tx_buf.into_inner(),
+            tx_desc.into_inner(),
         )
     }};
 
@@ -405,7 +405,7 @@ macro_rules! dma_buffers_chunk_size {
 macro_rules! dma_descriptors_chunk_size {
     ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
         let (rx, tx) = $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size);
-        (rx.into_mut(), tx.into_mut())
+        (rx.into_inner(), tx.into_inner())
     }};
 
     ($size:expr, $chunk_size:expr) => {
@@ -745,7 +745,7 @@ impl<'a> DescriptorSet<'a> {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        Ok(unsafe { Self::new_unchecked(descriptors.into_mut()) })
+        Ok(unsafe { Self::new_unchecked(descriptors.into_inner()) })
     }
 
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates

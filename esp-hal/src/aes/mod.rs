@@ -986,8 +986,11 @@ pub mod dma {
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
             let input_len = work_item.buffers.input.len();
-            let (input_dscr, output_dscr) =
-                self.descriptors.get_typed_mut().into_mut().split_at_mut(1);
+            let (input_dscr, output_dscr) = self
+                .descriptors
+                .get_typed_mut()
+                .into_inner()
+                .split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.

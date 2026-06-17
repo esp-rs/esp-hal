@@ -600,13 +600,13 @@ mod tests {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
         let mut dma_rx_buf = DmaRxBuf::new(
-            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.rx_buffer).unwrap(),
         )
         .unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(
-            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
         )
         .unwrap();
 
@@ -962,13 +962,13 @@ mod tests {
 
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(
-            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.rx_buffer).unwrap(),
         )
         .unwrap();
         let dma_tx_buf = DmaTxBuf::new(
-            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
         )
         .unwrap();
 
@@ -994,13 +994,13 @@ mod tests {
 
         // Set up a large buffer that would trigger a timeout
         let mut dma_rx_buf = DmaRxBuf::new(
-            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.rx_buffer).unwrap(),
         )
         .unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(
-            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
         )
         .unwrap();
 
@@ -1035,13 +1035,13 @@ mod tests {
     async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(
-            DmaAlignedMut::new_slice(ctx.rx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.rx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.rx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.rx_buffer).unwrap(),
         )
         .unwrap();
         let dma_tx_buf = DmaTxBuf::new(
-            DmaAlignedMut::new_slice(ctx.tx_descriptors).unwrap(),
-            DmaAlignedMut::new_slice(ctx.tx_buffer).unwrap(),
+            DmaAlignedMut::new(ctx.tx_descriptors).unwrap(),
+            DmaAlignedMut::new(ctx.tx_buffer).unwrap(),
         )
         .unwrap();
 

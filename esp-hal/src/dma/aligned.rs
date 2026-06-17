@@ -66,23 +66,23 @@ pub struct DmaAlignedMut<'a, T>(&'a mut T)
 where
     T: ?Sized;
 
-impl<'a, T> DmaAlignedMut<'a, [T]> {
+impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     #[doc_replace("align_req" => {
         cfg(soc_internal_memory_cached) => "64",
         _ => "4"
     })]
-    /// Creates a new [`DmaAlignedMut`] from a mutable slice, if it's
+    /// Creates a new [`DmaAlignedMut`] from a mutable variable, if it's
     /// provably compatible.
     ///
-    /// In internal memory, the address and length of the slice
-    /// must be __align_req__ byte aligned.
+    /// In internal memory, the address and size of the variable
+    /// must be at least __align_req__ byte aligned.
     #[instability::unstable]
-    pub fn new_slice(ptr: &'a mut [T]) -> Result<Self, DmaBufError> {
-        if ptr.is_empty() {
+    pub fn new(ptr: &'a mut T) -> Result<Self, DmaBufError> {
+        if core::mem::size_of_val(ptr) == 0 {
             return Ok(Self(ptr));
         }
 
-        let addr = ptr.as_ptr() as usize;
+        let addr = ptr as *mut T as *mut () as usize;
 
         if is_valid_ram_address(addr) {
             let alignment = core::mem::align_of::<InternalMemory<()>>();
@@ -120,16 +120,14 @@ impl<'a, T> DmaAlignedMut<'a, [T]> {
 
         Err(DmaBufError::UnsupportedMemoryRegion)
     }
-}
 
-impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     /// Creates a new [`DmaAlignedMut`] from *any* mutable slice.
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the reference is properly aligned for [`InternalMemory`] and
-    /// the cachelines occupied by the reference do not overlap with any other data that can be
-    /// corrupted by a cacheline invalidation operation.
+    /// The caller must ensure that the reference is properly aligned for the memory region it
+    /// occupies and the cachelines occupied by the reference do not overlap with any other data
+    /// that can be corrupted by a cacheline invalidation operation.
     #[instability::unstable]
     pub const unsafe fn new_unchecked(ptr: &'a mut T) -> Self {
         Self(ptr)
@@ -187,11 +185,9 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
             );
         }
     }
-}
 
-impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     /// Converts this object into a mutable reference.
-    pub fn into_mut(self) -> &'a mut T {
+    pub fn into_inner(self) -> &'a mut T {
         self.0
     }
 }

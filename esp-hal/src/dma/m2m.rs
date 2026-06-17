@@ -626,6 +626,9 @@ where
         if rx_descriptors.is_empty() || tx_descriptors.is_empty() {
             return Err(DmaError::OutOfDescriptors);
         }
+
+        // Safety: descriptors are aligned to what the DMA requires, and we don't call invalidate on
+        // these slices.
         let rx_descriptors = unsafe { DmaAlignedMut::new_unchecked(rx_descriptors) };
         let tx_descriptors = unsafe { DmaAlignedMut::new_unchecked(tx_descriptors) };
 
@@ -656,7 +659,7 @@ where
         // the user calls core::mem::forget on SimpleMem2MemTransfer. This is
         // just the unfortunate consequence of doing DMA without enforcing
         // 'static.
-        let rx_buffer = DmaAlignedMut::new_slice(unsafe {
+        let rx_buffer = DmaAlignedMut::new(unsafe {
             core::slice::from_raw_parts_mut(rx_buffer.as_mut_ptr(), rx_buffer.len())
         })?;
         let tx_buffer = unsafe {
