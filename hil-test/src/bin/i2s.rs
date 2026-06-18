@@ -14,7 +14,7 @@ mod tests {
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf},
+        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf, aligned::InternalMemory},
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
@@ -371,9 +371,14 @@ mod tests {
 
     #[test]
     fn test_i2s_read_one_shot_multiple(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([0; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -423,9 +428,14 @@ mod tests {
 
     #[test]
     async fn test_i2s_read_one_shot_multiple_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([0; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -480,9 +490,13 @@ mod tests {
     // write completes.
     #[test]
     fn test_i2s_write_one_shot(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([1u8; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -518,9 +532,13 @@ mod tests {
     // write completes.
     #[test]
     async fn test_i2s_write_one_shot_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([1u8; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -558,9 +576,13 @@ mod tests {
     // write completes.
     #[test]
     async fn test_i2s_write_one_shot_multiple(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let buffer = hil_test::mk_static!(InternalMemory<[u8; 4]>, InternalMemory::new([1u8; 4]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -602,9 +624,13 @@ mod tests {
     // write completes.
     #[test]
     async fn test_i2s_write_one_shot_multiple_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+        let buffer = hil_test::mk_static!(InternalMemory<[u8; 4]>, InternalMemory::new([1u8; 4]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
             ctx.i2s,

@@ -4,17 +4,25 @@ use super::*;
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
 /// 4095 at most. It can only be used for transmitting data to a peripheral's
-/// FIFO. See [DmaRxBuf] for receiving data.
+/// FIFO. See [ScopedDmaRxBuf] for receiving data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct ScopedDmaTxBuf<'a> {
     descriptors: DescriptorSet<'a>,
-    buffer: &'a mut [u8],
+    buffer: DmaAlignedMut<'a, [u8]>,
     burst: BurstConfig,
 }
 
 impl<'a> ScopedDmaTxBuf<'a> {
     /// Creates a new [ScopedDmaTxBuf] from some descriptors and a buffer.
+    pub fn new(
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+    }
+
+    /// Creates a new [ScopedDmaTxBuf] with a caller-chosen minimum alignment.
     ///
     /// There must be enough descriptors for the provided buffer.
     /// Depending on alignment requirements, each descriptor can handle at most
@@ -23,8 +31,8 @@ impl<'a> ScopedDmaTxBuf<'a> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new_with_config(
-        descriptors: &'a mut [DmaDescriptor],
-        buffer: &'a mut [u8],
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
         config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
@@ -47,10 +55,9 @@ impl<'a> ScopedDmaTxBuf<'a> {
         let burst = burst.into();
         self.set_length_fallible(length, burst)?;
 
-        self.descriptors.link_with_buffer(
-            self.buffer,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )?;
+        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::Out);
+        self.descriptors
+            .link_with_buffer(&mut self.buffer, max_chunk_size)?;
 
         self.burst = burst;
         Ok(())
@@ -63,8 +70,8 @@ impl<'a> ScopedDmaTxBuf<'a> {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'a mut [DmaDescriptor], &'a mut [u8]) {
-        (self.descriptors.into_inner(), self.buffer)
+    pub fn split(self) -> (DmaAlignedMut<'a, [DmaDescriptor]>, DmaAlignedMut<'a, [u8]>) {
+        (self.descriptors.descriptors, self.buffer)
     }
 
     /// Returns the size of the underlying buffer
@@ -87,10 +94,8 @@ impl<'a> ScopedDmaTxBuf<'a> {
         }
         burst.ensure_buffer_compatible(&self.buffer[..len], TransferDirection::Out)?;
 
-        self.descriptors.set_tx_length(
-            len,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )?;
+        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::Out);
+        self.descriptors.set_tx_length(len, max_chunk_size)?;
 
         // This only needs to be done once (after every significant length change) as
         // Self::prepare sets Preparation::auto_write_back to false.
@@ -124,12 +129,12 @@ impl<'a> ScopedDmaTxBuf<'a> {
 
     /// Returns the buf as a mutable slice than can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.buffer
+        &mut self.buffer
     }
 
     /// Returns the buf as a slice than can be read.
     pub fn as_slice(&self) -> &[u8] {
-        self.buffer
+        &self.buffer
     }
 }
 
@@ -139,37 +144,16 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 
     fn prepare(&mut self) -> Preparation {
         #[cfg(soc_internal_memory_cached)]
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                self.descriptors.head() as u32,
-                core::mem::size_of_val(self.descriptors.descriptors) as u32,
-            );
-        }
+        self.descriptors.descriptors.writeback();
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
-                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
-                    unsafe {
-                        crate::soc::cache_writeback_addr(
-                            self.buffer.as_ptr() as u32,
-                            self.buffer.len() as u32,
-                        )
-                    };
-                }
-            } else if #[cfg(soc_internal_memory_cached)] {
-                unsafe {
-                    crate::soc::cache_writeback_addr(
-                        self.buffer.as_ptr() as u32,
-                        self.buffer.len() as u32,
-                    )
-                };
-            }
-        }
+        #[cfg(dma_can_access_psram)]
+        let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buffer.writeback();
 
         Preparation {
             start: self.descriptors.head(),
-            direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,
@@ -196,11 +180,19 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct ScopedDmaRxBuf<'a> {
     descriptors: DescriptorSet<'a>,
-    buffer: &'a mut [u8],
+    buffer: DmaAlignedMut<'a, [u8]>,
     burst: BurstConfig,
 }
 
 impl<'a> ScopedDmaRxBuf<'a> {
+    /// Creates a new [ScopedDmaRxBuf] from some descriptors and a buffer.
+    pub fn new(
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
+    ) -> Result<Self, DmaBufError> {
+        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+    }
+
     /// Creates a new [ScopedDmaRxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -210,8 +202,8 @@ impl<'a> ScopedDmaRxBuf<'a> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new_with_config(
-        descriptors: &'a mut [DmaDescriptor],
-        buffer: &'a mut [u8],
+        descriptors: DmaAlignedMut<'a, [DmaDescriptor]>,
+        buffer: DmaAlignedMut<'a, [u8]>,
         config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
@@ -233,10 +225,9 @@ impl<'a> ScopedDmaRxBuf<'a> {
         let burst = burst.into();
         self.set_length_fallible(length, burst)?;
 
-        self.descriptors.link_with_buffer(
-            self.buffer,
-            burst.max_chunk_size_for(self.buffer, TransferDirection::In),
-        )?;
+        let max_chunk_size = burst.max_chunk_size_for(&self.buffer, TransferDirection::In);
+        self.descriptors
+            .link_with_buffer(&mut self.buffer, max_chunk_size)?;
 
         self.burst = burst;
         Ok(())
@@ -249,8 +240,8 @@ impl<'a> ScopedDmaRxBuf<'a> {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'a mut [DmaDescriptor], &'a mut [u8]) {
-        (self.descriptors.into_inner(), self.buffer)
+    pub fn split(self) -> (DmaAlignedMut<'a, [DmaDescriptor]>, DmaAlignedMut<'a, [u8]>) {
+        (self.descriptors.descriptors, self.buffer)
     }
 
     /// Returns the size of the underlying buffer
@@ -291,12 +282,12 @@ impl<'a> ScopedDmaRxBuf<'a> {
 
     /// Returns the entire underlying buffer as a slice than can be read.
     pub fn as_slice(&self) -> &[u8] {
-        self.buffer
+        &self.buffer
     }
 
     /// Returns the entire underlying buffer as a slice than can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.buffer
+        &mut self.buffer
     }
 
     /// Return the number of bytes that was received by this buf.
@@ -351,38 +342,16 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
         }
 
         #[cfg(soc_internal_memory_cached)]
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                self.descriptors.head() as u32,
-                core::mem::size_of_val(self.descriptors.descriptors) as u32,
-            );
-        }
+        self.descriptors.descriptors.writeback();
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
-                // Optimization: avoid locking for PSRAM range.
-                let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
-                    unsafe {
-                        crate::soc::cache_invalidate_addr(
-                            self.buffer.as_ptr() as u32,
-                            self.buffer.len() as u32,
-                        )
-                    };
-                }
-            } else if #[cfg(soc_internal_memory_cached)] {
-                unsafe {
-                    crate::soc::cache_invalidate_addr(
-                        self.buffer.as_ptr() as u32,
-                        self.buffer.len() as u32,
-                    )
-                };
-            }
-        }
+        #[cfg(dma_can_access_psram)]
+        let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
+
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buffer.invalidate();
 
         Preparation {
             start: self.descriptors.head(),
-            direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: is_data_in_psram,
             burst_transfer: self.burst,

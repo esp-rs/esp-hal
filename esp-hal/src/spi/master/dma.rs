@@ -15,8 +15,6 @@ use enumset::EnumSet;
 use procmacros::ram;
 
 use super::*;
-#[cfg(all(spi_master_version = "1", spi_address_workaround))]
-use crate::dma::InternalMemoryBuffer;
 use crate::{
     RegisterToggle,
     dma::{
@@ -28,11 +26,11 @@ use crate::{
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
-        InternalMemoryCachelineAligned,
         NoBuffer,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
+        aligned::{DmaAlignedMut, InternalMemory},
         asynch::DmaRxFuture,
         prepare_for_rx,
         prepare_for_tx,
@@ -116,7 +114,8 @@ impl<'d> Spi<'d, Blocking> {
 /// # {before_snippet}
 /// use esp_hal::{
 ///     dma::{DmaRxBuf, DmaTxBuf},
-///     dma_buffers,
+///     dma_rx_buffer,
+///     dma_tx_buffer,
 ///     spi::{
 ///         Mode,
 ///         master::{Config, Spi},
@@ -124,10 +123,8 @@ impl<'d> Spi<'d, Blocking> {
 /// };
 ///
 /// // Optional: create and set up copy buffers.
-/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-///
-/// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-/// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
+/// let dma_rx_buf = dma_rx_buffer!(32000)?;
+/// let dma_tx_buf = dma_tx_buffer!(32000)?;
 ///
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
@@ -264,19 +261,30 @@ impl<'d> SpiDma<'d, Blocking> {
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
 
-        let descriptors = unsafe { (&mut *state.descriptors.get()).get_mut() };
-        descriptors.fill(DmaDescriptor::EMPTY);
-
-        let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
+        // Safety: The descriptors occupy their own shared cache line and are updated in a
+        // synchronised fashion.
+        let (tx_descriptors, rx_descriptors) = unsafe {
+            let descriptors = (&mut *state.descriptors.get()).get_mut().into_inner();
+            descriptors.fill(DmaDescriptor::EMPTY);
+            let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
+            (
+                DmaAlignedMut::new_unchecked(tx_descriptors),
+                DmaAlignedMut::new_unchecked(rx_descriptors),
+            )
+        };
 
         let tx_buffer = cfg_select! {
             all(spi_master_version = "1", spi_address_workaround) => unsafe {
-                (&mut *state.default_tx_buffer.get()).get_mut()
+                (&mut *state.default_tx_buffer.get()).get_mut().unsize()
             },
-            _ => &mut []
+            _ => unsafe {
+                DmaAlignedMut::new_unchecked(&mut [][..])
+            }
         };
 
-        let rx_buffer = unwrap!(DmaRxBuf::new(rx_descriptors, &mut []));
+        let rx_buffer = unwrap!(DmaRxBuf::new(rx_descriptors, unsafe {
+            DmaAlignedMut::new_unchecked(&mut [])
+        }));
         let tx_buffer = unwrap!(DmaTxBuf::new(tx_descriptors, tx_buffer));
 
         // The buffers must be set up when creating the driver.
@@ -888,7 +896,7 @@ impl<'a> MaybeCopyRxBuf<'a> {
 
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
-                    if let Some(buffer) = buffer.as_ref() {
+                    if let Some(buffer) = buffer.as_mut() {
                         buffer.write_back();
                     }
                     *buffer = None;
@@ -1946,10 +1954,10 @@ struct DmaState {
     rx_buffer: UnsafeCell<MaybeUninit<ScopedDmaRxBuf<'static>>>,
     tx_buffer: UnsafeCell<MaybeUninit<ScopedDmaTxBuf<'static>>>,
 
-    descriptors: UnsafeCell<InternalMemoryCachelineAligned<[DmaDescriptor; 2]>>,
+    descriptors: UnsafeCell<InternalMemory<[DmaDescriptor; 2]>>,
 
     #[cfg(all(spi_master_version = "1", spi_address_workaround))]
-    default_tx_buffer: UnsafeCell<InternalMemoryBuffer<4>>,
+    default_tx_buffer: UnsafeCell<InternalMemory<[u8; 4]>>,
 }
 
 impl DmaState {
@@ -1999,9 +2007,9 @@ for_each_spi_master!(
                                 rx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
 
-                                descriptors: UnsafeCell::new(InternalMemoryCachelineAligned::new([DmaDescriptor::EMPTY; 2])),
+                                descriptors: UnsafeCell::new(InternalMemory::new([DmaDescriptor::EMPTY; 2])),
                                 #[cfg(all(spi_master_version = "1", spi_address_workaround))]
-                                default_tx_buffer: UnsafeCell::new(InternalMemoryBuffer::new()),
+                                default_tx_buffer: UnsafeCell::new(InternalMemory::new([0; 4])),
                             };
 
                             &DMA_STATE

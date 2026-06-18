@@ -20,10 +20,7 @@ mod read {
         time::Rate,
     };
     #[cfg(spi_master_supports_dma)]
-    use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
-    };
+    use esp_hal::{dma_rx_buffer, dma_tx_buffer};
 
     #[cfg(spi_master_supports_dma)]
     type DmaChannel<'a> = cfg_select! {
@@ -127,8 +124,7 @@ mod read {
     fn test_spidma_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
-        let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         // SPI should read '0's from the MISO pin
         ctx.miso_mirror.set_low();
@@ -175,10 +171,8 @@ mod read {
     fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        // WAS THIS AN ERROR?
-        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, 1);
-        let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(1).unwrap();
 
         let mut spi = ctx
             .spi
@@ -220,9 +214,8 @@ mod read {
     fn data_mode_combinations_are_not_rejected(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (buffer, descriptors, tx, txd) = dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
         let mut spi = ctx
@@ -288,10 +281,7 @@ mod write {
         time::Rate,
     };
     #[cfg(spi_master_supports_dma)]
-    use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
-    };
+    use esp_hal::{dma_rx_buffer, dma_tx_buffer};
 
     #[cfg(spi_master_supports_dma)]
     type DmaChannel<'a> = cfg_select! {
@@ -393,8 +383,7 @@ mod write {
     fn perform_spidma_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_dma(ctx.dma_channel);
@@ -442,9 +431,8 @@ mod write {
     fn perform_spidmabus_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (rx, rxd, buffer, descriptors) = dma_buffers!(4, DMA_BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx
@@ -531,10 +519,7 @@ mod spi_slave {
         spi::{Mode, slave::Spi},
     };
     #[cfg(spi_slave_supports_dma)]
-    use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
-    };
+    use esp_hal::{dma_rx_buffer, dma_tx_buffer};
 
     #[cfg(spi_slave_supports_dma)]
     type DmaChannel<'a> = cfg_select! {
@@ -679,9 +664,9 @@ mod spi_slave {
     #[test]
     fn test_basic_dma(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
-        let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let mut slave_receive = dma_rx_buffer!(DMA_SIZE).unwrap();
+        let mut slave_send = dma_tx_buffer!(DMA_SIZE).unwrap();
 
         let spi = ctx.spi.with_dma(ctx.dma_channel);
 
@@ -719,7 +704,8 @@ mod qspi_dma {
     use esp_hal::{
         Blocking,
         dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
         spi::{
             Mode,
@@ -830,8 +816,7 @@ mod qspi_dma {
     fn execute_read(mut spi: SpiUnderTest, mut miso_mirror: Output<'static>, expected: u8) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         miso_mirror.set_low();
         (spi, dma_rx_buf) = transfer_read(spi, dma_rx_buf, Command::None);
@@ -847,10 +832,8 @@ mod qspi_dma {
     fn execute_write_read(mut spi: SpiUnderTest, mut mosi_mirror: Output<'static>, expected: u8) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (rx_buffer, rx_descriptors, buffer, descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         dma_tx_buf.fill(&[0x00; DMA_BUFFER_SIZE]);
 
@@ -878,8 +861,7 @@ mod qspi_dma {
     ) {
         const DMA_BUFFER_SIZE: usize = 4;
 
-        let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
-        let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
 
         for command_data_mode in COMMAND_DATA_MODES {
             dma_tx_buf.fill(&[write; DMA_BUFFER_SIZE]);
@@ -1100,9 +1082,8 @@ mod qspi_dma {
         let [pin, pin_mirror, _] = ctx.gpios;
         let mut pin_mirror = Output::new(pin_mirror, Level::Low, OutputConfig::default());
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
         let mut spi = ctx
             .spi
             .with_sio0(pin)
@@ -1242,9 +1223,8 @@ mod qspi_dma {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
         let spi = ctx
             .spi
             .with_sio0(mosi)

@@ -13,8 +13,8 @@ mod tests {
     #[cfg(esp32c6)]
     use esp_hal::parl_io::{RxEightBits, TxEightBits};
     use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         gpio::{AnyPin, Pin},
         parl_io::{
             BitPackOrder,
@@ -129,9 +129,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_1_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -192,9 +191,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_2_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -255,9 +253,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_4_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -329,9 +326,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 250;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };

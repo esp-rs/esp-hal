@@ -70,7 +70,7 @@ mod tests {
     fn with_tx_view(all_cpu_owned: bool, f: impl FnOnce(DmaTxStreamBufView)) {
         let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
         buf.prepare();
-        let (descriptors, buffer) = buf.split();
+        let (mut descriptors, buffer) = buf.split();
         if all_cpu_owned {
             for desc in descriptors.iter_mut() {
                 desc.set_owner(Owner::Cpu);
@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dma_rx_stream_buf_insufficient_descriptors() {
+    fn test_dma_rx_stream_buf_insufficient_descriptors_require_at_least_4() {
         let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaRxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
@@ -116,7 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dma_tx_stream_buf_insufficient_descriptors() {
+    fn test_dma_tx_stream_buf_insufficient_descriptors_require_at_least_4() {
         let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaTxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
@@ -339,7 +339,7 @@ mod tests {
             core::assert_eq!(view.available_bytes(), 0);
 
             let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
-            let (descriptors, buffer) = buf.split();
+            let (mut descriptors, buffer) = buf.split();
 
             // DMA processed first descriptor, now it should be owned by CPU
             descriptors[0].set_owner(Owner::Cpu);

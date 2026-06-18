@@ -11,9 +11,8 @@ use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
     Blocking,
-    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
-    dma_buffers,
-    dma_descriptors_chunk_size,
+    dma::ExternalBurstConfig,
+    dma_rx_buffer,
     gpio::{Flex, interconnect::InputSignal},
     pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
     spi::{
@@ -25,17 +24,25 @@ use esp_hal::{
 use hil_test as _;
 extern crate alloc;
 
-macro_rules! dma_alloc_buffer {
+macro_rules! dma_alloc_tx_buffer {
     ($size:expr, $align:expr) => {{
-        let layout = core::alloc::Layout::from_size_align($size, $align).unwrap();
-        unsafe {
+        let layout = core::alloc::Layout::from_size_align($size, $align as usize).unwrap();
+        let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
                 error!("dma_alloc_buffer: alloc failed");
                 alloc::alloc::handle_alloc_error(layout);
             }
             core::slice::from_raw_parts_mut(ptr, $size)
-        }
+        };
+
+        const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
+        let descriptors = esp_hal::dma_descriptors_impl!($size, DMA_CHUNK_SIZE);
+        esp_hal::dma::DmaTxBuf::new_with_config(
+            descriptors,
+            unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
+            $align,
+        )
     }};
 }
 
@@ -65,6 +72,7 @@ mod tests {
         let dma_channel = cfg_select! {
             spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
             spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let mut mosi = Flex::new(mosi);
@@ -94,11 +102,7 @@ mod tests {
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
         const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32;
-        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
-
-        let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-        let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-        let mut dma_tx_buf = DmaTxBuf::new_with_config(descriptors, buffer, DMA_ALIGNMENT).unwrap();
+        let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi;
@@ -144,14 +148,9 @@ mod tests {
     fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
         const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32; // matches dcache line size
-        const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize; // 64 byte aligned
 
-        let (_, descriptors) = dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-        let buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-        let dma_tx_buf = DmaTxBuf::new_with_config(descriptors, buffer, DMA_ALIGNMENT).unwrap();
-
-        let (rx, rxd, _, _) = dma_buffers!(1, 0);
-        let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
+        let dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(1).unwrap();
 
         let unit = ctx.pcnt_unit;
         let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);

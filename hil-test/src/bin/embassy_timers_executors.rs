@@ -428,14 +428,14 @@ mod interrupt_executor {
     }
 }
 
-#[cfg(any(esp32, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
+#[cfg(any(soc_has_spi3, soc_has_i2s0))]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod interrupt_spi_dma {
     use embassy_time::{Duration, Instant, Timer};
     use esp_hal::{
         Blocking,
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         interrupt::{Priority, software::SoftwareInterruptControl},
         spi::{
             Mode,
@@ -451,12 +451,11 @@ mod interrupt_spi_dma {
     static STOP_INTERRUPT_TASK: AtomicBool = AtomicBool::new(false);
     static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 
-    #[cfg(any(esp32, esp32s2, esp32s3))]
+    #[cfg(soc_has_spi3)]
     #[embassy_executor::task]
     async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocking>) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(128);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(128).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(128).unwrap();
 
         let mut spi = spi.with_buffers(dma_rx_buf, dma_tx_buf).into_async();
 
@@ -475,7 +474,7 @@ mod interrupt_spi_dma {
         }
     }
 
-    #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+    #[cfg(not(soc_has_spi3))]
     #[embassy_executor::task]
     async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
         use esp_hal::dma_tx_stream_buffer;
@@ -511,12 +510,14 @@ mod interrupt_spi_dma {
             any(feature = "esp32", feature = "esp32s2") => {
                 (peripherals.DMA_SPI2, peripherals.DMA_SPI3)
             }
+            feature = "esp32p4" => {
+                (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
+            }
             _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
         };
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
-        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(1024).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(1024).unwrap();
 
         let (_, mosi) = hil_test::common_test_pins!(peripherals);
 
@@ -533,7 +534,7 @@ mod interrupt_spi_dma {
         .with_buffers(dma_rx_buf, dma_tx_buf)
         .into_async();
 
-        #[cfg(any(esp32, esp32s2, esp32s3))]
+        #[cfg(soc_has_spi3)]
         let other_peripheral = Spi::new(
             peripherals.SPI3,
             Config::default()
@@ -543,7 +544,7 @@ mod interrupt_spi_dma {
         .unwrap()
         .with_dma(dma_channel2);
 
-        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        #[cfg(not(soc_has_spi3))]
         let other_peripheral = esp_hal::i2s::master::I2s::new(
             peripherals.I2S0,
             dma_channel2,
@@ -620,9 +621,8 @@ mod interrupt_spi_dma {
             peripherals: SpiPeripherals,
             finished: &'static Signal<CriticalSectionRawMutex, ()>,
         ) {
-            let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(3200);
-            let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-            let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+            let dma_rx_buf = dma_rx_buffer!(3200).unwrap();
+            let dma_tx_buf = dma_tx_buffer!(3200).unwrap();
 
             let mut spi = Spi::new(
                 peripherals.spi,
@@ -652,15 +652,9 @@ mod interrupt_spi_dma {
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let dma_channel = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_master_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
-            spi_master_dma_engine = "AXI_GDMA" => {
-                peripherals.DMA_AXI_CH0
-            },
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());

@@ -903,7 +903,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
                 //     }
                 // }
                 // ```
-                #(  #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
+                #( #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }
