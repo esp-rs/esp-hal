@@ -184,6 +184,12 @@ macro_rules! property {
     ("i2c_master.bus_timeout_is_exponential") => {
         false
     };
+    ("i2c_master.force_out_inverted") => {
+        true
+    };
+    ("i2c_master.has_pd_en") => {
+        true
+    };
     ("i2c_master.max_bus_timeout") => {
         31
     };

@@ -160,6 +160,12 @@ macro_rules! property {
     ("i2c_master.bus_timeout_is_exponential") => {
         false
     };
+    ("i2c_master.force_out_inverted") => {
+        false
+    };
+    ("i2c_master.has_pd_en") => {
+        false
+    };
     ("i2c_master.i2c0_data_register_ahb_address") => {
         1610690588
     };

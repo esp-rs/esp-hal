@@ -281,6 +281,7 @@ has_conf_update = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+has_pd_en = true
 
 [device.interrupts]
 support_status = "partial"

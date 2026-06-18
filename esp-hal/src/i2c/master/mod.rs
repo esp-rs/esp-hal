@@ -1297,4 +1297,22 @@ where
         self.driver().reset_fsm(false);
         Ok(())
     }
+
+    /// Drives SCL low (`true`) or releases it (`false`) via `scl_pd_en`.
+    ///
+    /// Useful for manual clock-stretching and bus recovery sequences.
+    #[cfg(i2c_master_has_pd_en)]
+    #[instability::unstable]
+    pub fn force_scl_low(&mut self, low: bool) {
+        self.driver().set_scl_pd(low);
+    }
+
+    /// Drives SDA low (`true`) or releases it (`false`) via `sda_pd_en`.
+    ///
+    /// Useful for manual STOP condition generation and bus recovery sequences.
+    #[cfg(i2c_master_has_pd_en)]
+    #[instability::unstable]
+    pub fn force_sda_low(&mut self, low: bool) {
+        self.driver().set_sda_pd(low);
+    }
 }

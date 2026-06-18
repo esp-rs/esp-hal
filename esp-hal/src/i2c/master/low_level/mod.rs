@@ -446,9 +446,15 @@ impl Driver<'_> {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
-            // Use open drain output for SDA and SCL
-            w.sda_force_out().set_bit();
-            w.scl_force_out().set_bit();
+            // Set force_out to the peripheral's OD mode value.
+            // Non-inverted chips (ESP32, S2, S3, C2, C3): OD=1, direct=0.
+            // Inverted chips (C5, C6, C61, H2, P4):       OD=0, direct=1.
+            let od_bit = cfg_select! {
+                i2c_master_force_out_inverted => false,
+                _ => true,
+            };
+            w.sda_force_out().bit(od_bit);
+            w.scl_force_out().bit(od_bit);
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
@@ -583,6 +589,62 @@ impl Driver<'_> {
             }
         })
         .await;
+    }
+
+    /// Restores force_out to the OD value for this chip.
+    #[cfg(i2c_master_has_pd_en)]
+    fn restore_force_out(&self) {
+        let od_bit = cfg_select! {
+            i2c_master_force_out_inverted => false,
+            _ => true,
+        };
+        self.regs().ctr().modify(|_, w| {
+            w.scl_force_out().bit(od_bit);
+            w.sda_force_out().bit(od_bit)
+        });
+        self.update_registers();
+    }
+
+    /// Sets or clears `scl_pd_en`. Switches to force_out=1 while pd_en is
+    /// active (required on all chips), restoring OD mode when both pd_en bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    pub(super) fn set_scl_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.scl_force_out().set_bit().sda_force_out().set_bit());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.scl_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+            }
+        }
+        self.update_registers();
+    }
+
+    /// Asserts or clears `sda_pd_en`. Switches to force_out=1 while pd_en is
+    /// active (required on all chips), restoring OD mode when both pd_en bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    pub(super) fn set_sda_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.scl_force_out().set_bit().sda_force_out().set_bit());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.sda_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+            }
+        }
+        self.update_registers();
     }
 
     /// Resets the I2C peripheral's command registers.
