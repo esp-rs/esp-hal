@@ -9,7 +9,6 @@
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio-unstable
-//% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test

@@ -196,21 +196,22 @@ pub fn resolve_release_binary(workspace: &Path, target: &str, artifact_name: &st
     release_dir.join(base_name)
 }
 
-// Maximum time we wait for the harness firmware to flash and emit its
-// first defmt log line before giving up.
+// Maximum time we wait for the harness firmware to flash and signal readiness
+// via semihosting before giving up.
 const HARNESS_BOOT_TIMEOUT: Duration = Duration::from_secs(90);
+const HARNESS_READY_MARKER: &str = "[HARNESS-READY]";
 const PROBE_LIST_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Spawn `probe-rs run` for the harness, capture its stdout, and block
-/// until the firmware emits its first defmt log line (i.e. flashing is
-/// complete and the support firmware is actually running).
+/// until the firmware prints a `[HARNESS-READY]` semihosting line (i.e.
+/// flashing is complete and the support firmware is actually running).
 fn spawn_harness_and_wait_until_ready(
     binary_path: &Path,
     probe: &str,
     boot_timeout: Duration,
 ) -> Result<Child> {
     log::info!(
-        "[HARNESS] probe-rs run --preverify --probe {probe} {} (waiting for first defmt line, timeout {}s)",
+        "[HARNESS] probe-rs run --preverify --probe {probe} {} (waiting for {HARNESS_READY_MARKER}, timeout {}s)",
         binary_path.display(),
         boot_timeout.as_secs(),
     );
@@ -218,7 +219,6 @@ fn spawn_harness_and_wait_until_ready(
     let mut child = Command::new("probe-rs")
         .args(["run", "--preverify", "--probe", probe])
         .arg(binary_path)
-        .env("DEFMT_LOG", "info")
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
@@ -240,7 +240,7 @@ fn spawn_harness_and_wait_until_ready(
                 Ok(0) => break,
                 Ok(_) => {
                     print!("[HARNESS] {line}");
-                    if !signaled && looks_like_defmt_line(&line) {
+                    if !signaled && line.contains(HARNESS_READY_MARKER) {
                         let _ = ready_tx.send(());
                         signaled = true;
                     }
@@ -259,25 +259,16 @@ fn spawn_harness_and_wait_until_ready(
             let _ = child.kill();
             let _ = child.wait();
             bail!(
-                "[HARNESS] firmware did not produce any defmt output within {}s",
+                "[HARNESS] firmware did not signal readiness within {}s",
                 boot_timeout.as_secs()
             );
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => {
             let _ = child.kill();
             let _ = child.wait();
-            bail!("[HARNESS] probe-rs exited before producing any defmt output");
+            bail!("[HARNESS] probe-rs exited before firmware signaled readiness");
         }
     }
-}
-
-fn looks_like_defmt_line(line: &str) -> bool {
-    let trimmed = line.trim_start();
-    trimmed.starts_with("[INFO ")
-        || trimmed.starts_with("[WARN ")
-        || trimmed.starts_with("[ERROR]")
-        || trimmed.starts_with("[DEBUG]")
-        || trimmed.starts_with("[TRACE]")
 }
 
 struct HarnessGuard {
@@ -311,7 +302,6 @@ fn spawn_probe_run(name: &str, binary_path: &Path, probe: &str) -> Result<Child>
     Command::new("probe-rs")
         .args(["run", "--preverify", "--probe", probe])
         .arg(binary_path)
-        .env("DEFMT_LOG", "info")
         .spawn()
         .map_err(|e| anyhow!("[{name}] failed to spawn probe-rs run: {e}"))
 }

@@ -47,26 +47,17 @@ mod tests {
 
     #[embassy_executor::task]
     async fn net_task(mut runner: Runner<'static, Interface>) {
-        defmt::debug!("[STA] Starting network task");
         runner.run().await
     }
 
     #[embassy_executor::task]
     async fn connection(mut controller: WifiController<'static>) {
-        defmt::debug!("[STA] Start connection task");
-
         loop {
             match controller.connect_async().await {
                 Ok(_) => {
-                    defmt::info!("[STA] Wifi connected to");
-
-                    // wait until we're no longer connected
                     controller.wait_for_disconnect_async().await.ok();
-                    defmt::info!("[STA] Disconnected");
                 }
-                Err(e) => {
-                    defmt::info!("[STA] Failed to connect to wifi: {:?}", e);
-                }
+                Err(_) => {}
             }
 
             Timer::after(Duration::from_millis(1500)).await
@@ -101,8 +92,7 @@ mod tests {
 
         let scan_config = ScanConfig::default().with_max(10);
         let result = controller.scan_async(&scan_config).await.unwrap();
-
-        defmt::debug!("[STA] Scan complete, found {} networks", result.len());
+        let _ = result;
 
         spawner.spawn(connection(controller).unwrap());
         spawner.spawn(net_task(runner).unwrap());
@@ -144,7 +134,6 @@ mod tests {
 
     #[test]
     async fn wifi_dhcp_http_test(p: Peripherals) {
-        defmt::info!("[STA] Starting Wi-Fi DHCP HTTP test");
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -159,14 +148,10 @@ mod tests {
         .unwrap();
 
         run_http_smoke_test(spawner, controller, wifi_interface).await;
-
-        defmt::info!("[STA] TEST_DONE: PASS");
     }
 
     #[test]
     async fn wifi_drop(p: Peripherals) {
-        defmt::info!("[STA] Starting Wi-Fi Drop test");
-
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
@@ -195,7 +180,5 @@ mod tests {
         .unwrap();
 
         run_http_smoke_test(spawner, controller, wifi_interface).await;
-
-        defmt::info!("[STA] Wi-Fi drop + recovery PASS");
     }
 }

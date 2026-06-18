@@ -2,7 +2,6 @@
 //% SUPPORT-FIRMWARE: true
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio-unstable
-//% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 
 #![no_std]
@@ -94,7 +93,7 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
     stack.wait_config_up().await;
-    defmt::info!("[AP-SUPPORT] ready at {}:8080", gw_ip_addr_str);
+    hil_test::signal_harness_ready();
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];

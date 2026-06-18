@@ -49,6 +49,13 @@ macro_rules! assert_eq {
     ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
 }
 
+/// Signal to the radio HIL runner that harness firmware is ready.
+///
+/// The runner waits for this semihosting line before starting the DUT test.
+pub fn signal_harness_ready() {
+    semihosting::println!("[HARNESS-READY]");
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
