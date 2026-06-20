@@ -1,7 +1,8 @@
-//! SDMMC SD-card bring-up test (blocking core, ESP32-S3).
+//! SDMMC SD-card bring-up test (interrupt-driven async, ESP32-S3).
 //!
 //! Initializes an SD card through the `sdio` crate's `MmcBus` integration, reads
-//! block 0, then round-trips a known pattern through a scratch block.
+//! block 0, then round-trips a known pattern through a scratch block. A
+//! concurrent heartbeat task confirms the data path does not busy-wait.
 //!
 //! Pins are wired through the GPIO matrix; adjust them for your board:
 //! - CLK  => GPIO14
@@ -33,12 +34,25 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// Block index used for the destructive write/read-back round-trip.
 const SCRATCH_BLOCK: u32 = 0x2000;
 
+/// Heartbeat task: proves the executor keeps running during transfers.
+#[embassy_executor::task]
+async fn heartbeat() {
+    let mut tick = 0u32;
+    loop {
+        esp_println::println!("tick {tick}");
+        tick += 1;
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(100)).await;
+    }
+}
+
 #[esp_hal::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+    spawner.spawn(heartbeat().unwrap());
 
     let mut controller = SdHostController::new(peripherals.SDHOST);
     let slot = controller
@@ -49,7 +63,8 @@ async fn main(_spawner: Spawner) {
         .with_data0(peripherals.GPIO2)
         .with_data1(peripherals.GPIO4)
         .with_data2(peripherals.GPIO12)
-        .with_data3(peripherals.GPIO13);
+        .with_data3(peripherals.GPIO13)
+        .into_async();
 
     let mut card: BlockDevice<Card, _, _, 512> = BlockDevice::new_sd_card(slot, 40_000_000, Delay)
         .await
