@@ -229,6 +229,7 @@ mod imp {
     };
 
     use critical_section::Mutex;
+    use esp_sync::RawMutex;
     use procmacros::handler;
 
     use super::{
@@ -393,6 +394,14 @@ mod imp {
     static CD_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
     static IO_ARMED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 
+    /// Serializes whole transactions over the single shared transfer engine.
+    ///
+    /// Held for an entire command+data+busy transaction so a second slot cannot
+    /// clobber `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
+    /// near-free) in the common single-slot case.
+    static ENGINE_LOCK: embassy_sync::mutex::Mutex<RawMutex, ()> =
+        embassy_sync::mutex::Mutex::new(());
+
     /// SDIO card-interrupt bit for a slot.
     fn io_slot_bit(id: SlotId) -> u32 {
         match id {
@@ -535,6 +544,7 @@ mod imp {
     pub struct SdHostController<'d> {
         _peri: SDHOST<'d>,
         _guard: PeripheralGuard,
+        taken: [bool; 2],
     }
 
     impl<'d> SdHostController<'d> {
@@ -545,6 +555,7 @@ mod imp {
             let this = Self {
                 _peri: peri,
                 _guard: guard,
+                taken: [false; 2],
             };
 
             // DesignWare reset, then module clock, then quiesce interrupts.
@@ -564,12 +575,21 @@ mod imp {
         }
 
         /// Returns a builder for the given slot in blocking mode.
-        pub fn slot<'a>(
-            &'a mut self,
+        ///
+        /// Both slots can be taken (once each) and driven independently; the
+        /// shared engine serializes their transactions. Requesting the same slot
+        /// twice returns [`ConfigError::SlotInUse`].
+        pub fn slot(
+            &mut self,
             id: SlotId,
             config: Config,
-        ) -> Result<Slot<'a, Blocking>, ConfigError> {
+        ) -> Result<Slot<'d, Blocking>, ConfigError> {
             config.validate()?;
+            let idx = id.index() as usize;
+            if self.taken[idx] {
+                return Err(ConfigError::SlotInUse);
+            }
+            self.taken[idx] = true;
             Ok(Slot {
                 id,
                 config,
@@ -994,7 +1014,10 @@ mod imp {
         where
             C: sdio::ControlCommand + 'a,
         {
-            async move { self.cmd_async::<C>(cmd).await }
+            async move {
+                let _lock = ENGINE_LOCK.lock().await;
+                self.cmd_async::<C>(cmd).await
+            }
         }
 
         fn read_blocks<'a, C>(
@@ -1005,6 +1028,7 @@ mod imp {
             C: sdio::BlockReadCommand + 'a,
         {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
                 let words = self
                     .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
@@ -1021,6 +1045,7 @@ mod imp {
             C: sdio::BlockWriteCommand + 'a,
         {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
                 let words = self
                     .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
@@ -1037,6 +1062,7 @@ mod imp {
             C: sdio::ByteReadCommand + 'a,
         {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 let (n, arg) = (cmd.byte_count(), cmd.arg());
                 let words = self
                     .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)
@@ -1053,6 +1079,7 @@ mod imp {
             C: sdio::ByteWriteCommand + 'a,
         {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 let (n, arg) = (cmd.byte_count(), cmd.arg());
                 let words = self
                     .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)
@@ -1066,6 +1093,7 @@ mod imp {
             hz: u32,
         ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
                 self.set_bus_low_level(BusWidth::Bit1, hz)?;
                 self.send_init_sequence()?;
@@ -1079,6 +1107,7 @@ mod imp {
             hz: u32,
         ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
             async move {
+                let _lock = ENGINE_LOCK.lock().await;
                 let w = match width {
                     sdio::BusWidth::W1 => BusWidth::Bit1,
                     sdio::BusWidth::W4 => BusWidth::Bit4,
