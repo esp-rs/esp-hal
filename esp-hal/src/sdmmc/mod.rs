@@ -66,19 +66,22 @@ pub enum BusWidth {
 
 /// Slot configuration.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 #[cfg_attr(not(esp32s3), allow(dead_code))]
 pub struct Config {
     clock_source: ClockSource,
+    module_div: u8,
     input_delay_phase: DelayPhase,
-    frequency_hz: u32,
+    wp_active_high: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             clock_source: ClockSource::Pll160m,
+            module_div: 2,
             input_delay_phase: DelayPhase::_0,
-            frequency_hz: 400_000,
+            wp_active_high: false,
         }
     }
 }
@@ -90,16 +93,30 @@ impl Config {
         self
     }
 
+    /// Sets the module-clock divider (valid range `2..=16`).
+    pub fn with_module_divider(mut self, div: u8) -> Self {
+        self.module_div = div;
+        self
+    }
+
     /// Sets the input sampling delay phase.
     pub fn with_input_delay_phase(mut self, phase: DelayPhase) -> Self {
         self.input_delay_phase = phase;
         self
     }
 
-    /// Sets the target card clock frequency in Hz.
-    pub fn with_frequency(mut self, hz: u32) -> Self {
-        self.frequency_hz = hz;
+    /// Sets whether the write-protect signal is active-high.
+    pub fn with_wp_active_high(mut self, active_high: bool) -> Self {
+        self.wp_active_high = active_high;
         self
+    }
+
+    /// Validates field ranges.
+    fn validate(&self) -> Result<(), ConfigError> {
+        if !(2..=16).contains(&self.module_div) {
+            return Err(ConfigError::InvalidModuleDivider);
+        }
+        Ok(())
     }
 }
 
@@ -162,7 +179,39 @@ pub enum Error {
 /// Error returned when applying a [`Config`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// Requested card clock frequency is out of range.
+    UnsupportedFrequency,
+    /// Requested bus width exceeds the wired data lines.
+    UnsupportedBusWidth,
+    /// Module-clock divider is outside `2..=16`.
+    InvalidModuleDivider,
+    /// The slot is already in use.
+    SlotInUse,
+    /// The clock or command pin was not connected.
+    MissingClkOrCmd,
+    /// Data line 0 was not connected.
+    NoData0,
+}
+
+#[cfg(feature = "__sdmmc")]
+impl From<Error> for sdio::MmcError {
+    fn from(error: Error) -> Self {
+        use sdio::MmcError;
+        match error {
+            Error::ResponseTimeout | Error::DataTimeout | Error::Timeout | Error::NoCard => {
+                MmcError::Timeout
+            }
+            Error::ResponseCrc | Error::DataCrc | Error::StartBitError => MmcError::Crc,
+            Error::FifoOverrun
+            | Error::DmaError
+            | Error::ResponseError
+            | Error::BufferNotDmaCapable => MmcError::Io,
+            Error::BufferAlignment | Error::HardwareLocked => MmcError::Other,
+            Error::Unsupported => MmcError::Unsupported,
+        }
+    }
+}
 
 #[cfg(esp32s3)]
 pub use imp::SdHostController;
@@ -173,7 +222,17 @@ pub use imp::Slot;
 mod imp {
     use core::{cell::UnsafeCell, marker::PhantomData};
 
-    use super::{BusWidth, ClockSource, CommandFlags, Config, Error, ResponseLen, SlotId};
+    use super::{
+        BusWidth,
+        ClockSource,
+        CommandFlags,
+        Config,
+        ConfigError,
+        DelayPhase,
+        Error,
+        ResponseLen,
+        SlotId,
+    };
     use crate::{
         Async,
         Blocking,
@@ -193,10 +252,8 @@ mod imp {
         system::{Peripheral, PeripheralGuard},
     };
 
-    /// Module clock: 160 MHz PLL divided by the module divider.
+    /// Default module-clock divider used during controller bring-up.
     const MODULE_DIV: u32 = 2;
-    /// Resulting module clock in Hz (160 MHz / `MODULE_DIV`).
-    const MODULE_CLOCK_HZ: u32 = 160_000_000 / MODULE_DIV;
     /// Spin-poll bound for self-clearing hardware bits.
     const POLL_LIMIT: u32 = 1_000_000;
 
@@ -306,12 +363,19 @@ mod imp {
         }
 
         /// Returns a builder for the given slot in blocking mode.
-        pub fn slot<'a>(&'a mut self, id: SlotId, config: Config) -> Slot<'a, Blocking> {
-            Slot {
+        pub fn slot<'a>(
+            &'a mut self,
+            id: SlotId,
+            config: Config,
+        ) -> Result<Slot<'a, Blocking>, ConfigError> {
+            config.validate()?;
+            Ok(Slot {
                 id,
                 config,
                 width: BusWidth::Bit1,
                 data_pins: 0,
+                clk_connected: false,
+                cmd_connected: false,
                 cd_connected: false,
                 wp_connected: false,
                 _guard: PeripheralGuard::new(Peripheral::SdioHost),
@@ -327,7 +391,7 @@ mod imp {
                 cd: None,
                 wp: None,
                 _pd: PhantomData,
-            }
+            })
         }
     }
 
@@ -337,6 +401,8 @@ mod imp {
         config: Config,
         width: BusWidth,
         data_pins: u8,
+        clk_connected: bool,
+        cmd_connected: bool,
         cd_connected: bool,
         wp_connected: bool,
         _guard: PeripheralGuard,
@@ -356,12 +422,14 @@ mod imp {
             pin.apply_output_config(&OutputConfig::default());
             pin.set_output_enable(true);
             self.clk = interconnect::OutputSignal::connect_with_guard(pin, out_clk(self.id));
+            self.clk_connected = true;
             self
         }
 
         /// Connects the bidirectional command line.
         pub fn with_cmd(mut self, cmd: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
             self.cmd = connect_bidir(cmd.into(), in_cmd(self.id), out_cmd(self.id));
+            self.cmd_connected = true;
             self
         }
 
@@ -433,21 +501,36 @@ mod imp {
         }
 
         /// Returns `true` if the card reports write protection. Returns `false`
-        /// if no write-protect pin is wired.
+        /// if no write-protect pin is wired. Polarity follows
+        /// [`Config::with_wp_active_high`].
         pub fn is_write_protected(&self) -> bool {
             if !self.wp_connected {
                 return false;
             }
-            (regs().wrtprt().read().write_protect().bits() & (1 << self.id.index())) != 0
+            let level =
+                (regs().wrtprt().read().write_protect().bits() & (1 << self.id.index())) != 0;
+            level == self.config.wp_active_high
         }
 
         /// Applies bus width + card clock for the slot. Used during card init.
         pub fn set_bus_low_level(&mut self, width: BusWidth, hz: u32) -> Result<(), Error> {
-            set_module_clock(self.config.clock_source, MODULE_DIV);
+            let div = self.config.module_div as u32;
+            set_module_clock(self.config.clock_source, div);
             set_card_width(self.id, width);
             self.width = width;
-            let div = freq_to_card_div(hz);
-            set_card_clock(self.id, div)
+            let card_div = freq_to_card_div(module_hz(self.config.clock_source, div), hz);
+            set_card_clock(self.id, card_div)
+        }
+
+        /// Checks that the mandatory pins for a transfer were connected.
+        fn validate_pins(&self) -> Result<(), ConfigError> {
+            if !self.clk_connected || !self.cmd_connected {
+                return Err(ConfigError::MissingClkOrCmd);
+            }
+            if self.data_pins < 1 {
+                return Err(ConfigError::NoData0);
+            }
+            Ok(())
         }
 
         /// Issues the 80-clock SD init sequence (no command index).
@@ -554,6 +637,8 @@ mod imp {
                 config: self.config,
                 width: self.width,
                 data_pins: self.data_pins,
+                clk_connected: self.clk_connected,
+                cmd_connected: self.cmd_connected,
                 cd_connected: self.cd_connected,
                 wp_connected: self.wp_connected,
                 _guard: self._guard,
@@ -565,6 +650,203 @@ mod imp {
                 wp: self.wp,
                 _pd: PhantomData,
             }
+        }
+
+        /// Issues a control command, mapping protocol types to the engine core.
+        fn cmd_sync<'a, C: sdio::ControlCommand + 'a>(
+            &mut self,
+            cmd: C,
+        ) -> Result<C::Resp<'a>, sdio::MmcError> {
+            let resp_len = resp_len_of::<C::Resp<'a>>();
+            let flags = CommandFlags {
+                wait_complete: !is_stop_or_abort(C::INDEX),
+                stop_abort: is_stop_or_abort(C::INDEX),
+                busy: <C::Resp<'a> as sdio::Response>::BUSY,
+            };
+            let crc = <C::Resp<'a> as sdio::Response>::CRC;
+            let words = send_command_blocking(self.id, C::INDEX, cmd.arg(), resp_len, crc, flags)?;
+            Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
+        }
+
+        /// Reads blocks/bytes into the command's buffer via the IDMAC.
+        fn read_sync(
+            &mut self,
+            index: u8,
+            arg: u32,
+            buf: &mut [u8],
+            block_size: u16,
+            block_count: u32,
+        ) -> Result<[u32; 4], sdio::MmcError> {
+            let mut dma = DmaAlignedMut::new(buf).map_err(map_dma_buf_err)?;
+            Ok(self.read_blocks_blocking(index, arg, &mut dma, block_size, block_count)?)
+        }
+
+        /// Writes blocks/bytes from the command's buffer via the IDMAC.
+        fn write_sync(
+            &mut self,
+            index: u8,
+            arg: u32,
+            buf: &[u8],
+            block_size: u16,
+            block_count: u32,
+        ) -> Result<[u32; 4], sdio::MmcError> {
+            let ptr = dma_ptr(buf.as_ptr() as usize)?;
+            Ok(transfer_blocking(
+                self.id,
+                index,
+                arg,
+                true,
+                ptr,
+                buf.len(),
+                block_size,
+                block_count,
+            )?)
+        }
+    }
+
+    impl<'d> sdio::MmcBus for Slot<'d, Blocking> {
+        fn send_command<'a, C>(
+            &mut self,
+            cmd: C,
+        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        where
+            C: sdio::ControlCommand + 'a,
+        {
+            let result = self.cmd_sync::<C>(cmd);
+            async move { result }
+        }
+
+        fn read_blocks<'a, C>(
+            &mut self,
+            mut cmd: C,
+        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        where
+            C: sdio::BlockReadCommand + 'a,
+        {
+            let result = (|| {
+                let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
+                let words = self.read_sync(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)?;
+                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
+            })();
+            async move { result }
+        }
+
+        fn write_blocks<'a, C>(
+            &mut self,
+            cmd: C,
+        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        where
+            C: sdio::BlockWriteCommand + 'a,
+        {
+            let result = (|| {
+                let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
+                let words = self.write_sync(C::INDEX, arg, &cmd.buf()[..], bs, bc)?;
+                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
+            })();
+            async move { result }
+        }
+
+        fn read_bytes<'a, C>(
+            &mut self,
+            mut cmd: C,
+        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        where
+            C: sdio::ByteReadCommand + 'a,
+        {
+            let result = (|| {
+                let (n, arg) = (cmd.byte_count(), cmd.arg());
+                let words = self.read_sync(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)?;
+                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
+            })();
+            async move { result }
+        }
+
+        fn write_bytes<'a, C>(
+            &mut self,
+            cmd: C,
+        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        where
+            C: sdio::ByteWriteCommand + 'a,
+        {
+            let result = (|| {
+                let (n, arg) = (cmd.byte_count(), cmd.arg());
+                let words = self.write_sync(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)?;
+                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
+            })();
+            async move { result }
+        }
+
+        fn init_idle(
+            &mut self,
+            hz: u32,
+        ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
+            let result = (|| -> Result<(), sdio::MmcError> {
+                self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
+                self.set_bus_low_level(BusWidth::Bit1, hz)?;
+                self.send_init_sequence()?;
+                Ok(())
+            })();
+            async move { result }
+        }
+
+        fn set_bus(
+            &mut self,
+            width: sdio::BusWidth,
+            hz: u32,
+        ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
+            let result = (|| -> Result<(), sdio::MmcError> {
+                let w = match width {
+                    sdio::BusWidth::W1 => BusWidth::Bit1,
+                    sdio::BusWidth::W4 => BusWidth::Bit4,
+                    sdio::BusWidth::W8 => return Err(sdio::MmcError::Unsupported),
+                };
+                if matches!(w, BusWidth::Bit4) && self.data_pins < 4 {
+                    return Err(sdio::MmcError::Unsupported);
+                }
+                if hz > 40_000_000 {
+                    return Err(sdio::MmcError::Unsupported);
+                }
+                self.set_bus_low_level(w, hz)?;
+                if hz > 25_000_000 {
+                    set_input_delay_phase(self.config.input_delay_phase);
+                }
+                Ok(())
+            })();
+            async move { result }
+        }
+
+        fn supports_bus_width(&self) -> sdio::BusWidth {
+            if self.data_pins >= 4 {
+                sdio::BusWidth::W4
+            } else {
+                sdio::BusWidth::W1
+            }
+        }
+
+        fn supports_frequency(&self) -> u32 {
+            40_000_000
+        }
+    }
+
+    /// Maps the engine's [`ResponseLen`] from the crate's typed response.
+    fn resp_len_of<R: sdio::Response>() -> ResponseLen {
+        match R::LEN {
+            sdio::ResponseLen::Zero => ResponseLen::None,
+            sdio::ResponseLen::R48 => ResponseLen::Short,
+            sdio::ResponseLen::R136 => ResponseLen::Long,
+        }
+    }
+
+    /// CMD12 (and SDIO abort) are stop/abort commands.
+    fn is_stop_or_abort(index: u8) -> bool {
+        index == 12
+    }
+
+    /// Maps a DMA buffer error to the crate's error type.
+    fn map_dma_buf_err(error: crate::dma::DmaBufError) -> sdio::MmcError {
+        match error {
+            crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
+            _ => sdio::MmcError::Io,
         }
     }
 
@@ -1039,15 +1321,37 @@ mod imp {
         });
     }
 
+    /// Module clock in Hz for a given source and divider.
+    fn module_hz(source: ClockSource, div: u32) -> u32 {
+        let base = match source {
+            ClockSource::Pll160m => 160_000_000,
+            ClockSource::Xtal => 40_000_000,
+        };
+        base / div
+    }
+
     /// Computes the per-card divider for a target frequency.
     ///
     /// `card_clk = module / (2 * div)`; `div == 0` bypasses the divider.
-    fn freq_to_card_div(target_hz: u32) -> u8 {
-        if target_hz == 0 || MODULE_CLOCK_HZ <= target_hz {
+    fn freq_to_card_div(module_hz: u32, target_hz: u32) -> u8 {
+        if target_hz == 0 || module_hz <= target_hz {
             return 0;
         }
-        let div = MODULE_CLOCK_HZ.div_ceil(2 * target_hz);
+        let div = module_hz.div_ceil(2 * target_hz);
         div.clamp(1, 255) as u8
+    }
+
+    /// Sets the input sampling delay phase used for high-speed clocking.
+    fn set_input_delay_phase(phase: DelayPhase) {
+        let v = match phase {
+            DelayPhase::_0 => 0u8,
+            DelayPhase::_1 => 1,
+            DelayPhase::_2 => 2,
+            DelayPhase::_3 => 3,
+        };
+        regs()
+            .clk_edge_sel()
+            .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
     }
 
     fn out_clk(id: SlotId) -> OutputSignal {
