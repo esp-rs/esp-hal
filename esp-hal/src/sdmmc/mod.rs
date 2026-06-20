@@ -1337,6 +1337,38 @@ mod imp {
         });
     }
 
+    /// Programs the module clock in `HP_SYS_CLKRST` (P4 keeps the divider/source
+    /// outside the SDHOST block; see `sdmmc_ll`). Source fixed at PLL160M.
+    #[cfg(esp32p4)]
+    fn set_module_clock(_source: ClockSource, div: u32) {
+        let c = crate::peripherals::HP_SYS_CLKRST::regs();
+        c.peri_clk_ctrl01().modify(|_, w| unsafe {
+            w.sdio_ls_clk_src_sel().bits(0);
+            w.sdio_ls_clk_en().set_bit()
+        });
+        if div > 1 {
+            let h = (div / 2 - 1) as u8;
+            let l = (div - 1) as u8;
+            let n = (div - 1) as u8;
+            c.peri_clk_ctrl02().modify(|_, w| unsafe {
+                w.sdio_ls_clk_edge_h().bits(h);
+                w.sdio_ls_clk_edge_l().bits(l);
+                w.sdio_ls_clk_edge_n().bits(n)
+            });
+            c.peri_clk_ctrl02()
+                .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
+            c.peri_clk_ctrl02()
+                .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+        } else {
+            c.peri_clk_ctrl01().modify(|_, w| w.sdio_hs_mode().set_bit());
+            c.peri_clk_ctrl02().modify(|_, w| unsafe {
+                w.sdio_ls_clk_edge_h().bits(0);
+                w.sdio_ls_clk_edge_l().bits(0);
+                w.sdio_ls_clk_edge_n().bits(0)
+            });
+        }
+    }
+
     /// Programs the shared module clock register (divider, phases).
     #[cfg(esp32)]
     fn set_module_clock(_source: ClockSource, div: u32) {

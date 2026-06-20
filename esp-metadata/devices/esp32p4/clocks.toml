@@ -191,7 +191,7 @@ peripheral_clocks = { templates = [
     { name = "UsbDevice", template_params = { default_clk_en_template = "{{apb_clk_template}}", apb_field = "usb_device_apb_clk_en" }, keep_enabled = true },
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "emac_sys_clk_en" } },
-    { name = "Sdmmc", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en" } },
+    { name = "SdioHost", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en" } },
     { name = "Uhci",  template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_uhci" } },
     # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
     { name = "Aes",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_aes" } },
