@@ -333,8 +333,14 @@ is_lp_sys = true
 [device.lp_timer]
 support_status = "partial"
 
-[device.sd_host]
-support_status = "not_supported"  # SDIO host
+[device.sdmmc]
+support_status = "partial"
+slots = 2
+delay_phase_num = 8
+has_iomux = true
+has_gpio_matrix = true
+psram_dma = true
+uhs = false
 
 [device.sdm]
 support_status = { status = "not_supported", issue = 2370 }

@@ -337,6 +337,30 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sdmmc.slots") => {
+        2
+    };
+    ("sdmmc.slots", str) => {
+        stringify!(2)
+    };
+    ("sdmmc.delay_phase_num") => {
+        0
+    };
+    ("sdmmc.delay_phase_num", str) => {
+        stringify!(0)
+    };
+    ("sdmmc.has_iomux") => {
+        true
+    };
+    ("sdmmc.has_gpio_matrix") => {
+        false
+    };
+    ("sdmmc.psram_dma") => {
+        false
+    };
+    ("sdmmc.uhs") => {
+        false
+    };
     ("sleep.light_sleep") => {
         true
     };

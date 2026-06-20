@@ -16,6 +16,7 @@ semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
     { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
     { if = 'bt_driver_supported', features = ["__bluetooth"] },
+    { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
 ] }
 check-configs = [
     { features = [] },
@@ -25,12 +26,14 @@ check-configs = [
     { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_ENABLE_PMP = "false" }, if = 'riscv && !esp32c2 && !esp32c3' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
+    { features = ["unstable", "rt", "__sdmmc"],     if = 'sdmmc_driver_supported' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
         { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
         { if = 'bt_driver_supported', features = ["__bluetooth"] },
+        { if = 'sdmmc_driver_supported', features = ["__sdmmc"] },
     ] },
 ]
 
@@ -79,6 +82,7 @@ embassy-usb-synopsys-otg = { version = "0.4.0", optional = true, features = ["ho
 embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 nb                       = { version = "1.1", optional = true }
+sdio                     = { version = "0.2", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt                    = { version = "1.1", optional = true }
@@ -137,6 +141,7 @@ default = ["rt", "exception-handler", "float-save-restore"]
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
 __bluetooth = []
+__sdmmc = ["dep:sdio"]
 __usb_otg = [
     "dep:embassy-usb-driver",
     "dep:embassy-usb-synopsys-otg",
@@ -185,6 +190,7 @@ float-save-restore = ["xtensa-lx-rt/float-save-restore"]
 ##
 esp32   = [
     "dep:esp32",
+    "__sdmmc",
     "procmacros/rtc-slow",
     "procmacros/rtc-fast",
     "esp-rom-sys/esp32",
@@ -238,6 +244,7 @@ esp32c6 = [
 ## ESP32-P4 (chip revision >= v3.x)
 esp32p4 = [
     "dep:esp32p4",
+    "__sdmmc",
     "__usb_otg",
     "esp-riscv-rt/rtc-ram",
     "esp-riscv-rt/clic-48",
@@ -281,6 +288,7 @@ esp32s2 = [
 ##
 esp32s3 = [
     "dep:esp32s3",
+    "__sdmmc",
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "procmacros/rtc-fast",
