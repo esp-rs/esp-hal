@@ -213,12 +213,10 @@ impl From<Error> for sdio::MmcError {
     }
 }
 
-#[cfg(esp32s3)]
-pub use imp::SdHostController;
-#[cfg(esp32s3)]
-pub use imp::Slot;
+#[cfg(any(esp32, esp32s3))]
+pub use imp::{SdHostController, Slot, SlotClk, SlotCmd, SlotData};
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32, esp32s3))]
 mod imp {
     use core::{
         cell::{RefCell, UnsafeCell},
@@ -232,17 +230,20 @@ mod imp {
     use esp_sync::RawMutex;
     use procmacros::handler;
 
+    #[cfg(esp32s3)]
+    use super::DelayPhase;
     use super::{
         BusWidth,
         ClockSource,
         CommandFlags,
         Config,
         ConfigError,
-        DelayPhase,
         Error,
         ResponseLen,
         SlotId,
     };
+    #[cfg(sdmmc_has_gpio_matrix)]
+    use crate::gpio::{InputSignal, OutputSignal, PinGuard, Pull, interconnect::PeripheralInput};
     use crate::{
         Async,
         Blocking,
@@ -250,12 +251,8 @@ mod imp {
         asynch::AtomicWaker,
         dma::aligned::DmaAlignedMut,
         gpio::{
-            InputSignal,
             OutputConfig,
-            OutputSignal,
-            PinGuard,
-            Pull,
-            interconnect::{self, PeripheralInput, PeripheralOutput},
+            interconnect::{self, PeripheralOutput},
         },
         pac::sdhost::RegisterBlock,
         peripherals::{Interrupt, SDHOST},
@@ -579,19 +576,19 @@ mod imp {
         /// Both slots can be taken (once each) and driven independently; the
         /// shared engine serializes their transactions. Requesting the same slot
         /// twice returns [`ConfigError::SlotInUse`].
-        pub fn slot(
+        pub fn slot<const S: u8>(
             &mut self,
-            id: SlotId,
             config: Config,
-        ) -> Result<Slot<'d, Blocking>, ConfigError> {
+        ) -> Result<Slot<'d, S, Blocking>, ConfigError> {
+            const { assert!(S < 2, "SDMMC has only slots 0 and 1") };
             config.validate()?;
-            let idx = id.index() as usize;
+            let idx = S as usize;
             if self.taken[idx] {
                 return Err(ConfigError::SlotInUse);
             }
             self.taken[idx] = true;
             Ok(Slot {
-                id,
+                id: slot_id(S),
                 config,
                 width: BusWidth::Bit1,
                 data_pins: 0,
@@ -600,14 +597,6 @@ mod imp {
                 cd_connected: false,
                 wp_connected: false,
                 _guard: PeripheralGuard::new(Peripheral::SdioHost),
-                clk: PinGuard::new_unconnected(),
-                cmd: PinGuard::new_unconnected(),
-                data: [
-                    PinGuard::new_unconnected(),
-                    PinGuard::new_unconnected(),
-                    PinGuard::new_unconnected(),
-                    PinGuard::new_unconnected(),
-                ],
                 power: None,
                 cd: None,
                 wp: None,
@@ -616,8 +605,142 @@ mod imp {
         }
     }
 
-    /// A configured card slot, generic over the driver mode.
-    pub struct Slot<'d, Dm: DriverMode> {
+    /// Maps a const slot index to its [`SlotId`].
+    const fn slot_id(s: u8) -> SlotId {
+        if s == 0 { SlotId::_0 } else { SlotId::_1 }
+    }
+
+    /// Card-clock output pin for slot `S`.
+    pub trait SlotClk<'d, const S: u8> {
+        #[doc(hidden)]
+        fn configure(self);
+    }
+
+    /// Command (bidirectional) pin for slot `S`.
+    pub trait SlotCmd<'d, const S: u8> {
+        #[doc(hidden)]
+        fn configure(self);
+    }
+
+    /// Data line `L` (bidirectional) for slot `S`.
+    pub trait SlotData<'d, const S: u8, const L: u8> {
+        #[doc(hidden)]
+        fn configure(self);
+    }
+
+    // GPIO-matrix chips (S3, P4): any pin can carry any slot signal; route through
+    // the interconnect matrix. Blanket-implemented so the builder accepts any GPIO.
+    // The pin is permanently routed (the guard is leaked) for the slot's lifetime.
+    #[cfg(sdmmc_has_gpio_matrix)]
+    impl<'d, const S: u8, P: PeripheralOutput<'d>> SlotClk<'d, S> for P {
+        fn configure(self) {
+            let pin = self.into();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
+            core::mem::forget(interconnect::OutputSignal::connect_with_guard(
+                pin,
+                out_clk(slot_id(S)),
+            ));
+        }
+    }
+
+    #[cfg(sdmmc_has_gpio_matrix)]
+    impl<'d, const S: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>> SlotCmd<'d, S> for P {
+        fn configure(self) {
+            core::mem::forget(connect_bidir(
+                self.into(),
+                in_cmd(slot_id(S)),
+                out_cmd(slot_id(S)),
+            ));
+        }
+    }
+
+    #[cfg(sdmmc_has_gpio_matrix)]
+    impl<'d, const S: u8, const L: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>>
+        SlotData<'d, S, L> for P
+    {
+        fn configure(self) {
+            core::mem::forget(connect_bidir(
+                self.into(),
+                in_data(slot_id(S), L),
+                out_data(slot_id(S), L),
+            ));
+        }
+    }
+
+    // IO_MUX-only chips (ESP32): each slot signal lives on fixed pads selected by
+    // an IO_MUX function. The traits are implemented only for the mandated
+    // `(gpio, af)` pairs, so a wrong pin is a compile error. `HS1_*` is slot 0,
+    // `HS2_*` is slot 1.
+    #[cfg(not(sdmmc_has_gpio_matrix))]
+    fn configure_iomux_pad(pin: u8, af: crate::gpio::AlternateFunction) {
+        crate::gpio::io_mux_reg(pin).modify(|_, w| {
+            unsafe { w.mcu_sel().bits(af as u8) };
+            w.fun_ie().set_bit();
+            w.fun_wpu().set_bit()
+        });
+    }
+
+    #[cfg(not(sdmmc_has_gpio_matrix))]
+    macro_rules! impl_slot_clk {
+        ($gpio:ident, $af:ident, $s:literal) => {
+            impl<'d> SlotClk<'d, $s> for crate::peripherals::$gpio<'d> {
+                fn configure(self) {
+                    configure_iomux_pad(
+                        crate::gpio::Pin::number(&self),
+                        crate::gpio::AlternateFunction::$af,
+                    );
+                }
+            }
+        };
+    }
+
+    #[cfg(not(sdmmc_has_gpio_matrix))]
+    macro_rules! impl_slot_cmd {
+        ($gpio:ident, $af:ident, $s:literal) => {
+            impl<'d> SlotCmd<'d, $s> for crate::peripherals::$gpio<'d> {
+                fn configure(self) {
+                    configure_iomux_pad(
+                        crate::gpio::Pin::number(&self),
+                        crate::gpio::AlternateFunction::$af,
+                    );
+                }
+            }
+        };
+    }
+
+    #[cfg(not(sdmmc_has_gpio_matrix))]
+    macro_rules! impl_slot_data {
+        ($gpio:ident, $af:ident, $s:literal, $l:literal) => {
+            impl<'d> SlotData<'d, $s, $l> for crate::peripherals::$gpio<'d> {
+                fn configure(self) {
+                    configure_iomux_pad(
+                        crate::gpio::Pin::number(&self),
+                        crate::gpio::AlternateFunction::$af,
+                    );
+                }
+            }
+        };
+    }
+
+    #[cfg(not(sdmmc_has_gpio_matrix))]
+    for_each_iomux_function! {
+        (HS1_CLK, $gpio:ident, $af:ident) => { impl_slot_clk!($gpio, $af, 0); };
+        (HS1_CMD, $gpio:ident, $af:ident) => { impl_slot_cmd!($gpio, $af, 0); };
+        (HS1_DATA0, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 0); };
+        (HS1_DATA1, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 1); };
+        (HS1_DATA2, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 2); };
+        (HS1_DATA3, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 3); };
+        (HS2_CLK, $gpio:ident, $af:ident) => { impl_slot_clk!($gpio, $af, 1); };
+        (HS2_CMD, $gpio:ident, $af:ident) => { impl_slot_cmd!($gpio, $af, 1); };
+        (HS2_DATA0, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 0); };
+        (HS2_DATA1, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 1); };
+        (HS2_DATA2, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 2); };
+        (HS2_DATA3, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 3); };
+    }
+
+    /// A configured card slot, generic over the slot index and driver mode.
+    pub struct Slot<'d, const S: u8, Dm: DriverMode> {
         id: SlotId,
         config: Config,
         width: BusWidth,
@@ -627,62 +750,57 @@ mod imp {
         cd_connected: bool,
         wp_connected: bool,
         _guard: PeripheralGuard,
-        clk: PinGuard,
-        cmd: PinGuard,
-        data: [PinGuard; 4],
         power: Option<interconnect::OutputSignal<'d>>,
         cd: Option<interconnect::InputSignal<'d>>,
         wp: Option<interconnect::InputSignal<'d>>,
         _pd: PhantomData<(&'d mut (), Dm)>,
     }
 
-    impl<'d, Dm: DriverMode> Slot<'d, Dm> {
+    impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         /// Connects the card clock output.
-        pub fn with_clk(mut self, clk: impl PeripheralOutput<'d>) -> Self {
-            let pin = clk.into();
-            pin.apply_output_config(&OutputConfig::default());
-            pin.set_output_enable(true);
-            self.clk = interconnect::OutputSignal::connect_with_guard(pin, out_clk(self.id));
+        pub fn with_clk(mut self, clk: impl SlotClk<'d, S>) -> Self {
+            clk.configure();
             self.clk_connected = true;
             self
         }
 
         /// Connects the bidirectional command line.
-        pub fn with_cmd(mut self, cmd: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.cmd = connect_bidir(cmd.into(), in_cmd(self.id), out_cmd(self.id));
+        pub fn with_cmd(mut self, cmd: impl SlotCmd<'d, S>) -> Self {
+            cmd.configure();
             self.cmd_connected = true;
             self
         }
 
         /// Connects data line 0 (required for any transfer).
-        pub fn with_data0(mut self, d0: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.data[0] = connect_bidir(d0.into(), in_data(self.id, 0), out_data(self.id, 0));
+        pub fn with_data0(mut self, d0: impl SlotData<'d, S, 0>) -> Self {
+            d0.configure();
             self.note_data_pin(1);
             self
         }
 
         /// Connects data line 1.
-        pub fn with_data1(mut self, d1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.data[1] = connect_bidir(d1.into(), in_data(self.id, 1), out_data(self.id, 1));
+        pub fn with_data1(mut self, d1: impl SlotData<'d, S, 1>) -> Self {
+            d1.configure();
             self.note_data_pin(2);
             self
         }
 
         /// Connects data line 2.
-        pub fn with_data2(mut self, d2: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.data[2] = connect_bidir(d2.into(), in_data(self.id, 2), out_data(self.id, 2));
+        pub fn with_data2(mut self, d2: impl SlotData<'d, S, 2>) -> Self {
+            d2.configure();
             self.note_data_pin(3);
             self
         }
 
         /// Connects data line 3 (completes the 4-bit bus).
-        pub fn with_data3(mut self, d3: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
-            self.data[3] = connect_bidir(d3.into(), in_data(self.id, 3), out_data(self.id, 3));
+        pub fn with_data3(mut self, d3: impl SlotData<'d, S, 3>) -> Self {
+            d3.configure();
             self.note_data_pin(4);
             self
         }
 
         /// Connects the card-detect input.
+        #[cfg(sdmmc_has_gpio_matrix)]
         pub fn with_card_detect(mut self, cd: impl PeripheralInput<'d>) -> Self {
             let pin = cd.into();
             pin.set_input_enable(true);
@@ -693,6 +811,7 @@ mod imp {
         }
 
         /// Connects the write-protect input.
+        #[cfg(sdmmc_has_gpio_matrix)]
         pub fn with_write_protect(mut self, wp: impl PeripheralInput<'d>) -> Self {
             let pin = wp.into();
             pin.set_input_enable(true);
@@ -809,6 +928,7 @@ mod imp {
                 block_size,
                 block_count,
             )?;
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
             buf.invalidate();
             Ok(resp)
         }
@@ -825,6 +945,7 @@ mod imp {
             block_size: u16,
             block_count: u32,
         ) -> Result<[u32; 4], Error> {
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
             buf.writeback();
             let total = buf.len();
             let ptr = dma_ptr(buf.as_ptr() as usize)?;
@@ -850,11 +971,11 @@ mod imp {
         }
     }
 
-    impl<'d> Slot<'d, Blocking> {
+    impl<'d, const S: u8> Slot<'d, S, Blocking> {
         /// Reconfigures the slot to operate in [`Async`] mode.
         ///
         /// Binds the `SDHOST` interrupt handler and enables interrupt delivery.
-        pub fn into_async(self) -> Slot<'d, Async> {
+        pub fn into_async(self) -> Slot<'d, S, Async> {
             let r = regs();
             r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
@@ -873,9 +994,6 @@ mod imp {
                 cd_connected: self.cd_connected,
                 wp_connected: self.wp_connected,
                 _guard: self._guard,
-                clk: self.clk,
-                cmd: self.cmd,
-                data: self.data,
                 power: self.power,
                 cd: self.cd,
                 wp: self.wp,
@@ -884,9 +1002,9 @@ mod imp {
         }
     }
 
-    impl<'d> Slot<'d, Async> {
+    impl<'d, const S: u8> Slot<'d, S, Async> {
         /// Reconfigures the slot back to [`Blocking`] mode.
-        pub fn into_blocking(self) -> Slot<'d, Blocking> {
+        pub fn into_blocking(self) -> Slot<'d, S, Blocking> {
             let r = regs();
             r.ctrl().modify(|_, w| w.int_enable().clear_bit());
             r.intmask().write(|w| unsafe { w.bits(0) });
@@ -903,9 +1021,6 @@ mod imp {
                 cd_connected: self.cd_connected,
                 wp_connected: self.wp_connected,
                 _guard: self._guard,
-                clk: self.clk,
-                cmd: self.cmd,
-                data: self.data,
                 power: self.power,
                 cd: self.cd,
                 wp: self.wp,
@@ -964,6 +1079,10 @@ mod imp {
             block_size: u16,
             block_count: u32,
         ) -> Result<[u32; 4], sdio::MmcError> {
+            #[cfg_attr(
+                not(any(soc_internal_memory_cached, dma_can_access_psram)),
+                allow(unused_mut)
+            )]
             let mut dma = DmaAlignedMut::new(buf).map_err(map_dma_buf_err)?;
             let ptr = dma_ptr(dma.as_ptr() as usize)?;
             let total = dma.len();
@@ -978,6 +1097,7 @@ mod imp {
                 block_count,
             )
             .await?;
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
             dma.invalidate();
             Ok(resp)
         }
@@ -1006,7 +1126,7 @@ mod imp {
         }
     }
 
-    impl<'d> sdio::MmcBus for Slot<'d, Async> {
+    impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         fn send_command<'a, C>(
             &mut self,
             cmd: C,
@@ -1120,6 +1240,7 @@ mod imp {
                     return Err(sdio::MmcError::Unsupported);
                 }
                 self.set_bus_low_level(w, hz)?;
+                #[cfg(esp32s3)]
                 if hz > 25_000_000 {
                     set_input_delay_phase(self.config.input_delay_phase);
                 }
@@ -1162,6 +1283,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn connect_bidir(
         pin: interconnect::OutputSignal<'_>,
         input: InputSignal,
@@ -1196,8 +1318,11 @@ mod imp {
     }
 
     /// Programs the shared module clock register (divider, source, phases).
+    ///
+    /// Field encodings differ per chip (see each chip's `sdmmc_ll`).
+    #[cfg(esp32s3)]
     fn set_module_clock(source: ClockSource, div: u32) {
-        // l: clock period, h: high pulse, n == l (see TRM / sdmmc_ll).
+        // S3: l == period, h == high pulse, n == l; phase dout=90°, din=0°.
         let l = (div - 1) as u8;
         let h = (div / 2).saturating_sub(1) as u8;
         let n = l;
@@ -1209,6 +1334,24 @@ mod imp {
             w.ccllkin_edge_l().bits(l);
             w.ccllkin_edge_n().bits(n);
             w.cclk_en().bit(matches!(source, ClockSource::Pll160m))
+        });
+    }
+
+    /// Programs the shared module clock register (divider, phases).
+    #[cfg(esp32)]
+    fn set_module_clock(_source: ClockSource, div: u32) {
+        // ESP32: h == period, l == high pulse, n == h; phase dout=din=180°. The
+        // module clock source is fixed at PLL160M (no `clk_sel`).
+        let h = (div - 1) as u8;
+        let l = (div / 2).saturating_sub(1) as u8;
+        let n = h;
+        regs().clk_edge_sel().write(|w| unsafe {
+            w.cclkin_edge_drv_sel().bits(4); // output phase 180°
+            w.cclkin_edge_sam_sel().bits(4); // input phase 180°
+            w.cclkin_edge_slf_sel().bits(0); // core phase 0°
+            w.ccllkin_edge_h().bits(h);
+            w.ccllkin_edge_l().bits(l);
+            w.ccllkin_edge_n().bits(n)
         });
     }
 
@@ -1821,6 +1964,7 @@ mod imp {
     }
 
     /// Sets the input sampling delay phase used for high-speed clocking.
+    #[cfg(esp32s3)]
     fn set_input_delay_phase(phase: DelayPhase) {
         let v = match phase {
             DelayPhase::_0 => 0u8,
@@ -1833,6 +1977,7 @@ mod imp {
             .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn out_clk(id: SlotId) -> OutputSignal {
         match id {
             SlotId::_0 => OutputSignal::SDHOST_CCLK_OUT_1,
@@ -1840,6 +1985,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn out_cmd(id: SlotId) -> OutputSignal {
         match id {
             SlotId::_0 => OutputSignal::SDHOST_CCMD_OUT_1,
@@ -1847,6 +1993,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn in_cmd(id: SlotId) -> InputSignal {
         match id {
             SlotId::_0 => InputSignal::SDHOST_CCMD_IN_1,
@@ -1854,6 +2001,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn out_data(id: SlotId, line: u8) -> OutputSignal {
         match (id, line) {
             (SlotId::_0, 0) => OutputSignal::SDHOST_CDATA_OUT_10,
@@ -1867,6 +2015,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn in_data(id: SlotId, line: u8) -> InputSignal {
         match (id, line) {
             (SlotId::_0, 0) => InputSignal::SDHOST_CDATA_IN_10,
@@ -1880,6 +2029,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn in_card_detect(id: SlotId) -> InputSignal {
         match id {
             SlotId::_0 => InputSignal::SDHOST_CARD_DETECT_N_1,
@@ -1887,6 +2037,7 @@ mod imp {
         }
     }
 
+    #[cfg(sdmmc_has_gpio_matrix)]
     fn in_write_protect(id: SlotId) -> InputSignal {
         match id {
             SlotId::_0 => InputSignal::SDHOST_CARD_WRITE_PRT_1,

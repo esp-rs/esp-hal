@@ -1,10 +1,10 @@
-//! SDMMC SD-card bring-up test (interrupt-driven async, ESP32-S3).
+//! SDMMC SD-card bring-up test (interrupt-driven async, ESP32 / ESP32-S3).
 //!
 //! Initializes an SD card through the `sdio` crate's `MmcBus` integration, reads
 //! block 0, then round-trips a known pattern through a scratch block. A
 //! concurrent heartbeat task confirms the data path does not busy-wait.
 //!
-//! Pins are wired through the GPIO matrix; adjust them for your board:
+//! Slot 1 pins (fixed IO_MUX pads on ESP32, GPIO matrix on ESP32-S3):
 //! - CLK  => GPIO14
 //! - CMD  => GPIO15
 //! - DAT0 => GPIO2
@@ -12,7 +12,7 @@
 //! - DAT2 => GPIO12
 //! - DAT3 => GPIO13
 
-//% CHIP_FILTER: esp32s3
+//% CHIP_FILTER: esp32s3 || esp32
 
 #![no_std]
 #![no_main]
@@ -24,7 +24,7 @@ use embassy_time::Delay;
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    sdmmc::{Config, SdHostController, SlotId},
+    sdmmc::{Config, SdHostController},
     timer::timg::TimerGroup,
 };
 use sdio::{BlockDevice, sd::Card};
@@ -56,7 +56,7 @@ async fn main(spawner: Spawner) {
 
     let mut controller = SdHostController::new(peripherals.SDHOST);
     let slot = controller
-        .slot(SlotId::_1, Config::default())
+        .slot::<1>(Config::default())
         .unwrap()
         .with_clk(peripherals.GPIO14)
         .with_cmd(peripherals.GPIO15)
