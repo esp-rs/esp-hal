@@ -103,12 +103,60 @@ impl Config {
     }
 }
 
+/// Length of the response a command expects.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ResponseLen {
+    /// No response.
+    None,
+    /// Short 48-bit response (`resp[0]`).
+    Short,
+    /// Long 136-bit response (`resp[0..4]`).
+    Long,
+}
+
+/// Per-command engine flags.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct CommandFlags {
+    /// Wait for the data line to be free before issuing.
+    pub wait_complete: bool,
+    /// Stop/abort command (CMD12, CMD52 abort).
+    pub stop_abort: bool,
+    /// Poll DAT0 until the card releases busy (R1b).
+    pub busy: bool,
+}
+
 /// Error returned by host operations.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// A hardware operation did not complete in time.
     Timeout,
+    /// Response CRC check failed.
+    ResponseCrc,
+    /// Data CRC or end-bit error.
+    DataCrc,
+    /// Card did not respond to the command.
+    ResponseTimeout,
+    /// Data transfer timed out.
+    DataTimeout,
+    /// FIFO under- or overrun during a transfer.
+    FifoOverrun,
+    /// Data start-bit error.
+    StartBitError,
+    /// Command could not be loaded (hardware locked).
+    HardwareLocked,
+    /// Controller flagged a response error.
+    ResponseError,
+    /// IDMAC transfer error.
+    DmaError,
+    /// No card present in the slot.
+    NoCard,
+    /// Buffer lies in a region the IDMAC cannot reach.
+    BufferNotDmaCapable,
+    /// Buffer not aligned strictly enough for the cache line.
+    BufferAlignment,
+    /// Operation not supported.
+    Unsupported,
 }
 
 /// Error returned when applying a [`Config`].
@@ -125,7 +173,7 @@ pub use imp::Slot;
 mod imp {
     use core::marker::PhantomData;
 
-    use super::{BusWidth, ClockSource, Config, Error, SlotId};
+    use super::{BusWidth, ClockSource, CommandFlags, Config, Error, ResponseLen, SlotId};
     use crate::{
         Async,
         Blocking,
@@ -149,6 +197,19 @@ mod imp {
     const MODULE_CLOCK_HZ: u32 = 160_000_000 / MODULE_DIV;
     /// Spin-poll bound for self-clearing hardware bits.
     const POLL_LIMIT: u32 = 1_000_000;
+
+    // `rintsts` event bits (see `sdmmc_ll.h` `SDMMC_LL_EVENT_*`).
+    const EVT_RESP_ERR: u32 = 1 << 1;
+    const EVT_CMD_DONE: u32 = 1 << 2;
+    const EVT_RCRC: u32 = 1 << 6;
+    const EVT_DCRC: u32 = 1 << 7;
+    const EVT_RTO: u32 = 1 << 8;
+    const EVT_DTO: u32 = 1 << 9;
+    const EVT_HTO: u32 = 1 << 10;
+    const EVT_FRUN: u32 = 1 << 11;
+    const EVT_HLE: u32 = 1 << 12;
+    const EVT_SBE: u32 = 1 << 13;
+    const EVT_EBE: u32 = 1 << 15;
 
     fn regs() -> &'static RegisterBlock {
         SDHOST::regs()
@@ -346,6 +407,24 @@ mod imp {
             wait_command_accepted()
         }
 
+        /// Issues a no-data command and returns its raw response words.
+        ///
+        /// Low-level bring-up surface; the public API arrives with `MmcBus`.
+        #[doc(hidden)]
+        pub fn command_blocking(
+            &mut self,
+            index: u8,
+            arg: u32,
+            resp_len: ResponseLen,
+            check_crc: bool,
+            flags: CommandFlags,
+        ) -> Result<[u32; 4], Error> {
+            if !self.is_card_present() {
+                return Err(Error::NoCard);
+            }
+            send_command_blocking(self.id, index, arg, resp_len, check_crc, flags)
+        }
+
         fn note_data_pin(&mut self, count: u8) {
             self.data_pins = self.data_pins.max(count);
             self.width = if self.data_pins >= 4 {
@@ -491,6 +570,119 @@ mod imp {
             if (r.rintsts().read().bits() & (1 << 12)) != 0 {
                 r.rintsts().write(|w| unsafe { w.bits(1 << 12) });
                 return Err(Error::Timeout);
+            }
+        }
+        Err(Error::Timeout)
+    }
+
+    /// Issues a no-data command and waits for completion in blocking mode.
+    fn send_command_blocking(
+        id: SlotId,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<[u32; 4], Error> {
+        let r = regs();
+        let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
+
+        // Clear stale command/response status before issuing.
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect()
+                .bit(!matches!(resp_len, ResponseLen::None));
+            w.response_length()
+                .bit(matches!(resp_len, ResponseLen::Long));
+            w.check_response_crc().bit(check_crc);
+            w.wait_prvdata_complete().bit(flags.wait_complete);
+            w.stop_abort_cmd().bit(flags.stop_abort);
+            w.use_hole().set_bit();
+            w.card_number().bits(id.index());
+            w.start_cmd().set_bit()
+        });
+
+        wait_command_accepted()?;
+
+        // Wait for completion or a command-phase error.
+        let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
+        let mut sts = 0;
+        let mut completed = false;
+        for _ in 0..POLL_LIMIT {
+            sts = r.rintsts().read().bits();
+            if sts & done != 0 {
+                completed = true;
+                break;
+            }
+        }
+        if !completed {
+            return Err(Error::Timeout);
+        }
+        map_rintsts(sts)?;
+
+        let resp = read_response(resp_len);
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        // R1b / busy: DesignWare only IRQs busy-clear for writes, so always poll.
+        if flags.busy {
+            wait_busy_cleared()?;
+        }
+        Ok(resp)
+    }
+
+    /// Reads response registers into spec word order (`words[3]` is the MSW).
+    fn read_response(resp_len: ResponseLen) -> [u32; 4] {
+        let r = regs();
+        match resp_len {
+            ResponseLen::None => [0; 4],
+            ResponseLen::Short => [r.resp0().read().bits(), 0, 0, 0],
+            ResponseLen::Long => [
+                r.resp0().read().bits(),
+                r.resp1().read().bits(),
+                r.resp2().read().bits(),
+                r.resp3().read().bits(),
+            ],
+        }
+    }
+
+    /// Maps `rintsts` error bits to an [`Error`]; errors take priority.
+    fn map_rintsts(sts: u32) -> Result<(), Error> {
+        if sts & EVT_HLE != 0 {
+            return Err(Error::HardwareLocked);
+        }
+        if sts & EVT_RTO != 0 {
+            return Err(Error::ResponseTimeout);
+        }
+        if sts & EVT_RCRC != 0 {
+            return Err(Error::ResponseCrc);
+        }
+        if sts & EVT_RESP_ERR != 0 {
+            return Err(Error::ResponseError);
+        }
+        if sts & (EVT_DTO | EVT_HTO) != 0 {
+            return Err(Error::DataTimeout);
+        }
+        if sts & (EVT_DCRC | EVT_EBE) != 0 {
+            return Err(Error::DataCrc);
+        }
+        if sts & EVT_SBE != 0 {
+            return Err(Error::StartBitError);
+        }
+        if sts & EVT_FRUN != 0 {
+            return Err(Error::FifoOverrun);
+        }
+        Ok(())
+    }
+
+    /// Polls DAT0 until the card releases the busy signal.
+    fn wait_busy_cleared() -> Result<(), Error> {
+        let r = regs();
+        for _ in 0..POLL_LIMIT {
+            if !r.status().read().data_busy().bit_is_set() {
+                return Ok(());
             }
         }
         Err(Error::Timeout)
