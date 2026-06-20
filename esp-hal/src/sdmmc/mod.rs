@@ -171,13 +171,14 @@ pub use imp::Slot;
 
 #[cfg(esp32s3)]
 mod imp {
-    use core::marker::PhantomData;
+    use core::{cell::UnsafeCell, marker::PhantomData};
 
     use super::{BusWidth, ClockSource, CommandFlags, Config, Error, ResponseLen, SlotId};
     use crate::{
         Async,
         Blocking,
         DriverMode,
+        dma::aligned::DmaAlignedMut,
         gpio::{
             InputSignal,
             OutputConfig,
@@ -188,6 +189,7 @@ mod imp {
         },
         pac::sdhost::RegisterBlock,
         peripherals::SDHOST,
+        soc::is_valid_ram_address,
         system::{Peripheral, PeripheralGuard},
     };
 
@@ -201,6 +203,7 @@ mod imp {
     // `rintsts` event bits (see `sdmmc_ll.h` `SDMMC_LL_EVENT_*`).
     const EVT_RESP_ERR: u32 = 1 << 1;
     const EVT_CMD_DONE: u32 = 1 << 2;
+    const EVT_DATA_OVER: u32 = 1 << 3;
     const EVT_RCRC: u32 = 1 << 6;
     const EVT_DCRC: u32 = 1 << 7;
     const EVT_RTO: u32 = 1 << 8;
@@ -209,7 +212,60 @@ mod imp {
     const EVT_FRUN: u32 = 1 << 11;
     const EVT_HLE: u32 = 1 << 12;
     const EVT_SBE: u32 = 1 << 13;
+    const EVT_ACD: u32 = 1 << 14;
     const EVT_EBE: u32 = 1 << 15;
+
+    // `ctrl` IDMAC-enable bits not modeled by the PAC (raw writes only).
+    const CTRL_DMA_ENABLE: u32 = 1 << 5;
+    const CTRL_USE_INTERNAL_DMA: u32 = 1 << 25;
+
+    /// IDMAC descriptor count in the driver-owned ring.
+    const RING_LEN: usize = 4;
+    /// Maximum bytes per descriptor (`SDMMC_DMA_MAX_BUF_LEN`).
+    const DMA_MAX_BUF_LEN: usize = 4096;
+
+    // `Desc.flags` bits (see `sdmmc_desc_t`).
+    const DESC_LAST: u32 = 1 << 2;
+    const DESC_FIRST: u32 = 1 << 3;
+    const DESC_CHAINED: u32 = 1 << 4;
+    const DESC_OWN: u32 = 1 << 31;
+
+    /// One 16-byte IDMAC linked-list descriptor.
+    #[repr(C, align(4))]
+    #[derive(Clone, Copy)]
+    struct Desc {
+        flags: u32,
+        sizes: u32,
+        buf1: u32,
+        next: u32,
+    }
+
+    impl Desc {
+        const ZERO: Self = Desc {
+            flags: 0,
+            sizes: 0,
+            buf1: 0,
+            next: 0,
+        };
+    }
+
+    /// Tracks progress while filling the descriptor ring.
+    #[derive(Clone, Copy)]
+    struct Transfer {
+        ptr: u32,
+        remaining: usize,
+        next_desc: usize,
+    }
+
+    /// Driver-owned descriptor ring in internal DMA-capable RAM.
+    struct DescRing(UnsafeCell<[Desc; RING_LEN]>);
+    // Access is serialized by the single controller / per-slot mutex (issue 08).
+    unsafe impl Sync for DescRing {}
+    static DESC_RING: DescRing = DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN]));
+
+    fn ring() -> &'static mut [Desc; RING_LEN] {
+        unsafe { &mut *DESC_RING.0.get() }
+    }
 
     fn regs() -> &'static RegisterBlock {
         SDHOST::regs()
@@ -423,6 +479,61 @@ mod imp {
                 return Err(Error::NoCard);
             }
             send_command_blocking(self.id, index, arg, resp_len, check_crc, flags)
+        }
+
+        /// Reads `block_count` blocks into a DMA-capable buffer (CMD17/CMD18).
+        ///
+        /// Low-level bring-up surface; the public API arrives with `MmcBus`.
+        #[doc(hidden)]
+        pub fn read_blocks_blocking(
+            &mut self,
+            cmd_index: u8,
+            arg: u32,
+            buf: &mut DmaAlignedMut<'_, [u8]>,
+            block_size: u16,
+            block_count: u32,
+        ) -> Result<[u32; 4], Error> {
+            let total = buf.len();
+            let ptr = dma_ptr(buf.as_ptr() as usize)?;
+            let resp = transfer_blocking(
+                self.id,
+                cmd_index,
+                arg,
+                false,
+                ptr,
+                total,
+                block_size,
+                block_count,
+            )?;
+            buf.invalidate();
+            Ok(resp)
+        }
+
+        /// Writes `block_count` blocks from a DMA-capable buffer (CMD24/CMD25).
+        ///
+        /// Low-level bring-up surface; the public API arrives with `MmcBus`.
+        #[doc(hidden)]
+        pub fn write_blocks_blocking(
+            &mut self,
+            cmd_index: u8,
+            arg: u32,
+            buf: &mut DmaAlignedMut<'_, [u8]>,
+            block_size: u16,
+            block_count: u32,
+        ) -> Result<[u32; 4], Error> {
+            buf.writeback();
+            let total = buf.len();
+            let ptr = dma_ptr(buf.as_ptr() as usize)?;
+            transfer_blocking(
+                self.id,
+                cmd_index,
+                arg,
+                true,
+                ptr,
+                total,
+                block_size,
+                block_count,
+            )
         }
 
         fn note_data_pin(&mut self, count: u8) {
@@ -686,6 +797,231 @@ mod imp {
             }
         }
         Err(Error::Timeout)
+    }
+
+    /// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
+    ///
+    /// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
+    fn dma_ptr(addr: usize) -> Result<u32, Error> {
+        if is_valid_ram_address(addr) {
+            return Ok(addr as u32);
+        }
+        #[cfg(sdmmc_psram_dma)]
+        if crate::soc::is_valid_psram_address(addr) {
+            return Ok(addr as u32);
+        }
+        Err(Error::BufferNotDmaCapable)
+    }
+
+    /// Single- or multi-block data transfer over the IDMAC, blocking.
+    fn transfer_blocking(
+        id: SlotId,
+        index: u8,
+        arg: u32,
+        write: bool,
+        buf_ptr: u32,
+        total_len: usize,
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], Error> {
+        let r = regs();
+
+        reset_fifo()?;
+        r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+        r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+
+        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
+
+        // Build the descriptor chain for the whole transfer.
+        let ring = ring();
+        *ring = [Desc::ZERO; RING_LEN];
+        ring[0].flags |= DESC_FIRST;
+        let mut t = Transfer {
+            ptr: buf_ptr,
+            remaining: total_len,
+            next_desc: 0,
+        };
+        fill_descriptors(ring, &mut t, RING_LEN);
+
+        r.dbaddr()
+            .write(|w| unsafe { w.bits(ring.as_ptr() as u32) });
+        enable_idmac();
+        r.pldmnd().write(|w| unsafe { w.bits(1) });
+
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect().set_bit();
+            w.check_response_crc().set_bit();
+            w.data_expected().set_bit();
+            w.read_write().bit(write);
+            w.send_auto_stop().bit(block_count > 1);
+            w.wait_prvdata_complete().set_bit();
+            w.use_hole().set_bit();
+            w.card_number().bits(id.index());
+            w.start_cmd().set_bit()
+        });
+
+        let result = run_data_phase(&mut t, ring, write, block_count);
+
+        disable_idmac();
+        r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+        r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+
+        result?;
+        Ok(read_response(ResponseLen::Short))
+    }
+
+    /// Waits for the command response then the data phase, refilling the ring.
+    fn run_data_phase(
+        t: &mut Transfer,
+        ring: &mut [Desc; RING_LEN],
+        write: bool,
+        block_count: u32,
+    ) -> Result<(), Error> {
+        let r = regs();
+        let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
+
+        wait_command_accepted()?;
+
+        // Command response phase.
+        let cmd_done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
+        let mut sts = 0;
+        let mut got = false;
+        for _ in 0..POLL_LIMIT {
+            sts = r.rintsts().read().bits();
+            if sts & cmd_done != 0 {
+                got = true;
+                break;
+            }
+        }
+        if !got {
+            return Err(Error::Timeout);
+        }
+        map_rintsts(sts)?;
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        // Data phase: poll completion, refill descriptors as the engine frees them.
+        let data_err = EVT_DCRC | EVT_DTO | EVT_HTO | EVT_SBE | EVT_EBE | EVT_FRUN;
+        let mut completed = false;
+        for _ in 0..POLL_LIMIT {
+            let sts = r.rintsts().read().bits();
+            if sts & data_err != 0 {
+                map_rintsts(sts)?;
+            }
+            let id_sts = r.idsts().read();
+            if id_sts.fbe().bit_is_set() || id_sts.du().bit_is_set() {
+                return Err(Error::DmaError);
+            }
+            if t.remaining > 0 {
+                let free = free_descriptors(ring, t.next_desc);
+                if free > 0 {
+                    fill_descriptors(ring, t, free);
+                    r.pldmnd().write(|w| unsafe { w.bits(1) });
+                }
+            }
+            if sts & EVT_DATA_OVER != 0 {
+                completed = true;
+                break;
+            }
+        }
+        if !completed {
+            return Err(Error::Timeout);
+        }
+
+        // Multi-block transfers append an auto-stop; wait for its completion.
+        if block_count > 1 {
+            for _ in 0..POLL_LIMIT {
+                if r.rintsts().read().bits() & EVT_ACD != 0 {
+                    break;
+                }
+            }
+        }
+        if write {
+            wait_busy_cleared()?;
+        }
+        Ok(())
+    }
+
+    /// Counts descriptors the engine has released, starting at `next`.
+    fn free_descriptors(ring: &[Desc; RING_LEN], next: usize) -> usize {
+        let mut count = 0;
+        for i in 0..RING_LEN {
+            let d = &ring[(next + i) % RING_LEN];
+            if d.flags & DESC_OWN != 0 {
+                break;
+            }
+            count += 1;
+            if d.next == 0 {
+                break;
+            }
+        }
+        count
+    }
+
+    /// Fills up to `count` descriptors from the remaining transfer (shared
+    /// blocking/async refill; mirrors `sd_host_fill_dma_descriptors`).
+    fn fill_descriptors(ring: &mut [Desc; RING_LEN], t: &mut Transfer, count: usize) {
+        for _ in 0..count {
+            if t.remaining == 0 {
+                return;
+            }
+            let i = t.next_desc;
+            let size = t.remaining.min(DMA_MAX_BUF_LEN);
+            let last = size == t.remaining;
+            let next_ptr = if last {
+                0
+            } else {
+                &ring[(i + 1) % RING_LEN] as *const Desc as u32
+            };
+            let first = ring[i].flags & DESC_FIRST;
+            let d = &mut ring[i];
+            d.flags = DESC_OWN | DESC_CHAINED | first | if last { DESC_LAST } else { 0 };
+            d.sizes = ((size + 3) & !3) as u32;
+            d.buf1 = t.ptr;
+            d.next = next_ptr;
+            t.remaining -= size;
+            t.ptr += size as u32;
+            t.next_desc = (i + 1) % RING_LEN;
+        }
+    }
+
+    /// Resets the FIFO and waits for the self-clear.
+    fn reset_fifo() -> Result<(), Error> {
+        let r = regs();
+        r.ctrl().modify(|_, w| w.fifo_reset().set_bit());
+        for _ in 0..POLL_LIMIT {
+            if !r.ctrl().read().fifo_reset().bit_is_set() {
+                return Ok(());
+            }
+        }
+        Err(Error::Timeout)
+    }
+
+    /// Enables the IDMAC engine for a transfer.
+    fn enable_idmac() {
+        let r = regs();
+        r.bmod().modify(|_, w| w.swr().set_bit());
+        r.idinten().write(|w| unsafe { w.bits(0) });
+        r.ctrl()
+            .modify(|rd, w| unsafe { w.bits(rd.bits() | CTRL_DMA_ENABLE | CTRL_USE_INTERNAL_DMA) });
+        r.bmod().modify(|_, w| {
+            w.de().set_bit();
+            w.fb().set_bit()
+        });
+    }
+
+    /// Disables the IDMAC engine after a transfer.
+    fn disable_idmac() {
+        let r = regs();
+        r.ctrl()
+            .modify(|rd, w| unsafe { w.bits(rd.bits() & !CTRL_USE_INTERNAL_DMA) });
+        r.bmod().modify(|_, w| {
+            w.de().clear_bit();
+            w.fb().clear_bit()
+        });
+        r.ctrl().modify(|_, w| w.dma_reset().set_bit());
     }
 
     /// Sets the bus width bits for a slot.
