@@ -647,10 +647,17 @@ driver_configs![
         name: "RTC Timekeeping",
         properties: {}
     },
-    SdHostProperties {
-        driver: sd_host,
-        name: "SDIO host",
-        properties: {}
+    Sdmmc {
+        driver: sdmmc,
+        name: "SDMMC/SDIO host",
+        properties: {
+            slots: u32,
+            delay_phase_num: u32,
+            has_iomux: bool,
+            has_gpio_matrix: bool,
+            psram_dma: bool,
+            uhs: bool,
+        }
     },
     SdSlaveProperties {
         driver: sd_slave,

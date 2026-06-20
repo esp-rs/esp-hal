@@ -750,8 +750,14 @@ version = 2
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
-[device.sd_host]
-support_status = "not_supported"
+[device.sdmmc]
+support_status = "partial"
+slots = 2
+delay_phase_num = 4
+has_iomux = false
+has_gpio_matrix = true
+psram_dma = false
+uhs = false
 [device.twai]
 [device.usb_otg]
 fifo_depth_words = 256

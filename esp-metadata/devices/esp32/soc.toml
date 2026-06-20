@@ -718,8 +718,14 @@ version = 1
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
-[device.sd_host]
-support_status = "not_supported"
+[device.sdmmc]
+support_status = "partial"
+slots = 2
+delay_phase_num = 0
+has_iomux = true
+has_gpio_matrix = false
+psram_dma = false
+uhs = false
 [device.sd_slave]
 support_status = "not_supported"
 [device.touch]
