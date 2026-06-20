@@ -224,6 +224,7 @@ mod imp {
         cell::{RefCell, UnsafeCell},
         future::poll_fn,
         marker::PhantomData,
+        sync::atomic::{AtomicBool, Ordering},
         task::Poll,
     };
 
@@ -339,6 +340,9 @@ mod imp {
 
     // `rintsts` card-detect change bit.
     const EVT_CD: u32 = 1 << 0;
+    // `rintsts` SDIO card-interrupt bits (one per slot).
+    const EVT_IO_SLOT0: u32 = 1 << 16;
+    const EVT_IO_SLOT1: u32 = 1 << 17;
 
     // `idsts` fatal DMA bits (fatal bus error / descriptor unavailable).
     const IDSTS_FBE: u32 = 1 << 2;
@@ -385,9 +389,30 @@ mod imp {
 
     static ENGINE: Mutex<RefCell<Engine>> = Mutex::new(RefCell::new(Engine::IDLE));
     static XFER_WAKER: AtomicWaker = AtomicWaker::new();
-    #[allow(dead_code)] // Card-interrupt wakers are wired up in issue 07.
     static IO_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
     static CD_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
+    static IO_ARMED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
+
+    /// SDIO card-interrupt bit for a slot.
+    fn io_slot_bit(id: SlotId) -> u32 {
+        match id {
+            SlotId::_0 => EVT_IO_SLOT0,
+            SlotId::_1 => EVT_IO_SLOT1,
+        }
+    }
+
+    /// Interrupt mask kept armed while idle: card-detect plus any armed SDIO
+    /// card interrupts. Preserves IO arming across transfers.
+    fn idle_intmask() -> u32 {
+        let mut m = INTMASK_IDLE;
+        if IO_ARMED[0].load(Ordering::Acquire) {
+            m |= EVT_IO_SLOT0;
+        }
+        if IO_ARMED[1].load(Ordering::Acquire) {
+            m |= EVT_IO_SLOT1;
+        }
+        m
+    }
 
     /// Arms the engine for a new operation and clears stale status.
     fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
@@ -457,11 +482,26 @@ mod imp {
 
             if eng.result.is_some() {
                 eng.transfer = None;
-                r.intmask().write(|w| unsafe { w.bits(INTMASK_IDLE) });
+                r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
                 r.idinten().write(|w| unsafe { w.bits(0) });
                 XFER_WAKER.wake();
             }
         });
+
+        // SDIO card interrupt (level-triggered): mask the bit and wake; the
+        // caller re-arms after servicing the function via CMD52/53.
+        if rint & EVT_IO_SLOT0 != 0 {
+            IO_ARMED[0].store(false, Ordering::Release);
+            r.intmask()
+                .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT0) });
+            IO_WAKER[0].wake();
+        }
+        if rint & EVT_IO_SLOT1 != 0 {
+            IO_ARMED[1].store(false, Ordering::Release);
+            r.intmask()
+                .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT1) });
+            IO_WAKER[1].wake();
+        }
 
         // Card-detect change: wake both slot listeners.
         if rint & EVT_CD != 0 {
@@ -798,7 +838,7 @@ mod imp {
             let r = regs();
             r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-            r.intmask().write(|w| unsafe { w.bits(INTMASK_IDLE) });
+            r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
             r.idinten().write(|w| unsafe { w.bits(0) });
             r.ctrl().modify(|_, w| w.int_enable().set_bit());
             crate::interrupt::bind_handler(Interrupt::SDIO_HOST, on_interrupt);
@@ -851,6 +891,31 @@ mod imp {
                 wp: self.wp,
                 _pd: PhantomData,
             }
+        }
+
+        /// Waits for the SDIO card interrupt (card pulls DAT1 low).
+        ///
+        /// Usage contract: `await` this, service the function via CMD52/53, then
+        /// `await` again to re-arm. The interrupt is level-triggered and is
+        /// masked on wake to avoid an IRQ storm until the caller re-arms.
+        pub async fn wait_for_sdio_interrupt(&mut self) {
+            let slot = self.id.index() as usize;
+            let bit = io_slot_bit(self.id);
+
+            IO_ARMED[slot].store(true, Ordering::Release);
+            regs()
+                .intmask()
+                .modify(|rd, w| unsafe { w.bits(rd.bits() | bit) });
+
+            poll_fn(|cx| {
+                IO_WAKER[slot].register(cx.waker());
+                if IO_ARMED[slot].load(Ordering::Acquire) {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            })
+            .await
         }
 
         /// Issues a control command, mapping protocol types to the engine core.
@@ -1270,7 +1335,7 @@ mod imp {
     /// Masks interrupts, tears down the IDMAC and clears engine state.
     fn abort_transfer() {
         let r = regs();
-        r.intmask().write(|w| unsafe { w.bits(INTMASK_IDLE) });
+        r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
         r.idinten().write(|w| unsafe { w.bits(0) });
         disable_idmac();
         let _ = reset_fifo();
@@ -1317,7 +1382,7 @@ mod imp {
         r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
         arm_engine(false, false, None);
         r.intmask()
-            .write(|w| unsafe { w.bits(INTMASK_IDLE | INTMASK_CMD) });
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
 
         r.cmdarg().write(|w| unsafe { w.bits(arg) });
         r.cmd().write(|w| unsafe {
@@ -1362,6 +1427,8 @@ mod imp {
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
         r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
         r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        // Real byte count; descriptor sizes round up to words, but bytcnt caps DMA
+        // so CMD53 byte-mode never writes past the user buffer.
         r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
 
         // Build the descriptor chain and prime the IDMAC.
@@ -1382,7 +1449,7 @@ mod imp {
         arm_engine(true, block_count > 1, Some(t));
         r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
         r.intmask()
-            .write(|w| unsafe { w.bits(INTMASK_IDLE | INTMASK_DATA) });
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
 
         r.cmdarg().write(|w| unsafe { w.bits(arg) });
         r.cmd().write(|w| unsafe {
