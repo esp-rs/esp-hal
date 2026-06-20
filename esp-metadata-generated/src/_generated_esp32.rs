@@ -3559,6 +3559,8 @@ macro_rules! implement_peripheral_clocks {
             Rmt,
             /// RSA peripheral clock signal
             Rsa,
+            /// SDIO_HOST peripheral clock signal
+            SdioHost,
             /// SHA peripheral clock signal
             Sha,
             /// SPI2 peripheral clock signal
@@ -3602,6 +3604,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Pcnt,
                 Self::Rmt,
                 Self::Rsa,
+                Self::SdioHost,
                 Self::Sha,
                 Self::Spi2,
                 Self::Spi3,
@@ -3678,6 +3681,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .peri_clk_en()
                         .modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
+                }
+                Peripheral::SdioHost => {
+                    crate::peripherals::SYSTEM::regs()
+                        .wifi_clk_en()
+                        .modify(|_, w| w.sdio_host_clk_en().bit(enable));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::SYSTEM::regs()
@@ -3807,6 +3815,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .peri_rst_en()
                         .modify(|_, w| w.crypto_rsa_rst().bit(reset));
+                }
+                Peripheral::SdioHost => {
+                    crate::peripherals::SYSTEM::regs()
+                        .wifi_rst_en()
+                        .modify(|_, w| w.sdio_host_rst().bit(reset));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::SYSTEM::regs()
