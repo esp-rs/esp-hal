@@ -263,8 +263,8 @@ mod imp {
             OutputConfig,
             interconnect::{self, PeripheralOutput},
         },
-        pac::sdhost::RegisterBlock,
         peripherals::{Interrupt, SDHOST},
+        private::DropGuard,
         soc::is_valid_ram_address,
         system::{Peripheral, PeripheralGuard},
     };
@@ -335,14 +335,9 @@ mod imp {
     struct DescRing(UnsafeCell<[Desc; RING_LEN]>);
     // Access is serialized by the single controller / per-slot mutex (issue 08).
     unsafe impl Sync for DescRing {}
-    static DESC_RING: DescRing = DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN]));
 
     fn ring() -> &'static mut [Desc; RING_LEN] {
-        unsafe { &mut *DESC_RING.0.get() }
-    }
-
-    fn regs() -> &'static RegisterBlock {
-        SDHOST::regs()
+        unsafe { &mut *STATE.desc_ring.0.get() }
     }
 
     // `rintsts` card-detect change bit.
@@ -394,37 +389,179 @@ mod imp {
         };
     }
 
-    static ENGINE: Mutex<RefCell<Engine>> = Mutex::new(RefCell::new(Engine::IDLE));
-
-    static XFER_WAKER: AtomicWaker = AtomicWaker::new();
-    static IO_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
-    static CD_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
-    static IO_ARMED: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
-
-    /// Serializes whole transactions over the single shared transfer engine.
+    /// Mutable controller state shared with the interrupt handler.
     ///
-    /// Held for an entire command+data+busy transaction so a second slot cannot
-    /// clobber `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
+    /// `engine_lock` serializes whole transactions over the single shared
+    /// transfer engine so a second slot cannot clobber
+    /// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
     /// near-free) in the common single-slot case.
-    static ENGINE_LOCK: embassy_sync::mutex::Mutex<RawMutex, ()> =
-        embassy_sync::mutex::Mutex::new(());
+    struct State {
+        engine: Mutex<RefCell<Engine>>,
+        xfer_waker: AtomicWaker,
+        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
+        desc_ring: DescRing,
+    }
+    unsafe impl Sync for State {}
 
-    /// SDIO card-interrupt bit for a slot.
-    fn io_slot_bit(id: SlotId) -> u32 {
-        match id {
-            SlotId::_0 => EVT_IO_SLOT0,
-            SlotId::_1 => EVT_IO_SLOT1,
+    static STATE: State = State {
+        engine: Mutex::new(RefCell::new(Engine::IDLE)),
+        xfer_waker: AtomicWaker::new(),
+        engine_lock: embassy_sync::mutex::Mutex::new(()),
+        desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
+    };
+
+    /// Matrix-routed pin guards owned by the slot for its whole lifetime.
+    ///
+    /// Held here (rather than leaked) so re-running a `with_*` builder method
+    /// drops the previous routing. IO_MUX chips drive fixed pads and need none.
+    #[cfg(sdmmc_has_gpio_matrix)]
+    struct SlotPins {
+        clk: PinGuard,
+        cmd: PinGuard,
+        data: [PinGuard; 4],
+    }
+
+    #[cfg(sdmmc_has_gpio_matrix)]
+    impl SlotPins {
+        const fn new() -> Self {
+            Self {
+                clk: PinGuard::new_unconnected(),
+                cmd: PinGuard::new_unconnected(),
+                data: [const { PinGuard::new_unconnected() }; 4],
+            }
         }
+    }
+
+    /// Mutable per-slot runtime state.
+    struct SlotState {
+        io_waker: AtomicWaker,
+        cd_waker: AtomicWaker,
+        io_armed: AtomicBool,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        pins: UnsafeCell<SlotPins>,
+    }
+
+    // `pins` is only touched while building a slot (never by the ISR); the slot
+    // value owns its `State`, mirroring the SPI driver.
+    #[cfg(sdmmc_has_gpio_matrix)]
+    unsafe impl Sync for SlotState {}
+
+    impl SlotState {
+        const fn new() -> Self {
+            Self {
+                io_waker: AtomicWaker::new(),
+                cd_waker: AtomicWaker::new(),
+                io_armed: AtomicBool::new(false),
+                #[cfg(sdmmc_has_gpio_matrix)]
+                pins: UnsafeCell::new(SlotPins::new()),
+            }
+        }
+    }
+
+    static SLOT_STATE: [SlotState; 2] = [SlotState::new(), SlotState::new()];
+
+    /// Mutable runtime state for a slot.
+    #[cfg(sdmmc_has_gpio_matrix)]
+    fn slot_state(id: SlotId) -> &'static SlotState {
+        &SLOT_STATE[id.index() as usize]
+    }
+
+    /// Exclusive access to a slot's pin guards (builder-time only).
+    #[cfg(sdmmc_has_gpio_matrix)]
+    fn slot_pins(id: SlotId) -> &'static mut SlotPins {
+        unsafe { &mut *slot_state(id).pins.get() }
+    }
+
+    /// Immutable per-slot routing: SDIO card-interrupt bit plus, on GPIO-matrix
+    /// chips, the input/output signals the slot's pins connect to.
+    struct SlotInfo {
+        io_event: u32,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        clk_out: OutputSignal,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        cmd_in: InputSignal,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        cmd_out: OutputSignal,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        data_in: [InputSignal; 4],
+        #[cfg(sdmmc_has_gpio_matrix)]
+        data_out: [OutputSignal; 4],
+        #[cfg(sdmmc_has_gpio_matrix)]
+        cd_in: InputSignal,
+        #[cfg(sdmmc_has_gpio_matrix)]
+        wp_in: InputSignal,
+    }
+
+    static SLOT_INFO: [SlotInfo; 2] = [
+        SlotInfo {
+            io_event: EVT_IO_SLOT0,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            clk_out: OutputSignal::SDHOST_CCLK_OUT_1,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cmd_in: InputSignal::SDHOST_CCMD_IN_1,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cmd_out: OutputSignal::SDHOST_CCMD_OUT_1,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            data_in: [
+                InputSignal::SDHOST_CDATA_IN_10,
+                InputSignal::SDHOST_CDATA_IN_11,
+                InputSignal::SDHOST_CDATA_IN_12,
+                InputSignal::SDHOST_CDATA_IN_13,
+            ],
+            #[cfg(sdmmc_has_gpio_matrix)]
+            data_out: [
+                OutputSignal::SDHOST_CDATA_OUT_10,
+                OutputSignal::SDHOST_CDATA_OUT_11,
+                OutputSignal::SDHOST_CDATA_OUT_12,
+                OutputSignal::SDHOST_CDATA_OUT_13,
+            ],
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cd_in: InputSignal::SDHOST_CARD_DETECT_N_1,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            wp_in: InputSignal::SDHOST_CARD_WRITE_PRT_1,
+        },
+        SlotInfo {
+            io_event: EVT_IO_SLOT1,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            clk_out: OutputSignal::SDHOST_CCLK_OUT_2,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cmd_in: InputSignal::SDHOST_CCMD_IN_2,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cmd_out: OutputSignal::SDHOST_CCMD_OUT_2,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            data_in: [
+                InputSignal::SDHOST_CDATA_IN_20,
+                InputSignal::SDHOST_CDATA_IN_21,
+                InputSignal::SDHOST_CDATA_IN_22,
+                InputSignal::SDHOST_CDATA_IN_23,
+            ],
+            #[cfg(sdmmc_has_gpio_matrix)]
+            data_out: [
+                OutputSignal::SDHOST_CDATA_OUT_20,
+                OutputSignal::SDHOST_CDATA_OUT_21,
+                OutputSignal::SDHOST_CDATA_OUT_22,
+                OutputSignal::SDHOST_CDATA_OUT_23,
+            ],
+            #[cfg(sdmmc_has_gpio_matrix)]
+            cd_in: InputSignal::SDHOST_CARD_DETECT_N_2,
+            #[cfg(sdmmc_has_gpio_matrix)]
+            wp_in: InputSignal::SDHOST_CARD_WRITE_PRT_2,
+        },
+    ];
+
+    /// Static routing data for a slot.
+    fn slot_info(id: SlotId) -> &'static SlotInfo {
+        &SLOT_INFO[id.index() as usize]
     }
 
     /// Interrupt mask kept armed while idle: card-detect plus any armed SDIO
     /// card interrupts. Preserves IO arming across transfers.
     fn idle_intmask() -> u32 {
         let mut m = INTMASK_IDLE;
-        if IO_ARMED[0].load(Ordering::Acquire) {
+        if SLOT_STATE[0].io_armed.load(Ordering::Acquire) {
             m |= EVT_IO_SLOT0;
         }
-        if IO_ARMED[1].load(Ordering::Acquire) {
+        if SLOT_STATE[1].io_armed.load(Ordering::Acquire) {
             m |= EVT_IO_SLOT1;
         }
         m
@@ -433,7 +570,7 @@ mod imp {
     /// Arms the engine for a new operation and clears stale status.
     fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
         critical_section::with(|cs| {
-            *ENGINE.borrow_ref_mut(cs) = Engine {
+            *STATE.engine.borrow_ref_mut(cs) = Engine {
                 transfer,
                 result: None,
                 expect_data,
@@ -446,18 +583,18 @@ mod imp {
 
     /// Returns the recorded terminal result, if the ISR has finished the op.
     fn take_result() -> Option<Result<(), Error>> {
-        critical_section::with(|cs| ENGINE.borrow_ref_mut(cs).result.take())
+        critical_section::with(|cs| STATE.engine.borrow_ref_mut(cs).result.take())
     }
 
     /// SDMMC interrupt handler: refills the IDMAC ring and wakes the task.
     #[handler]
     fn on_interrupt() {
-        let r = regs();
+        let r = SDHOST::regs();
         let rint = r.rintsts().read().bits();
         let idsts = r.idsts().read().bits();
 
         critical_section::with(|cs| {
-            let mut eng = ENGINE.borrow_ref_mut(cs);
+            let mut eng = STATE.engine.borrow_ref_mut(cs);
 
             // Refill descriptors the engine has released mid-transfer.
             if let Some(t) = eng.transfer.as_mut()
@@ -500,29 +637,29 @@ mod imp {
                 eng.transfer = None;
                 r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
                 r.idinten().write(|w| unsafe { w.bits(0) });
-                XFER_WAKER.wake();
+                STATE.xfer_waker.wake();
             }
         });
 
         // SDIO card interrupt (level-triggered): mask the bit and wake; the
         // caller re-arms after servicing the function via CMD52/53.
         if rint & EVT_IO_SLOT0 != 0 {
-            IO_ARMED[0].store(false, Ordering::Release);
+            SLOT_STATE[0].io_armed.store(false, Ordering::Release);
             r.intmask()
                 .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT0) });
-            IO_WAKER[0].wake();
+            SLOT_STATE[0].io_waker.wake();
         }
         if rint & EVT_IO_SLOT1 != 0 {
-            IO_ARMED[1].store(false, Ordering::Release);
+            SLOT_STATE[1].io_armed.store(false, Ordering::Release);
             r.intmask()
                 .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT1) });
-            IO_WAKER[1].wake();
+            SLOT_STATE[1].io_waker.wake();
         }
 
         // Card-detect change: wake both slot listeners.
         if rint & EVT_CD != 0 {
-            CD_WAKER[0].wake();
-            CD_WAKER[1].wake();
+            SLOT_STATE[0].cd_waker.wake();
+            SLOT_STATE[1].cd_waker.wake();
         }
 
         // Write-1-clear the bits handled this pass.
@@ -568,7 +705,7 @@ mod imp {
             // DesignWare reset, then module clock, then quiesce interrupts.
             let _ = reset_engine();
             set_module_clock(ClockSource::Pll160m, MODULE_DIV);
-            let r = regs();
+            let r = SDHOST::regs();
             r.tmout().write(|w| unsafe {
                 w.response_timeout()
                     .bits(0xFF)
@@ -640,28 +777,26 @@ mod imp {
 
     // GPIO-matrix chips (S3, P4): any pin can carry any slot signal; route through
     // the interconnect matrix. Blanket-implemented so the builder accepts any GPIO.
-    // The pin is permanently routed (the guard is leaked) for the slot's lifetime.
+    // The routing guard is stored in the slot's `State` for the slot's lifetime.
     #[cfg(sdmmc_has_gpio_matrix)]
     impl<'d, const S: u8, P: PeripheralOutput<'d>> SlotClk<'d, S> for P {
         fn configure(self) {
             let pin = self.into();
             pin.apply_output_config(&OutputConfig::default());
             pin.set_output_enable(true);
-            core::mem::forget(interconnect::OutputSignal::connect_with_guard(
-                pin,
-                out_clk(slot_id(S)),
-            ));
+            slot_pins(slot_id(S)).clk =
+                interconnect::OutputSignal::connect_with_guard(pin, slot_info(slot_id(S)).clk_out);
         }
     }
 
     #[cfg(sdmmc_has_gpio_matrix)]
     impl<'d, const S: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>> SlotCmd<'d, S> for P {
         fn configure(self) {
-            core::mem::forget(connect_bidir(
+            slot_pins(slot_id(S)).cmd = connect_bidir(
                 self.into(),
-                in_cmd(slot_id(S)),
-                out_cmd(slot_id(S)),
-            ));
+                slot_info(slot_id(S)).cmd_in,
+                slot_info(slot_id(S)).cmd_out,
+            );
         }
     }
 
@@ -670,11 +805,11 @@ mod imp {
         SlotData<'d, S, L> for P
     {
         fn configure(self) {
-            core::mem::forget(connect_bidir(
+            slot_pins(slot_id(S)).data[L as usize] = connect_bidir(
                 self.into(),
-                in_data(slot_id(S), L),
-                out_data(slot_id(S), L),
-            ));
+                slot_info(slot_id(S)).data_in[L as usize],
+                slot_info(slot_id(S)).data_out[L as usize],
+            );
         }
     }
 
@@ -814,7 +949,7 @@ mod imp {
         pub fn with_card_detect(mut self, cd: impl PeripheralInput<'d>) -> Self {
             let pin = cd.into();
             pin.set_input_enable(true);
-            in_card_detect(self.id).connect_to(&pin);
+            slot_info(self.id).cd_in.connect_to(&pin);
             self.cd = Some(pin);
             self.cd_connected = true;
             self
@@ -825,7 +960,7 @@ mod imp {
         pub fn with_write_protect(mut self, wp: impl PeripheralInput<'d>) -> Self {
             let pin = wp.into();
             pin.set_input_enable(true);
-            in_write_protect(self.id).connect_to(&pin);
+            slot_info(self.id).wp_in.connect_to(&pin);
             self.wp = Some(pin);
             self.wp_connected = true;
             self
@@ -847,7 +982,7 @@ mod imp {
             if !self.cd_connected {
                 return true;
             }
-            (regs().cdetect().read().card_detect_n().bits() & (1 << self.id.index())) == 0
+            (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << self.id.index())) == 0
         }
 
         /// Returns `true` if the card reports write protection. Returns `false`
@@ -857,8 +992,9 @@ mod imp {
             if !self.wp_connected {
                 return false;
             }
-            let level =
-                (regs().wrtprt().read().write_protect().bits() & (1 << self.id.index())) != 0;
+            let level = (SDHOST::regs().wrtprt().read().write_protect().bits()
+                & (1 << self.id.index()))
+                != 0;
             level == self.config.wp_active_high
         }
 
@@ -885,7 +1021,7 @@ mod imp {
 
         /// Issues the 80-clock SD init sequence (no command index).
         pub fn send_init_sequence(&mut self) -> Result<(), Error> {
-            let r = regs();
+            let r = SDHOST::regs();
             r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
             r.cmdarg().write(|w| unsafe { w.bits(0) });
             r.cmd().write(|w| unsafe {
@@ -996,7 +1132,7 @@ mod imp {
         ///
         /// Binds the `SDHOST` interrupt handler and enables interrupt delivery.
         pub fn into_async(self) -> Slot<'d, S, Async> {
-            let r = regs();
+            let r = SDHOST::regs();
             r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
@@ -1025,7 +1161,7 @@ mod imp {
     impl<'d, const S: u8> Slot<'d, S, Async> {
         /// Reconfigures the slot back to [`Blocking`] mode.
         pub fn into_blocking(self) -> Slot<'d, S, Blocking> {
-            let r = regs();
+            let r = SDHOST::regs();
             r.ctrl().modify(|_, w| w.int_enable().clear_bit());
             r.intmask().write(|w| unsafe { w.bits(0) });
             r.idinten().write(|w| unsafe { w.bits(0) });
@@ -1055,16 +1191,16 @@ mod imp {
         /// masked on wake to avoid an IRQ storm until the caller re-arms.
         pub async fn wait_for_sdio_interrupt(&mut self) {
             let slot = self.id.index() as usize;
-            let bit = io_slot_bit(self.id);
+            let bit = slot_info(self.id).io_event;
 
-            IO_ARMED[slot].store(true, Ordering::Release);
-            regs()
+            SLOT_STATE[slot].io_armed.store(true, Ordering::Release);
+            SDHOST::regs()
                 .intmask()
                 .modify(|rd, w| unsafe { w.bits(rd.bits() | bit) });
 
             poll_fn(|cx| {
-                IO_WAKER[slot].register(cx.waker());
-                if IO_ARMED[slot].load(Ordering::Acquire) {
+                SLOT_STATE[slot].io_waker.register(cx.waker());
+                if SLOT_STATE[slot].io_armed.load(Ordering::Acquire) {
                     Poll::Pending
                 } else {
                     Poll::Ready(())
@@ -1147,125 +1283,89 @@ mod imp {
     }
 
     impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
-        fn send_command<'a, C>(
-            &mut self,
-            cmd: C,
-        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        async fn send_command<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
         where
             C: sdio::ControlCommand + 'a,
         {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                self.cmd_async::<C>(cmd).await
-            }
+            let _lock = STATE.engine_lock.lock().await;
+            self.cmd_async::<C>(cmd).await
         }
 
-        fn read_blocks<'a, C>(
-            &mut self,
-            mut cmd: C,
-        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        async fn read_blocks<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
         where
             C: sdio::BlockReadCommand + 'a,
         {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
-                let words = self
-                    .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
-                    .await?;
-                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
-            }
+            let _lock = STATE.engine_lock.lock().await;
+            let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
+            let words = self
+                .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
+                .await?;
+            Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
 
-        fn write_blocks<'a, C>(
-            &mut self,
-            cmd: C,
-        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        async fn write_blocks<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
         where
             C: sdio::BlockWriteCommand + 'a,
         {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
-                let words = self
-                    .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
-                    .await?;
-                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
-            }
+            let _lock = STATE.engine_lock.lock().await;
+            let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
+            let words = self
+                .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
+                .await?;
+            Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
 
-        fn read_bytes<'a, C>(
-            &mut self,
-            mut cmd: C,
-        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        async fn read_bytes<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
         where
             C: sdio::ByteReadCommand + 'a,
         {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                let (n, arg) = (cmd.byte_count(), cmd.arg());
-                let words = self
-                    .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)
-                    .await?;
-                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
-            }
+            let _lock = STATE.engine_lock.lock().await;
+            let (n, arg) = (cmd.byte_count(), cmd.arg());
+            let words = self
+                .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)
+                .await?;
+            Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
 
-        fn write_bytes<'a, C>(
-            &mut self,
-            cmd: C,
-        ) -> impl core::future::Future<Output = Result<C::Resp<'a>, sdio::MmcError>>
+        async fn write_bytes<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
         where
             C: sdio::ByteWriteCommand + 'a,
         {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                let (n, arg) = (cmd.byte_count(), cmd.arg());
-                let words = self
-                    .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)
-                    .await?;
-                Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
-            }
+            let _lock = STATE.engine_lock.lock().await;
+            let (n, arg) = (cmd.byte_count(), cmd.arg());
+            let words = self
+                .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)
+                .await?;
+            Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
 
-        fn init_idle(
-            &mut self,
-            hz: u32,
-        ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
-                self.set_bus_low_level(BusWidth::Bit1, hz)?;
-                self.send_init_sequence()?;
-                Ok(())
-            }
+        async fn init_idle(&mut self, hz: u32) -> Result<(), sdio::MmcError> {
+            let _lock = STATE.engine_lock.lock().await;
+            self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
+            self.set_bus_low_level(BusWidth::Bit1, hz)?;
+            self.send_init_sequence()?;
+            Ok(())
         }
 
-        fn set_bus(
-            &mut self,
-            width: sdio::BusWidth,
-            hz: u32,
-        ) -> impl core::future::Future<Output = Result<(), sdio::MmcError>> {
-            async move {
-                let _lock = ENGINE_LOCK.lock().await;
-                let w = match width {
-                    sdio::BusWidth::W1 => BusWidth::Bit1,
-                    sdio::BusWidth::W4 => BusWidth::Bit4,
-                    sdio::BusWidth::W8 => return Err(sdio::MmcError::Unsupported),
-                };
-                if matches!(w, BusWidth::Bit4) && self.data_pins < 4 {
-                    return Err(sdio::MmcError::Unsupported);
-                }
-                if hz > 40_000_000 {
-                    return Err(sdio::MmcError::Unsupported);
-                }
-                self.set_bus_low_level(w, hz)?;
-                #[cfg(esp32s3)]
-                if hz > 25_000_000 {
-                    set_input_delay_phase(self.config.input_delay_phase);
-                }
-                Ok(())
+        async fn set_bus(&mut self, width: sdio::BusWidth, hz: u32) -> Result<(), sdio::MmcError> {
+            let _lock = STATE.engine_lock.lock().await;
+            let w = match width {
+                sdio::BusWidth::W1 => BusWidth::Bit1,
+                sdio::BusWidth::W4 => BusWidth::Bit4,
+                sdio::BusWidth::W8 => return Err(sdio::MmcError::Unsupported),
+            };
+            if matches!(w, BusWidth::Bit4) && self.data_pins < 4 {
+                return Err(sdio::MmcError::Unsupported);
             }
+            if hz > 40_000_000 {
+                return Err(sdio::MmcError::Unsupported);
+            }
+            self.set_bus_low_level(w, hz)?;
+            #[cfg(esp32s3)]
+            if hz > 25_000_000 {
+                set_input_delay_phase(self.config.input_delay_phase);
+            }
+            Ok(())
         }
 
         fn supports_mmc(&self) -> bool {
@@ -1324,7 +1424,7 @@ mod imp {
 
     /// Resets the controller, FIFO and DMA blocks, waiting for self-clear.
     fn reset_engine() -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         r.ctrl().modify(|_, w| {
             w.controller_reset().set_bit();
             w.fifo_reset().set_bit();
@@ -1351,7 +1451,7 @@ mod imp {
         let l = (div - 1) as u8;
         let h = (div / 2).saturating_sub(1) as u8;
         let n = l;
-        regs().clk_edge_sel().write(|w| unsafe {
+        SDHOST::regs().clk_edge_sel().write(|w| unsafe {
             w.cclkin_edge_drv_sel().bits(1); // output phase 90°
             w.cclkin_edge_sam_sel().bits(0); // input phase 0°
             w.cclkin_edge_slf_sel().bits(0); // core phase 0°
@@ -1403,7 +1503,7 @@ mod imp {
         let h = (div - 1) as u8;
         let l = (div / 2).saturating_sub(1) as u8;
         let n = h;
-        regs().clk_edge_sel().write(|w| unsafe {
+        SDHOST::regs().clk_edge_sel().write(|w| unsafe {
             w.cclkin_edge_drv_sel().bits(4); // output phase 180°
             w.cclkin_edge_sam_sel().bits(4); // input phase 180°
             w.cclkin_edge_slf_sel().bits(0); // core phase 0°
@@ -1416,7 +1516,7 @@ mod imp {
     /// Sets a slot's card clock divider and (re-)enables the card clock.
     fn set_card_clock(id: SlotId, card_div: u8) -> Result<(), Error> {
         let slot = id.index();
-        let r = regs();
+        let r = SDHOST::regs();
 
         // Disable card clock before changing the divider.
         r.clkena().modify(|rd, w| unsafe {
@@ -1460,7 +1560,7 @@ mod imp {
     /// Commits clock-register changes via an `update_clock_registers_only`
     /// command.
     fn apply_clock_update(id: SlotId) -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         r.cmdarg().write(|w| unsafe { w.bits(0) });
         r.cmd().write(|w| unsafe {
             w.update_clock_registers_only().set_bit();
@@ -1473,7 +1573,7 @@ mod imp {
 
     /// Spins until the CIU accepts the command (`start_cmd` self-clears).
     fn wait_command_accepted() -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         for _ in 0..POLL_LIMIT {
             if !r.cmd().read().start_cmd().bit_is_set() {
                 return Ok(());
@@ -1496,7 +1596,7 @@ mod imp {
         check_crc: bool,
         flags: CommandFlags,
     ) -> Result<[u32; 4], Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
 
         // Clear stale command/response status before issuing.
@@ -1545,45 +1645,22 @@ mod imp {
         Ok(resp)
     }
 
-    /// Aborts an in-flight transfer on drop unless explicitly disarmed.
-    struct AbortGuard {
-        armed: bool,
-    }
-
-    impl AbortGuard {
-        fn new() -> Self {
-            Self { armed: true }
-        }
-
-        fn disarm(mut self) {
-            self.armed = false;
-        }
-    }
-
-    impl Drop for AbortGuard {
-        fn drop(&mut self) {
-            if self.armed {
-                abort_transfer();
-            }
-        }
-    }
-
     /// Masks interrupts, tears down the IDMAC and clears engine state.
     fn abort_transfer() {
-        let r = regs();
+        let r = SDHOST::regs();
         r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
         r.idinten().write(|w| unsafe { w.bits(0) });
         disable_idmac();
         let _ = reset_fifo();
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
         r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-        critical_section::with(|cs| *ENGINE.borrow_ref_mut(cs) = Engine::IDLE);
+        critical_section::with(|cs| *STATE.engine.borrow_ref_mut(cs) = Engine::IDLE);
     }
 
     /// Awaits the terminal result the interrupt handler records.
     async fn wait_result() -> Result<(), Error> {
         poll_fn(|cx| {
-            XFER_WAKER.register(cx.waker());
+            STATE.xfer_waker.register(cx.waker());
             match take_result() {
                 Some(res) => Poll::Ready(res),
                 None => Poll::Pending,
@@ -1595,7 +1672,7 @@ mod imp {
     /// Yields between DAT0 polls while the card signals busy (R1b).
     async fn wait_busy_async() -> Result<(), Error> {
         for _ in 0..POLL_LIMIT {
-            if !regs().status().read().data_busy().bit_is_set() {
+            if !SDHOST::regs().status().read().data_busy().bit_is_set() {
                 return Ok(());
             }
             yield_now().await;
@@ -1612,8 +1689,8 @@ mod imp {
         check_crc: bool,
         flags: CommandFlags,
     ) -> Result<[u32; 4], Error> {
-        let r = regs();
-        let guard = AbortGuard::new();
+        let r = SDHOST::regs();
+        let guard = DropGuard::new((), |()| abort_transfer());
 
         r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
         arm_engine(false, false, None);
@@ -1641,7 +1718,7 @@ mod imp {
         if flags.busy {
             wait_busy_async().await?;
         }
-        guard.disarm();
+        guard.defuse();
         Ok(resp)
     }
 
@@ -1656,8 +1733,8 @@ mod imp {
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
-        let r = regs();
-        let guard = AbortGuard::new();
+        let r = SDHOST::regs();
+        let guard = DropGuard::new((), |()| abort_transfer());
 
         reset_fifo()?;
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
@@ -1708,13 +1785,13 @@ mod imp {
         }
         disable_idmac();
         let resp = read_response(ResponseLen::Short);
-        guard.disarm();
+        guard.defuse();
         Ok(resp)
     }
 
     /// Reads response registers into spec word order (`words[3]` is the MSW).
     fn read_response(resp_len: ResponseLen) -> [u32; 4] {
-        let r = regs();
+        let r = SDHOST::regs();
         match resp_len {
             ResponseLen::None => [0; 4],
             ResponseLen::Short => [r.resp0().read().bits(), 0, 0, 0],
@@ -1758,7 +1835,7 @@ mod imp {
 
     /// Polls DAT0 until the card releases the busy signal.
     fn wait_busy_cleared() -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         for _ in 0..POLL_LIMIT {
             if !r.status().read().data_busy().bit_is_set() {
                 return Ok(());
@@ -1792,7 +1869,7 @@ mod imp {
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
-        let r = regs();
+        let r = SDHOST::regs();
 
         reset_fifo()?;
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
@@ -1848,7 +1925,7 @@ mod imp {
         write: bool,
         block_count: u32,
     ) -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
 
         wait_command_accepted()?;
@@ -1957,7 +2034,7 @@ mod imp {
 
     /// Resets the FIFO and waits for the self-clear.
     fn reset_fifo() -> Result<(), Error> {
-        let r = regs();
+        let r = SDHOST::regs();
         r.ctrl().modify(|_, w| w.fifo_reset().set_bit());
         for _ in 0..POLL_LIMIT {
             if !r.ctrl().read().fifo_reset().bit_is_set() {
@@ -1969,7 +2046,7 @@ mod imp {
 
     /// Enables the IDMAC engine for a transfer.
     fn enable_idmac() {
-        let r = regs();
+        let r = SDHOST::regs();
         r.bmod().modify(|_, w| w.swr().set_bit());
         r.idinten().write(|w| unsafe { w.bits(0) });
         r.ctrl()
@@ -1982,7 +2059,7 @@ mod imp {
 
     /// Disables the IDMAC engine after a transfer.
     fn disable_idmac() {
-        let r = regs();
+        let r = SDHOST::regs();
         r.ctrl()
             .modify(|rd, w| unsafe { w.bits(rd.bits() & !CTRL_USE_INTERNAL_DMA) });
         r.bmod().modify(|_, w| {
@@ -1995,7 +2072,7 @@ mod imp {
     /// Sets the bus width bits for a slot.
     fn set_card_width(id: SlotId, width: BusWidth) {
         let slot = id.index();
-        regs().ctype().modify(|rd, w| unsafe {
+        SDHOST::regs().ctype().modify(|rd, w| unsafe {
             let mut w4 = rd.card_width4().bits();
             let w8 = rd.card_width8().bits() & !(1 << slot);
             match width {
@@ -2039,76 +2116,8 @@ mod imp {
             DelayPhase::_2 => 4,
             DelayPhase::_3 => 6,
         };
-        regs()
+        SDHOST::regs()
             .clk_edge_sel()
             .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn out_clk(id: SlotId) -> OutputSignal {
-        match id {
-            SlotId::_0 => OutputSignal::SDHOST_CCLK_OUT_1,
-            SlotId::_1 => OutputSignal::SDHOST_CCLK_OUT_2,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn out_cmd(id: SlotId) -> OutputSignal {
-        match id {
-            SlotId::_0 => OutputSignal::SDHOST_CCMD_OUT_1,
-            SlotId::_1 => OutputSignal::SDHOST_CCMD_OUT_2,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn in_cmd(id: SlotId) -> InputSignal {
-        match id {
-            SlotId::_0 => InputSignal::SDHOST_CCMD_IN_1,
-            SlotId::_1 => InputSignal::SDHOST_CCMD_IN_2,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn out_data(id: SlotId, line: u8) -> OutputSignal {
-        match (id, line) {
-            (SlotId::_0, 0) => OutputSignal::SDHOST_CDATA_OUT_10,
-            (SlotId::_0, 1) => OutputSignal::SDHOST_CDATA_OUT_11,
-            (SlotId::_0, 2) => OutputSignal::SDHOST_CDATA_OUT_12,
-            (SlotId::_0, _) => OutputSignal::SDHOST_CDATA_OUT_13,
-            (SlotId::_1, 0) => OutputSignal::SDHOST_CDATA_OUT_20,
-            (SlotId::_1, 1) => OutputSignal::SDHOST_CDATA_OUT_21,
-            (SlotId::_1, 2) => OutputSignal::SDHOST_CDATA_OUT_22,
-            (SlotId::_1, _) => OutputSignal::SDHOST_CDATA_OUT_23,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn in_data(id: SlotId, line: u8) -> InputSignal {
-        match (id, line) {
-            (SlotId::_0, 0) => InputSignal::SDHOST_CDATA_IN_10,
-            (SlotId::_0, 1) => InputSignal::SDHOST_CDATA_IN_11,
-            (SlotId::_0, 2) => InputSignal::SDHOST_CDATA_IN_12,
-            (SlotId::_0, _) => InputSignal::SDHOST_CDATA_IN_13,
-            (SlotId::_1, 0) => InputSignal::SDHOST_CDATA_IN_20,
-            (SlotId::_1, 1) => InputSignal::SDHOST_CDATA_IN_21,
-            (SlotId::_1, 2) => InputSignal::SDHOST_CDATA_IN_22,
-            (SlotId::_1, _) => InputSignal::SDHOST_CDATA_IN_23,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn in_card_detect(id: SlotId) -> InputSignal {
-        match id {
-            SlotId::_0 => InputSignal::SDHOST_CARD_DETECT_N_1,
-            SlotId::_1 => InputSignal::SDHOST_CARD_DETECT_N_2,
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    fn in_write_protect(id: SlotId) -> InputSignal {
-        match id {
-            SlotId::_0 => InputSignal::SDHOST_CARD_WRITE_PRT_1,
-            SlotId::_1 => InputSignal::SDHOST_CARD_WRITE_PRT_2,
-        }
     }
 }
