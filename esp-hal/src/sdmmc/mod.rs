@@ -236,6 +236,7 @@ mod imp {
     };
 
     use embassy_futures::yield_now;
+    use embassy_sync::waitqueue::WakerRegistration;
     use esp_sync::{NonReentrantMutex, RawMutex};
     use portable_atomic::AtomicBool;
     use procmacros::handler;
@@ -378,6 +379,7 @@ mod imp {
         over_seen: bool,
         acd_seen: bool,
         wait_busy: bool,
+        waker: WakerRegistration,
     }
 
     impl Engine {
@@ -389,6 +391,7 @@ mod imp {
             over_seen: false,
             acd_seen: false,
             wait_busy: false,
+            waker: WakerRegistration::new(),
         };
     }
 
@@ -400,7 +403,6 @@ mod imp {
     /// near-free) in the common single-slot case.
     struct State {
         engine: NonReentrantMutex<Engine>,
-        xfer_waker: AtomicWaker,
         engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
         desc_ring: DescRing,
     }
@@ -408,7 +410,6 @@ mod imp {
 
     static STATE: State = State {
         engine: NonReentrantMutex::new(Engine::IDLE),
-        xfer_waker: AtomicWaker::new(),
         engine_lock: embassy_sync::mutex::Mutex::new(()),
         desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
     };
@@ -581,23 +582,9 @@ mod imp {
                 over_seen: false,
                 acd_seen: false,
                 wait_busy: false,
+                waker: WakerRegistration::new(),
             };
         });
-    }
-
-    /// Arms the engine to complete on the Busy Clear Interrupt (SBE/BCI bit).
-    fn arm_busy_wait() {
-        STATE.engine.with(|eng| {
-            *eng = Engine {
-                wait_busy: true,
-                ..Engine::IDLE
-            };
-        });
-    }
-
-    /// Returns the recorded terminal result, if the ISR has finished the op.
-    fn take_result() -> Option<Result<(), Error>> {
-        STATE.engine.with(|eng| eng.result.take())
     }
 
     /// SDMMC interrupt handler: refills the IDMAC ring and wakes the task.
@@ -658,7 +645,7 @@ mod imp {
                 eng.transfer = None;
                 r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
                 r.idinten().write(|w| unsafe { w.bits(0) });
-                STATE.xfer_waker.wake();
+                eng.waker.wake();
             }
         });
 
@@ -1204,7 +1191,12 @@ mod imp {
             &mut self,
             cmd: C,
         ) -> Result<C::Resp<'a>, sdio::MmcError> {
-            let resp_len = resp_len_of::<C::Resp<'a>>().for_index(C::INDEX);
+            let resp_len = match <C::Resp<'a> as sdio::Response>::LEN {
+                sdio::ResponseLen::Zero => ResponseLen::None,
+                sdio::ResponseLen::R48 => ResponseLen::Short,
+                sdio::ResponseLen::R136 => ResponseLen::Long,
+            }
+            .for_index(C::INDEX);
             let flags = CommandFlags {
                 wait_complete: !is_stop_or_abort(C::INDEX),
                 stop_abort: is_stop_or_abort(C::INDEX),
@@ -1229,7 +1221,10 @@ mod imp {
                 not(any(soc_internal_memory_cached, dma_can_access_psram)),
                 allow(unused_mut)
             )]
-            let mut dma = DmaAlignedMut::new(buf).map_err(map_dma_buf_err)?;
+            let mut dma = DmaAlignedMut::new(buf).map_err(|e| match e {
+                crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
+                _ => sdio::MmcError::Io,
+            })?;
             let ptr = dma_ptr(dma.as_ptr() as usize)?;
             let total = dma.len();
             let resp = transfer_async(
@@ -1377,25 +1372,9 @@ mod imp {
     }
 
     /// Maps the engine's [`ResponseLen`] from the crate's typed response.
-    fn resp_len_of<R: sdio::Response>() -> ResponseLen {
-        match R::LEN {
-            sdio::ResponseLen::Zero => ResponseLen::None,
-            sdio::ResponseLen::R48 => ResponseLen::Short,
-            sdio::ResponseLen::R136 => ResponseLen::Long,
-        }
-    }
-
     /// CMD12 (and SDIO abort) are stop/abort commands.
     fn is_stop_or_abort(index: u8) -> bool {
         index == 12
-    }
-
-    /// Maps a DMA buffer error to the crate's error type.
-    fn map_dma_buf_err(error: crate::dma::DmaBufError) -> sdio::MmcError {
-        match error {
-            crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
-            _ => sdio::MmcError::Io,
-        }
     }
 
     #[cfg(sdmmc_has_gpio_matrix)]
@@ -1412,6 +1391,16 @@ mod imp {
         interconnect::OutputSignal::connect_with_guard(pin, output)
     }
 
+    /// Spins up to `POLL_LIMIT` times until `ready` holds, else times out.
+    fn poll_until(mut ready: impl FnMut() -> bool) -> Result<(), Error> {
+        for _ in 0..POLL_LIMIT {
+            if ready() {
+                return Ok(());
+            }
+        }
+        Err(Error::Timeout)
+    }
+
     /// Resets the controller, FIFO and DMA blocks, waiting for self-clear.
     fn reset_engine() -> Result<(), Error> {
         let r = SDHOST::regs();
@@ -1420,16 +1409,12 @@ mod imp {
             w.fifo_reset().set_bit();
             w.dma_reset().set_bit()
         });
-        for _ in 0..POLL_LIMIT {
+        poll_until(|| {
             let c = r.ctrl().read();
-            if !c.controller_reset().bit_is_set()
+            !c.controller_reset().bit_is_set()
                 && !c.fifo_reset().bit_is_set()
                 && !c.dma_reset().bit_is_set()
-            {
-                return Ok(());
-            }
-        }
-        Err(Error::Timeout)
+        })
     }
 
     /// Programs the shared module clock register (divider, source, phases).
@@ -1592,20 +1577,7 @@ mod imp {
         // Clear stale command/response status before issuing.
         r.rintsts().write(|w| unsafe { w.bits(consume) });
 
-        r.cmdarg().write(|w| unsafe { w.bits(arg) });
-        r.cmd().write(|w| unsafe {
-            w.index().bits(index);
-            w.response_expect()
-                .bit(!matches!(resp_len, ResponseLen::None));
-            w.response_length()
-                .bit(matches!(resp_len, ResponseLen::Long));
-            w.check_response_crc().bit(check_crc);
-            w.wait_prvdata_complete().bit(flags.wait_complete);
-            w.stop_abort_cmd().bit(flags.stop_abort);
-            w.use_hole().set_bit();
-            w.card_number().bits(id.index());
-            w.start_cmd().set_bit()
-        });
+        issue_command(id, index, arg, resp_len, check_crc, flags);
 
         wait_command_accepted()?;
 
@@ -1648,15 +1620,16 @@ mod imp {
     }
 
     /// Awaits the terminal result the interrupt handler records.
-    async fn wait_result() -> Result<(), Error> {
+    fn wait_result() -> impl Future<Output = Result<(), Error>> {
         poll_fn(|cx| {
-            STATE.xfer_waker.register(cx.waker());
-            match take_result() {
+            STATE.engine.with(|eng| match eng.result.take() {
                 Some(res) => Poll::Ready(res),
-                None => Poll::Pending,
-            }
+                None => {
+                    eng.waker.register(cx.waker());
+                    Poll::Pending
+                }
+            })
         })
-        .await
     }
 
     /// Waits for the card to release DAT0 after a write via the Busy Clear
@@ -1676,7 +1649,12 @@ mod imp {
 
         // Enable Busy Clear Interrupt generation, then arm and unmask it.
         r.cardthrctl().modify(|_, w| w.cardclrinten().set_bit());
-        arm_busy_wait();
+        STATE.engine.with(|eng| {
+            *eng = Engine {
+                wait_busy: true,
+                ..Engine::IDLE
+            };
+        });
         r.rintsts().write(|w| unsafe { w.bits(EVT_SBE) });
         r.intmask()
             .write(|w| unsafe { w.bits(idle_intmask() | EVT_SBE) });
@@ -1729,20 +1707,7 @@ mod imp {
         r.intmask()
             .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
 
-        r.cmdarg().write(|w| unsafe { w.bits(arg) });
-        r.cmd().write(|w| unsafe {
-            w.index().bits(index);
-            w.response_expect()
-                .bit(!matches!(resp_len, ResponseLen::None));
-            w.response_length()
-                .bit(matches!(resp_len, ResponseLen::Long));
-            w.check_response_crc().bit(check_crc);
-            w.wait_prvdata_complete().bit(flags.wait_complete);
-            w.stop_abort_cmd().bit(flags.stop_abort);
-            w.use_hole().set_bit();
-            w.card_number().bits(id.index());
-            w.start_cmd().set_bit()
-        });
+        issue_command(id, index, arg, resp_len, check_crc, flags);
         wait_command_accepted()?;
 
         wait_result().await?;
@@ -1796,6 +1761,49 @@ mod imp {
         r.intmask()
             .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
 
+        issue_data_command(id, index, arg, write, block_count);
+        wait_command_accepted()?;
+
+        wait_result().await?;
+        if write {
+            wait_busy_async().await?;
+        }
+        disable_idmac();
+        let resp = read_response(ResponseLen::Short);
+        guard.defuse();
+        Ok(resp)
+    }
+
+    /// Programs `cmdarg`/`cmd` for a no-data command and submits it to the CIU.
+    fn issue_command(
+        id: SlotId,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect()
+                .bit(!matches!(resp_len, ResponseLen::None));
+            w.response_length()
+                .bit(matches!(resp_len, ResponseLen::Long));
+            w.check_response_crc().bit(check_crc);
+            w.wait_prvdata_complete().bit(flags.wait_complete);
+            w.stop_abort_cmd().bit(flags.stop_abort);
+            w.use_hole().set_bit();
+            w.card_number().bits(id.index());
+            w.start_cmd().set_bit()
+        });
+    }
+
+    /// Programs `cmdarg`/`cmd` for a data-transfer command and submits it to the
+    /// CIU.
+    fn issue_data_command(id: SlotId, index: u8, arg: u32, write: bool, block_count: u32) {
+        let r = SDHOST::regs();
         r.cmdarg().write(|w| unsafe { w.bits(arg) });
         r.cmd().write(|w| unsafe {
             w.index().bits(index);
@@ -1809,16 +1817,6 @@ mod imp {
             w.card_number().bits(id.index());
             w.start_cmd().set_bit()
         });
-        wait_command_accepted()?;
-
-        wait_result().await?;
-        if write {
-            wait_busy_async().await?;
-        }
-        disable_idmac();
-        let resp = read_response(ResponseLen::Short);
-        guard.defuse();
-        Ok(resp)
     }
 
     /// Reads response registers into spec word order (`words[3]` is the MSW).
@@ -1867,13 +1865,7 @@ mod imp {
 
     /// Polls DAT0 until the card releases the busy signal.
     fn wait_busy_cleared() -> Result<(), Error> {
-        let r = SDHOST::regs();
-        for _ in 0..POLL_LIMIT {
-            if !r.status().read().data_busy().bit_is_set() {
-                return Ok(());
-            }
-        }
-        Err(Error::Timeout)
+        poll_until(|| !SDHOST::regs().status().read().data_busy().bit_is_set())
     }
 
     /// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
@@ -1926,19 +1918,7 @@ mod imp {
         enable_idmac();
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
-        r.cmdarg().write(|w| unsafe { w.bits(arg) });
-        r.cmd().write(|w| unsafe {
-            w.index().bits(index);
-            w.response_expect().set_bit();
-            w.check_response_crc().set_bit();
-            w.data_expected().set_bit();
-            w.read_write().bit(write);
-            w.send_auto_stop().bit(block_count > 1);
-            w.wait_prvdata_complete().set_bit();
-            w.use_hole().set_bit();
-            w.card_number().bits(id.index());
-            w.start_cmd().set_bit()
-        });
+        issue_data_command(id, index, arg, write, block_count);
 
         let result = run_data_phase(&mut t, ring, write, block_count);
 
@@ -2068,12 +2048,7 @@ mod imp {
     fn reset_fifo() -> Result<(), Error> {
         let r = SDHOST::regs();
         r.ctrl().modify(|_, w| w.fifo_reset().set_bit());
-        for _ in 0..POLL_LIMIT {
-            if !r.ctrl().read().fifo_reset().bit_is_set() {
-                return Ok(());
-            }
-        }
-        Err(Error::Timeout)
+        poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set())
     }
 
     /// Enables the IDMAC engine for a transfer.
