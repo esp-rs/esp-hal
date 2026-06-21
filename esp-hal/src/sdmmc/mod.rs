@@ -131,6 +131,15 @@ pub enum ResponseLen {
     Long,
 }
 
+impl ResponseLen {
+    /// CMD0 (`GO_IDLE_STATE`) never returns a response; the `sdio` crate
+    /// declares it as `R1`, so force no-response by command index.
+    #[cfg_attr(not(any(esp32, esp32s3)), allow(dead_code))]
+    fn for_index(self, index: u8) -> Self {
+        if index == 0 { ResponseLen::None } else { self }
+    }
+}
+
 /// Per-command engine flags.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct CommandFlags {
@@ -386,6 +395,7 @@ mod imp {
     }
 
     static ENGINE: Mutex<RefCell<Engine>> = Mutex::new(RefCell::new(Engine::IDLE));
+
     static XFER_WAKER: AtomicWaker = AtomicWaker::new();
     static IO_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
     static CD_WAKER: [AtomicWaker; 2] = [AtomicWaker::new(), AtomicWaker::new()];
@@ -876,6 +886,7 @@ mod imp {
         /// Issues the 80-clock SD init sequence (no command index).
         pub fn send_init_sequence(&mut self) -> Result<(), Error> {
             let r = regs();
+            r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
             r.cmdarg().write(|w| unsafe { w.bits(0) });
             r.cmd().write(|w| unsafe {
                 w.send_initialization().set_bit();
@@ -883,7 +894,16 @@ mod imp {
                 w.card_number().bits(self.id.index() as u8);
                 w.start_cmd().set_bit()
             });
-            wait_command_accepted()
+            wait_command_accepted()?;
+
+            // Wait for the 80 init clocks to actually finish before any command.
+            for _ in 0..POLL_LIMIT {
+                if r.rintsts().read().bits() & EVT_CMD_DONE != 0 {
+                    r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
+                    return Ok(());
+                }
+            }
+            Err(Error::Timeout)
         }
 
         /// Issues a no-data command and returns its raw response words.
@@ -1058,7 +1078,7 @@ mod imp {
             &mut self,
             cmd: C,
         ) -> Result<C::Resp<'a>, sdio::MmcError> {
-            let resp_len = resp_len_of::<C::Resp<'a>>();
+            let resp_len = resp_len_of::<C::Resp<'a>>().for_index(C::INDEX);
             let flags = CommandFlags {
                 wait_complete: !is_stop_or_abort(C::INDEX),
                 stop_abort: is_stop_or_abort(C::INDEX),
@@ -1149,7 +1169,7 @@ mod imp {
         {
             async move {
                 let _lock = ENGINE_LOCK.lock().await;
-                let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
+                let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
                 let words = self
                     .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
                     .await?;
@@ -1166,7 +1186,7 @@ mod imp {
         {
             async move {
                 let _lock = ENGINE_LOCK.lock().await;
-                let (bs, bc, arg) = (cmd.block_size(), cmd.block_count(), cmd.arg());
+                let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
                 let words = self
                     .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
                     .await?;
@@ -1246,6 +1266,11 @@ mod imp {
                 }
                 Ok(())
             }
+        }
+
+        fn supports_mmc(&self) -> bool {
+            // Native parallel SD/MMC host (not SPI mode).
+            true
         }
 
         fn supports_bus_width(&self) -> sdio::BusWidth {
@@ -1360,7 +1385,8 @@ mod imp {
             c.peri_clk_ctrl02()
                 .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
         } else {
-            c.peri_clk_ctrl01().modify(|_, w| w.sdio_hs_mode().set_bit());
+            c.peri_clk_ctrl01()
+                .modify(|_, w| w.sdio_hs_mode().set_bit());
             c.peri_clk_ctrl02().modify(|_, w| unsafe {
                 w.sdio_ls_clk_edge_h().bits(0);
                 w.sdio_ls_clk_edge_l().bits(0);
@@ -1422,7 +1448,13 @@ mod imp {
             w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
             w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
         });
-        apply_clock_update(id)
+        apply_clock_update(id)?;
+
+        // Let the freshly (re-)started card clock propagate before the next
+        // command, matching esp-idf's `sd_host_set_clk_div`. Without this the
+        // first response command after a clock change can be missed.
+        crate::rom::ets_delay_us(10);
+        Ok(())
     }
 
     /// Commits clock-register changes via an `update_clock_registers_only`
