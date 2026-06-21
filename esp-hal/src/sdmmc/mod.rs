@@ -1959,10 +1959,13 @@ mod imp {
         map_rintsts(sts)?;
         r.rintsts().write(|w| unsafe { w.bits(consume) });
 
-        // Data phase: poll completion, refill descriptors as the engine frees them.
+        // Data phase: wait for completion, refilling descriptors as the engine
+        // frees them. No CPU-side iteration cap: a stalled card or host-side
+        // FIFO starvation is terminated by the controller's data timeout
+        // (DRTO/HTO), and a DMA fault by IDMAC FBE/DU, so the loop can only spin
+        // while the transfer is genuinely making progress.
         let data_err = EVT_DCRC | EVT_DTO | EVT_HTO | EVT_SBE | EVT_EBE | EVT_FRUN;
-        let mut completed = false;
-        for _ in 0..POLL_LIMIT {
+        loop {
             let sts = r.rintsts().read().bits();
             if sts & data_err != 0 {
                 map_rintsts(sts)?;
@@ -1979,21 +1982,15 @@ mod imp {
                 }
             }
             if sts & EVT_DATA_OVER != 0 {
-                completed = true;
                 break;
             }
         }
-        if !completed {
-            return Err(Error::Timeout);
-        }
 
         // Multi-block transfers append an auto-stop; wait for its completion.
+        // This follows DATA_OVER promptly, so a bounded wait is fine, but a
+        // missing completion must be reported rather than silently ignored.
         if block_count > 1 {
-            for _ in 0..POLL_LIMIT {
-                if r.rintsts().read().bits() & EVT_ACD != 0 {
-                    break;
-                }
-            }
+            poll_until(|| r.rintsts().read().bits() & EVT_ACD != 0)?;
         }
         if write {
             wait_busy_cleared()?;
