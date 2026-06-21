@@ -235,6 +235,7 @@ mod imp {
         task::Poll,
     };
 
+    use embassy_futures::yield_now;
     use esp_sync::{NonReentrantMutex, RawMutex};
     use portable_atomic::AtomicBool;
     use procmacros::handler;
@@ -376,6 +377,7 @@ mod imp {
         multiblock: bool,
         over_seen: bool,
         acd_seen: bool,
+        wait_busy: bool,
     }
 
     impl Engine {
@@ -386,6 +388,7 @@ mod imp {
             multiblock: false,
             over_seen: false,
             acd_seen: false,
+            wait_busy: false,
         };
     }
 
@@ -577,6 +580,17 @@ mod imp {
                 multiblock,
                 over_seen: false,
                 acd_seen: false,
+                wait_busy: false,
+            };
+        });
+    }
+
+    /// Arms the engine to complete on the Busy Clear Interrupt (SBE/BCI bit).
+    fn arm_busy_wait() {
+        STATE.engine.with(|eng| {
+            *eng = Engine {
+                wait_busy: true,
+                ..Engine::IDLE
             };
         });
     }
@@ -594,44 +608,53 @@ mod imp {
         let idsts = r.idsts().read().bits();
 
         STATE.engine.with(|eng| {
-            // Refill descriptors the engine has released mid-transfer.
-            if let Some(t) = eng.transfer.as_mut()
-                && t.remaining > 0
-            {
-                let ring = ring();
-                let free = free_descriptors(ring, t.next_desc);
-                if free > 0 {
-                    fill_descriptors(ring, t, free);
-                    r.pldmnd().write(|w| unsafe { w.bits(1) });
+            if eng.wait_busy {
+                // For an R1b/no-data command the SBE bit doubles as the Busy
+                // Clear Interrupt, fired when the card releases DAT0.
+                if rint & EVT_SBE != 0 {
+                    eng.result = Some(Ok(()));
                 }
-            }
+            } else {
+                // Refill descriptors the engine has released mid-transfer.
+                if let Some(t) = eng.transfer.as_mut()
+                    && t.remaining > 0
+                {
+                    let ring = ring();
+                    let free = free_descriptors(ring, t.next_desc);
+                    if free > 0 {
+                        fill_descriptors(ring, t, free);
+                        r.pldmnd().write(|w| unsafe { w.bits(1) });
+                    }
+                }
 
-            if eng.result.is_none() {
-                let err = map_rintsts(rint).err().or_else(|| {
-                    if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
-                        Some(Error::DmaError)
-                    } else {
-                        None
-                    }
-                });
-                if let Some(e) = err {
-                    eng.result = Some(Err(e));
-                } else if eng.expect_data {
-                    if rint & EVT_DATA_OVER != 0 {
-                        eng.over_seen = true;
-                    }
-                    if rint & EVT_ACD != 0 {
-                        eng.acd_seen = true;
-                    }
-                    if eng.over_seen && (!eng.multiblock || eng.acd_seen) {
+                if eng.result.is_none() {
+                    let err = map_rintsts(rint).err().or_else(|| {
+                        if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
+                            Some(Error::DmaError)
+                        } else {
+                            None
+                        }
+                    });
+                    if let Some(e) = err {
+                        eng.result = Some(Err(e));
+                    } else if eng.expect_data {
+                        if rint & EVT_DATA_OVER != 0 {
+                            eng.over_seen = true;
+                        }
+                        if rint & EVT_ACD != 0 {
+                            eng.acd_seen = true;
+                        }
+                        if eng.over_seen && (!eng.multiblock || eng.acd_seen) {
+                            eng.result = Some(Ok(()));
+                        }
+                    } else if rint & EVT_CMD_DONE != 0 {
                         eng.result = Some(Ok(()));
                     }
-                } else if rint & EVT_CMD_DONE != 0 {
-                    eng.result = Some(Ok(()));
                 }
             }
 
             if eng.result.is_some() {
+                eng.wait_busy = false;
                 eng.transfer = None;
                 r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
                 r.idinten().write(|w| unsafe { w.bits(0) });
@@ -663,21 +686,6 @@ mod imp {
         // Write-1-clear the bits handled this pass.
         r.rintsts().write(|w| unsafe { w.bits(rint) });
         r.idsts().write(|w| unsafe { w.bits(idsts) });
-    }
-
-    /// Cooperative yield without an external dependency.
-    async fn yield_now() {
-        let mut yielded = false;
-        poll_fn(|cx| {
-            if yielded {
-                Poll::Ready(())
-            } else {
-                yielded = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        })
-        .await
     }
 
     /// SDMMC / SDIO host controller driver.
@@ -1651,8 +1659,50 @@ mod imp {
         .await
     }
 
-    /// Yields between DAT0 polls while the card signals busy (R1b).
+    /// Waits for the card to release DAT0 after a write via the Busy Clear
+    /// Interrupt.
+    ///
+    /// The controller only raises the BCI (which shares the SBE status bit) for
+    /// data-write commands, and only when generation is enabled in `cardthrctl`;
+    /// the bit is left enabled solely for the duration of the wait so it cannot
+    /// be mistaken for a start-bit error during a multi-block transfer.
     async fn wait_busy_async() -> Result<(), Error> {
+        let r = SDHOST::regs();
+
+        // Fast path: the card may already be ready.
+        if !r.status().read().data_busy().bit_is_set() {
+            return Ok(());
+        }
+
+        // Enable Busy Clear Interrupt generation, then arm and unmask it.
+        r.cardthrctl().modify(|_, w| w.cardclrinten().set_bit());
+        arm_busy_wait();
+        r.rintsts().write(|w| unsafe { w.bits(EVT_SBE) });
+        r.intmask()
+            .write(|w| unsafe { w.bits(idle_intmask() | EVT_SBE) });
+
+        // Close the arm race: if busy cleared between the check above and the
+        // unmask, the rising edge is already gone, so bail out instead of
+        // waiting for an interrupt that will never fire.
+        let res = if !r.status().read().data_busy().bit_is_set() {
+            STATE.engine.with(|eng| *eng = Engine::IDLE);
+            Ok(())
+        } else {
+            wait_result().await
+        };
+
+        // Restore: stop generating the BCI and re-mask the shared SBE bit.
+        r.cardthrctl().modify(|_, w| w.cardclrinten().clear_bit());
+        r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
+        res
+    }
+
+    /// Polls DAT0 while the card signals busy (R1b).
+    ///
+    /// Used after no-data commands (e.g. `CMD7`, `MMC_SWITCH`): the controller
+    /// does not generate a Busy Clear Interrupt for those, so polling is the
+    /// only option, mirroring ESP-IDF's `wait_for_busy_cleared`.
+    async fn wait_busy_poll() -> Result<(), Error> {
         for _ in 0..POLL_LIMIT {
             if !SDHOST::regs().status().read().data_busy().bit_is_set() {
                 return Ok(());
@@ -1698,7 +1748,7 @@ mod imp {
         wait_result().await?;
         let resp = read_response(resp_len);
         if flags.busy {
-            wait_busy_async().await?;
+            wait_busy_poll().await?;
         }
         guard.defuse();
         Ok(resp)
