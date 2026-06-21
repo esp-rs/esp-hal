@@ -142,6 +142,13 @@ impl<ADCX> AdcConfig<ADCX> {
         Self::default()
     }
 
+    /// Set the sampling/readout resolution of the ADC.
+    #[cfg(esp32)]
+    pub fn resolution(&mut self, resolution: Resolution) -> &mut Self {
+        self.resolution = resolution;
+        self
+    }
+
     /// Enable the specified pin with the given attenuation
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCX>
     where
