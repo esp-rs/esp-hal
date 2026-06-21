@@ -58,7 +58,7 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let mut controller = SdHostController::new(peripherals.SDHOST);
+    let controller = SdHostController::new(peripherals.SDHOST);
     let config = Config::default().with_input_delay_phase(INPUT_DELAY_PHASE);
     let slot = controller.slot::<1>(config).unwrap();
     #[cfg(feature = "esp32s3")]

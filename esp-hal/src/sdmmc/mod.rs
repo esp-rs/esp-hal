@@ -688,7 +688,7 @@ mod imp {
     pub struct SdHostController<'d> {
         _peri: SDHOST<'d>,
         _guard: PeripheralGuard,
-        taken: [bool; 2],
+        taken: [portable_atomic::AtomicBool; 2],
     }
 
     impl<'d> SdHostController<'d> {
@@ -699,7 +699,10 @@ mod imp {
             let this = Self {
                 _peri: peri,
                 _guard: guard,
-                taken: [false; 2],
+                taken: [
+                    portable_atomic::AtomicBool::new(false),
+                    portable_atomic::AtomicBool::new(false),
+                ],
             };
 
             // DesignWare reset, then module clock, then quiesce interrupts.
@@ -723,17 +726,19 @@ mod imp {
         /// Both slots can be taken (once each) and driven independently; the
         /// shared engine serializes their transactions. Requesting the same slot
         /// twice returns [`ConfigError::SlotInUse`].
+        ///
+        /// The returned slot borrows the controller, so the controller cannot be
+        /// dropped while any of its slots are alive.
         pub fn slot<const S: u8>(
-            &mut self,
+            &self,
             config: Config,
-        ) -> Result<Slot<'d, S, Blocking>, ConfigError> {
+        ) -> Result<Slot<'_, S, Blocking>, ConfigError> {
             const { assert!(S < 2, "SDMMC has only slots 0 and 1") };
             config.validate()?;
             let idx = S as usize;
-            if self.taken[idx] {
+            if self.taken[idx].swap(true, Ordering::Relaxed) {
                 return Err(ConfigError::SlotInUse);
             }
-            self.taken[idx] = true;
             Ok(Slot {
                 id: slot_id(S),
                 config,
