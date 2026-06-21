@@ -31,13 +31,20 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     interrupt::software::SoftwareInterruptControl,
-    sdmmc::{Config, SdHostController},
+    sdmmc::{Config, DelayPhase, SdHostController},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
 use sdio::{BlockDevice, sd::Card};
 
 esp_bootloader_esp_idf::esp_app_desc!();
+
+/// Target card clock. 40 MHz exercises the SD high-speed (SDR25) path.
+const CARD_HZ: u32 = 40_000_000;
+
+/// Input sampling phase for the high-speed path (esp32s3 only). If 40 MHz
+/// init fails with a timeout, try `_1`, `_2`, then `_3`.
+const INPUT_DELAY_PHASE: DelayPhase = DelayPhase::_0;
 
 /// Test-owned file (8.3 name); assumed not to exist on the card.
 const TEST_FILE: &str = "ESPQA.TXT";
@@ -52,7 +59,8 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let mut controller = SdHostController::new(peripherals.SDHOST);
-    let slot = controller.slot::<1>(Config::default()).unwrap();
+    let config = Config::default().with_input_delay_phase(INPUT_DELAY_PHASE);
+    let slot = controller.slot::<1>(config).unwrap();
     #[cfg(feature = "esp32s3")]
     let slot = slot
         .with_clk(peripherals.GPIO39)
@@ -68,7 +76,7 @@ async fn main(_spawner: Spawner) {
         .with_data3(peripherals.GPIO13);
     let slot = slot.into_async();
 
-    let mut card: BlockDevice<Card, _, _, 512> = BlockDevice::new_sd_card(slot, 25_000_000, Delay)
+    let mut card: BlockDevice<Card, _, _, 512> = BlockDevice::new_sd_card(slot, CARD_HZ, Delay)
         .await
         .unwrap();
     println!("card initialized: {:?}", card.card());
