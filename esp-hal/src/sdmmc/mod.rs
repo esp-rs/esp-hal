@@ -2028,13 +2028,16 @@ mod imp {
     }
 
     /// Sets the input sampling delay phase used for high-speed clocking.
+    ///
+    /// The `cclkin_edge_sam_sel` encoding is non-linear; mirror esp-idf's
+    /// `sdmmc_ll_set_din_delay_phase` (0°, 90°, 180°, 270°).
     #[cfg(esp32s3)]
     fn set_input_delay_phase(phase: DelayPhase) {
         let v = match phase {
             DelayPhase::_0 => 0u8,
             DelayPhase::_1 => 1,
-            DelayPhase::_2 => 2,
-            DelayPhase::_3 => 3,
+            DelayPhase::_2 => 4,
+            DelayPhase::_3 => 6,
         };
         regs()
             .clk_edge_sel()
