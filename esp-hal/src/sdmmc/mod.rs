@@ -228,15 +228,15 @@ pub use imp::{SdHostController, Slot, SlotClk, SlotCmd, SlotData};
 #[cfg(any(esp32, esp32s3))]
 mod imp {
     use core::{
-        cell::{RefCell, UnsafeCell},
+        cell::UnsafeCell,
         future::poll_fn,
         marker::PhantomData,
-        sync::atomic::{AtomicBool, Ordering},
+        sync::atomic::Ordering,
         task::Poll,
     };
 
-    use critical_section::Mutex;
-    use esp_sync::RawMutex;
+    use esp_sync::{NonReentrantMutex, RawMutex};
+    use portable_atomic::AtomicBool;
     use procmacros::handler;
 
     #[cfg(esp32s3)]
@@ -396,7 +396,7 @@ mod imp {
     /// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
     /// near-free) in the common single-slot case.
     struct State {
-        engine: Mutex<RefCell<Engine>>,
+        engine: NonReentrantMutex<Engine>,
         xfer_waker: AtomicWaker,
         engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
         desc_ring: DescRing,
@@ -404,7 +404,7 @@ mod imp {
     unsafe impl Sync for State {}
 
     static STATE: State = State {
-        engine: Mutex::new(RefCell::new(Engine::IDLE)),
+        engine: NonReentrantMutex::new(Engine::IDLE),
         xfer_waker: AtomicWaker::new(),
         engine_lock: embassy_sync::mutex::Mutex::new(()),
         desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
@@ -569,8 +569,8 @@ mod imp {
 
     /// Arms the engine for a new operation and clears stale status.
     fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
-        critical_section::with(|cs| {
-            *STATE.engine.borrow_ref_mut(cs) = Engine {
+        STATE.engine.with(|eng| {
+            *eng = Engine {
                 transfer,
                 result: None,
                 expect_data,
@@ -583,7 +583,7 @@ mod imp {
 
     /// Returns the recorded terminal result, if the ISR has finished the op.
     fn take_result() -> Option<Result<(), Error>> {
-        critical_section::with(|cs| STATE.engine.borrow_ref_mut(cs).result.take())
+        STATE.engine.with(|eng| eng.result.take())
     }
 
     /// SDMMC interrupt handler: refills the IDMAC ring and wakes the task.
@@ -593,9 +593,7 @@ mod imp {
         let rint = r.rintsts().read().bits();
         let idsts = r.idsts().read().bits();
 
-        critical_section::with(|cs| {
-            let mut eng = STATE.engine.borrow_ref_mut(cs);
-
+        STATE.engine.with(|eng| {
             // Refill descriptors the engine has released mid-transfer.
             if let Some(t) = eng.transfer.as_mut()
                 && t.remaining > 0
@@ -688,7 +686,7 @@ mod imp {
     pub struct SdHostController<'d> {
         _peri: SDHOST<'d>,
         _guard: PeripheralGuard,
-        taken: [portable_atomic::AtomicBool; 2],
+        taken: [AtomicBool; 2],
     }
 
     impl<'d> SdHostController<'d> {
@@ -699,10 +697,7 @@ mod imp {
             let this = Self {
                 _peri: peri,
                 _guard: guard,
-                taken: [
-                    portable_atomic::AtomicBool::new(false),
-                    portable_atomic::AtomicBool::new(false),
-                ],
+                taken: [AtomicBool::new(false), AtomicBool::new(false)],
             };
 
             // DesignWare reset, then module clock, then quiesce interrupts.
@@ -710,10 +705,8 @@ mod imp {
             set_module_clock(ClockSource::Pll160m, MODULE_DIV);
             let r = SDHOST::regs();
             r.tmout().write(|w| unsafe {
-                w.response_timeout()
-                    .bits(0xFF)
-                    .data_timeout()
-                    .bits(0xFF_FFFF)
+                w.response_timeout().bits(0xFF);
+                w.data_timeout().bits(0xFF_FFFF)
             });
             r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.ctrl().modify(|_, w| w.int_enable().clear_bit());
@@ -832,9 +825,9 @@ mod imp {
     }
 
     #[cfg(not(sdmmc_has_gpio_matrix))]
-    macro_rules! impl_slot_clk {
-        ($gpio:ident, $af:ident, $s:literal) => {
-            impl<'d> SlotClk<'d, $s> for crate::peripherals::$gpio<'d> {
+    macro_rules! impl_signal_trait {
+        ($gpio:ident, $trait:ident, $af:ident, $s:literal) => {
+            impl<'d> $trait<'d, $s> for crate::peripherals::$gpio<'d> {
                 fn configure(self) {
                     configure_iomux_pad(
                         crate::gpio::Pin::number(&self),
@@ -843,26 +836,9 @@ mod imp {
                 }
             }
         };
-    }
 
-    #[cfg(not(sdmmc_has_gpio_matrix))]
-    macro_rules! impl_slot_cmd {
-        ($gpio:ident, $af:ident, $s:literal) => {
-            impl<'d> SlotCmd<'d, $s> for crate::peripherals::$gpio<'d> {
-                fn configure(self) {
-                    configure_iomux_pad(
-                        crate::gpio::Pin::number(&self),
-                        crate::gpio::AlternateFunction::$af,
-                    );
-                }
-            }
-        };
-    }
-
-    #[cfg(not(sdmmc_has_gpio_matrix))]
-    macro_rules! impl_slot_data {
-        ($gpio:ident, $af:ident, $s:literal, $l:literal) => {
-            impl<'d> SlotData<'d, $s, $l> for crate::peripherals::$gpio<'d> {
+        ($gpio:ident, $trait:ident, $af:ident, $s:literal, $l:literal) => {
+            impl<'d> $trait<'d, $s, $l> for crate::peripherals::$gpio<'d> {
                 fn configure(self) {
                     configure_iomux_pad(
                         crate::gpio::Pin::number(&self),
@@ -875,18 +851,19 @@ mod imp {
 
     #[cfg(not(sdmmc_has_gpio_matrix))]
     for_each_iomux_function! {
-        (HS1_CLK, $gpio:ident, $af:ident) => { impl_slot_clk!($gpio, $af, 0); };
-        (HS1_CMD, $gpio:ident, $af:ident) => { impl_slot_cmd!($gpio, $af, 0); };
-        (HS1_DATA0, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 0); };
-        (HS1_DATA1, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 1); };
-        (HS1_DATA2, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 2); };
-        (HS1_DATA3, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 0, 3); };
-        (HS2_CLK, $gpio:ident, $af:ident) => { impl_slot_clk!($gpio, $af, 1); };
-        (HS2_CMD, $gpio:ident, $af:ident) => { impl_slot_cmd!($gpio, $af, 1); };
-        (HS2_DATA0, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 0); };
-        (HS2_DATA1, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 1); };
-        (HS2_DATA2, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 2); };
-        (HS2_DATA3, $gpio:ident, $af:ident) => { impl_slot_data!($gpio, $af, 1, 3); };
+        (HS1_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 0); };
+        (HS1_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 0); };
+        (HS1_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 0); };
+        (HS1_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 1); };
+        (HS1_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 2); };
+        (HS1_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 3); };
+
+        (HS2_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 1); };
+        (HS2_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 1); };
+        (HS2_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 0); };
+        (HS2_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 1); };
+        (HS2_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 2); };
+        (HS2_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 3); };
     }
 
     /// A configured card slot, generic over the slot index and driver mode.
@@ -1659,7 +1636,7 @@ mod imp {
         let _ = reset_fifo();
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
         r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-        critical_section::with(|cs| *STATE.engine.borrow_ref_mut(cs) = Engine::IDLE);
+        STATE.engine.with(|eng| *eng = Engine::IDLE);
     }
 
     /// Awaits the terminal result the interrupt handler records.
