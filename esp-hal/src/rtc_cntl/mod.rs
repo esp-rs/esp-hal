@@ -416,6 +416,8 @@ impl<'d> Rtc<'d> {
 
         config.apply();
 
+        sleep_uart_prepare();
+
         // Latch the systimer value *before* sleeping. The systimer keeps running during
         // the sleep enter/exit sequences, so we must not advance from the post-wake
         // value (that would count the enter/exit time twice). Instead we set an absolute
@@ -433,6 +435,7 @@ impl<'d> Rtc<'d> {
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
+        sleep_uart_resume();
     }
 
     pub(crate) const RTC_DISABLE_ROM_LOG: u32 = 1;
@@ -1027,5 +1030,29 @@ impl Default for WakeLock {
 impl Drop for WakeLock {
     fn drop(&mut self) {
         Self::release();
+    }
+}
+
+#[cfg(sleep_driver_supported)]
+fn sleep_uart_prepare() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().suspend_for_sleep();
+            }
+        };
+    }
+}
+
+#[cfg(sleep_driver_supported)]
+fn sleep_uart_resume() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().resume_from_sleep();
+            }
+        };
     }
 }
