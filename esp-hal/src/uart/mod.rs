@@ -2015,11 +2015,14 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Split the UART into a borrowed transmitter and receiver
+    /// Borrows the UART as separate transmitter and receiver halves.
     ///
-    /// This is particularly useful when having two futures correlating to
-    /// transmitting and receiving, and you want to go back to using the UART
-    /// as a whole later.
+    /// Unlike [`split`], this method does not consume the UART. The returned
+    /// transmitter and receiver are borrowed from the original UART, which can
+    /// be used again after those borrows end.
+    ///
+    /// This is particularly useful when running separate transmit and receive
+    /// futures concurrently.
     ///
     /// ## Example
     ///
@@ -2032,7 +2035,7 @@ where
     ///
     /// loop {
     ///     // The UART can be split into separate Transmit and Receive components:
-    ///     let (rx, tx) = uart.split_borrowed();
+    ///     let (rx, tx) = uart.split_mut();
     ///
     ///     // Each component can be used individually to interact with the UART:
     ///     tx.write(&[42u8])?;
@@ -2042,7 +2045,7 @@ where
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub fn split_borrowed(&mut self) -> (&mut UartRx<'d, Dm>, &mut UartTx<'d, Dm>) {
+    pub fn split_mut(&mut self) -> (&mut UartRx<'d, Dm>, &mut UartTx<'d, Dm>) {
         (&mut self.rx, &mut self.tx)
     }
 

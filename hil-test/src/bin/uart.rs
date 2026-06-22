@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_borrowed_send_receive_different_baudrates(ctx: Context) {
+    fn test_split_mut_send_receive_change_baud(ctx: Context) {
         let mut uart0 = ctx.uart0.with_tx(ctx.tx);
         let mut uart1 = ctx.uart1.with_rx(ctx.rx);
 
@@ -392,8 +392,8 @@ mod tests {
                 panic!("{:?}: Failed to apply UART 1 baudrate: {}", e, baudrate)
             });
 
-            let (_, tx) = uart0.split_borrowed();
-            let (rx, _) = uart1.split_borrowed();
+            let (_, tx) = uart0.split_mut();
+            let (rx, _) = uart1.split_mut();
 
             tx.flush().unwrap();
             tx.write(&bytes).unwrap();
