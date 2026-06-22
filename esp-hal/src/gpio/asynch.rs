@@ -95,7 +95,6 @@ impl Flex<'_> {
         // Hold a wake lock for the duration of the wait so automatic light sleep does
         // not gate the GPIO interrupt. When the pin is configured as a light-sleep wake
         // source, sleeping is intended (the pin will wake the chip), so no lock is held.
-        // TODO: to make this actually work, we need to enable the GPIO wakeup source.
         let _wake_lock = (!options.wake_enable).then(WakeLock::new);
 
         PinFuture { pin: self }.await;
