@@ -124,7 +124,7 @@ options:
     default:
       - value: '"8KB"'
         if: "esp32s2"
-      - value: '"32KB"'
+      - value: '"64KB"'
     constraints:
       - if: "esp32s2"
         type:
