@@ -335,7 +335,7 @@ macro_rules! property {
         true
     };
     ("sleep.auto_light_sleep") => {
-        false
+        true
     };
     ("soc.cpu_has_branch_predictor") => {
         false
