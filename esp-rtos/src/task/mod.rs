@@ -400,30 +400,34 @@ pub(crate) trait ContextExt {
 
 impl ContextExt for CpuContext {
     fn set_tp(&mut self, tp: u32) {
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
+        cfg_select! {
+            xtensa => {
                 self.THREADPTR = tp;
-            } else if #[cfg(riscv)] {
+            }
+            riscv => {
                 self.tp = tp as usize;
             }
+            _ => {}
         }
     }
 
     fn sp(&self) -> u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
+        cfg_select! {
+            xtensa => {
                 self.A1
-            } else {
+            }
+            _ => {
                 self.sp as u32
             }
         }
     }
 
     fn set_sp(&mut self, sp: u32) {
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
+        cfg_select! {
+            xtensa => {
                 self.A1 = sp;
-            } else {
+            }
+            _ => {
                 self.sp = sp as usize;
             }
         }
@@ -706,14 +710,15 @@ pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
     match run_scheduler {
         RunSchedulerOn::DontRun => {}
         RunSchedulerOn::RunOnCore(_core) => {
-            cfg_if::cfg_if! {
-                if #[cfg(multi_core)] {
+            cfg_select! {
+                multi_core => {
                     if _core == Cpu::current() {
                         yield_task()
                     } else {
                         schedule_other_core()
                     }
-                } else {
+                }
+                _ => {
                     yield_task()
                 }
             }

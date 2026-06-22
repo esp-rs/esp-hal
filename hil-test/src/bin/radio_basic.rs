@@ -35,6 +35,7 @@ fn init_heap() {
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 48 * 1024);
         }
+        _ => {}
     }
 }
 

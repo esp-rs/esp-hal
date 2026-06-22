@@ -761,10 +761,11 @@ impl Info {
                 w.rsck_i_edge()
                     .bit(matches!(data_mode, Mode::_1 | Mode::_2))
             });
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s2)] {
+            cfg_select! {
+                esp32s2 => {
                     let ctrl1_reg = self.regs().ctrl1();
-                } else {
+                }
+                _ => {
                     let ctrl1_reg = self.regs().slave();
                 }
             }

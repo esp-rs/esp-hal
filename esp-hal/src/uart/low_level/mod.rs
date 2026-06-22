@@ -553,15 +553,16 @@ impl Info {
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
-            cfg_if::cfg_if! {
-                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))] {
+            cfg_select! {
+                any(uart_has_sclk_divider, soc_has_pcr, esp32p4) => {
                     const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 
                     let conf = ClockConfig::new(config.clock_source, clk_div - 1);
                     let divider = (clk << FRAC_BITS) / (config.baudrate * clk_div);
-                } else {
+                }
+                _ => {
                     debug!("SCLK: {}", clk);
                     let conf = ClockConfig::new(config.clock_source);
                     let divider = (clk << FRAC_BITS) / config.baudrate;

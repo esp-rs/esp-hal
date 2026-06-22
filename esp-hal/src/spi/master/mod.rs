@@ -1268,8 +1268,8 @@ where
 
         self.flush()?;
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
+        cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => {
                 let mut buffer = buffer;
                 let mut data_mode = data_mode;
                 let mut address = address;
@@ -1292,6 +1292,7 @@ where
                     return Err(Error::Unsupported);
                 }
             }
+            _ => {}
         }
 
         self.driver().setup_half_duplex(

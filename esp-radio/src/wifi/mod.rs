@@ -987,10 +987,11 @@ pub(crate) fn coex_initialize() -> i32 {
 pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     debug!("coex-init");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe { crate::sys::include::coex_init() }
-        } else {
+        }
+        _ => {
             0
         }
     }

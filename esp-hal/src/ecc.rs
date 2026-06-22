@@ -617,30 +617,33 @@ impl Info {
     }
 
     fn qx_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qx_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.px_mem(0).as_ptr()
             }
         }
     }
 
     fn qy_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qy_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.py_mem(0).as_ptr()
             }
         }
     }
 
     fn qz_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qz_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.k_mem(0).as_ptr()
             }
         }
@@ -977,30 +980,33 @@ impl MemoryPointers {
     }
 
     fn set_qx(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qx = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.px = Some(ptr.cast());
             }
         }
     }
 
     fn set_qy(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qy = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.py = Some(ptr.cast());
             }
         }
     }
 
     fn set_qz(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qz = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.k = Some(ptr.cast());
             }
         }
@@ -1203,10 +1209,11 @@ fn ecc_work_queue_handler() {
     if !ECC_WORK_QUEUE.process() {
         // The queue may indicate that it needs to be polled again. In this case, we do not clear
         // the interrupt bit, which causes the interrupt to be re-handled.
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c61))] {
+        cfg_select! {
+            any(esp32c5, esp32c61) => {
                 let reg = ECC::regs().int_clr();
-            } else {
+            }
+            _ => {
                 let reg = ECC::regs().mult_int_clr();
             }
         }

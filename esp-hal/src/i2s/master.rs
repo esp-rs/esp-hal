@@ -1352,10 +1352,11 @@ where
 
     /// Change the I2S Tx unit configuration.
     pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(i2s_version = "1")] {
+        cfg_select! {
+            i2s_version = "1" => {
                 self.i2s.configure_tx(tx_config, self.data_format)
-            } else {
+            }
+            _ => {
                 self.i2s.configure_tx(tx_config)
             }
         }
@@ -1424,10 +1425,11 @@ where
 
     /// Change the I2S Rx unit configuration.
     pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_if::cfg_if! {
-            if #[cfg(i2s_version = "1")] {
+        cfg_select! {
+            i2s_version = "1" => {
                 self.i2s.configure_rx(rx_config, self.data_format)
-            } else {
+            }
+            _ => {
                 self.i2s.configure_rx(rx_config)
             }
         }
@@ -1908,11 +1910,12 @@ mod private {
                 .int_clr()
                 .write(|w| w.in_suc_eof().clear_bit_by_one());
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     // On ESP32, the eof_num count in words.
                     let eof_num = len / 4;
-                } else {
+                }
+                _ => {
                     let eof_num = len - 1;
                 }
             }
@@ -2395,80 +2398,92 @@ mod private {
     impl Signals for crate::peripherals::I2S0<'_> {
         #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s2)] {
+            cfg_select! {
+                esp32s2 => {
                     OutputSignal::CLK_I2S
-                } else if #[cfg(esp32s3)] {
+                }
+                esp32s3 => {
                     OutputSignal::I2S0_MCLK
-                } else {
+                }
+                _ => {
                     OutputSignal::I2S_MCLK
                 }
             }
         }
 
         fn bclk_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(any(i2s_version = "1", esp32s3))] {
+            cfg_select! {
+                any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0O_BCK
-                } else {
+                }
+                _ => {
                     OutputSignal::I2SO_BCK
                 }
             }
         }
 
         fn ws_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(any(i2s_version = "1", esp32s3))] {
+            cfg_select! {
+                any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0O_WS
-                } else {
+                }
+                _ => {
                     OutputSignal::I2SO_WS
                 }
             }
         }
 
         fn dout_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     OutputSignal::I2S0O_DATA_23
-                } else if #[cfg(esp32s2)] {
+                }
+                esp32s2 => {
                     OutputSignal::I2S0O_DATA_OUT23
-                } else if #[cfg(esp32s3)] {
+                }
+                esp32s3 => {
                     OutputSignal::I2S0O_SD
-                } else {
+                }
+                _ => {
                     OutputSignal::I2SO_SD
                 }
             }
         }
 
         fn bclk_rx_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(any(i2s_version = "1", esp32s3))] {
+            cfg_select! {
+                any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0I_BCK
-                } else {
+                }
+                _ => {
                     OutputSignal::I2SI_BCK
                 }
             }
         }
 
         fn ws_rx_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(any(i2s_version = "1", esp32s3))] {
+            cfg_select! {
+                any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0I_WS
-                } else {
+                }
+                _ => {
                     OutputSignal::I2SI_WS
                 }
             }
         }
 
         fn din_signal(&self) -> InputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     InputSignal::I2S0I_DATA_15
-                } else if #[cfg(esp32s2)] {
+                }
+                esp32s2 => {
                     InputSignal::I2S0I_DATA_IN15
-                } else if #[cfg(esp32s3)] {
+                }
+                esp32s3 => {
                     InputSignal::I2S0I_SD
-                } else {
+                }
+                _ => {
                     InputSignal::I2SI_SD
                 }
             }
@@ -2505,10 +2520,11 @@ mod private {
         }
 
         fn dout_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     OutputSignal::I2S1O_DATA_23
-                } else {
+                }
+                _ => {
                     OutputSignal::I2S1O_SD
                 }
             }
@@ -2523,10 +2539,11 @@ mod private {
         }
 
         fn din_signal(&self) -> InputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     InputSignal::I2S1I_DATA_15
-                } else {
+                }
+                _ => {
                     InputSignal::I2S1I_SD
                 }
             }

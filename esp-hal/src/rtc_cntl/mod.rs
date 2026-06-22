@@ -141,13 +141,14 @@ pub mod sleep;
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 pub(crate) mod rtc;
 
-cfg_if::cfg_if! {
-    if #[cfg(soc_has_lp_wdt)] {
+cfg_select! {
+    soc_has_lp_wdt => {
         use crate::peripherals::LP_WDT;
         #[cfg(lp_timer_driver_supported)]
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
-    } else {
+    }
+    _ => {
         use crate::peripherals::LPWR as LP_WDT;
         use crate::peripherals::LPWR as LP_TIMER;
         use crate::peripherals::LPWR as LP_AON;
@@ -223,8 +224,8 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
@@ -233,7 +234,8 @@ impl<'d> Rtc<'d> {
 
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            }
+            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
 
                 let h = rtc_cntl
@@ -242,7 +244,8 @@ impl<'d> Rtc<'d> {
                     .main_timer_buf0_high()
                     .bits();
                 let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
-            } else {
+            }
+            _ => {
                 rtc_cntl.time_update().write(|w| w.time_update().set_bit());
 
                 let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
@@ -416,10 +419,11 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32p4)] {
+        cfg_select! {
+            esp32p4 => {
                 let reg = LP_AON::regs().lp_store4();
-            } else {
+            }
+            _ => {
                 let reg = LP_AON::regs().store4();
             }
         }
@@ -433,10 +437,11 @@ impl<'d> Rtc<'d> {
     #[instability::unstable]
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+        cfg_select! {
+            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 let interrupt = Interrupt::LP_WDT;
-            } else {
+            }
+            _ => {
                 let interrupt = Interrupt::RTC_CORE;
             }
         }
@@ -834,17 +839,19 @@ pub fn wakeup_cause() -> SleepSource {
         return SleepSource::Undefined;
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(soc_has_pmu)] {
+        }
+        soc_has_pmu => {
             // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()
                 .wakeup_cause()
                 .bits();
-        } else {
+        }
+        _ => {
             let wakeup_cause_bits = LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits();
         }
     }

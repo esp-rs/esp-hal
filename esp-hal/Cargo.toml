@@ -46,7 +46,6 @@ test  = false
 [dependencies]
 bitflags                 = "2.9"
 bytemuck                 = "1.24"
-cfg-if                   = "1"
 critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"

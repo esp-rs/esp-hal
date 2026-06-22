@@ -210,13 +210,14 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
-        cfg_if::cfg_if! {
-            if #[cfg(all(stack_guard_monitoring))] {
+        cfg_select! {
+            all(stack_guard_monitoring) => {
                 let stack_guard_offset = Some(esp_config::esp_config_int!(
                     usize,
                     "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
                 ));
-            } else {
+            }
+            _ => {
                 let stack_guard_offset = None;
             }
         };

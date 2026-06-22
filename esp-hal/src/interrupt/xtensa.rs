@@ -361,8 +361,8 @@ pub(crate) fn priority_to_cpu_interrupt(interrupt: Interrupt, level: Priority) -
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
+cfg_select! {
+    esp32 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
             Interrupt::TG0_T0_EDGE,
             Interrupt::TG0_T1_EDGE,
@@ -373,7 +373,8 @@ cfg_if::cfg_if! {
             Interrupt::TG1_WDT_EDGE,
             Interrupt::TG1_LACT_EDGE,
         ];
-    } else if #[cfg(esp32s2)] {
+    }
+    esp32s2 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
             Interrupt::TG0_T0_EDGE,
             Interrupt::TG0_T1_EDGE,
@@ -387,9 +388,11 @@ cfg_if::cfg_if! {
             Interrupt::SYSTIMER_TARGET1,
             Interrupt::SYSTIMER_TARGET2,
         ];
-    } else if #[cfg(esp32s3)] {
+    }
+    esp32s3 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-    } else {
+    }
+    _ => {
         compile_error!("Unsupported chip");
     }
 }
@@ -580,10 +583,11 @@ pub(crate) mod rt {
     #[unsafe(no_mangle)]
     #[ram]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
-        cfg_if::cfg_if! {
-            if #[cfg(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring))] {
+        cfg_select! {
+            all(feature = "rt", feature = "exception-handler", stack_guard_monitoring) => {
                 crate::exception_handler::breakpoint_interrupt(save_frame);
-            } else {
+            }
+            _ => {
                 unsafe { level6_interrupt(save_frame) }
             }
         }

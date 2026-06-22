@@ -112,10 +112,11 @@ impl RegisterAccess for AhbGdmaTxChannel<'_> {
 
 impl TxRegisterAccess for AhbGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
+        cfg_select! {
+            esp32s3 => {
                  self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
-            } else {
+            }
+            _ => {
                  self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
             }
         }
@@ -218,20 +219,22 @@ impl InterruptAccess<DmaTxInterrupt> for AhbGdmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 self.0.state.tx_is_async.load(portable_atomic::Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 true
             }
         }
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 self.0.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
+            _ => {}
         }
     }
 }
@@ -442,20 +445,22 @@ impl InterruptAccess<DmaRxInterrupt> for AhbGdmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 self.0.state.rx_is_async.load(portable_atomic::Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 true
             }
         }
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
+        cfg_select! {
+            any(esp32c2, esp32c3) => {
                 self.0.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
             }
+            _ => {}
         }
     }
 }

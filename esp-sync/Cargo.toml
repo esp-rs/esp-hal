@@ -19,7 +19,6 @@ check-configs = [
 clippy-configs = [{ features = ["defmt"] }]
 
 [dependencies]
-cfg-if = "1"
 document-features = "0.2"
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }

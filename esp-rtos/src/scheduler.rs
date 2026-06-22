@@ -217,10 +217,11 @@ impl SchedulerState {
         }
 
         let current_sp: u32;
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
+        cfg_select! {
+            xtensa => {
                 unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
-            } else {
+            }
+            _ => {
                 unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
             }
         }
@@ -381,10 +382,11 @@ impl SchedulerState {
 
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
         unsafe {
-            cfg_if::cfg_if! {
-                if #[cfg(xtensa)] {
+            cfg_select! {
+                xtensa => {
                     let saved_sp = to_delete.as_ref().cpu_context.A1 as usize;
-                } else {
+                }
+                _ => {
                     let saved_sp = to_delete.as_ref().cpu_context.sp;
                 }
             }
@@ -422,10 +424,11 @@ impl SchedulerState {
             let task = unsafe { task.as_ref() };
             let in_queue = task.in_run_or_wait_queue;
 
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "esp-radio")] {
+            cfg_select! {
+                feature = "esp-radio" => {
                     let in_waitqueue = task.current_wait_queue.is_some();
-                } else {
+                }
+                _ => {
                     let in_waitqueue = false;
                 }
             }

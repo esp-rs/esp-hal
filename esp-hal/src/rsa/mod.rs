@@ -615,10 +615,11 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
     }
 
     fn is_done(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(rsa_version = "1")] {
+        cfg_select! {
+            rsa_version = "1" => {
                 SIGNALED.load(Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 self.driver.is_idle()
             }
         }

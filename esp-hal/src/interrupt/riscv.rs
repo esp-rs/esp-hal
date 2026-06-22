@@ -309,8 +309,8 @@ pub fn enable_direct(
     cpu_interrupt: DirectBindableCpuInterrupt,
     handler: unsafe extern "C" fn(),
 ) {
-    cfg_if::cfg_if! {
-        if #[cfg(interrupt_controller = "clic")] {
+    cfg_select! {
+        interrupt_controller = "clic" => {
             let clic = unsafe { crate::soc::pac::CLIC::steal() };
 
             // Enable hardware vectoring
@@ -327,7 +327,8 @@ pub fn enable_direct(
                 .wrapping_add(cpu_interrupt as usize);
 
             let instr = handler as usize as u32;
-        } else {
+        }
+        _ => {
             use riscv::register::mtvec;
             let mt = mtvec::read();
 
@@ -416,12 +417,14 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 }
 
 fn cpu_wait_mode_on() -> bool {
-    cfg_if::cfg_if! {
-        if #[cfg(soc_has_pcr)] {
+    cfg_select! {
+        soc_has_pcr => {
             crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        } else if #[cfg(soc_has_hp_sys)] {
+        }
+        soc_has_hp_sys => {
             crate::peripherals::HP_SYS::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        } else {
+        }
+        _ => {
             crate::peripherals::SYSTEM::regs()
                 .cpu_per_conf()
                 .read()
@@ -593,11 +596,12 @@ pub(crate) mod rt {
         // so we clear it anyway
         cpu_intr.clear();
 
-        cfg_if::cfg_if! {
-            if #[cfg(interrupt_controller = "clic")] {
+        cfg_select! {
+            interrupt_controller = "clic" => {
                 let prio = cpu_int::current_runlevel();
                 let mcause = riscv::register::mcause::read();
-            } else {
+            }
+            _ => {
                 // Change the current runlevel so that interrupt handlers can access the correct runlevel.
                 let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
                 let level = unsafe { change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio))) };
@@ -627,8 +631,8 @@ pub(crate) mod rt {
             handle_interrupts();
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(interrupt_controller = "clic")] {
+        cfg_select! {
+            interrupt_controller = "clic" => {
                 // In case the target uses the CLIC, it is mandatory to restore `mcause` register
                 // since it contains the former CPU priority. When executing `mret`,
                 // the hardware will restore the former threshold, from `mcause` to
@@ -636,7 +640,8 @@ pub(crate) mod rt {
                 unsafe {
                     core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
                 }
-            } else {
+            }
+            _ => {
                 unsafe { change_current_runlevel(level) };
             }
         }
