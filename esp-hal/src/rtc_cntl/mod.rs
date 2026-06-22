@@ -1016,12 +1016,17 @@ impl WakeLock {
         Self
     }
 
-    pub(crate) fn acquire() {
+    /// Acquires a wake lock, preventing automatic light sleep.
+    pub fn acquire() {
         #[cfg(sleep_auto_light_sleep)]
         wake_lock_count().fetch_add(1, portable_atomic::Ordering::AcqRel);
     }
 
-    pub(crate) fn release() {
+    /// Releases a wake lock, allowing automatic light sleep when no wake locks are held.
+    ///
+    /// Note that this function should only be called to release a wake lock acquired via
+    /// [`Self::acquire`].
+    pub fn release() {
         #[cfg(sleep_auto_light_sleep)]
         {
             let previous = wake_lock_count().fetch_sub(1, portable_atomic::Ordering::AcqRel);
