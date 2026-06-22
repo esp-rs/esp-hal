@@ -113,11 +113,11 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::Duration,
 };
+#[cfg(sleep_auto_light_sleep)]
+pub use light_sleep::auto_light_sleep;
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::main;
-#[cfg(sleep_auto_light_sleep)]
-pub use light_sleep::auto_light_sleep;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
