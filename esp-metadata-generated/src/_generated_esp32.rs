@@ -314,7 +314,7 @@ macro_rules! property {
         true
     };
     ("sleep.auto_light_sleep") => {
-        false
+        true
     };
     ("soc.cpu_has_branch_predictor") => {
         false
@@ -2787,6 +2787,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Apb => request_apb_clk(clocks),
                     }
@@ -2798,6 +2799,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Apb => release_apb_clk(clocks),
@@ -2850,6 +2852,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     request_pll_f160m_clk(clocks);
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -2860,6 +2863,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     release_pll_f160m_clk(clocks);
                 }
@@ -2907,6 +2911,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::SCLK", self);
                 if increment_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Enabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::RefTick => request_ref_tick(clocks),
                         RmtSclkConfig::ApbClk => request_apb_clk(clocks),
@@ -2918,6 +2923,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::SCLK", self);
                 if decrement_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Disabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_sclk_impl(clocks, false);
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::RefTick => release_ref_tick(clocks),
@@ -2971,6 +2977,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     request_apb_clk(clocks);
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -2980,6 +2987,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     release_apb_clk(clocks);
                 }

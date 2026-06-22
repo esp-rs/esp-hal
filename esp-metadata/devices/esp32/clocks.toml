@@ -138,12 +138,12 @@ system_clocks = { clock_tree = [
     ] },
 ], template_groups = [
     { group = "MCPWM", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true }
         ] }
     ] },
     { group = "I2C", clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk", params = { sclk = [
             { name = "APB", outputs = "APB_CLK", default = true },
         ] } },
     ] },
@@ -156,13 +156,13 @@ system_clocks = { clock_tree = [
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
     ] },
     { group = "RMT", clocks = [
-        { name = "SCLK", type = "mux", variants = [
+        { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "REF_TICK", outputs = "REF_TICK" },
             { name = "APB_CLK",  outputs = "APB_CLK", default = true },
         ] },
     ] },
     { group = "SPI", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "APB", outputs = "APB_CLK", default = true },
         ] },
     ] },
