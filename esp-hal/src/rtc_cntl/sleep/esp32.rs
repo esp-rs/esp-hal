@@ -87,10 +87,8 @@ impl WakeSource for TimerWakeupSource {
                 .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
 
             LPWR::regs().slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
+                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
+                w.main_timer_alarm_en().set_bit()
             });
         }
     }

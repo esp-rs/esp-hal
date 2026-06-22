@@ -414,14 +414,16 @@ impl<'d> Rtc<'d> {
 
         let timer =
             sleep::TimerWakeupSource::new(core::time::Duration::from_micros(duration.as_micros()));
-        let gpio = sleep::GpioWakeupSource::new();
-        self.sleep_light(&[&timer, &gpio]);
+        // let gpio = sleep::GpioWakeupSource::new();
+        self.sleep_light(&[&timer]);
         let after = self.time_since_power_up();
 
         let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us.as_micros());
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
+
+        info!("Slept for {} us", slept_us.as_micros());
 
         slept_us
     }
