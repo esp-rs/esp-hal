@@ -223,17 +223,26 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
                 }
 
+                rtc_cntl.int_clr().write(|w| w.time_valid().clear_bit_by_one());
+
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+            }
+            any(esp32s2, esp32s3, esp32c2, esp32c3) => {
+                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+
+                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
+                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
+            }
+            _ => {
                 rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
 
                 let h = rtc_cntl
@@ -242,11 +251,6 @@ impl<'d> Rtc<'d> {
                     .main_timer_buf0_high()
                     .bits();
                 let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
-            } else {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
-
-                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
-                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
             }
         }
 
@@ -414,16 +418,14 @@ impl<'d> Rtc<'d> {
 
         let timer =
             sleep::TimerWakeupSource::new(core::time::Duration::from_micros(duration.as_micros()));
-        // let gpio = sleep::GpioWakeupSource::new();
-        self.sleep_light(&[&timer]);
+        let gpio = sleep::GpioWakeupSource::new();
+        self.sleep_light(&[&timer, &gpio]);
         let after = self.time_since_power_up();
 
         let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us.as_micros());
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
-
-        info!("Slept for {} us", slept_us.as_micros());
 
         slept_us
     }
