@@ -243,7 +243,11 @@ impl<'d> Rtc<'d> {
                 let l = rtc_cntl.time0().read().time_lo().bits();
             }
             any(esp32s2, esp32s3, esp32c2, esp32c3) => {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                // TODO: investigate if this is only needed after lightsleep
+                for _ in 0..10 {
+                    rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                    crate::rom::ets_delay_us(1);
+                }
 
                 let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
                 let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
@@ -429,6 +433,7 @@ impl<'d> Rtc<'d> {
         let after = self.time_since_power_up();
 
         let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
+        info!("Before: {:?}, After: {:?}", before, after);
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us.as_micros());
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
