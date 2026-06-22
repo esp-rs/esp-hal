@@ -29,7 +29,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[embassy_executor::task]
 async fn periodic() {
     loop {
-        esp_println::println!("tick");
+        esp_println::println!("tick @ {:?}", esp_hal::time::Instant::now());
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
