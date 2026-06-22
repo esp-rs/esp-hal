@@ -397,7 +397,9 @@ impl<'d> Rtc<'d> {
     /// measured by the always-running LP timer. Only a timer wake source is armed,
     /// and the scheduler's pre-armed systimer alarm is left untouched.
     ///
-    /// This function must be called inside a critical section, and other core(s)
+    /// # Safety
+    ///
+    /// This function must be called inside an interrupt-free context, and other core(s)
     /// must be idle.
     ///
     /// [`Instant::now`]: crate::time::Instant::now
