@@ -8,6 +8,9 @@
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
+//! This example requires a board with PSRAM. If no PSRAM is detected, the
+//! allocation will fail at runtime.
+//!
 //! This example transfers data via SPI.
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
@@ -58,24 +61,18 @@ macro_rules! dma_alloc_tx_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
+const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
+    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
+    feature = "esp32s2" => ExternalBurstConfig::Size32,
+    _ => ExternalBurstConfig::Size64,
+};
 
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
     info!("Starting SPI loopback test");
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let psram = esp_hal::psram::Psram::new(peripherals.PSRAM, Default::default());
-    let (_, psram_size) = psram.raw_parts();
-
-    if psram_size == 0 {
-        error!("No PSRAM detected. This example requires a board with PSRAM.");
-        loop {}
-    }
-
-    esp_alloc::psram_allocator!(&psram);
-
+    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
     let (sclk, mosi, cs) = cfg_select! {

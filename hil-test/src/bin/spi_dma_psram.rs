@@ -90,6 +90,7 @@ mod tests {
 
     /// SPI DMA loopback with TX from PSRAM, ExternalBurstConfig::Size64.
     #[test]
+    #[cfg(not(esp32s2))]
     fn test_psram_tx_loopback_size64(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8192;
         const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;

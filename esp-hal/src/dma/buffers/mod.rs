@@ -66,6 +66,8 @@ cfg_if::cfg_if! {
             Size32 = 32,
 
             /// 64 bytes
+            // TODO: investigate why ext_mem_bk_size = 2 causes corruption on S2
+            #[cfg(not(esp32s2))]
             Size64 = 64,
         }
 
