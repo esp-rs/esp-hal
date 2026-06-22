@@ -49,33 +49,33 @@ pub fn auto_light_sleep() -> IdleFn {
 
 extern "C" fn auto_light_sleep_hook() -> ! {
     loop {
-        let slept = SCHEDULER.with(|scheduler| {
+        SCHEDULER.with(|scheduler| {
             if WakeLock::is_active() {
-                return false;
+                return;
             }
 
             // MVP: only commit to sleep on the primary core, and never while a second
             // core scheduler is running (it would keep running while the chip sleeps).
             if Cpu::current() != Cpu::ProCpu {
-                return false;
+                return;
             }
             #[cfg(multi_core)]
             if scheduler.per_cpu[1].initialized {
-                return false;
+                return;
             }
 
             let Some(time_driver) = scheduler.time_driver.as_mut() else {
-                return false;
+                return;
             };
             let next_wakeup = time_driver.next_wakeup();
             if next_wakeup == u64::MAX {
-                return false;
+                return;
             }
 
             let now = crate::now();
             let sleep_duration = next_wakeup.saturating_sub(now);
             if sleep_duration < LIGHT_SLEEP_MIN_US {
-                return false;
+                return;
             }
 
             unsafe {
@@ -87,11 +87,8 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             // stale. Force a re-arm against the restored time base so the tick handler
             // fires promptly and drains the timer queue.
             time_driver.rearm(crate::now());
-            true
         });
 
-        if !slept {
-            esp_hal::interrupt::wait_for_interrupt();
-        }
+        esp_hal::interrupt::wait_for_interrupt();
     }
 }
