@@ -349,6 +349,8 @@ defmt = [
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
 ## Never enable this feature in a library crate using esp-radio.
+##
+## 💡 This feature should be enabled when using unstable APIs from `esp-hal`.
 unstable = [
   "esp-hal/requires-unstable",
   "dep:embedded-io-06",
