@@ -225,7 +225,13 @@ impl<'d> Rtc<'d> {
 
         cfg_select! {
             esp32 => {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
+                // Without this, this function may return a stale value
+                for _ in 0..10 {
+                    rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                    crate::rom::ets_delay_us(1);
+                }
+
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
