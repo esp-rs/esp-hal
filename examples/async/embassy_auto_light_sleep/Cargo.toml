@@ -17,6 +17,12 @@ esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
 
 [features]
+esp32 = [
+    "esp-backtrace/esp32",
+    "esp-bootloader-esp-idf/esp32",
+    "esp-rtos/esp32",
+    "esp-hal/esp32",
+]
 esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
