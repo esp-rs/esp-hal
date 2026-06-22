@@ -174,7 +174,7 @@ pub(super) fn wait_for_idle(info: &Info) {
     while info.regs().status().read().txfifo_cnt().bits() > 0 {}
 
     cfg_select! {
-        any(esp32c2, esp32c3) => {
+        any(esp32c2, esp32c3, esp32s2) => {
             while info.regs().fsm_status().read().st_utx_out().bits() != 0 {}
         }
         _ => {
