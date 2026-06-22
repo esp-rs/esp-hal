@@ -8,6 +8,8 @@
 //! `wake_lock_demo` shows a region guarded by a manual [`WakeLock`]: while the
 //! guard is alive, the idle hook falls back to `WFI` and the chip never sleeps.
 
+//% CHIP_FILTER: sleep_auto_light_sleep
+
 #![no_std]
 #![no_main]
 
