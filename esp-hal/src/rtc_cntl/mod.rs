@@ -430,7 +430,8 @@ impl<'d> Rtc<'d> {
 
         let timer =
             sleep::TimerWakeupSource::new(core::time::Duration::from_micros(duration.as_micros()));
-        self.sleep_light(&[&timer]);
+        let gpio = sleep::GpioWakeupSource::new();
+        self.sleep_light(&[&timer, &gpio]);
         let after = self.time_since_power_up();
 
         let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
