@@ -76,7 +76,7 @@ system_clocks = { clock_tree = [
     ] },
 ], template_groups = [
     { group = "MCPWM", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "CRYPTO_PWM_CLK", outputs = "CRYPTO_PWM_CLK", default = true }
         ] }
     ] },
@@ -87,7 +87,7 @@ system_clocks = { clock_tree = [
         ] },
     ] },
     { group = "RMT", clocks = [
-        { name = "SCLK", type = "mux", variants = [
+        { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "APB_CLK",     outputs = "APB_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
@@ -103,13 +103,13 @@ system_clocks = { clock_tree = [
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
     ] },
     { group = "I2C", clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
     { group = "SPI", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "XTAL", outputs = "XTAL_CLK", default = true },
             { name = "APB",  outputs = "APB_CLK" }, # PLL_F80M?
         ] },

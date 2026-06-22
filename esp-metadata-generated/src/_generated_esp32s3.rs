@@ -335,7 +335,7 @@ macro_rules! property {
         true
     };
     ("sleep.auto_light_sleep") => {
-        false
+        true
     };
     ("soc.cpu_has_branch_predictor") => {
         false
@@ -2924,6 +2924,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
                         I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -2936,6 +2937,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
@@ -2994,6 +2996,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     request_crypto_pwm_clk(clocks);
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -3004,6 +3007,7 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.mcpwm_function_clock_refcount[self as usize],
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     release_crypto_pwm_clk(clocks);
                 }
@@ -3053,6 +3057,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::SCLK", self);
                 if increment_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Enabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::ApbClk => request_apb_clk(clocks),
                         RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
@@ -3065,6 +3070,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::SCLK", self);
                 if decrement_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Disabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_sclk_impl(clocks, false);
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::ApbClk => release_apb_clk(clocks),
@@ -3127,6 +3133,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::Apb => request_apb_clk(clocks),
@@ -3139,6 +3146,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),

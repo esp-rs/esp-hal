@@ -35,12 +35,9 @@ async fn periodic() {
 }
 
 cfg_select! {
-    feature = "esp32" => {
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
         use peripherals::GPIO0 as BOOT_GPIO;
     }
-    // any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
-    //    use peripherals::GPIO0 as BOOT_GPIO;
-    // }
     // feature = "esp32c2" => {
     //    use peripherals::GPIO8 as BOOT_GPIO;
     // }
@@ -110,8 +107,7 @@ async fn main(spawner: Spawner) {
     );
 
     let boot_btn = cfg_select! {
-        feature = "esp32" => p.GPIO0,
-        // any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
+        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
         // feature = "esp32c2" => p.GPIO8,
         // feature = "esp32c5" => p.GPIO28,
         // feature = "esp32p4" => p.GPIO35,
