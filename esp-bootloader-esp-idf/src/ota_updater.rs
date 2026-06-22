@@ -149,4 +149,10 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
 
         Ok((flash_region, next_slot))
     }
+
+    /// Reset the OTA-data.
+    pub fn reset_data(&mut self) -> Result<(), Error> {
+        self.ota_data()?
+            .set_current_app_partition(AppPartitionSubType::Factory)
+    }
 }

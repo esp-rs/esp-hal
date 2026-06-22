@@ -67,7 +67,13 @@ fn main() -> ! {
     let mut ota =
         esp_bootloader_esp_idf::ota_updater::OtaUpdater::new(&mut flash, &mut buffer).unwrap();
 
-    let current = ota.selected_partition().unwrap();
+    let current = if let Ok(current) = ota.selected_partition() {
+        current
+    } else {
+        ota.reset_data().unwrap();
+        esp_bootloader_esp_idf::partitions::AppPartitionSubType::Factory
+    };
+
     println!(
         "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
         ota.current_ota_state()
