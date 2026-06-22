@@ -430,8 +430,6 @@ impl<'d> Rtc<'d> {
     /// `wake_sources`.
     #[cfg(sleep_driver_supported)]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
-        sleep_uart_prepare();
-
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in wake_sources {
@@ -440,6 +438,7 @@ impl<'d> Rtc<'d> {
 
         config.apply();
 
+        sleep_uart_prepare();
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();

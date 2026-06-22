@@ -163,15 +163,30 @@ pub(super) fn change_flow_control(
     sync_regs(info.regs());
 }
 
-pub(super) fn force_xoff(info: &Info, en: bool) {
-    info.regs()
-        .flow_conf()
-        .modify(|_, w| w.force_xoff().bit(en));
+#[cfg(any(esp32, esp32s2))]
+pub(super) fn force_xoff(_info: &Info, _en: bool) {
+    // We drain the entire FIFO, so we have nothing to disable.
 }
 
 #[cfg(any(esp32, esp32s2))]
 pub(super) fn wait_for_idle(info: &Info) {
+    // Wait for FIFO to drain completely.
+    while info.regs().status().read().txfifo_cnt().bits() > 0 {}
     while info.regs().status().read().st_utx_out().bits() != 0 {}
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+pub(super) fn force_xoff(info: &Info, en: bool) {
+    let reg = info.regs().flow_conf();
+    reg.modify(|_, w| {
+        w.force_xon().bit(false);
+        w.force_xoff().bit(en)
+    });
+
+    if !en {
+        reg.modify(|_r, w| w.force_xon().bit(true));
+        reg.modify(|_r, w| w.force_xon().bit(false));
+    }
 }
 
 #[cfg(not(any(esp32, esp32s2)))]
@@ -188,12 +203,13 @@ pub(super) fn wait_for_idle(info: &Info) {
 
 fn configure_rts_flow_ctrl(info: &Info, enable: bool, threshold: Option<u8>) {
     if let Some(threshold) = threshold {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 info.regs()
                     .conf1()
                     .modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-            } else {
+            }
+            _ => {
                 info.regs()
                     .mem_conf()
                     .modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
