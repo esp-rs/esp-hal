@@ -433,7 +433,6 @@ impl<'d> Rtc<'d> {
         let after = self.time_since_power_up();
 
         let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
-        info!("Before: {:?}, After: {:?}", before, after);
         let slept_ticks = crate::time::implem::us_to_ticks(slept_us.as_micros());
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };

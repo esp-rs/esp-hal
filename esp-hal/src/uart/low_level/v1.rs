@@ -163,18 +163,18 @@ pub(super) fn change_flow_control(
     sync_regs(info.regs());
 }
 
-#[cfg(any(esp32, esp32s2, esp32c3))]
+#[cfg(any(esp32, esp32s2, esp32c2, esp32c3))]
 pub(super) fn force_xoff(_info: &Info, _en: bool) {
     // We drain the entire FIFO, so we have nothing to disable.
 }
 
-#[cfg(any(esp32, esp32s2, esp32c3))]
+#[cfg(any(esp32, esp32s2, esp32c2, esp32c3))]
 pub(super) fn wait_for_idle(info: &Info) {
     // Wait for FIFO to drain completely.
     while info.regs().status().read().txfifo_cnt().bits() > 0 {}
 
     cfg_select! {
-        esp32c3 => {
+        any(esp32c2, esp32c3) => {
             while info.regs().fsm_status().read().st_utx_out().bits() != 0 {}
         }
         _ => {
@@ -183,7 +183,7 @@ pub(super) fn wait_for_idle(info: &Info) {
     }
 }
 
-#[cfg(not(any(esp32, esp32s2, esp32c3)))]
+#[cfg(not(any(esp32, esp32s2, esp32c2, esp32c3)))]
 pub(super) fn force_xoff(info: &Info, en: bool) {
     let reg = info.regs().flow_conf();
     reg.modify(|_, w| {
@@ -197,7 +197,7 @@ pub(super) fn force_xoff(info: &Info, en: bool) {
     }
 }
 
-#[cfg(not(any(esp32, esp32s2, esp32c3)))]
+#[cfg(not(any(esp32, esp32s2, esp32c2, esp32c3)))]
 pub(super) fn wait_for_idle(info: &Info) {
     const FSM_IDLE: u8 = 0;
     const FSM_TX_WAIT_SEND: u8 = 0x0F;
