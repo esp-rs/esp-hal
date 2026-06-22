@@ -65,7 +65,17 @@ fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Info);
     info!("Starting SPI loopback test");
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
+
+    let psram = esp_hal::psram::Psram::new(peripherals.PSRAM, Default::default());
+    let (_, psram_size) = psram.raw_parts();
+
+    if psram_size == 0 {
+        error!("No PSRAM detected. This example requires a board with PSRAM.");
+        loop {}
+    }
+
+    esp_alloc::psram_allocator!(&psram);
+
     let delay = Delay::new();
 
     let (sclk, mosi, cs) = cfg_select! {

@@ -29,8 +29,7 @@ pub struct PsramConfig {
 /// Initialize PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    utils::psram_init(config);
-    true
+    utils::psram_init(config)
 }
 
 #[procmacros::ram]
@@ -109,7 +108,7 @@ pub(crate) mod utils {
     // Function initializes the PSRAM by configuring GPIO pins, resetting the PSRAM,
     // and enabling Quad I/O (QIO) mode. It also calls the psram_cache_init
     // function to configure cache parameters and read/write commands.
-    pub(crate) fn psram_init(config: &mut PsramConfig) {
+    pub(crate) fn psram_init(config: &mut PsramConfig) -> bool {
         psram_gpio_config();
 
         if config.size.is_auto() {
@@ -131,27 +130,32 @@ pub(crate) mod utils {
                 CS_PSRAM_SEL, // cs bit mask
                 false,
             );
+
+            if dev_id == 0xffffff {
+                debug!(
+                    "Unknown PSRAM chip ID: {:x}. PSRAM chip not found or not supported.",
+                    dev_id
+                );
+                return false;
+            }
+
             info!("chip id = {:x}", dev_id);
 
-            let size = if dev_id != 0xffffff {
-                const PSRAM_ID_EID_S: u32 = 16;
-                const PSRAM_ID_EID_M: u32 = 0xff;
-                const PSRAM_EID_SIZE_M: u32 = 0x07;
-                const PSRAM_EID_SIZE_S: u32 = 5;
+            const PSRAM_ID_EID_S: u32 = 16;
+            const PSRAM_ID_EID_M: u32 = 0xff;
+            const PSRAM_EID_SIZE_M: u32 = 0x07;
+            const PSRAM_EID_SIZE_S: u32 = 5;
 
-                let size_id = (((dev_id >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                    & PSRAM_EID_SIZE_M;
+            let size_id = (((dev_id >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                & PSRAM_EID_SIZE_M;
 
-                const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-                const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
-                match size_id {
-                    PSRAM_EID_SIZE_64MBITS => 8 * 1024 * 1024,
-                    PSRAM_EID_SIZE_32MBITS => 4 * 1024 * 1024,
-                    _ => 2 * 1024 * 1024,
-                }
-            } else {
-                0
+            let size = match size_id {
+                PSRAM_EID_SIZE_64MBITS => 8 * 1024 * 1024,
+                PSRAM_EID_SIZE_32MBITS => 4 * 1024 * 1024,
+                _ => 2 * 1024 * 1024,
             };
 
             info!("size is {}", size);
@@ -163,6 +167,8 @@ pub(crate) mod utils {
         psram_enable_qio_mode();
 
         psram_cache_init(config.speed, PsramVaddrMode::Normal);
+
+        true
     }
 
     // send reset command to psram, in spi mode
