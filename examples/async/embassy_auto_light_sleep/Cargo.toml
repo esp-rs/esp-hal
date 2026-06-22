@@ -47,6 +47,12 @@ esp32h2 = [
     "esp-rtos/esp32h2",
     "esp-hal/esp32h2",
 ]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-rtos/esp32s2",
+    "esp-hal/esp32s2",
+]
 
 [profile.release]
 debug            = true

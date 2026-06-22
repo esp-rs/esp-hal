@@ -92,19 +92,19 @@ system_clocks = { clock_tree = [
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
     ] },
     { group = "RMT", clocks = [
-        { name = "SCLK", type = "mux", variants = [
+        { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "REF_TICK", outputs = "REF_TICK" },
             { name = "APB_CLK",  outputs = "APB_CLK", default = true },
         ] },
     ] },
     { group = "I2C", clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk", params = { sclk = [
             { name = "APB",      outputs = "APB_CLK", default = true },
             { name = "REF_TICK", outputs = "REF_TICK" },
         ] } },
     ] },
     { group = "SPI", clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "APB", outputs = "APB_CLK", default = true },
         ] },
     ] },
