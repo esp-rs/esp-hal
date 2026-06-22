@@ -430,6 +430,8 @@ impl<'d> Rtc<'d> {
     /// `wake_sources`.
     #[cfg(sleep_driver_supported)]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
+        sleep_uart_prepare();
+
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
         for wake_source in wake_sources {
@@ -441,6 +443,8 @@ impl<'d> Rtc<'d> {
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
+
+        sleep_uart_resume();
     }
 
     pub(crate) const RTC_DISABLE_ROM_LOG: u32 = 1;
@@ -1031,5 +1035,27 @@ impl Default for WakeLock {
 impl Drop for WakeLock {
     fn drop(&mut self) {
         Self::release();
+    }
+}
+
+fn sleep_uart_prepare() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().suspend_for_sleep();
+            }
+        };
+    }
+}
+
+fn sleep_uart_resume() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().resume_from_sleep();
+            }
+        };
     }
 }

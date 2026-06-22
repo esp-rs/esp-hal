@@ -748,6 +748,15 @@ impl Info {
 
         Ok(to_read)
     }
+
+    pub(crate) fn suspend_for_sleep(&self) {
+        version::force_xoff(self, true);
+        version::wait_for_idle(self);
+    }
+
+    pub(crate) fn resume_from_sleep(&self) {
+        version::force_xoff(self, false);
+    }
 }
 
 impl PartialEq for Info {

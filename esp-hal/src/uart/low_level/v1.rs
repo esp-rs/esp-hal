@@ -114,9 +114,10 @@ pub(super) fn change_flow_control(
             xon_threshold,
             xoff_threshold,
         } => {
-            info.regs()
-                .flow_conf()
-                .modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+            info.regs().flow_conf().modify(|_, w| {
+                w.xonoff_del().set_bit();
+                w.sw_flow_con_en().set_bit()
+            });
 
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {
@@ -160,6 +161,29 @@ pub(super) fn change_flow_control(
     }
 
     sync_regs(info.regs());
+}
+
+pub(super) fn force_xoff(info: &Info, en: bool) {
+    info.regs()
+        .flow_conf()
+        .modify(|_, w| w.force_xoff().bit(en));
+}
+
+#[cfg(any(esp32, esp32s2))]
+pub(super) fn wait_for_idle(info: &Info) {
+    while info.regs().status().read().st_utx_out().bits() != 0 {}
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+pub(super) fn wait_for_idle(info: &Info) {
+    const FSM_IDLE: u8 = 0;
+    const FSM_TX_WAIT_SEND: u8 = 0x0F;
+    loop {
+        let bits = info.regs().status().read().st_utx_out().bits();
+        if [FSM_TX_WAIT_SEND, FSM_IDLE].contains(&bits) {
+            return;
+        }
+    }
 }
 
 fn configure_rts_flow_ctrl(info: &Info, enable: bool, threshold: Option<u8>) {
