@@ -328,10 +328,10 @@ is_lp_sys = true
 
 [device.lp_timer]
 support_status = "not_supported"  # RTC Timekeeping
+
 [device.sd_host]
 support_status = "not_supported"  # SDIO host
-[device.sd_slave]
-support_status = "not_supported"
+
 [device.sdm]
 support_status = { status = "not_supported", issue = 2370 }
 [device.sleep]
