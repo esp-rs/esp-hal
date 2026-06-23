@@ -234,7 +234,10 @@ mod imp {
     };
 
     use embassy_futures::yield_now;
-    use embassy_sync::waitqueue::WakerRegistration;
+    use embassy_sync::{
+        mutex::{MappedMutexGuard, MutexGuard},
+        waitqueue::WakerRegistration,
+    };
     use esp_sync::{NonReentrantMutex, RawMutex};
     use portable_atomic::AtomicBool;
     use procmacros::handler;
@@ -270,7 +273,7 @@ mod imp {
     };
 
     /// Default module-clock divider used during controller bring-up.
-    const MODULE_DIV: u32 = 2;
+    const MODULE_DIV: u8 = 2;
     /// Spin-poll bound for self-clearing hardware bits.
     const POLL_LIMIT: u32 = 1_000_000;
 
@@ -391,6 +394,63 @@ mod imp {
             wait_busy: false,
             waker: WakerRegistration::new(),
         };
+
+        fn configure_for_slot(&mut self, _slot_id: SlotId) {}
+
+        /// Sets the bus width bits for a slot.
+        fn set_card_width(&mut self, id: SlotId, width: BusWidth) {
+            let slot = id.index();
+            SDHOST::regs().ctype().modify(|rd, w| unsafe {
+                let mut w4 = rd.card_width4().bits();
+                let w8 = rd.card_width8().bits() & !(1 << slot);
+                match width {
+                    BusWidth::Bit4 => w4 |= 1 << slot,
+                    BusWidth::Bit1 => w4 &= !(1 << slot),
+                }
+                w.card_width4().bits(w4);
+                w.card_width8().bits(w8)
+            });
+        }
+
+        /// Sets a slot's card clock divider and (re-)enables the card clock.
+        fn set_card_clock(&mut self, id: SlotId, card_div: u8) -> Result<(), Error> {
+            let slot = id.index();
+            let r = SDHOST::regs();
+
+            // Disable card clock before changing the divider.
+            r.clkena().modify(|rd, w| unsafe {
+                w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
+            });
+            apply_clock_update(id)?;
+
+            // Select per-slot divider register and program the divider value.
+            r.clksrc().modify(|rd, w| unsafe {
+                let mut v = rd.clksrc().bits();
+                match id {
+                    SlotId::_0 => v &= !0b11,
+                    SlotId::_1 => {
+                        v &= !0b1100;
+                        v |= 1 << 2;
+                    }
+                }
+                w.clksrc().bits(v)
+            });
+            r.clkdiv().modify(|_, w| unsafe {
+                match id {
+                    SlotId::_0 => w.clk_divider0().bits(card_div),
+                    SlotId::_1 => w.clk_divider1().bits(card_div),
+                }
+            });
+
+            // Re-enable card clock with low-power gating, then commit.
+            r.clkena().modify(|rd, w| unsafe {
+                w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
+                w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
+            });
+            apply_clock_update(id)?;
+
+            Ok(())
+        }
     }
 
     /// Mutable controller state shared with the interrupt handler.
@@ -401,14 +461,35 @@ mod imp {
     /// near-free) in the common single-slot case.
     struct State {
         engine: NonReentrantMutex<Engine>,
-        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
+        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ActiveSlotData>,
         desc_ring: DescRing,
     }
     unsafe impl Sync for State {}
 
+    struct ActiveSlotData {
+        active_slot: Option<SlotId>,
+        marker: (),
+    }
+
+    impl State {
+        async fn select_slot(&self, slot_id: SlotId) -> MappedMutexGuard<'_, RawMutex, ()> {
+            let mut guard = self.engine_lock.lock().await;
+
+            if guard.active_slot != Some(slot_id) {
+                self.engine.with(|eng| eng.configure_for_slot(slot_id));
+                guard.active_slot = Some(slot_id);
+            }
+
+            MutexGuard::map(guard, |d| &mut d.marker)
+        }
+    }
+
     static STATE: State = State {
         engine: NonReentrantMutex::new(Engine::IDLE),
-        engine_lock: embassy_sync::mutex::Mutex::new(()),
+        engine_lock: embassy_sync::mutex::Mutex::new(ActiveSlotData {
+            active_slot: None,
+            marker: (),
+        }),
         desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
     };
 
@@ -975,12 +1056,23 @@ mod imp {
 
         /// Applies bus width + card clock for the slot. Used during card init.
         pub fn set_bus_low_level(&mut self, width: BusWidth, hz: u32) -> Result<(), Error> {
-            let div = self.config.module_div as u32;
+            let div = self.config.module_div;
             set_module_clock(self.config.clock_source, div);
-            set_card_width(self.id, width);
-            self.width = width;
             let card_div = freq_to_card_div(module_hz(self.config.clock_source, div), hz);
-            set_card_clock(self.id, card_div)
+
+            // Immediately apply slot-specific configuration
+            STATE.engine.with(|eng| {
+                eng.set_card_width(self.id, width);
+                eng.set_card_clock(self.id, card_div)?;
+                Ok(())
+            })?;
+            self.width = width;
+
+            // Let the freshly (re-)started card clock propagate before the next
+            // command, matching esp-idf's `sd_host_set_clk_div`. Without this the
+            // first response command after a clock change can be missed.
+            crate::rom::ets_delay_us(10);
+            Ok(())
         }
 
         /// Checks that the mandatory pins for a transfer were connected.
@@ -1270,7 +1362,7 @@ mod imp {
         where
             C: sdio::ControlCommand + 'a,
         {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             self.cmd_async::<C>(cmd).await
         }
 
@@ -1278,7 +1370,7 @@ mod imp {
         where
             C: sdio::BlockReadCommand + 'a,
         {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
             let words = self
                 .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
@@ -1290,7 +1382,7 @@ mod imp {
         where
             C: sdio::BlockWriteCommand + 'a,
         {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
             let words = self
                 .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
@@ -1302,7 +1394,7 @@ mod imp {
         where
             C: sdio::ByteReadCommand + 'a,
         {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             let (n, arg) = (cmd.byte_count(), cmd.arg());
             let words = self
                 .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)
@@ -1314,7 +1406,7 @@ mod imp {
         where
             C: sdio::ByteWriteCommand + 'a,
         {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             let (n, arg) = (cmd.byte_count(), cmd.arg());
             let words = self
                 .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)
@@ -1323,15 +1415,14 @@ mod imp {
         }
 
         async fn init_idle(&mut self, hz: u32) -> Result<(), sdio::MmcError> {
-            let _lock = STATE.engine_lock.lock().await;
+            let _lock = STATE.select_slot(slot_id(S)).await;
             self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
             self.set_bus_low_level(BusWidth::Bit1, hz)?;
             self.send_init_sequence()?;
             Ok(())
         }
 
-        async fn set_bus(&mut self, width: sdio::BusWidth, hz: u32) -> Result<(), sdio::MmcError> {
-            let _lock = STATE.engine_lock.lock().await;
+        fn set_bus(&mut self, width: sdio::BusWidth, hz: u32) -> Result<(), sdio::MmcError> {
             let w = match width {
                 sdio::BusWidth::W1 => BusWidth::Bit1,
                 sdio::BusWidth::W4 => BusWidth::Bit4,
@@ -1419,10 +1510,10 @@ mod imp {
     ///
     /// Field encodings differ per chip (see each chip's `sdmmc_ll`).
     #[cfg(esp32s3)]
-    fn set_module_clock(source: ClockSource, div: u32) {
+    fn set_module_clock(source: ClockSource, div: u8) {
         // S3: l == period, h == high pulse, n == l; phase dout=90°, din=0°.
-        let l = (div - 1) as u8;
-        let h = (div / 2).saturating_sub(1) as u8;
+        let l = div - 1;
+        let h = (div / 2).saturating_sub(1);
         let n = l;
         SDHOST::regs().clk_edge_sel().write(|w| unsafe {
             w.cclkin_edge_drv_sel().bits(1); // output phase 90°
@@ -1438,16 +1529,16 @@ mod imp {
     /// Programs the module clock in `HP_SYS_CLKRST` (P4 keeps the divider/source
     /// outside the SDHOST block; see `sdmmc_ll`). Source fixed at PLL160M.
     #[cfg(esp32p4)]
-    fn set_module_clock(_source: ClockSource, div: u32) {
+    fn set_module_clock(_source: ClockSource, div: u8) {
         let c = crate::peripherals::HP_SYS_CLKRST::regs();
         c.peri_clk_ctrl01().modify(|_, w| unsafe {
             w.sdio_ls_clk_src_sel().bits(0);
             w.sdio_ls_clk_en().set_bit()
         });
         if div > 1 {
-            let h = (div / 2 - 1) as u8;
-            let l = (div - 1) as u8;
-            let n = (div - 1) as u8;
+            let h = div / 2 - 1;
+            let l = div - 1;
+            let n = div - 1;
             c.peri_clk_ctrl02().modify(|_, w| unsafe {
                 w.sdio_ls_clk_edge_h().bits(h);
                 w.sdio_ls_clk_edge_l().bits(l);
@@ -1470,11 +1561,11 @@ mod imp {
 
     /// Programs the shared module clock register (divider, phases).
     #[cfg(esp32)]
-    fn set_module_clock(_source: ClockSource, div: u32) {
+    fn set_module_clock(_source: ClockSource, div: u8) {
         // ESP32: h == period, l == high pulse, n == h; phase dout=din=180°. The
         // module clock source is fixed at PLL160M (no `clk_sel`).
-        let h = (div - 1) as u8;
-        let l = (div / 2).saturating_sub(1) as u8;
+        let h = div - 1;
+        let l = (div / 2).saturating_sub(1);
         let n = h;
         SDHOST::regs().clk_edge_sel().write(|w| unsafe {
             w.cclkin_edge_drv_sel().bits(4); // output phase 180°
@@ -1484,50 +1575,6 @@ mod imp {
             w.ccllkin_edge_l().bits(l);
             w.ccllkin_edge_n().bits(n)
         });
-    }
-
-    /// Sets a slot's card clock divider and (re-)enables the card clock.
-    fn set_card_clock(id: SlotId, card_div: u8) -> Result<(), Error> {
-        let slot = id.index();
-        let r = SDHOST::regs();
-
-        // Disable card clock before changing the divider.
-        r.clkena().modify(|rd, w| unsafe {
-            w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
-        });
-        apply_clock_update(id)?;
-
-        // Select per-slot divider register and program the divider value.
-        r.clksrc().modify(|rd, w| unsafe {
-            let mut v = rd.clksrc().bits();
-            match id {
-                SlotId::_0 => v &= !0b11,
-                SlotId::_1 => {
-                    v &= !0b1100;
-                    v |= 1 << 2;
-                }
-            }
-            w.clksrc().bits(v)
-        });
-        r.clkdiv().modify(|_, w| unsafe {
-            match id {
-                SlotId::_0 => w.clk_divider0().bits(card_div),
-                SlotId::_1 => w.clk_divider1().bits(card_div),
-            }
-        });
-
-        // Re-enable card clock with low-power gating, then commit.
-        r.clkena().modify(|rd, w| unsafe {
-            w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
-            w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
-        });
-        apply_clock_update(id)?;
-
-        // Let the freshly (re-)started card clock propagate before the next
-        // command, matching esp-idf's `sd_host_set_clk_div`. Without this the
-        // first response command after a clock change can be missed.
-        crate::rom::ets_delay_us(10);
-        Ok(())
     }
 
     /// Commits clock-register changes via an `update_clock_registers_only`
@@ -2071,28 +2118,13 @@ mod imp {
         r.ctrl().modify(|_, w| w.dma_reset().set_bit());
     }
 
-    /// Sets the bus width bits for a slot.
-    fn set_card_width(id: SlotId, width: BusWidth) {
-        let slot = id.index();
-        SDHOST::regs().ctype().modify(|rd, w| unsafe {
-            let mut w4 = rd.card_width4().bits();
-            let w8 = rd.card_width8().bits() & !(1 << slot);
-            match width {
-                BusWidth::Bit4 => w4 |= 1 << slot,
-                BusWidth::Bit1 => w4 &= !(1 << slot),
-            }
-            w.card_width4().bits(w4);
-            w.card_width8().bits(w8)
-        });
-    }
-
     /// Module clock in Hz for a given source and divider.
-    fn module_hz(source: ClockSource, div: u32) -> u32 {
+    fn module_hz(source: ClockSource, div: u8) -> u32 {
         let base = match source {
             ClockSource::Pll160m => 160_000_000,
             ClockSource::Xtal => 40_000_000,
         };
-        base / div
+        base / (div as u32)
     }
 
     /// Computes the per-card divider for a target frequency.
