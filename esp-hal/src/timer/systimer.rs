@@ -333,28 +333,26 @@ impl Unit {
 
     fn set_count(&self, value: u64) {
         let systimer = SYSTIMER::regs();
-        #[cfg(not(esp32s2))]
-        {
-            let unitload = systimer.unitload(self.channel() as _);
-            let unit_load = systimer.unit_load(self.channel() as _);
 
-            unitload.hi().write(|w| w.load_hi().set((value << 32) as _));
-            unitload
-                .lo()
-                .write(|w| w.load_lo().set((value & 0xFFFF_FFFF) as _));
+        let value_lo = (value & 0xFFFF_FFFF) as _;
+        let value_hi = (value >> 32) as _;
 
-            unit_load.write(|w| w.load().set_bit());
-        }
-        #[cfg(esp32s2)]
-        {
-            systimer
-                .load_hi()
-                .write(|w| w.load_hi().set((value << 32) as _));
-            systimer
-                .load_lo()
-                .write(|w| w.load_lo().set((value & 0xFFFF_FFFF) as _));
+        cfg_select! {
+            esp32s2 => {
+                systimer.load_hi().write(|w| w.load_hi().set(value_hi));
+                systimer.load_lo().write(|w| w.load_lo().set(value_lo));
 
-            systimer.load().write(|w| w.load().set_bit());
+                systimer.load().write(|w| w.load().set_bit());
+            }
+            _ => {
+                let unitload = systimer.unitload(self.channel() as _);
+                let unit_load = systimer.unit_load(self.channel() as _);
+
+                unitload.hi().write(|w| w.load_hi().set(value_hi));
+                unitload.lo().write(|w| w.load_lo().set(value_lo));
+
+                unit_load.write(|w| w.load().set_bit());
+            }
         }
     }
 
