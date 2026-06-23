@@ -51,6 +51,17 @@ pub(crate) const CONFIG_DATA_CACHE_LINE_SIZE: usize = cfg_select! {
     data_cache_line_size_16b => 16,
 };
 
+const _: () = {
+    ::core::assert!(
+        !(CONFIG_INSTRUCTION_CACHE_SIZE == 0x8000 && CONFIG_INSTRUCTION_CACHE_LINE_SIZE == 16),
+        "A 16B instruction cache line size requires a 16KB instruction cache"
+    );
+    ::core::assert!(
+        !(CONFIG_DATA_CACHE_SIZE == 0x10000 && CONFIG_DATA_CACHE_LINE_SIZE == 16),
+        "A 16B data cache line size requires a 16KB or 32KB data cache"
+    );
+};
+
 #[unsafe(link_section = ".rwtext")]
 pub(crate) unsafe fn configure_cpu_caches() {
     // this is just the bare minimum we need to run code from flash
