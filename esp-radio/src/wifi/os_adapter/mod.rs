@@ -791,7 +791,8 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    esp_phy::disable_phy();
+    // Wi-Fi modem disable: also clears Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::disable_phy_with_wifi_rx();
 }
 
 /// **************************************************************************
@@ -810,7 +811,8 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    core::mem::forget(esp_phy::enable_phy());
+    // Wi-Fi modem enable: also sets Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::enable_phy_with_wifi_rx();
 }
 
 /// **************************************************************************
