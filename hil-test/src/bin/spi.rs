@@ -207,11 +207,8 @@ macro_rules! run_loopback_test {
     ($spi:expr, $align:expr) => {{
         use defmt::error;
         const PSRAM_DMA_BUFFER_SIZE: usize = 8192;
-        let layout = core::alloc::Layout::from_size_align(
-            PSRAM_DMA_BUFFER_SIZE,
-            $align as usize,
-        )
-        .unwrap();
+        let layout =
+            core::alloc::Layout::from_size_align(PSRAM_DMA_BUFFER_SIZE, $align as usize).unwrap();
         let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
@@ -1469,7 +1466,8 @@ mod psram_dma {
     }
 }
 
-// FIXME: Only validated on the ESP32-S3 HIL bench; other PSRAM chips pick up spurious PCNT pulses there.
+// FIXME: Only validated on the ESP32-S3 HIL bench; other PSRAM chips pick up spurious PCNT pulses
+// there.
 #[cfg(all(esp32s3, feature = "unstable"))]
 #[embedded_test::tests(default_timeout = 3)]
 mod half_duplex_write_psram {
