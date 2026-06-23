@@ -76,24 +76,28 @@ pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
 // so that either ieee or esp-radio gets it for free without duplicating in both
 #[unsafe(no_mangle)]
 extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32c6, esp32h2, esp32p4))] {
+    cfg_select! {
+        any(esp32c6, esp32h2, esp32p4) => {
             unsafe extern "C" {
                 fn ets_clk_get_xtal_freq() -> i32;
             }
             (unsafe { ets_clk_get_xtal_freq() }) / 1_000_000
-        } else if #[cfg(any(esp32s2, esp32s3, esp32c3))] {
+        }
+        any(esp32s2, esp32s3, esp32c3) => {
             unsafe extern "C" {
                 fn ets_get_xtal_freq() -> i32;
             }
             (unsafe { ets_get_xtal_freq() }) / 1_000_000
-        } else if #[cfg(any(esp32, esp32c2))] {
+        }
+        any(esp32, esp32c2) => {
             // just rely on RTC_CNTL_STORE4
             (regs!(RTC_CNTL).store4().read().bits() & 0xff) as i32
-        } else if #[cfg(any(esp32c5, esp32c61))]  {
+        }
+        any(esp32c5, esp32c61) => {
             // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
             regs!(PCR).sysclk_conf().read().clk_xtal_freq().bits() as i32
-        } else {
+        }
+        _ => {
             compile_error!("rtc_clk_xtal_freq_get not implemented for this chip");
         }
     }

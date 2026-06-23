@@ -71,6 +71,7 @@ fn main() -> ! {
                 (&mut pin18, WakeupLevel::High),
             ];
         }
+        _ => {}
     }
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);

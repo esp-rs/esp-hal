@@ -178,13 +178,14 @@ coex_fns! {
 extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
     trace!("coex_schm_register_btdm_callback");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe {
                 const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
                 coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
             }
-        } else {
+        }
+        _ => {
             0
         }
     }

@@ -53,6 +53,7 @@ fn main() -> ! {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
             let mut pin_high = peripherals.GPIO10;
         }
+        _ => {}
     }
 
     println!("up and runnning!");

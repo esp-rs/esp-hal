@@ -243,10 +243,11 @@ pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
     // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
     // will not need to have a scheduler in their firmware.
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "wifi", feature = "ble"))] {
+    cfg_select! {
+        any(feature = "wifi", feature = "ble") => {
             crate::preempt::now() as i64
-        } else {
+        }
+        _ => {
             // In this case we don't have a scheduler, we can return esp-hal's timestamp.
             esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
         }
@@ -323,10 +324,11 @@ pub(crate) fn enable_wifi_power_domain() {
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
         #[cfg(not(esp32))]
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_apb_ctrl)] {
+        cfg_select! {
+            soc_has_apb_ctrl => {
                 let syscon = regs!(APB_CTRL);
-            } else { // S2
+            }
+            _ => { // S2
                 let syscon = regs!(SYSCON);
             }
         }
@@ -378,12 +380,10 @@ pub(crate) fn enable_wifi_power_domain() {
                 w.rst_btmac_apb().set_bit();
                 #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().set_bit();
-                cfg_select! {
-                    soc_has_wifi => {
-                        w.rst_wifibb().set_bit();
-                        w.rst_wifimac().set_bit();
-                    }
-                    _ => {}
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().set_bit();
+                    w.rst_wifimac().set_bit();
                 }
                 w
             });
@@ -395,12 +395,10 @@ pub(crate) fn enable_wifi_power_domain() {
                 w.rst_btmac_apb().clear_bit();
                 #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().clear_bit();
-                cfg_select! {
-                    soc_has_wifi => {
-                        w.rst_wifibb().clear_bit();
-                        w.rst_wifimac().clear_bit();
-                    }
-                    _ => {}
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().clear_bit();
+                    w.rst_wifimac().clear_bit();
                 }
                 w
             });

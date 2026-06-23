@@ -191,20 +191,22 @@ impl<'d> Aes<'d> {
     }
 
     fn start(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().start().write(|w| w.start().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs().trigger().write(|w| w.trigger().set_bit());
             }
         }
     }
 
     fn is_idle(&mut self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().idle().read().idle().bit_is_set()
-            } else {
+            }
+            _ => {
                 self.regs().state().read().state().bits() == 0
             }
         }
@@ -224,10 +226,11 @@ impl<'d> Aes<'d> {
 
     fn write_block(&mut self, block: &[u8]) {
         for (i, word) in read_words(block).enumerate() {
-            cfg_if::cfg_if! {
-                if #[cfg(aes_has_split_text_registers)] {
+            cfg_select! {
+                aes_has_split_text_registers => {
                     self.regs().text_in(i).write(|w| unsafe { w.bits(word) });
-                } else {
+                }
+                _ => {
                     self.regs().text(i).write(|w| unsafe { w.bits(word) });
                 }
             }
@@ -235,10 +238,11 @@ impl<'d> Aes<'d> {
     }
 
     fn read_block(&self, block: &mut [u8]) {
-        cfg_if::cfg_if! {
-            if #[cfg(aes_has_split_text_registers)] {
+        cfg_select! {
+            aes_has_split_text_registers => {
                 write_words(block, |i| self.regs().text_out(i).read().bits());
-            } else {
+            }
+            _ => {
                 write_words(block, |i| self.regs().text(i).read().bits());
             }
         }

@@ -101,8 +101,8 @@ pub(super) fn read_fifo(register_block: &RegisterBlock) -> u8 {
 }
 
 pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
+    cfg_select! {
+        esp32p4 => {
             // P4: data register is read-only (RX FIFO only). TX uses txfifo_start_addr.
             // PAC txfifo_start_addr is also read-only in SVD, use direct MMIO.
             // TODO: file an esp-pacs issue/PR so the P4 SVD marks the TX FIFO
@@ -112,7 +112,8 @@ pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
             unsafe {
                 ((base + 0x100) as *mut u32).write_volatile(data as u32);
             }
-        } else {
+        }
+        _ => {
             register_block
                 .data()
                 .write(|w| unsafe { w.fifo_rdata().bits(data) });

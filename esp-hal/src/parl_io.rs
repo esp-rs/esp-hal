@@ -1925,10 +1925,11 @@ mod private {
         }
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32c5)] {
+            cfg_select! {
+                esp32c5 => {
                     OutputSignal::PARL_TX_CS
-                } else {
+                }
+                _ => {
                     OutputSignal::PARL_TX_DATA7
                 }
             }

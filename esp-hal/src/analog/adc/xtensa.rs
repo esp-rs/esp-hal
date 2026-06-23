@@ -15,12 +15,13 @@ mod calibration;
 
 pub(super) const NUM_ATTENS: usize = 10;
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32s3)] {
+cfg_select! {
+    esp32s3 => {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
     }
+    _ => {}
 }
 
 impl<ADCX> AdcConfig<ADCX>

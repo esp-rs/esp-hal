@@ -80,10 +80,11 @@ impl DmaTxChannel for SpiDmaTxChannel<'_> {}
 impl RegisterAccess for SpiDmaTxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let clock = Peripheral::SpiDma;
-            } else {
+            }
+            _ => {
                 let clock = match self.0 {
                     SpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
                     SpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,
@@ -159,10 +160,11 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 
 impl TxRegisterAccess for SpiDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
-            } else {
+            }
+            _ => {
                 self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
             }
         }
@@ -278,10 +280,11 @@ impl InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannel<'_> {
 impl RegisterAccess for SpiDmaRxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let clock = Peripheral::SpiDma;
-            } else {
+            }
+            _ => {
                 let clock = match self.0 {
                     SpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
                     SpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,

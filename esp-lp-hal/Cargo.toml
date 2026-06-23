@@ -35,7 +35,6 @@ bench = false
 test  = false
 
 [dependencies]
-cfg-if            = "1"
 document-features = "0.2"
 embedded-hal      = { version = "1.0.0",  optional = true }
 embedded-hal-nb   = { version = "1.0.0",  optional = true }

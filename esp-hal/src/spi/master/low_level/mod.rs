@@ -654,8 +654,8 @@ impl Driver {
     }
 
     pub(super) fn update(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(spi_master_version = "3")] {
+        cfg_select! {
+            spi_master_version = "3" => {
                 let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
@@ -663,7 +663,8 @@ impl Driver {
                 while reg_block.cmd().read().update().bit_is_set() {
                     // wait
                 }
-            } else {
+            }
+            _ => {
                 // Doesn't seem to be needed for ESP32 and ESP32-S2
             }
         }

@@ -47,11 +47,12 @@ pub use self::riscv::*;
 pub use self::xtensa::*;
 use crate::{peripherals::Interrupt, system::Cpu};
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
+cfg_select! {
+    esp32 => {
         use crate::peripherals::DPORT as INTERRUPT_CORE0;
         use crate::peripherals::DPORT as INTERRUPT_CORE1;
-    } else {
+    }
+    _ => {
         use crate::peripherals::INTERRUPT_CORE0;
         #[cfg(multi_core)]
         use crate::peripherals::INTERRUPT_CORE1;

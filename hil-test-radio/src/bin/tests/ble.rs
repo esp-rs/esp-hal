@@ -24,14 +24,16 @@ const BATTERY_SERVICE_UUID: u16 = 0x180f;
 const BATTERY_LEVEL_UUID: u16 = 0x2a19;
 
 fn init_heap() {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c6))] {
+    cfg_select! {
+        any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c6) => {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 36 * 1024);
-        } else if #[cfg(any(esp32c5, esp32h2))] {
+        },
+        any(esp32c5, esp32h2) => {
             esp_alloc::heap_allocator!(size: 72 * 1024);
-        }
+        },
+        _ => {},
     }
 }
 

@@ -53,8 +53,8 @@ impl From<DmaAlignmentError> for DmaBufError {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(dma_can_access_psram)] {
+cfg_select! {
+    dma_can_access_psram => {
         /// Burst size used when transferring to and from external memory.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -150,7 +150,8 @@ cfg_if::cfg_if! {
                 }
             }
         }
-    } else {
+    }
+    _ => {
         /// Burst transfer configuration.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -286,13 +287,14 @@ impl BurstConfig {
     fn min_alignment(self, _buffer: &[u8], direction: TransferDirection) -> usize {
         let alignment = self.min_dram_alignment(direction);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+        cfg_select! {
+            dma_can_access_psram => {
                 let mut alignment = alignment;
                 if is_valid_psram_address(_buffer.as_ptr() as usize) {
                     alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
                 }
             }
+            _ => {}
         }
 
         alignment
@@ -334,10 +336,11 @@ impl BurstConfig {
         }
         // buffer can be either DRAM or PSRAM (if supported)
         let is_in_dram = is_slice_in_dram(buffer);
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)]{
+        cfg_select! {
+            dma_can_access_psram => {
                 let is_in_psram = is_slice_in_psram(buffer);
-            } else {
+            }
+            _ => {
                 let is_in_psram = false;
             }
         }
@@ -898,8 +901,8 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             desc.reset_for_rx();
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+        cfg_select! {
+            dma_can_access_psram => {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
                 if is_data_in_psram || cfg!(soc_internal_memory_cached) {
@@ -911,6 +914,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
                     };
                 }
             }
+            _ => {}
         }
 
         Preparation {
@@ -1818,8 +1822,8 @@ pub(crate) unsafe fn prepare_for_tx(
 
     let data_len = data.len().min(chunk_size * descriptors.len());
 
-    cfg_if::cfg_if! {
-        if #[cfg(dma_can_access_psram)] {
+    cfg_select! {
+        dma_can_access_psram => {
             let data_addr = data.addr().get();
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
@@ -1827,9 +1831,11 @@ pub(crate) unsafe fn prepare_for_tx(
             if data_in_psram || cfg!(soc_internal_memory_cached) {
                 unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
             }
-        } else if #[cfg(soc_internal_memory_cached)] {
+        }
+        soc_internal_memory_cached => {
             unsafe { crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32) };
         }
+        _ => {}
     }
 
     let descriptors = unsafe { DmaAlignedMut::new_unchecked(descriptors) };
@@ -1880,11 +1886,12 @@ pub(crate) unsafe fn prepare_for_rx(
     // - it may be improperly aligned for PSRAM
     // - it may not have a length that is a multiple of the external memory block size
 
-    cfg_if::cfg_if! {
-        if #[cfg(dma_can_access_psram)] {
+    cfg_select! {
+        dma_can_access_psram => {
             let data_addr = data.addr().get();
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
-        } else {
+        }
+        _ => {
             let data_in_psram = false;
         }
     }
@@ -1892,8 +1899,8 @@ pub(crate) unsafe fn prepare_for_rx(
     let descriptors = unsafe { DmaAlignedMut::new_unchecked(descriptors) };
     let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
     let data_len = if data_in_psram {
-        cfg_if::cfg_if! {
-            if #[cfg(dma_can_access_psram)] {
+        cfg_select! {
+            dma_can_access_psram => {
                 // This could use a better API, but right now we'll have to build the descriptor list by
                 // hand.
                 let consumed_bytes = build_descriptor_list_for_psram(
@@ -1909,7 +1916,8 @@ pub(crate) unsafe fn prepare_for_rx(
                 }
 
                 consumed_bytes
-            } else {
+            }
+            _ => {
                 unreachable!()
             }
         }

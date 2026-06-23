@@ -2,12 +2,12 @@
 
 use esp_sync::NonReentrantMutex;
 
-cfg_if::cfg_if! {
-    if #[cfg(all(soc_multi_core_enabled, feature = "unstable"))] {
+cfg_select! {
+    all(soc_multi_core_enabled, feature = "unstable") => {
         pub(crate) mod multi_core;
-        #[cfg(feature = "unstable")]
         pub use multi_core::*;
     }
+    _ => {}
 }
 
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
@@ -273,13 +273,14 @@ impl Cpu {
     #[inline(always)]
     #[instability::unstable]
     pub fn other() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 match Self::current() {
                     Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
                     Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
                 }
-            } else {
+            }
+            _ => {
                 [].into_iter()
             }
         }
@@ -288,10 +289,11 @@ impl Cpu {
     /// Returns an iterator over all cores.
     #[inline(always)]
     pub fn all() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 [Cpu::ProCpu, Cpu::AppCpu].into_iter()
-            } else {
+            }
+            _ => {
                 [Cpu::ProCpu].into_iter()
             }
         }
@@ -308,12 +310,14 @@ impl Cpu {
 #[inline(always)]
 pub(crate) fn raw_core() -> usize {
     // This method must never return UNUSED_THREAD_ID_VALUE
-    cfg_if::cfg_if! {
-        if #[cfg(all(multi_core, riscv))] {
+    cfg_select! {
+        all(multi_core, riscv) => {
             riscv::register::mhartid::read()
-        } else if #[cfg(all(multi_core, xtensa))] {
+        }
+        all(multi_core, xtensa) => {
             (xtensa_lx::get_processor_id() & 0x2000) as usize
-        } else {
+        }
+        _ => {
             0
         }
     }
