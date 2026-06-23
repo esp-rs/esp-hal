@@ -12,7 +12,7 @@
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
-  
+
   _rwtext_start = .;
 
   /* Xtensa L32R requires literals before code (see comment in `text.x`). */

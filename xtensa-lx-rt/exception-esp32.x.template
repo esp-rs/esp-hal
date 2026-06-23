@@ -97,3 +97,11 @@ SECTIONS {
     _init_end = ABSOLUTE(.);
   } > vectors_seg
 }
+
+/* Safety net for the SUBALIGN(0x40) layout. The fixed `. = 0x40/0x80/...`
+   assignments this replaced failed the link if any vector overflowed its
+   64-byte slot. With SUBALIGN an overflow instead shifts the following
+   vectors and grows the section past 0x400, where the ALIGN(0x400) pad
+   rounds up to 0x800. Asserting the exact size restores that guarantee and
+   pins the 0x400 value the ESP32-S3 `.rwdata_dummy` reservation depends on. */
+ASSERT(SIZEOF(.vectors) == 0x400, ".vectors must be exactly 0x400 bytes - a vector overflowed its 64-byte slot");
