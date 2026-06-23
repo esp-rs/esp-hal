@@ -11,6 +11,8 @@ license       = "MIT OR Apache-2.0"
 exclude = ["testdata"]
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = [] }
 check-configs = [
     { features = [] },

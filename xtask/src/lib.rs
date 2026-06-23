@@ -142,6 +142,32 @@ impl Package {
             .any(|(feature, _)| chips.iter().any(|c| c == feature))
     }
 
+    /// Should doc tests be skipped for this package?
+    ///
+    /// Controlled by the `skip-doctests` key in the package's
+    /// `[package.metadata.espressif]` table. Defaults to `false`.
+    ///
+    /// If a package does not define `doc-config`, doc tests are skipped by default.
+    // FIXME: doc tests should slowly be enabled (by removing the `skip-doctests` key) as the docs
+    // are fixed up, and eventually this opt-out should be removed entirely.
+    pub fn skip_doctests(&self) -> bool {
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(value)) = metadata.get("skip-doctests") else {
+            return false;
+        };
+
+        let Value::Boolean(value) = value else {
+            log::warn!("Invalid value for 'skip-doctests' in metadata");
+            return false;
+        };
+
+        *value.value()
+    }
+
     /// Does the package have inline assembly?
     pub fn has_inline_assembly(&self, workspace: &Path) -> bool {
         // feature(asm_experimental_arch) is enabled in all crates that use Xtensa

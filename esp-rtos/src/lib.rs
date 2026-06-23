@@ -52,7 +52,7 @@ esp_rtos::start_second_core(
 //! // let esp_radio_controller = esp_radio::init().unwrap();
 #![doc = esp_hal::after_snippet!()]
 //! ```
-//!
+//! 
 //! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
