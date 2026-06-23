@@ -300,20 +300,15 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-// Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
-// causing an eventual overflow. Currently we are holding onto a guard ourselves while Wi-Fi/BT is
-// active, so the blobs should not be able to disable the clock anyway.
-//
-// This might have some low-power issues, but we're not there yet anyway.
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_enable_clock() {
-    // Stealing the peripheral is safe here, as they must have been passed into the relevant
-    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    let guard = esp_phy::enable_phy();
+    core::mem::forget(guard);
 }
 
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_disable_clock() {
-    // No-op, see `phy_enable_clock`.
+    esp_phy::disable_phy();
 }
 
 pub(crate) fn enable_wifi_power_domain() {
