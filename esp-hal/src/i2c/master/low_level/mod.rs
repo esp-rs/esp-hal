@@ -605,14 +605,12 @@ impl Driver<'_> {
         self.update_registers();
     }
 
-    /// Sets or clears `scl_pd_en`. Switches to force_out=1 while pd_en is
+    /// Sets or clears `scl_pd_en`. Switches `scl_force_out` to 1 while pd_en is
     /// active (required on all chips), restoring OD mode when both pd_en bits clear.
     #[cfg(i2c_master_has_pd_en)]
     pub(super) fn set_scl_pd(&self, low: bool) {
         if low {
-            self.regs()
-                .ctr()
-                .modify(|_, w| w.scl_force_out().set_bit().sda_force_out().set_bit());
+            self.regs().ctr().modify(|_, w| w.scl_force_out().set_bit());
         }
         self.regs()
             .scl_sp_conf()
@@ -621,19 +619,18 @@ impl Driver<'_> {
             let sp = self.regs().scl_sp_conf().read();
             if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
                 self.restore_force_out();
+                return;
             }
         }
         self.update_registers();
     }
 
-    /// Asserts or clears `sda_pd_en`. Switches to force_out=1 while pd_en is
+    /// Asserts or clears `sda_pd_en`. Switches `sda_force_out` to 1 while pd_en is
     /// active (required on all chips), restoring OD mode when both pd_en bits clear.
     #[cfg(i2c_master_has_pd_en)]
     pub(super) fn set_sda_pd(&self, low: bool) {
         if low {
-            self.regs()
-                .ctr()
-                .modify(|_, w| w.scl_force_out().set_bit().sda_force_out().set_bit());
+            self.regs().ctr().modify(|_, w| w.sda_force_out().set_bit());
         }
         self.regs()
             .scl_sp_conf()
@@ -642,6 +639,7 @@ impl Driver<'_> {
             let sp = self.regs().scl_sp_conf().read();
             if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
                 self.restore_force_out();
+                return;
             }
         }
         self.update_registers();
