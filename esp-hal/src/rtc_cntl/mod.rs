@@ -421,17 +421,16 @@ impl<'d> Rtc<'d> {
         // value (that would count the enter/exit time twice). Instead we set an absolute
         // target of `before + slept`, measured by the always-running LP timer.
         let before_ticks = crate::time::implem::raw_counter();
-        let before = self.time_since_power_up();
+        let before = self.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
 
-        let after = self.time_since_power_up();
+        let after = self.time_since_boot_raw();
 
-        let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
-        info!("Before: {:?}, After: {:?}", before, after);
-        let slept_ticks = crate::time::implem::us_to_ticks(slept_us.as_micros());
+        let slept_us = crate::clock::rtc_ticks_to_us(after.wrapping_sub(before));
+        let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
     }
