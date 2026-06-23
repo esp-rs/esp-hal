@@ -112,6 +112,8 @@ pub enum Package {
     CompileTests,
 }
 
+static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
+
 impl Package {
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
@@ -120,6 +122,9 @@ impl Package {
             .map(|chip| chip.to_string())
             .collect::<Vec<_>>();
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(Item::Table(features)) = toml.manifest.get("features") else {
             return false;
         };
@@ -152,6 +157,10 @@ impl Package {
     // are fixed up, and eventually this opt-out should be removed entirely.
     pub fn skip_doctests(&self) -> bool {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            // No Cargo.toml in the package, must be the examples
+            return true;
+        };
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -198,6 +207,9 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(Item::Table(features)) = toml.manifest.get("features") else {
             unreachable!("has_chip_features() already checked for a features table");
         };
@@ -275,12 +287,11 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self) -> bool {
-        if *self == Package::Examples || *self == Package::CompileTests {
-            // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
-            // did nothing in this directory will be published.
-            false
+        let toml = self.toml();
+        if let Some(ref toml) = *toml {
+            toml.is_published()
         } else {
-            self.toml().is_published()
+            false
         }
     }
 
@@ -408,6 +419,9 @@ impl Package {
         metadata_key: &str,
     ) -> Option<CheckConfig> {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return None;
+        };
 
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(config_meta) = metadata.get(metadata_key)
@@ -456,6 +470,9 @@ impl Package {
         metadata_key: &str,
     ) -> Option<Vec<CheckConfig>> {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return None;
+        };
         let mut cases = Vec::new();
 
         if let Some(metadata) = toml.espressif_metadata()
@@ -505,19 +522,24 @@ impl Package {
         cases
     }
 
-    fn toml(&self) -> MappedMutexGuard<'_, CargoToml> {
-        static TOML: Mutex<Option<HashMap<Package, CargoToml>>> = Mutex::new(None);
-
+    fn toml(&self) -> MappedMutexGuard<'_, Option<CargoToml>> {
         let tomls = TOML.lock();
 
         MutexGuard::map(tomls, |tomls| {
             let tomls = tomls.get_or_insert_default();
 
-            tomls.entry(*self).or_insert_with(|| {
-                CargoToml::new(&std::env::current_dir().unwrap(), *self)
-                    .expect("Failed to parse Cargo.toml")
-            })
+            tomls
+                .entry(*self)
+                .or_insert_with(|| CargoToml::new(&std::env::current_dir().unwrap(), *self).ok())
         })
+    }
+
+    #[cfg(feature = "rel-check")]
+    fn remove_toml_from_cache(&self) {
+        let mut tomls = TOML.lock();
+        if let Some(ref mut tomls) = *tomls {
+            tomls.remove(self);
+        }
     }
 
     fn targets_lp_core(&self) -> bool {
@@ -526,6 +548,9 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -550,10 +575,6 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        if *self == Package::Examples || *self == Package::CompileTests {
-            return Ok(());
-        }
-
         if self.targets_lp_core() && !chip.has_lp_core() {
             return Err(anyhow!(
                 "Package '{self}' requires an LP core, but '{chip}' does not have one",
@@ -567,6 +588,10 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return Ok(());
+        };
+
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
             && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
@@ -593,6 +618,10 @@ impl Package {
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            // No Cargo.toml in the package, must be the examples
+            return false;
+        };
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -844,7 +873,11 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 
 /// Parse the version from the specified package's Cargo manifest.
 pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
-    Ok(package.toml().package_version())
+    let toml = package.toml();
+    let Some(ref toml) = *toml else {
+        return Err(anyhow!("Failed to parse Cargo.toml for package {package}"));
+    };
+    Ok(toml.package_version())
 }
 
 /// Make the path "Windows"-safe
