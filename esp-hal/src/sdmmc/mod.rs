@@ -8,7 +8,6 @@
 //! This module is under active development. ESP32-S3 is the current bring-up
 //! target; ESP32 and ESP32-P4 support is added in later milestones.
 
-#[cfg(feature = "__sdmmc")]
 use sdio as _;
 
 /// Selects one of the controller's card slots.
@@ -203,7 +202,6 @@ pub enum ConfigError {
     NoData0,
 }
 
-#[cfg(feature = "__sdmmc")]
 impl From<Error> for sdio::MmcError {
     fn from(error: Error) -> Self {
         use sdio::MmcError;
