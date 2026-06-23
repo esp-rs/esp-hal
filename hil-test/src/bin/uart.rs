@@ -373,6 +373,36 @@ mod tests {
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
+
+    #[test]
+    fn test_split_mut_send_receive_change_baud(ctx: Context) {
+        let mut uart0 = ctx.uart0.with_tx(ctx.tx);
+        let mut uart1 = ctx.uart1.with_rx(ctx.rx);
+
+        let bytes = [0x42, 0x43, 0x44];
+        let mut buf = [0u8; 3];
+
+        for i in 1..=2 {
+            let baudrate = 9600 * i;
+            let uart_cfg = uart::Config::default().with_baudrate(baudrate);
+            uart0.apply_config(&uart_cfg).unwrap_or_else(|e| {
+                panic!("{:?}: Failed to apply UART 0 baudrate: {}", e, baudrate)
+            });
+            uart1.apply_config(&uart_cfg).unwrap_or_else(|e| {
+                panic!("{:?}: Failed to apply UART 1 baudrate: {}", e, baudrate)
+            });
+
+            let (_, tx) = uart0.split_mut();
+            let (rx, _) = uart1.split_mut();
+
+            tx.flush().unwrap();
+            tx.write(&bytes).unwrap();
+
+            embedded_io::Read::read_exact(rx, &mut buf).unwrap();
+
+            assert_eq!(buf, bytes);
+        }
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]

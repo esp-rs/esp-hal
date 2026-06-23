@@ -2014,6 +2014,41 @@ where
         (self.rx, self.tx)
     }
 
+    #[procmacros::doc_replace]
+    /// Borrows the UART as separate transmitter and receiver halves.
+    ///
+    /// Unlike [`split`], this method does not consume the UART. The returned
+    /// transmitter and receiver are borrowed from the original UART, which can
+    /// be used again after those borrows end.
+    ///
+    /// This is particularly useful when running separate transmit and receive
+    /// futures concurrently.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    ///
+    /// loop {
+    ///     // The UART can be split into separate Transmit and Receive components:
+    ///     let (rx, tx) = uart.split_mut();
+    ///
+    ///     // Each component can be used individually to interact with the UART:
+    ///     tx.write(&[42u8])?;
+    ///     let mut byte = [0u8; 1];
+    ///     rx.read(&mut byte);
+    /// }
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn split_mut(&mut self) -> (&mut UartRx<'d, Dm>, &mut UartTx<'d, Dm>) {
+        (&mut self.rx, &mut self.tx)
+    }
+
     /// Reads and clears errors set by received data.
     #[instability::unstable]
     pub fn check_for_rx_errors(&mut self) -> Result<(), RxError> {
