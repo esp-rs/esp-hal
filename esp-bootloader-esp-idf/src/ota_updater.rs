@@ -149,4 +149,15 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
 
         Ok((flash_region, next_slot))
     }
+
+    /// Reset the OTA-data.
+    ///
+    /// If present this will activate the FACTORY image, OTA0 otherwise.
+    pub fn reset_data(&mut self) -> Result<(), Error> {
+        // `Factory` resets the OTA data - the bootloader will
+        // check if a FACTORY image is present and boot it,
+        // will choose OTA0 otherwise
+        self.ota_data()?
+            .set_current_app_partition(AppPartitionSubType::Factory)
+    }
 }
