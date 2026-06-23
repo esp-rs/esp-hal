@@ -67,15 +67,7 @@ harness           = false
 required-features = ["embassy", "esp-alloc"]
 
 [[bin]]
-name              = "spi_full_duplex"
-harness           = false
-
-[[bin]]
-name              = "spi_half_duplex_slave_qspi"
-harness           = false
-
-[[bin]]
-name              = "spi_half_duplex_write_psram"
+name              = "spi"
 harness           = false
 
 [[bin]]

@@ -8,6 +8,9 @@
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
+//! This example requires a board with PSRAM. If no PSRAM is detected, the
+//! allocation will fail at runtime.
+//!
 //! This example transfers data via SPI.
 //! Connect MISO and MOSI pins to see the outgoing data is read as incoming
 //! data.
@@ -58,7 +61,11 @@ macro_rules! dma_alloc_tx_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
+const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
+    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
+    feature = "esp32s2" => ExternalBurstConfig::Size32,
+    _ => ExternalBurstConfig::Size64,
+};
 
 #[main]
 fn main() -> ! {

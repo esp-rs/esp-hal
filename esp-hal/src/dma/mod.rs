@@ -934,6 +934,8 @@ impl From<ExternalBurstConfig> for DmaExtMemBKSize {
         match size {
             ExternalBurstConfig::Size16 => DmaExtMemBKSize::Size16,
             ExternalBurstConfig::Size32 => DmaExtMemBKSize::Size32,
+            // TODO: investigate why ext_mem_bk_size = 2 causes corruption on S2
+            #[cfg(not(esp32s2))]
             ExternalBurstConfig::Size64 => DmaExtMemBKSize::Size64,
         }
     }
