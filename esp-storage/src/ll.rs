@@ -69,3 +69,22 @@ pub unsafe fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> Resu
         value => Err(value),
     }
 }
+
+/// Low-level SPI NOR Flash encrypted write
+///
+/// # Safety
+///
+/// The `dest_addr` + `len` should not exceed the size of flash.
+/// Both `dest_addr` and `len` must be 32-byte aligned.
+/// The target flash region must already be erased.
+/// The `data` pointer must be word-aligned.
+pub unsafe fn spiflash_write_encrypted(
+    dest_addr: u32,
+    data: *mut u32,
+    len: u32,
+) -> Result<(), i32> {
+    match chip_specific::spiflash_write_encrypted(dest_addr, data, len) {
+        0 => Ok(()),
+        value => Err(value),
+    }
+}

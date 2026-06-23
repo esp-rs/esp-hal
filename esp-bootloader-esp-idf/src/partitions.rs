@@ -89,8 +89,36 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// If the partition is encrypted.
+    ///
+    /// This is the flag from the partition table.
+    /// If flash encryption is enabled certain partition types are encrypted
+    /// regardless of this.
     pub fn is_encrypted(&self) -> bool {
         self.flags() & 0b10 != 0
+    }
+
+    /// Like [PartitionEntry::is_encrypted] but also takes into account:
+    /// - is flash encryption enabled, otherwise this will always return false
+    /// - certain partition types are always encrypted, no matter what the partition table says
+    pub(crate) fn is_effectively_encrypted(&self) -> bool {
+        #[cfg(feature = "std")]
+        let enabled = false;
+
+        #[cfg(not(feature = "std"))]
+        let enabled = esp_storage::flash_encryption();
+
+        enabled
+            && (self.is_encrypted()
+                || matches!(self.partition_type(), PartitionType::App(_))
+                || matches!(self.partition_type(), PartitionType::PartitionTable(_))
+                || matches!(
+                    self.partition_type(),
+                    PartitionType::Data(DataPartitionSubType::NvsKeys)
+                )
+                || matches!(
+                    self.partition_type(),
+                    PartitionType::Data(DataPartitionSubType::Ota)
+                ))
     }
 
     /// The partition type (type and sub-type).
@@ -547,9 +575,21 @@ pub fn read_partition_table<'a, 'd>(
     flash: &mut esp_storage::FlashStorage<'d>,
     storage: &'a mut [u8],
 ) -> Result<PartitionTable<'a>, Error> {
-    flash
-        .read(PARTITION_TABLE_OFFSET, storage)
-        .map_err(|_e| Error::StorageError)?;
+    #[cfg(feature = "std")]
+    let enabled = false;
+
+    #[cfg(not(feature = "std"))]
+    let enabled = esp_storage::flash_encryption();
+
+    if enabled {
+        flash
+            .read_encrypted(PARTITION_TABLE_OFFSET, storage)
+            .map_err(|_e| Error::StorageError)?;
+    } else {
+        flash
+            .read(PARTITION_TABLE_OFFSET, storage)
+            .map_err(|_e| Error::StorageError)?;
+    }
 
     PartitionTable::new(storage)
 }
@@ -587,9 +627,15 @@ impl FlashRegion<'_, '_> {
             return Err(Error::OutOfBounds);
         }
 
-        self.flash
-            .read(address, bytes)
-            .map_err(|_e| Error::StorageError)
+        if self.raw.is_effectively_encrypted() {
+            self.flash
+                .read_encrypted(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        } else {
+            self.flash
+                .read(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        }
     }
 
     /// Write bytes to the partition.
@@ -604,9 +650,15 @@ impl FlashRegion<'_, '_> {
             return Err(Error::OutOfBounds);
         }
 
-        self.flash
-            .write(address, bytes)
-            .map_err(|_e| Error::StorageError)
+        if self.raw.is_effectively_encrypted() {
+            self.flash
+                .write_encrypted(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        } else {
+            self.flash
+                .write(address, bytes)
+                .map_err(|_e| Error::StorageError)
+        }
     }
 
     /// Returns the size of the partition in bytes.
