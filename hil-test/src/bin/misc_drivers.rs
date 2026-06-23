@@ -371,7 +371,7 @@ mod systimer {
         timer::{
             OneShotTimer,
             PeriodicTimer,
-            systimer::{Alarm, SystemTimer},
+            systimer::{Alarm, SystemTimer, Unit},
         },
     };
     use portable_atomic::{AtomicUsize, Ordering};
@@ -505,6 +505,19 @@ mod systimer {
 
         // We'll end the test in the interrupt handler.
         loop {}
+    }
+
+    #[test]
+    fn set_unit_count_does_not_mask_high_bits(_ctx: Context) {
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit0, 1 << 32);
+            assert!(SystemTimer::unit_value(Unit::Unit0) >= 1 << 32);
+        }
+        #[cfg(not(esp32s2))]
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit1, 1 << 32);
+            assert!(SystemTimer::unit_value(Unit::Unit1) >= 1 << 32);
+        }
     }
 }
 
