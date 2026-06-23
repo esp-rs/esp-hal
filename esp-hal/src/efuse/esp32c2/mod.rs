@@ -114,11 +114,13 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
     }
 
     // see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_table.csv#L97>
+    // ESP-IDF: signed-extended diff_code11 (sign bit 5); out_digi = code0 - signed - 123
+    // (so bit 5 set means add the magnitude; bit 5 clear means subtract).
     let diff_code11: u16 = super::read_field_le(ADC1_CAL_VOL_ATTEN3);
-    let code11 = if diff_code0 & (1 << 5) != 0 {
-        code0 - (diff_code11 & 0x1f)
+    let code11 = if diff_code11 & (1 << 5) != 0 {
+        code0 + (diff_code11 & 0x1f)
     } else {
-        code0 + diff_code11
+        code0 - diff_code11
     } - 123;
 
     Some(code11)
