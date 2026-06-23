@@ -26,26 +26,68 @@ use esp_hal::{
 };
 use hil_test as _;
 
-macro_rules! dma_alloc_tx_buffer {
-    ($size:expr, $align:expr) => {{
-        let layout = core::alloc::Layout::from_size_align($size, $align as usize).unwrap();
+const DMA_BUFFER_SIZE: usize = 8192;
+
+macro_rules! run_loopback_test {
+    ($spi:expr, $align:expr) => {{
+        let layout =
+            core::alloc::Layout::from_size_align(DMA_BUFFER_SIZE, $align as usize).unwrap();
         let buffer = unsafe {
             let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
                 error!("dma_alloc_buffer: alloc failed");
                 alloc::alloc::handle_alloc_error(layout);
             }
-            core::slice::from_raw_parts_mut(ptr, $size)
+            core::slice::from_raw_parts_mut(ptr, DMA_BUFFER_SIZE)
         };
 
         const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
-        let descriptors = esp_hal::dma_descriptors_impl!($size, DMA_CHUNK_SIZE);
-        esp_hal::dma::DmaTxBuf::new_with_config(
+        let descriptors = esp_hal::dma_descriptors_impl!(DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
+        let dma_tx_buf = esp_hal::dma::DmaTxBuf::new_with_config(
             descriptors,
             unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
             $align,
         )
+        .unwrap();
+        let dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        run_loopback($spi, dma_tx_buf, dma_rx_buf);
     }};
+}
+
+fn run_loopback(
+    spi: SpiDma<'static, Blocking>,
+    mut dma_tx_buf: esp_hal::dma::DmaTxBuf,
+    mut dma_rx_buf: esp_hal::dma::DmaRxBuf,
+) {
+    for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+        *v = (i % 256) as u8;
+    }
+
+    let mut spi = spi;
+
+    for i in 0..4u8 {
+        dma_tx_buf.as_mut_slice()[0] = i;
+        *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i;
+
+        let transfer = spi
+            .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
+
+        for j in 0..dma_rx_buf.as_slice().len() {
+            if dma_rx_buf.as_slice()[j] != dma_tx_buf.as_slice()[j] {
+                defmt::panic!(
+                    "Mismatch at iteration {}, index {}: expected {=u8:#04x}, got {=u8:#04x}",
+                    i,
+                    j,
+                    dma_tx_buf.as_slice()[j],
+                    dma_rx_buf.as_slice()[j],
+                );
+            }
+        }
+    }
 }
 
 struct Context {
@@ -88,84 +130,22 @@ mod tests {
         Context { spi }
     }
 
-    /// SPI DMA loopback with TX from PSRAM, ExternalBurstConfig::Size64.
+    /// SPI DMA loopback with TX from PSRAM, ExternalBurstConfig::Size16.
     #[test]
-    #[cfg(not(esp32s2))]
-    fn test_psram_tx_loopback_size64(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 8192;
-        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
-
-        let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
-        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
-
-        for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *v = (i % 256) as u8;
-        }
-
-        let mut spi = ctx.spi;
-
-        for i in 0..4u8 {
-            dma_tx_buf.as_mut_slice()[0] = i;
-            *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i;
-
-            let transfer = spi
-                .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
-                .map_err(|e| e.0)
-                .unwrap();
-
-            (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-
-            for j in 0..DMA_BUFFER_SIZE {
-                if dma_rx_buf.as_slice()[j] != dma_tx_buf.as_slice()[j] {
-                    defmt::panic!(
-                        "Mismatch at iteration {}, index {}: expected {=u8:#04x}, got {=u8:#04x}",
-                        i,
-                        j,
-                        dma_tx_buf.as_slice()[j],
-                        dma_rx_buf.as_slice()[j],
-                    );
-                }
-            }
-        }
+    fn test_psram_tx_loopback_size16(ctx: Context) {
+        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size16);
     }
 
     /// SPI DMA loopback with TX from PSRAM, ExternalBurstConfig::Size32.
     #[test]
     fn test_psram_tx_loopback_size32(ctx: Context) {
-        const DMA_BUFFER_SIZE: usize = 8192;
-        const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size32;
+        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size32);
+    }
 
-        let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
-        let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
-
-        for (i, v) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *v = (i % 256) as u8;
-        }
-
-        let mut spi = ctx.spi;
-
-        for i in 0..4u8 {
-            dma_tx_buf.as_mut_slice()[0] = i;
-            *dma_tx_buf.as_mut_slice().last_mut().unwrap() = i;
-
-            let transfer = spi
-                .transfer_buffers(dma_rx_buf.len(), dma_rx_buf, dma_tx_buf.len(), dma_tx_buf)
-                .map_err(|e| e.0)
-                .unwrap();
-
-            (spi, (dma_rx_buf, dma_tx_buf)) = transfer.wait();
-
-            for j in 0..DMA_BUFFER_SIZE {
-                if dma_rx_buf.as_slice()[j] != dma_tx_buf.as_slice()[j] {
-                    defmt::panic!(
-                        "Mismatch at iteration {}, index {}: expected {=u8:#04x}, got {=u8:#04x}",
-                        i,
-                        j,
-                        dma_tx_buf.as_slice()[j],
-                        dma_rx_buf.as_slice()[j],
-                    );
-                }
-            }
-        }
+    /// SPI DMA loopback with TX from PSRAM, ExternalBurstConfig::Size64.
+    #[test]
+    #[cfg(not(esp32s2))]
+    fn test_psram_tx_loopback_size64(ctx: Context) {
+        run_loopback_test!(ctx.spi, ExternalBurstConfig::Size64);
     }
 }
