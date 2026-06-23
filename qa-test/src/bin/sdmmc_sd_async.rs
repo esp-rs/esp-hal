@@ -28,10 +28,12 @@ use embedded_fatfs::{FileSystem, FsOptions, ReadWriteSeek};
 use embedded_io_async::{Read, Write};
 use embedded_partitions::mbr::Scheme;
 use esp_backtrace as _;
+#[cfg(feature = "esp32s3")]
+use esp_hal::sdmmc::DelayPhase;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     interrupt::software::SoftwareInterruptControl,
-    sdmmc::{Config, DelayPhase, SdHostController},
+    sdmmc::{Config, SdHostController, SlotConfig},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -44,6 +46,7 @@ const CARD_HZ: u32 = 40_000_000;
 
 /// Input sampling phase for the high-speed path (esp32s3 only). If 40 MHz
 /// init fails with a timeout, try `_1`, `_2`, then `_3`.
+#[cfg(feature = "esp32s3")]
 const INPUT_DELAY_PHASE: DelayPhase = DelayPhase::_0;
 
 /// Test-owned file (8.3 name); assumed not to exist on the card.
@@ -58,9 +61,12 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let controller = SdHostController::new(peripherals.SDHOST);
-    let config = Config::default().with_input_delay_phase(INPUT_DELAY_PHASE);
-    let slot = controller.slot::<1>(config).unwrap();
+    let controller = SdHostController::new(peripherals.SDHOST, Config::default()).unwrap();
+    #[cfg(feature = "esp32s3")]
+    let slot_config = SlotConfig::default().with_input_delay_phase(INPUT_DELAY_PHASE);
+    #[cfg(not(feature = "esp32s3"))]
+    let slot_config = SlotConfig::default();
+    let slot = controller.slot::<1>(slot_config).unwrap();
     #[cfg(feature = "esp32s3")]
     let slot = slot
         .with_clk(peripherals.GPIO39)

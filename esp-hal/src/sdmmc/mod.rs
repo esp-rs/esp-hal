@@ -8,7 +8,8 @@
 //! This module is under active development. ESP32-S3 is the current bring-up
 //! target; ESP32 and ESP32-P4 support is added in later milestones.
 
-use sdio as _;
+use procmacros::BuilderLite;
+use sdio::{self as _, MmcError};
 
 /// Selects one of the controller's card slots.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -40,6 +41,7 @@ pub enum ClockSource {
 }
 
 /// Clock input sampling phase used for high-speed tuning.
+#[cfg(esp32s3)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum DelayPhase {
     /// 0°.
@@ -63,15 +65,15 @@ pub enum BusWidth {
     Bit4,
 }
 
-/// Slot configuration.
+/// Controller-wide (engine) configuration.
+///
+/// These settings drive the shared module clock and therefore apply to the
+/// whole controller, not an individual slot.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
-#[cfg_attr(not(esp32s3), allow(dead_code))]
 pub struct Config {
     clock_source: ClockSource,
     module_div: u8,
-    input_delay_phase: DelayPhase,
-    wp_active_high: bool,
 }
 
 impl Default for Config {
@@ -79,8 +81,6 @@ impl Default for Config {
         Self {
             clock_source: ClockSource::Pll160m,
             module_div: 2,
-            input_delay_phase: DelayPhase::_0,
-            wp_active_high: false,
         }
     }
 }
@@ -98,24 +98,34 @@ impl Config {
         self
     }
 
-    /// Sets the input sampling delay phase.
-    pub fn with_input_delay_phase(mut self, phase: DelayPhase) -> Self {
-        self.input_delay_phase = phase;
-        self
-    }
-
-    /// Sets whether the write-protect signal is active-high.
-    pub fn with_wp_active_high(mut self, active_high: bool) -> Self {
-        self.wp_active_high = active_high;
-        self
-    }
-
     /// Validates field ranges.
     fn validate(&self) -> Result<(), ConfigError> {
         if !(2..=16).contains(&self.module_div) {
             return Err(ConfigError::InvalidModuleDivider);
         }
         Ok(())
+    }
+}
+
+/// Per-slot configuration.
+#[derive(Clone, Copy, Debug, BuilderLite)]
+#[non_exhaustive]
+pub struct SlotConfig {
+    /// Input sampling delay phase used for high-speed tuning (esp32s3 only).
+    #[cfg(esp32s3)]
+    input_delay_phase: DelayPhase,
+
+    /// Write-protect signal polarity (active-high or active-low).
+    wp_active_high: bool,
+}
+
+impl Default for SlotConfig {
+    fn default() -> Self {
+        Self {
+            #[cfg(esp32s3)]
+            input_delay_phase: DelayPhase::_0,
+            wp_active_high: false,
+        }
     }
 }
 
@@ -202,9 +212,8 @@ pub enum ConfigError {
     NoData0,
 }
 
-impl From<Error> for sdio::MmcError {
+impl From<Error> for MmcError {
     fn from(error: Error) -> Self {
-        use sdio::MmcError;
         match error {
             Error::ResponseTimeout | Error::DataTimeout | Error::Timeout | Error::NoCard => {
                 MmcError::Timeout
@@ -234,10 +243,7 @@ mod imp {
     };
 
     use embassy_futures::yield_now;
-    use embassy_sync::{
-        mutex::{MappedMutexGuard, MutexGuard},
-        waitqueue::WakerRegistration,
-    };
+    use embassy_sync::{mutex::MutexGuard, waitqueue::WakerRegistration};
     use esp_sync::{NonReentrantMutex, RawMutex};
     use portable_atomic::AtomicBool;
     use procmacros::handler;
@@ -252,6 +258,7 @@ mod imp {
         ConfigError,
         Error,
         ResponseLen,
+        SlotConfig,
         SlotId,
     };
     #[cfg(sdmmc_has_gpio_matrix)]
@@ -272,8 +279,6 @@ mod imp {
         system::{Peripheral, PeripheralGuard},
     };
 
-    /// Default module-clock divider used during controller bring-up.
-    const MODULE_DIV: u8 = 2;
     /// Spin-poll bound for self-clearing hardware bits.
     const POLL_LIMIT: u32 = 1_000_000;
 
@@ -395,8 +400,6 @@ mod imp {
             waker: WakerRegistration::new(),
         };
 
-        fn configure_for_slot(&mut self, _slot_id: SlotId) {}
-
         /// Sets the bus width bits for a slot.
         fn set_card_width(&mut self, id: SlotId, width: BusWidth) {
             let slot = id.index();
@@ -459,39 +462,94 @@ mod imp {
     /// transfer engine so a second slot cannot clobber
     /// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
     /// near-free) in the common single-slot case.
+    /// Persistent controller/slot settings consulted on slot selection.
+    ///
+    /// Kept separate from [`Engine`] (which is reset between transfers) so the
+    /// engine-wide module clock and per-slot tuning survive across operations.
+    struct Settings {
+        module: Config,
+        active_slot: Option<SlotId>,
+        #[cfg(esp32s3)]
+        slots: [SlotSettings; 2],
+    }
+
+    impl Settings {
+        const INIT: Self = Settings {
+            module: Config {
+                clock_source: ClockSource::Pll160m,
+                module_div: 2,
+            },
+            active_slot: None,
+            #[cfg(esp32s3)]
+            slots: [SlotSettings::INIT; 2],
+        };
+    }
+
+    /// Per-slot settings needed to (re-)apply shared registers on selection.
+    #[cfg(esp32s3)]
+    #[derive(Clone, Copy)]
+    struct SlotSettings {
+        hz: u32,
+        input_delay_phase: DelayPhase,
+    }
+
+    #[cfg(esp32s3)]
+    impl SlotSettings {
+        const INIT: Self = SlotSettings {
+            hz: 0,
+            input_delay_phase: DelayPhase::_0,
+        };
+    }
+
     struct State {
         engine: NonReentrantMutex<Engine>,
-        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ActiveSlotData>,
+        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
+        settings: NonReentrantMutex<Settings>,
         desc_ring: DescRing,
     }
     unsafe impl Sync for State {}
 
-    struct ActiveSlotData {
-        active_slot: Option<SlotId>,
-        marker: (),
-    }
-
     impl State {
-        async fn select_slot(&self, slot_id: SlotId) -> MappedMutexGuard<'_, RawMutex, ()> {
-            let mut guard = self.engine_lock.lock().await;
-
-            if guard.active_slot != Some(slot_id) {
-                self.engine.with(|eng| eng.configure_for_slot(slot_id));
-                guard.active_slot = Some(slot_id);
-            }
-
-            MutexGuard::map(guard, |d| &mut d.marker)
+        async fn select_slot(&self, slot_id: SlotId) -> MutexGuard<'_, RawMutex, ()> {
+            let guard = self.engine_lock.lock().await;
+            select_slot_sync(slot_id);
+            guard
         }
     }
 
     static STATE: State = State {
         engine: NonReentrantMutex::new(Engine::IDLE),
-        engine_lock: embassy_sync::mutex::Mutex::new(ActiveSlotData {
-            active_slot: None,
-            marker: (),
-        }),
+        engine_lock: embassy_sync::mutex::Mutex::new(()),
+        settings: NonReentrantMutex::new(Settings::INIT),
         desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
     };
+
+    /// Applies the active slot's shared-register settings when the active slot
+    /// changes. Serializes nothing; transaction ordering is handled separately.
+    fn select_slot_sync(slot_id: SlotId) {
+        STATE.settings.with(|s| {
+            if s.active_slot != Some(slot_id) {
+                configure_for_slot(s, slot_id);
+                s.active_slot = Some(slot_id);
+            }
+        });
+    }
+
+    /// Applies shared registers that depend on which slot is active. Only the
+    /// high-speed input-delay phase is slot-specific (esp32s3); other chips have
+    /// nothing to re-apply.
+    fn configure_for_slot(settings: &Settings, slot_id: SlotId) {
+        #[cfg(esp32s3)]
+        {
+            let sl = &settings.slots[slot_id.index() as usize];
+            // Keep the high-speed input-delay gate: only meaningful above SDR25.
+            if sl.hz > 25_000_000 {
+                set_input_delay_phase(sl.input_delay_phase);
+            }
+        }
+        #[cfg(not(esp32s3))]
+        let _ = (settings, slot_id);
+    }
 
     /// Matrix-routed pin guards owned by the slot for its whole lifetime.
     ///
@@ -765,8 +823,9 @@ mod imp {
 
     impl<'d> SdHostController<'d> {
         /// Creates the controller, enabling its bus clock and configuring the
-        /// shared module clock.
-        pub fn new(peri: SDHOST<'d>) -> Self {
+        /// shared (engine-wide) module clock from `config`.
+        pub fn new(peri: SDHOST<'d>, config: Config) -> Result<Self, ConfigError> {
+            config.validate()?;
             let guard = PeripheralGuard::new(Peripheral::SdioHost);
             let this = Self {
                 _peri: peri,
@@ -774,9 +833,12 @@ mod imp {
                 taken: [AtomicBool::new(false), AtomicBool::new(false)],
             };
 
-            // DesignWare reset, then module clock, then quiesce interrupts.
+            // DesignWare reset, then module clock, then quiesce interrupts. The
+            // module clock is engine-wide, so it is programmed once here and the
+            // config is stashed for slots to derive their card dividers from.
             let _ = reset_engine();
-            set_module_clock(ClockSource::Pll160m, MODULE_DIV);
+            set_module_clock(config.clock_source, config.module_div);
+            STATE.settings.with(|s| s.module = config);
             let r = SDHOST::regs();
             r.tmout().write(|w| unsafe {
                 w.response_timeout().bits(0xFF);
@@ -785,7 +847,7 @@ mod imp {
             r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
             r.ctrl().modify(|_, w| w.int_enable().clear_bit());
 
-            this
+            Ok(this)
         }
 
         /// Returns a builder for the given slot in blocking mode.
@@ -798,14 +860,19 @@ mod imp {
         /// dropped while any of its slots are alive.
         pub fn slot<const S: u8>(
             &self,
-            config: Config,
+            config: SlotConfig,
         ) -> Result<Slot<'_, S, Blocking>, ConfigError> {
             const { assert!(S < 2, "SDMMC has only slots 0 and 1") };
-            config.validate()?;
             let idx = S as usize;
             if self.taken[idx].swap(true, Ordering::Relaxed) {
                 return Err(ConfigError::SlotInUse);
             }
+            // Publish this slot's tuning so the engine can re-apply it whenever
+            // the slot becomes active.
+            #[cfg(esp32s3)]
+            STATE
+                .settings
+                .with(|s| s.slots[idx].input_delay_phase = config.input_delay_phase);
             Ok(Slot {
                 id: slot_id(S),
                 config,
@@ -943,7 +1010,7 @@ mod imp {
     /// A configured card slot, generic over the slot index and driver mode.
     pub struct Slot<'d, const S: u8, Dm: DriverMode> {
         id: SlotId,
-        config: Config,
+        config: SlotConfig,
         width: BusWidth,
         data_pins: u8,
         clk_connected: bool,
@@ -1043,7 +1110,7 @@ mod imp {
 
         /// Returns `true` if the card reports write protection. Returns `false`
         /// if no write-protect pin is wired. Polarity follows
-        /// [`Config::with_wp_active_high`].
+        /// [`SlotConfig::with_wp_active_high`].
         pub fn is_write_protected(&self) -> bool {
             if !self.wp_connected {
                 return false;
@@ -1056,9 +1123,12 @@ mod imp {
 
         /// Applies bus width + card clock for the slot. Used during card init.
         pub fn set_bus_low_level(&mut self, width: BusWidth, hz: u32) -> Result<(), Error> {
-            let div = self.config.module_div;
-            set_module_clock(self.config.clock_source, div);
-            let card_div = freq_to_card_div(module_hz(self.config.clock_source, div), hz);
+            // The engine-wide module clock is programmed once at construction;
+            // here we only derive this slot's card divider from it.
+            let (source, div) = STATE
+                .settings
+                .with(|s| (s.module.clock_source, s.module.module_div));
+            let card_div = freq_to_card_div(module_hz(source, div), hz);
 
             // Immediately apply slot-specific configuration
             STATE.engine.with(|eng| {
@@ -1067,6 +1137,18 @@ mod imp {
                 Ok(())
             })?;
             self.width = width;
+
+            // Record this slot's frequency and (re-)apply its slot-specific
+            // shared-register tuning now that it is the active slot. Done here
+            // (not via `select_slot_sync`) so a frequency change on the already
+            // active slot still re-applies the input-delay phase.
+            #[cfg(esp32s3)]
+            STATE.settings.with(|s| {
+                let idx = self.id.index() as usize;
+                s.slots[idx].hz = hz;
+                s.active_slot = Some(self.id);
+                configure_for_slot(s, self.id);
+            });
 
             // Let the freshly (re-)started card clock propagate before the next
             // command, matching esp-idf's `sd_host_set_clk_div`. Without this the
@@ -1088,6 +1170,7 @@ mod imp {
 
         /// Issues the 80-clock SD init sequence (no command index).
         pub fn send_init_sequence(&mut self) -> Result<(), Error> {
+            select_slot_sync(self.id);
             let r = SDHOST::regs();
             r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
             r.cmdarg().write(|w| unsafe { w.bits(0) });
@@ -1124,6 +1207,7 @@ mod imp {
             if !self.is_card_present() {
                 return Err(Error::NoCard);
             }
+            select_slot_sync(self.id);
             send_command_blocking(self.id, index, arg, resp_len, check_crc, flags)
         }
 
@@ -1139,6 +1223,7 @@ mod imp {
             block_size: u16,
             block_count: u32,
         ) -> Result<[u32; 4], Error> {
+            select_slot_sync(self.id);
             let total = buf.len();
             let ptr = dma_ptr(buf.as_ptr() as usize)?;
             let resp = transfer_blocking(
@@ -1168,6 +1253,7 @@ mod imp {
             block_size: u16,
             block_count: u32,
         ) -> Result<[u32; 4], Error> {
+            select_slot_sync(self.id);
             #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
             buf.writeback();
             let total = buf.len();
@@ -1435,10 +1521,6 @@ mod imp {
                 return Err(sdio::MmcError::Unsupported);
             }
             self.set_bus_low_level(w, hz)?;
-            #[cfg(esp32s3)]
-            if hz > 25_000_000 {
-                set_input_delay_phase(self.config.input_delay_phase);
-            }
             Ok(())
         }
 
