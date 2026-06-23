@@ -79,6 +79,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     let temporary_package_list = [
         Package::EspHal,
         Package::EspRadio,
+        Package::EspRtos,
         Package::EspBootloaderEspIdf,
     ];
     if !temporary_package_list.contains(&package) {

@@ -14,6 +14,17 @@
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
+//! # struct FakeHeap;
+//! # unsafe impl core::alloc::GlobalAlloc for FakeHeap {
+//! #     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+//! #         unimplemented!()
+//! #     }
+//! #     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+//! #         unimplemented!()
+//! #     }
+//! # }
+//! # #[global_allocator]
+//! # static ALLOCATOR: FakeHeap = FakeHeap;
 //! use esp_hal::timer::timg::TimerGroup;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //!
@@ -24,8 +35,14 @@
     multi_core,
     doc = "
 // Optionally, start the scheduler on the second core
+use static_cell::ConstStaticCell;
+use esp_hal::system::Stack;
+
+static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
 esp_rtos::start_second_core(
+    peripherals.CPU_CTRL,
     software_interrupt.software_interrupt1,
+    STACK.take(),
     || {}, // Second core's main function.
 );
 "
@@ -33,9 +50,9 @@ esp_rtos::start_second_core(
 #![doc = ""]
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
-//! # }
+#![doc = esp_hal::after_snippet!()]
 //! ```
-//! 
+//!
 //! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
