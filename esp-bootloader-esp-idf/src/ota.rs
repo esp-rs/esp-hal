@@ -149,7 +149,7 @@ impl OtaSelectEntry {
                 return false;
             }
 
-            return true;
+            true
         }
 
         let mut buffer = [0u8; 32];
