@@ -31,13 +31,8 @@ cfg_select! {
     _ => {}
 }
 
-cfg_select! {
-    all(multi_core, feature = "unstable") => {
-        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    }
-    _ => {}
-}
-
+#[cfg(all(multi_core, feature = "unstable"))]
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
 use esp_hal::gpio::dedicated::{
     DedicatedGpio,

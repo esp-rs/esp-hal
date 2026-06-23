@@ -230,11 +230,12 @@ impl InterruptAccess<DmaTxInterrupt> for AhbGdmaTxChannel<'_> {
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_select! {
-            any(esp32c2, esp32c3) => {
-                self.0.state.tx_is_async.store(_is_async, portable_atomic::Ordering::Release);
-            }
-            _ => {}
+        #[cfg(any(esp32c2, esp32c3))]
+        {
+            self.0
+                .state
+                .tx_is_async
+                .store(_is_async, portable_atomic::Ordering::Release);
         }
     }
 }
@@ -456,11 +457,12 @@ impl InterruptAccess<DmaRxInterrupt> for AhbGdmaRxChannel<'_> {
     }
 
     fn set_async(&self, _is_async: bool) {
-        cfg_select! {
-            any(esp32c2, esp32c3) => {
-                self.0.state.rx_is_async.store(_is_async, portable_atomic::Ordering::Release);
-            }
-            _ => {}
+        #[cfg(any(esp32c2, esp32c3))]
+        {
+            self.0
+                .state
+                .rx_is_async
+                .store(_is_async, portable_atomic::Ordering::Release);
         }
     }
 }

@@ -380,12 +380,10 @@ pub(crate) fn enable_wifi_power_domain() {
                 w.rst_btmac_apb().set_bit();
                 #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().set_bit();
-                cfg_select! {
-                    soc_has_wifi => {
-                        w.rst_wifibb().set_bit();
-                        w.rst_wifimac().set_bit();
-                    }
-                    _ => {}
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().set_bit();
+                    w.rst_wifimac().set_bit();
                 }
                 w
             });
@@ -397,12 +395,10 @@ pub(crate) fn enable_wifi_power_domain() {
                 w.rst_btmac_apb().clear_bit();
                 #[cfg(soc_has_ieee802154)]
                 w.rst_zbmac().clear_bit();
-                cfg_select! {
-                    soc_has_wifi => {
-                        w.rst_wifibb().clear_bit();
-                        w.rst_wifimac().clear_bit();
-                    }
-                    _ => {}
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().clear_bit();
+                    w.rst_wifimac().clear_bit();
                 }
                 w
             });
