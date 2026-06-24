@@ -194,7 +194,6 @@ fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0x1F
 has_arbitration_en = true
-force_out_inverted = true
 has_pd_en = true
 
 # DMA: P4 exposes three DMA controllers. IDF public docs
