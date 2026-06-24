@@ -1079,6 +1079,57 @@ macro_rules! for_each_rsa_multiplication {
         (1888), (1920), (1952), (1984), (2016), (2048)));
     };
 }
+/// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($slot:ident, $idx:literal, $iomux:literal, [$($clk:ident)?]
+/// [$($cmd_in:ident)?] [$($cmd_out:ident)?] [$($data_in:ident),*] [$($data_out:ident),*]
+/// [$($cd:ident)?] [$($wp:ident)?] [$($card_int:ident)?] [$($data_strobe:ident)?]
+/// [$($rst:ident)?])`
+///
+/// Macro fragments:
+///
+/// - `$slot`: the name of the slot (`slot0`, `slot1`).
+/// - `$idx`: the zero-based slot index.
+/// - `$iomux`: `true` if the slot's clock/command/data signals are IO_MUX-routed.
+/// - `$clk`, `$cmd_in`, `$cmd_out`, `$data_in`, `$data_out`: GPIO-matrix bus signal names (absent
+///   for IO_MUX-routed slots).
+/// - `$cd`, `$wp`, `$card_int`, `$data_strobe`, `$rst`: auxiliary signal names, each present only
+///   when the slot routes that signal through the GPIO matrix.
+///
+/// Each optional signal is wrapped in brackets so the branch shape stays uniform: a set
+/// signal appears as `[SIGNAL]`, an absent one as `[]`.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdmmc {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdmmc { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [],
+        [SDHOST_CARD_DETECT_N_1], [SDHOST_CARD_WRITE_PRT_1], [SDHOST_CARD_INT_N_1],
+        [SDHOST_DATA_STROBE_1], [SD_RST_N_1])); _for_each_inner_sdmmc!((slot1, 1, false,
+        [SDHOST_CCLK_OUT_2], [SDHOST_CCMD_IN_2], [SDHOST_CCMD_OUT_2],
+        [SDHOST_CDATA_IN_20, SDHOST_CDATA_IN_21, SDHOST_CDATA_IN_22, SDHOST_CDATA_IN_23,
+        SDHOST_CDATA_IN_24, SDHOST_CDATA_IN_25, SDHOST_CDATA_IN_26, SDHOST_CDATA_IN_27],
+        [SDHOST_CDATA_OUT_20, SDHOST_CDATA_OUT_21, SDHOST_CDATA_OUT_22,
+        SDHOST_CDATA_OUT_23, SDHOST_CDATA_OUT_24, SDHOST_CDATA_OUT_25,
+        SDHOST_CDATA_OUT_26, SDHOST_CDATA_OUT_27], [SDHOST_CARD_DETECT_N_2],
+        [SDHOST_CARD_WRITE_PRT_2], [SDHOST_CARD_INT_N_2], [SDHOST_DATA_STROBE_2],
+        [SD_RST_N_2])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [],
+        [SDHOST_CARD_DETECT_N_1], [SDHOST_CARD_WRITE_PRT_1], [SDHOST_CARD_INT_N_1],
+        [SDHOST_DATA_STROBE_1], [SD_RST_N_1]), (slot1, 1, false, [SDHOST_CCLK_OUT_2],
+        [SDHOST_CCMD_IN_2], [SDHOST_CCMD_OUT_2], [SDHOST_CDATA_IN_20, SDHOST_CDATA_IN_21,
+        SDHOST_CDATA_IN_22, SDHOST_CDATA_IN_23, SDHOST_CDATA_IN_24, SDHOST_CDATA_IN_25,
+        SDHOST_CDATA_IN_26, SDHOST_CDATA_IN_27], [SDHOST_CDATA_OUT_20,
+        SDHOST_CDATA_OUT_21, SDHOST_CDATA_OUT_22, SDHOST_CDATA_OUT_23,
+        SDHOST_CDATA_OUT_24, SDHOST_CDATA_OUT_25, SDHOST_CDATA_OUT_26,
+        SDHOST_CDATA_OUT_27], [SDHOST_CARD_DETECT_N_2], [SDHOST_CARD_WRITE_PRT_2],
+        [SDHOST_CARD_INT_N_2], [SDHOST_DATA_STROBE_2], [SD_RST_N_2])));
+    };
+}
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sha_algorithm {
