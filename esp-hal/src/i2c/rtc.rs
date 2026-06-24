@@ -20,9 +20,8 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use core::time::Duration;
-//!
 //! use esp_hal::i2c::rtc::Config;
+//! use esp_hal::time::Duration;
 //!
 //! let config = Config::default().with_timeout(Duration::from_micros(100));
 //! # {after_snippet}
@@ -36,8 +35,8 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! use esp_hal::i2c::rtc::I2c;
-//! # use core::time::Duration;
 //! # use esp_hal::i2c::rtc::Config;
+//! # use esp_hal::time::Duration;
 //! #
 //! # let config = Config::default();
 //! #
@@ -75,9 +74,8 @@
 //! # {after_snippet}
 //! ```
 
-use core::time::Duration;
-
 use crate::{
+    time::Duration,
     gpio::{InputPin, OutputPin, RtcFunction, RtcPin},
     peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
 };
@@ -244,9 +242,8 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use core::time::Duration;
-    ///
     /// use esp_hal::i2c::rtc::{Config, I2c};
+    /// use esp_hal::time::Duration;
     /// let mut i2c = I2c::new(
     ///     peripherals.RTC_I2C,
     ///     Config::default(),
@@ -279,7 +276,7 @@ impl<'d> I2c<'d> {
             .scl_stop_period()
             .write(|w| unsafe { w.scl_stop_period().bits(config.timing.scl_stop_period) });
 
-        let ticks = duration_to_clock(config.timeout);
+        let ticks = nanos_to_clock(config.timeout.as_micros().saturating_mul(1_000));
         let ticks = ticks.max(2u32.pow(19) - 1);
         self.i2c
             .register_block()
@@ -690,16 +687,15 @@ impl Timing {
 }
 
 fn clock_from_micros(micros: u64) -> u32 {
-    duration_to_clock(Duration::from_micros(micros))
+    nanos_to_clock(micros * 1_000)
 }
 
 fn clock_from_nanos(nanos: u64) -> u32 {
-    duration_to_clock(Duration::from_nanos(nanos))
+    nanos_to_clock(nanos)
 }
 
-fn duration_to_clock(value: Duration) -> u32 {
-    ((value.as_nanos() * crate::soc::clocks::rc_fast_clk_frequency() as u128) / 1_000_000_000)
-        as u32
+fn nanos_to_clock(nanos: u64) -> u32 {
+    ((nanos as u128 * crate::soc::clocks::rc_fast_clk_frequency() as u128) / 1_000_000_000) as u32
 }
 
 /// A generic I2C Command

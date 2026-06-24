@@ -382,6 +382,13 @@ impl core::hash::Hash for Duration {
     }
 }
 
+impl Default for Duration {
+    #[inline]
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
 impl Duration {
     /// A duration of zero time.
     pub const ZERO: Self = Self(InnerDuration::from_ticks(0));

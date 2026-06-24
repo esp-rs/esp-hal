@@ -113,7 +113,7 @@ async fn main(_spawner: Spawner) {
     let delay = esp_hal::delay::Delay::new();
 
     let timer = esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(
-        core::time::Duration::from_millis(SLEEP_MS),
+        esp_hal::time::Duration::from_millis(SLEEP_MS),
     );
 
     delay.delay_millis(100);

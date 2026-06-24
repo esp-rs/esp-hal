@@ -25,7 +25,6 @@
 
 ```rust, no_run
 # {before_snippet}
-# use core::time::Duration;
 # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 
 let rtc = Rtc::new(peripherals.LPWR);

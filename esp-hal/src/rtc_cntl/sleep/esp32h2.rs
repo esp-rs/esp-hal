@@ -30,7 +30,7 @@ impl WakeSource for TimerWakeupSource {
 
         let lp_timer = unsafe { &*esp32h2::LP_TIMER::ptr() };
         // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;

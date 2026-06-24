@@ -15,14 +15,14 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
-use core::time::Duration;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2, esp32h2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::rtc_cntl::Rtc;
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
+use crate::time::Duration;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -52,10 +52,10 @@ pub enum WakeupLevel {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
+/// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -101,11 +101,11 @@ pub enum Error {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull};
+/// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -154,11 +154,11 @@ impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
+/// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -220,11 +220,11 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// External wake-up source (Ext1).
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPinWithResistors};
+/// # use esp_hal::time::Duration;
 /// #
 /// let delay = Delay::new();
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -292,7 +292,6 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason,
@@ -300,6 +299,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// #   wakeup_cause, Rtc, SocResetReason
 /// # };
 /// # use esp_hal::system::Cpu;
+/// # use esp_hal::time::Duration;
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
 ///

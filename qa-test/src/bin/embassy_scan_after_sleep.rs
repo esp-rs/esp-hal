@@ -38,7 +38,7 @@ async fn main(_spawner: Spawner) {
     delay.delay_millis(100);
 
     let timer =
-        esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(core::time::Duration::from_secs(1));
+        esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(esp_hal::time::Duration::from_secs(1));
 
     let mut rtc = esp_hal::rtc_cntl::Rtc::new(peripherals.LPWR);
     esp_println::println!("Start sleep");
