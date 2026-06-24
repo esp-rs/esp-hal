@@ -167,7 +167,7 @@ macro_rules! property {
         false
     };
     ("i2c_master.force_out_inverted") => {
-        false
+        true
     };
     ("i2c_master.has_pd_en") => {
         true

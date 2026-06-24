@@ -905,6 +905,7 @@ impl Chip {
                     "i2c_master_has_arbitration_en",
                     "i2c_master_has_tx_fifo_watermark",
                     "i2c_master_bus_timeout_is_exponential",
+                    "i2c_master_force_out_inverted",
                     "i2c_master_has_pd_en",
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
@@ -1077,6 +1078,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
                     "cargo:rustc-cfg=i2c_master_has_tx_fifo_watermark",
                     "cargo:rustc-cfg=i2c_master_bus_timeout_is_exponential",
+                    "cargo:rustc-cfg=i2c_master_force_out_inverted",
                     "cargo:rustc-cfg=i2c_master_has_pd_en",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
@@ -1393,6 +1395,7 @@ impl Chip {
                     "i2c_master_has_arbitration_en",
                     "i2c_master_has_tx_fifo_watermark",
                     "i2c_master_bus_timeout_is_exponential",
+                    "i2c_master_force_out_inverted",
                     "i2c_master_has_pd_en",
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
@@ -1624,6 +1627,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
                     "cargo:rustc-cfg=i2c_master_has_tx_fifo_watermark",
                     "cargo:rustc-cfg=i2c_master_bus_timeout_is_exponential",
+                    "cargo:rustc-cfg=i2c_master_force_out_inverted",
                     "cargo:rustc-cfg=i2c_master_has_pd_en",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
@@ -5308,6 +5312,7 @@ impl Chip {
                     "i2c_master_has_bus_timeout_enable",
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_has_arbitration_en",
+                    "i2c_master_force_out_inverted",
                     "i2c_master_has_pd_en",
                     "i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
                     "i2c_master_i2c0_data_register_ahb_address_is_set",
@@ -5545,6 +5550,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
+                    "cargo:rustc-cfg=i2c_master_force_out_inverted",
                     "cargo:rustc-cfg=i2c_master_has_pd_en",
                     "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
                     "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address_is_set",
@@ -6009,6 +6015,7 @@ impl Chip {
                     "i2c_master_has_arbitration_en",
                     "i2c_master_has_tx_fifo_watermark",
                     "i2c_master_bus_timeout_is_exponential",
+                    "i2c_master_force_out_inverted",
                     "i2c_master_has_pd_en",
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
@@ -6285,6 +6292,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
                     "cargo:rustc-cfg=i2c_master_has_tx_fifo_watermark",
                     "cargo:rustc-cfg=i2c_master_bus_timeout_is_exponential",
+                    "cargo:rustc-cfg=i2c_master_force_out_inverted",
                     "cargo:rustc-cfg=i2c_master_has_pd_en",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
@@ -6850,6 +6858,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_arbitration_en)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_tx_fifo_watermark)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_bus_timeout_is_exponential)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_force_out_inverted)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_pd_en)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_csr_pc)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_osc_slow_clk)");
@@ -6951,7 +6960,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(ecc_has_curve_p384)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
-    println!("cargo:rustc-check-cfg=cfg(i2c_master_force_out_inverted)");
     println!("cargo:rustc-check-cfg=cfg(i2s_clock_configured_by_pcr)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");

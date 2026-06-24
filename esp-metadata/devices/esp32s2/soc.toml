@@ -460,6 +460,7 @@ has_bus_timeout_enable = true
 max_bus_timeout = 0xFFFFFF
 separate_filter_config_registers = true
 has_arbitration_en = true
+force_out_inverted = true
 has_pd_en = true
 i2c0_data_register_ahb_address = 0x6001301c
 
