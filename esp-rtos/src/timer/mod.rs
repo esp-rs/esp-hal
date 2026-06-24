@@ -123,7 +123,7 @@ impl TimeDriver {
         }
     }
 
-    #[cfg(sleep_auto_light_sleep)]
+    #[cfg(sleep_light_sleep)]
     pub(crate) fn next_wakeup(&self) -> u64 {
         self.timer_queue.next_wakeup()
     }
