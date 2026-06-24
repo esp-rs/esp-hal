@@ -4,9 +4,6 @@
 //!
 //! Driver for the SDMMC/SDIO host controller (`SDHOST`). The controller exposes
 //! up to two independent card slots that share a single transfer engine.
-//!
-//! This module is under active development. ESP32-S3 is the current bring-up
-//! target; ESP32 and ESP32-P4 support is added in later milestones.
 
 use procmacros::BuilderLite;
 use sdio::{self as _, MmcError};
@@ -39,9 +36,6 @@ pub enum ClockSource {
     /// Crystal oscillator.
     #[cfg(not(esp32p4))]
     Xtal,
-    // /// APLL
-    // #[cfg(esp32p4)]
-    // Apll,
 }
 
 /// Clock input sampling phase used for high-speed tuning.
@@ -192,8 +186,6 @@ pub enum Error {
     NoCard,
     /// Buffer lies in a region the IDMAC cannot reach.
     BufferNotDmaCapable,
-    /// Buffer not aligned strictly enough for the cache line.
-    BufferAlignment,
     /// Operation not supported.
     Unsupported,
 }
@@ -202,10 +194,6 @@ pub enum Error {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// Requested card clock frequency is out of range.
-    UnsupportedFrequency,
-    /// Requested bus width exceeds the wired data lines.
-    UnsupportedBusWidth,
     /// Module-clock divider is outside `2..=16`.
     InvalidModuleDivider,
     /// The slot is already in use.
@@ -228,7 +216,7 @@ impl From<Error> for MmcError {
             | Error::DmaError
             | Error::ResponseError
             | Error::BufferNotDmaCapable => MmcError::Io,
-            Error::BufferAlignment | Error::HardwareLocked => MmcError::Other,
+            Error::HardwareLocked => MmcError::Other,
             Error::Unsupported => MmcError::Unsupported,
         }
     }
@@ -351,7 +339,7 @@ mod imp {
     /// Driver-owned descriptor ring in internal DMA-capable RAM.
     #[cfg_attr(soc_internal_memory_cached, repr(align(64)))]
     struct DescRing(UnsafeCell<[Desc; RING_LEN]>);
-    // Access is serialized by the single controller / per-slot mutex (issue 08).
+    // Access is serialized by the single controller / per-slot mutex.
     unsafe impl Sync for DescRing {}
 
     fn ring() -> &'static mut [Desc; RING_LEN] {
@@ -490,12 +478,6 @@ mod imp {
         }
     }
 
-    /// Mutable controller state shared with the interrupt handler.
-    ///
-    /// `engine_lock` serializes whole transactions over the single shared
-    /// transfer engine so a second slot cannot clobber
-    /// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
-    /// near-free) in the common single-slot case.
     /// Persistent controller/slot settings consulted on slot selection.
     ///
     /// Kept separate from [`Engine`] (which is reset between transfers) so the
@@ -535,6 +517,12 @@ mod imp {
         };
     }
 
+    /// Mutable controller state shared with the interrupt handler.
+    ///
+    /// `engine_lock` serializes whole transactions over the single shared
+    /// transfer engine so a second slot cannot clobber
+    /// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
+    /// near-free) in the common single-slot case.
     struct State {
         engine: NonReentrantMutex<Engine>,
         engine_lock: embassy_sync::mutex::Mutex<RawMutex, Bounce>,
@@ -930,8 +918,6 @@ mod imp {
                 data_pins: 0,
                 clk_connected: false,
                 cmd_connected: false,
-                cd_connected: false,
-                wp_connected: false,
                 _guard: PeripheralGuard::new(Peripheral::SdioHost),
                 power: None,
                 cd: None,
@@ -1101,8 +1087,6 @@ mod imp {
         data_pins: u8,
         clk_connected: bool,
         cmd_connected: bool,
-        cd_connected: bool,
-        wp_connected: bool,
         _guard: PeripheralGuard,
         power: Option<interconnect::OutputSignal<'d>>,
         cd: Option<interconnect::InputSignal<'d>>,
@@ -1160,7 +1144,6 @@ mod imp {
             pin.set_input_enable(true);
             slot_info(self.id).cd_in.unwrap().connect_to(&pin);
             self.cd = Some(pin);
-            self.cd_connected = true;
             self
         }
 
@@ -1171,7 +1154,6 @@ mod imp {
             pin.set_input_enable(true);
             slot_info(self.id).wp_in.unwrap().connect_to(&pin);
             self.wp = Some(pin);
-            self.wp_connected = true;
             self
         }
 
@@ -1188,7 +1170,7 @@ mod imp {
         /// Returns `true` if a card is detected, or if no card-detect pin is
         /// wired (assume present).
         pub fn is_card_present(&self) -> bool {
-            if !self.cd_connected {
+            if self.cd.is_none() {
                 return true;
             }
             (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << self.id.index())) == 0
@@ -1198,7 +1180,7 @@ mod imp {
         /// if no write-protect pin is wired. Polarity follows
         /// [`SlotConfig::with_wp_active_high`].
         pub fn is_write_protected(&self) -> bool {
-            if !self.wp_connected {
+            if self.wp.is_none() {
                 return false;
             }
             let level = (SDHOST::regs().wrtprt().read().write_protect().bits()
@@ -1386,8 +1368,6 @@ mod imp {
                 data_pins: self.data_pins,
                 clk_connected: self.clk_connected,
                 cmd_connected: self.cmd_connected,
-                cd_connected: self.cd_connected,
-                wp_connected: self.wp_connected,
                 _guard: self._guard,
                 power: self.power,
                 cd: self.cd,
@@ -1413,8 +1393,6 @@ mod imp {
                 data_pins: self.data_pins,
                 clk_connected: self.clk_connected,
                 cmd_connected: self.cmd_connected,
-                cd_connected: self.cd_connected,
-                wp_connected: self.wp_connected,
                 _guard: self._guard,
                 power: self.power,
                 cd: self.cd,
