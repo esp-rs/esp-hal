@@ -359,10 +359,10 @@ macro_rules! property {
         stringify!(384)
     };
     ("sleep.light_sleep") => {
-        false
+        true
     };
     ("sleep.deep_sleep") => {
-        false
+        true
     };
     ("soc.cpu_has_branch_predictor") => {
         true
@@ -438,6 +438,15 @@ macro_rules! property {
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
+    };
+    ("timergroup.rc_fast_calibration_divider_min_rev") => {
+        0
+    };
+    ("timergroup.rc_fast_calibration_divider") => {
+        32
+    };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        false
     };
     ("uart.ram_size") => {
         128

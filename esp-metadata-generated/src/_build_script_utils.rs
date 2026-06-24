@@ -1889,6 +1889,12 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
+                    "pm_support_wifi_wakeup",
+                    "pm_support_beacon_wakeup",
+                    "pm_support_bt_wakeup",
+                    "gpio_support_deepsleep_wakeup",
+                    "uart_support_wakeup_int",
+                    "pm_support_ext1_wakeup",
                     "adc_driver_supported",
                     "aes_driver_supported",
                     "assist_debug_driver_supported",
@@ -1912,6 +1918,7 @@ impl Chip {
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
                     "sha_driver_supported",
+                    "sleep_driver_supported",
                     "soc_driver_supported",
                     "spi_master_driver_supported",
                     "spi_slave_driver_supported",
@@ -2023,6 +2030,8 @@ impl Chip {
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
+                    "sleep_light_sleep",
+                    "sleep_deep_sleep",
                     "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
@@ -2068,6 +2077,7 @@ impl Chip {
                     "spi_master_has_clk_pre_div",
                     "spi_master_dma_can_access_flash",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_rc_fast_calibration_divider",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_version=\"2\"",
@@ -2157,6 +2167,12 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
+                    "cargo:rustc-cfg=pm_support_wifi_wakeup",
+                    "cargo:rustc-cfg=pm_support_beacon_wakeup",
+                    "cargo:rustc-cfg=pm_support_bt_wakeup",
+                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
+                    "cargo:rustc-cfg=uart_support_wakeup_int",
+                    "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=aes_driver_supported",
                     "cargo:rustc-cfg=assist_debug_driver_supported",
@@ -2180,6 +2196,7 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
+                    "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
                     "cargo:rustc-cfg=spi_slave_driver_supported",
@@ -2291,6 +2308,8 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=sleep_light_sleep",
+                    "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
@@ -2336,6 +2355,7 @@ impl Chip {
                     "cargo:rustc-cfg=spi_master_has_clk_pre_div",
                     "cargo:rustc-cfg=spi_master_dma_can_access_flash",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_version=\"2\"",
@@ -6857,6 +6877,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_pvt_monitor)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
+    println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
@@ -6894,6 +6915,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parl_io_tx_clock)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_dma_can_access_flash)");
+    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_5g)");
@@ -6907,7 +6929,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
     println!("cargo:rustc-check-cfg=cfg(lp_core)");
-    println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
@@ -6920,7 +6941,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_ls_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
-    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32c61)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");

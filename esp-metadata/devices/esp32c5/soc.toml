@@ -20,6 +20,14 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_beacon_wakeup",
+    "pm_support_bt_wakeup",
+    "gpio_support_deepsleep_wakeup",
+    "uart_support_wakeup_int",
+    "pm_support_ext1_wakeup",
 ]
 
 [device.soc]
@@ -483,6 +491,7 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
+rc_fast_calibration = { divider = 32, min_rev = 0 }
 
 [device.uart]
 support_status = "supported"
@@ -575,7 +584,9 @@ support_status = { status = "not_supported", issue = 5161 }
 support_status = { status = "not_supported", issue = 5154 }
 
 [device.sleep]
-support_status = { status = "not_supported", issue = 5165 }
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
 
 [device.etm]
 support_status = { status = "not_supported", issue = 5167 }
