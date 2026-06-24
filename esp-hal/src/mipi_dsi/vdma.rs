@@ -52,6 +52,7 @@ const LLI_VALID: u32 = 1 << 31;
 /// `static mut`) and all CPU writes go straight to memory without being
 /// coalesced or reordered by the compiler.  The caller is still responsible
 /// for cache-line flushes before arming the DMA channel.
+#[repr(C)]
 pub(super) struct VdmaLinkItem {
     sar_lo: VolatileCell<u32>,    // 0x00 – source address (low 32 bits)
     sar_hi: VolatileCell<u32>,    // 0x04 – source address (high 32 bits, always 0)

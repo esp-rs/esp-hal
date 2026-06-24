@@ -74,6 +74,7 @@ pub enum OwnedBy {
 ///
 /// Layout matches the Synopsys DesignWare GMAC databook for enhanced mode.
 /// Words 4–7 are reserved for hardware use (TX timestamp, etc.).
+#[repr(C)]
 pub struct TDes {
     pub(super) tdes0: VolatileCell<u32>,
     pub(super) tdes1: VolatileCell<u32>,
@@ -141,6 +142,7 @@ impl TDes {
 /// RX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`).
 ///
 /// Words 4–7 are reserved for hardware use (RX timestamp, VLAN, etc.).
+#[repr(C)]
 pub struct RDes {
     pub(super) rdes0: VolatileCell<u32>,
     pub(super) rdes1: VolatileCell<u32>,
