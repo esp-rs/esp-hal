@@ -2807,6 +2807,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting TIMG_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::acquire();
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::OscSlowClk => request_osc_slow_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
@@ -2820,6 +2821,7 @@ macro_rules! define_clock_tree_types {
             trace!("Releasing TIMG_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::release();
                 enable_timg_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::OscSlowClk => release_osc_slow_clk(clocks),

@@ -71,7 +71,7 @@ system_clocks = { clock_tree = [
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
     # Modelling this separately makes the HAL code simpler.
-    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
         { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
