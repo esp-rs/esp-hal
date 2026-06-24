@@ -56,7 +56,7 @@ system_clocks = { clock_tree = [
     ] },
 
     # TIMG0-only?
-    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [
+    { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "MPLL_CLK",        outputs = "MPLL_CLK" },
         { name = "SPLL_CLK",        outputs = "SPLL_CLK" },
         { name = "CPLL_CLK",        outputs = "CPLL_CLK" },
