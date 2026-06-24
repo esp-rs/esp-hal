@@ -114,10 +114,15 @@ pub(super) fn suspend(info: &Info, en: bool) {
         w.sw_flow_con_en().bit(en);
         w.force_xoff().bit(en)
     });
-    info.regs()
-        .swfc_conf0()
-        .modify(|_, w| w.force_xon().bit(false));
     sync_regs(info.regs());
+
+    if !en {
+        // If we are resuming, we are toggling the XON bit, so clear it.
+        info.regs()
+            .swfc_conf0()
+            .modify(|_, w| w.force_xon().bit(false));
+        sync_regs(info.regs());
+    }
 }
 
 #[cfg(sleep_driver_supported)]
