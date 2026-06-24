@@ -76,7 +76,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             unsafe {
                 let mut rtc = Rtc::new(LPWR::steal());
                 let timer =
-                    TimerWakeupSource::new(core::time::Duration::from_micros(sleep_duration));
+                    TimerWakeupSource::new(esp_hal::time::Duration::from_micros(sleep_duration));
                 let gpio = GpioWakeupSource::new();
                 rtc.sleep_light(&[&timer, &gpio]);
             }
