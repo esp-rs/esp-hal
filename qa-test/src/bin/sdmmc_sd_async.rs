@@ -5,16 +5,16 @@
 //! non-destructive create/update/read/delete cycle on a test-owned file that is
 //! assumed not to exist. No raw blocks are overwritten.
 //!
-//! Slot 1 pins:
+//! Pins:
 //!
-//! | Signal | ESP32-S3 (1-bit, GPIO matrix) | ESP32 (4-bit, fixed IO_MUX) |
-//! | ------ | ----------------------------- | --------------------------- |
-//! | CLK    | GPIO39                        | GPIO14                      |
-//! | CMD    | GPIO38                        | GPIO15                      |
-//! | DAT0   | GPIO40                        | GPIO2                       |
-//! | DAT1   | -                             | GPIO4                       |
-//! | DAT2   | -                             | GPIO12                      |
-//! | DAT3   | -                             | GPIO13                      |
+//! | Signal | ESP32-S3 (1-bit) | ESP32 (4-bit) | ESP32-P4 (4-bit, slot 0)
+//! | ------ | ---------------  | ------------- | ------------------------
+//! | CLK    | GPIO39           | GPIO14        | GPIO43
+//! | CMD    | GPIO38           | GPIO15        | GPIO44
+//! | DAT0   | GPIO40           | GPIO2         | GPIO39
+//! | DAT1   | -                | GPIO4         | GPIO40
+//! | DAT2   | -                | GPIO12        | GPIO41
+//! | DAT3   | -                | GPIO13        | GPIO42
 
 //% CHIP_FILTER: sdmmc_driver_supported
 
@@ -62,24 +62,37 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let controller = SdHostController::new(peripherals.SDHOST, Config::default()).unwrap();
-    #[cfg(feature = "esp32s3")]
-    let slot_config = SlotConfig::default().with_input_delay_phase(INPUT_DELAY_PHASE);
-    #[cfg(not(feature = "esp32s3"))]
     let slot_config = SlotConfig::default();
-    let slot = controller.slot::<1>(slot_config).unwrap();
-    #[cfg(feature = "esp32s3")]
-    let slot = slot
-        .with_clk(peripherals.GPIO39)
-        .with_cmd(peripherals.GPIO38)
-        .with_data0(peripherals.GPIO40);
-    #[cfg(feature = "esp32")]
-    let slot = slot
-        .with_clk(peripherals.GPIO14)
-        .with_cmd(peripherals.GPIO15)
-        .with_data0(peripherals.GPIO2)
-        .with_data1(peripherals.GPIO4)
-        .with_data2(peripherals.GPIO12)
-        .with_data3(peripherals.GPIO13);
+    cfg_select! {
+        feature = "esp32s3" => {
+            let slot = controller.slot::<1>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE)).unwrap();
+            let slot = slot
+                .with_clk(peripherals.GPIO39)
+                .with_cmd(peripherals.GPIO38)
+                .with_data0(peripherals.GPIO40);
+        }
+        feature = "esp32" => {
+            let slot = controller.slot::<1>(slot_config).unwrap();
+            let slot = slot
+                .with_clk(peripherals.GPIO14)
+                .with_cmd(peripherals.GPIO15)
+                .with_data0(peripherals.GPIO2)
+                .with_data1(peripherals.GPIO4)
+                .with_data2(peripherals.GPIO12)
+                .with_data3(peripherals.GPIO13);
+        }
+        feature = "esp32p4" => {
+            let slot = controller.slot::<0>(slot_config).unwrap();
+            let slot = slot
+                .with_clk(peripherals.GPIO43)
+                .with_cmd(peripherals.GPIO44)
+                .with_data0(peripherals.GPIO39)
+                .with_data1(peripherals.GPIO40)
+                .with_data2(peripherals.GPIO41)
+                .with_data3(peripherals.GPIO42);
+        }
+    }
+
     let slot = slot.into_async();
 
     let mut card: BlockDevice<Card, _, _, 512> = BlockDevice::new_sd_card(slot, CARD_HZ, Delay)
