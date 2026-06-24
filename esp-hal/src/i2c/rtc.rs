@@ -20,8 +20,7 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::i2c::rtc::Config;
-//! use esp_hal::time::Duration;
+//! use esp_hal::{i2c::rtc::Config, time::Duration};
 //!
 //! let config = Config::default().with_timeout(Duration::from_micros(100));
 //! # {after_snippet}
@@ -75,9 +74,9 @@
 //! ```
 
 use crate::{
-    time::Duration,
     gpio::{InputPin, OutputPin, RtcFunction, RtcPin},
     peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
+    time::Duration,
 };
 
 /// Trait representing the RTC_I2C SDA pin.
@@ -242,8 +241,10 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
-    /// use esp_hal::time::Duration;
+    /// use esp_hal::{
+    ///     i2c::rtc::{Config, I2c},
+    ///     time::Duration,
+    /// };
     /// let mut i2c = I2c::new(
     ///     peripherals.RTC_I2C,
     ///     Config::default(),
