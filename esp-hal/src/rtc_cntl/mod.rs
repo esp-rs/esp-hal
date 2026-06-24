@@ -224,32 +224,45 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
+        // Load counter value
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
+                // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
+                // Without this, this function may return a stale value
+                for _ in 0..10 {
+                    rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                    crate::rom::ets_delay_us(1);
+                }
+            }
+            _ => {
+                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+            }
+        }
+
+        // Read counter value
         cfg_select! {
             esp32 => {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
                 }
 
+                rtc_cntl.int_clr().write(|w| w.time_valid().clear_bit_by_one());
+
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
             }
-            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
-                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
-
+            any(esp32s2, esp32s3, esp32c2, esp32c3) => {
+                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
+                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
+            }
+            _ => {
                 let h = rtc_cntl
                     .main_buf0_high()
                     .read()
                     .main_timer_buf0_high()
                     .bits();
                 let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
-            }
-            _ => {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
-
-                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
-                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
             }
         }
 
@@ -403,9 +416,23 @@ impl<'d> Rtc<'d> {
 
         config.apply();
 
+        // Latch the systimer value *before* sleeping. The systimer keeps running during
+        // the sleep enter/exit sequences, so we must not advance from the post-wake
+        // value (that would count the enter/exit time twice). Instead we set an absolute
+        // target of `before + slept`, measured by the always-running LP timer.
+        let before_ticks = crate::time::implem::raw_counter();
+        let before = self.time_since_boot_raw();
+
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
         config.finish_sleep();
+
+        let after = self.time_since_boot_raw();
+
+        let slept_us = crate::clock::rtc_ticks_to_us(after.wrapping_sub(before));
+        let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
+
+        unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
     }
 
     pub(crate) const RTC_DISABLE_ROM_LOG: u32 = 1;

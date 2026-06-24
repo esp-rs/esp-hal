@@ -461,5 +461,16 @@ pub(crate) fn now() -> u64 {
     Instant::now().duration_since_epoch().as_micros()
 }
 
+/// Rearms the alarm timer.
+///
+/// This function may be necessary to call after waking up from light sleep.
+pub fn rearm_alarm() {
+    SCHEDULER.with(|s| {
+        if let Some(time_driver) = s.time_driver.as_mut() {
+            time_driver.rearm(now());
+        }
+    });
+}
+
 #[cfg(feature = "embassy")]
 embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::EmbassyTimeDriver = crate::timer::embassy::EmbassyTimeDriver);

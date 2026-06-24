@@ -700,3 +700,33 @@ mod twai {
         }
     }
 }
+
+#[cfg(lp_timer_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod lp_timekeeping {
+    use esp_hal::{
+        rtc_cntl::Rtc,
+        time::{Duration, Instant},
+    };
+
+    #[init]
+    fn init() -> Rtc<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        Rtc::new(peripherals.LPWR)
+    }
+
+    #[test]
+    fn returns_correct_timestamp(rtc: Rtc<'static>) {
+        let start_rtc = rtc.time_since_power_up();
+        let start_instant = Instant::now();
+        while start_instant.elapsed() < Duration::from_millis(10) {}
+
+        let rtc_duration = rtc.time_since_power_up() - start_rtc;
+        assert!(
+            rtc_duration > Duration::from_millis(5),
+            "RTC only advanced by {:?}",
+            rtc_duration
+        );
+    }
+}

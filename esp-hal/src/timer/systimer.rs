@@ -167,7 +167,7 @@ impl<'d> SystemTimer<'d> {
     }
 
     #[inline]
-    fn us_to_ticks(us: u64) -> u64 {
+    pub(crate) fn us_to_ticks(us: u64) -> u64 {
         // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
         // is called once and only once during startup.
         let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
