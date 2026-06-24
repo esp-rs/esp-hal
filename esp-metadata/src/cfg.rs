@@ -655,8 +655,6 @@ driver_configs![
             light_sleep: bool,
             #[serde(default)]
             deep_sleep: bool,
-            #[serde(default)]
-            auto_light_sleep: bool,
         }
     },
     SocProperties {
