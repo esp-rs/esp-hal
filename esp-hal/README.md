@@ -103,7 +103,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |
-| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -150,7 +150,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5421]: https://github.com/esp-rs/esp-hal/issues/5421
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
-[5424]: https://github.com/esp-rs/esp-hal/issues/5424
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 <!-- end chip support table -->
 

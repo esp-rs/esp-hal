@@ -14,23 +14,22 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
-// ESP32-C5 currently only supports timer wakeup, which does not use `RefCell`.
-#[cfg(not(esp32c5))]
+// ESP32-C5/C61 currently only support timer wakeup, which does not use `RefCell`.
+#[cfg(not(any(esp32c5, esp32c61)))]
 use core::cell::RefCell;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2, esp32h2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
-use crate::rtc_cntl::Rtc;
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c5, esp32c6, esp32c2, esp32h2))]
-use crate::time::Duration;
+use crate::{rtc_cntl::Rtc, time::Duration};
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c5, path = "esp32c5.rs")]
+#[cfg_attr(esp32c61, path = "esp32c61.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
@@ -75,13 +74,11 @@ pub enum WakeupLevel {
 /// # {after_snippet}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c5, esp32c6, esp32c2, esp32h2))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c5, esp32c6, esp32c2, esp32h2))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {
