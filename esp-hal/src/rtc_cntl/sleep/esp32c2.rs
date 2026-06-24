@@ -397,6 +397,14 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+
+        // This is the light-sleep config. The main XTAL is powered down in sleep
+        // (`xtal_fpu` stays false), so the analog regulator/bias must use the
+        // same XTAL-down settings that `deep()` applies "because of xtal_fpu".
+        cfg.set_rtc_regulator_fpu(true);
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
         cfg
     }
 }
@@ -439,12 +447,9 @@ fn rtc_sleep_pu(val: bool) {
         .modify(|_, w| w.lslp_mem_force_pu().bit(val));
 
     APB_CTRL::regs().front_end_mem_pd().modify(|_r, w| {
-        w.dc_mem_force_pu()
-            .bit(val)
-            .pbus_mem_force_pu()
-            .bit(val)
-            .agc_mem_force_pu()
-            .bit(val)
+        w.dc_mem_force_pu().bit(val);
+        w.pbus_mem_force_pu().bit(val);
+        w.agc_mem_force_pu().bit(val)
     });
 
     BB::regs()
