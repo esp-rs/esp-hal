@@ -262,7 +262,7 @@ mod imp {
         SlotId,
     };
     #[cfg(sdmmc_has_gpio_matrix)]
-    use crate::gpio::{InputSignal, OutputSignal, PinGuard, Pull, interconnect::PeripheralInput};
+    use crate::gpio::{PinGuard, Pull, interconnect::PeripheralInput};
     use crate::{
         Async,
         Blocking,
@@ -270,7 +270,9 @@ mod imp {
         asynch::AtomicWaker,
         dma::aligned::DmaAlignedMut,
         gpio::{
+            InputSignal,
             OutputConfig,
+            OutputSignal,
             interconnect::{self, PeripheralOutput},
         },
         peripherals::{Interrupt, SDHOST},
@@ -613,82 +615,71 @@ mod imp {
         unsafe { &mut *slot_state(id).pins.get() }
     }
 
-    /// Immutable per-slot routing: SDIO card-interrupt bit plus, on GPIO-matrix
-    /// chips, the input/output signals the slot's pins connect to.
+    /// Immutable per-slot routing: SDIO card-interrupt bit plus the input/output
+    /// signals the slot's pins connect to through the GPIO matrix.
+    ///
+    /// Signals a slot does not route through the matrix (IO_MUX-routed bus
+    /// signals, or chips without a GPIO matrix at all) are `None`/empty, so one
+    /// table shape serves every chip. On IO_MUX-only chips none of the signal
+    /// fields are read, hence the conditional `allow(dead_code)`.
+    ///
+    /// Populated from chip metadata by the `for_each_sdmmc!` invocation below.
+    #[cfg_attr(not(sdmmc_has_gpio_matrix), allow(dead_code))]
     struct SlotInfo {
         io_event: u32,
-        #[cfg(sdmmc_has_gpio_matrix)]
-        clk_out: OutputSignal,
-        #[cfg(sdmmc_has_gpio_matrix)]
-        cmd_in: InputSignal,
-        #[cfg(sdmmc_has_gpio_matrix)]
-        cmd_out: OutputSignal,
-        #[cfg(sdmmc_has_gpio_matrix)]
-        data_in: [InputSignal; 4],
-        #[cfg(sdmmc_has_gpio_matrix)]
-        data_out: [OutputSignal; 4],
-        #[cfg(sdmmc_has_gpio_matrix)]
-        cd_in: InputSignal,
-        #[cfg(sdmmc_has_gpio_matrix)]
-        wp_in: InputSignal,
+        clk_out: Option<OutputSignal>,
+        cmd_in: Option<InputSignal>,
+        cmd_out: Option<OutputSignal>,
+        data_in: &'static [InputSignal],
+        data_out: &'static [OutputSignal],
+        cd_in: Option<InputSignal>,
+        wp_in: Option<InputSignal>,
     }
 
-    static SLOT_INFO: [SlotInfo; 2] = [
-        SlotInfo {
-            io_event: EVT_IO_SLOT0,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            clk_out: OutputSignal::SDHOST_CCLK_OUT_1,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cmd_in: InputSignal::SDHOST_CCMD_IN_1,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cmd_out: OutputSignal::SDHOST_CCMD_OUT_1,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            data_in: [
-                InputSignal::SDHOST_CDATA_IN_10,
-                InputSignal::SDHOST_CDATA_IN_11,
-                InputSignal::SDHOST_CDATA_IN_12,
-                InputSignal::SDHOST_CDATA_IN_13,
-            ],
-            #[cfg(sdmmc_has_gpio_matrix)]
-            data_out: [
-                OutputSignal::SDHOST_CDATA_OUT_10,
-                OutputSignal::SDHOST_CDATA_OUT_11,
-                OutputSignal::SDHOST_CDATA_OUT_12,
-                OutputSignal::SDHOST_CDATA_OUT_13,
-            ],
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cd_in: InputSignal::SDHOST_CARD_DETECT_N_1,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            wp_in: InputSignal::SDHOST_CARD_WRITE_PRT_1,
-        },
-        SlotInfo {
-            io_event: EVT_IO_SLOT1,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            clk_out: OutputSignal::SDHOST_CCLK_OUT_2,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cmd_in: InputSignal::SDHOST_CCMD_IN_2,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cmd_out: OutputSignal::SDHOST_CCMD_OUT_2,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            data_in: [
-                InputSignal::SDHOST_CDATA_IN_20,
-                InputSignal::SDHOST_CDATA_IN_21,
-                InputSignal::SDHOST_CDATA_IN_22,
-                InputSignal::SDHOST_CDATA_IN_23,
-            ],
-            #[cfg(sdmmc_has_gpio_matrix)]
-            data_out: [
-                OutputSignal::SDHOST_CDATA_OUT_20,
-                OutputSignal::SDHOST_CDATA_OUT_21,
-                OutputSignal::SDHOST_CDATA_OUT_22,
-                OutputSignal::SDHOST_CDATA_OUT_23,
-            ],
-            #[cfg(sdmmc_has_gpio_matrix)]
-            cd_in: InputSignal::SDHOST_CARD_DETECT_N_2,
-            #[cfg(sdmmc_has_gpio_matrix)]
-            wp_in: InputSignal::SDHOST_CARD_WRITE_PRT_2,
-        },
-    ];
+    // Wrap an optional metadata signal name in `Some(..)`, or yield `None` when
+    // the slot does not route that signal through the GPIO matrix.
+    macro_rules! opt_in {
+        () => {
+            None
+        };
+        ($signal:ident) => {
+            Some(InputSignal::$signal)
+        };
+    }
+    macro_rules! opt_out {
+        () => {
+            None
+        };
+        ($signal:ident) => {
+            Some(OutputSignal::$signal)
+        };
+    }
+
+    // The SDIO card-interrupt bit is positional (`rintsts` bit `16 + slot`); the
+    // signal names come straight from chip metadata.
+    for_each_sdmmc! {
+        (all $( (
+            $slot:ident, $idx:literal, $iomux:literal,
+            [$($clk:ident)?], [$($cmd_in:ident)?], [$($cmd_out:ident)?],
+            [$($data_in:ident),*], [$($data_out:ident),*],
+            [$($cd:ident)?], [$($wp:ident)?], [$($card_int:ident)?],
+            [$($data_strobe:ident)?], [$($rst:ident)?]
+        ) ),*) => {
+            static SLOT_INFO: [SlotInfo; 2] = [ $(
+                SlotInfo {
+                    io_event: 1u32 << (16 + $idx),
+                    clk_out: opt_out!($($clk)?),
+                    cmd_in: opt_in!($($cmd_in)?),
+                    cmd_out: opt_out!($($cmd_out)?),
+                    data_in: &[ $(InputSignal::$data_in),* ],
+                    data_out: &[ $(OutputSignal::$data_out),* ],
+                    cd_in: opt_in!($($cd)?),
+                    wp_in: opt_in!($($wp)?),
+                }
+            ),* ];
+        };
+    }
+
 
     /// Static routing data for a slot.
     fn slot_info(id: SlotId) -> &'static SlotInfo {
@@ -923,8 +914,10 @@ mod imp {
             let pin = self.into();
             pin.apply_output_config(&OutputConfig::default());
             pin.set_output_enable(true);
-            slot_pins(slot_id(S)).clk =
-                interconnect::OutputSignal::connect_with_guard(pin, slot_info(slot_id(S)).clk_out);
+            slot_pins(slot_id(S)).clk = interconnect::OutputSignal::connect_with_guard(
+                pin,
+                slot_info(slot_id(S)).clk_out.unwrap(),
+            );
         }
     }
 
@@ -933,8 +926,8 @@ mod imp {
         fn configure(self) {
             slot_pins(slot_id(S)).cmd = connect_bidir(
                 self.into(),
-                slot_info(slot_id(S)).cmd_in,
-                slot_info(slot_id(S)).cmd_out,
+                slot_info(slot_id(S)).cmd_in.unwrap(),
+                slot_info(slot_id(S)).cmd_out.unwrap(),
             );
         }
     }
@@ -1072,7 +1065,7 @@ mod imp {
         pub fn with_card_detect(mut self, cd: impl PeripheralInput<'d>) -> Self {
             let pin = cd.into();
             pin.set_input_enable(true);
-            slot_info(self.id).cd_in.connect_to(&pin);
+            slot_info(self.id).cd_in.unwrap().connect_to(&pin);
             self.cd = Some(pin);
             self.cd_connected = true;
             self
@@ -1083,7 +1076,7 @@ mod imp {
         pub fn with_write_protect(mut self, wp: impl PeripheralInput<'d>) -> Self {
             let pin = wp.into();
             pin.set_input_enable(true);
-            slot_info(self.id).wp_in.connect_to(&pin);
+            slot_info(self.id).wp_in.unwrap().connect_to(&pin);
             self.wp = Some(pin);
             self.wp_connected = true;
             self

@@ -726,6 +726,12 @@ has_iomux = true
 has_gpio_matrix = false
 psram_dma = false
 uhs = false
+# Both slots are routed exclusively through the IO_MUX (fixed HS1_*/HS2_* pads);
+# there are no SDMMC signals on the GPIO matrix, so no signal names are listed.
+slot_config = [
+    { iomux = true },
+    { iomux = true },
+]
 [device.sd_slave]
 support_status = "not_supported"
 [device.touch]
