@@ -117,9 +117,10 @@ pub(super) fn change_flow_control(
             xon_threshold,
             xoff_threshold,
         } => {
-            info.regs()
-                .flow_conf()
-                .modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+            info.regs().flow_conf().modify(|_, w| {
+                w.xonoff_del().set_bit();
+                w.sw_flow_con_en().set_bit()
+            });
 
             cfg_select! {
                 esp32 => {
@@ -164,6 +165,24 @@ pub(super) fn change_flow_control(
     }
 
     sync_regs(info.regs());
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn suspend(_info: &Info, _en: bool) {
+    // We drain the entire FIFO, so we have nothing to disable.
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn wait_for_suspended(info: &Info) {
+    // Wait for FIFO to drain completely.
+    while info.regs().status().read().txfifo_cnt().bits() > 0 {}
+
+    let fsm_status = cfg_select! {
+        esp32 => info.regs().status(),
+        _ => info.regs().fsm_status(),
+    };
+
+    while fsm_status.read().st_utx_out().bits() != 0 {}
 }
 
 fn configure_rts_flow_ctrl(info: &Info, enable: bool, threshold: Option<u8>) {

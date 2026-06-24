@@ -749,6 +749,17 @@ impl Info {
 
         Ok(to_read)
     }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn suspend_for_sleep(&self) {
+        version::suspend(self, true);
+        version::wait_for_suspended(self);
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn resume_from_sleep(&self) {
+        version::suspend(self, false);
+    }
 }
 
 impl PartialEq for Info {

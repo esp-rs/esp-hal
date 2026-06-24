@@ -85,6 +85,7 @@ use crate::{
     pac::uart0::RegisterBlock,
     private::DropGuard,
     ram,
+    rtc_cntl::WakeLock,
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
@@ -502,6 +503,7 @@ where
                 phantom: PhantomData,
                 guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
+                _wake_lock: WakeLock::new(),
             },
             tx: UartTx {
                 uart: self.uart,
@@ -558,6 +560,8 @@ pub struct UartRx<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
+    // Receiving data continuously, the peripheral can't let the system to sleep.
+    _wake_lock: WakeLock,
 }
 
 /// A configuration error.
@@ -1021,6 +1025,7 @@ impl<'d> UartRx<'d, Blocking> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
+            _wake_lock: self._wake_lock,
         }
     }
 }
@@ -1042,6 +1047,7 @@ impl<'d> UartRx<'d, Async> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
+            _wake_lock: self._wake_lock,
         }
     }
 
