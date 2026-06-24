@@ -17,59 +17,12 @@
 //!
 //! On ESP32 (no write-back cache) a compiler fence alone is sufficient.
 
-use core::{
-    mem::{align_of, offset_of, size_of},
-    sync::atomic::{Ordering, fence},
-};
+use core::sync::atomic::{Ordering, fence};
 
-use crate::reg_access::VolatileCell;
-
-// ── Cache helpers ────────────────────────────────────────────────────────────
-//
-// On ESP32-P4 these call the ROM cache-maintenance functions to make CPU
-// writes visible to DMA (writeback) and to discard stale cached data before
-// the CPU reads DMA-written memory (invalidate).
-//
-// On all other targets (no write-back cache) they compile to nothing.
-
-#[inline(always)]
-unsafe fn cache_wb<T>(ptr: *const T) {
-    unsafe { cache_wb_buf(ptr.cast::<u8>(), size_of::<T>()) }
-}
-
-#[inline(always)]
-unsafe fn cache_inv<T>(ptr: *const T) {
-    unsafe { cache_inv_buf(ptr.cast::<u8>(), size_of::<T>()) }
-}
-
-#[inline(always)]
-unsafe fn cache_wb_buf(ptr: *const u8, size: usize) {
-    #[cfg(esp32p4)]
-    unsafe {
-        crate::soc::cache_writeback_addr(ptr as u32, size as u32);
-    }
-    #[cfg(not(esp32p4))]
-    let _ = (ptr, size);
-}
-
-#[inline(always)]
-unsafe fn cache_inv_buf(ptr: *const u8, size: usize) {
-    #[cfg(esp32p4)]
-    unsafe {
-        crate::soc::cache_invalidate_addr(ptr as u32, size as u32);
-    }
-    #[cfg(not(esp32p4))]
-    let _ = (ptr, size);
-}
+use crate::{dma::aligned::InternalMemory, reg_access::VolatileCell};
 
 /// Maximum frame size supported per DMA buffer (1518 + FCS + rounding).
-const DEFAULT_MAX_FRAME_SIZE: usize = 1524;
-pub const MAX_FRAME_SIZE: usize = if cfg!(esp32p4) {
-    // Must be cache line aligned
-    usize::next_multiple_of(DEFAULT_MAX_FRAME_SIZE, 64)
-} else {
-    DEFAULT_MAX_FRAME_SIZE
-};
+pub const MAX_FRAME_SIZE: usize = 1524;
 /// Minimum accepted RX frame length.
 pub const MIN_RX_FRAME_SIZE: usize = 14;
 
@@ -121,8 +74,6 @@ pub enum OwnedBy {
 ///
 /// Layout matches the Synopsys DesignWare GMAC databook for enhanced mode.
 /// Words 4–7 are reserved for hardware use (TX timestamp, etc.).
-#[cfg_attr(esp32p4, repr(C, align(64)))]
-#[cfg_attr(not(esp32p4), repr(C, align(4)))]
 pub struct TDes {
     pub(super) tdes0: VolatileCell<u32>,
     pub(super) tdes1: VolatileCell<u32>,
@@ -134,22 +85,6 @@ pub struct TDes {
     _tdes6: VolatileCell<u32>,
     _tdes7: VolatileCell<u32>,
 }
-
-// Verify size and field offsets at compile time.
-// On P4 the struct is padded to 64 bytes (one cache line).
-#[cfg(not(esp32p4))]
-const _: () = ::core::assert!(size_of::<TDes>() == 32);
-#[cfg(esp32p4)]
-const _: () = ::core::assert!(size_of::<TDes>() == 64);
-#[cfg(not(esp32p4))]
-const _: () = ::core::assert!(align_of::<TDes>() >= 4);
-#[cfg(esp32p4)]
-const _: () = ::core::assert!(align_of::<TDes>() >= 64);
-
-const _: () = ::core::assert!(offset_of!(TDes, tdes0) == 0);
-const _: () = ::core::assert!(offset_of!(TDes, tdes1) == 4);
-const _: () = ::core::assert!(offset_of!(TDes, buf_addr) == 8);
-const _: () = ::core::assert!(offset_of!(TDes, next_desc) == 12);
 
 impl TDes {
     /// Zero-initialized descriptor, suitable for `static` initializers.
@@ -176,7 +111,7 @@ impl TDes {
     }
 
     /// Sets the ownership bit.
-    pub fn set_owned_by(&self, owner: OwnedBy) {
+    pub fn set_owned_by(&mut self, owner: OwnedBy) {
         let v = self.tdes0.get();
         self.tdes0.set(match owner {
             OwnedBy::Cpu => v & !TDES0_OWN,
@@ -184,21 +119,21 @@ impl TDes {
         });
     }
 
-    fn set_chained(&self) {
+    fn set_chained(&mut self) {
         self.tdes0.set(self.tdes0.get() | TDES0_CHAINED);
     }
 
-    fn set_len_and_flags(&self, len: usize) {
+    fn set_len_and_flags(&mut self, len: usize) {
         self.tdes1.set(len as u32 & RDES1_BUF1_SIZE_MASK);
         self.tdes0
             .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC);
     }
 
-    fn set_buffer_addr(&self, addr: *const u8) {
+    fn set_buffer_addr(&mut self, addr: *const u8) {
         self.buf_addr.set(addr as u32);
     }
 
-    fn set_next_desc(&self, addr: *const TDes) {
+    fn set_next_desc(&mut self, addr: *const TDes) {
         self.next_desc.set(addr as u32);
     }
 }
@@ -206,10 +141,6 @@ impl TDes {
 /// RX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`).
 ///
 /// Words 4–7 are reserved for hardware use (RX timestamp, VLAN, etc.).
-///
-/// On ESP32-P4 the alignment is raised to 64 bytes (one cache line).
-#[cfg_attr(esp32p4, repr(C, align(64)))]
-#[cfg_attr(not(esp32p4), repr(C, align(4)))]
 pub struct RDes {
     pub(super) rdes0: VolatileCell<u32>,
     pub(super) rdes1: VolatileCell<u32>,
@@ -220,15 +151,6 @@ pub struct RDes {
     _rdes6: VolatileCell<u32>,
     _rdes7: VolatileCell<u32>,
 }
-
-#[cfg(not(esp32p4))]
-const _: () = ::core::assert!(size_of::<RDes>() == 32);
-#[cfg(esp32p4)]
-const _: () = ::core::assert!(size_of::<RDes>() == 64);
-#[cfg(not(esp32p4))]
-const _: () = ::core::assert!(align_of::<RDes>() >= 4);
-#[cfg(esp32p4)]
-const _: () = ::core::assert!(align_of::<RDes>() >= 64);
 
 impl RDes {
     /// Zero-initialized descriptor, suitable for `static` initializers.
@@ -254,9 +176,13 @@ impl RDes {
         }
     }
 
-    fn set_owned_by(&self, owner: OwnedBy) {
+    fn set_rdes0(&mut self, value: u32) {
+        self.rdes0.set(value);
+    }
+
+    fn set_owned_by(&mut self, owner: OwnedBy) {
         let v = self.rdes0.get();
-        self.rdes0.set(match owner {
+        self.set_rdes0(match owner {
             OwnedBy::Cpu => v & !RDES0_OWN,
             OwnedBy::Dma => v | RDES0_OWN,
         });
@@ -271,7 +197,7 @@ impl RDes {
         ((self.rdes0.get() & RDES0_FL_MASK) >> RDES0_FL_SHIFT) as usize
     }
 
-    fn configure_buffer(&self, size: usize) {
+    fn configure_buffer(&mut self, size: usize) {
         self.rdes1.set(
             (self.rdes1.get() & !RDES1_BUF1_SIZE_MASK)
                 | (size as u32 & RDES1_BUF1_SIZE_MASK)
@@ -279,11 +205,11 @@ impl RDes {
         );
     }
 
-    fn set_buffer_addr(&self, addr: *const u8) {
+    fn set_buffer_addr(&mut self, addr: *const u8) {
         self.buf_addr.set(addr as u32);
     }
 
-    fn set_next_desc(&self, addr: *const RDes) {
+    fn set_next_desc(&mut self, addr: *const RDes) {
         self.next_desc.set(addr as u32);
     }
 }
@@ -295,10 +221,10 @@ impl RDes {
 /// `TX` is the number of transmit slots; `RX` is the number of receive slots.
 /// Pass a mutable reference to [`Ethernet::new`][super::Ethernet::new].
 pub struct EthernetDmaStorage<const RX: usize, const TX: usize> {
-    pub(super) rx_descs: [RDes; RX],
-    pub(super) tx_descs: [TDes; TX],
-    pub(super) rx_bufs: [[u8; MAX_FRAME_SIZE]; RX],
-    pub(super) tx_bufs: [[u8; MAX_FRAME_SIZE]; TX],
+    pub(super) rx_descs: [InternalMemory<RDes>; RX],
+    pub(super) tx_descs: [InternalMemory<TDes>; TX],
+    pub(super) rx_bufs: [InternalMemory<[u8; MAX_FRAME_SIZE]>; RX],
+    pub(super) tx_bufs: [InternalMemory<[u8; MAX_FRAME_SIZE]>; TX],
 }
 
 impl<const RX: usize, const TX: usize> Default for EthernetDmaStorage<RX, TX> {
@@ -311,10 +237,10 @@ impl<const RX: usize, const TX: usize> EthernetDmaStorage<RX, TX> {
     /// Creates a zero-initialized storage block, suitable for `static` placement.
     pub const fn new() -> Self {
         Self {
-            rx_descs: [const { RDes::new_zeroed() }; RX],
-            tx_descs: [const { TDes::new_zeroed() }; TX],
-            rx_bufs: [[0u8; MAX_FRAME_SIZE]; RX],
-            tx_bufs: [[0u8; MAX_FRAME_SIZE]; TX],
+            rx_descs: [const { InternalMemory::new(RDes::new_zeroed()) }; RX],
+            tx_descs: [const { InternalMemory::new(TDes::new_zeroed()) }; TX],
+            rx_bufs: [const { InternalMemory::new([0u8; MAX_FRAME_SIZE]) }; RX],
+            tx_bufs: [const { InternalMemory::new([0u8; MAX_FRAME_SIZE]) }; TX],
         }
     }
 }
@@ -328,14 +254,17 @@ unsafe impl<const RX: usize, const TX: usize> Sync for EthernetDmaStorage<RX, TX
 
 /// TX descriptor ring backed by references into `EthernetDmaStorage`.
 pub struct TDesRing<'a> {
-    descriptors: &'a mut [TDes],
-    buffers: &'a mut [[u8; MAX_FRAME_SIZE]],
+    descriptors: &'a mut [InternalMemory<TDes>],
+    buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
     index: usize,
 }
 
 impl<'a> TDesRing<'a> {
     /// Creates a new TX ring from the given descriptor and buffer slices.
-    pub fn new(descriptors: &'a mut [TDes], buffers: &'a mut [[u8; MAX_FRAME_SIZE]]) -> Self {
+    pub fn new(
+        descriptors: &'a mut [InternalMemory<TDes>],
+        buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+    ) -> Self {
         assert!(!descriptors.is_empty());
         assert_eq!(descriptors.len(), buffers.len());
 
@@ -354,15 +283,18 @@ impl<'a> TDesRing<'a> {
     pub fn reset(&mut self) {
         let n = self.descriptors.len();
         for i in 0..n {
-            let desc = &self.descriptors[i];
+            let next = self.descriptors[(i + 1) % n].as_ptr();
+            let buf_addr = self.buffers[i].as_ptr().cast::<u8>();
+
+            let mut desc = self.descriptors[i].get_mut();
             desc.tdes0.set(0);
             desc.tdes1.set(0);
             desc.set_chained();
-            desc.set_buffer_addr(self.buffers[i].as_ptr());
-            let next = &raw const self.descriptors[(i + 1) % n];
+            desc.set_buffer_addr(buf_addr);
             desc.set_next_desc(next);
             desc.set_owned_by(OwnedBy::Cpu);
-            unsafe { cache_wb(desc) };
+            #[cfg(soc_internal_memory_cached)]
+            self.descriptors[i].get_mut().writeback();
         }
         self.index = 0;
         fence(Ordering::Release);
@@ -370,7 +302,7 @@ impl<'a> TDesRing<'a> {
 
     /// Returns the address of the first descriptor (used to program `EMAC_DMA.dmatxbaseaddr`).
     pub fn base_ptr(&self) -> *const TDes {
-        self.descriptors.as_ptr()
+        self.descriptors[0].as_ptr()
     }
 
     /// Copies `frame` into the next available TX buffer and hands it to DMA.
@@ -382,32 +314,22 @@ impl<'a> TDesRing<'a> {
             return Err(TxError::FrameTooLarge);
         }
 
-        let desc = &self.descriptors[self.index];
-        unsafe { cache_inv(desc) };
-        fence(Ordering::Acquire);
-        if desc.owned_by() != OwnedBy::Cpu {
-            return Err(TxError::RingFull);
+        if let Some(buf) = self.available_buf() {
+            buf[..frame.len()].copy_from_slice(frame);
+            self.commit(frame.len());
+            Ok(())
+        } else {
+            Err(TxError::RingFull)
         }
-
-        let buf = &mut self.buffers[self.index];
-        buf[..frame.len()].copy_from_slice(frame);
-        desc.set_len_and_flags(frame.len());
-        desc.set_owned_by(OwnedBy::Dma);
-        unsafe {
-            cache_wb_buf(buf.as_ptr(), frame.len());
-            cache_wb(desc);
-        }
-        fence(Ordering::Release);
-
-        self.index = (self.index + 1) % self.descriptors.len();
-        Ok(())
     }
 
     /// Returns `true` if the current slot is CPU-owned (ready to accept a frame).
     pub fn has_capacity(&self) -> bool {
-        unsafe { cache_inv(&raw const self.descriptors[self.index]) };
+        let desc = self.descriptors[self.index].get_ref();
+        #[cfg(soc_internal_memory_cached)]
+        desc.invalidate();
         fence(Ordering::Acquire);
-        self.descriptors[self.index].owned_by() == OwnedBy::Cpu
+        desc.owned_by() == OwnedBy::Cpu
     }
 
     /// Returns a mutable reference to the current TX DMA buffer if the slot is
@@ -415,10 +337,9 @@ impl<'a> TDesRing<'a> {
     ///
     /// After writing the frame, call [`TDesRing::commit`] to hand it to DMA.
     pub fn available_buf(&mut self) -> Option<&mut [u8; MAX_FRAME_SIZE]> {
-        unsafe { cache_inv(&raw const self.descriptors[self.index]) };
-        fence(Ordering::Acquire);
-        if self.descriptors[self.index].owned_by() == OwnedBy::Cpu {
-            Some(&mut self.buffers[self.index])
+        if self.has_capacity() {
+            let idx = self.index;
+            Some(self.buffers[idx].get_mut().into_inner())
         } else {
             None
         }
@@ -430,15 +351,21 @@ impl<'a> TDesRing<'a> {
     /// ring index.  The caller must trigger a TX poll demand after this call
     /// (see `EmacRegs::demand_tx_poll`).
     pub fn commit(&mut self, len: usize) {
-        let desc = &self.descriptors[self.index];
+        let idx = self.index;
+        let n = self.descriptors.len();
+
+        #[cfg(soc_internal_memory_cached)]
+        self.buffers[idx].get_mut().writeback();
+
+        let mut desc = self.descriptors[idx].get_mut();
         desc.set_len_and_flags(len);
         desc.set_owned_by(OwnedBy::Dma);
-        unsafe {
-            cache_wb_buf(self.buffers[self.index].as_ptr(), len);
-            cache_wb(desc);
-        }
+
+        #[cfg(soc_internal_memory_cached)]
+        desc.writeback();
+
         fence(Ordering::Release);
-        self.index = (self.index + 1) % self.descriptors.len();
+        self.index = (idx + 1) % n;
     }
 }
 
@@ -455,14 +382,17 @@ pub enum TxError {
 
 /// RX descriptor ring backed by references into `EthernetDmaStorage`.
 pub struct RDesRing<'a> {
-    descriptors: &'a mut [RDes],
-    buffers: &'a mut [[u8; MAX_FRAME_SIZE]],
+    descriptors: &'a mut [InternalMemory<RDes>],
+    buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
     index: usize,
 }
 
 impl<'a> RDesRing<'a> {
     /// Creates a new RX ring from the given descriptor and buffer slices.
-    pub fn new(descriptors: &'a mut [RDes], buffers: &'a mut [[u8; MAX_FRAME_SIZE]]) -> Self {
+    pub fn new(
+        descriptors: &'a mut [InternalMemory<RDes>],
+        buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
+    ) -> Self {
         assert!(!descriptors.is_empty());
         assert_eq!(descriptors.len(), buffers.len());
 
@@ -481,16 +411,20 @@ impl<'a> RDesRing<'a> {
     pub fn reset(&mut self) {
         let n = self.descriptors.len();
         for i in 0..n {
-            unsafe { cache_inv_buf(self.buffers[i].as_ptr(), MAX_FRAME_SIZE) };
+            let next = self.descriptors[(i + 1) % n].as_ptr();
+            let buf_addr = self.buffers[i].as_ptr().cast::<u8>();
 
-            let desc = &self.descriptors[i];
+            #[cfg(soc_internal_memory_cached)]
+            self.buffers[i].get_mut().invalidate();
+
+            let mut desc = self.descriptors[i].get_mut();
             desc.rdes0.set(0);
             desc.configure_buffer(MAX_FRAME_SIZE);
-            desc.set_buffer_addr(self.buffers[i].as_mut_ptr());
-            let next = &raw const self.descriptors[(i + 1) % n];
+            desc.set_buffer_addr(buf_addr);
             desc.set_next_desc(next);
             desc.set_owned_by(OwnedBy::Dma);
-            unsafe { cache_wb(desc) };
+            #[cfg(soc_internal_memory_cached)]
+            desc.writeback();
         }
         self.index = 0;
         fence(Ordering::Release);
@@ -498,7 +432,7 @@ impl<'a> RDesRing<'a> {
 
     /// Returns the address of the first descriptor (used to program `EMAC_DMA.dmarxbaseaddr`).
     pub fn base_ptr(&self) -> *const RDes {
-        self.descriptors.as_ptr()
+        self.descriptors[0].as_ptr()
     }
 
     /// Returns a mutable data slice if a frame is ready.
@@ -509,34 +443,46 @@ impl<'a> RDesRing<'a> {
     /// release the descriptor back to DMA.
     pub fn receive(&mut self) -> Option<&mut [u8]> {
         loop {
-            unsafe { cache_inv(&raw const self.descriptors[self.index]) };
-            fence(Ordering::Acquire);
-            let desc = &self.descriptors[self.index];
-            if desc.owned_by() != OwnedBy::Cpu {
-                return None;
-            }
+            let idx = self.index;
 
-            // Extract all needed values before the desc borrow ends so
-            // that recycle_current() can reborrow self.
-            let status = desc.rdes0.get();
-            let is_complete = desc.is_complete_frame();
-            let frame_len = desc.frame_len();
+            // Inspect the descriptor. Returns `Some(len)` for a valid frame,
+            // `None` if the slot must be recycled. The descriptor borrow ends
+            // with this block so `recycle_current` can reborrow `self`.
+            let len = {
+                let desc = self.descriptors[idx].get_ref();
+                #[cfg(soc_internal_memory_cached)]
+                desc.invalidate();
+                fence(Ordering::Acquire);
+                if desc.owned_by() != OwnedBy::Cpu {
+                    return None;
+                }
 
-            if status & RDES0_ES != 0 || !is_complete {
+                let status = desc.rdes0.get();
+                let is_complete = desc.is_complete_frame();
+                let frame_len = desc.frame_len();
+
+                if status & RDES0_ES != 0 || !is_complete {
+                    None
+                } else {
+                    // Strip the 4-byte FCS the GMAC appends to the frame length.
+                    let len = frame_len.saturating_sub(4);
+                    if (MIN_RX_FRAME_SIZE..=MAX_FRAME_SIZE).contains(&len) {
+                        Some(len)
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            let Some(len) = len else {
                 self.recycle_current();
                 continue;
-            }
+            };
 
-            // Strip the 4-byte FCS the GMAC appends to the frame length.
-            let len = frame_len.saturating_sub(4);
-            if !(MIN_RX_FRAME_SIZE..=MAX_FRAME_SIZE).contains(&len) {
-                self.recycle_current();
-                continue;
-            }
-
-            unsafe { cache_inv_buf(self.buffers[self.index].as_ptr(), len) };
+            #[cfg(soc_internal_memory_cached)]
+            self.buffers[idx].get_mut().invalidate();
             fence(Ordering::Acquire);
-            return Some(&mut self.buffers[self.index][..len]);
+            return Some(&mut self.buffers[idx].get_mut().into_inner()[..len]);
         }
     }
 
@@ -549,16 +495,21 @@ impl<'a> RDesRing<'a> {
 
     /// Returns `true` when the current descriptor has been returned by DMA.
     pub fn has_packet(&self) -> bool {
-        unsafe { cache_inv(&raw const self.descriptors[self.index]) };
+        let desc = self.descriptors[self.index].get_ref();
+        #[cfg(soc_internal_memory_cached)]
+        desc.invalidate();
         fence(Ordering::Acquire);
-        self.descriptors[self.index].owned_by() == OwnedBy::Cpu
+        desc.owned_by() == OwnedBy::Cpu
     }
 
     fn recycle_current(&mut self) {
-        let desc = &self.descriptors[self.index];
-        desc.rdes0.set(RDES0_OWN);
-        unsafe { cache_wb(desc) };
+        let idx = self.index;
+        let n = self.descriptors.len();
+        let mut desc = self.descriptors[idx].get_mut();
+        desc.set_rdes0(RDES0_OWN);
+        #[cfg(soc_internal_memory_cached)]
+        desc.writeback();
         fence(Ordering::Release);
-        self.index = (self.index + 1) % self.descriptors.len();
+        self.index = (idx + 1) % n;
     }
 }
