@@ -404,44 +404,6 @@ impl<'d> Rtc<'d> {
         self.sleep(&config, wake_sources);
     }
 
-    /// Enters light sleep for the provided `duration`, then restores monotonic system time.
-    ///
-    /// Returns the actual sleep duration.
-    ///
-    /// On return, [`Instant::now`] reflects the real elapsed time: the systimer,
-    /// which stops during light sleep, is advanced by the time spent asleep as
-    /// measured by the always-running LP timer. Only a timer wake source is armed,
-    /// and the scheduler's pre-armed systimer alarm is left untouched.
-    ///
-    /// # Safety
-    ///
-    /// This function must be called inside an interrupt-free context, and other core(s)
-    /// must be idle.
-    ///
-    /// [`Instant::now`]: crate::time::Instant::now
-    #[cfg(sleep_auto_light_sleep)]
-    pub unsafe fn light_sleep_for(&mut self, duration: Duration) -> Duration {
-        // Latch the systimer value *before* sleeping. The systimer keeps running during
-        // the sleep enter/exit sequences, so we must not advance from the post-wake
-        // value (that would count the enter/exit time twice). Instead we set an absolute
-        // target of `before + slept`, measured by the always-running LP timer.
-        let before_ticks = crate::time::implem::raw_counter();
-        let before = self.time_since_power_up();
-
-        let timer =
-            sleep::TimerWakeupSource::new(core::time::Duration::from_micros(duration.as_micros()));
-        let gpio = sleep::GpioWakeupSource::new();
-        self.sleep_light(&[&timer, &gpio]);
-        let after = self.time_since_power_up();
-
-        let slept_us = Duration::from_micros(after.as_micros().wrapping_sub(before.as_micros()));
-        let slept_ticks = crate::timer::systimer::SystemTimer::us_to_ticks(slept_us.as_micros());
-
-        unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
-
-        slept_us
-    }
-
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
     #[cfg(sleep_driver_supported)]

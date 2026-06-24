@@ -1,8 +1,11 @@
 use esp_hal::{
     peripherals::LPWR,
-    rtc_cntl::{Rtc, WakeLock},
+    rtc_cntl::{
+        Rtc,
+        WakeLock,
+        sleep::{GpioWakeupSource, TimerWakeupSource},
+    },
     system::Cpu,
-    time::Duration,
 };
 
 use crate::{SCHEDULER, task::IdleFn};
@@ -22,7 +25,7 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// - there is a finite next scheduled wakeup, and
 /// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
-/// If all hold, it calls [`Rtc::light_sleep_for`] for the next wakeup; otherwise
+/// If all hold, it calls [`Rtc::light_sleep`] for the next wakeup; otherwise
 /// it falls back to `WFI`. The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
@@ -34,7 +37,7 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
-/// [`Rtc::light_sleep_for`]: esp_hal::rtc_cntl::Rtc::light_sleep_for
+/// [`Rtc::light_sleep`]: esp_hal::rtc_cntl::Rtc::light_sleep
 pub fn auto_light_sleep() -> IdleFn {
     auto_light_sleep_hook
 }
@@ -72,7 +75,10 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
             unsafe {
                 let mut rtc = Rtc::new(LPWR::steal());
-                rtc.light_sleep_for(Duration::from_micros(sleep_duration));
+                let timer =
+                    TimerWakeupSource::new(core::time::Duration::from_micros(sleep_duration));
+                let gpio = GpioWakeupSource::new();
+                rtc.sleep_light(&[&timer, &gpio]);
             }
 
             // The alarm timer was gated during light sleep, so its pre-armed alarm is
