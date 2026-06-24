@@ -56,7 +56,76 @@ esp_rtos::start_second_core(
 //! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
-//!
+#![cfg_attr(
+    sleep_auto_light_sleep,
+    doc = r"
+## Automatic Light Sleep (experimental)
+
+When enabled, the CPU will automatically enter light sleep mode when there are no tasks to run,
+and wake up when a task is ready to run. This can help reduce power consumption.
+
+Because waking up from automatic light sleep can increase latency, the minimum expected idle time
+can be configured using `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US`.
+
+To enable automatic light sleep, call the [`auto_light_sleep`] function and pass the
+idle hook it returns to [`start_with_idle_hook`].
+
+To prevent the CPU from entering light sleep, take a [`WakeLock`]. Drop the lock when you are done
+with the critical code.
+"
+)]
+#![cfg_attr(
+    all(sleep_auto_light_sleep, multi_core),
+    doc = r"
+
+⚠️ If you are using bare-metal code on the second core (i.e. the second core is
+not managed by the RTOS), make sure to take a [`WakeLock`], otherwise the automatic
+light sleep may cause unexpected behavior.
+"
+)]
+#![cfg_attr(
+    sleep_auto_light_sleep,
+    doc = r"
+### Example
+
+```rust,no_run
+#![no_std]
+# #[panic_handler]
+# fn panic(_: &core::panic::PanicInfo) -> ! {
+#     loop {}
+# }
+# struct FakeHeap;
+# unsafe impl core::alloc::GlobalAlloc for FakeHeap {
+#     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+#         unimplemented!()
+#     }
+#     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+#         unimplemented!()
+#     }
+# }
+# #[global_allocator]
+# static ALLOCATOR: FakeHeap = FakeHeap;
+
+use esp_hal::interrupt::software::SoftwareInterruptControl;
+use esp_hal::timer::timg::TimerGroup;
+
+# fn main() {
+let p = esp_hal::init(esp_hal::Config::default());
+
+let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+let timg0 = TimerGroup::new(p.TIMG0);
+
+esp_rtos::start_with_idle_hook(
+    timg0.timer0,
+    sw_int.software_interrupt0,
+    esp_rtos::auto_light_sleep(),
+);
+# }
+```
+
+[`WakeLock`]: esp_hal::rtc_cntl::WakeLock
+"
+)]
 //! ## Additional configuration
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_rtos_config_table.md"))]
@@ -77,6 +146,8 @@ mod fmt;
 
 #[cfg(feature = "esp-radio")]
 mod esp_radio;
+#[cfg(sleep_auto_light_sleep)]
+mod light_sleep;
 mod run_queue;
 mod scheduler;
 mod syscall;
@@ -111,6 +182,8 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::Duration,
 };
+#[cfg(sleep_auto_light_sleep)]
+pub use light_sleep::auto_light_sleep;
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::main;

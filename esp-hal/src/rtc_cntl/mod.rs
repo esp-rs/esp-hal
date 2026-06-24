@@ -933,3 +933,99 @@ pub fn wakeup_cause() -> SleepSource {
 
     SleepSource::Undefined
 }
+
+#[cfg(sleep_auto_light_sleep)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize =
+            portable_atomic::AtomicUsize::new(0);
+
+        fn wake_lock_count() -> &'static portable_atomic::AtomicUsize {
+            &ESP_HAL_WAKE_LOCK_COUNT
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize;
+        }
+
+        fn wake_lock_count() -> &'static portable_atomic::AtomicUsize {
+            // use of extern static is unsafe and requires unsafe block
+            unsafe { &ESP_HAL_WAKE_LOCK_COUNT }
+        }
+    }
+}
+
+/// A guard that prevents the system from entering automatic light sleep.
+///
+/// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
+/// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
+/// released when the guard is dropped.
+#[cfg_attr(
+    not(sleep_auto_light_sleep),
+    doc = r"
+
+Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
+)]
+#[instability::unstable]
+#[non_exhaustive]
+pub struct WakeLock;
+
+impl WakeLock {
+    /// Acquires a wake lock, preventing automatic light sleep until it is dropped.
+    pub fn new() -> Self {
+        Self::acquire();
+        Self
+    }
+
+    /// Acquires a wake lock, preventing automatic light sleep.
+    pub fn acquire() {
+        #[cfg(sleep_auto_light_sleep)]
+        wake_lock_count().fetch_add(1, portable_atomic::Ordering::AcqRel);
+    }
+
+    /// Releases a wake lock, allowing automatic light sleep when no wake locks are held.
+    ///
+    /// Note that this function should only be called to release a wake lock acquired via
+    /// [`Self::acquire`].
+    pub fn release() {
+        #[cfg(sleep_auto_light_sleep)]
+        {
+            let previous = wake_lock_count().fetch_sub(1, portable_atomic::Ordering::AcqRel);
+            debug_assert_ne!(previous, 0, "wake lock counter underflow");
+        }
+    }
+
+    /// Returns `true` if at least one wake lock is currently held.
+    #[instability::unstable]
+    pub fn is_active() -> bool {
+        cfg_select! {
+            sleep_auto_light_sleep => {
+                wake_lock_count().load(portable_atomic::Ordering::Acquire)
+                    != 0
+            }
+            _ => true,
+        }
+    }
+}
+
+#[instability::unstable]
+impl Clone for WakeLock {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
+#[instability::unstable]
+impl Default for WakeLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for WakeLock {
+    fn drop(&mut self) {
+        Self::release();
+    }
+}

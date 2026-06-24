@@ -167,6 +167,7 @@ pub mod dma {
     use crate::{
         DriverMode,
         dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
+        rtc_cntl::WakeLock,
         spi::Error,
     };
 
@@ -365,6 +366,7 @@ pub mod dma {
         dma_buf: ManuallyDrop<Buf>,
         has_rx: bool,
         has_tx: bool,
+        _wake_lock: WakeLock,
     }
 
     impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
@@ -377,6 +379,7 @@ pub mod dma {
                 dma_buf: ManuallyDrop::new(dma_buf),
                 has_rx,
                 has_tx,
+                _wake_lock: WakeLock::new(),
             }
         }
 

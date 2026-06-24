@@ -580,6 +580,7 @@ is_lp_sys = true
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+auto_light_sleep = true
 
 [device.parl_io]
 support_status = "partial"

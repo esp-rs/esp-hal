@@ -503,6 +503,7 @@ version = 2
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+auto_light_sleep = true
 
 # Other drivers which are partially supported but have no other configuration:
 

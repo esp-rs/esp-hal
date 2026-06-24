@@ -308,6 +308,9 @@ pub(crate) fn init() {
         );
     }
 
+    #[cfg(feature = "unstable")]
+    esp_hal::rtc_cntl::WakeLock::acquire();
+
     if !preempt::initialized() {
         panic!("The scheduler must be initialized before initializing the radio.");
     }
@@ -352,6 +355,9 @@ pub(crate) fn deinit() {
     #[cfg(all(esp32, feature = "unstable"))]
     // Allow using `ADC2` again
     release_adc2(unsafe { esp_hal::Internal::conjure() });
+
+    #[cfg(feature = "unstable")]
+    esp_hal::rtc_cntl::WakeLock::release();
 
     debug!("Radio deinitialized");
 }

@@ -3,7 +3,10 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::gpio::{Event, Flex, GpioBank, Input, InputPin, WaitForOptions, WakeConfigError};
+use crate::{
+    gpio::{Event, Flex, GpioBank, Input, InputPin, WaitForOptions, WakeConfigError},
+    rtc_cntl::WakeLock,
+};
 
 impl Flex<'_> {
     /// Wait until the pin experiences a particular [`Event`].
@@ -88,6 +91,11 @@ impl Flex<'_> {
         // the interrupt will signal the future to complete.
         self.pin
             .listen_with_options(event, true, false, options.wake_enable)?;
+
+        // Hold a wake lock for the duration of the wait so automatic light sleep does
+        // not gate the GPIO interrupt. When the pin is configured as a light-sleep wake
+        // source, sleeping is intended (the pin will wake the chip), so no lock is held.
+        let _wake_lock = (!options.wake_enable).then(WakeLock::new);
 
         PinFuture { pin: self }.await;
         Ok(())

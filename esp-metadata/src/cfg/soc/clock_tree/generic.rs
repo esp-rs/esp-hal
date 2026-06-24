@@ -88,6 +88,9 @@ pub struct Generic {
     #[serde(default)]
     always_on: bool,
 
+    #[serde(default)]
+    wake_locking: bool,
+
     /// The expression that calculates the clock node's output frequency.
     output: Expression,
 
@@ -122,6 +125,10 @@ impl ClockTreeNodeType for Generic {
 
     fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.wake_locking
     }
 
     fn validate_source_data(
