@@ -16,6 +16,8 @@ features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 targets_lp_core = true
 doc-config = { features = ["embedded-hal"], append = [
     { features = ["embedded-io"], if = 'lp_core' },

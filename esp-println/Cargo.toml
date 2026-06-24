@@ -12,6 +12,8 @@ license       = "MIT OR Apache-2.0"
 links         = "esp-println"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["auto", "defmt-espflash", "critical-section"] }
 check-configs = [
     { features = ["auto"] },

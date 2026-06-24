@@ -311,7 +311,11 @@ fn update(args: UpdateArgs) -> Result<()> {
     for package in sorted.iter() {
         log::info!("Package = {}", package);
 
-        let toml = package.toml();
+        let toml_ref = package.toml();
+        let Some(ref toml) = *toml_ref else {
+            continue;
+        };
+        let package_path = toml.package_path();
         let version = toml.version();
 
         if std::fs::exists(format!(
@@ -321,13 +325,16 @@ fn update(args: UpdateArgs) -> Result<()> {
             log::warn!("Already exists as version {version}");
             continue;
         }
-        core::mem::drop(toml);
+
+        core::mem::drop(toml_ref);
+        package.remove_toml_from_cache();
+
         log::info!("Updating...");
 
         // make sure we have a lock file
         std::process::Command::new("cargo")
             .arg("update")
-            .current_dir(package.toml().package_path())
+            .current_dir(&package_path)
             .env_clear()
             .envs(
                 std::env::vars()
@@ -350,7 +357,7 @@ fn update(args: UpdateArgs) -> Result<()> {
                 .into_iter()
                 .filter(|(k, _)| !k.starts_with("CARGO")),
         );
-        cmd.current_dir(&package.toml().package_path());
+        cmd.current_dir(&package_path);
 
         log::info!("{:?}", cmd);
         cmd.status()?;
@@ -385,7 +392,7 @@ fn update(args: UpdateArgs) -> Result<()> {
             .arg("--allow-dirty")
             .arg("--index=http://crates.io")
             .arg("--target-dir=../target")
-            .current_dir(package.toml().package_path())
+            .current_dir(&package_path)
             .env_clear()
             .envs(
                 std::env::vars()
@@ -409,6 +416,9 @@ fn update(args: UpdateArgs) -> Result<()> {
 
         // copy the crate to our registry
         let toml = package.toml();
+        let Some(ref toml) = *toml else {
+            unreachable!("");
+        };
         let krate = toml.manifest["package"]["name"].as_str().unwrap();
         let version = toml.manifest["package"]["version"].as_str().unwrap();
         std::fs::copy(

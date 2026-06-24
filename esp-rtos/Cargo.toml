@@ -75,6 +75,7 @@ esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated"
 
 [dev-dependencies]
 esp-hal = { version = "~1.1.0", path = "../esp-hal", features = ["unstable"] }
+static_cell = "2"
 
 [features]
 default = []

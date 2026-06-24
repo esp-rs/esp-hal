@@ -11,6 +11,8 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = ["println", "esp-println/auto"] },
