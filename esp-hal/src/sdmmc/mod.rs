@@ -229,10 +229,10 @@ impl From<Error> for MmcError {
     }
 }
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s3, esp32p4))]
 pub use imp::{SdHostController, Slot, SlotClk, SlotCmd, SlotData};
 
-#[cfg(any(esp32, esp32s3))]
+#[cfg(any(esp32, esp32s3, esp32p4))]
 mod imp {
     use core::{
         cell::UnsafeCell,
@@ -905,51 +905,74 @@ mod imp {
         fn configure(self);
     }
 
-    // GPIO-matrix chips (S3, P4): any pin can carry any slot signal; route through
-    // the interconnect matrix. Blanket-implemented so the builder accepts any GPIO.
-    // The routing guard is stored in the slot's `State` for the slot's lifetime.
+    // GPIO-matrix-routed slots (all of S3; slot 1 on P4): any pin can carry any of
+    // the slot's signals, routed through the interconnect matrix. The impls accept
+    // any GPIO and stash the routing guard in the slot's `State` for its lifetime.
+    //
+    // Generated per matrix slot (`iomux = false`) rather than blanket over the slot
+    // index: on P4 the IO_MUX slot's bus signals are implemented for fixed pins
+    // below, and a blanket `impl<const S>` would collide with those.
     #[cfg(sdmmc_has_gpio_matrix)]
-    impl<'d, const S: u8, P: PeripheralOutput<'d>> SlotClk<'d, S> for P {
-        fn configure(self) {
-            let pin = self.into();
-            pin.apply_output_config(&OutputConfig::default());
-            pin.set_output_enable(true);
-            slot_pins(slot_id(S)).clk = interconnect::OutputSignal::connect_with_guard(
-                pin,
-                slot_info(slot_id(S)).clk_out.unwrap(),
-            );
-        }
+    for_each_sdmmc! {
+        (
+            $slot:ident, $idx:literal, false,
+            [$($clk:ident)?], [$($cmd_in:ident)?], [$($cmd_out:ident)?],
+            [$($data_in:ident),*], [$($data_out:ident),*],
+            [$($cd:ident)?], [$($wp:ident)?], [$($card_int:ident)?],
+            [$($data_strobe:ident)?], [$($rst:ident)?]
+        ) => {
+            impl<'d, P: PeripheralOutput<'d>> SlotClk<'d, $idx> for P {
+                fn configure(self) {
+                    let pin = self.into();
+                    pin.apply_output_config(&OutputConfig::default());
+                    pin.set_output_enable(true);
+                    slot_pins(slot_id($idx)).clk = interconnect::OutputSignal::connect_with_guard(
+                        pin,
+                        slot_info(slot_id($idx)).clk_out.unwrap(),
+                    );
+                }
+            }
+
+            impl<'d, P: PeripheralInput<'d> + PeripheralOutput<'d>> SlotCmd<'d, $idx> for P {
+                fn configure(self) {
+                    slot_pins(slot_id($idx)).cmd = connect_bidir(
+                        self.into(),
+                        slot_info(slot_id($idx)).cmd_in.unwrap(),
+                        slot_info(slot_id($idx)).cmd_out.unwrap(),
+                    );
+                }
+            }
+
+            impl<'d, const L: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>>
+                SlotData<'d, $idx, L> for P
+            {
+                fn configure(self) {
+                    slot_pins(slot_id($idx)).data[L as usize] = connect_bidir(
+                        self.into(),
+                        slot_info(slot_id($idx)).data_in[L as usize],
+                        slot_info(slot_id($idx)).data_out[L as usize],
+                    );
+                }
+            }
+        };
+
+        // IO_MUX-routed slots (P4 slot 0) get their bus impls from the fixed-pin
+        // block below; nothing to generate here.
+        (
+            $slot:ident, $idx:literal, true,
+            [$($clk:ident)?], [$($cmd_in:ident)?], [$($cmd_out:ident)?],
+            [$($data_in:ident),*], [$($data_out:ident),*],
+            [$($cd:ident)?], [$($wp:ident)?], [$($card_int:ident)?],
+            [$($data_strobe:ident)?], [$($rst:ident)?]
+        ) => {};
     }
 
-    #[cfg(sdmmc_has_gpio_matrix)]
-    impl<'d, const S: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>> SlotCmd<'d, S> for P {
-        fn configure(self) {
-            slot_pins(slot_id(S)).cmd = connect_bidir(
-                self.into(),
-                slot_info(slot_id(S)).cmd_in.unwrap(),
-                slot_info(slot_id(S)).cmd_out.unwrap(),
-            );
-        }
-    }
-
-    #[cfg(sdmmc_has_gpio_matrix)]
-    impl<'d, const S: u8, const L: u8, P: PeripheralInput<'d> + PeripheralOutput<'d>>
-        SlotData<'d, S, L> for P
-    {
-        fn configure(self) {
-            slot_pins(slot_id(S)).data[L as usize] = connect_bidir(
-                self.into(),
-                slot_info(slot_id(S)).data_in[L as usize],
-                slot_info(slot_id(S)).data_out[L as usize],
-            );
-        }
-    }
-
-    // IO_MUX-only chips (ESP32): each slot signal lives on fixed pads selected by
-    // an IO_MUX function. The traits are implemented only for the mandated
-    // `(gpio, af)` pairs, so a wrong pin is a compile error. `HS1_*` is slot 0,
-    // `HS2_*` is slot 1.
-    #[cfg(not(sdmmc_has_gpio_matrix))]
+    // IO_MUX-routed slots (both slots on ESP32; slot 0 on P4): each bus signal
+    // lives on a fixed pad selected by an IO_MUX function. The traits are
+    // implemented only for the mandated `(gpio, af)` pairs, so a wrong pin is a
+    // compile error. ESP32 names them `HS1_*` (slot 0) / `HS2_*` (slot 1); P4
+    // names slot 0's pads `SD1_*`.
+    #[cfg(sdmmc_has_iomux)]
     fn configure_iomux_pad(pin: u8, af: crate::gpio::AlternateFunction) {
         crate::gpio::io_mux_reg(pin).modify(|_, w| {
             unsafe { w.mcu_sel().bits(af as u8) };
@@ -958,7 +981,7 @@ mod imp {
         });
     }
 
-    #[cfg(not(sdmmc_has_gpio_matrix))]
+    #[cfg(sdmmc_has_iomux)]
     macro_rules! impl_signal_trait {
         ($gpio:ident, $trait:ident, $af:ident, $s:literal) => {
             impl<'d> $trait<'d, $s> for crate::peripherals::$gpio<'d> {
@@ -983,21 +1006,24 @@ mod imp {
         };
     }
 
-    #[cfg(not(sdmmc_has_gpio_matrix))]
+    // Arms for functions absent on a given chip simply never match (the generated
+    // macro ignores unmatched functions), so ESP32's `HS*_*` and P4's `SD1_*` can
+    // coexist here. P4 wires only slot 0 (`SD1_*`) to fixed pads; slot 1 is matrix.
+    #[cfg(sdmmc_has_iomux)]
     for_each_iomux_function! {
-        (HS1_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 0); };
-        (HS1_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 0); };
-        (HS1_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 0); };
-        (HS1_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 1); };
-        (HS1_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 2); };
-        (HS1_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 3); };
+        (SD1_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 0); };
+        (SD1_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 0); };
+        (SD1_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 0); };
+        (SD1_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 1); };
+        (SD1_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 2); };
+        (SD1_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 3); };
 
-        (HS2_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 1); };
-        (HS2_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 1); };
-        (HS2_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 0); };
-        (HS2_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 1); };
-        (HS2_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 2); };
-        (HS2_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 3); };
+        (SD2_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 1); };
+        (SD2_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 1); };
+        (SD2_DATA0, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 0); };
+        (SD2_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 1); };
+        (SD2_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 2); };
+        (SD2_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 1, 3); };
     }
 
     /// A configured card slot, generic over the slot index and driver mode.
@@ -1606,8 +1632,8 @@ mod imp {
     #[cfg(esp32p4)]
     fn set_module_clock(_source: ClockSource, div: u8) {
         let c = crate::peripherals::HP_SYS_CLKRST::regs();
-        c.peri_clk_ctrl01().modify(|_, w| unsafe {
-            w.sdio_ls_clk_src_sel().bits(0);
+        c.peri_clk_ctrl01().modify(|_, w| {
+            w.sdio_ls_clk_src_sel().bit(false); // PLL_F160M
             w.sdio_ls_clk_en().set_bit()
         });
         if div > 1 {
