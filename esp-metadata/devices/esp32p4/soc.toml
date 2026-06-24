@@ -82,6 +82,7 @@ peripherals = [
     { name = "LP_AON", pac = "LP_SYS" },
     { name = "LP_AON_CLKRST" },
     { name = "LP_SYS" },
+    { name = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
     { name = "PMU" },
@@ -327,15 +328,19 @@ apb_cycle_wait_num = 16  # placeholder
 is_lp_sys = true
 
 [device.lp_timer]
-support_status = "not_supported"  # RTC Timekeeping
+support_status = "partial"
 
 [device.sd_host]
 support_status = "not_supported"  # SDIO host
 
 [device.sdm]
 support_status = { status = "not_supported", issue = 2370 }
+
 [device.sleep]
-support_status = "not_supported"  # PMU eco5 sleep -- placeholder TODO in esp-hal
+support_status = "partial"  # PMU eco5 sleep: timer wakeup (light + deep)
+light_sleep = true
+deep_sleep = true
+
 [device.spi_slave]
 support_status = "not_supported"
 [device.temp_sensor]

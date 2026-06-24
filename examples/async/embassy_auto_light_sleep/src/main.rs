@@ -17,7 +17,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Event, Input, WaitForOptions},
+    gpio::{Event, Input, InputConfig, Pull, WaitForOptions},
     interrupt::software::SoftwareInterruptControl,
     peripherals,
     rtc_cntl::WakeLock,
@@ -41,9 +41,9 @@ cfg_select! {
     feature = "esp32c5" => {
        use peripherals::GPIO28 as BOOT_GPIO;
     }
-    // feature = "esp32p4" => {
-    //    use peripherals::GPIO35 as BOOT_GPIO;
-    // }
+    feature = "esp32p4" => {
+       use peripherals::GPIO35 as BOOT_GPIO;
+    }
     // esp32c3, esp32c6, esp32c61, esp32h2
     _ => {
         use peripherals::GPIO9 as BOOT_GPIO;
@@ -52,7 +52,7 @@ cfg_select! {
 
 #[embassy_executor::task]
 async fn gpio(boot_btn: BOOT_GPIO<'static>) {
-    let mut input = Input::new(boot_btn, Default::default());
+    let mut input = Input::new(boot_btn, InputConfig::default().with_pull(Pull::Up));
 
     loop {
         input
@@ -106,7 +106,7 @@ async fn main(spawner: Spawner) {
     let boot_btn = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
         feature = "esp32c5" => p.GPIO28,
-        // feature = "esp32p4" => p.GPIO35,
+        feature = "esp32p4" => p.GPIO35,
         // esp32c2, esp32c3, esp32c6, esp32c61, esp32h2
         _ => p.GPIO9,
     };

@@ -161,27 +161,40 @@ bitflags::bitflags! {
         #[cfg(pm_support_ext0_wakeup)]
         /// EXT0 GPIO wakeup
         const ExtEvent0Trig   = 1 << 0;
-        #[cfg(pm_support_ext1_wakeup)]
+        #[cfg(all(pm_support_ext1_wakeup, not(esp32p4)))]
         /// EXT1 GPIO wakeup
         const ExtEvent1Trig   = 1 << 1;
+        #[cfg(esp32p4)]
+        /// EXT1 GPIO wakeup (ESP32-P4 PMU bitmap)
+        const ExtEvent1Trig   = 1 << 12;
         /// GPIO wakeup (light sleep only)
         const GpioTrigEn      = 1 << 2;
-        #[cfg(not(any(esp32c6, esp32h2)))]
+        #[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
         /// Timer wakeup
         const TimerTrigEn     = 1 << 3;
         #[cfg(any(esp32c6, esp32h2))]
         /// Timer wakeup
         const TimerTrigEn     = 1 << 4;
+        #[cfg(esp32p4)]
+        /// Timer wakeup (ESP32-P4 PMU bitmap: PMU_RTC_TIMER_WAKEUP_EN)
+        const TimerTrigEn     = 1 << 13;
         #[cfg(pm_support_wifi_wakeup)]
         /// MAC wakeup (light sleep only)
         const WifiTrigEn      = 1 << 5;
+        #[cfg(not(esp32p4))]
         /// UART0 wakeup (light sleep only)
         const Uart0TrigEn     = 1 << 6;
+        #[cfg(esp32p4)]
+        /// UART0 wakeup (ESP32-P4 PMU bitmap)
+        const Uart0TrigEn     = 1 << 8;
         /// UART1 wakeup (light sleep only)
         const Uart1TrigEn     = 1 << 7;
-        #[cfg(pm_support_touch_sensor_wakeup)]
+        #[cfg(all(pm_support_touch_sensor_wakeup, not(esp32p4)))]
         /// Touch wakeup
         const TouchTrigEn     = 1 << 8;
+        #[cfg(all(pm_support_touch_sensor_wakeup, esp32p4))]
+        /// Touch wakeup (ESP32-P4 PMU bitmap)
+        const TouchTrigEn     = 1 << 11;
         #[cfg(ulp_supported)]
         /// ULP wakeup
         const UlpTrigEn       = 1 << 9;
@@ -301,8 +314,17 @@ impl<'d> Rtc<'d> {
 
         let rtc_cntl = LP_AON::regs();
 
-        let l = rtc_cntl.store2().read().bits() as u64;
-        let h = rtc_cntl.store3().read().bits() as u64;
+        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        cfg_select! {
+            esp32p4 => {
+                let l = rtc_cntl.lp_store2().read().bits() as u64;
+                let h = rtc_cntl.lp_store3().read().bits() as u64;
+            }
+            _ => {
+                let l = rtc_cntl.store2().read().bits() as u64;
+                let h = rtc_cntl.store3().read().bits() as u64;
+            }
+        }
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
@@ -317,12 +339,25 @@ impl<'d> Rtc<'d> {
         let rtc_cntl = LP_AON::regs();
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
-        rtc_cntl
-            .store2() // Low bits
-            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-        rtc_cntl
-            .store3() // High bits
-            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        cfg_select! {
+            esp32p4 => {
+                rtc_cntl
+                    .lp_store2() // Low bits
+                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+                rtc_cntl
+                    .lp_store3() // High bits
+                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+            }
+            _ => {
+                rtc_cntl
+                    .store2() // Low bits
+                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+                rtc_cntl
+                    .store3() // High bits
+                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+            }
+        }
     }
 
     #[procmacros::doc_replace]
@@ -483,6 +518,9 @@ impl<'d> Rtc<'d> {
         cfg_select! {
             any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 let interrupt = Interrupt::LP_WDT;
+            }
+            esp32p4 => {
+                let interrupt = Interrupt::LP_TIMER0;
             }
             _ => {
                 let interrupt = Interrupt::RTC_CORE;

@@ -37,6 +37,12 @@ MEMORY
     /* External flash (XIP via cache); +0x20 skips the IDF app image header. */
     ROM : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x400000 - 0x20
 
-    /* LP SRAM (32 KB, persists over deep sleep). */
-    RTC_FAST : ORIGIN = 0x50108000, LENGTH = 32K
+    /* LP SRAM (32 KB, persists over deep sleep).
+
+       The first 0x100 bytes are reserved: on ESP32-P4 rev 3.0 (ECO5) the
+       deep-sleep wake reset vector is redirected to LP-RAM base 0x50108000
+       (LP_CLKRST hpcore0_stat_vector_sel = 0) to run the MSPI-crash-after-
+       power-up workaround stub before jumping to HP ROM. The stub is copied
+       there at deep-sleep entry, so nothing else may be linked into it. */
+    RTC_FAST : ORIGIN = 0x50108000 + 0x100, LENGTH = 32K - 0x100
 }
