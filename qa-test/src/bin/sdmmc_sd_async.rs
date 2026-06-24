@@ -42,7 +42,7 @@ use sdio::{BlockDevice, sd::Card};
 esp_bootloader_esp_idf::esp_app_desc!();
 
 /// Target card clock. 40 MHz exercises the SD high-speed (SDR25) path.
-const CARD_HZ: u32 = 40_000_000;
+const CARD_HZ: u32 = 25_000_000;
 
 /// Input sampling phase for the high-speed path (esp32s3 only). If 40 MHz
 /// init fails with a timeout, try `_1`, `_2`, then `_3`.
@@ -57,6 +57,7 @@ const MSG_UPDATE: &[u8] = b"esp-hal sdmmc async update (longer payload)\n";
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    esp_println::logger::init_logger(log::LevelFilter::Info);
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
@@ -101,7 +102,10 @@ async fn main(_spawner: Spawner) {
     println!("card initialized: {:?}", card.card());
 
     let mut button = Input::new(
-        peripherals.GPIO0,
+        cfg_select! {
+            feature = "esp32p4" => peripherals.GPIO35,
+            _ => peripherals.GPIO0,
+        },
         InputConfig::default().with_pull(Pull::Up),
     );
     println!("Press the BOOT button to run the SD card test.");

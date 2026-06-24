@@ -37,7 +37,11 @@ pub enum ClockSource {
     /// 160 MHz PLL.
     Pll160m,
     /// Crystal oscillator.
+    #[cfg(not(esp32p4))]
     Xtal,
+    // /// APLL
+    // #[cfg(esp32p4)]
+    // Apll,
 }
 
 /// Clock input sampling phase used for high-speed tuning.
@@ -214,6 +218,7 @@ pub enum ConfigError {
 
 impl From<Error> for MmcError {
     fn from(error: Error) -> Self {
+        warn!("{:?}", error);
         match error {
             Error::ResponseTimeout | Error::DataTimeout | Error::Timeout | Error::NoCard => {
                 MmcError::Timeout
@@ -261,6 +266,8 @@ mod imp {
         SlotConfig,
         SlotId,
     };
+    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+    use crate::dma::aligned::InternalMemory;
     #[cfg(sdmmc_has_gpio_matrix)]
     use crate::gpio::{PinGuard, Pull, interconnect::PeripheralInput};
     use crate::{
@@ -342,12 +349,39 @@ mod imp {
     }
 
     /// Driver-owned descriptor ring in internal DMA-capable RAM.
+    #[cfg_attr(soc_internal_memory_cached, repr(align(64)))]
     struct DescRing(UnsafeCell<[Desc; RING_LEN]>);
     // Access is serialized by the single controller / per-slot mutex (issue 08).
     unsafe impl Sync for DescRing {}
 
     fn ring() -> &'static mut [Desc; RING_LEN] {
         unsafe { &mut *STATE.desc_ring.0.get() }
+    }
+
+    // On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
+    // both base address and length, otherwise a read invalidate would discard
+    // neighbouring data and a write would miss CPU-cached bytes. Control
+    // transfers (SCR = 8 B, SSR / SWITCH = 64 B) and single-block I/O (512 B)
+    // come from caller buffers we cannot align (e.g. `BufStream`), so they are
+    // bounced through an aligned scratch buffer. One block covers every case.
+    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+    const BOUNCE_LEN: usize = 512;
+
+    /// Per-transaction scratch owned by `engine_lock`. On SoCs with a data
+    /// cache it holds a DMA-aligned bounce buffer for cache-unaligned caller
+    /// buffers; `InternalMemory` provides the alignment and the lock provides
+    /// the exclusive access, so no `UnsafeCell` is needed. Elsewhere it is an
+    /// empty marker carried by the same lock.
+    struct Bounce {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        buf: InternalMemory<[u8; BOUNCE_LEN]>,
+    }
+
+    impl Bounce {
+        const INIT: Self = Bounce {
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            buf: InternalMemory::new([0; BOUNCE_LEN]),
+        };
     }
 
     // `rintsts` card-detect change bit.
@@ -452,9 +486,7 @@ mod imp {
                 w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
                 w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
             });
-            apply_clock_update(id)?;
-
-            Ok(())
+            apply_clock_update(id)
         }
     }
 
@@ -505,14 +537,14 @@ mod imp {
 
     struct State {
         engine: NonReentrantMutex<Engine>,
-        engine_lock: embassy_sync::mutex::Mutex<RawMutex, ()>,
+        engine_lock: embassy_sync::mutex::Mutex<RawMutex, Bounce>,
         settings: NonReentrantMutex<Settings>,
         desc_ring: DescRing,
     }
     unsafe impl Sync for State {}
 
     impl State {
-        async fn select_slot(&self, slot_id: SlotId) -> MutexGuard<'_, RawMutex, ()> {
+        async fn select_slot(&self, slot_id: SlotId) -> MutexGuard<'_, RawMutex, Bounce> {
             let guard = self.engine_lock.lock().await;
             select_slot_sync(slot_id);
             guard
@@ -521,7 +553,7 @@ mod imp {
 
     static STATE: State = State {
         engine: NonReentrantMutex::new(Engine::IDLE),
-        engine_lock: embassy_sync::mutex::Mutex::new(()),
+        engine_lock: embassy_sync::mutex::Mutex::new(Bounce::INIT),
         settings: NonReentrantMutex::new(Settings::INIT),
         desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
     };
@@ -680,7 +712,6 @@ mod imp {
         };
     }
 
-
     /// Static routing data for a slot.
     fn slot_info(id: SlotId) -> &'static SlotInfo {
         &SLOT_INFO[id.index() as usize]
@@ -817,18 +848,26 @@ mod imp {
         /// shared (engine-wide) module clock from `config`.
         pub fn new(peri: SDHOST<'d>, config: Config) -> Result<Self, ConfigError> {
             config.validate()?;
+            // P4 powers the SD card / IO domain from an on-chip LDO that must be
+            // up before any card communication.
+            #[cfg(esp32p4)]
+            enable_sd_io_ldo();
             let guard = PeripheralGuard::new(Peripheral::SdioHost);
             let this = Self {
                 _peri: peri,
                 _guard: guard,
-                taken: [AtomicBool::new(false), AtomicBool::new(false)],
+                taken: [const { AtomicBool::new(false) }; 2],
             };
 
-            // DesignWare reset, then module clock, then quiesce interrupts. The
-            // module clock is engine-wide, so it is programmed once here and the
-            // config is stashed for slots to derive their card dividers from.
-            let _ = reset_engine();
+            // Module clock first, then the DesignWare reset, then quiesce
+            // interrupts. The module clock is engine-wide, so it is programmed once
+            // here and the config is stashed for slots to derive their card
+            // dividers from. The clock must precede `reset_engine` because on P4
+            // the controller's CIU has no functional clock until the module clock
+            // (in `HP_SYS_CLKRST`) is running, so its reset would never complete.
             set_module_clock(config.clock_source, config.module_div);
+            this.reset_engine();
+
             STATE.settings.with(|s| s.module = config);
             let r = SDHOST::regs();
             r.tmout().write(|w| unsafe {
@@ -839,6 +878,26 @@ mod imp {
             r.ctrl().modify(|_, w| w.int_enable().clear_bit());
 
             Ok(this)
+        }
+
+        /// Resets the controller, FIFO and DMA blocks, waiting for self-clear.
+        fn reset_engine(&self) {
+            let r = SDHOST::regs();
+            r.ctrl().modify(|_, w| {
+                w.controller_reset().set_bit();
+                w.fifo_reset().set_bit();
+                w.dma_reset().set_bit()
+            });
+
+            // A reset timeout means the controller never left reset; there is no
+            // matching `ConfigError` and the first card command would surface it
+            // as a timeout regardless, so this is best-effort.
+            let _ = poll_until(|| {
+                let c = r.ctrl().read();
+                !c.controller_reset().bit_is_set()
+                    && !c.fifo_reset().bit_is_set()
+                    && !c.dma_reset().bit_is_set()
+            });
         }
 
         /// Returns a builder for the given slot in blocking mode.
@@ -977,7 +1036,15 @@ mod imp {
         crate::gpio::io_mux_reg(pin).modify(|_, w| {
             unsafe { w.mcu_sel().bits(af as u8) };
             w.fun_ie().set_bit();
-            w.fun_wpu().set_bit()
+            w.fun_wpu().set_bit();
+            // esp-idf bumps the SD pads to the strongest drive on every chip
+            // except ESP32 (where the default of 2 is sufficient). Matches
+            // `configure_pin_iomux`.
+            #[cfg(not(esp32))]
+            unsafe {
+                w.fun_drv().bits(3)
+            };
+            w
         });
     }
 
@@ -1404,6 +1471,12 @@ mod imp {
         }
 
         /// Reads blocks/bytes into the command's buffer via the IDMAC.
+        ///
+        /// `bounce` is the transaction-scoped scratch owned by `engine_lock`.
+        #[cfg_attr(
+            not(any(soc_internal_memory_cached, dma_can_access_psram)),
+            allow(unused_variables)
+        )]
         async fn read_async(
             &mut self,
             index: u8,
@@ -1411,7 +1484,33 @@ mod imp {
             buf: &mut [u8],
             block_size: u16,
             block_count: u32,
+            bounce: &mut Bounce,
         ) -> Result<[u32; 4], sdio::MmcError> {
+            // Small control reads (SCR/SSR/SWITCH) from a cache-unaligned caller
+            // buffer can't be DMA'd directly on cached SoCs: invalidation would
+            // clobber data sharing the cache line. Bounce them through the
+            // aligned scratch buffer and copy the result out.
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            if buf.len() <= BOUNCE_LEN && DmaAlignedMut::new(&mut buf[..]).is_err() {
+                let total = buf.len();
+                let mut dma = bounce.buf.get_mut();
+                let ptr = dma_ptr(dma.as_ptr() as usize)?;
+                let resp = transfer_async(
+                    self.id,
+                    index,
+                    arg,
+                    false,
+                    ptr,
+                    total,
+                    block_size,
+                    block_count,
+                )
+                .await?;
+                dma.invalidate();
+                buf.copy_from_slice(&dma[..total]);
+                return Ok(resp);
+            }
+
             #[cfg_attr(
                 not(any(soc_internal_memory_cached, dma_can_access_psram)),
                 allow(unused_mut)
@@ -1439,6 +1538,12 @@ mod imp {
         }
 
         /// Writes blocks/bytes from the command's buffer via the IDMAC.
+        ///
+        /// `bounce` is the transaction-scoped scratch owned by `engine_lock`.
+        #[cfg_attr(
+            not(any(soc_internal_memory_cached, dma_can_access_psram)),
+            allow(unused_variables)
+        )]
         async fn write_async(
             &mut self,
             index: u8,
@@ -1446,7 +1551,32 @@ mod imp {
             buf: &[u8],
             block_size: u16,
             block_count: u32,
+            bounce: &mut Bounce,
         ) -> Result<[u32; 4], sdio::MmcError> {
+            // Cached SoCs: the IDMAC reads the source straight from memory, so
+            // the CPU's dirty cache lines must be flushed first. A cache-
+            // unaligned caller buffer also can't be flushed in place without
+            // touching neighbours, so bounce it through the aligned scratch.
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            if buf.len() <= BOUNCE_LEN {
+                let total = buf.len();
+                let mut dma = bounce.buf.get_mut();
+                dma[..total].copy_from_slice(buf);
+                dma.writeback();
+                let ptr = dma_ptr(dma.as_ptr() as usize)?;
+                return Ok(transfer_async(
+                    self.id,
+                    index,
+                    arg,
+                    true,
+                    ptr,
+                    total,
+                    block_size,
+                    block_count,
+                )
+                .await?);
+            }
+
             let ptr = dma_ptr(buf.as_ptr() as usize)?;
             Ok(transfer_async(
                 self.id,
@@ -1475,10 +1605,10 @@ mod imp {
         where
             C: sdio::BlockReadCommand + 'a,
         {
-            let _lock = STATE.select_slot(slot_id(S)).await;
+            let mut lock = STATE.select_slot(slot_id(S)).await;
             let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
             let words = self
-                .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc)
+                .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc, &mut lock)
                 .await?;
             Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
@@ -1487,10 +1617,10 @@ mod imp {
         where
             C: sdio::BlockWriteCommand + 'a,
         {
-            let _lock = STATE.select_slot(slot_id(S)).await;
+            let mut lock = STATE.select_slot(slot_id(S)).await;
             let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
             let words = self
-                .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc)
+                .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc, &mut lock)
                 .await?;
             Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
@@ -1499,10 +1629,10 @@ mod imp {
         where
             C: sdio::ByteReadCommand + 'a,
         {
-            let _lock = STATE.select_slot(slot_id(S)).await;
+            let mut lock = STATE.select_slot(slot_id(S)).await;
             let (n, arg) = (cmd.byte_count(), cmd.arg());
             let words = self
-                .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1)
+                .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1, &mut lock)
                 .await?;
             Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
@@ -1511,10 +1641,10 @@ mod imp {
         where
             C: sdio::ByteWriteCommand + 'a,
         {
-            let _lock = STATE.select_slot(slot_id(S)).await;
+            let mut lock = STATE.select_slot(slot_id(S)).await;
             let (n, arg) = (cmd.byte_count(), cmd.arg());
             let words = self
-                .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1)
+                .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1, &mut lock)
                 .await?;
             Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
         }
@@ -1591,22 +1721,6 @@ mod imp {
         Err(Error::Timeout)
     }
 
-    /// Resets the controller, FIFO and DMA blocks, waiting for self-clear.
-    fn reset_engine() -> Result<(), Error> {
-        let r = SDHOST::regs();
-        r.ctrl().modify(|_, w| {
-            w.controller_reset().set_bit();
-            w.fifo_reset().set_bit();
-            w.dma_reset().set_bit()
-        });
-        poll_until(|| {
-            let c = r.ctrl().read();
-            !c.controller_reset().bit_is_set()
-                && !c.fifo_reset().bit_is_set()
-                && !c.dma_reset().bit_is_set()
-        })
-    }
-
     /// Programs the shared module clock register (divider, source, phases).
     ///
     /// Field encodings differ per chip (see each chip's `sdmmc_ll`).
@@ -1627,15 +1741,67 @@ mod imp {
         });
     }
 
+    /// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.
+    ///
+    /// On the ESP32-P4 the dedicated SD IO pins (GPIO39-44) and the card VDD are
+    /// supplied by internal LDO channel 4 (analog unit `ext_ldo[4]`), which must
+    /// be brought up before any card communication or every command response
+    /// times out. esp-idf does this in the application via
+    /// `sd_pwr_ctrl_new_on_chip_ldo` (`CONFIG_EXAMPLE_SD_PWR_CTRL_LDO_IO_ID = 4`
+    /// on the reference board). This is board-specific and belongs in a future
+    /// regulator API; it lives here for now to bring P4 up.
+    ///
+    /// Voltage selection (mirrors esp-idf `ldo_ll`): `force_tieh_sel = 1`
+    /// hands control to software (`tieh_sel`), `tieh_sel = 0` selects the `tieh`
+    /// bit, and `tieh = 1` ties the output to the 3.3 V rail directly, so the
+    /// `dref`/`mul` reference is irrelevant. `target0`/`target1` keep their
+    /// reset (power-on delay) defaults via `modify`.
+    #[cfg(esp32p4)]
+    fn enable_sd_io_ldo() {
+        let pmu = crate::peripherals::PMU::regs();
+
+        // Limit inrush current while the output cap charges; keep ripple
+        // suppression (voltage detector) enabled.
+        pmu.ext_ldo_p1_0p2a_ana().modify(|_, w| {
+            w.ana_0p2a_en_cur_lim_1().set_bit();
+            w.ana_0p2a_en_vdet_1().set_bit()
+        });
+
+        // Software-controlled, 3.3 V rail, then enable the regulator.
+        pmu.ext_ldo_p1_0p2a().modify(|_, w| {
+            w._0p2a_force_tieh_sel_1().set_bit();
+            unsafe { w._0p2a_tieh_sel_1().bits(0) };
+            w._0p2a_tieh_1().set_bit();
+            w._0p2a_xpd_1().set_bit()
+        });
+
+        crate::rom::ets_delay_us(500);
+
+        // Drop the inrush current limit once the output has settled.
+        pmu.ext_ldo_p1_0p2a_ana()
+            .modify(|_, w| w.ana_0p2a_en_cur_lim_1().clear_bit());
+        crate::rom::ets_delay_us(100);
+    }
+
     /// Programs the module clock in `HP_SYS_CLKRST` (P4 keeps the divider/source
     /// outside the SDHOST block; see `sdmmc_ll`). Source fixed at PLL160M.
     #[cfg(esp32p4)]
     fn set_module_clock(_source: ClockSource, div: u8) {
         let c = crate::peripherals::HP_SYS_CLKRST::regs();
+
+        // Enable the PLL_F160M reference clock that feeds the SDMMC LS clock
+        // (esp-idf `esp_clk_tree_enable_src`). Without this gate `cclk_in` stays at
+        // 0, the controller never clocks, and every command times out.
+        c.ref_clk_ctrl2()
+            .modify(|_, w| w.ref_160m_clk_en().set_bit());
+
         c.peri_clk_ctrl01().modify(|_, w| {
             w.sdio_ls_clk_src_sel().bit(false); // PLL_F160M
             w.sdio_ls_clk_en().set_bit()
         });
+
+        // Low-speed clock divider edges (`h`/`l`/`n`); `div == 1` bypasses the
+        // divider via `sdio_hs_mode`.
         if div > 1 {
             let h = div / 2 - 1;
             let l = div - 1;
@@ -1645,10 +1811,6 @@ mod imp {
                 w.sdio_ls_clk_edge_l().bits(l);
                 w.sdio_ls_clk_edge_n().bits(n)
             });
-            c.peri_clk_ctrl02()
-                .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
-            c.peri_clk_ctrl02()
-                .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
         } else {
             c.peri_clk_ctrl01()
                 .modify(|_, w| w.sdio_hs_mode().set_bit());
@@ -1658,6 +1820,25 @@ mod imp {
                 w.sdio_ls_clk_edge_n().bits(0)
             });
         }
+
+        // Enable the drive (output), sample (input) and self (core) clocks with
+        // their default edge phases (drive=1, sample=0, self=0). Without these the
+        // controller never drives the card clock out, so commands never complete.
+        // Mirrors esp-idf `sdmmc_ll_init_phase_delay`.
+        c.peri_clk_ctrl02().modify(|_, w| unsafe {
+            w.sdio_ls_drv_clk_en().set_bit();
+            w.sdio_ls_sam_clk_en().set_bit();
+            w.sdio_ls_slf_clk_en().set_bit();
+            w.sdio_ls_drv_clk_edge_sel().bits(1);
+            w.sdio_ls_sam_clk_edge_sel().bits(0);
+            w.sdio_ls_slf_clk_edge_sel().bits(0)
+        });
+
+        // Commit the divider/phase edge configuration.
+        c.peri_clk_ctrl02()
+            .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
+        c.peri_clk_ctrl02()
+            .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
     }
 
     /// Programs the shared module clock register (divider, phases).
@@ -1855,7 +2036,6 @@ mod imp {
 
         issue_command(id, index, arg, resp_len, check_crc, flags);
         wait_command_accepted()?;
-
         wait_result().await?;
         let resp = read_response(resp_len);
         if flags.busy {
@@ -1897,9 +2077,7 @@ mod imp {
             next_desc: 0,
         };
         fill_descriptors(ring, &mut t, RING_LEN);
-        r.dbaddr()
-            .write(|w| unsafe { w.bits(ring.as_ptr() as u32) });
-        enable_idmac();
+        enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
         arm_engine(true, block_count > 1, Some(t));
@@ -1909,7 +2087,6 @@ mod imp {
 
         issue_data_command(id, index, arg, write, block_count);
         wait_command_accepted()?;
-
         wait_result().await?;
         if write {
             wait_busy_async().await?;
@@ -2059,9 +2236,7 @@ mod imp {
         };
         fill_descriptors(ring, &mut t, RING_LEN);
 
-        r.dbaddr()
-            .write(|w| unsafe { w.bits(ring.as_ptr() as u32) });
-        enable_idmac();
+        enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
         issue_data_command(id, index, arg, write, block_count);
@@ -2165,7 +2340,7 @@ mod imp {
     fn fill_descriptors(ring: &mut [Desc; RING_LEN], t: &mut Transfer, count: usize) {
         for _ in 0..count {
             if t.remaining == 0 {
-                return;
+                break;
             }
             let i = t.next_desc;
             let size = t.remaining.min(DMA_MAX_BUF_LEN);
@@ -2185,6 +2360,15 @@ mod imp {
             t.ptr += size as u32;
             t.next_desc = (i + 1) % RING_LEN;
         }
+        // On write-back-cache SoCs the IDMAC fetches descriptors straight from
+        // memory; flush the freshly written ring so it doesn't read stale lines.
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                ring.as_ptr() as u32,
+                core::mem::size_of_val(ring) as u32,
+            );
+        }
     }
 
     /// Resets the FIFO and waits for the self-clear.
@@ -2194,13 +2378,18 @@ mod imp {
         poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set())
     }
 
-    /// Enables the IDMAC engine for a transfer.
-    fn enable_idmac() {
+    /// Enables the IDMAC engine for a transfer and programs the descriptor base.
+    ///
+    /// `BMOD.SWR` resets the IDMAC's internal registers (including `DBADDR`) on
+    /// this IP, so the descriptor base must be written *after* the reset,
+    /// matching the ordering ESP-IDF uses in `sdmmc_host_dma_prepare`.
+    fn enable_idmac(dbaddr: u32) {
         let r = SDHOST::regs();
-        r.bmod().modify(|_, w| w.swr().set_bit());
-        r.idinten().write(|w| unsafe { w.bits(0) });
         r.ctrl()
             .modify(|rd, w| unsafe { w.bits(rd.bits() | CTRL_DMA_ENABLE | CTRL_USE_INTERNAL_DMA) });
+        r.bmod().modify(|_, w| w.swr().set_bit());
+        r.idinten().write(|w| unsafe { w.bits(0) });
+        r.dbaddr().write(|w| unsafe { w.bits(dbaddr) });
         r.bmod().modify(|_, w| {
             w.de().set_bit();
             w.fb().set_bit()
@@ -2223,6 +2412,9 @@ mod imp {
     fn module_hz(source: ClockSource, div: u8) -> u32 {
         let base = match source {
             ClockSource::Pll160m => 160_000_000,
+            //#[cfg(esp32p4)]
+            // ClockSource::Apll => unimplemented!(),
+            #[cfg(not(esp32p4))]
             ClockSource::Xtal => 40_000_000,
         };
         base / (div as u32)

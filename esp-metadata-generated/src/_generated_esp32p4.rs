@@ -4333,7 +4333,9 @@ macro_rules! implement_peripheral_clocks {
                         .modify(|_, w| w.rst_en_rsa().bit(reset));
                 }
                 Peripheral::SdioHost => {
-                    let _ = reset;
+                    crate::peripherals::LP_AON_CLKRST::regs()
+                        .lp_aonclkrst_hp_sdmmc_emac_rst_ctrl()
+                        .modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
