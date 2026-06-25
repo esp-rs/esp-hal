@@ -3,19 +3,6 @@
 //! Implements the chained-ring descriptor layout for the Synopsys DesignWare
 //! GMAC as found on ESP32 and ESP32-P4. The driver always uses the **enhanced
 //! 32-byte descriptor format** (`ALT_DESC_SIZE = 1` in `EMAC_DMA.dmabusmode`).
-//!
-//! # Cache coherency (ESP32-P4)
-//!
-//! ESP32-P4's RISC-V core has a write-back L1/L2 data cache. CPU writes to
-//! descriptors and packet buffers are not visible to DMA until the affected
-//! cache lines are flushed; similarly, DMA writes to RX descriptors and buffers
-//! are not visible to the CPU until the stale cache lines are invalidated.
-//!
-//! On P4 each descriptor is padded to 64 bytes (`align(64)`) so that no two
-//! descriptors share a cache line and a writeback/invalidate on one cannot
-//! corrupt CPU-owned state in an adjacent slot.
-//!
-//! On ESP32 (no write-back cache) a compiler fence alone is sufficient.
 
 use core::sync::atomic::{Ordering, fence};
 
