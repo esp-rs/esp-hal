@@ -20,8 +20,6 @@ use portable_atomic::AtomicBool;
 use procmacros::{BuilderLite, handler};
 use sdio::{self as _, MmcError};
 
-#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-use crate::dma::aligned::InternalMemory;
 #[cfg(sdmmc_has_gpio_matrix)]
 use crate::gpio::{OutputSignal, PinGuard, Pull};
 use crate::{
@@ -29,7 +27,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
-    dma::aligned::DmaAlignedMut,
+    dma::aligned::{DmaAlignedMut, InternalMemory},
     gpio::{
         InputSignal,
         OutputConfig,
@@ -37,7 +35,6 @@ use crate::{
     },
     peripherals::{Interrupt, SDHOST},
     private::DropGuard,
-    soc::is_valid_ram_address,
     system::{Peripheral, PeripheralGuard},
 };
 
@@ -174,7 +171,6 @@ pub enum ResponseLen {
 impl ResponseLen {
     /// CMD0 (`GO_IDLE_STATE`) never returns a response; the `sdio` crate
     /// declares it as `R1`, so force no-response by command index.
-    #[cfg_attr(not(any(esp32, esp32s3)), allow(dead_code))]
     fn for_index(self, index: u8) -> Self {
         if index == 0 { ResponseLen::None } else { self }
     }
@@ -317,13 +313,12 @@ struct Transfer {
 }
 
 /// Driver-owned descriptor ring in internal DMA-capable RAM.
-#[cfg_attr(soc_internal_memory_cached, repr(align(64)))]
-struct DescRing(UnsafeCell<[Desc; RING_LEN]>);
+struct DescRing(UnsafeCell<InternalMemory<[Desc; RING_LEN]>>);
 // Access is serialized by the single controller / per-slot mutex.
 unsafe impl Sync for DescRing {}
 
-fn ring() -> &'static mut [Desc; RING_LEN] {
-    unsafe { &mut *STATE.desc_ring.0.get() }
+fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
+    unsafe { &mut *STATE.desc_ring.0.get() }.get_mut()
 }
 
 // On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
@@ -537,7 +532,7 @@ static STATE: State = State {
     engine: NonReentrantMutex::new(Engine::IDLE),
     engine_lock: embassy_sync::mutex::Mutex::new(Bounce::INIT),
     settings: NonReentrantMutex::new(Settings::INIT),
-    desc_ring: DescRing(UnsafeCell::new([Desc::ZERO; RING_LEN])),
+    desc_ring: DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN]))),
 };
 
 /// Applies the active slot's shared-register settings when the active slot
@@ -761,10 +756,10 @@ fn on_interrupt() {
             if let Some(t) = eng.transfer.as_mut()
                 && t.remaining > 0
             {
-                let ring = ring();
-                let free = free_descriptors(ring, t.next_desc);
+                let mut ring = ring();
+                let free = free_descriptors(ring.reborrow(), t.next_desc);
                 if free > 0 {
-                    fill_descriptors(ring, t, free);
+                    fill_descriptors(ring.reborrow(), t, free);
                     r.pldmnd().write(|w| unsafe { w.bits(1) });
                 }
             }
@@ -1263,9 +1258,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Issues a no-data command and returns its raw response words.
-    ///
-    /// Low-level bring-up surface; the public API arrives with `MmcBus`.
-    #[doc(hidden)]
     pub fn command_blocking(
         &mut self,
         index: u8,
@@ -1282,20 +1274,17 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Reads `block_count` blocks into a DMA-capable buffer (CMD17/CMD18).
-    ///
-    /// Low-level bring-up surface; the public API arrives with `MmcBus`.
-    #[doc(hidden)]
     pub fn read_blocks_blocking(
         &mut self,
         cmd_index: u8,
         arg: u32,
-        buf: &mut DmaAlignedMut<'_, [u8]>,
+        mut buf: DmaAlignedMut<'_, [u8]>,
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
         select_slot_sync(self.id);
         let total = buf.len();
-        let ptr = dma_ptr(buf.as_ptr() as usize)?;
+        let ptr = dma_ptr(buf.reborrow())?;
         let resp =
             self.transfer_blocking(cmd_index, arg, false, ptr, total, block_size, block_count)?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
@@ -1304,14 +1293,11 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Writes `block_count` blocks from a DMA-capable buffer (CMD24/CMD25).
-    ///
-    /// Low-level bring-up surface; the public API arrives with `MmcBus`.
-    #[doc(hidden)]
     pub fn write_blocks_blocking(
         &mut self,
         cmd_index: u8,
         arg: u32,
-        buf: &mut DmaAlignedMut<'_, [u8]>,
+        mut buf: DmaAlignedMut<'_, [u8]>,
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
@@ -1319,7 +1305,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         buf.writeback();
         let total = buf.len();
-        let ptr = dma_ptr(buf.as_ptr() as usize)?;
+        let ptr = dma_ptr(buf.reborrow())?;
         self.transfer_blocking(cmd_index, arg, true, ptr, total, block_size, block_count)
     }
 
@@ -1388,15 +1374,15 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
 
         // Build the descriptor chain for the whole transfer.
-        let ring = ring();
-        *ring = [Desc::ZERO; RING_LEN];
+        let mut ring = ring();
+        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
         ring[0].flags |= DESC_FIRST;
         let mut t = Transfer {
             ptr: buf_ptr,
             remaining: total_len,
             next_desc: 0,
         };
-        fill_descriptors(ring, &mut t, RING_LEN);
+        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
@@ -1566,11 +1552,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Reads blocks/bytes into the command's buffer via the IDMAC.
-    ///
-    /// `bounce` is the transaction-scoped scratch owned by `engine_lock`.
     #[cfg_attr(
         not(any(soc_internal_memory_cached, dma_can_access_psram)),
-        allow(unused_variables)
+        expect(unused_variables) // bounce
     )]
     async fn read_async(
         &mut self,
@@ -1588,8 +1572,8 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         if buf.len() <= BOUNCE_LEN && DmaAlignedMut::new(&mut buf[..]).is_err() {
             let total = buf.len();
-            let dma = bounce.buf.get_mut();
-            let ptr = dma_ptr(dma.as_ptr() as usize)?;
+            let mut dma = bounce.buf.get_mut();
+            let ptr = dma_ptr(dma.reborrow().unsize())?;
             let resp = self
                 .transfer_async(index, arg, false, ptr, total, block_size, block_count)
                 .await?;
@@ -1598,11 +1582,11 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             return Ok(resp);
         }
 
-        let dma = DmaAlignedMut::new(buf).map_err(|e| match e {
+        let mut dma = DmaAlignedMut::new(buf).map_err(|e| match e {
             crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
             _ => sdio::MmcError::Io,
         })?;
-        let ptr = dma_ptr(dma.as_ptr() as usize)?;
+        let ptr = dma_ptr(dma.reborrow())?;
         let total = dma.len();
         let resp = self
             .transfer_async(index, arg, false, ptr, total, block_size, block_count)
@@ -1613,11 +1597,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Writes blocks/bytes from the command's buffer via the IDMAC.
-    ///
-    /// `bounce` is the transaction-scoped scratch owned by `engine_lock`.
     #[cfg_attr(
         not(any(soc_internal_memory_cached, dma_can_access_psram)),
-        allow(unused_variables)
+        expect(unused_variables) // bounce
     )]
     async fn write_async(
         &mut self,
@@ -1638,13 +1620,13 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             let mut dma = bounce.buf.get_mut();
             dma[..total].copy_from_slice(buf);
             dma.writeback();
-            let ptr = dma_ptr(dma.as_ptr() as usize)?;
+            let ptr = dma_ptr(dma.unsize())?;
             return Ok(self
                 .transfer_async(index, arg, true, ptr, total, block_size, block_count)
                 .await?);
         }
 
-        let ptr = dma_ptr(buf.as_ptr() as usize)?;
+        let ptr = dma_ptr_from_raw(buf.as_ptr())?;
         Ok(self
             .transfer_async(index, arg, true, ptr, buf.len(), block_size, block_count)
             .await?)
@@ -1696,15 +1678,15 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
 
         // Build the descriptor chain and prime the IDMAC.
-        let ring = ring();
-        *ring = [Desc::ZERO; RING_LEN];
+        let mut ring = ring();
+        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
         ring[0].flags |= DESC_FIRST;
         let mut t = Transfer {
             ptr: buf_ptr,
             remaining: total_len,
             next_desc: 0,
         };
-        fill_descriptors(ring, &mut t, RING_LEN);
+        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
@@ -2141,21 +2123,27 @@ fn wait_busy_cleared() -> Result<(), Error> {
 /// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
 ///
 /// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
-fn dma_ptr(addr: usize) -> Result<u32, Error> {
-    if is_valid_ram_address(addr) {
+fn dma_ptr(buf: DmaAlignedMut<'_, [u8]>) -> Result<u32, Error> {
+    dma_ptr_from_raw(buf.as_ptr())
+}
+
+fn dma_ptr_from_raw(addr: *const u8) -> Result<u32, Error> {
+    // Not in some weird region like flash or RTC memory.
+    if crate::soc::is_valid_ram_address(addr as usize) {
         return Ok(addr as u32);
     }
-    #[cfg(sdmmc_psram_dma)]
-    if crate::soc::is_valid_psram_address(addr) {
+    #[cfg(all(soc_has_psram, not(sdmmc_psram_dma)))]
+    if crate::soc::is_valid_psram_address(addr as usize) {
         return Ok(addr as u32);
     }
+
     Err(Error::BufferNotDmaCapable)
 }
 
 /// Waits for the command response then the data phase, refilling the ring.
 fn run_data_phase(
     t: &mut Transfer,
-    ring: &mut [Desc; RING_LEN],
+    mut ring: DmaAlignedMut<'_, [Desc; RING_LEN]>,
     write: bool,
     block_count: u32,
 ) -> Result<(), Error> {
@@ -2195,9 +2183,9 @@ fn run_data_phase(
             return Err(Error::DmaError);
         }
         if t.remaining > 0 {
-            let free = free_descriptors(ring, t.next_desc);
+            let free = free_descriptors(ring.reborrow(), t.next_desc);
             if free > 0 {
-                fill_descriptors(ring, t, free);
+                fill_descriptors(ring.reborrow(), t, free);
                 r.pldmnd().write(|w| unsafe { w.bits(1) });
             }
         }
@@ -2219,7 +2207,7 @@ fn run_data_phase(
 }
 
 /// Counts descriptors the engine has released, starting at `next`.
-fn free_descriptors(ring: &[Desc; RING_LEN], next: usize) -> usize {
+fn free_descriptors(ring: DmaAlignedMut<'_, [Desc; RING_LEN]>, next: usize) -> usize {
     let mut count = 0;
     for i in 0..RING_LEN {
         let d = &ring[(next + i) % RING_LEN];
@@ -2236,7 +2224,7 @@ fn free_descriptors(ring: &[Desc; RING_LEN], next: usize) -> usize {
 
 /// Fills up to `count` descriptors from the remaining transfer (shared
 /// blocking/async refill; mirrors `sd_host_fill_dma_descriptors`).
-fn fill_descriptors(ring: &mut [Desc; RING_LEN], t: &mut Transfer, count: usize) {
+fn fill_descriptors(mut ring: DmaAlignedMut<'_, [Desc; RING_LEN]>, t: &mut Transfer, count: usize) {
     for _ in 0..count {
         if t.remaining == 0 {
             break;
@@ -2259,12 +2247,9 @@ fn fill_descriptors(ring: &mut [Desc; RING_LEN], t: &mut Transfer, count: usize)
         t.ptr += size as u32;
         t.next_desc = (i + 1) % RING_LEN;
     }
-    // On write-back-cache SoCs the IDMAC fetches descriptors straight from
-    // memory; flush the freshly written ring so it doesn't read stale lines.
+
     #[cfg(soc_internal_memory_cached)]
-    unsafe {
-        crate::soc::cache_writeback_addr(ring.as_ptr() as u32, core::mem::size_of_val(ring) as u32);
-    }
+    ring.writeback();
 }
 
 fn reset_transfer() -> Result<(), Error> {

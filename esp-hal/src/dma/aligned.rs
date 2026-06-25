@@ -222,6 +222,11 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     pub fn into_inner(self) -> &'a mut T {
         self.0
     }
+
+    /// Reborrows this object with a different lifetime.
+    pub fn reborrow<'b>(&'b mut self) -> DmaAlignedMut<'b, T> {
+        DmaAlignedMut(self.0)
+    }
 }
 
 impl<'a, T, const N: usize> DmaAlignedMut<'a, [T; N]> {
