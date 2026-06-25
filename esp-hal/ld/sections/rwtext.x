@@ -15,12 +15,10 @@
 
   _rwtext_start = .;
 
-  /* Xtensa L32R requires literals before code (see comment in `text.x`). */
-  *(.rwtext.literal .rwtext.literal.*)
-  *(.rwtext .rwtext.*)
+  /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
+  *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
   /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
-  *:esp_rom_spiflash.*(.literal .literal.*)
-  *:esp_rom_spiflash.*(.text .text.*)
+  *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
 
   #IF ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK
     INCLUDE "rwtext_hook.x"
