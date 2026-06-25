@@ -922,14 +922,13 @@ impl<'d> SdHostController<'d> {
         Ok(Slot {
             id: slot_id(S),
             config,
-            width: BusWidth::Bit1,
             data_pins: 0,
             clk_connected: false,
             cmd_connected: false,
+            cd_connected: false,
+            wp_connected: false,
             _guard: PeripheralGuard::new(Peripheral::SdioHost),
             power: None,
-            cd: None,
-            wp: None,
             _pd: PhantomData,
         })
     }
@@ -1091,14 +1090,13 @@ for_each_iomux_function! {
 pub struct Slot<'d, const S: u8, Dm: DriverMode> {
     id: SlotId,
     config: SlotConfig,
-    width: BusWidth,
     data_pins: u8,
     clk_connected: bool,
     cmd_connected: bool,
+    cd_connected: bool,
+    wp_connected: bool,
     _guard: PeripheralGuard,
     power: Option<interconnect::OutputSignal<'d>>,
-    cd: Option<interconnect::InputSignal<'d>>,
-    wp: Option<interconnect::InputSignal<'d>>,
     _pd: PhantomData<(&'d mut (), Dm)>,
 }
 
@@ -1150,7 +1148,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         let pin = cd.into();
         pin.set_input_enable(true);
         slot_info(self.id).cd_in.unwrap().connect_to(&pin);
-        self.cd = Some(pin);
+        self.cd_connected = true;
         self
     }
 
@@ -1159,7 +1157,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         let pin = wp.into();
         pin.set_input_enable(true);
         slot_info(self.id).wp_in.unwrap().connect_to(&pin);
-        self.wp = Some(pin);
+        self.wp_connected = true;
         self
     }
 
@@ -1176,7 +1174,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     /// Returns `true` if a card is detected, or if no card-detect pin is
     /// wired (assume present).
     pub fn is_card_present(&self) -> bool {
-        if self.cd.is_none() {
+        if !self.cd_connected {
             return true;
         }
         (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << self.id.index())) == 0
@@ -1186,7 +1184,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     /// if no write-protect pin is wired. Polarity follows
     /// [`SlotConfig::with_wp_active_high`].
     pub fn is_write_protected(&self) -> bool {
-        if self.wp.is_none() {
+        if !self.wp_connected {
             return false;
         }
         let level =
@@ -1209,7 +1207,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
             eng.set_card_clock(self.id, card_div)?;
             Ok(())
         })?;
-        self.width = width;
 
         // Record this slot's frequency and (re-)apply its slot-specific
         // shared-register tuning now that it is the active slot. Done here
@@ -1328,11 +1325,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
 
     fn note_data_pin(&mut self, count: u8) {
         self.data_pins = self.data_pins.max(count);
-        self.width = if self.data_pins >= 4 {
-            BusWidth::Bit4
-        } else {
-            BusWidth::Bit1
-        };
     }
 
     /// Issues a no-data command and waits for completion in blocking mode.
@@ -1490,14 +1482,13 @@ impl<'d, const S: u8> Slot<'d, S, Blocking> {
         Slot {
             id: self.id,
             config: self.config,
-            width: self.width,
             data_pins: self.data_pins,
             clk_connected: self.clk_connected,
             cmd_connected: self.cmd_connected,
             _guard: self._guard,
             power: self.power,
-            cd: self.cd,
-            wp: self.wp,
+            cd_connected: self.cd_connected,
+            wp_connected: self.wp_connected,
             _pd: PhantomData,
         }
     }
@@ -1515,14 +1506,13 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         Slot {
             id: self.id,
             config: self.config,
-            width: self.width,
             data_pins: self.data_pins,
             clk_connected: self.clk_connected,
             cmd_connected: self.cmd_connected,
             _guard: self._guard,
             power: self.power,
-            cd: self.cd,
-            wp: self.wp,
+            cd_connected: self.cd_connected,
+            wp_connected: self.wp_connected,
             _pd: PhantomData,
         }
     }
@@ -1598,7 +1588,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         if buf.len() <= BOUNCE_LEN && DmaAlignedMut::new(&mut buf[..]).is_err() {
             let total = buf.len();
-            let mut dma = bounce.buf.get_mut();
+            let dma = bounce.buf.get_mut();
             let ptr = dma_ptr(dma.as_ptr() as usize)?;
             let resp = self
                 .transfer_async(index, arg, false, ptr, total, block_size, block_count)
@@ -1608,11 +1598,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             return Ok(resp);
         }
 
-        #[cfg_attr(
-            not(any(soc_internal_memory_cached, dma_can_access_psram)),
-            allow(unused_mut)
-        )]
-        let mut dma = DmaAlignedMut::new(buf).map_err(|e| match e {
+        let dma = DmaAlignedMut::new(buf).map_err(|e| match e {
             crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
             _ => sdio::MmcError::Io,
         })?;
