@@ -204,7 +204,7 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
     /// Invalidates the cache lines for this data.
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
     #[instability::unstable]
-    pub fn invalidate(&mut self) {
+    pub fn invalidate(&self) {
         if !self.do_cache_op() {
             return;
         }
