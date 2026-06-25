@@ -347,8 +347,27 @@ uhs = false
 # (SD1_*); only its auxiliary signals reach the GPIO matrix. Slot 1 is routed
 # entirely through the GPIO matrix.
 slot_config = [
-    { iomux = true, cd = "SDHOST_CARD_DETECT_N_1", wp = "SDHOST_CARD_WRITE_PRT_1", card_int = "SDHOST_CARD_INT_N_1", data_strobe = "SDHOST_DATA_STROBE_1", rst = "SD_RST_N_1" },
-    { iomux = false, clk = "SDHOST_CCLK_OUT_2", cmd_in = "SDHOST_CCMD_IN_2", cmd_out = "SDHOST_CCMD_OUT_2", data_in = ["SDHOST_CDATA_IN_20", "SDHOST_CDATA_IN_21", "SDHOST_CDATA_IN_22", "SDHOST_CDATA_IN_23", "SDHOST_CDATA_IN_24", "SDHOST_CDATA_IN_25", "SDHOST_CDATA_IN_26", "SDHOST_CDATA_IN_27"], data_out = ["SDHOST_CDATA_OUT_20", "SDHOST_CDATA_OUT_21", "SDHOST_CDATA_OUT_22", "SDHOST_CDATA_OUT_23", "SDHOST_CDATA_OUT_24", "SDHOST_CDATA_OUT_25", "SDHOST_CDATA_OUT_26", "SDHOST_CDATA_OUT_27"], cd = "SDHOST_CARD_DETECT_N_2", wp = "SDHOST_CARD_WRITE_PRT_2", card_int = "SDHOST_CARD_INT_N_2", data_strobe = "SDHOST_DATA_STROBE_2", rst = "SD_RST_N_2" },
+    {
+        iomux = true,
+        cd = "SDHOST_CARD_DETECT_N_1",
+        wp = "SDHOST_CARD_WRITE_PRT_1",
+        card_int = "SDHOST_CARD_INT_N_1",
+        data_strobe = "SDHOST_DATA_STROBE_1",
+        rst = "SD_RST_N_1",
+    },
+    {
+        iomux = false,
+        clk = "SDHOST_CCLK_OUT_2",
+        cmd_in = "SDHOST_CCMD_IN_2",
+        cmd_out = "SDHOST_CCMD_OUT_2",
+        data_in = ["SDHOST_CDATA_IN_20", "SDHOST_CDATA_IN_21", "SDHOST_CDATA_IN_22", "SDHOST_CDATA_IN_23", "SDHOST_CDATA_IN_24", "SDHOST_CDATA_IN_25", "SDHOST_CDATA_IN_26", "SDHOST_CDATA_IN_27"],
+        data_out = ["SDHOST_CDATA_OUT_20", "SDHOST_CDATA_OUT_21", "SDHOST_CDATA_OUT_22", "SDHOST_CDATA_OUT_23", "SDHOST_CDATA_OUT_24", "SDHOST_CDATA_OUT_25", "SDHOST_CDATA_OUT_26", "SDHOST_CDATA_OUT_27"],
+        cd = "SDHOST_CARD_DETECT_N_2",
+        wp = "SDHOST_CARD_WRITE_PRT_2",
+        card_int = "SDHOST_CARD_INT_N_2",
+        data_strobe = "SDHOST_DATA_STROBE_2",
+        rst = "SD_RST_N_2",
+    },
 ]
 
 [device.sdm]
