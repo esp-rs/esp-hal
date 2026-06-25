@@ -429,7 +429,7 @@ impl Engine {
         r.clkena().modify(|rd, w| unsafe {
             w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
         });
-        apply_clock_update(id)?;
+        self.apply_clock_update(id)?;
 
         // Select per-slot divider register and program the divider value.
         r.clksrc().modify(|rd, w| unsafe {
@@ -455,7 +455,21 @@ impl Engine {
             w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
             w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
         });
-        apply_clock_update(id)
+        self.apply_clock_update(id)
+    }
+
+    /// Commits clock-register changes via an `update_clock_registers_only`
+    /// command.
+    fn apply_clock_update(&mut self, id: SlotId) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(0) });
+        r.cmd().write(|w| unsafe {
+            w.update_clock_registers_only().set_bit();
+            w.wait_prvdata_complete().set_bit();
+            w.card_number().bits(id.index() as u8);
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
     }
 }
 
@@ -1256,7 +1270,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
             return Err(Error::NoCard);
         }
         select_slot_sync(self.id);
-        send_command_blocking(self.id, index, arg, resp_len, check_crc, flags)
+        self.send_command_blocking(index, arg, resp_len, check_crc, flags)
     }
 
     /// Reads `block_count` blocks into a DMA-capable buffer (CMD17/CMD18).
@@ -1274,16 +1288,8 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         select_slot_sync(self.id);
         let total = buf.len();
         let ptr = dma_ptr(buf.as_ptr() as usize)?;
-        let resp = transfer_blocking(
-            self.id,
-            cmd_index,
-            arg,
-            false,
-            ptr,
-            total,
-            block_size,
-            block_count,
-        )?;
+        let resp =
+            self.transfer_blocking(cmd_index, arg, false, ptr, total, block_size, block_count)?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         buf.invalidate();
         Ok(resp)
@@ -1306,16 +1312,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         buf.writeback();
         let total = buf.len();
         let ptr = dma_ptr(buf.as_ptr() as usize)?;
-        transfer_blocking(
-            self.id,
-            cmd_index,
-            arg,
-            true,
-            ptr,
-            total,
-            block_size,
-            block_count,
-        )
+        self.transfer_blocking(cmd_index, arg, true, ptr, total, block_size, block_count)
     }
 
     fn note_data_pin(&mut self, count: u8) {
@@ -1325,6 +1322,144 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         } else {
             BusWidth::Bit1
         };
+    }
+
+    /// Issues a no-data command and waits for completion in blocking mode.
+    fn send_command_blocking(
+        &mut self,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+        let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
+
+        // Clear stale command/response status before issuing.
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        self.issue_command(index, arg, resp_len, check_crc, flags)?;
+
+        // Wait for completion or a command-phase error.
+        let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
+        let mut sts = 0;
+        let mut completed = false;
+        for _ in 0..POLL_LIMIT {
+            sts = r.rintsts().read().bits();
+            if sts & done != 0 {
+                completed = true;
+                break;
+            }
+        }
+        if !completed {
+            return Err(Error::Timeout);
+        }
+        map_rintsts(sts)?;
+
+        let resp = read_response(resp_len);
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        // R1b / busy: DesignWare only IRQs busy-clear for writes, so always poll.
+        if flags.busy {
+            wait_busy_cleared()?;
+        }
+        Ok(resp)
+    }
+
+    /// Single- or multi-block data transfer over the IDMAC, blocking.
+    fn transfer_blocking(
+        &mut self,
+        index: u8,
+        arg: u32,
+        write: bool,
+        buf_ptr: u32,
+        total_len: usize,
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+
+        reset_transfer()?;
+        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
+
+        // Build the descriptor chain for the whole transfer.
+        let ring = ring();
+        *ring = [Desc::ZERO; RING_LEN];
+        ring[0].flags |= DESC_FIRST;
+        let mut t = Transfer {
+            ptr: buf_ptr,
+            remaining: total_len,
+            next_desc: 0,
+        };
+        fill_descriptors(ring, &mut t, RING_LEN);
+        enable_idmac(ring.as_ptr() as u32);
+        r.pldmnd().write(|w| unsafe { w.bits(1) });
+
+        self.issue_data_command(index, arg, write, block_count)?;
+
+        let result = run_data_phase(&mut t, ring, write, block_count);
+
+        disable_idmac();
+        r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+        r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+
+        result?;
+        Ok(read_response(ResponseLen::Short))
+    }
+
+    /// Programs `cmdarg`/`cmd` for a no-data command and submits it to the CIU.
+    fn issue_command(
+        &mut self,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect()
+                .bit(!matches!(resp_len, ResponseLen::None));
+            w.response_length()
+                .bit(matches!(resp_len, ResponseLen::Long));
+            w.check_response_crc().bit(check_crc);
+            w.wait_prvdata_complete().bit(flags.wait_complete);
+            w.stop_abort_cmd().bit(flags.stop_abort);
+            w.use_hole().set_bit();
+            w.card_number().bits(self.id.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
+    }
+
+    /// Programs `cmdarg`/`cmd` for a data-transfer command and submits it to the
+    /// CIU.
+    fn issue_data_command(
+        &mut self,
+        index: u8,
+        arg: u32,
+        write: bool,
+        block_count: u32,
+    ) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect().set_bit();
+            w.check_response_crc().set_bit();
+            w.data_expected().set_bit();
+            w.read_write().bit(write);
+            w.send_auto_stop().bit(block_count > 1);
+            w.wait_prvdata_complete().set_bit();
+            w.use_hole().set_bit();
+            w.card_number().bits(self.id.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
     }
 }
 
@@ -1423,7 +1558,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             busy: <C::Resp<'a> as sdio::Response>::BUSY,
         };
         let crc = <C::Resp<'a> as sdio::Response>::CRC;
-        let words = send_command_async(self.id, C::INDEX, cmd.arg(), resp_len, crc, flags).await?;
+        let words = self
+            .send_command_async(C::INDEX, cmd.arg(), resp_len, crc, flags)
+            .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
@@ -1452,17 +1589,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             let total = buf.len();
             let mut dma = bounce.buf.get_mut();
             let ptr = dma_ptr(dma.as_ptr() as usize)?;
-            let resp = transfer_async(
-                self.id,
-                index,
-                arg,
-                false,
-                ptr,
-                total,
-                block_size,
-                block_count,
-            )
-            .await?;
+            let resp = self
+                .transfer_async(index, arg, false, ptr, total, block_size, block_count)
+                .await?;
             dma.invalidate();
             buf.copy_from_slice(&dma[..total]);
             return Ok(resp);
@@ -1478,17 +1607,9 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         })?;
         let ptr = dma_ptr(dma.as_ptr() as usize)?;
         let total = dma.len();
-        let resp = transfer_async(
-            self.id,
-            index,
-            arg,
-            false,
-            ptr,
-            total,
-            block_size,
-            block_count,
-        )
-        .await?;
+        let resp = self
+            .transfer_async(index, arg, false, ptr, total, block_size, block_count)
+            .await?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         dma.invalidate();
         Ok(resp)
@@ -1521,31 +1642,89 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             dma[..total].copy_from_slice(buf);
             dma.writeback();
             let ptr = dma_ptr(dma.as_ptr() as usize)?;
-            return Ok(transfer_async(
-                self.id,
-                index,
-                arg,
-                true,
-                ptr,
-                total,
-                block_size,
-                block_count,
-            )
-            .await?);
+            return Ok(self
+                .transfer_async(index, arg, true, ptr, total, block_size, block_count)
+                .await?);
         }
 
         let ptr = dma_ptr(buf.as_ptr() as usize)?;
-        Ok(transfer_async(
-            self.id,
-            index,
-            arg,
-            true,
-            ptr,
-            buf.len(),
-            block_size,
-            block_count,
-        )
-        .await?)
+        Ok(self
+            .transfer_async(index, arg, true, ptr, buf.len(), block_size, block_count)
+            .await?)
+    }
+
+    /// Issues a no-data command and awaits completion via the interrupt handler.
+    async fn send_command_async(
+        &mut self,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+        let guard = DropGuard::new((), |()| abort_transfer());
+
+        r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
+        arm_engine(false, false, None);
+        r.intmask()
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
+
+        self.issue_command(index, arg, resp_len, check_crc, flags)?;
+        wait_result().await?;
+        let resp = read_response(resp_len);
+        if flags.busy {
+            wait_busy_poll().await?;
+        }
+        guard.defuse();
+        Ok(resp)
+    }
+
+    /// Single- or multi-block data transfer over the IDMAC, interrupt-driven.
+    async fn transfer_async(
+        &mut self,
+        index: u8,
+        arg: u32,
+        write: bool,
+        buf_ptr: u32,
+        total_len: usize,
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], Error> {
+        let guard = DropGuard::new((), |()| abort_transfer());
+        let r = SDHOST::regs();
+
+        reset_transfer()?;
+        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
+
+        // Build the descriptor chain and prime the IDMAC.
+        let ring = ring();
+        *ring = [Desc::ZERO; RING_LEN];
+        ring[0].flags |= DESC_FIRST;
+        let mut t = Transfer {
+            ptr: buf_ptr,
+            remaining: total_len,
+            next_desc: 0,
+        };
+        fill_descriptors(ring, &mut t, RING_LEN);
+        enable_idmac(ring.as_ptr() as u32);
+        r.pldmnd().write(|w| unsafe { w.bits(1) });
+
+        arm_engine(true, block_count > 1, Some(t));
+        r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
+        r.intmask()
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
+
+        self.issue_data_command(index, arg, write, block_count)?;
+        wait_result().await?;
+        if write {
+            wait_busy_async().await?;
+        }
+        disable_idmac();
+        let resp = read_response(ResponseLen::Short);
+        guard.defuse();
+        Ok(resp)
     }
 }
 
@@ -1565,7 +1744,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let mut lock = STATE.select_slot(slot_id(S)).await;
         let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
         let words = self
-            .read_async(C::INDEX, arg, &mut cmd.buf()[..], bs, bc, &mut lock)
+            .read_async(C::INDEX, arg, cmd.buf(), bs, bc, &mut lock)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1577,7 +1756,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let mut lock = STATE.select_slot(slot_id(S)).await;
         let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
         let words = self
-            .write_async(C::INDEX, arg, &cmd.buf()[..], bs, bc, &mut lock)
+            .write_async(C::INDEX, arg, cmd.buf(), bs, bc, &mut lock)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1589,7 +1768,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let mut lock = STATE.select_slot(slot_id(S)).await;
         let (n, arg) = (cmd.byte_count(), cmd.arg());
         let words = self
-            .read_async(C::INDEX, arg, &mut cmd.buf()[..], n as u16, 1, &mut lock)
+            .read_async(C::INDEX, arg, cmd.buf(), n as u16, 1, &mut lock)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1601,7 +1780,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let mut lock = STATE.select_slot(slot_id(S)).await;
         let (n, arg) = (cmd.byte_count(), cmd.arg());
         let words = self
-            .write_async(C::INDEX, arg, &cmd.buf()[..], n as u16, 1, &mut lock)
+            .write_async(C::INDEX, arg, cmd.buf(), n as u16, 1, &mut lock)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1816,20 +1995,6 @@ fn set_module_clock(_source: ClockSource, div: u8) {
     });
 }
 
-/// Commits clock-register changes via an `update_clock_registers_only`
-/// command.
-fn apply_clock_update(id: SlotId) -> Result<(), Error> {
-    let r = SDHOST::regs();
-    r.cmdarg().write(|w| unsafe { w.bits(0) });
-    r.cmd().write(|w| unsafe {
-        w.update_clock_registers_only().set_bit();
-        w.wait_prvdata_complete().set_bit();
-        w.card_number().bits(id.index() as u8);
-        w.start_cmd().set_bit()
-    });
-    wait_command_accepted()
-}
-
 /// Spins until the CIU accepts the command (`start_cmd` self-clears).
 fn wait_command_accepted() -> Result<(), Error> {
     let r = SDHOST::regs();
@@ -1846,60 +2011,13 @@ fn wait_command_accepted() -> Result<(), Error> {
     Err(Error::Timeout)
 }
 
-/// Issues a no-data command and waits for completion in blocking mode.
-fn send_command_blocking(
-    id: SlotId,
-    index: u8,
-    arg: u32,
-    resp_len: ResponseLen,
-    check_crc: bool,
-    flags: CommandFlags,
-) -> Result<[u32; 4], Error> {
-    let r = SDHOST::regs();
-    let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
-
-    // Clear stale command/response status before issuing.
-    r.rintsts().write(|w| unsafe { w.bits(consume) });
-
-    issue_command(id, index, arg, resp_len, check_crc, flags);
-
-    wait_command_accepted()?;
-
-    // Wait for completion or a command-phase error.
-    let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
-    let mut sts = 0;
-    let mut completed = false;
-    for _ in 0..POLL_LIMIT {
-        sts = r.rintsts().read().bits();
-        if sts & done != 0 {
-            completed = true;
-            break;
-        }
-    }
-    if !completed {
-        return Err(Error::Timeout);
-    }
-    map_rintsts(sts)?;
-
-    let resp = read_response(resp_len);
-    r.rintsts().write(|w| unsafe { w.bits(consume) });
-
-    // R1b / busy: DesignWare only IRQs busy-clear for writes, so always poll.
-    if flags.busy {
-        wait_busy_cleared()?;
-    }
-    Ok(resp)
-}
-
 /// Masks interrupts, tears down the IDMAC and clears engine state.
 fn abort_transfer() {
     let r = SDHOST::regs();
     r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
     r.idinten().write(|w| unsafe { w.bits(0) });
     disable_idmac();
-    let _ = reset_fifo();
-    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+    let _ = reset_transfer();
     STATE.engine.with(|eng| *eng = Engine::IDLE);
 }
 
@@ -1974,131 +2092,6 @@ async fn wait_busy_poll() -> Result<(), Error> {
     Err(Error::Timeout)
 }
 
-/// Issues a no-data command and awaits completion via the interrupt handler.
-async fn send_command_async(
-    id: SlotId,
-    index: u8,
-    arg: u32,
-    resp_len: ResponseLen,
-    check_crc: bool,
-    flags: CommandFlags,
-) -> Result<[u32; 4], Error> {
-    let r = SDHOST::regs();
-    let guard = DropGuard::new((), |()| abort_transfer());
-
-    r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
-    arm_engine(false, false, None);
-    r.intmask()
-        .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
-
-    issue_command(id, index, arg, resp_len, check_crc, flags);
-    wait_command_accepted()?;
-    wait_result().await?;
-    let resp = read_response(resp_len);
-    if flags.busy {
-        wait_busy_poll().await?;
-    }
-    guard.defuse();
-    Ok(resp)
-}
-
-/// Single- or multi-block data transfer over the IDMAC, interrupt-driven.
-async fn transfer_async(
-    id: SlotId,
-    index: u8,
-    arg: u32,
-    write: bool,
-    buf_ptr: u32,
-    total_len: usize,
-    block_size: u16,
-    block_count: u32,
-) -> Result<[u32; 4], Error> {
-    let r = SDHOST::regs();
-    let guard = DropGuard::new((), |()| abort_transfer());
-
-    reset_fifo()?;
-    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
-    // Real byte count; descriptor sizes round up to words, but bytcnt caps DMA
-    // so CMD53 byte-mode never writes past the user buffer.
-    r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
-
-    // Build the descriptor chain and prime the IDMAC.
-    let ring = ring();
-    *ring = [Desc::ZERO; RING_LEN];
-    ring[0].flags |= DESC_FIRST;
-    let mut t = Transfer {
-        ptr: buf_ptr,
-        remaining: total_len,
-        next_desc: 0,
-    };
-    fill_descriptors(ring, &mut t, RING_LEN);
-    enable_idmac(ring.as_ptr() as u32);
-    r.pldmnd().write(|w| unsafe { w.bits(1) });
-
-    arm_engine(true, block_count > 1, Some(t));
-    r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
-    r.intmask()
-        .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
-
-    issue_data_command(id, index, arg, write, block_count);
-    wait_command_accepted()?;
-    wait_result().await?;
-    if write {
-        wait_busy_async().await?;
-    }
-    disable_idmac();
-    let resp = read_response(ResponseLen::Short);
-    guard.defuse();
-    Ok(resp)
-}
-
-/// Programs `cmdarg`/`cmd` for a no-data command and submits it to the CIU.
-fn issue_command(
-    id: SlotId,
-    index: u8,
-    arg: u32,
-    resp_len: ResponseLen,
-    check_crc: bool,
-    flags: CommandFlags,
-) {
-    let r = SDHOST::regs();
-    r.cmdarg().write(|w| unsafe { w.bits(arg) });
-    r.cmd().write(|w| unsafe {
-        w.index().bits(index);
-        w.response_expect()
-            .bit(!matches!(resp_len, ResponseLen::None));
-        w.response_length()
-            .bit(matches!(resp_len, ResponseLen::Long));
-        w.check_response_crc().bit(check_crc);
-        w.wait_prvdata_complete().bit(flags.wait_complete);
-        w.stop_abort_cmd().bit(flags.stop_abort);
-        w.use_hole().set_bit();
-        w.card_number().bits(id.index());
-        w.start_cmd().set_bit()
-    });
-}
-
-/// Programs `cmdarg`/`cmd` for a data-transfer command and submits it to the
-/// CIU.
-fn issue_data_command(id: SlotId, index: u8, arg: u32, write: bool, block_count: u32) {
-    let r = SDHOST::regs();
-    r.cmdarg().write(|w| unsafe { w.bits(arg) });
-    r.cmd().write(|w| unsafe {
-        w.index().bits(index);
-        w.response_expect().set_bit();
-        w.check_response_crc().set_bit();
-        w.data_expected().set_bit();
-        w.read_write().bit(write);
-        w.send_auto_stop().bit(block_count > 1);
-        w.wait_prvdata_complete().set_bit();
-        w.use_hole().set_bit();
-        w.card_number().bits(id.index());
-        w.start_cmd().set_bit()
-    });
-}
-
 /// Reads response registers into spec word order (`words[3]` is the MSW).
 fn read_response(resp_len: ResponseLen) -> [u32; 4] {
     let r = SDHOST::regs();
@@ -2160,53 +2153,6 @@ fn dma_ptr(addr: usize) -> Result<u32, Error> {
         return Ok(addr as u32);
     }
     Err(Error::BufferNotDmaCapable)
-}
-
-/// Single- or multi-block data transfer over the IDMAC, blocking.
-fn transfer_blocking(
-    id: SlotId,
-    index: u8,
-    arg: u32,
-    write: bool,
-    buf_ptr: u32,
-    total_len: usize,
-    block_size: u16,
-    block_count: u32,
-) -> Result<[u32; 4], Error> {
-    let r = SDHOST::regs();
-
-    reset_fifo()?;
-    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-
-    r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
-    r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
-
-    // Build the descriptor chain for the whole transfer.
-    let ring = ring();
-    *ring = [Desc::ZERO; RING_LEN];
-    ring[0].flags |= DESC_FIRST;
-    let mut t = Transfer {
-        ptr: buf_ptr,
-        remaining: total_len,
-        next_desc: 0,
-    };
-    fill_descriptors(ring, &mut t, RING_LEN);
-
-    enable_idmac(ring.as_ptr() as u32);
-    r.pldmnd().write(|w| unsafe { w.bits(1) });
-
-    issue_data_command(id, index, arg, write, block_count);
-    wait_command_accepted()?;
-
-    let result = run_data_phase(&mut t, ring, write, block_count);
-
-    disable_idmac();
-    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-
-    result?;
-    Ok(read_response(ResponseLen::Short))
 }
 
 /// Waits for the command response then the data phase, refilling the ring.
@@ -2324,11 +2270,15 @@ fn fill_descriptors(ring: &mut [Desc; RING_LEN], t: &mut Transfer, count: usize)
     }
 }
 
-/// Resets the FIFO and waits for the self-clear.
-fn reset_fifo() -> Result<(), Error> {
+fn reset_transfer() -> Result<(), Error> {
     let r = SDHOST::regs();
     r.ctrl().modify(|_, w| w.fifo_reset().set_bit());
-    poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set())
+    let res = poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set());
+
+    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+    r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+
+    res
 }
 
 /// Enables the IDMAC engine for a transfer and programs the descriptor base.
