@@ -375,24 +375,18 @@ fn rtc_sleep_pu(val: bool) {
         .modify(|_, w| w.slowmem_force_lpu().bit(val).fastmem_force_lpu().bit(val));
 
     syscon.front_end_mem_pd().modify(|_r, w| {
-        w.dc_mem_force_pu()
-            .bit(val)
-            .pbus_mem_force_pu()
-            .bit(val)
-            .agc_mem_force_pu()
-            .bit(val)
+        w.dc_mem_force_pu().bit(val);
+        w.pbus_mem_force_pu().bit(val);
+        w.agc_mem_force_pu().bit(val)
     });
 
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
     nrx.nrxpd_ctrl().modify(|_, w| {
-        w.rx_rot_force_pu()
-            .bit(val)
-            .vit_force_pu()
-            .bit(val)
-            .demap_force_pu()
-            .bit(val)
+        w.rx_rot_force_pu().bit(val);
+        w.vit_force_pu().bit(val);
+        w.demap_force_pu().bit(val)
     });
 
     fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
@@ -402,8 +396,8 @@ fn rtc_sleep_pu(val: bool) {
 
     syscon.mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
-            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
-            .rom_power_up()
+            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 });
+        w.rom_power_up()
             .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
     });
 }
@@ -859,10 +853,8 @@ impl RtcSleepConfig {
         // In deep sleep mode, we never get here
         unsafe {
             LPWR::regs().int_clr().write(|w| {
-                w.slp_reject()
-                    .clear_bit_by_one()
-                    .slp_wakeup()
-                    .clear_bit_by_one()
+                w.slp_reject().clear_bit_by_one();
+                w.slp_wakeup().clear_bit_by_one()
             });
 
             // restore config if it is a light sleep

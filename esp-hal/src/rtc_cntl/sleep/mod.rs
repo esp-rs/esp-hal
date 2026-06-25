@@ -512,10 +512,8 @@ macro_rules! uart_wakeup_impl {
 
                     #[cfg(not(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3)))]
                     uart.sleep_conf2().modify(|_, w| unsafe {
-                        w.wk_mode_sel()
-                            .bits(0)
-                            .active_threshold()
-                            .bits(self.threshold)
+                        w.wk_mode_sel().bits(0);
+                        w.active_threshold().bits(self.threshold)
                     });
                 }
             }

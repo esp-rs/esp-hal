@@ -2720,7 +2720,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
-                    "sleep_auto_light_sleep",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_csr_prv_mode=\"3088\"",
                     "soc_cpu_csr_prv_mode_is_set",
@@ -3014,7 +3013,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
-                    "cargo:rustc-cfg=sleep_auto_light_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
@@ -3984,7 +3982,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
-                    "sleep_auto_light_sleep",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_csr_prv_mode=\"3088\"",
                     "soc_cpu_csr_prv_mode_is_set",
@@ -4242,7 +4239,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
-                    "cargo:rustc-cfg=sleep_auto_light_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
@@ -6915,7 +6911,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(sleep_auto_light_sleep)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_soc_root_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_hs_div)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_ls_div)");

@@ -57,7 +57,7 @@ esp_rtos::start_second_core(
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
 #![cfg_attr(
-    sleep_auto_light_sleep,
+    sleep_light_sleep,
     doc = r"
 ## Automatic Light Sleep (experimental)
 
@@ -75,7 +75,7 @@ with the critical code.
 "
 )]
 #![cfg_attr(
-    all(sleep_auto_light_sleep, multi_core),
+    all(sleep_light_sleep, multi_core),
     doc = r"
 
 ⚠️ If you are using bare-metal code on the second core (i.e. the second core is
@@ -84,7 +84,7 @@ light sleep may cause unexpected behavior.
 "
 )]
 #![cfg_attr(
-    sleep_auto_light_sleep,
+    sleep_light_sleep,
     doc = r"
 ### Example
 
@@ -146,7 +146,7 @@ mod fmt;
 
 #[cfg(feature = "esp-radio")]
 mod esp_radio;
-#[cfg(sleep_auto_light_sleep)]
+#[cfg(sleep_light_sleep)]
 mod light_sleep;
 mod run_queue;
 mod scheduler;
@@ -182,7 +182,7 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::Duration,
 };
-#[cfg(sleep_auto_light_sleep)]
+#[cfg(sleep_light_sleep)]
 pub use light_sleep::auto_light_sleep;
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]

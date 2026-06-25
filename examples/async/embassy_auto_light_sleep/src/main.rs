@@ -8,7 +8,7 @@
 //! `wake_lock_demo` shows a region guarded by a manual [`WakeLock`]: while the
 //! guard is alive, the idle hook falls back to `WFI` and the chip never sleeps.
 
-//% CHIP_FILTER: sleep_auto_light_sleep
+//% CHIP_FILTER: sleep_light_sleep
 
 #![no_std]
 #![no_main]
@@ -29,23 +29,20 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[embassy_executor::task]
 async fn periodic() {
     loop {
-        esp_println::println!("tick");
+        esp_println::println!("tick @ {:?}", esp_hal::time::Instant::now());
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 
 cfg_select! {
-    // any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
-    //  peripherals::GPIO0 as BOOT_GPIO;
-    // }
-    // feature = "esp32c2" => {
-    //  peripherals::GPIO8 as BOOT_GPIO;
-    // }
+    any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => {
+        use peripherals::GPIO0 as BOOT_GPIO;
+    }
     // feature = "esp32c5" => {
-    //  peripherals::GPIO28 as BOOT_GPIO;
+    //    use peripherals::GPIO28 as BOOT_GPIO;
     // }
     // feature = "esp32p4" => {
-    //  peripherals::GPIO35 as BOOT_GPIO;
+    //    use peripherals::GPIO35 as BOOT_GPIO;
     // }
     // esp32c3, esp32c6, esp32c61, esp32h2
     _ => {
@@ -107,11 +104,10 @@ async fn main(spawner: Spawner) {
     );
 
     let boot_btn = cfg_select! {
-        // any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
-        // feature = "esp32c2" => p.GPIO8,
+        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
         // feature = "esp32c5" => p.GPIO28,
         // feature = "esp32p4" => p.GPIO35,
-        // esp32c3, esp32c6, esp32c61, esp32h2
+        // esp32c2, esp32c3, esp32c6, esp32c61, esp32h2
         _ => p.GPIO9,
     };
 

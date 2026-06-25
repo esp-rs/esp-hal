@@ -228,7 +228,12 @@ impl<'d> Rtc<'d> {
             any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
                 // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
                 // Without this, this function may return a stale value
-                for _ in 0..10 {
+                const UPDATE_COUNT: usize = if cfg!(esp32) {
+                    20
+                } else {
+                    10
+                };
+                for _ in 0..UPDATE_COUNT {
                     rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                     crate::rom::ets_delay_us(1);
                 }
@@ -936,7 +941,7 @@ pub fn wakeup_cause() -> SleepSource {
     SleepSource::Undefined
 }
 
-#[cfg(sleep_auto_light_sleep)]
+#[cfg(sleep_light_sleep)]
 cfg_select! {
     feature = "rt" => {
         #[unsafe(no_mangle)]
@@ -965,7 +970,7 @@ cfg_select! {
 /// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
 /// released when the guard is dropped.
 #[cfg_attr(
-    not(sleep_auto_light_sleep),
+    not(sleep_light_sleep),
     doc = r"
 
 Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
@@ -983,7 +988,7 @@ impl WakeLock {
 
     /// Acquires a wake lock, preventing automatic light sleep.
     pub fn acquire() {
-        #[cfg(sleep_auto_light_sleep)]
+        #[cfg(sleep_light_sleep)]
         wake_lock_count().fetch_add(1, portable_atomic::Ordering::AcqRel);
     }
 
@@ -992,7 +997,7 @@ impl WakeLock {
     /// Note that this function should only be called to release a wake lock acquired via
     /// [`Self::acquire`].
     pub fn release() {
-        #[cfg(sleep_auto_light_sleep)]
+        #[cfg(sleep_light_sleep)]
         {
             let previous = wake_lock_count().fetch_sub(1, portable_atomic::Ordering::AcqRel);
             debug_assert_ne!(previous, 0, "wake lock counter underflow");
@@ -1003,7 +1008,7 @@ impl WakeLock {
     #[instability::unstable]
     pub fn is_active() -> bool {
         cfg_select! {
-            sleep_auto_light_sleep => {
+            sleep_light_sleep => {
                 wake_lock_count().load(portable_atomic::Ordering::Acquire)
                     != 0
             }
