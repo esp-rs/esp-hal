@@ -82,10 +82,9 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_ext1(true);
-        sleep_config.need_pd_top = true;
 
         // ext1_wakeup_prepare
         let mut pins = self.pins.borrow_mut();
