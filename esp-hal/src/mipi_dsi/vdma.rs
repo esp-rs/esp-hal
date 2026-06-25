@@ -45,14 +45,8 @@ const CTRL_HI_BASE: u32 = (1 << 6) | (16 << 7) | (1 << 15) | (16 << 16);
 
 const LLI_VALID: u32 = 1 << 31;
 
-/// One VDMA link-list item (LLI), 64 bytes, 64-byte aligned.
-///
-/// Layout matches `dw_gdma_link_list_item_t` from the IDF.  Fields use
-/// [`VolatileCell`] so that the struct can live in a shared `static` (no
-/// `static mut`) and all CPU writes go straight to memory without being
-/// coalesced or reordered by the compiler.  The caller is still responsible
-/// for cache-line flushes before arming the DMA channel.
-#[repr(C, align(64))]
+/// One VDMA link-list item (LLI).
+#[repr(C)]
 pub(super) struct VdmaLinkItem {
     sar_lo: VolatileCell<u32>,    // 0x00 – source address (low 32 bits)
     sar_hi: VolatileCell<u32>,    // 0x04 – source address (high 32 bits, always 0)
@@ -71,13 +65,6 @@ pub(super) struct VdmaLinkItem {
     _res2: VolatileCell<u32>,     // 0x38
     _res3: VolatileCell<u32>,     // 0x3C
 }
-
-const _: () = {
-    core::assert!(
-        core::mem::size_of::<VdmaLinkItem>() == 64,
-        "VdmaLinkItem must be 64 bytes"
-    );
-};
 
 impl VdmaLinkItem {
     pub(super) const fn zeroed() -> Self {
@@ -103,7 +90,7 @@ impl VdmaLinkItem {
 
     /// Populate this LLI for a circular frame-buffer transfer.
     ///
-    /// `next` must point to the next 64-byte-aligned LLI in the chain.
+    /// `next` must point to the next LLI in the chain.
     /// `LLI_LAST` is deliberately **not** set; the DMA always follows the LLP
     /// pointer to continue the linked-list ring.
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {
