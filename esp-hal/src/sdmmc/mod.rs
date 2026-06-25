@@ -206,6 +206,7 @@ pub enum ConfigError {
 
 impl From<Error> for MmcError {
     fn from(error: Error) -> Self {
+        #[cfg(feature = "log-04")] // no defmt in sdio yet
         warn!("{:?}", error);
         match error {
             Error::ResponseTimeout | Error::DataTimeout | Error::Timeout | Error::NoCard => {
@@ -900,7 +901,7 @@ mod imp {
             &self,
             config: SlotConfig,
         ) -> Result<Slot<'_, S, Blocking>, ConfigError> {
-            const { assert!(S < 2, "SDMMC has only slots 0 and 1") };
+            const { ::core::assert!(S < 2, "SDMMC has only slots 0 and 1") };
             let idx = S as usize;
             if self.taken[idx].swap(true, Ordering::Relaxed) {
                 return Err(ConfigError::SlotInUse);
