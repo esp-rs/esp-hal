@@ -229,7 +229,12 @@ impl<'d> Rtc<'d> {
             any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
                 // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
                 // Without this, this function may return a stale value
-                for _ in 0..10 {
+                const UPDATE_COUNT: usize = if cfg!(esp32) {
+                    20
+                } else {
+                    10
+                };
+                for _ in 0..UPDATE_COUNT {
                     rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                     crate::rom::ets_delay_us(1);
                 }
