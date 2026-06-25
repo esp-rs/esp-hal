@@ -738,9 +738,10 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(esp32)]
     assert!(
         crate::efuse::chip_revision()
-            >= crate::efuse::ChipRevision::from_combined(
-                esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION")
-            ),
+            >= crate::efuse::ChipRevision::from_combined(esp_config::esp_config_int!(
+                u16,
+                "ESP_HAL_CONFIG_MIN_CHIP_REVISION"
+            )),
         "esp-hal does not officially support ESP32 chips with hardware revision older than v{}.{}. \
          See https://github.com/esp-rs/esp-hal/issues/5656.",
         esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION") / 100,
