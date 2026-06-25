@@ -341,7 +341,7 @@ pub struct HpParam {
     pub pll_stable_wait_cycle: u16,
     /// Number of cycles to wait for modifying the ICG control.
     pub modify_icg_cntl_wait_cycle: u8,
-    /// Number of cycles to wait for switching the ICG coйntrol.
+    /// Number of cycles to wait for switching the ICG control.
     pub switch_icg_cntl_wait_cycle: u8,
     /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
