@@ -865,6 +865,10 @@ impl RtcSleepConfig {
         }
     }
 
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep
+    }
+
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         Self::wake_io_reset();
     }
