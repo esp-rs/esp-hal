@@ -23,7 +23,7 @@ use sdio::{self as _, MmcError};
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
 use crate::dma::aligned::InternalMemory;
 #[cfg(sdmmc_has_gpio_matrix)]
-use crate::gpio::{PinGuard, Pull, interconnect::PeripheralInput};
+use crate::gpio::{OutputSignal, PinGuard, Pull};
 use crate::{
     Async,
     Blocking,
@@ -33,8 +33,7 @@ use crate::{
     gpio::{
         InputSignal,
         OutputConfig,
-        OutputSignal,
-        interconnect::{self, PeripheralOutput},
+        interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, SDHOST},
     private::DropGuard,
@@ -616,7 +615,8 @@ impl SlotState {
     }
 }
 
-static SLOT_STATE: [SlotState; 2] = [SlotState::new(), SlotState::new()];
+const SLOT_COUNT: usize = 2;
+static SLOT_STATE: [SlotState; SLOT_COUNT] = [const { SlotState::new() }; SLOT_COUNT];
 
 /// Mutable runtime state for a slot.
 #[cfg(sdmmc_has_gpio_matrix)]
@@ -639,13 +639,17 @@ fn slot_pins(id: SlotId) -> &'static mut SlotPins {
 /// fields are read, hence the conditional `allow(dead_code)`.
 ///
 /// Populated from chip metadata by the `for_each_sdmmc!` invocation below.
-#[cfg_attr(not(sdmmc_has_gpio_matrix), allow(dead_code))]
 struct SlotInfo {
     io_event: u32,
+    #[cfg(sdmmc_has_gpio_matrix)]
     clk_out: Option<OutputSignal>,
+    #[cfg(sdmmc_has_gpio_matrix)]
     cmd_in: Option<InputSignal>,
+    #[cfg(sdmmc_has_gpio_matrix)]
     cmd_out: Option<OutputSignal>,
+    #[cfg(sdmmc_has_gpio_matrix)]
     data_in: &'static [InputSignal],
+    #[cfg(sdmmc_has_gpio_matrix)]
     data_out: &'static [OutputSignal],
     cd_in: Option<InputSignal>,
     wp_in: Option<InputSignal>,
@@ -661,6 +665,8 @@ macro_rules! opt_in {
         Some(InputSignal::$signal)
     };
 }
+
+#[cfg(sdmmc_has_gpio_matrix)]
 macro_rules! opt_out {
     () => {
         None
@@ -683,11 +689,18 @@ for_each_sdmmc! {
         static SLOT_INFO: [SlotInfo; 2] = [ $(
             SlotInfo {
                 io_event: 1u32 << (16 + $idx),
+
+                #[cfg(sdmmc_has_gpio_matrix)]
                 clk_out: opt_out!($($clk)?),
+                #[cfg(sdmmc_has_gpio_matrix)]
                 cmd_in: opt_in!($($cmd_in)?),
+                #[cfg(sdmmc_has_gpio_matrix)]
                 cmd_out: opt_out!($($cmd_out)?),
+                #[cfg(sdmmc_has_gpio_matrix)]
                 data_in: &[ $(InputSignal::$data_in),* ],
+                #[cfg(sdmmc_has_gpio_matrix)]
                 data_out: &[ $(OutputSignal::$data_out),* ],
+
                 cd_in: opt_in!($($cd)?),
                 wp_in: opt_in!($($wp)?),
             }
@@ -1133,7 +1146,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Connects the card-detect input.
-    #[cfg(sdmmc_has_gpio_matrix)]
     pub fn with_card_detect(mut self, cd: impl PeripheralInput<'d>) -> Self {
         let pin = cd.into();
         pin.set_input_enable(true);
@@ -1143,7 +1155,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Connects the write-protect input.
-    #[cfg(sdmmc_has_gpio_matrix)]
     pub fn with_write_protect(mut self, wp: impl PeripheralInput<'d>) -> Self {
         let pin = wp.into();
         pin.set_input_enable(true);

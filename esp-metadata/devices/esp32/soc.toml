@@ -414,7 +414,7 @@ output_signals = [
     { name = "I2S0I_WS",                 id = 28 },
     { name = "I2CEXT0_SCL",              id = 29 },
     { name = "I2CEXT0_SDA",              id = 30 },
-    { name = "SDIO_TOHOSTT",             id = 31 },
+    { name = "SDIO_TOHOST_INT",          id = 31 },
     { name = "PWM0_0A",                  id = 32 },
     { name = "PWM0_0B",                  id = 33 },
     { name = "PWM0_1A",                  id = 34 },
@@ -716,6 +716,7 @@ version = 1
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
+
 [device.sdmmc]
 support_status = "partial"
 slots = 2
@@ -725,11 +726,23 @@ has_gpio_matrix = false
 psram_dma = false
 uhs = false
 # Both slots are routed exclusively through the IO_MUX (fixed HS1_*/HS2_* pads);
-# there are no SDMMC signals on the GPIO matrix, so no signal names are listed.
 slot_config = [
-    { iomux = true },
-    { iomux = true },
+    {
+        iomux = true,
+        cd = "HOST_CARD_DETECT_N_1",
+        wp = "HOST_CARD_WRITE_PRT_1",
+        card_int = "HOST_CARD_INT_N_1",
+        rst = "HOST_RST_N_1",
+    },
+    {
+        iomux = true,
+        cd = "HOST_CARD_DETECT_N_2",
+        wp = "HOST_CARD_WRITE_PRT_2",
+        card_int = "HOST_CARD_INT_N_2",
+        rst = "HOST_RST_N_2",
+    },
 ]
+
 [device.sd_slave]
 support_status = "not_supported"
 [device.touch]

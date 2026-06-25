@@ -692,10 +692,14 @@ macro_rules! for_each_rsa_multiplication {
 macro_rules! for_each_sdmmc {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_sdmmc { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [], [], [], [], [],
-        [])); _for_each_inner_sdmmc!((slot1, 1, true, [], [], [], [], [], [], [], [], [],
-        [])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [], [], [], [],
-        [], []), (slot1, 1, true, [], [], [], [], [], [], [], [], [], [])));
+        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
+        [HOST_RST_N_1])); _for_each_inner_sdmmc!((slot1, 1, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_2], [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [],
+        [HOST_RST_N_2])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
+        [HOST_RST_N_1]), (slot1, 1, true, [], [], [], [], [], [HOST_CARD_DETECT_N_2],
+        [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [], [HOST_RST_N_2])));
     };
 }
 #[macro_export]
@@ -5496,7 +5500,7 @@ macro_rules! define_io_mux_signals {
             I2S0I_WS                 = 28,
             I2CEXT0_SCL              = 29,
             I2CEXT0_SDA              = 30,
-            SDIO_TOHOSTT             = 31,
+            SDIO_TOHOST_INT          = 31,
             PWM0_0A                  = 32,
             PWM0_0B                  = 33,
             PWM0_1A                  = 34,
