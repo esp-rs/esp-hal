@@ -1,7 +1,3 @@
-// Note: the PMU setup is based on esp-idf v5.1.2. Related code should be based
-// on the same version until documentation is released and the code can be
-// reasoned about.
-
 use strum::FromRepr;
 
 use crate::{

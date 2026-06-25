@@ -18,6 +18,14 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_beacon_wakeup",
+    "pm_support_bt_wakeup",
+    "gpio_support_deepsleep_wakeup",
+    "uart_support_wakeup_int",
+    "pm_support_ext1_wakeup",
 ]
 
 [device.soc]
@@ -117,6 +125,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
+rc_fast_calibration = { divider = 32, min_rev = 0 }
 
 [device.gpio]
 version = 2
@@ -322,7 +331,9 @@ support_status = { status = "not_supported", issue = 5419 }
 [device.lp_timer]
 
 [device.sleep]
-support_status = { status = "not_supported", issue = 5424 }
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
 
 [device.rng]
 support_status = "partial"

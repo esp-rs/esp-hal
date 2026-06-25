@@ -2,20 +2,12 @@ use core::ops::Not;
 
 use crate::{
     clock::RtcClock,
-    gpio::RtcFunction,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
-        sleep::{
-            Ext1WakeupSource,
-            TimerWakeupSource,
-            WakeFromLpCoreWakeupSource,
-            WakeSource,
-            WakeTriggers,
-            WakeupLevel,
-        },
+        sleep::{TimerWakeupSource, WakeSource, WakeTriggers},
     },
-    soc::clocks::{self, ClockTree, LpSlowClkConfig, TimgCalibrationClockConfig},
+    soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -27,7 +19,7 @@ impl WakeSource for TimerWakeupSource {
     ) {
         triggers.set_timer(true);
 
-        let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
+        let lp_timer = unsafe { &*esp32c5::LP_TIMER::ptr() };
         // TODO: maybe add check to prevent overflow?
         let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
@@ -49,99 +41,6 @@ impl WakeSource for TimerWakeupSource {
                 .tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().set_bit());
         }
-    }
-}
-
-impl Ext1WakeupSource<'_, '_> {
-    /// Returns the currently configured wakeup pins.
-    fn wakeup_pins() -> u8 {
-        unsafe { lp_aon().ext_wakeup_cntl().read().ext_wakeup_sel().bits() }
-    }
-
-    fn wake_io_reset() {
-        use crate::gpio::RtcPin;
-
-        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
-            if wakeup_pins & (1 << pin.number()) != 0 {
-                pin.rtcio_pad_hold(false);
-                pin.rtc_set_config(false, false, RtcFunction::Rtc);
-            }
-        }
-
-        let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(unsafe { crate::peripherals::GPIO0::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO1::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO2::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO3::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO4::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO5::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO6::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO7::steal() }, wakeup_pins);
-    }
-}
-
-impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        // We don't have to keep the LP domain powered if we hold the wakeup pin states.
-        triggers.set_ext1(true);
-
-        // set pins to RTC function
-        let mut pins = self.pins.borrow_mut();
-        let mut pin_mask = 0u8;
-        let mut level_mask = 0u8;
-        for (pin, level) in pins.iter_mut() {
-            pin_mask |= 1 << pin.number();
-            level_mask |= match level {
-                WakeupLevel::High => 1 << pin.number(),
-                WakeupLevel::Low => 0,
-            };
-
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
-            pin.rtcio_pad_hold(true);
-        }
-
-        unsafe {
-            // clear previous wakeup status
-            lp_aon()
-                .ext_wakeup_cntl()
-                .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-
-            // set pin + level register fields
-            lp_aon().ext_wakeup_cntl().modify(|r, w| {
-                w.ext_wakeup_sel()
-                    .bits(r.ext_wakeup_sel().bits() | pin_mask)
-                    .ext_wakeup_lv()
-                    .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
-            });
-        }
-    }
-}
-
-impl Drop for Ext1WakeupSource<'_, '_> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        let mut pins = self.pins.borrow_mut();
-        for (pin, _level) in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
-        }
-    }
-}
-
-impl WakeSource for WakeFromLpCoreWakeupSource {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_lp_core(true);
     }
 }
 
@@ -180,8 +79,8 @@ impl AnalogSleepConfig {
                 cfg.regulator0.set_slp_xpd(false);
                 cfg.regulator0.set_slp_dbias(0);
                 cfg.regulator0.set_xpd(true);
-                cfg.bias.set_dbg_atten(12);
-                cfg.regulator0.set_dbias(23); // 0.7V
+                cfg.bias.set_dbg_atten(9); // PMU_DBG_ATTEN_DEEPSLEEP_DEFAULT
+                cfg.regulator0.set_dbias(15); // PMU_LP_DBIAS_DEEPSLEEP_0V7_DEFAULT
 
                 cfg
             },
@@ -198,8 +97,8 @@ impl AnalogSleepConfig {
                 cfg.bias.set_pd_cur(true);
                 cfg.bias.set_bias_sleep(true);
                 cfg.regulator0.set_xpd(true);
-                cfg.bias.set_dbg_atten(0);
-                cfg.regulator0.set_dbias(1); // 0.6V
+                cfg.bias.set_dbg_atten(1); // PMU_DBG_ATTEN_LIGHTSLEEP_DEFAULT
+                cfg.regulator0.set_dbias(0); // PMU_HP_DBIAS_LIGHTSLEEP_0V6_DEFAULT
 
                 cfg
             },
@@ -213,21 +112,25 @@ impl AnalogSleepConfig {
                 cfg.regulator0.set_slp_xpd(false);
                 cfg.regulator0.set_slp_dbias(0);
                 cfg.regulator0.set_xpd(true);
-                cfg.bias.set_dbg_atten(0);
-                cfg.regulator0.set_dbias(12); // 0.7V
+                cfg.bias.set_dbg_atten(1); // PMU_DBG_ATTEN_LIGHTSLEEP_DEFAULT
+                cfg.regulator0.set_dbias(15); // PMU_LP_DBIAS_LIGHTSLEEP_0V7_DEFAULT
 
                 cfg
             },
         };
 
+        // When XTAL or RC_FAST stays on during sleep, raise the regulator
+        // voltage back to the active-mode calibration value.
         if !pd_flags.pd_xtal() {
             this.hp_sys.bias.set_pd_cur(false);
             this.hp_sys.bias.set_bias_sleep(false);
-            this.hp_sys.regulator0.set_dbias(25);
+            this.hp_sys.bias.set_dbg_atten(0);
+            this.hp_sys.regulator0.set_dbias(28); // get_act_hp_dbias() ~ HP_CALI_DBIAS
 
             this.lp_sys_sleep.bias.set_pd_cur(false);
             this.lp_sys_sleep.bias.set_bias_sleep(false);
-            this.lp_sys_sleep.regulator0.set_dbias(26);
+            this.lp_sys_sleep.bias.set_dbg_atten(0);
+            this.lp_sys_sleep.regulator0.set_dbias(28); // get_act_lp_dbias() ~ LP_CALI_DBIAS
         }
 
         this
@@ -442,6 +345,10 @@ pub struct HpParam {
     pub switch_icg_cntl_wait_cycle: u8,
     /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
+    /// Number of cycles to wait for all isolate signals to be ready.
+    pub isolate_wait_cycle: u8,
+    /// Number of cycles to wait for all reset signals to be ready.
+    pub reset_wait_cycle: u8,
 }
 
 /// Parameters for low-power system configurations during sleep modes.
@@ -458,6 +365,10 @@ pub struct LpParam {
     pub digital_power_down_wait_cycle: u8,
     /// Number of cycles to wait for the digital power-up sequence.
     pub digital_power_up_wait_cycle: u8,
+    /// Number of cycles to wait for all isolate signals to be ready.
+    pub isolate_wait_cycle: u8,
+    /// Number of cycles to wait for all reset signals to be ready.
+    pub reset_wait_cycle: u8,
 }
 
 /// Parameters for high-power and low-power system configurations during sleep
@@ -493,6 +404,8 @@ impl ParamSleepConfig {
             digital_power_down_wait_cycle: 0,
             modify_icg_cntl_wait_cycle: 0,
             switch_icg_cntl_wait_cycle: 0,
+            isolate_wait_cycle: 0,
+            reset_wait_cycle: 0,
         },
         lp_sys: LpParam {
             min_slp_slow_clk_cycle: 10,
@@ -501,6 +414,8 @@ impl ParamSleepConfig {
             digital_power_up_wait_cycle: 32,
 
             digital_power_down_wait_cycle: 0,
+            isolate_wait_cycle: 0,
+            reset_wait_cycle: 0,
         },
         hp_lp: HpLpParam {
             xtal_stable_wait_cycle: 30,
@@ -524,17 +439,29 @@ impl ParamSleepConfig {
             });
 
             pmu().power_wait_timer0().modify(|_, w| {
-                w.dg_hp_wait_timer() // pmu_ll_hp_set_digital_power_supply_wait_cycle
+                w.dg_hp_pd_wait_timer() // pmu_ll_hp_set_digital_power_supply_wait_cycle
                     .bits(self.hp_sys.digital_power_supply_wait_cycle)
                     .dg_hp_powerup_timer() // pmu_ll_hp_set_digital_power_up_wait_cycle
                     .bits(self.hp_sys.digital_power_up_wait_cycle)
             });
 
             pmu().power_wait_timer1().modify(|_, w| {
-                w.dg_lp_wait_timer() // pmu_ll_lp_set_digital_power_supply_wait_cycle
+                w.dg_lp_pd_wait_timer() // pmu_ll_lp_set_digital_power_supply_wait_cycle
                     .bits(self.lp_sys.digital_power_supply_wait_cycle)
                     .dg_lp_powerup_timer() // pmu_ll_lp_set_digital_power_up_wait_cycle
                     .bits(self.lp_sys.digital_power_up_wait_cycle)
+            });
+
+            // pmu_hal_hp/lp_set_control_ready_wait_cycle (new on ESP32-C5)
+            pmu().power_wait_timer2().modify(|_, w| {
+                w.dg_hp_iso_wait_timer()
+                    .bits(self.hp_sys.isolate_wait_cycle)
+                    .dg_hp_rst_wait_timer()
+                    .bits(self.hp_sys.reset_wait_cycle)
+                    .dg_lp_iso_wait_timer()
+                    .bits(self.lp_sys.isolate_wait_cycle)
+                    .dg_lp_rst_wait_timer()
+                    .bits(self.lp_sys.reset_wait_cycle)
             });
 
             pmu().slp_wakeup_cntl5().modify(|_, w| {
@@ -566,6 +493,10 @@ impl ParamSleepConfig {
             config.us_to_fastclk(MachineConstants::HP_POWER_UP_WAIT_TIME_US) as u16;
         param.hp_sys.pll_stable_wait_cycle =
             config.us_to_fastclk(MachineConstants::HP_PLL_WAIT_STABLE_TIME_US) as u16;
+        param.hp_sys.isolate_wait_cycle =
+            config.us_to_fastclk(MachineConstants::HP_ISOLATE_WAIT_TIME_US) as u8;
+        param.hp_sys.reset_wait_cycle =
+            config.us_to_fastclk(MachineConstants::HP_RESET_WAIT_TIME_US) as u8;
 
         let hw_wait_time_us = config.pmu_sleep_calculate_hw_wait_time(pd_flags);
 
@@ -583,6 +514,10 @@ impl ParamSleepConfig {
             config.us_to_fastclk(MachineConstants::LP_POWER_SUPPLY_WAIT_TIME_US) as u16;
         param.lp_sys.digital_power_up_wait_cycle =
             config.us_to_fastclk(MachineConstants::LP_POWER_UP_WAIT_TIME_US) as u8;
+        param.lp_sys.isolate_wait_cycle =
+            config.us_to_fastclk(MachineConstants::LP_ISOLATE_WAIT_TIME_US) as u8;
+        param.lp_sys.reset_wait_cycle =
+            config.us_to_fastclk(MachineConstants::LP_RESET_WAIT_TIME_US) as u8;
 
         // This looks different from esp-idf but it is the same:
         // Both `xtal_stable_wait_cycle` and `xtal_stable_wait_slow_clk_cycle` are
@@ -675,17 +610,23 @@ impl SleepTimeConfig {
             self.slowclk_to_us(MachineConstants::LP_CLK_POWER_ON_WAIT_CYCLE)
         };
 
+        // ESP32-C5 adds control (isolate + reset) wait time to both domains.
+        let lp_control_wait_time_us =
+            MachineConstants::LP_ISOLATE_WAIT_TIME_US + MachineConstants::LP_RESET_WAIT_TIME_US;
         let lp_hw_wait_time_us = MachineConstants::LP_MIN_SLP_TIME_US
             + MachineConstants::LP_ANALOG_WAIT_TIME_US
             + lp_clk_power_on_wait_time_us
             + lp_wakeup_wait_time_us
             + lp_clk_switch_time_us
             + MachineConstants::LP_POWER_SUPPLY_WAIT_TIME_US
-            + MachineConstants::LP_POWER_UP_WAIT_TIME_US;
+            + MachineConstants::LP_POWER_UP_WAIT_TIME_US
+            + lp_control_wait_time_us;
 
         // HP core hardware wait time, microsecond
         let hp_digital_power_up_wait_time_us = MachineConstants::HP_POWER_SUPPLY_WAIT_TIME_US
             + MachineConstants::HP_POWER_UP_WAIT_TIME_US;
+        let hp_control_wait_time_us =
+            MachineConstants::HP_ISOLATE_WAIT_TIME_US + MachineConstants::HP_RESET_WAIT_TIME_US;
         let hp_regdma_wait_time_us = u32::max(
             MachineConstants::HP_REGDMA_S2M_WORK_TIME_US
                 + MachineConstants::HP_REGDMA_M2A_WORK_TIME_US,
@@ -698,7 +639,8 @@ impl SleepTimeConfig {
             + u32::max(
                 hp_digital_power_up_wait_time_us + hp_regdma_wait_time_us,
                 hp_clock_wait_time_us,
-            );
+            )
+            + hp_control_wait_time_us;
 
         #[rustfmt::skip] // ASCII art
         //  When the SOC wakeup (lp timer or GPIO wakeup) and Modem wakeup (Beacon wakeup) complete,
@@ -755,12 +697,12 @@ impl Default for RtcSleepConfig {
     }
 }
 
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    unsafe { &*esp32c6::PMU::ptr() }
+unsafe fn pmu<'a>() -> &'a esp32c5::pmu::RegisterBlock {
+    unsafe { &*esp32c5::PMU::ptr() }
 }
 
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    unsafe { &*esp32c6::LP_AON::ptr() }
+unsafe fn lp_aon<'a>() -> &'a esp32c5::lp_aon::RegisterBlock {
+    unsafe { &*esp32c5::LP_AON::ptr() }
 }
 
 bitfield::bitfield! {
@@ -816,7 +758,7 @@ impl PowerDownFlags {
     }
 }
 
-// Constants defined in `PMU_SLEEP_MC_DEFAULT()`
+// Constants defined in `PMU_SLEEP_MC_DEFAULT()` (ESP32-C5 values)
 struct MachineConstants;
 impl MachineConstants {
     const LP_MIN_SLP_TIME_US: u32 = 450;
@@ -825,25 +767,29 @@ impl MachineConstants {
     const LP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
     const LP_CLK_SWITCH_CYCLE: u32 = 1;
     const LP_CLK_POWER_ON_WAIT_CYCLE: u32 = 1;
+    const LP_ISOLATE_WAIT_TIME_US: u32 = 1;
+    const LP_RESET_WAIT_TIME_US: u32 = 1;
     const LP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
     const LP_POWER_UP_WAIT_TIME_US: u32 = 2;
 
     const HP_MIN_SLP_TIME_US: u32 = 450;
-    const HP_CLOCK_DOMAIN_SYNC_TIME_US: u32 = 150;
+    const HP_CLOCK_DOMAIN_SYNC_TIME_US: u32 = 2;
     const HP_SYSTEM_DFS_UP_WORK_TIME_US: u32 = 124;
     const HP_ANALOG_WAIT_TIME_US: u32 = 154;
+    const HP_ISOLATE_WAIT_TIME_US: u32 = 1;
+    const HP_RESET_WAIT_TIME_US: u32 = 1;
     const HP_POWER_SUPPLY_WAIT_TIME_US: u32 = 2;
     const HP_POWER_UP_WAIT_TIME_US: u32 = 2;
-    const HP_REGDMA_S2M_WORK_TIME_US: u32 = 172;
-    const HP_REGDMA_S2A_WORK_TIME_US: u32 = 480;
-    const HP_REGDMA_M2A_WORK_TIME_US: u32 = 278;
+    const HP_REGDMA_S2M_WORK_TIME_US: u32 = 287;
+    const HP_REGDMA_S2A_WORK_TIME_US: u32 = 720;
+    const HP_REGDMA_M2A_WORK_TIME_US: u32 = 430;
     // Unused, but defined in esp-idf. May be needed later.
-    // const HP_REGDMA_A2S_WORK_TIME_US: u32 = 382;
-    const HP_REGDMA_RF_ON_WORK_TIME_US: u32 = 70;
+    // const HP_REGDMA_A2S_WORK_TIME_US: u32 = 433;
+    const HP_REGDMA_RF_ON_WORK_TIME_US: u32 = 68;
     // Unused, but defined in esp-idf. May be needed later.
-    // const HP_REGDMA_RF_OFF_WORK_TIME_US: u32 = 23;
+    // const HP_REGDMA_RF_OFF_WORK_TIME_US: u32 = 25;
     const HP_XTAL_WAIT_STABLE_TIME_US: u32 = 250;
-    const HP_PLL_WAIT_STABLE_TIME_US: u32 = 1;
+    const HP_PLL_WAIT_STABLE_TIME_US: u32 = 50;
 
     const MODEM_STATE_SKIP_TIME_US: u32 = Self::HP_REGDMA_M2A_WORK_TIME_US
         + Self::HP_SYSTEM_DFS_UP_WORK_TIME_US
@@ -871,7 +817,9 @@ impl RtcSleepConfig {
 
     fn wake_io_reset() {
         // loosely based on esp_deep_sleep_wakeup_io_reset
-        Ext1WakeupSource::wake_io_reset();
+        //
+        // ESP32-C5 does not yet expose the RTC IO pin abstraction in esp-hal, so
+        // there are no EXT1 wakeup pins to reset here.
     }
 
     /// Finalize power-down flags, apply configuration based on the flags.
@@ -939,10 +887,7 @@ impl RtcSleepConfig {
 
         let cpu_freq_config = ClockTree::with(|clocks| {
             let cpu_freq_config = SavedClockConfig::save(clocks);
-            crate::soc::clocks::configure_soc_root_clk(
-                clocks,
-                crate::soc::clocks::SocRootClkConfig::Xtal,
-            );
+            crate::soc::clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
             cpu_freq_config
         });
 
