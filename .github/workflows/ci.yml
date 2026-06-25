@@ -288,6 +288,57 @@ jobs:
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
+  # Xtensa LLD linking
+  #
+  # Verifies that the Xtensa examples link successfully with LLD (`rust-lld`)
+  # instead of GNU LD. RISC-V already links with `rust-lld`, so only the
+  # Xtensa chips are exercised here. Kept intentionally small.
+  #
+  # The radio examples (embassy_dhcp for Wi-Fi, bas_peripheral for BLE) link
+  # the Espressif blobs and exercise the per-archive `.text` grouping that
+  # keeps L32R literal loads in reach under LLD, so they are included to guard
+  # that layout against regressions.
+  xtensa-lld:
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      # Link with LLD rather than GNU LD. Setting `RUSTFLAGS` overrides the
+      # `rustflags` (and thus the linker selection) from each example's
+      # `.cargo/config.toml`.
+      RUSTFLAGS: "-C link-arg=-Tlinkall.x -C linker=rust-lld"
+    steps:
+      - uses: actions/checkout@v6
+
+      # Install the Rust toolchain for Xtensa devices. Keep this in sync with
+      # the `esp-hal` build job above so the LLD linking test exercises the
+      # same compiler as the rest of CI.
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.96.0.0
+
+      - name: Build hello_world with LLD
+        working-directory: examples/hello_world
+        run: |
+          cargo +esp build --release --target xtensa-esp32-none-elf --features esp32
+          cargo +esp build --release --target xtensa-esp32s2-none-elf --features esp32s2
+          cargo +esp build --release --target xtensa-esp32s3-none-elf --features esp32s3
+
+      - name: Build embassy_dhcp with LLD
+        working-directory: examples/wifi/embassy_dhcp
+        run: |
+          cargo +esp build --release --target xtensa-esp32-none-elf --features esp32
+          cargo +esp build --release --target xtensa-esp32s2-none-elf --features esp32s2
+          cargo +esp build --release --target xtensa-esp32s3-none-elf --features esp32s3
+
+      - name: Build bas_peripheral (trouble BLE) with LLD
+        working-directory: examples/ble/bas_peripheral
+        run: |
+          cargo +esp build --release --target xtensa-esp32-none-elf --features esp32
+          cargo +esp build --release --target xtensa-esp32s3-none-elf --features esp32s3
+
+  # --------------------------------------------------------------------------
   # host tests
 
   host-tests:

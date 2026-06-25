@@ -20,6 +20,13 @@ SECTIONS {
     . = ALIGN (4);
     _text_start = ABSOLUTE(.);
     . = ALIGN (4);
+    /* Keep each object's literal pool adjacent to its code. A single
+       combined group preserves input-file order in both GNU ld and LLD,
+       so every function's `.literal.<f>` stays within L32R reach of its
+       `.text.<f>`. Splitting literals and text into separate `*(...)`
+       groups instead bunches all literals at the start and can push late
+       code past the 256 KB L32R window in large images (see
+       `esp-hal/ld/sections/text.x`). */
     *(.literal .text .literal.* .text.*)
     _text_end = ABSOLUTE(.);
     _etext = .;
@@ -61,6 +68,7 @@ SECTIONS {
   .rwtext : ALIGN(4)
   {
     . = ALIGN (4);
+    /* Keep each object's literal pool adjacent to its code (see `.text`). */
     *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
   } > RWTEXT
 
