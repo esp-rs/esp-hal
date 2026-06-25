@@ -156,14 +156,6 @@ pub enum ResponseLen {
     Long,
 }
 
-impl ResponseLen {
-    /// CMD0 (`GO_IDLE_STATE`) never returns a response; the `sdio` crate
-    /// declares it as `R1`, so force no-response by command index.
-    fn for_index(self, index: u8) -> Self {
-        if index == 0 { ResponseLen::None } else { self }
-    }
-}
-
 /// Per-command engine flags.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1568,8 +1560,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             sdio::ResponseLen::Zero => ResponseLen::None,
             sdio::ResponseLen::R48 => ResponseLen::Short,
             sdio::ResponseLen::R136 => ResponseLen::Long,
-        }
-        .for_index(C::INDEX);
+        };
         let flags = CommandFlags {
             wait_complete: !is_stop_or_abort(C::INDEX),
             stop_abort: is_stop_or_abort(C::INDEX),
