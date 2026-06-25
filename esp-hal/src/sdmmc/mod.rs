@@ -40,6 +40,7 @@ use crate::{
 
 /// Selects one of the controller's card slots.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SlotId {
     /// Slot 0.
     _0,
@@ -60,6 +61,7 @@ impl SlotId {
 
 /// Card clock source feeding the controller's divider.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
     /// 160 MHz PLL.
     Pll160m,
@@ -71,6 +73,7 @@ pub enum ClockSource {
 /// Clock input sampling phase used for high-speed tuning.
 #[cfg(esp32s3)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DelayPhase {
     /// 0°.
     #[default]
@@ -85,6 +88,7 @@ pub enum DelayPhase {
 
 /// Card data bus width.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BusWidth {
     /// 1-bit bus (DAT0 only).
     #[default]
@@ -97,10 +101,14 @@ pub enum BusWidth {
 ///
 /// These settings drive the shared module clock and therefore apply to the
 /// whole controller, not an individual slot.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
+    /// The clock source for the module clock.
     clock_source: ClockSource,
+
+    /// The module-clock divider (valid range `2..=16`).
     module_div: u8,
 }
 
@@ -114,18 +122,6 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Sets the card clock source.
-    pub fn with_clock_source(mut self, source: ClockSource) -> Self {
-        self.clock_source = source;
-        self
-    }
-
-    /// Sets the module-clock divider (valid range `2..=16`).
-    pub fn with_module_divider(mut self, div: u8) -> Self {
-        self.module_div = div;
-        self
-    }
-
     /// Validates field ranges.
     fn validate(&self) -> Result<(), ConfigError> {
         if !(2..=16).contains(&self.module_div) {
@@ -136,7 +132,8 @@ impl Config {
 }
 
 /// Per-slot configuration.
-#[derive(Clone, Copy, Debug, BuilderLite)]
+#[derive(Clone, Copy, Debug, Default, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SlotConfig {
     /// Input sampling delay phase used for high-speed tuning (esp32s3 only).
@@ -147,18 +144,9 @@ pub struct SlotConfig {
     wp_active_high: bool,
 }
 
-impl Default for SlotConfig {
-    fn default() -> Self {
-        Self {
-            #[cfg(esp32s3)]
-            input_delay_phase: DelayPhase::_0,
-            wp_active_high: false,
-        }
-    }
-}
-
 /// Length of the response a command expects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ResponseLen {
     /// No response.
     None,
@@ -178,6 +166,7 @@ impl ResponseLen {
 
 /// Per-command engine flags.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandFlags {
     /// Wait for the data line to be free before issuing.
     pub wait_complete: bool,
@@ -189,7 +178,9 @@ pub struct CommandFlags {
 
 /// Error returned by host operations.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[expect(clippy::enum_variant_names)]
 pub enum Error {
     /// A hardware operation did not complete in time.
     Timeout,
@@ -219,8 +210,33 @@ pub enum Error {
     Unsupported,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Timeout => write!(f, "A hardware operation did not complete in time"),
+            Error::ResponseCrc => write!(f, "Response CRC check failed"),
+            Error::DataCrc => write!(f, "Data CRC or end-bit error"),
+            Error::ResponseTimeout => write!(f, "Card did not respond to the command"),
+            Error::DataTimeout => write!(f, "Data transfer timed out"),
+            Error::FifoOverrun => write!(f, "FIFO under- or overrun during a transfer"),
+            Error::StartBitError => write!(f, "Data start-bit error"),
+            Error::HardwareLocked => write!(f, "Command could not be loaded (hardware locked)"),
+            Error::ResponseError => write!(f, "Controller flagged a response error"),
+            Error::DmaError => write!(f, "IDMAC transfer error"),
+            Error::NoCard => write!(f, "No card present in the slot"),
+            Error::BufferNotDmaCapable => {
+                write!(f, "Buffer lies in a region the IDMAC cannot reach")
+            }
+            Error::Unsupported => write!(f, "Operation not supported"),
+        }
+    }
+}
+
 /// Error returned when applying a [`Config`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
     /// Module-clock divider is outside `2..=16`.
@@ -233,9 +249,23 @@ pub enum ConfigError {
     NoData0,
 }
 
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::InvalidModuleDivider => {
+                write!(f, "Module-clock divider is outside 2..=16")
+            }
+            ConfigError::SlotInUse => write!(f, "The slot is already in use"),
+            ConfigError::MissingClkOrCmd => write!(f, "The clock or command pin was not connected"),
+            ConfigError::NoData0 => write!(f, "Data line 0 was not connected"),
+        }
+    }
+}
+
 impl From<Error> for MmcError {
     fn from(error: Error) -> Self {
-        #[cfg(feature = "log-04")] // no defmt in sdio yet
         warn!("{:?}", error);
         match error {
             Error::ResponseTimeout | Error::DataTimeout | Error::Timeout | Error::NoCard => {
@@ -460,7 +490,7 @@ impl Engine {
         r.cmd().write(|w| unsafe {
             w.update_clock_registers_only().set_bit();
             w.wait_prvdata_complete().set_bit();
-            w.card_number().bits(id.index() as u8);
+            w.card_number().bits(id.index());
             w.start_cmd().set_bit()
         });
         wait_command_accepted()
@@ -765,13 +795,13 @@ fn on_interrupt() {
             }
 
             if eng.result.is_none() {
-                let err = map_rintsts(rint).err().or_else(|| {
-                    if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
+                let err = map_rintsts(rint)
+                    .err()
+                    .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
                         Some(Error::DmaError)
                     } else {
                         None
-                    }
-                });
+                    });
                 if let Some(e) = err {
                     eng.result = Some(Err(e));
                 } else if eng.expect_data {
@@ -1242,7 +1272,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         r.cmd().write(|w| unsafe {
             w.send_initialization().set_bit();
             w.wait_prvdata_complete().set_bit();
-            w.card_number().bits(self.id.index() as u8);
+            w.card_number().bits(self.id.index());
             w.start_cmd().set_bit()
         });
         wait_command_accepted()?;
@@ -1357,6 +1387,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Single- or multi-block data transfer over the IDMAC, blocking.
+    #[expect(clippy::too_many_arguments)]
     fn transfer_blocking(
         &mut self,
         index: u8,
@@ -1660,6 +1691,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Single- or multi-block data transfer over the IDMAC, interrupt-driven.
+    #[expect(clippy::too_many_arguments)]
     async fn transfer_async(
         &mut self,
         index: u8,
