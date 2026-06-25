@@ -484,6 +484,13 @@ impl<'d> Rtc<'d> {
 
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
         sleep_uart_resume();
+
+        // Unlike deep sleep, light sleep does not reset the chip, so `wakeup_cause` cannot rely on
+        // the reset reason to tell whether a wakeup occurred.
+        // https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/esp_hw_support/sleep_modes.c#L2158
+        if !config.deep_slp() {
+            LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
+        }
     }
 
     pub(crate) const RTC_DISABLE_ROM_LOG: u32 = 1;
@@ -914,9 +921,14 @@ pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     SocResetReason::from_repr(reason as usize)
 }
 
+/// Tracks whether the chip has just returned from a light sleep.
+static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+
 /// Return wakeup reason.
 pub fn wakeup_cause() -> SleepSource {
-    if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep) {
+    if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep)
+        && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed)
+    {
         return SleepSource::Undefined;
     }
 
