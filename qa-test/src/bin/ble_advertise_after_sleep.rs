@@ -39,7 +39,7 @@ const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 // GATT Server definition
 #[gatt_server]
 struct Server {
-    battery_service: BatteryService,
+    _battery_service: BatteryService,
 }
 
 /// Battery service
@@ -68,7 +68,7 @@ async fn main(_s: Spawner) {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let sleep_config = esp_hal::rtc_cntl::sleep::RtcSleepConfig::default();
-    let timer = TimerWakeupSource::new(core::time::Duration::from_secs(SLEEP_SECS));
+    let timer = TimerWakeupSource::new(esp_hal::time::Duration::from_secs(SLEEP_SECS));
 
     let connector = BleConnector::new(peripherals.BT, Default::default()).unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
