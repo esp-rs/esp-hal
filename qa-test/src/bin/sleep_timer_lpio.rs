@@ -1,10 +1,12 @@
 //! Demonstrates deep sleep with timer, using low and high level pins as wakeup
 //! sources.
 //!
-//! The following wiring is assumed for ESP32-C6:
-//! - ext1 wakeup pin => GPIO2 (low level) / GPIO3 (high level)
-//! The following wiring is assumed for ESP32-H2:
-//! - ext1 wakeup pin => GPIO9 (low level) / GPIO10 (high level)
+//! Wiring
+//!
+//! | Function           | ESP32-C6 | ESP32-H2  |
+//! | ------------------ | -------- | --------- |
+//! | Wake on low level  | GPIO2    | GPIO9     |
+//! | Wake on high level | GPIO3    | GPIO10    |
 
 //% CHIP_FILTER: esp32c6 || esp32h2
 

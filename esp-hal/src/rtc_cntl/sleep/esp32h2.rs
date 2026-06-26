@@ -82,10 +82,9 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_ext1(true);
-        sleep_config.need_pd_top = true;
 
         // ext1_wakeup_prepare
         let mut pins = self.pins.borrow_mut();
@@ -684,6 +683,13 @@ impl RtcSleepConfig {
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
+        let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
+            matches!(
+                clocks::lp_slow_clk_config(clocks),
+                Some(LpSlowClkConfig::Xtal32k)
+            )
+        });
+
         if self.deep {
             // force-disable certain power domains
             self.pd_flags.set_pd_top(self.need_pd_top.not());
@@ -692,15 +698,17 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_cpu(true);
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
-            let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
-                matches!(
-                    clocks::lp_slow_clk_config(clocks),
-                    Some(LpSlowClkConfig::Xtal32k)
-                )
-            });
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
-        } else if self.need_pd_top {
-            self.pd_flags.set_pd_top(false);
+        } else {
+            // Light sleep: the digital and top domains stay powered (so execution
+            // resumes in place; the top domain must also stay on for any EXT1/GPIO
+            // wakeup). Power down the analog clock sources nothing needs while the
+            // core is clock-gated to cut power. Unlike the C5/C6 family, H2's
+            // light-sleep analog config does not lower the HP voltage, so this saves
+            // the oscillator current but not regulator power.
+            self.pd_flags.set_pd_xtal(true);
+            self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 

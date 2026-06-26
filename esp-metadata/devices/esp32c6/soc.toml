@@ -29,7 +29,7 @@ symbols = [
     "pm_support_bt_wakeup",
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
-    "pm_support_ext1_wakeup",
+    "pm_support_ext1_wakeup", # FIXME https://github.com/esp-rs/esp-hal/issues/5798
 ]
 
 [device.soc]

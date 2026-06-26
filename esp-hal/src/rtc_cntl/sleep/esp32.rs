@@ -136,10 +136,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
         // set pins to RTC function
@@ -147,6 +145,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
             pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtcio_pad_hold(true);
             bits |= 1 << pin.rtc_number();
         }
 
