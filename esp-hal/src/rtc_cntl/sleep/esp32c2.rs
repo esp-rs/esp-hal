@@ -513,6 +513,10 @@ impl RtcSleepConfig {
         cfg
     }
 
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
+    }
+
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         let cfg = RtcConfig::default();
 
@@ -729,9 +733,7 @@ impl RtcSleepConfig {
             .wakeup_state()
             .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0.into()) });
 
-        LPWR::regs()
-            .state0()
-            .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }
 
     pub(crate) fn finish_sleep(&self) {

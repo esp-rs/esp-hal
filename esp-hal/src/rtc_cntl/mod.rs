@@ -431,6 +431,15 @@ impl<'d> Rtc<'d> {
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
+
+        if config.is_deep_sleep() {
+            // Because RTC is in a slower clock domain than the CPU, it
+            // can take several CPU cycles for the sleep mode to start.
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+
         config.finish_sleep();
 
         let after = self.time_since_boot_raw();
