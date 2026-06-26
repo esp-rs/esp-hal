@@ -354,8 +354,24 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_aon_pd_en(pd_flags.pd_hp_aon());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
+        if pd_flags.pd_modem() {
+            // The modem (Wi-Fi/BLE) power domain is powered down during sleep, so
+            // isolate and retain its analog I2C buses as before.
+            self.hp_sys.clk.set_i2c_iso_en(true);
+            self.hp_sys.clk.set_i2c_retention(true);
+        } else {
+            // The modem power domain is kept on across (light-)sleep
+            // (`pd_modem == false`, the default). In that case its analog blocks -
+            // the BBPLL and the analog I2C buses used to (re)configure it - must be
+            // kept powered too, matching the `HP_MODEM` power state. Otherwise the
+            // radio comes back without a usable PLL and can no longer transmit
+            // (e.g. BLE advertising silently stops working) after wakeup.
+            self.hp_sys.clk.set_i2c_iso_en(false);
+            self.hp_sys.clk.set_i2c_retention(false);
+            self.hp_sys.clk.set_xpd_bb_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll(true);
+        }
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
