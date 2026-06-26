@@ -153,13 +153,26 @@ pub(crate) fn invalidate_flash_cache(start: u32, len: u32) {
     }
 }
 
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, esp32p4)))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe {
         unsafe extern "C" {
             fn Cache_Invalidate_Addr(addr: u32, size: u32);
         }
         Cache_Invalidate_Addr(vaddr, size);
+    }
+}
+
+#[cfg(esp32p4)]
+fn invalidate_cache(vaddr: u32, size: u32) {
+    const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
+    const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
+
+    unsafe {
+        unsafe extern "C" {
+            fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
+        }
+        Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | CACHE_MAP_L2_CACHE, vaddr, size);
     }
 }
 
