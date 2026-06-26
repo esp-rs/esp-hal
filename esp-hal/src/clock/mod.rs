@@ -96,16 +96,20 @@ impl CpuClock {
     /// # {after_snippet}
     /// ```
     pub const fn max() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c2)] {
+        cfg_select! {
+            esp32c2 => {
                 Self::_120MHz
-            } else if #[cfg(any(esp32c3, esp32c6, esp32c61))] {
+            }
+            any(esp32c3, esp32c6, esp32c61) => {
                 Self::_160MHz
-            } else if #[cfg(esp32h2)] {
+            }
+            esp32h2 => {
                 Self::_96MHz
-            } else if #[cfg(esp32p4)] {
+            }
+            esp32p4 => {
                 Self::_400MHz
-            } else {
+            }
+            _ => {
                 Self::_240MHz
             }
         }
@@ -127,10 +131,11 @@ impl RtcClock {
     #[instability::unstable]
     #[cfg(any(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+        cfg_select! {
+            soc_has_clock_node_rtc_slow_clk => {
                 let freq = clocks::rtc_slow_clk_frequency();
-            } else {
+            }
+            _ => {
                 let freq = clocks::lp_slow_clk_frequency();
             }
         }
@@ -148,6 +153,14 @@ impl RtcClock {
     #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
+            #[cfg(not(esp32c2))]
+            if cal_clk == TimgCalibrationClockConfig::Xtal32kClk {
+                debug!("Assuming Xtal32k has precisely 32.768kHz instead of calibrating");
+                let freq_hz: u64 = 32_768;
+                let period_64 = (1_000_000u64 << RtcClock::CAL_FRACT) / freq_hz;
+                return period_64 as u32;
+            }
+
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency());
 
             let (xtal_cycles, _) = RtcClock::measure_rtc_clock(
@@ -302,12 +315,13 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         // Make sure we measure the crystal.
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg_function_clock)] {
+        cfg_select! {
+            soc_has_clock_node_timg_function_clock => {
                 let current_function_clock = clocks::TimgInstance::Timg0.function_clock_config(clocks);
                 clocks::TimgInstance::Timg0.configure_function_clock(clocks, function_clock);
                 clocks::TimgInstance::Timg0.request_function_clock(clocks);
             }
+            _ => {}
         }
 
         let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
@@ -432,11 +446,12 @@ fn calibrate_rtc_slow_clock() {
 fn calibrate_rtc_slow_clock() {
     // Unfortunate device specific mapping.
     // TODO: fix it by generating cfgs for each mux input?
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
+    cfg_select! {
+        esp32s2 => {
             // Can directly measure output of the RTC_SLOW mux
             let slow_clk = TimgCalibrationClockConfig::RtcClk;
-        } else if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+        }
+        soc_has_clock_node_rtc_slow_clk => {
             let slow_clk = match unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) {
                 RtcSlowClkConfig::RcFast => TimgCalibrationClockConfig::RcFastDivClk,
                 RtcSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
@@ -445,29 +460,33 @@ fn calibrate_rtc_slow_clock() {
                 #[cfg(esp32c2)]
                 RtcSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Osc32kClk,
             };
-        } else if #[cfg(soc_has_clock_node_lp_slow_clk)]{
+        }
+        soc_has_clock_node_lp_slow_clk => {
             let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
                 LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
                 LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
                 LpSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
             };
         }
+        _ => {}
     }
 
     let cal_val = RtcClock::calibrate(slow_clk, 1024);
 
-    cfg_if::cfg_if! {
-        if #[cfg(soc_has_lp_aon)] {
+    cfg_select! {
+        soc_has_lp_aon => {
             use crate::peripherals::LP_AON;
-        } else {
+        }
+        _ => {
             use crate::peripherals::LPWR as LP_AON;
         }
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
+    cfg_select! {
+        esp32p4 => {
             let reg = LP_AON::regs().lp_store1();
-        } else {
+        }
+        _ => {
             let reg = LP_AON::regs().store1();
         }
     }
@@ -492,10 +511,11 @@ pub fn xtal_clock() -> Rate {
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
 fn rtc_slow_cal_period() -> u64 {
-    cfg_if::cfg_if! {
-        if #[cfg(soc_has_lp_aon)] {
+    cfg_select! {
+        soc_has_lp_aon => {
             use crate::peripherals::LP_AON;
-        } else {
+        }
+        _ => {
             use crate::peripherals::LPWR as LP_AON;
         }
     }
@@ -504,10 +524,11 @@ fn rtc_slow_cal_period() -> u64 {
     // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
     // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
     // Once that lands this cfg branch can disappear.
-    cfg_if::cfg_if! {
-        if #[cfg(esp32p4)] {
+    cfg_select! {
+        esp32p4 => {
             let reg = LP_AON::regs().lp_store1();
-        } else {
+        }
+        _ => {
             let reg = LP_AON::regs().store1();
         }
     }

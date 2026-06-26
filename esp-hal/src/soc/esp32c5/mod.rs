@@ -27,6 +27,13 @@ pub(crate) fn pre_init() {
     }
     // this is hacky, but for some reason we must reset the output enable register manually
     crate::peripherals::GPIO::regs().enable().reset();
+
+    // Clear bit reset_event_bypass to ensure that the system bus is also reset during a core reset
+    // (WDT), preventing bus freezing caused by an incorrect MSPI core reset in ROM. Mirrors
+    // ESP-IDF's bootloader_hardware_init.
+    crate::peripherals::PCR::regs()
+        .reset_event_bypass()
+        .modify(|_, w| w.reset_event_bypass().clear_bit());
 }
 
 pub(crate) fn enable_branch_predictor() {
@@ -44,7 +51,7 @@ pub(crate) fn enable_branch_predictor() {
 
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
+#[crate::ram]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(addr: u32, size: u32);
@@ -57,7 +64,7 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
+#[crate::ram]
 pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);

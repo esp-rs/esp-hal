@@ -98,7 +98,7 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
         let rtc_cntl = LPWR::regs();
         // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -397,6 +397,14 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+
+        // This is the light-sleep config. The main XTAL is powered down in sleep
+        // (`xtal_fpu` stays false), so the analog regulator/bias must use the
+        // same XTAL-down settings that `deep()` applies "because of xtal_fpu".
+        cfg.set_rtc_regulator_fpu(true);
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
         cfg
     }
 }
@@ -439,12 +447,9 @@ fn rtc_sleep_pu(val: bool) {
         .modify(|_, w| w.lslp_mem_force_pu().bit(val));
 
     APB_CTRL::regs().front_end_mem_pd().modify(|_r, w| {
-        w.dc_mem_force_pu()
-            .bit(val)
-            .pbus_mem_force_pu()
-            .bit(val)
-            .agc_mem_force_pu()
-            .bit(val)
+        w.dc_mem_force_pu().bit(val);
+        w.pbus_mem_force_pu().bit(val);
+        w.agc_mem_force_pu().bit(val)
     });
 
     BB::regs()
@@ -506,6 +511,10 @@ impl RtcSleepConfig {
         cfg.set_pd_cur_slp(true);
 
         cfg
+    }
+
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -724,9 +733,7 @@ impl RtcSleepConfig {
             .wakeup_state()
             .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0.into()) });
 
-        LPWR::regs()
-            .state0()
-            .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }
 
     pub(crate) fn finish_sleep(&self) {

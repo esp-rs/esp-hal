@@ -61,4 +61,6 @@ _sidata = LOADADDR(.data);
   *(.noinit .noinit.*)
   *(.uninit .uninit.*)
   . = ALIGN(4);
+
+  _noinit_end = .;
 } > RWDATA

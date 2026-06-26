@@ -1,9 +1,10 @@
 use core::marker::PhantomData;
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32c6)] {
+cfg_select! {
+    esp32c6 => {
         use Interrupt::APB_SARADC as InterruptSource;
-    } else {
+    }
+    _ => {
         use Interrupt::APB_ADC as InterruptSource;
     }
 }
@@ -28,6 +29,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt},
+    rtc_cntl::WakeLock,
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -39,22 +41,25 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c3/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c6/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
-cfg_if::cfg_if! {
-    if #[cfg(adc_adc1)] {
+cfg_select! {
+    adc_adc1 => {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
     }
+    _ => {}
 }
 
 // The number of analog IO pins, and in turn the number of attentuations,
 // depends on which chip is being used
-cfg_if::cfg_if! {
-    if #[cfg(esp32c6)] {
+cfg_select! {
+    esp32c6 => {
         pub(super) const NUM_ATTENS: usize = 7;
-    } else if #[cfg(esp32c5)] {
+    }
+    esp32c5 => {
         pub(super) const NUM_ATTENS: usize = 6;
-    } else {
+    }
+    _ => {
         pub(super) const NUM_ATTENS: usize = 5;
     }
 }
@@ -561,10 +566,11 @@ pub(super) fn acquire_async_adc() {
 }
 
 pub(super) fn release_async_adc() -> bool {
-    cfg_if::cfg_if! {
-        if #[cfg(all(adc_adc1, adc_adc2))] {
+    cfg_select! {
+        all(adc_adc1, adc_adc2) => {
             ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
-        } else {
+        }
+        _ => {
             true
         }
     }
@@ -663,12 +669,14 @@ impl Instance for crate::peripherals::ADC2<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct AdcFuture<ADCX: Instance> {
     phantom: PhantomData<ADCX>,
+    _wake_lock: WakeLock,
 }
 
 impl<ADCX: Instance> AdcFuture<ADCX> {
     pub fn new(_self: &super::Adc<'_, ADCX, Async>) -> Self {
         Self {
             phantom: PhantomData,
+            _wake_lock: WakeLock::new(),
         }
     }
 }

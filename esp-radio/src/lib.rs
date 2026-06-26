@@ -265,17 +265,16 @@ pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new()
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
-    cfg_if::cfg_if! {
-        if #[cfg(wifi_driver_supported)] {
-            core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-            core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
-            core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
-        }
+    #[cfg(wifi_driver_supported)]
+    {
+        core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+        core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+        core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
+        core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
     };
 };
 
@@ -308,6 +307,9 @@ pub(crate) fn init() {
             "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
         );
     }
+
+    #[cfg(feature = "unstable")]
+    esp_hal::rtc_cntl::WakeLock::acquire();
 
     if !preempt::initialized() {
         panic!("The scheduler must be initialized before initializing the radio.");
@@ -353,6 +355,9 @@ pub(crate) fn deinit() {
     #[cfg(all(esp32, feature = "unstable"))]
     // Allow using `ADC2` again
     release_adc2(unsafe { esp_hal::Internal::conjure() });
+
+    #[cfg(feature = "unstable")]
+    esp_hal::rtc_cntl::WakeLock::release();
 
     debug!("Radio deinitialized");
 }

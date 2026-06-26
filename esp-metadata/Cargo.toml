@@ -7,6 +7,7 @@ description   = "Metadata for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-metadata/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
+publish       = false
 
 [package.metadata.espressif]
 forever-unstable = true
@@ -21,8 +22,8 @@ clippy-configs = [] # don't waste time on this
 anyhow       = "1.0"
 clap         = { version = "4.5", features = ["derive"], optional = true }
 convert_case = "0.8"
-basic-toml   = "0.1"
-serde        = { version = "1.0", default-features = false, features = ["derive"] }
+toml         = { version = "1.1", features = ["preserve_order"] }
+serde        = { version = "1.0", default-features = false, features = ["derive", "std"] }
 somni-parser = "0.2.1"
 somni-expr   = "0.2"
 strum        = { version = "0.27", features = ["derive"] }

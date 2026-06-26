@@ -8,8 +8,6 @@
 #![no_std]
 #![no_main]
 
-use core::time::Duration;
-
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
@@ -23,6 +21,7 @@ use esp_hal::{
         wakeup_cause,
     },
     system::Cpu,
+    time::Duration,
 };
 use esp_println::println;
 

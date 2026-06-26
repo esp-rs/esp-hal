@@ -60,6 +60,9 @@ pub struct Source {
     #[serde(default)]
     always_on: bool,
 
+    #[serde(default)]
+    wake_locking: bool,
+
     /// If set, this expression will be used to validate the clock configuration.
     ///
     /// The expression may refer to clock sources, or any of the clock tree item's properties (e.g.
@@ -81,6 +84,10 @@ impl ClockTreeNodeType for Source {
 
     fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.wake_locking
     }
 
     fn validate_source_data(
@@ -306,6 +313,10 @@ pub struct DerivedClockSource {
 impl ClockTreeNodeType for DerivedClockSource {
     fn name(&self) -> &str {
         self.source_options.name()
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.source_options.wake_locking()
     }
 
     fn input_clocks(

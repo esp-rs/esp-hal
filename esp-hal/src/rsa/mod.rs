@@ -32,6 +32,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac,
     peripherals::RSA,
+    rtc_cntl::WakeLock,
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
@@ -262,6 +263,26 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     fn read_out(&self, outbuf: &mut [u32]) {
         for (reg, op) in self.regs().z_mem_iter().zip(outbuf.iter_mut()) {
             *op = reg.read().bits();
+        }
+
+        #[cfg(clear_crypto_secrets)]
+        self.clear_secrets();
+    }
+
+    /// Removes the operands and intermediate results from the peripheral.
+    #[cfg(clear_crypto_secrets)]
+    fn clear_secrets(&self) {
+        for reg in self.regs().x_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().y_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().z_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
+        }
+        for reg in self.regs().m_mem_iter() {
+            reg.write(|w| unsafe { w.bits(0) });
         }
     }
 
@@ -582,6 +603,7 @@ static SIGNALED: AtomicBool = AtomicBool::new(false);
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RsaFuture<'a, 'd> {
     driver: &'a Rsa<'d, Async>,
+    _wake_lock: WakeLock,
 }
 
 impl<'a, 'd> RsaFuture<'a, 'd> {
@@ -591,14 +613,18 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
 
         driver.internal_enable_disable_interrupt(true);
 
-        Self { driver }
+        Self {
+            driver,
+            _wake_lock: WakeLock::new(),
+        }
     }
 
     fn is_done(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(rsa_version = "1")] {
+        cfg_select! {
+            rsa_version = "1" => {
                 SIGNALED.load(Ordering::Acquire)
-            } else {
+            }
+            _ => {
                 self.driver.is_idle()
             }
         }

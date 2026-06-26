@@ -17,14 +17,13 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::delay::Delay;
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_rx_buffer;
 //! # use esp_hal::dma::DmaRxBuf;
 //! # use esp_hal::gpio::NoPin;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIo, RxConfig, RxFourBits};
 //!
 //! // Initialize DMA buffer and descriptors for data reception
-//! let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(32000, 0);
-//! let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
+//! let mut dma_rx_buf = dma_rx_buffer!(32000)?;
 //! let dma_channel = peripherals.DMA_CH0;
 //!
 //! // Configure the 4-bit input pins and clock pin
@@ -1926,10 +1925,11 @@ mod private {
         }
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32c5)] {
+            cfg_select! {
+                esp32c5 => {
                     OutputSignal::PARL_TX_CS
-                } else {
+                }
+                _ => {
                     OutputSignal::PARL_TX_DATA7
                 }
             }

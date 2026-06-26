@@ -20,19 +20,19 @@ for_each_dma_engine! {
     };
     ("COPY_DMA") => {
         mod copy;
-        pub use copy::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
+        pub use copy::*;
     };
     ("CRYPTO_DMA") => {
         mod crypto;
-        pub use crypto::{CryptoDmaChannel, CryptoDmaRxChannel, CryptoDmaTxChannel};
+        pub use crypto::*;
     };
     ("I2S_DMA") => {
         mod i2s;
-        pub use i2s::{I2sDmaChannel, I2sDmaRxChannel, I2sDmaTxChannel};
+        pub use i2s::*;
     };
     ("SPI_DMA") => {
         mod spi;
-        pub use spi::{SpiDmaChannel, SpiDmaRxChannel, SpiDmaTxChannel};
+        pub use spi::*;
     };
 }
 

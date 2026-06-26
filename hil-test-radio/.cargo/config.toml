@@ -20,9 +20,6 @@ rustflags = [
     "-C", "link-arg=-Wl,-Tlinkall.x",
 ]
 
-[env]
-DEFMT_LOG = "info,embedded_test=warn"
-
 [unstable]
 build-std = ["core", "alloc"]
 

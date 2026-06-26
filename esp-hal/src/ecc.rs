@@ -617,30 +617,33 @@ impl Info {
     }
 
     fn qx_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qx_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.px_mem(0).as_ptr()
             }
         }
     }
 
     fn qy_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qy_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.py_mem(0).as_ptr()
             }
         }
     }
 
     fn qz_mem(&self) -> *mut u32 {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.regs.qz_mem(0).as_ptr()
-            } else {
+            }
+            _ => {
                 self.regs.k_mem(0).as_ptr()
             }
         }
@@ -655,6 +658,29 @@ impl Info {
         self.read_mem(self.qx_mem(), qx);
         self.read_mem(self.qy_mem(), qy);
         self.read_mem(self.qz_mem(), qz);
+    }
+
+    /// Clears all peripheral memory blocks
+    #[cfg(clear_crypto_secrets)]
+    fn clear_secrets(&self) {
+        self.zero_mem(self.k_mem());
+        self.zero_mem(self.px_mem());
+        self.zero_mem(self.py_mem());
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            self.zero_mem(self.qx_mem());
+            self.zero_mem(self.qy_mem());
+            self.zero_mem(self.qz_mem());
+        }
+    }
+
+    #[cfg(clear_crypto_secrets)]
+    fn zero_mem(&self, mut word_ptr: *mut u32) {
+        for _ in 0..(MEM_BLOCK_SIZE / 4) {
+            unsafe { word_ptr.write_volatile(0) };
+            word_ptr = word_ptr.wrapping_add(1);
+        }
     }
 
     fn is_busy(&self) -> bool {
@@ -954,30 +980,33 @@ impl MemoryPointers {
     }
 
     fn set_qx(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qx = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.px = Some(ptr.cast());
             }
         }
     }
 
     fn set_qy(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qy = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.py = Some(ptr.cast());
             }
         }
     }
 
     fn set_qz(&mut self, ptr: NonNull<[u8]>) {
-        cfg_if::cfg_if! {
-            if #[cfg(ecc_separate_jacobian_point_memory)] {
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => {
                 self.qz = Some(ptr.cast());
-            } else {
+            }
+            _ => {
                 self.k = Some(ptr.cast());
             }
         }
@@ -1134,6 +1163,9 @@ impl<'d> EccBackend<'d> {
 
         item.point_verification_result = driver.info().check_point_verification_result().is_ok();
 
+        #[cfg(clear_crypto_secrets)]
+        driver.info().clear_secrets();
+
         Poll::Ready(Status::Completed)
     }
 
@@ -1142,6 +1174,11 @@ impl<'d> EccBackend<'d> {
             unreachable!()
         };
         driver.reset();
+
+        // The operands may have already been written to the peripheral.
+        #[cfg(clear_crypto_secrets)]
+        driver.info().clear_secrets();
+
         item.cancelled = true;
     }
 
@@ -1172,10 +1209,11 @@ fn ecc_work_queue_handler() {
     if !ECC_WORK_QUEUE.process() {
         // The queue may indicate that it needs to be polled again. In this case, we do not clear
         // the interrupt bit, which causes the interrupt to be re-handled.
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c61))] {
+        cfg_select! {
+            any(esp32c5, esp32c61) => {
                 let reg = ECC::regs().int_clr();
-            } else {
+            }
+            _ => {
                 let reg = ECC::regs().mult_int_clr();
             }
         }

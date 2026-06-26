@@ -67,20 +67,11 @@ macro_rules! property {
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
-    ("dma.can_access_psram") => {
-        true
-    };
     ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
         true
-    };
-    ("dma.max_priority") => {
-        5
-    };
-    ("dma.max_priority", str) => {
-        stringify!(5)
     };
     ("dma.gdma_version") => {
         2
@@ -281,10 +272,10 @@ macro_rules! property {
         stringify!(32)
     };
     ("rsa.memory_size_bytes") => {
-        384
+        512
     };
     ("rsa.memory_size_bytes", str) => {
-        stringify!(384)
+        stringify!(512)
     };
     ("sleep.light_sleep") => {
         false
@@ -300,12 +291,6 @@ macro_rules! property {
     };
     ("soc.multi_core_enabled") => {
         true
-    };
-    ("soc.rc_fast_clk_default") => {
-        20000000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(20000000)
     };
     ("soc.internal_memory_cached") => {
         true
@@ -791,37 +776,6 @@ macro_rules! for_each_sw_interrupt {
     };
 }
 #[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-        }
-    };
-}
-#[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rsa_exponentiation {
     ($($pattern:tt => $code:tt;)*) => {
@@ -922,6 +876,38 @@ macro_rules! for_each_rsa_exponentiation {
         _for_each_inner_rsa_exponentiation!((3008));
         _for_each_inner_rsa_exponentiation!((3040));
         _for_each_inner_rsa_exponentiation!((3072));
+        _for_each_inner_rsa_exponentiation!((3104));
+        _for_each_inner_rsa_exponentiation!((3136));
+        _for_each_inner_rsa_exponentiation!((3168));
+        _for_each_inner_rsa_exponentiation!((3200));
+        _for_each_inner_rsa_exponentiation!((3232));
+        _for_each_inner_rsa_exponentiation!((3264));
+        _for_each_inner_rsa_exponentiation!((3296));
+        _for_each_inner_rsa_exponentiation!((3328));
+        _for_each_inner_rsa_exponentiation!((3360));
+        _for_each_inner_rsa_exponentiation!((3392));
+        _for_each_inner_rsa_exponentiation!((3424));
+        _for_each_inner_rsa_exponentiation!((3456));
+        _for_each_inner_rsa_exponentiation!((3488));
+        _for_each_inner_rsa_exponentiation!((3520));
+        _for_each_inner_rsa_exponentiation!((3552));
+        _for_each_inner_rsa_exponentiation!((3584));
+        _for_each_inner_rsa_exponentiation!((3616));
+        _for_each_inner_rsa_exponentiation!((3648));
+        _for_each_inner_rsa_exponentiation!((3680));
+        _for_each_inner_rsa_exponentiation!((3712));
+        _for_each_inner_rsa_exponentiation!((3744));
+        _for_each_inner_rsa_exponentiation!((3776));
+        _for_each_inner_rsa_exponentiation!((3808));
+        _for_each_inner_rsa_exponentiation!((3840));
+        _for_each_inner_rsa_exponentiation!((3872));
+        _for_each_inner_rsa_exponentiation!((3904));
+        _for_each_inner_rsa_exponentiation!((3936));
+        _for_each_inner_rsa_exponentiation!((3968));
+        _for_each_inner_rsa_exponentiation!((4000));
+        _for_each_inner_rsa_exponentiation!((4032));
+        _for_each_inner_rsa_exponentiation!((4064));
+        _for_each_inner_rsa_exponentiation!((4096));
         _for_each_inner_rsa_exponentiation!((all(32), (64), (96), (128), (160), (192),
         (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
         (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
@@ -931,7 +917,10 @@ macro_rules! for_each_rsa_exponentiation {
         (1888), (1920), (1952), (1984), (2016), (2048), (2080), (2112), (2144), (2176),
         (2208), (2240), (2272), (2304), (2336), (2368), (2400), (2432), (2464), (2496),
         (2528), (2560), (2592), (2624), (2656), (2688), (2720), (2752), (2784), (2816),
-        (2848), (2880), (2912), (2944), (2976), (3008), (3040), (3072)));
+        (2848), (2880), (2912), (2944), (2976), (3008), (3040), (3072), (3104), (3136),
+        (3168), (3200), (3232), (3264), (3296), (3328), (3360), (3392), (3424), (3456),
+        (3488), (3520), (3552), (3584), (3616), (3648), (3680), (3712), (3744), (3776),
+        (3808), (3840), (3872), (3904), (3936), (3968), (4000), (4032), (4064), (4096)));
     };
 }
 #[macro_export]
@@ -987,11 +976,29 @@ macro_rules! for_each_rsa_multiplication {
         _for_each_inner_rsa_multiplication!((1472));
         _for_each_inner_rsa_multiplication!((1504));
         _for_each_inner_rsa_multiplication!((1536));
+        _for_each_inner_rsa_multiplication!((1568));
+        _for_each_inner_rsa_multiplication!((1600));
+        _for_each_inner_rsa_multiplication!((1632));
+        _for_each_inner_rsa_multiplication!((1664));
+        _for_each_inner_rsa_multiplication!((1696));
+        _for_each_inner_rsa_multiplication!((1728));
+        _for_each_inner_rsa_multiplication!((1760));
+        _for_each_inner_rsa_multiplication!((1792));
+        _for_each_inner_rsa_multiplication!((1824));
+        _for_each_inner_rsa_multiplication!((1856));
+        _for_each_inner_rsa_multiplication!((1888));
+        _for_each_inner_rsa_multiplication!((1920));
+        _for_each_inner_rsa_multiplication!((1952));
+        _for_each_inner_rsa_multiplication!((1984));
+        _for_each_inner_rsa_multiplication!((2016));
+        _for_each_inner_rsa_multiplication!((2048));
         _for_each_inner_rsa_multiplication!((all(32), (64), (96), (128), (160), (192),
         (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
         (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
         (928), (960), (992), (1024), (1056), (1088), (1120), (1152), (1184), (1216),
-        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536)));
+        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536),
+        (1568), (1600), (1632), (1664), (1696), (1728), (1760), (1792), (1824), (1856),
+        (1888), (1920), (1952), (1984), (2016), (2048)));
     };
 }
 #[macro_export]
@@ -1005,11 +1012,20 @@ macro_rules! for_each_sha_algorithm {
         (insecure_against : "length extension"), 1));
         _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
         (insecure_against : "length extension"), 2));
+        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
+        (insecure_against :), 3)); _for_each_inner_sha_algorithm!((Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4));
+        _for_each_inner_sha_algorithm!((Sha512_224, "SHA-512/224"(sizes : 128, 28, 16)
+        (insecure_against :), 5)); _for_each_inner_sha_algorithm!((Sha512_256,
+        "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6));
         _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
         (insecure_against : "collision", "length extension"), 0), (Sha224,
         "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
         (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
-        2)));
+        2), (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 3), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4),
+        (Sha512_224, "SHA-512/224"(sizes : 128, 28, 16) (insecure_against :), 5),
+        (Sha512_256, "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6)));
     };
 }
 #[macro_export]
@@ -2695,6 +2711,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting TIMG_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::acquire();
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::MpllClk => request_mpll_clk(clocks),
                     TimgCalibrationClockConfig::SpllClk => request_spll_clk(clocks),
@@ -2710,6 +2727,7 @@ macro_rules! define_clock_tree_types {
             trace!("Releasing TIMG_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::release();
                 enable_timg_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::MpllClk => release_mpll_clk(clocks),
@@ -4690,6 +4708,9 @@ macro_rules! for_each_peripheral {
         #[doc = "UART4 peripheral singleton"] UART4 <= UART4(UART4 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI1 peripheral singleton"]
+        SPI1 <= SPI1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SPI3 peripheral singleton"]
@@ -4762,7 +4783,8 @@ macro_rules! for_each_peripheral {
         USB_HS <= USB_HS(USB_HS : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
+        FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
@@ -4827,6 +4849,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((UART2(unstable)));
         _for_each_inner_peripheral!((UART3(unstable)));
         _for_each_inner_peripheral!((UART4(unstable)));
+        _for_each_inner_peripheral!((SPI0(unstable)));
+        _for_each_inner_peripheral!((SPI1(unstable)));
         _for_each_inner_peripheral!((SPI2)); _for_each_inner_peripheral!((SPI3));
         _for_each_inner_peripheral!((I2C0(unstable)));
         _for_each_inner_peripheral!((I2C1(unstable)));
@@ -4852,6 +4876,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((ECC(unstable)));
         _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((USB_HS(unstable)));
+        _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
@@ -5041,7 +5066,9 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "UART4 peripheral singleton"] UART4 <= UART4(UART4 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
+        = "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)), (@ peri_type #[doc =
+        "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)), (@ peri_type #[doc =
+        "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
         "SPI3 peripheral singleton"] SPI3 <= SPI3(SPI3 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
@@ -5097,16 +5124,18 @@ macro_rules! for_each_peripheral {
         = "USB_HS peripheral singleton"] USB_HS <= USB_HS(USB_HS : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@
-        peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual()
-        (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <=
-        virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
-        (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
-        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18),
-        (GPIO19), (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26),
-        (GPIO27), (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34),
-        (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42),
-        (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50),
-        (GPIO51), (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
+        peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
+        (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <=
+        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
+        CPU_CTRL <= virtual() (unstable))));
+        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
+        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
+        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
+        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
+        (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35),
+        (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43),
+        (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50), (GPIO51),
+        (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
         (DMA_CH2(unstable)), (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)),
         (DMA_AXI_CH2(unstable)), (VDMA_CH0(unstable)), (VDMA_CH1(unstable)),
         (VDMA_CH2(unstable)), (VDMA_CH3(unstable)), (GPIO(unstable)), (SYSTEM(unstable)),
@@ -5116,14 +5145,15 @@ macro_rules! for_each_peripheral {
         (LP_AON(unstable)), (LP_AON_CLKRST(unstable)), (LP_SYS(unstable)),
         (LP_WDT(unstable)), (LPWR(unstable)), (PMU(unstable)), (SYSTIMER(unstable)),
         (TIMG0(unstable)), (TIMG1(unstable)), (UART0(unstable)), (UART1(unstable)),
-        (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI2), (SPI3),
-        (I2C0(unstable)), (I2C1(unstable)), (TWAI0(unstable)), (TWAI1(unstable)),
-        (TWAI2(unstable)), (PSRAM(unstable)), (DMA(unstable)), (AXI_GDMA(unstable)),
-        (ETH(unstable)), (MIPI_DSI(unstable)), (USB_DEVICE(unstable)),
-        (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
-        (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)), (AES(unstable)),
-        (SHA(unstable)), (RSA(unstable)), (ECC(unstable)), (USB_FS(unstable)),
-        (USB_HS(unstable)), (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        (UART2(unstable)), (UART3(unstable)), (UART4(unstable)), (SPI0(unstable)),
+        (SPI1(unstable)), (SPI2), (SPI3), (I2C0(unstable)), (I2C1(unstable)),
+        (TWAI0(unstable)), (TWAI1(unstable)), (TWAI2(unstable)), (PSRAM(unstable)),
+        (DMA(unstable)), (AXI_GDMA(unstable)), (ETH(unstable)), (MIPI_DSI(unstable)),
+        (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
+        (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
+        (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
+        (USB_FS(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
         Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (SHA, Sha, 5,
         AxiGdmaChannel)));

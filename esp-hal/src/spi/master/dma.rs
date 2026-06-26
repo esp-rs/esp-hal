@@ -30,6 +30,7 @@ use crate::{
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
+        aligned::{DmaAlignedMut, InternalMemory},
         asynch::DmaRxFuture,
         prepare_for_rx,
         prepare_for_tx,
@@ -113,7 +114,8 @@ impl<'d> Spi<'d, Blocking> {
 /// # {before_snippet}
 /// use esp_hal::{
 ///     dma::{DmaRxBuf, DmaTxBuf},
-///     dma_buffers,
+///     dma_rx_buffer,
+///     dma_tx_buffer,
 ///     spi::{
 ///         Mode,
 ///         master::{Config, Spi},
@@ -121,10 +123,8 @@ impl<'d> Spi<'d, Blocking> {
 /// };
 ///
 /// // Optional: create and set up copy buffers.
-/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-///
-/// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-/// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
+/// let dma_rx_buf = dma_rx_buffer!(32000)?;
+/// let dma_tx_buf = dma_tx_buffer!(32000)?;
 ///
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
@@ -256,36 +256,36 @@ impl<'d> SpiDma<'d, Blocking> {
         let channel = Channel::new(channel);
         channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
 
-        for_each_spi_master!((all $($inst:tt),*) => {
-            const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
-        };);
-        let id = if spi.info() == unsafe { crate::peripherals::SPI2::steal().info() } {
-            0
-        } else {
-            1
-        };
-
         let state = spi.spi.dma_state();
 
         state.tx_transfer_in_progress.set(false);
         state.rx_transfer_in_progress.set(false);
 
-        static mut TX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-            [[DmaDescriptor::EMPTY]; SPI_NUM];
-        static mut RX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
-            [[DmaDescriptor::EMPTY]; SPI_NUM];
+        // Safety: The descriptors occupy their own shared cache line and are updated in a
+        // synchronised fashion.
+        let (tx_descriptors, rx_descriptors) = unsafe {
+            let descriptors = (&mut *state.descriptors.get()).get_mut().into_inner();
+            descriptors.fill(DmaDescriptor::EMPTY);
+            let (tx_descriptors, rx_descriptors) = descriptors.split_at_mut(1);
+            (
+                DmaAlignedMut::new_unchecked(tx_descriptors),
+                DmaAlignedMut::new_unchecked(rx_descriptors),
+            )
+        };
 
-        let rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
-
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
-                static mut BUFFERS: [[u32; 1]; SPI_NUM] = [[0]; SPI_NUM];
-                let buffer = crate::dma::as_mut_byte_array!(BUFFERS[id], 4);
-                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, buffer));
-            } else {
-                let tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
+        let tx_buffer = cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => unsafe {
+                (&mut *state.default_tx_buffer.get()).get_mut().unsize()
+            },
+            _ => unsafe {
+                DmaAlignedMut::new_unchecked(&mut [][..])
             }
-        }
+        };
+
+        let rx_buffer = unwrap!(DmaRxBuf::new(rx_descriptors, unsafe {
+            DmaAlignedMut::new_unchecked(&mut [])
+        }));
+        let tx_buffer = unwrap!(DmaTxBuf::new(tx_descriptors, tx_buffer));
 
         // The buffers must be set up when creating the driver.
         unsafe { (&mut *state.tx_buffer.get()).write(tx_buffer.into_scoped()) };
@@ -638,6 +638,111 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
+    /// Half-duplex read.
+    ///
+    /// This performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Because command and address phases cannot be split
+    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// in the configured internal RX copy buffer.
+    #[instability::unstable]
+    pub async fn half_duplex_read_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+
+        if buffer.is_empty() {
+            let rx_buffer = unsafe { NoBuffer(self.spi.dma_state().rx_buffer().prepare()) };
+            self.half_duplex_read_dma_async(data_mode, cmd, address, dummy, 0, rx_buffer)
+                .await?;
+            return Ok(());
+        }
+
+        let operation = DmaOperationKind::for_read(buffer);
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_buffer = match operation {
+            DmaOperationKind::Copied => {
+                MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyRxBuf::Direct {
+                descriptors: &mut descriptors,
+                #[cfg(dma_can_access_psram)]
+                align_buffer: [const { None }; 2],
+            },
+        };
+
+        let chunk_size = maybe_copy_buffer.chunk_size();
+        if chunk_size == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > chunk_size {
+            return match operation {
+                DmaOperationKind::Copied => Err(Error::from(DmaError::Overflow)),
+                DmaOperationKind::InPlace => Err(Error::MaxDmaTransferSizeExceeded),
+            };
+        }
+
+        let rx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(&mut *buffer)) };
+        self.half_duplex_read_dma_async(data_mode, cmd, address, dummy, buffer.len(), rx_buffer)
+            .await?;
+        maybe_copy_buffer.finish(buffer);
+
+        Ok(())
+    }
+
+    /// Half-duplex write.
+    ///
+    /// This performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Because command and address phases cannot be split
+    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// in the configured internal TX copy buffer.
+    #[instability::unstable]
+    pub async fn half_duplex_write_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.wait_for_idle_async().await;
+
+        if buffer.is_empty() {
+            let tx_buffer = unsafe { NoBuffer(self.spi.dma_state().tx_buffer().prepare()) };
+            self.half_duplex_write_dma_async(data_mode, cmd, address, dummy, 0, tx_buffer)
+                .await?;
+            return Ok(());
+        }
+
+        let operation = DmaOperationKind::for_write(buffer);
+        let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
+        let mut maybe_copy_buffer = match operation {
+            DmaOperationKind::Copied => {
+                MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
+            }
+            DmaOperationKind::InPlace => MaybeCopyTxBuf::Direct(&mut descriptors),
+        };
+
+        let chunk_size = maybe_copy_buffer.chunk_size();
+        if chunk_size == 0 {
+            return Err(Error::from(DmaError::BufferTooSmall));
+        }
+        if buffer.len() > chunk_size {
+            return match operation {
+                DmaOperationKind::Copied => Err(Error::from(DmaError::Overflow)),
+                DmaOperationKind::InPlace => Err(Error::MaxDmaTransferSizeExceeded),
+            };
+        }
+
+        let tx_buffer = unsafe { maybe_copy_buffer.setup(NonNull::from(buffer)) };
+        self.half_duplex_write_dma_async(data_mode, cmd, address, dummy, buffer.len(), tx_buffer)
+            .await
+    }
+
     async fn transfer_buffers_dma_async(
         &mut self,
         read_bytes: usize,
@@ -648,6 +753,56 @@ impl<'d> SpiDma<'d, Async> {
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         unsafe {
             spi.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
+        }
+        spi.wait_for_idle_async().await;
+        spi.defuse();
+        Ok(())
+    }
+
+    async fn half_duplex_read_dma_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_read: usize,
+        mut rx_buffer: impl DmaRxBuffer,
+    ) -> Result<(), Error> {
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        unsafe {
+            spi.start_half_duplex_read(
+                data_mode,
+                cmd,
+                address,
+                dummy,
+                bytes_to_read,
+                &mut rx_buffer,
+            )?;
+        }
+        spi.wait_for_idle_async().await;
+        spi.defuse();
+        Ok(())
+    }
+
+    async fn half_duplex_write_dma_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        bytes_to_write: usize,
+        mut tx_buffer: impl DmaTxBuffer,
+    ) -> Result<(), Error> {
+        let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
+        unsafe {
+            spi.start_half_duplex_write(
+                data_mode,
+                cmd,
+                address,
+                dummy,
+                bytes_to_write,
+                &mut tx_buffer,
+            )?;
         }
         spi.wait_for_idle_async().await;
         spi.defuse();
@@ -685,6 +840,7 @@ impl<'a> MaybeCopyTxBuf<'a> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum MaybeCopyRxBuf<'a> {
     Copy(&'a mut ScopedDmaRxBuf<'static>),
     Direct {
@@ -740,7 +896,7 @@ impl<'a> MaybeCopyRxBuf<'a> {
 
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
-                    if let Some(buffer) = buffer.as_ref() {
+                    if let Some(buffer) = buffer.as_mut() {
                         buffer.write_back();
                     }
                     *buffer = None;
@@ -750,6 +906,7 @@ impl<'a> MaybeCopyRxBuf<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
 enum DmaOperationKind {
     /// The entire slice must be copied into the internal buffer first
     Copied,
@@ -1796,6 +1953,11 @@ struct DmaState {
 
     rx_buffer: UnsafeCell<MaybeUninit<ScopedDmaRxBuf<'static>>>,
     tx_buffer: UnsafeCell<MaybeUninit<ScopedDmaTxBuf<'static>>>,
+
+    descriptors: UnsafeCell<InternalMemory<[DmaDescriptor; 2]>>,
+
+    #[cfg(all(spi_master_version = "1", spi_address_workaround))]
+    default_tx_buffer: UnsafeCell<InternalMemory<[u8; 4]>>,
 }
 
 impl DmaState {
@@ -1844,6 +2006,10 @@ for_each_spi_master!(
 
                                 rx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
+
+                                descriptors: UnsafeCell::new(InternalMemory::new([DmaDescriptor::EMPTY; 2])),
+                                #[cfg(all(spi_master_version = "1", spi_address_workaround))]
+                                default_tx_buffer: UnsafeCell::new(InternalMemory::new([0; 4])),
                             };
 
                             &DMA_STATE

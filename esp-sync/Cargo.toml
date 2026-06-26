@@ -19,7 +19,6 @@ check-configs = [
 clippy-configs = [{ features = ["defmt"] }]
 
 [dependencies]
-cfg-if = "1"
 document-features = "0.2"
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }
@@ -27,7 +26,7 @@ embassy-sync-07 = { package = "embassy-sync", version = "0.7" }
 embassy-sync-08 = { package = "embassy-sync", version = "0.8" }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt  = { version = "1.0.1", optional = true }
+defmt  = { version = "1.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]

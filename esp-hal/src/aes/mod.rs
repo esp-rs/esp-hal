@@ -191,20 +191,22 @@ impl<'d> Aes<'d> {
     }
 
     fn start(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().start().write(|w| w.start().set_bit());
-            } else {
+            }
+            _ => {
                 self.regs().trigger().write(|w| w.trigger().set_bit());
             }
         }
     }
 
     fn is_idle(&mut self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 self.regs().idle().read().idle().bit_is_set()
-            } else {
+            }
+            _ => {
                 self.regs().state().read().state().bits() == 0
             }
         }
@@ -216,12 +218,19 @@ impl<'d> Aes<'d> {
         }
     }
 
+    /// Clears all key registers, no key material should be left in the peripheral.
+    #[cfg(clear_crypto_secrets)]
+    fn clear_key(&mut self) {
+        self.write_key(&[0; 32]);
+    }
+
     fn write_block(&mut self, block: &[u8]) {
         for (i, word) in read_words(block).enumerate() {
-            cfg_if::cfg_if! {
-                if #[cfg(aes_has_split_text_registers)] {
+            cfg_select! {
+                aes_has_split_text_registers => {
                     self.regs().text_in(i).write(|w| unsafe { w.bits(word) });
-                } else {
+                }
+                _ => {
                     self.regs().text(i).write(|w| unsafe { w.bits(word) });
                 }
             }
@@ -229,10 +238,11 @@ impl<'d> Aes<'d> {
     }
 
     fn read_block(&self, block: &mut [u8]) {
-        cfg_if::cfg_if! {
-            if #[cfg(aes_has_split_text_registers)] {
+        cfg_select! {
+            aes_has_split_text_registers => {
                 write_words(block, |i| self.regs().text_out(i).read().bits());
-            } else {
+            }
+            _ => {
                 write_words(block, |i| self.regs().text(i).read().bits());
             }
         }
@@ -256,6 +266,11 @@ impl<'d> Aes<'d> {
         self.start();
         while !(self.is_idle()) {}
         self.read_block(block);
+
+        // The `key` is dropped, but the hardware retains a copy in the key registers, clear them
+        // too.
+        #[cfg(clear_crypto_secrets)]
+        self.clear_key();
     }
 
     /// Encrypts the given buffer with the given key.
@@ -321,6 +336,9 @@ impl<'d> Aes<'d> {
                 }
             }
         }
+
+        #[cfg(clear_crypto_secrets)]
+        self.clear_key();
     }
 }
 
@@ -369,6 +387,7 @@ pub mod dma {
             DmaRxBuffer,
             DmaTxBuffer,
             NoBuffer,
+            aligned::InternalMemory,
             prepare_for_rx,
             prepare_for_tx,
         },
@@ -690,6 +709,7 @@ pub mod dma {
     #[procmacros::doc_replace(
         "dma_channel" => {
             cfg(esp32s2) => "DMA_CRYPTO",
+            cfg(esp32p4) => "DMA_AXI_CH0",
             _ => "DMA_CH0"
         }
     )]
@@ -745,8 +765,7 @@ pub mod dma {
 
         #[cfg(dma_can_access_psram)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
-        input_descriptors: [DmaDescriptor; 1],
-        output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
+        descriptors: InternalMemory<[DmaDescriptor; OUT_DESCR_COUNT + 1]>,
     }
 
     // The DMA descriptors prevent auto-implementing Sync and Send, but they can be treated as Send
@@ -761,6 +780,7 @@ pub mod dma {
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]
@@ -785,14 +805,14 @@ pub mod dma {
 
                 #[cfg(dma_can_access_psram)]
                 unaligned_data_buffers: [const { None }; 2],
-                input_descriptors: [DmaDescriptor::EMPTY; 1],
-                output_descriptors: [DmaDescriptor::EMPTY; OUT_DESCR_COUNT],
+                descriptors: InternalMemory::new([DmaDescriptor::EMPTY; OUT_DESCR_COUNT + 1]),
             }
         }
 
         #[procmacros::doc_replace(
             "dma_channel" => {
                 cfg(esp32s2) => "DMA_CRYPTO",
+                cfg(esp32p4) => "DMA_AXI_CH0",
                 _ => "DMA_CH0"
             }
         )]
@@ -926,7 +946,7 @@ pub mod dma {
                     #[cfg(dma_can_access_psram)]
                     for buffer in self.unaligned_data_buffers.iter_mut() {
                         // Avoid copying the write_back buffer
-                        if let Some(buffer) = buffer.as_ref() {
+                        if let Some(buffer) = buffer.as_mut() {
                             buffer.write_back();
                         }
                         *buffer = None;
@@ -970,11 +990,12 @@ pub mod dma {
             work_item: &mut AesOperation,
         ) -> Result<(), AesDma<'d>> {
             let input_len = work_item.buffers.input.len();
+            let (input_dscr, output_dscr) = self.descriptors.get_mut().into_inner().split_at_mut(1);
             let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.
                 unwrap!(prepare_for_tx(
-                    &mut self.input_descriptors,
+                    input_dscr,
                     work_item.buffers.input,
                     BLOCK_SIZE,
                 ))
@@ -988,7 +1009,7 @@ pub mod dma {
 
             let (output_buffer, rx_data_len) = unsafe {
                 prepare_for_rx(
-                    &mut self.output_descriptors,
+                    output_dscr,
                     #[cfg(dma_can_access_psram)]
                     &mut self.unaligned_data_buffers,
                     // Truncate data based on how much the TX buffer can read.

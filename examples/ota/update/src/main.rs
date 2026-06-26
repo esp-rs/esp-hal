@@ -34,7 +34,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_storage::Storage;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
@@ -68,7 +67,13 @@ fn main() -> ! {
     let mut ota =
         esp_bootloader_esp_idf::ota_updater::OtaUpdater::new(&mut flash, &mut buffer).unwrap();
 
-    let current = ota.selected_partition().unwrap();
+    let current = if let Ok(current) = ota.selected_partition() {
+        current
+    } else {
+        ota.reset_data().unwrap();
+        esp_bootloader_esp_idf::partitions::AppPartitionSubType::Factory
+    };
+
     println!(
         "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
         ota.current_ota_state()
@@ -91,6 +96,7 @@ fn main() -> ! {
     let button = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
         feature = "esp32c5" => peripherals.GPIO28,
+        feature = "esp32p4" => peripherals.GPIO35,
         _ => peripherals.GPIO9,
     };
 

@@ -1,12 +1,3 @@
-use embedded_storage::nor_flash::{
-    ErrorType,
-    MultiwriteNorFlash,
-    NorFlash,
-    NorFlashError,
-    NorFlashErrorKind,
-    ReadNorFlash,
-};
-
 #[cfg(feature = "bytewise-read")]
 use crate::buffer::FlashWordBuffer;
 use crate::{
@@ -16,35 +7,30 @@ use crate::{
 };
 
 impl FlashStorage<'_> {
+    #[cfg(not(feature = "bytewise-read"))]
+    /// Minimum read size in bytes for [`FlashStorage::read_nor`].
+    pub const READ_SIZE: usize = Self::WORD_SIZE as _;
+
+    #[cfg(feature = "bytewise-read")]
+    /// Minimum read size in bytes for [`FlashStorage::read_nor`].
+    pub const READ_SIZE: usize = 1;
+
+    /// Minimum write size in bytes for [`FlashStorage::write_nor`].
+    pub const WRITE_SIZE: usize = Self::WORD_SIZE as _;
+
+    /// Minimum erase size in bytes for [`FlashStorage::erase`].
+    pub const ERASE_SIZE: usize = Self::SECTOR_SIZE as _;
+
     #[inline(always)]
     fn is_word_aligned(bytes: &[u8]) -> bool {
         // TODO: Use is_aligned_to when stabilized (see `pointer_is_aligned`)
         (bytes.as_ptr() as usize).is_multiple_of(Self::WORD_SIZE as usize)
     }
-}
 
-impl NorFlashError for FlashStorageError {
-    fn kind(&self) -> NorFlashErrorKind {
-        match self {
-            Self::NotAligned => NorFlashErrorKind::NotAligned,
-            Self::OutOfBounds => NorFlashErrorKind::OutOfBounds,
-            _ => NorFlashErrorKind::Other,
-        }
-    }
-}
-
-impl ErrorType for FlashStorage<'_> {
-    type Error = FlashStorageError;
-}
-
-impl ReadNorFlash for FlashStorage<'_> {
-    #[cfg(not(feature = "bytewise-read"))]
-    const READ_SIZE: usize = Self::WORD_SIZE as _;
-
-    #[cfg(feature = "bytewise-read")]
-    const READ_SIZE: usize = 1;
-
-    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+    /// Read bytes from flash using NOR flash semantics.
+    ///
+    /// Offset and length must be aligned to [`Self::READ_SIZE`].
+    pub fn read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), FlashStorageError> {
         const RS: u32 = FlashStorage::READ_SIZE as u32;
         self.check_alignment::<{ RS }>(offset, bytes.len())?;
         self.check_bounds(offset, bytes.len())?;
@@ -131,16 +117,11 @@ impl ReadNorFlash for FlashStorage<'_> {
         Ok(())
     }
 
-    fn capacity(&self) -> usize {
-        self.capacity
-    }
-}
-
-impl NorFlash for FlashStorage<'_> {
-    const WRITE_SIZE: usize = Self::WORD_SIZE as _;
-    const ERASE_SIZE: usize = Self::SECTOR_SIZE as _;
-
-    fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+    /// Write bytes to flash using NOR flash semantics.
+    ///
+    /// The target region must be erased beforehand. Offset and length must be
+    /// aligned to [`Self::WRITE_SIZE`].
+    pub fn write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), FlashStorageError> {
         const WS: u32 = FlashStorage::WORD_SIZE;
         self.check_alignment::<{ WS }>(offset, bytes.len())?;
         self.check_bounds(offset, bytes.len())?;
@@ -174,7 +155,10 @@ impl NorFlash for FlashStorage<'_> {
         Ok(())
     }
 
-    fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+    /// Erase flash from `from` up to but not including `to`.
+    ///
+    /// Both addresses must be aligned to [`Self::ERASE_SIZE`].
+    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), FlashStorageError> {
         let len = (to - from) as _;
         const SZ: u32 = FlashStorage::SECTOR_SIZE;
         self.check_alignment::<{ SZ }>(from, len)?;
@@ -203,7 +187,60 @@ impl NorFlash for FlashStorage<'_> {
     }
 }
 
-impl MultiwriteNorFlash for FlashStorage<'_> {}
+#[cfg(feature = "embedded-storage")]
+mod embedded_storage_traits {
+    use ::embedded_storage::nor_flash::{
+        ErrorType,
+        MultiwriteNorFlash,
+        NorFlash,
+        NorFlashError,
+        NorFlashErrorKind,
+        ReadNorFlash,
+    };
+
+    use super::*;
+
+    impl NorFlashError for FlashStorageError {
+        fn kind(&self) -> NorFlashErrorKind {
+            match self {
+                FlashStorageError::NotAligned => NorFlashErrorKind::NotAligned,
+                FlashStorageError::OutOfBounds => NorFlashErrorKind::OutOfBounds,
+                _ => NorFlashErrorKind::Other,
+            }
+        }
+    }
+
+    impl ErrorType for FlashStorage<'_> {
+        type Error = FlashStorageError;
+    }
+
+    impl ReadNorFlash for FlashStorage<'_> {
+        const READ_SIZE: usize = FlashStorage::READ_SIZE;
+
+        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+            FlashStorage::read_nor(self, offset, bytes)
+        }
+
+        fn capacity(&self) -> usize {
+            FlashStorage::capacity(self)
+        }
+    }
+
+    impl NorFlash for FlashStorage<'_> {
+        const WRITE_SIZE: usize = FlashStorage::WRITE_SIZE;
+        const ERASE_SIZE: usize = FlashStorage::ERASE_SIZE;
+
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            FlashStorage::write_nor(self, offset, bytes)
+        }
+
+        fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+            FlashStorage::erase(self, from, to)
+        }
+    }
+
+    impl MultiwriteNorFlash for FlashStorage<'_> {}
+}
 
 // Run the tests with `--test-threads=1` - the emulation is not multithread safe
 #[cfg(test)]
@@ -290,10 +327,10 @@ mod tests {
         let mut data = TestBuffer::default();
 
         flash.erase(0, FLASH_SIZE).unwrap();
-        flash.write(0, &src.data).unwrap();
+        flash.write_nor(0, &src.data).unwrap();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(Some(true)) {
-            flash.read(off, &mut data.data[..len as usize]).unwrap();
+            flash.read_nor(off, &mut data.data[..len as usize]).unwrap();
             assert_eq!(
                 data.data[..len as usize],
                 src.data[off as usize..][..len as usize]
@@ -309,7 +346,9 @@ mod tests {
         let mut data = TestBuffer::default();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(Some(false)) {
-            flash.read(off, &mut data.data[..len as usize]).unwrap_err();
+            flash
+                .read_nor(off, &mut data.data[..len as usize])
+                .unwrap_err();
         }
     }
 
@@ -322,11 +361,11 @@ mod tests {
         let mut data = TestBuffer::default();
 
         flash.erase(0, FLASH_SIZE).unwrap();
-        flash.write(0, &src.data).unwrap();
+        flash.write_nor(0, &src.data).unwrap();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(Some(true)) {
             flash
-                .read(off, &mut data.data[1..][..len as usize])
+                .read_nor(off, &mut data.data[1..][..len as usize])
                 .unwrap();
             assert_eq!(
                 data.data[1..][..len as usize],
@@ -345,10 +384,10 @@ mod tests {
         let mut data = TestBuffer::default();
 
         flash.erase(0, FLASH_SIZE).unwrap();
-        flash.write(0, &src.data).unwrap();
+        flash.write_nor(0, &src.data).unwrap();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(None) {
-            flash.read(off, &mut data.data[..len as usize]).unwrap();
+            flash.read_nor(off, &mut data.data[..len as usize]).unwrap();
             assert_eq!(
                 data.data[..len as usize],
                 src.data[off as usize..][..len as usize]
@@ -366,11 +405,11 @@ mod tests {
         let mut data = TestBuffer::default();
 
         flash.erase(0, FLASH_SIZE).unwrap();
-        flash.write(0, &src.data).unwrap();
+        flash.write_nor(0, &src.data).unwrap();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(None) {
             flash
-                .read(off, &mut data.data[1..][..len as usize])
+                .read_nor(off, &mut data.data[1..][..len as usize])
                 .unwrap();
             assert_eq!(
                 data.data[1..][..len as usize],
@@ -387,9 +426,9 @@ mod tests {
         let write_data = TestBuffer::seq();
 
         flash.erase(0, FLASH_SIZE).unwrap();
-        flash.write(0, &write_data.data[1..129]).unwrap();
+        flash.write_nor(0, &write_data.data[1..129]).unwrap();
 
-        flash.read(0, &mut read_data.data[..128]).unwrap();
+        flash.read_nor(0, &mut read_data.data[..128]).unwrap();
 
         assert_eq!(&read_data.data[..128], &write_data.data[1..129]);
     }
@@ -407,9 +446,9 @@ mod tests {
 
         // Clear area before and after erase
         flash.erase(from - SECTOR_SIZE, from).unwrap();
-        flash.write(from - SECTOR_SIZE, &write_data).unwrap();
+        flash.write_nor(from - SECTOR_SIZE, &write_data).unwrap();
         flash.erase(to, to + SECTOR_SIZE).unwrap();
-        flash.write(to, &write_data).unwrap();
+        flash.write_nor(to, &write_data).unwrap();
 
         // Erase and verify that only the desired parts were touched
         flash.erase(from, to).unwrap();

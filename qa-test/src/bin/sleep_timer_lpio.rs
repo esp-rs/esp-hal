@@ -1,17 +1,17 @@
 //! Demonstrates deep sleep with timer, using low and high level pins as wakeup
 //! sources.
 //!
-//! The following wiring is assumed for ESP32-C6:
-//! - ext1 wakeup pin => GPIO2 (low level) / GPIO3 (high level)
-//! The following wiring is assumed for ESP32-H2:
-//! - ext1 wakeup pin => GPIO9 (low level) / GPIO10 (high level)
+//! Wiring
+//!
+//! | Function           | ESP32-C6 | ESP32-H2  |
+//! | ------------------ | -------- | --------- |
+//! | Wake on low level  | GPIO2    | GPIO9     |
+//! | Wake on high level | GPIO3    | GPIO10    |
 
 //% CHIP_FILTER: esp32c6 || esp32h2
 
 #![no_std]
 #![no_main]
-
-use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
@@ -26,6 +26,7 @@ use esp_hal::{
         wakeup_cause,
     },
     system::Cpu,
+    time::Duration,
 };
 use esp_println::println;
 
@@ -53,6 +54,7 @@ fn main() -> ! {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
             let mut pin_high = peripherals.GPIO10;
         }
+        _ => {}
     }
 
     println!("up and runnning!");

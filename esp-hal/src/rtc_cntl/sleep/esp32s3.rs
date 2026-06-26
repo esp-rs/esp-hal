@@ -113,7 +113,7 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
         let rtc_cntl = LPWR::regs();
         // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -181,10 +181,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
         // set pins to RTC function
@@ -192,6 +190,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
             pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtcio_pad_hold(true);
             bits |= 1 << pin.rtc_number();
         }
 
@@ -342,6 +341,15 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+
+        // This is the light-sleep config. The main XTAL is powered down in sleep
+        // (`xtal_fpu` stays false), so the analog regulator/bias must use the
+        // same XTAL-down settings that `deep()` applies "because of xtal_fpu".
+        cfg.set_rtc_regulator_fpu(true);
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_pd_cur_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
         cfg
     }
 }
@@ -366,24 +374,18 @@ fn rtc_sleep_pu(val: bool) {
         .modify(|_, w| w.slowmem_force_lpu().bit(val).fastmem_force_lpu().bit(val));
 
     syscon.front_end_mem_pd().modify(|_r, w| {
-        w.dc_mem_force_pu()
-            .bit(val)
-            .pbus_mem_force_pu()
-            .bit(val)
-            .agc_mem_force_pu()
-            .bit(val)
+        w.dc_mem_force_pu().bit(val);
+        w.pbus_mem_force_pu().bit(val);
+        w.agc_mem_force_pu().bit(val)
     });
 
     bb.bbpd_ctrl()
         .modify(|_r, w| w.fft_force_pu().bit(val).dc_est_force_pu().bit(val));
 
     nrx.nrxpd_ctrl().modify(|_, w| {
-        w.rx_rot_force_pu()
-            .bit(val)
-            .vit_force_pu()
-            .bit(val)
-            .demap_force_pu()
-            .bit(val)
+        w.rx_rot_force_pu().bit(val);
+        w.vit_force_pu().bit(val);
+        w.demap_force_pu().bit(val)
     });
 
     fe.gen_ctrl().modify(|_, w| w.iq_est_force_pu().bit(val));
@@ -393,8 +395,8 @@ fn rtc_sleep_pu(val: bool) {
 
     syscon.mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
-            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
-            .rom_power_up()
+            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 });
+        w.rom_power_up()
             .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
     });
 }
@@ -436,6 +438,10 @@ impl RtcSleepConfig {
         cfg.set_pd_cur_slp(true);
 
         cfg
+    }
+
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -840,9 +846,7 @@ impl RtcSleepConfig {
                 .wakeup_state()
                 .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
 
-            LPWR::regs()
-                .state0()
-                .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+            LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
         }
     }
 
@@ -850,10 +854,8 @@ impl RtcSleepConfig {
         // In deep sleep mode, we never get here
         unsafe {
             LPWR::regs().int_clr().write(|w| {
-                w.slp_reject()
-                    .clear_bit_by_one()
-                    .slp_wakeup()
-                    .clear_bit_by_one()
+                w.slp_reject().clear_bit_by_one();
+                w.slp_wakeup().clear_bit_by_one()
             });
 
             // restore config if it is a light sleep

@@ -21,6 +21,8 @@ check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_PLACE_ANON_IN_RAM = "true", ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM = "true", ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM = "true", ESP_HAL_CONFIG_CLEAR_CRYPTO_SECRETS = "false" } },
+    { features = ["unstable", "rt"], env = { ESP_HAL_CONFIG_ENABLE_PMP = "false" }, if = 'riscv && !esp32c2 && !esp32c3' },
     { features = ["unstable", "rt", "__usb_otg"],   if = 'usb_otg_driver_supported' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'bt_driver_supported' },
 ]
@@ -44,7 +46,6 @@ test  = false
 [dependencies]
 bitflags                 = "2.9"
 bytemuck                 = "1.24"
-cfg-if                   = "1"
 critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
@@ -80,7 +81,7 @@ embedded-can             = { version = "0.4.1", optional = true }
 nb                       = { version = "1.1", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt                    = { version = "1.0.1", optional = true }
+defmt                    = { version = "1.1", optional = true }
 log-04                   = { package = "log", version = "0.4", optional = true }
 
 # ESP32-only fallback SHA algorithms
@@ -103,16 +104,16 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.40", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
-esp32c2 = { version = "0.29", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { version = "0.32", features = ["critical-section", "rt"], optional = true }
-esp32c5 = { version = "0.2",  features = ["critical-section", "rt"], optional = true }
-esp32c6 = { version = "0.23", features = ["critical-section", "rt"], optional = true }
-esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
-esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
-esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5a07030bbe72d57f82314a26ec42b7f93e03bd1d" }
+esp32   = { version = "0.40", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32c2 = { version = "0.29", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32c3 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32c6 = { version = "0.23", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32c61 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32h2 = { version = "0.19", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32s2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32s3 = { version = "0.35", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
+esp32p4 = { version = "0.2",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "4c1aeb8" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -152,7 +153,9 @@ rt = [
     "esp32?/rt",
     "esp32c2?/rt",
     "esp32c3?/rt",
+    "esp32c5?/rt",
     "esp32c6?/rt",
+    "esp32c61?/rt",
     "esp32p4?/rt",
     "esp32h2?/rt",
     "esp32s2?/rt",

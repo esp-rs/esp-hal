@@ -12,7 +12,8 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     dma::{DmaRxBuf, DmaTxBuf},
-//!     dma_buffers,
+//!     dma_rx_buffer,
+//!     dma_tx_buffer,
 //!     main,
 //!     rom::software_reset,
 //!     uart,
@@ -21,8 +22,6 @@
 //!
 //! #[main]
 //! fn main() -> ! {
-//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//!     let peripherals = esp_hal::init(config);
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
 //!
@@ -35,9 +34,8 @@
 //!         .with_tx(peripherals.GPIO2)
 //!         .with_rx(peripherals.GPIO3);
 //!
-//!     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
-//!     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-//!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+//!     let dma_rx = dma_rx_buffer!(4092).unwrap();
+//!     let mut dma_tx = dma_tx_buffer!(4092).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
 //!     uhci.apply_rx_config(
@@ -308,8 +306,8 @@ where
         for_each_uart! {
             (all $( ($id:literal, $peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
                 reg.conf0().modify(|_, w| {
-                    cfg_if::cfg_if! {
-                        if #[cfg(uhci_combined_uart_selector_field)] {
+                    cfg_select! {
+                        uhci_combined_uart_selector_field => {
                             unsafe {
                                 w.uart_sel().bits(
                                     match &self.uart.tx.uart.0 {
@@ -320,7 +318,8 @@ where
                                     }
                                 )
                             }
-                        } else {
+                        }
+                        _ => {
                             paste::paste! {
                                 // Clear any previous selection
                                 $(

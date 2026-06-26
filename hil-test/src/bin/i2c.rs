@@ -411,9 +411,10 @@ mod tests {
     #[test]
     #[cfg(esp32s3)]
     fn test_read_cali_with_rtc_i2c() {
-        use core::time::Duration;
-
-        use esp_hal::i2c::rtc::{Config, I2c, Timing};
+        use esp_hal::{
+            i2c::rtc::{Config, I2c, Timing},
+            time::Duration,
+        };
 
         let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
 

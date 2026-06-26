@@ -69,15 +69,13 @@ pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 /// Default wait cycles to enable the 8MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
+    fn apply(&self, rtc: &Rtc<'_>, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
+        // don't power down RTC peripherals
+        sleep_config.set_rtc_peri_pd_en(false);
+
         triggers.set_timer(true);
         // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -85,12 +83,9 @@ impl WakeSource for TimerWakeupSource {
             LPWR::regs()
                 .slp_timer0()
                 .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-
             LPWR::regs().slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
+                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
+                w.main_timer_alarm_en().set_bit()
             });
         }
     }
@@ -141,10 +136,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
         // set pins to RTC function
@@ -152,6 +145,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
             pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtcio_pad_hold(true);
             bits |= 1 << pin.rtc_number();
         }
 
@@ -261,6 +255,10 @@ impl RtcSleepConfig {
         cfg.set_rtc_fastmem_pd_en(true);
         cfg.set_rtc_slowmem_pd_en(true);
         cfg
+    }
+
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -449,29 +447,21 @@ impl RtcSleepConfig {
             }
 
             rtc_cntl.pwc().modify(|_, w| {
-                w.slowmem_folw_cpu()
-                    .bit(self.rtc_mem_inf_follow_cpu())
-                    .fastmem_folw_cpu()
-                    .bit(self.rtc_mem_inf_follow_cpu())
-                    // TODO: does this need to be optional based on if there is something stored in
-                    // fastmem?
-                    //.fastmem_pd_en().bit(self.rtc_fastmem_pd_en())
-                    .fastmem_force_pu()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .fastmem_force_lpu()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .fastmem_force_noiso()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .slowmem_pd_en()
-                    .bit(self.rtc_slowmem_pd_en())
-                    .slowmem_force_pu()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .slowmem_force_noiso()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .slowmem_force_lpu()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .pd_en()
-                    .bit(self.rtc_peri_pd_en())
+                w.slowmem_folw_cpu().bit(self.rtc_mem_inf_follow_cpu());
+                w.fastmem_folw_cpu().bit(self.rtc_mem_inf_follow_cpu());
+
+                // TODO: does this need to be optional based on if there is something stored in
+                // fastmem?
+                //.fastmem_pd_en().bit(self.rtc_fastmem_pd_en())
+
+                w.fastmem_force_pu().bit(!self.rtc_fastmem_pd_en());
+                w.fastmem_force_lpu().bit(!self.rtc_fastmem_pd_en());
+                w.fastmem_force_noiso().bit(!self.rtc_fastmem_pd_en());
+                w.slowmem_pd_en().bit(self.rtc_slowmem_pd_en());
+                w.slowmem_force_pu().bit(!self.rtc_slowmem_pd_en());
+                w.slowmem_force_noiso().bit(!self.rtc_slowmem_pd_en());
+                w.slowmem_force_lpu().bit(!self.rtc_slowmem_pd_en());
+                w.pd_en().bit(self.rtc_peri_pd_en())
             });
 
             // rtc_cntl.dig_pwc.modify(|_, w| w
@@ -572,9 +562,7 @@ impl RtcSleepConfig {
             .wakeup_state()
             .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0) });
 
-        LPWR::regs()
-            .state0()
-            .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }
 
     pub(crate) fn finish_sleep(&self) {

@@ -70,10 +70,10 @@ fn main() -> ! {
             rx_descriptors,
             tx_descriptors,
             BurstConfig {
-                external_memory: if cfg!(feature = "esp32s2") {
-                    ExternalBurstConfig::Size32
-                } else {
-                    ExternalBurstConfig::Size64
+                external_memory: cfg_select! {
+                    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
+                    feature = "esp32s2" => ExternalBurstConfig::Size32,
+                    _ => ExternalBurstConfig::Size64,
                 },
                 internal_memory: Default::default(),
             },

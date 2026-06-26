@@ -18,6 +18,9 @@ check-configs = [
     { features = ["esp-hal/unstable", "esp-radio"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
     { features = ["esp-hal/unstable", "esp-alloc", "embassy"] },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_STACK_POINTER_RANGE_CHECK = "false" } },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_SW_TASK_OVERFLOW_DETECTION = "true", ESP_RTOS_CONFIG_HW_TASK_OVERFLOW_DETECTION = "false" } },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"], env = { ESP_RTOS_CONFIG_SW_TASK_OVERFLOW_DETECTION = "true", ESP_RTOS_CONFIG_HW_TASK_OVERFLOW_DETECTION = "true" } },
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "esp-alloc", "defmt", "esp-radio", "embassy"] },
@@ -38,7 +41,6 @@ esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, f
 ] }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys" }
 
-cfg-if = "1"
 rtos-trace = { version = "0.2.0", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
@@ -58,7 +60,7 @@ embassy-executor = { version = "0.10", optional = true }
 embassy-time-queue-utils = { version = "0.3", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt            = { version = "1.0", optional = true }
+defmt            = { version = "1.1", optional = true }
 log-04           = { package = "log", version = "0.4", optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
@@ -73,6 +75,7 @@ esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated"
 
 [dev-dependencies]
 esp-hal = { version = "~1.1.0", path = "../esp-hal", features = ["unstable"] }
+static_cell = "2"
 
 [features]
 default = []
@@ -85,7 +88,7 @@ esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
 # Not documented because we don't currently expose anything that requires alloc, but isn't related to esp-radio.
 # TODO: make this public once we actually have alloc-based APIs.
-alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
+alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver", "defmt?/alloc"]
 
 ## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
 ##

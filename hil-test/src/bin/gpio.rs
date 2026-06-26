@@ -6,7 +6,7 @@
 
 #![no_std]
 #![no_main]
-#![cfg_attr(xtensa, feature(asm_experimental_arch))]
+#![cfg_attr(esp32s2, feature(asm_experimental_arch))]
 
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
@@ -31,13 +31,8 @@ cfg_select! {
     _ => {}
 }
 
-cfg_select! {
-    all(multi_core, feature = "unstable") => {
-        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    }
-    _ => {}
-}
-
+#[cfg(all(multi_core, feature = "unstable"))]
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
 use esp_hal::gpio::dedicated::{
     DedicatedGpio,

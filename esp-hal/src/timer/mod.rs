@@ -189,8 +189,12 @@ impl<'d> OneShotTimer<'d, Async> {
         self.delay_async(Duration::from_micros(us as u64)).await;
     }
 
-    async fn delay_async(&mut self, us: Duration) {
-        unwrap!(self.schedule(us));
+    /// Wait for *at least* the time interval `timeout`.
+    ///
+    /// Once the time period elapses, the underlying timer hardware does not automatically schedule
+    /// the next timeout. The next timeout is scheduled only when `delay_async` is called again.
+    async fn delay_async(&mut self, timeout: Duration) {
+        unwrap!(self.schedule(timeout));
 
         WaitFuture::new(self.inner.reborrow()).await;
 
@@ -351,6 +355,36 @@ impl<'d> PeriodicTimer<'d, Blocking> {
             inner: inner.into(),
             _ph: PhantomData,
         }
+    }
+
+    /// Converts the driver to [`Async`] mode.
+    pub fn into_async(self) -> PeriodicTimer<'d, Async> {
+        let handler = self.inner.async_interrupt_handler();
+        self.inner.set_interrupt_handler(handler);
+        PeriodicTimer {
+            inner: self.inner,
+            _ph: PhantomData,
+        }
+    }
+}
+
+impl<'d> PeriodicTimer<'d, Async> {
+    /// Converts the driver to [`Blocking`] mode.
+    pub fn into_blocking(self) -> PeriodicTimer<'d, Blocking> {
+        crate::interrupt::disable(Cpu::current(), self.inner.peripheral_interrupt());
+        PeriodicTimer {
+            inner: self.inner,
+            _ph: PhantomData,
+        }
+    }
+
+    /// Wait for *at least* the time interval loaded by [`PeriodicTimer::start`].
+    ///
+    /// Once the time period elapses, the underlying timer hardware automatically schedules the
+    /// next timeout.
+    pub async fn wait_async(&mut self) {
+        WaitFuture::new(self.inner.reborrow()).await;
+        self.clear_interrupt();
     }
 }
 

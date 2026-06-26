@@ -2,12 +2,12 @@
 
 use esp_sync::NonReentrantMutex;
 
-cfg_if::cfg_if! {
-    if #[cfg(all(soc_multi_core_enabled, feature = "unstable"))] {
+cfg_select! {
+    all(soc_multi_core_enabled, feature = "unstable") => {
         pub(crate) mod multi_core;
-        #[cfg(feature = "unstable")]
         pub use multi_core::*;
     }
+    _ => {}
 }
 
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
@@ -273,13 +273,14 @@ impl Cpu {
     #[inline(always)]
     #[instability::unstable]
     pub fn other() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 match Self::current() {
                     Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
                     Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
                 }
-            } else {
+            }
+            _ => {
                 [].into_iter()
             }
         }
@@ -288,10 +289,11 @@ impl Cpu {
     /// Returns an iterator over all cores.
     #[inline(always)]
     pub fn all() -> impl Iterator<Item = Self> {
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 [Cpu::ProCpu, Cpu::AppCpu].into_iter()
-            } else {
+            }
+            _ => {
                 [Cpu::ProCpu].into_iter()
             }
         }
@@ -308,12 +310,14 @@ impl Cpu {
 #[inline(always)]
 pub(crate) fn raw_core() -> usize {
     // This method must never return UNUSED_THREAD_ID_VALUE
-    cfg_if::cfg_if! {
-        if #[cfg(all(multi_core, riscv))] {
+    cfg_select! {
+        all(multi_core, riscv) => {
             riscv::register::mhartid::read()
-        } else if #[cfg(all(multi_core, xtensa))] {
+        }
+        all(multi_core, xtensa) => {
             (xtensa_lx::get_processor_id() & 0x2000) as usize
-        } else {
+        }
+        _ => {
             0
         }
     }
@@ -368,6 +372,7 @@ pub enum SleepSource {
 /// ```
 #[inline]
 pub fn software_reset() -> ! {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
     #[cfg(esp32p4)]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
@@ -377,8 +382,66 @@ pub fn software_reset() -> ! {
 #[instability::unstable]
 #[inline]
 pub fn software_reset_cpu(cpu: Cpu) {
+    let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
     crate::rom::software_reset_cpu(cpu as u32)
 }
+
+/// Guard for a temporary UART0 source-clock request.
+///
+/// Drops its request when dropped. If no request was needed, this is a no-op.
+#[must_use = "dropping the guard releases the UART0 source clock"]
+pub(crate) struct Uart0SclkGuard {
+    release: bool,
+}
+
+impl Drop for Uart0SclkGuard {
+    fn drop(&mut self) {
+        if self.release {
+            release_uart0_sclk();
+        }
+    }
+}
+
+/// Ensure UART0's source clock stays enabled for boot ROM compatibility.
+///
+/// On some chips, resetting or waking up while UART0's source clock is disabled
+/// can prevent the boot ROM from starting correctly. This only requests the
+/// clock when UART0 already has a function-clock configuration; otherwise the
+/// returned guard is a no-op.
+#[inline(always)]
+pub(crate) fn ensure_uart0_sclk_enabled() -> Uart0SclkGuard {
+    Uart0SclkGuard {
+        release: request_uart0_sclk(),
+    }
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn request_uart0_sclk() -> bool {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        let uart = crate::soc::clocks::UartInstance::Uart0;
+        if uart.function_clock_config(clocks).is_some() {
+            uart.request_function_clock(clocks);
+            true
+        } else {
+            false
+        }
+    })
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn request_uart0_sclk() -> bool {
+    false
+}
+
+#[cfg(soc_has_clock_node_uart_function_clock)]
+fn release_uart0_sclk() {
+    crate::soc::clocks::ClockTree::with(|clocks| {
+        crate::soc::clocks::UartInstance::Uart0.release_function_clock(clocks);
+    });
+}
+
+#[cfg(not(soc_has_clock_node_uart_function_clock))]
+fn release_uart0_sclk() {}
 
 /// Retrieves the reason for the last reset as a SocResetReason enum value.
 /// Returns `None` if the reset reason cannot be determined.

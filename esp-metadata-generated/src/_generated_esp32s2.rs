@@ -73,9 +73,6 @@ macro_rules! property {
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
-    ("dma.can_access_psram") => {
-        true
-    };
     ("dma.ext_mem_configurable_block_size") => {
         true
     };
@@ -330,12 +327,6 @@ macro_rules! property {
     };
     ("soc.multi_core_enabled") => {
         false
-    };
-    ("soc.rc_fast_clk_default") => {
-        8500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(8500000)
     };
     ("soc.internal_memory_cached") => {
         false
@@ -608,12 +599,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {}
     };
 }
 /// This macro can be used to generate code for each channel of the RMT peripheral.
@@ -1932,8 +1917,6 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static REF_TICK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1942,8 +1925,6 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
-        static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
@@ -2794,6 +2775,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting TIMG_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::acquire();
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::RtcClk => request_rtc_slow_clk(clocks),
                     TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
@@ -2806,6 +2788,7 @@ macro_rules! define_clock_tree_types {
             trace!("Releasing TIMG_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::release();
                 enable_timg_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::RtcClk => release_rtc_slow_clk(clocks),
@@ -2870,6 +2853,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Apb => request_apb_clk(clocks),
                         I2cFunctionClockSclk::RefTick => request_ref_tick(clocks),
@@ -2882,6 +2866,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Apb => release_apb_clk(clocks),
@@ -2937,6 +2922,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Requesting {:?}::SCLK", self);
                 if increment_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Enabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::RefTick => request_ref_tick(clocks),
                         RmtSclkConfig::ApbClk => request_apb_clk(clocks),
@@ -2948,6 +2934,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Releasing {:?}::SCLK", self);
                 if decrement_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
                     trace!("Disabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_sclk_impl(clocks, false);
                     match unwrap!(clocks.rmt_sclk[self as usize]) {
                         RmtSclkConfig::RefTick => release_ref_tick(clocks),
@@ -3001,6 +2988,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     request_apb_clk(clocks);
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -3010,6 +2998,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     release_apb_clk(clocks);
                 }
@@ -3022,8 +3011,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                apb_clk_frequency()
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
                 match source {
@@ -3264,8 +3252,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3467,14 +3454,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -3531,14 +3511,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
-            if let Some(config) = clocks.spi_function_clock[instance as usize] {
-                SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
-                    SpiInstance::function_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {}
         fn refresh_timg_function_clock_downstream(clocks: &mut ClockTree, instance: TimgInstance) {
             if let Some(config) = clocks.timg_function_clock[instance as usize] {
                 TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(

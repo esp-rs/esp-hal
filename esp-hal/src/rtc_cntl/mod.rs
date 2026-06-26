@@ -25,7 +25,6 @@
 
 ```rust, no_run
 # {before_snippet}
-# use core::time::Duration;
 # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 
 let rtc = Rtc::new(peripherals.LPWR);
@@ -141,13 +140,14 @@ pub mod sleep;
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 pub(crate) mod rtc;
 
-cfg_if::cfg_if! {
-    if #[cfg(soc_has_lp_wdt)] {
+cfg_select! {
+    soc_has_lp_wdt => {
         use crate::peripherals::LP_WDT;
         #[cfg(lp_timer_driver_supported)]
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
-    } else {
+    }
+    _ => {
         use crate::peripherals::LPWR as LP_WDT;
         use crate::peripherals::LPWR as LP_TIMER;
         use crate::peripherals::LPWR as LP_AON;
@@ -223,30 +223,50 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+        // Load counter value
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
+                // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
+                // Without this, this function may return a stale value
+                const UPDATE_COUNT: usize = if cfg!(esp32) {
+                    20
+                } else {
+                    10
+                };
+                for _ in 0..UPDATE_COUNT {
+                    rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                    crate::rom::ets_delay_us(1);
+                }
+            }
+            _ => {
+                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+            }
+        }
+
+        // Read counter value
+        cfg_select! {
+            esp32 => {
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
                 }
 
+                rtc_cntl.int_clr().write(|w| w.time_valid().clear_bit_by_one());
+
                 let h = rtc_cntl.time1().read().time_hi().bits();
                 let l = rtc_cntl.time0().read().time_lo().bits();
-            } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
-                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
-
+            }
+            any(esp32s2, esp32s3, esp32c2, esp32c3) => {
+                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
+                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
+            }
+            _ => {
                 let h = rtc_cntl
                     .main_buf0_high()
                     .read()
                     .main_timer_buf0_high()
                     .bits();
                 let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
-            } else {
-                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
-
-                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
-                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
             }
         }
 
@@ -400,8 +420,35 @@ impl<'d> Rtc<'d> {
 
         config.apply();
 
+        sleep_uart_prepare();
+
+        // Latch the systimer value *before* sleeping. The systimer keeps running during
+        // the sleep enter/exit sequences, so we must not advance from the post-wake
+        // value (that would count the enter/exit time twice). Instead we set an absolute
+        // target of `before + slept`, measured by the always-running LP timer.
+        let before_ticks = crate::time::implem::raw_counter();
+        let before = self.time_since_boot_raw();
+
+        let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
         config.start_sleep(wakeup_triggers);
+
+        if config.is_deep_sleep() {
+            // Because RTC is in a slower clock domain than the CPU, it
+            // can take several CPU cycles for the sleep mode to start.
+            loop {
+                core::hint::spin_loop();
+            }
+        }
+
         config.finish_sleep();
+
+        let after = self.time_since_boot_raw();
+
+        let slept_us = crate::clock::rtc_ticks_to_us(after.wrapping_sub(before));
+        let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
+
+        unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
+        sleep_uart_resume();
     }
 
     pub(crate) const RTC_DISABLE_ROM_LOG: u32 = 1;
@@ -415,10 +462,11 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32p4)] {
+        cfg_select! {
+            esp32p4 => {
                 let reg = LP_AON::regs().lp_store4();
-            } else {
+            }
+            _ => {
                 let reg = LP_AON::regs().store4();
             }
         }
@@ -432,10 +480,11 @@ impl<'d> Rtc<'d> {
     #[instability::unstable]
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
+        cfg_select! {
+            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
                 let interrupt = Interrupt::LP_WDT;
-            } else {
+            }
+            _ => {
                 let interrupt = Interrupt::RTC_CORE;
             }
         }
@@ -833,17 +882,19 @@ pub fn wakeup_cause() -> SleepSource {
         return SleepSource::Undefined;
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(soc_has_pmu)] {
+        }
+        soc_has_pmu => {
             // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()
                 .wakeup_cause()
                 .bits();
-        } else {
+        }
+        _ => {
             let wakeup_cause_bits = LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits();
         }
     }
@@ -897,4 +948,124 @@ pub fn wakeup_cause() -> SleepSource {
     }
 
     SleepSource::Undefined
+}
+
+#[cfg(sleep_light_sleep)]
+cfg_select! {
+    feature = "rt" => {
+        #[unsafe(no_mangle)]
+        static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize =
+            portable_atomic::AtomicUsize::new(0);
+
+        fn wake_lock_count() -> &'static portable_atomic::AtomicUsize {
+            &ESP_HAL_WAKE_LOCK_COUNT
+        }
+    }
+    _ => {
+        unsafe extern "Rust" {
+            static ESP_HAL_WAKE_LOCK_COUNT: portable_atomic::AtomicUsize;
+        }
+
+        fn wake_lock_count() -> &'static portable_atomic::AtomicUsize {
+            // use of extern static is unsafe and requires unsafe block
+            unsafe { &ESP_HAL_WAKE_LOCK_COUNT }
+        }
+    }
+}
+
+/// A guard that prevents the system from entering automatic light sleep.
+///
+/// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
+/// and the auto-lightsleep idle hook will not put the chip to sleep. The lock is
+/// released when the guard is dropped.
+#[cfg_attr(
+    not(sleep_light_sleep),
+    doc = r"
+
+Note: This chip does not support automatic light sleep. On this chip, `WakeLock` does nothing."
+)]
+#[instability::unstable]
+#[non_exhaustive]
+pub struct WakeLock;
+
+impl WakeLock {
+    /// Acquires a wake lock, preventing automatic light sleep until it is dropped.
+    pub fn new() -> Self {
+        Self::acquire();
+        Self
+    }
+
+    /// Acquires a wake lock, preventing automatic light sleep.
+    pub fn acquire() {
+        #[cfg(sleep_light_sleep)]
+        wake_lock_count().fetch_add(1, portable_atomic::Ordering::AcqRel);
+    }
+
+    /// Releases a wake lock, allowing automatic light sleep when no wake locks are held.
+    ///
+    /// Note that this function should only be called to release a wake lock acquired via
+    /// [`Self::acquire`].
+    pub fn release() {
+        #[cfg(sleep_light_sleep)]
+        {
+            let previous = wake_lock_count().fetch_sub(1, portable_atomic::Ordering::AcqRel);
+            debug_assert_ne!(previous, 0, "wake lock counter underflow");
+        }
+    }
+
+    /// Returns `true` if at least one wake lock is currently held.
+    #[instability::unstable]
+    pub fn is_active() -> bool {
+        cfg_select! {
+            sleep_light_sleep => {
+                wake_lock_count().load(portable_atomic::Ordering::Acquire)
+                    != 0
+            }
+            _ => true,
+        }
+    }
+}
+
+#[instability::unstable]
+impl Clone for WakeLock {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
+#[instability::unstable]
+impl Default for WakeLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for WakeLock {
+    fn drop(&mut self) {
+        Self::release();
+    }
+}
+
+#[cfg(sleep_driver_supported)]
+fn sleep_uart_prepare() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().suspend_for_sleep();
+            }
+        };
+    }
+}
+
+#[cfg(sleep_driver_supported)]
+fn sleep_uart_resume() {
+    use crate::uart::Instance;
+    for_each_uart! {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+            unsafe {
+                crate::peripherals::$inst::steal().info().resume_from_sleep();
+            }
+        };
+    }
 }

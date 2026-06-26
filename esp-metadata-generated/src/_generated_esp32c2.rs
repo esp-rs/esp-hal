@@ -76,20 +76,11 @@ macro_rules! property {
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
-    ("dma.can_access_psram") => {
-        false
-    };
     ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
         false
-    };
-    ("dma.max_priority") => {
-        9
-    };
-    ("dma.max_priority", str) => {
-        stringify!(9)
     };
     ("dma.gdma_version") => {
         1
@@ -267,12 +258,6 @@ macro_rules! property {
     };
     ("soc.multi_core_enabled") => {
         false
-    };
-    ("soc.rc_fast_clk_default") => {
-        17500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(17500000)
     };
     ("soc.internal_memory_cached") => {
         false
@@ -628,18 +613,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-        }
     };
 }
 #[macro_export]
@@ -1616,8 +1589,6 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_MEM_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static APB_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -2477,6 +2448,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting TIMG_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::acquire();
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
                     TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
@@ -2489,6 +2461,7 @@ macro_rules! define_clock_tree_types {
             trace!("Releasing TIMG_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::release();
                 enable_timg_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
@@ -2553,6 +2526,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
                         I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
@@ -2565,6 +2539,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
                         I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
@@ -2628,6 +2603,7 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::Pll40m => request_pll_40m(clocks),
@@ -2640,6 +2616,7 @@ macro_rules! define_clock_tree_types {
                 if decrement_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
                 {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    crate::rtc_cntl::WakeLock::release();
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
@@ -2927,8 +2904,7 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
-                UART_MEM_CLOCK_FREQ_CACHE[self as usize]
-                    .load(::core::sync::atomic::Ordering::Acquire)
+                uart_mem_clk_frequency()
             }
             pub fn mem_clock_source_frequency() -> u32 {
                 uart_mem_clk_frequency()
@@ -3210,14 +3186,7 @@ macro_rules! define_clock_tree_types {
             }
             refresh_uart_baud_rate_generator_downstream(clocks, instance);
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {
-            if let Some(config) = clocks.uart_mem_clock[instance as usize] {
-                UART_MEM_CLOCK_FREQ_CACHE[instance as usize].store(
-                    UartInstance::mem_clock_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-        }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_uart_baud_rate_generator_downstream(
             clocks: &mut ClockTree,
             instance: UartInstance,

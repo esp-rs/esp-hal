@@ -1,5 +1,8 @@
 use super::*;
-use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
+use crate::{
+    rtc_cntl::WakeLock,
+    soc::clocks::{ClockTree, I2cFunctionClockConfig},
+};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -13,6 +16,7 @@ pub(super) struct I2cFuture<'a> {
     deadline: Option<Instant>,
     /// True if the Future has been polled to completion.
     finished: bool,
+    _wake_lock: WakeLock,
 }
 
 impl<'a> I2cFuture<'a> {
@@ -52,6 +56,7 @@ impl<'a> I2cFuture<'a> {
             driver,
             deadline,
             finished: false,
+            _wake_lock: WakeLock::new(),
         }
     }
 
@@ -142,8 +147,8 @@ fn set_filter(
     sda_threshold: Option<u8>,
     scl_threshold: Option<u8>,
 ) {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_separate_filter_config_registers)] {
+    cfg_select! {
+        i2c_master_separate_filter_config_registers => {
             register_block.sda_filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -156,7 +161,8 @@ fn set_filter(
                 }
                 w.scl_filter_en().bit(scl_threshold.is_some())
             });
-        } else {
+        }
+        _ => {
             register_block.filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -230,13 +236,14 @@ fn configure_clock(
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_bus_timeout_enable)] {
+        cfg_select! {
+            i2c_master_has_bus_timeout_enable => {
                 info.regs().to().write(|w| {
                     w.time_out_en().bit(timeout.is_some());
                     w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
-            } else {
+            }
+            _ => {
                 info.regs()
                     .to()
                     .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
@@ -489,11 +496,12 @@ impl Driver<'_> {
     }
 
     fn do_fsm_reset(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_reliable_fsm_reset)] {
+        cfg_select! {
+            i2c_master_has_reliable_fsm_reset => {
                 // Device has a working FSM reset mechanism
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-            } else {
+            }
+            _ => {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
                 // define I2C_LL_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
@@ -1824,15 +1832,16 @@ where
 // Estimate the reason for an acknowledge check failure on a best effort basis.
 // When in doubt it's better to return `Unknown` than to return a wrong reason.
 fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_can_estimate_nack_reason)] {
+    cfg_select! {
+        i2c_master_can_estimate_nack_reason => {
             // this is based on observations rather than documented behavior
             if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
                 AcknowledgeCheckFailedReason::Address
             } else {
                 AcknowledgeCheckFailedReason::Data
             }
-        } else {
+        }
+        _ => {
             AcknowledgeCheckFailedReason::Unknown
         }
     }

@@ -11,6 +11,7 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     asynch::AtomicWaker,
+    dma::aligned::InternalMemory,
     interrupt,
     mipi_dsi::{
         ConfigError,
@@ -39,8 +40,10 @@ const FIFO_EMPTY_THRESHOLD: u32 = 1024 - DMA_BURST_LEN;
 
 // ── Static link-list storage ──────────────────────────────────────────────────
 
-static LLI_STORAGE: NonReentrantMutex<[VdmaLinkItem; NUM_LLIS]> =
-    NonReentrantMutex::new([const { VdmaLinkItem::zeroed() }; NUM_LLIS]);
+static LLI_STORAGE: NonReentrantMutex<InternalMemory<[VdmaLinkItem; NUM_LLIS]>> =
+    NonReentrantMutex::new(InternalMemory::new(
+        [const { VdmaLinkItem::zeroed() }; NUM_LLIS],
+    ));
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -144,17 +147,12 @@ fn vdma_block_done_isr() {
     ch.intclear0().write(|w| unsafe { w.bits(0xFFFFFFFF) });
 
     LLI_STORAGE.with(|storage| {
+        let mut storage = storage.get_mut();
         for lli in storage.iter() {
             lli.rearm();
         }
 
-        // Flush LLIs from CPU cache → SRAM.
-        unsafe {
-            crate::soc::cache_writeback_addr(
-                storage.as_ptr() as u32,
-                core::mem::size_of::<VdmaLinkItem>() as u32 * NUM_LLIS as u32,
-            );
-        }
+        storage.writeback();
     });
 }
 
@@ -389,18 +387,14 @@ impl<'d> DsiDpi<'d> {
         VDMA_ISR_CHANNEL.store(vdma_channel_id, atomic::Ordering::Relaxed);
 
         LLI_STORAGE.with(|storage| {
+            let mut storage = storage.get_mut();
             for i in 0..NUM_LLIS {
-                let next = &storage[(i + 1) % NUM_LLIS] as *const VdmaLinkItem;
+                let next = &raw const storage[(i + 1) % NUM_LLIS];
                 storage[i].configure(fb_ptrs[0] as u32, fb_size, next);
             }
 
             // Flush the LLI descriptors from CPU cache → SRAM so the DMA sees them.
-            unsafe {
-                crate::soc::cache_writeback_addr(
-                    storage.as_ptr() as u32,
-                    (core::mem::size_of::<VdmaLinkItem>() * NUM_LLIS) as u32,
-                );
-            }
+            storage.writeback();
 
             VdmaChannel::new(vdma_channel_id).start(&storage[0]);
         });
@@ -467,6 +461,7 @@ impl<'d> DsiDpi<'d> {
         // block is unaffected; the new pixels appear on the next block boundary.
         let src = self.fb_ptrs[back] as u32;
         LLI_STORAGE.with(|storage| {
+            let storage = storage.get_mut();
             for lli in storage.iter() {
                 lli.set_source(src);
             }

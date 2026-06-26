@@ -201,12 +201,22 @@ impl PhyState {
         unsafe {
             sys::include::phy_eco_version_sel(esp_hal::efuse::chip_revision().major);
         }
-        // Causes headaches for some reason.
-        // See: https://github.com/esp-rs/esp-hal/issues/4015
-        // #[cfg(phy_combo_module)]
-        // unsafe {
-        // phy_init_param_set(1);
-        // }
+        // For a combo module, PHY enable will not put the
+        // radio into the Wi-Fi RX state by default; the Wi-Fi driver is then responsible for
+        // turning Wi-Fi RX on/off via `set_wifi_rx_enabled` when it enables/disables the PHY.
+        // This mirrors `esp_phy_load_cal_and_init` in ESP-IDF.
+        cfg_select! {
+            esp32c5 => {
+                // C5 is intentionally excluded: ESP-IDF leaves `SOC_PHY_COMBO_MODULE` undefined
+                // for C5, so it doesn't call `phy_init_param_set` there. See:
+                // https://github.com/espressif/esp-idf/blob/7e3df61a/components/soc/esp32c5/include/soc/soc_caps.h#L658
+                // TODO: enable for C5.
+            }
+            phy_combo_module => unsafe {
+                sys::include::phy_init_param_set(1);
+            }
+            _ => {}
+        }
 
         #[cfg(all(
             phy_enable_usb,
@@ -410,6 +420,50 @@ pub fn disable_phy() {
     // Without this, PHY_CLOCK_REF_COUNTER (u8) leaks on every phy_enable/phy_disable
     // cycle from the WiFi blob C-callback interface, overflowing after ~9 TCP connects.
     decrease_phy_clock_ref_count_internal();
+}
+
+/// Enable the PHY for Wi-Fi: enables the PHY ([enable_phy]) and turns Wi-Fi RX on.
+///
+/// Wi-Fi must use this instead of [enable_phy] so that combo modules (which do not power up in the
+/// Wi-Fi RX state) actually receive.
+pub fn enable_phy_with_wifi_rx() {
+    core::mem::forget(enable_phy());
+    set_wifi_rx_enabled(true);
+}
+
+/// Disable the PHY for Wi-Fi: turns Wi-Fi RX off and disables the PHY ([disable_phy]).
+///
+/// Counterpart to [enable_phy_with_wifi_rx]. Mirrors ESP-IDF's `esp_phy_disable_wrapper`.
+pub fn disable_phy_with_wifi_rx() {
+    set_wifi_rx_enabled(false);
+    disable_phy();
+}
+
+/// Set the Wi-Fi RX state of the radio.
+///
+/// On combo modules the PHY does not power up in the Wi-Fi RX state, so Wi-Fi RX has to be enabled
+/// explicitly whenever the PHY is brought up, and disabled again when it is torn down. This
+/// mirrors the `phy_wifi_enable_set` calls ESP-IDF performs in its PHY enable/disable
+/// wrappers.
+///
+/// On non-combo modules this is a no-op.
+fn set_wifi_rx_enabled(enabled: bool) {
+    cfg_select! {
+        esp32c5 => {
+            // C5 is excluded for the same reason as `phy_init_param_set` (ESP-IDF leaves
+            // `SOC_PHY_COMBO_MODULE` undefined for C5, see:
+            // https://github.com/espressif/esp-idf/blob/7e3df61a/components/soc/esp32c5/include/soc/soc_caps.h#L658);
+            // its Wi-Fi adapter only calls `phy_wifi_enable_set` alongside a `set_bb_wdg` workaround
+            // we don't implement yet. TODO: enable for C5 once `set_bb_wdg` is handled.
+            let _ = enabled;
+        }
+        phy_combo_module => unsafe {
+            sys::include::phy_wifi_enable_set(enabled as u8);
+        }
+        _ => {
+            let _ = enabled;
+        }
+    }
 }
 
 /// Enable the PHY clock and acquire a [PhyClockGuard].

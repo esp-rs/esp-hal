@@ -56,6 +56,13 @@ inventory::collect!(McpToolRegistration);
 #[cfg(feature = "semver-checks")]
 pub mod semver_check;
 
+/// One `check-configs` or `clippy-configs` case from `[package.metadata.espressif]`.
+#[derive(Debug, Clone, Default)]
+pub struct CheckConfig {
+    pub features: Vec<String>,
+    pub env: HashMap<String, String>,
+}
+
 #[derive(
     Debug,
     Clone,
@@ -105,6 +112,8 @@ pub enum Package {
     CompileTests,
 }
 
+static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
+
 impl Package {
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
@@ -113,6 +122,9 @@ impl Package {
             .map(|chip| chip.to_string())
             .collect::<Vec<_>>();
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(Item::Table(features)) = toml.manifest.get("features") else {
             return false;
         };
@@ -133,6 +145,36 @@ impl Package {
         features
             .iter()
             .any(|(feature, _)| chips.iter().any(|c| c == feature))
+    }
+
+    /// Should doc tests be skipped for this package?
+    ///
+    /// Controlled by the `skip-doctests` key in the package's
+    /// `[package.metadata.espressif]` table. Defaults to `false`.
+    ///
+    /// If a package does not define `doc-config`, doc tests are skipped by default.
+    // FIXME: doc tests should slowly be enabled (by removing the `skip-doctests` key) as the docs
+    // are fixed up, and eventually this opt-out should be removed entirely.
+    pub fn skip_doctests(&self) -> bool {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            // No Cargo.toml in the package, must be the examples
+            return true;
+        };
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(value)) = metadata.get("skip-doctests") else {
+            return false;
+        };
+
+        let Value::Boolean(value) = value else {
+            log::warn!("Invalid value for 'skip-doctests' in metadata");
+            return false;
+        };
+
+        *value.value()
     }
 
     /// Does the package have inline assembly?
@@ -165,6 +207,9 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(Item::Table(features)) = toml.manifest.get("features") else {
             unreachable!("has_chip_features() already checked for a features table");
         };
@@ -195,6 +240,10 @@ impl Package {
     }
 
     /// Does the package have any host tests?
+    ///
+    /// Returns true when `src/**/*.rs` contains `#[test]`. Packages that return
+    /// true must also have a match arm in [`run_host_tests`]; see `xtask/README.md`
+    /// ("Host tests").
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
         if *self == Package::HilTest || *self == Package::HilTestRadio {
             return false;
@@ -238,12 +287,11 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self) -> bool {
-        if *self == Package::Examples || *self == Package::CompileTests {
-            // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
-            // did nothing in this directory will be published.
-            false
+        let toml = self.toml();
+        if let Some(ref toml) = *toml {
+            toml.is_published()
         } else {
-            self.toml().is_published()
+            false
         }
     }
 
@@ -256,7 +304,42 @@ impl Package {
         }
     }
 
-    fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+    fn parse_required_features(table: &InlineTable) -> Vec<String> {
+        let mut features = Vec::new();
+        if let Some(config_features) = table.get("features") {
+            let Value::Array(config_features) = config_features else {
+                panic!("features must be an array.");
+            };
+
+            for feature in config_features {
+                let feature = feature.as_str().expect("features must be strings.");
+                features.push(feature.to_owned());
+            }
+        }
+
+        features
+    }
+
+    fn parse_env_table(table: &InlineTable) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+        if let Some(env_value) = table.get("env") {
+            let Value::InlineTable(env_table) = env_value else {
+                panic!("env must be an inline table.");
+            };
+
+            for (key, value) in env_table.iter() {
+                let value = value.as_str().expect("env values must be strings.");
+                env.insert(key.to_string(), value.to_owned());
+            }
+        }
+
+        env
+    }
+
+    fn parse_conditional_append(
+        table: &InlineTable,
+        config: &Config,
+    ) -> Option<(Option<Vec<String>>, Option<HashMap<String, String>>)> {
         let script_ctx = ScriptContext::new();
         let mut ctx = script_ctx.for_config(config);
 
@@ -270,29 +353,43 @@ impl Package {
             }
         }
 
-        let Some(config_features) = table.get("features") else {
-            panic!("Missing features array.");
-        };
-        let Value::Array(config_features) = config_features else {
-            panic!("features must be an array.");
+        let features = if table.contains_key("features") {
+            Some(Self::parse_required_features(table))
+        } else {
+            None
         };
 
-        let mut features = Vec::new();
-        for feature in config_features {
-            let feature = feature.as_str().expect("features must be strings.");
-            features.push(feature.to_owned());
+        let env = if table.contains_key("env") {
+            Some(Self::parse_env_table(table))
+        } else {
+            None
+        };
+
+        if features.is_none() && env.is_none() {
+            panic!("append items must specify at least one of `features` or `env`.");
         }
 
-        Some(features)
+        Some((features, env))
     }
 
-    fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
-        // Base features. If their condition is not met, the whole item is ignored.
-        let mut features = Self::parse_conditional_features(table, config)?;
+    fn parse_config_set(table: &InlineTable, config: &Config) -> Option<CheckConfig> {
+        let script_ctx = ScriptContext::new();
+        let mut ctx = script_ctx.for_config(config);
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !ctx.evaluate(expr).expect("Failed to evaluate expression") {
+                return None;
+            }
+        }
+
+        let mut features = Self::parse_required_features(table);
+        let mut env = Self::parse_env_table(table);
 
         if let Some(conditionals) = table.get("append") {
-            // Optional features. If their conditions are met, they are appended to the base
-            // features.
             let Value::Array(conditionals) = conditionals else {
                 panic!("append must be an array.");
             };
@@ -300,51 +397,100 @@ impl Package {
                 let Value::InlineTable(cond_table) = cond else {
                     panic!("append items must be inline tables.");
                 };
-                if let Some(cond_features) = Self::parse_conditional_features(cond_table, config) {
-                    features.extend(cond_features);
+                if let Some((append_features, append_env)) =
+                    Self::parse_conditional_append(cond_table, config)
+                {
+                    if let Some(append_features) = append_features {
+                        features.extend(append_features);
+                    }
+                    if let Some(append_env) = append_env {
+                        env.extend(append_env);
+                    }
                 }
             }
-        };
+        }
 
-        Some(features)
+        Some(CheckConfig { features, env })
     }
 
-    /// Common function to get feature rules from metadata.
-    fn feature_rules_from_metadata(
+    fn single_config_rule_from_metadata(
         &self,
         config: &Config,
         metadata_key: &str,
-        is_array: bool,
-    ) -> Option<Vec<Vec<String>>> {
+    ) -> Option<CheckConfig> {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return None;
+        };
+
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get(metadata_key)
+        {
+            let Item::Value(Value::InlineTable(table)) = config_meta else {
+                panic!("'{}' must be an inline table.", metadata_key);
+            };
+
+            return Self::parse_config_set(table, config);
+        }
+
+        None
+    }
+
+    /// Documentation build configuration for this package.
+    ///
+    /// If the `doc-config` table is not found, this function returns `None`. This differs from
+    /// specifying an empty set of features, which returns `Some` with empty `features` and `env`.
+    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
+    // chip-specific features.
+    pub fn doc_config_rules(&self, config: &Config) -> Option<CheckConfig> {
+        if *self == Self::Examples {
+            return None;
+        }
+
+        let config = self.single_config_rule_from_metadata(config, "doc-config");
+
+        log::debug!("Doc config for package '{}': {:?}", self, config);
+        config
+    }
+
+    /// Configuration for semver checking of this package.
+    #[cfg(feature = "semver-checks")]
+    pub fn semver_config_rules(&self, config: &Config) -> CheckConfig {
+        let config = self
+            .single_config_rule_from_metadata(config, "semver-config")
+            .unwrap_or_default();
+
+        log::debug!("Semver config for package '{}': {:?}", self, config);
+        config
+    }
+
+    fn config_rules_from_metadata(
+        &self,
+        config: &Config,
+        metadata_key: &str,
+    ) -> Option<Vec<CheckConfig>> {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return None;
+        };
         let mut cases = Vec::new();
 
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(config_meta) = metadata.get(metadata_key)
         {
-            if is_array {
-                let Item::Value(Value::Array(tables)) = config_meta else {
-                    panic!(
-                        "'{}' must be an array of tables. {:?}",
-                        metadata_key, config_meta
-                    );
-                };
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "'{}' must be an array of tables. {:?}",
+                    metadata_key, config_meta
+                );
+            };
 
-                for table in tables {
-                    let Value::InlineTable(table) = table else {
-                        panic!("'{}' items must be inline tables.", metadata_key);
-                    };
-                    if let Some(features) = Self::parse_feature_set(table, config) {
-                        cases.push(features);
-                    }
-                }
-            } else {
-                let Item::Value(Value::InlineTable(table)) = config_meta else {
-                    panic!("'{}' must be an inline table.", metadata_key);
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("'{}' items must be inline tables.", metadata_key);
                 };
-
-                if let Some(features) = Self::parse_feature_set(table, config) {
-                    cases.push(features);
+                if let Some(case) = Self::parse_config_set(table, config) {
+                    cases.push(case);
                 }
             }
         }
@@ -352,80 +498,48 @@ impl Package {
         if cases.is_empty() { None } else { Some(cases) }
     }
 
-    /// Given a device config, return the features which should be enabled for
-    /// this package.
-    ///
-    /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
-    /// one feature set is supported. If the `doc-config` table is not found, this function returns
-    /// `None`. This differs from specifying an empty set of features, which returns `Some(empty
-    /// vector)`.
-    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
-    // chip-specific features.
-    pub fn doc_feature_rules(&self, config: &Config) -> Option<Vec<String>> {
-        if *self == Self::Examples {
-            return None;
-        }
-
-        let features = self
-            .feature_rules_from_metadata(config, "doc-config", false)
-            .and_then(|mut vec_of_vecs| vec_of_vecs.pop());
-
-        log::debug!("Doc features for package '{}': {:?}", self, features);
-        features
-    }
-
-    /// Given a device config, return the features which should be enabled for
-    /// semver checking of this package.
-    #[cfg(feature = "semver-checks")]
-    pub fn semver_feature_rules(&self, config: &Config) -> Vec<String> {
-        let feature_sets = self
-            .feature_rules_from_metadata(config, "semver-config", false)
-            .unwrap_or_default();
-
-        let features: Vec<String> = feature_sets.into_iter().flatten().collect();
-
-        log::debug!("Semver features for package '{}': {:?}", self, features);
-        features
-    }
-
-    /// Additional feature rules to test subsets of features for a package.
-    pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+    /// Check configurations to compile for this package in CI.
+    pub fn check_config_rules(&self, config: &Config) -> Vec<CheckConfig> {
         let mut cases = self
-            .feature_rules_from_metadata(config, "check-configs", true)
+            .config_rules_from_metadata(config, "check-configs")
             .unwrap_or_default();
 
-        // Add the default "no features" case if nothing was specified
         if cases.is_empty() {
-            cases.push(vec![]);
+            cases.push(CheckConfig::default());
         }
 
-        log::debug!("Check features for package '{}': {:?}", self, cases);
+        log::debug!("Check configs for package '{}': {:?}", self, cases);
         cases
     }
 
-    /// Additional feature rules to test subsets of features for a package.
-    pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+    /// Clippy configurations to run for this package in CI.
+    pub fn lint_config_rules(&self, config: &Config) -> Vec<CheckConfig> {
         let cases = self
-            .feature_rules_from_metadata(config, "clippy-configs", true)
+            .config_rules_from_metadata(config, "clippy-configs")
             .unwrap_or_default();
 
-        log::debug!("Check features for package '{}': {:?}", self, cases);
+        log::debug!("Clippy configs for package '{}': {:?}", self, cases);
         cases
     }
 
-    fn toml(&self) -> MappedMutexGuard<'_, CargoToml> {
-        static TOML: Mutex<Option<HashMap<Package, CargoToml>>> = Mutex::new(None);
-
+    fn toml(&self) -> MappedMutexGuard<'_, Option<CargoToml>> {
         let tomls = TOML.lock();
 
         MutexGuard::map(tomls, |tomls| {
             let tomls = tomls.get_or_insert_default();
 
-            tomls.entry(*self).or_insert_with(|| {
-                CargoToml::new(&std::env::current_dir().unwrap(), *self)
-                    .expect("Failed to parse Cargo.toml")
-            })
+            tomls
+                .entry(*self)
+                .or_insert_with(|| CargoToml::new(&std::env::current_dir().unwrap(), *self).ok())
         })
+    }
+
+    #[cfg(feature = "rel-check")]
+    fn remove_toml_from_cache(&self) {
+        let mut tomls = TOML.lock();
+        if let Some(ref mut tomls) = *tomls {
+            tomls.remove(self);
+        }
     }
 
     fn targets_lp_core(&self) -> bool {
@@ -434,6 +548,9 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -458,10 +575,6 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        if *self == Package::Examples || *self == Package::CompileTests {
-            return Ok(());
-        }
-
         if self.targets_lp_core() && !chip.has_lp_core() {
             return Err(anyhow!(
                 "Package '{self}' requires an LP core, but '{chip}' does not have one",
@@ -475,6 +588,10 @@ impl Package {
         }
 
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return Ok(());
+        };
+
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
             && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
@@ -501,6 +618,10 @@ impl Package {
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
         let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            // No Cargo.toml in the package, must be the examples
+            return false;
+        };
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -752,7 +873,11 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 
 /// Parse the version from the specified package's Cargo manifest.
 pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
-    Ok(package.toml().package_version())
+    let toml = package.toml();
+    let Some(ref toml) = *toml else {
+        return Err(anyhow!("Failed to parse Cargo.toml for package {package}"));
+    };
+    Ok(toml.package_version())
 }
 
 /// Make the path "Windows"-safe
@@ -785,6 +910,10 @@ pub fn format_package(
 }
 
 /// Run the host tests for the specified package.
+///
+/// Called by `cargo xtask host-tests` for every package where [`Package::has_host_tests`]
+/// is true. **When adding `#[test]` functions to a package, add a match arm here**
+/// with the correct `cargo test` flags/features. See `xtask/README.md` ("Host tests").
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
     let package_path = workspace.join(package.as_ref());
@@ -809,6 +938,8 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .arg("--lib")
                     .arg("--tests")
                     .features(&vec!["std".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
                     .build(),
                 &package_path,
             );
@@ -874,6 +1005,9 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .build(),
                 &package_path,
             );
+        }
+        Package::EspMetadata => {
+            return cargo::run(&cmd.clone().subcommand("test").build(), &package_path);
         }
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",

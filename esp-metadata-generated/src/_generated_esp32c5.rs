@@ -82,20 +82,11 @@ macro_rules! property {
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
-    ("dma.can_access_psram") => {
-        true
-    };
     ("dma.ext_mem_configurable_block_size") => {
         false
     };
     ("dma.separate_in_out_interrupts") => {
         true
-    };
-    ("dma.max_priority") => {
-        5
-    };
-    ("dma.max_priority", str) => {
-        stringify!(5)
     };
     ("dma.gdma_version") => {
         2
@@ -347,7 +338,7 @@ macro_rules! property {
         false
     };
     ("rng.is_lp_sys") => {
-        false
+        true
     };
     ("rsa.version") => {
         3
@@ -368,10 +359,10 @@ macro_rules! property {
         stringify!(384)
     };
     ("sleep.light_sleep") => {
-        false
+        true
     };
     ("sleep.deep_sleep") => {
-        false
+        true
     };
     ("soc.cpu_has_branch_predictor") => {
         true
@@ -387,12 +378,6 @@ macro_rules! property {
     };
     ("soc.cpu_csr_prv_mode", str) => {
         stringify!(2064)
-    };
-    ("soc.rc_fast_clk_default") => {
-        17500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(17500000)
     };
     ("soc.internal_memory_cached") => {
         false
@@ -453,6 +438,15 @@ macro_rules! property {
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
+    };
+    ("timergroup.rc_fast_calibration_divider_min_rev") => {
+        0
+    };
+    ("timergroup.rc_fast_calibration_divider") => {
+        32
+    };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        false
     };
     ("uart.ram_size") => {
         128
@@ -890,37 +884,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-        }
     };
 }
 /// This macro can be used to generate code for each channel of the RMT peripheral.
@@ -2850,6 +2813,7 @@ macro_rules! define_clock_tree_types {
             trace!("Requesting TIMG_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Enabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::acquire();
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::OscSlowClk => request_osc_slow_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
@@ -2863,6 +2827,7 @@ macro_rules! define_clock_tree_types {
             trace!("Releasing TIMG_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg_calibration_clock_refcount) {
                 trace!("Disabling TIMG_CALIBRATION_CLOCK");
+                crate::rtc_cntl::WakeLock::release();
                 enable_timg_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg_calibration_clock) {
                     TimgCalibrationClockConfig::OscSlowClk => release_osc_slow_clk(clocks),
@@ -4504,7 +4469,7 @@ macro_rules! for_each_peripheral {
         "PVT_MONITOR peripheral singleton"] PVT_MONITOR <= PVT() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
+        "RNG peripheral singleton"] RNG <= LPPERI() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RSA peripheral singleton"] RSA
         <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4865,7 +4830,7 @@ macro_rules! for_each_peripheral {
         "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc =
         "PVT_MONITOR peripheral singleton"] PVT_MONITOR <= PVT() (unstable)), (@
         peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT() (unstable)), (@
-        peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@
+        peri_type #[doc = "RNG peripheral singleton"] RNG <= LPPERI() (unstable)), (@
         peri_type #[doc = "RSA peripheral singleton"] RSA <= RSA(RSA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {

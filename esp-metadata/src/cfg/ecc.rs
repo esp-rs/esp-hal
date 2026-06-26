@@ -1,18 +1,21 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EccDriverProperties {
     working_modes: Vec<WorkingModeEntry>,
     curves: Vec<CurveEntry>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct WorkingModeEntry {
     id: u32,
     mode: WorkingMode,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CurveEntry {
     id: u32,
     curve: u32,

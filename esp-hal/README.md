@@ -62,7 +62,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 |
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|
 | ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [❌][5422] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          | [❌][5423] [^1] |          | ❌       |          |          |
 | Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |           |          |          |          |          |
@@ -79,7 +79,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
-| I2C slave                 | [❌][1909] [^1] |          | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | ❌       | [❌][1909] [^1] | [❌][1909] [^1] |
+| I2C slave                 | [❌][1909] [^1] |          | ✔️      | [❌][1909] [^1] | ✔️      | [❌][1909] [^1] | [❌][1909] [^1] | ❌       | [❌][1909] [^1] | [❌][1909] [^1] |
 | I2S                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |
 | Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -97,13 +97,13 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SDIO host                 | ❌    |          |          |          |          |           |          | ❌       |          | ❌       |
-| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          | ❌       |          |          |
-| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |
+| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |
-| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -138,7 +138,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5161]: https://github.com/esp-rs/esp-hal/issues/5161
 [5163]: https://github.com/esp-rs/esp-hal/issues/5163
 [5164]: https://github.com/esp-rs/esp-hal/issues/5164
-[5165]: https://github.com/esp-rs/esp-hal/issues/5165
 [5166]: https://github.com/esp-rs/esp-hal/issues/5166
 [5167]: https://github.com/esp-rs/esp-hal/issues/5167
 [5168]: https://github.com/esp-rs/esp-hal/issues/5168
@@ -151,7 +150,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5421]: https://github.com/esp-rs/esp-hal/issues/5421
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
-[5424]: https://github.com/esp-rs/esp-hal/issues/5424
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 <!-- end chip support table -->
 

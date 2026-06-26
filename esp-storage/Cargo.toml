@@ -13,28 +13,30 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.espressif]
 check-configs = [
     { features = [] },
+    { features = ["embedded-storage"] },
     { features = ["critical-section"] },
-    { features = ["bytewise-read"]},
-    { features = ["critical-section", "bytewise-read"] },
+    { features = ["bytewise-read"] },
+    { features = ["embedded-storage", "critical-section"] },
+    { features = ["embedded-storage", "critical-section", "bytewise-read"] },
 ]
-clippy-configs = [{ features = ["critical-section", "bytewise-read"] }]
+clippy-configs = [{ features = ["embedded-storage", "critical-section", "bytewise-read"] }]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6"]
+features       = ["esp32c6", "embedded-storage"]
 
 [lib]
 bench = false
 
 [dependencies]
-embedded-storage = "0.3.1"
+embedded-storage = { version = "0.3.1", optional = true }
 procmacros       = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true}
 
 # Optional dependencies
 esp-sync         = { version = "0.2.1", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "~0.1", path = "../esp-rom-sys", optional = true }
-defmt  = { version = "1.0.1", optional = true }
+defmt  = { version = "1.1", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
@@ -50,6 +52,9 @@ critical-section = []
 
 ## Bytewise read emulation
 bytewise-read = []
+
+## Implement traits from `embedded-storage` for [`FlashStorage`].
+embedded-storage = ["dep:embedded-storage"]
 
 ## Implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
@@ -69,6 +74,8 @@ esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-
 esp32c61  = ["esp-hal/esp32c61", "esp-hal/unstable", "esp-rom-sys/esp32c61", "esp-sync/esp32c61"]
 ##
 esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
+##
+esp32p4   = ["esp-hal/esp32p4", "esp-hal/unstable", "esp-rom-sys/esp32p4", "esp-sync/esp32p4"]
 ##
 esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32"]
 ##

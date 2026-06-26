@@ -24,7 +24,7 @@ on:
         description: '"hil-test", "hil-test-radio", or "all"'
         required: false
         type: string
-        default: "all"
+        default: "hil-test"
       # Not used by the workflow_call path, but referenced in run-name; declared
       # here (with empty defaults) so that expression is well-defined for both
       # triggers.
@@ -60,7 +60,7 @@ on:
         default: ""
       package:
         description: '"hil-test", "hil-test-radio", or "all"'
-        default: "all"
+        default: "hil-test"
       distinct_id:
         description: "Correlation marker set by the dispatcher; do not set manually"
         required: false
@@ -280,7 +280,7 @@ jobs:
         id: tests
         run: |
           if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--elfs ${{ inputs.tests }}" >> $GITHUB_OUTPUT
+            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
           else
             echo "value=" >> $GITHUB_OUTPUT
           fi
@@ -293,6 +293,7 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
+
           ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up
@@ -338,7 +339,7 @@ jobs:
         id: tests
         run: |
           if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--elfs ${{ inputs.tests }}" >> $GITHUB_OUTPUT
+            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
           else
             echo "value=" >> $GITHUB_OUTPUT
           fi
@@ -346,6 +347,7 @@ jobs:
       - name: Run Radio Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
+        timeout-minutes: 3
         run: |
           [ -f ~/setup.sh ] && source ~/setup.sh
 

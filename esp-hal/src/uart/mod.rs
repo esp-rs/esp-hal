@@ -85,6 +85,7 @@ use crate::{
     pac::uart0::RegisterBlock,
     private::DropGuard,
     ram,
+    rtc_cntl::WakeLock,
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
@@ -502,6 +503,7 @@ where
                 phantom: PhantomData,
                 guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
+                _wake_lock: WakeLock::new(),
             },
             tx: UartTx {
                 uart: self.uart,
@@ -558,6 +560,8 @@ pub struct UartRx<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
+    // Receiving data continuously, the peripheral can't let the system to sleep.
+    _wake_lock: WakeLock,
 }
 
 /// A configuration error.
@@ -1021,6 +1025,7 @@ impl<'d> UartRx<'d, Blocking> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
+            _wake_lock: self._wake_lock,
         }
     }
 }
@@ -1042,6 +1047,7 @@ impl<'d> UartRx<'d, Async> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
+            _wake_lock: self._wake_lock,
         }
     }
 
@@ -2012,6 +2018,41 @@ where
     #[instability::unstable]
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
         (self.rx, self.tx)
+    }
+
+    #[procmacros::doc_replace]
+    /// Borrows the UART as separate transmitter and receiver halves.
+    ///
+    /// Unlike [`split`], this method does not consume the UART. The returned
+    /// transmitter and receiver are borrowed from the original UART, which can
+    /// be used again after those borrows end.
+    ///
+    /// This is particularly useful when running separate transmit and receive
+    /// futures concurrently.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    ///
+    /// loop {
+    ///     // The UART can be split into separate Transmit and Receive components:
+    ///     let (rx, tx) = uart.split_mut();
+    ///
+    ///     // Each component can be used individually to interact with the UART:
+    ///     tx.write(&[42u8])?;
+    ///     let mut byte = [0u8; 1];
+    ///     rx.read(&mut byte);
+    /// }
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn split_mut(&mut self) -> (&mut UartRx<'d, Dm>, &mut UartTx<'d, Dm>) {
+        (&mut self.rx, &mut self.tx)
     }
 
     /// Reads and clears errors set by received data.

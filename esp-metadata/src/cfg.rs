@@ -345,13 +345,9 @@ driver_configs![
             #[serde(default)]
             mem2mem_requires_peripheral: bool,
             #[serde(default)]
-            can_access_psram: bool,
-            #[serde(default)]
             ext_mem_configurable_block_size: bool,
             #[serde(default)]
             separate_in_out_interrupts: bool,
-            #[serde(default)]
-            max_priority: Option<u32>,
             #[serde(default)]
             gdma_version: Option<u32>,
             #[serde(default)]
@@ -674,8 +670,6 @@ driver_configs![
             multi_core_enabled: bool,
             #[serde(default)]
             cpu_csr_prv_mode: Option<u32>,
-            #[serde(default)]
-            rc_fast_clk_default: Option<u32>,
             #[serde(default)]
             internal_memory_cached: bool,
             #[serde(flatten)]

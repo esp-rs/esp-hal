@@ -47,14 +47,16 @@ use crate::gpio::AnalogPin;
 // Only specific pins can be used with each DAC peripheral, and of course
 // these pins are different depending on which chip you are using; for this
 // reason, we will type alias the pins for ease of use later in this module:
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
+cfg_select! {
+    esp32 => {
         type Dac1Gpio<'d> = crate::peripherals::GPIO25<'d>;
         type Dac2Gpio<'d> = crate::peripherals::GPIO26<'d>;
-    } else if #[cfg(esp32s2)] {
+    }
+    esp32s2 => {
         type Dac1Gpio<'d> = crate::peripherals::GPIO17<'d>;
         type Dac2Gpio<'d> = crate::peripherals::GPIO18<'d>;
     }
+    _ => {}
 }
 
 /// Digital-to-Analog Converter (DAC) Channel

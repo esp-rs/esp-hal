@@ -100,20 +100,19 @@ async fn main(_spawner: Spawner) {
     }
 
     cfg_select! {
-        any(feature = "esp32c6", feature = "esp32h2", feature = "esp32s3") => {
-            let config = RtcSleepConfig::deep();
-        }
-        _ => {
-            // esp32/c3/s2
+        any(feature = "esp32", feature = "esp32c3", feature = "esp32s2") => {
             let mut config = RtcSleepConfig::deep();
             config.set_rtc_fastmem_pd_en(false);
+        }
+        _ => {
+            let config = RtcSleepConfig::deep();
         }
     }
 
     let delay = esp_hal::delay::Delay::new();
 
     let timer = esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(
-        core::time::Duration::from_millis(SLEEP_MS),
+        esp_hal::time::Duration::from_millis(SLEEP_MS),
     );
 
     delay.delay_millis(100);

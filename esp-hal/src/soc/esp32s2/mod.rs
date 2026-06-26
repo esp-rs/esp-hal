@@ -50,6 +50,28 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
 }
 
+// Byte values (not ROM enum indices) to let DMA alignment code use these directly. The ROM calls in
+// configure_cpu_caches will convert to the expected enum index.
+pub(crate) const CONFIG_INSTRUCTION_CACHE_LINE_SIZE: usize = cfg_select! {
+    instruction_cache_line_size_16b => 16,
+    instruction_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_DATA_CACHE_LINE_SIZE: usize = cfg_select! {
+    data_cache_line_size_16b => 16,
+    data_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
+    instruction_cache_size_8kb => 0,
+    instruction_cache_size_16kb => 1,
+};
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize = cfg_select! {
+    data_cache_size_0kb => 0, // doesn't matter according to esp-idf
+    data_cache_size_8kb => 0,
+    data_cache_size_16kb => 1,
+};
+
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {
     // Set up caches. Doesn't work when put in `configure_cpu_caches`.
@@ -107,29 +129,6 @@ pub(crate) unsafe fn configure_cpu_caches() {
 
     const CACHE_4WAYS_ASSOC: u32 = 0;
 
-    const CONFIG_ESP32S2_INSTRUCTION_CACHE_SIZE: u32 = match () {
-        _ if cfg!(instruction_cache_size_8kb) => 0,
-        _ if cfg!(instruction_cache_size_16kb) => 1,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S2_INSTRUCTION_CACHE_LINE_SIZE: u32 = match () {
-        _ if cfg!(instruction_cache_line_size_16b) => 0,
-        _ if cfg!(instruction_cache_line_size_32b) => 1,
-        _ => core::unreachable!(),
-    };
-
-    const CONFIG_ESP32S2_DATA_CACHE_SIZE: u32 = match () {
-        _ if cfg!(data_cache_size_0kb) => 0, // doesn't matter according to esp-idf
-        _ if cfg!(data_cache_size_8kb) => 0,
-        _ if cfg!(data_cache_size_16kb) => 1,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S2_DATA_CACHE_LINE_SIZE: u32 = match () {
-        _ if cfg!(data_cache_line_size_16b) => 0,
-        _ if cfg!(data_cache_line_size_32b) => 1,
-        _ => core::unreachable!(),
-    };
-
     #[derive(Clone, Copy, Debug)]
     enum CacheLayout {
         Invalid    = 0,
@@ -170,18 +169,28 @@ pub(crate) unsafe fn configure_cpu_caches() {
     }
 
     unsafe {
+        // Unlike S3 code, Cache_Set_(I/D)Cache_Mode takes a cache_line_size_t enum
+        // (CACHE_LINE_SIZE_16B=0, CACHE_LINE_SIZE_32B=1) rather than the size in bytes.
         Cache_Set_ICache_Mode(
-            CONFIG_ESP32S2_INSTRUCTION_CACHE_SIZE,
+            CONFIG_INSTRUCTION_CACHE_SIZE as u32,
             CACHE_4WAYS_ASSOC,
-            CONFIG_ESP32S2_INSTRUCTION_CACHE_LINE_SIZE,
+            match CONFIG_INSTRUCTION_CACHE_LINE_SIZE {
+                16 => 0,
+                32 => 1,
+                _ => unreachable!(),
+            },
         );
         Cache_Invalidate_ICache_All();
         Cache_Resume_ICache(0);
 
         Cache_Set_DCache_Mode(
-            CONFIG_ESP32S2_DATA_CACHE_SIZE,
+            CONFIG_DATA_CACHE_SIZE as u32,
             CACHE_4WAYS_ASSOC,
-            CONFIG_ESP32S2_DATA_CACHE_LINE_SIZE,
+            match CONFIG_DATA_CACHE_LINE_SIZE {
+                16 => 0,
+                32 => 1,
+                _ => unreachable!(),
+            },
         );
         Cache_Invalidate_DCache_All();
         Cache_Enable_DCache(0);

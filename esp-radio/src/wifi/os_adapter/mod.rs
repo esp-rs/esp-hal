@@ -791,7 +791,8 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    esp_phy::disable_phy();
+    // Wi-Fi modem disable: also clears Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::disable_phy_with_wifi_rx();
 }
 
 /// **************************************************************************
@@ -810,7 +811,8 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    core::mem::forget(esp_phy::enable_phy());
+    // Wi-Fi modem enable: also sets Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::enable_phy_with_wifi_rx();
 }
 
 /// **************************************************************************
@@ -1429,11 +1431,12 @@ extern_coex_fns! {
 pub unsafe extern "C" fn coex_status_get() -> u32 {
     trace!("coex_status_get");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             const COEX_STATUS_GET_WIFI_BITMAP: u8 = 1;
             unsafe { crate::sys::include::coex_status_get(COEX_STATUS_GET_WIFI_BITMAP) }
-        } else {
+        }
+        _ => {
             0
         }
     }
@@ -1452,15 +1455,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 ) -> c_int {
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe {
                 crate::sys::include::coex_schm_register_callback(
                     arg1 as u32,
                     unwrap!(cb) as *mut c_void,
                 )
             }
-        } else {
+        }
+        _ => {
             0
         }
     }

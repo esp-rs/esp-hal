@@ -373,6 +373,36 @@ mod tests {
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
+
+    #[test]
+    fn test_split_mut_send_receive_change_baud(ctx: Context) {
+        let mut uart0 = ctx.uart0.with_tx(ctx.tx);
+        let mut uart1 = ctx.uart1.with_rx(ctx.rx);
+
+        let bytes = [0x42, 0x43, 0x44];
+        let mut buf = [0u8; 3];
+
+        for i in 1..=2 {
+            let baudrate = 9600 * i;
+            let uart_cfg = uart::Config::default().with_baudrate(baudrate);
+            uart0.apply_config(&uart_cfg).unwrap_or_else(|e| {
+                panic!("{:?}: Failed to apply UART 0 baudrate: {}", e, baudrate)
+            });
+            uart1.apply_config(&uart_cfg).unwrap_or_else(|e| {
+                panic!("{:?}: Failed to apply UART 1 baudrate: {}", e, baudrate)
+            });
+
+            let (_, tx) = uart0.split_mut();
+            let (rx, _) = uart1.split_mut();
+
+            tx.flush().unwrap();
+            tx.write(&bytes).unwrap();
+
+            embedded_io::Read::read_exact(rx, &mut buf).unwrap();
+
+            assert_eq!(buf, bytes);
+        }
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
@@ -914,7 +944,8 @@ mod async_tx_rx_split {
 mod uhci {
     use esp_hal::{
         dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         interrupt::software::SoftwareInterruptControl,
         peripherals::Peripherals,
         timer::timg::TimerGroup,
@@ -942,10 +973,8 @@ mod uhci {
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            dma_buffers!(DMA_BUFFER_SIZE as usize);
-        let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx = dma_rx_buffer!(DMA_BUFFER_SIZE as usize).unwrap();
+        let dma_tx = dma_tx_buffer!(DMA_BUFFER_SIZE as usize).unwrap();
 
         Context {
             dma_rx,

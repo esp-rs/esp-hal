@@ -82,7 +82,7 @@ Our self-hosted runners have the following setup:
     - `GPIO2` and `GPIO3` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-P4 (`esp32p4`):
-  - Devkit: `ESP32-P4 EV Board 1.5.2` connected via USB-Serial-JTAG (`USB` port).
+  - Devkit: `ESP32-P4 EV Board 1.6 (rev 3.1)` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO5` and `GPIO6` are connected.
   - RPi: Raspbian 12 configured with the following [setup]

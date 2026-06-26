@@ -29,7 +29,7 @@ impl WakeSource for TimerWakeupSource {
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
         // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -354,8 +354,24 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_aon_pd_en(pd_flags.pd_hp_aon());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
+        if pd_flags.pd_modem() {
+            // The modem (Wi-Fi/BLE) power domain is powered down during sleep, so
+            // isolate and retain its analog I2C buses as before.
+            self.hp_sys.clk.set_i2c_iso_en(true);
+            self.hp_sys.clk.set_i2c_retention(true);
+        } else {
+            // The modem power domain is kept on across (light-)sleep
+            // (`pd_modem == false`, the default). In that case its analog blocks -
+            // the BBPLL and the analog I2C buses used to (re)configure it - must be
+            // kept powered too, matching the `HP_MODEM` power state. Otherwise the
+            // radio comes back without a usable PLL and can no longer transmit
+            // (e.g. BLE advertising silently stops working) after wakeup.
+            self.hp_sys.clk.set_i2c_iso_en(false);
+            self.hp_sys.clk.set_i2c_retention(false);
+            self.hp_sys.clk.set_xpd_bb_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll(true);
+        }
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -438,7 +454,7 @@ pub struct HpParam {
     pub pll_stable_wait_cycle: u16,
     /// Number of cycles to wait for modifying the ICG control.
     pub modify_icg_cntl_wait_cycle: u8,
-    /// Number of cycles to wait for switching the ICG coйntrol.
+    /// Number of cycles to wait for switching the ICG control.
     pub switch_icg_cntl_wait_cycle: u8,
     /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
@@ -865,6 +881,10 @@ impl RtcSleepConfig {
         }
     }
 
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep
+    }
+
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         Self::wake_io_reset();
     }
@@ -876,6 +896,13 @@ impl RtcSleepConfig {
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
+        let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
+            matches!(
+                clocks::lp_slow_clk_config(clocks),
+                Some(LpSlowClkConfig::Xtal32k)
+            )
+        });
+
         if self.deep {
             // force-disable certain power domains
             self.pd_flags.set_pd_top(true);
@@ -887,15 +914,20 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_hp_aon(true);
             self.pd_flags.set_pd_lp_periph(true);
-            let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
-                matches!(
-                    clocks::lp_slow_clk_config(clocks),
-                    Some(LpSlowClkConfig::Xtal32k)
-                )
-            });
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
             self.pd_flags.set_pd_rc32k(true);
             self.pd_flags.set_pd_rc_fast(true);
+        } else {
+            // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered
+            // and only clock-gated, so execution resumes in place. To cut power we
+            // turn off the analog clock sources that nothing needs while the core is
+            // gated. Powering down XTAL also makes the analog config drop the HP
+            // regulator to the 0.6 V light-sleep voltage instead of holding it at the
+            // active calibration voltage (see `AnalogSleepConfig::defaults_light_sleep`),
+            // which is the dominant saving.
+            self.pd_flags.set_pd_xtal(true);
+            self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 

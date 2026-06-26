@@ -123,6 +123,17 @@ impl TimeDriver {
         }
     }
 
+    #[cfg(sleep_light_sleep)]
+    pub(crate) fn next_wakeup(&self) -> u64 {
+        self.timer_queue.next_wakeup()
+    }
+
+    /// Force-rearms the alarm timer.
+    pub(crate) fn rearm(&mut self, now: u64) {
+        self.current_alarm = u64::MAX;
+        self.arm_next_wakeup(now);
+    }
+
     pub(crate) fn handle_alarm(&mut self, now: u64, on_task_ready: impl FnMut(TaskPtr)) {
         if now < self.current_alarm {
             trace!(
@@ -293,8 +304,7 @@ extern "C" fn timer_tick_handler() {
         // Re-arm the timer. This should be relatively cheap, and ensures that the timer will keep
         // ticking even if the interrupt doesn't trigger a context switch.
         // FIXME: this SHOULD be relatively cheap, but arming the timer involves u64 division.
-        time_driver.current_alarm = u64::MAX;
-        time_driver.arm_next_wakeup(now);
+        time_driver.rearm(now);
     });
 
     #[cfg(feature = "rtos-trace")]

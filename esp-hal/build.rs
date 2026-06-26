@@ -18,6 +18,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .contains("rust-analyzer");
 
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
+    // FIXME: i2c_slave_i2c1 is used conditionally in src/i2c/slave/mod.rs but may not be generated
+    // by metadata for single-I2C chips (e.g. ESP32-C3). Register it here to avoid unexpected_cfgs
+    // warnings on those targets.
+    println!("cargo:rustc-check-cfg=cfg(i2c_slave_i2c1)");
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && (level == "0" || level == "1")
     {
