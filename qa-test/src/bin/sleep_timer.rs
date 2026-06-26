@@ -1,4 +1,4 @@
-//! Demonstrates light/deep sleep with timer + GPIO wakeup
+//! Demonstrates waking from deep sleep with timer
 
 //% CHIP_FILTER: sleep_driver_supported
 
