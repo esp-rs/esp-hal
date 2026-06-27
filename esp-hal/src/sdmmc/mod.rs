@@ -1411,7 +1411,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
 
         self.issue_data_command(index, arg, write, block_count)?;
 
-        let result = run_data_phase(&mut t, ring, write, block_count);
+        let result = run_data_phase(&mut t, ring, write, needs_auto_stop(index, block_count));
 
         disable_idmac();
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
@@ -1465,7 +1465,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
             w.check_response_crc().set_bit();
             w.data_expected().set_bit();
             w.read_write().bit(write);
-            w.send_auto_stop().bit(block_count > 1);
+            w.send_auto_stop().bit(needs_auto_stop(index, block_count));
             w.wait_prvdata_complete().set_bit();
             w.use_hole().set_bit();
             w.card_number().bits(self.id.index());
@@ -1713,7 +1713,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
-        arm_engine(true, block_count > 1, Some(t));
+        arm_engine(true, needs_auto_stop(index, block_count), Some(t));
         r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
         r.intmask()
             .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
@@ -1833,6 +1833,18 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
 /// CMD12 (and SDIO abort) are stop/abort commands.
 fn is_stop_or_abort(index: u8) -> bool {
     index == 12
+}
+
+/// Whether the controller should auto-issue CMD12 (STOP_TRANSMISSION) after the
+/// data phase.
+///
+/// Auto-stop is only valid for the open-ended SD/MMC memory multi-block
+/// transfers (CMD18 `READ_MULTIPLE_BLOCK` / CMD25 `WRITE_MULTIPLE_BLOCK`).
+/// SDIO CMD53 (`IO_RW_EXTENDED`) carries its own block count in the command and
+/// must NOT be followed by CMD12: the card would not respond to it, surfacing as
+/// a spurious `ResponseTimeout` at the end of the data phase.
+fn needs_auto_stop(index: u8, block_count: u32) -> bool {
+    block_count > 1 && matches!(index, 18 | 25)
 }
 
 #[cfg(sdmmc_has_gpio_matrix)]
@@ -2168,7 +2180,7 @@ fn run_data_phase(
     t: &mut Transfer,
     mut ring: DmaAlignedMut<'_, [Desc; RING_LEN]>,
     write: bool,
-    block_count: u32,
+    auto_stop: bool,
 ) -> Result<(), Error> {
     let r = SDHOST::regs();
     let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
@@ -2217,10 +2229,12 @@ fn run_data_phase(
         }
     }
 
-    // Multi-block transfers append an auto-stop; wait for its completion.
-    // This follows DATA_OVER promptly, so a bounded wait is fine, but a
-    // missing completion must be reported rather than silently ignored.
-    if block_count > 1 {
+    // Open-ended memory multi-block transfers append an auto-stop (CMD12);
+    // wait for its completion. This follows DATA_OVER promptly, so a bounded
+    // wait is fine, but a missing completion must be reported rather than
+    // silently ignored. SDIO CMD53 sends no CMD12, so there is nothing to wait
+    // for.
+    if auto_stop {
         poll_until(|| r.rintsts().read().bits() & EVT_ACD != 0)?;
     }
     if write {
