@@ -822,16 +822,14 @@ fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
 #[handler]
 fn on_interrupt() {
     let r = SDHOST::regs();
-    let rint = r.rintsts().read().bits();
-    let rint_mask = r.intmask().read().bits();
-    let rint_armed = rint & rint_mask;
+    let pending = r.mintsts().read().bits();
     let idsts = r.idsts().read().bits();
 
     STATE.engine.with(|eng| {
         if eng.wait_busy {
             // For an R1b/no-data command the SBE bit doubles as the Busy
             // Clear Interrupt, fired when the card releases DAT0.
-            if rint_armed & EVT_SBE != 0 {
+            if pending & EVT_SBE != 0 {
                 eng.result = Some(Ok(()));
             }
         } else {
@@ -848,27 +846,26 @@ fn on_interrupt() {
             }
 
             if eng.result.is_none() {
-                let err =
-                    map_rintsts(rint_armed)
-                        .err()
-                        .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
-                            Some(Error::DmaError)
-                        } else {
-                            None
-                        });
+                let err = map_rintsts(pending)
+                    .err()
+                    .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
+                        Some(Error::DmaError)
+                    } else {
+                        None
+                    });
                 if let Some(e) = err {
                     eng.result = Some(Err(e));
                 } else if eng.expect_data {
-                    if rint_armed & EVT_DATA_OVER != 0 {
+                    if pending & EVT_DATA_OVER != 0 {
                         eng.over_seen = true;
                     }
-                    if rint_armed & EVT_ACD != 0 {
+                    if pending & EVT_ACD != 0 {
                         eng.acd_seen = true;
                     }
                     if eng.over_seen && (!eng.multiblock || eng.acd_seen) {
                         eng.result = Some(Ok(()));
                     }
-                } else if rint_armed & EVT_CMD_DONE != 0 {
+                } else if pending & EVT_CMD_DONE != 0 {
                     eng.result = Some(Ok(()));
                 }
             }
@@ -885,13 +882,13 @@ fn on_interrupt() {
 
     // SDIO card interrupt (level-triggered): mask the bit and wake; the
     // caller re-arms after servicing the function via CMD52/53.
-    if rint_armed & EVT_IO_SLOT0 != 0 {
+    if pending & EVT_IO_SLOT0 != 0 {
         SLOT_STATE[0].io_armed.store(false, Ordering::Release);
         r.intmask()
             .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT0) });
         SLOT_STATE[0].io_waker.wake();
     }
-    if rint_armed & EVT_IO_SLOT1 != 0 {
+    if pending & EVT_IO_SLOT1 != 0 {
         SLOT_STATE[1].io_armed.store(false, Ordering::Release);
         r.intmask()
             .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT1) });
@@ -899,13 +896,13 @@ fn on_interrupt() {
     }
 
     // Card-detect change: wake both slot listeners.
-    if rint_armed & EVT_CD != 0 {
+    if pending & EVT_CD != 0 {
         SLOT_STATE[0].cd_waker.wake();
         SLOT_STATE[1].cd_waker.wake();
     }
 
     // Write-1-clear the bits handled this pass.
-    r.rintsts().write(|w| unsafe { w.bits(rint_armed) });
+    r.rintsts().write(|w| unsafe { w.bits(pending) });
     r.idsts().write(|w| unsafe { w.bits(idsts) });
 }
 
@@ -1332,13 +1329,13 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         wait_command_accepted()?;
 
         // Wait for the 80 init clocks to actually finish before any command.
-        for _ in 0..POLL_LIMIT {
-            if r.rintsts().read().bits() & EVT_CMD_DONE != 0 {
+        match poll_until(|| r.rintsts().read().bits() & EVT_CMD_DONE != 0) {
+            Ok(_) => {
                 r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
-                return Ok(());
+                Ok(())
             }
+            Err(e) => return Err(e),
         }
-        Err(Error::Timeout)
     }
 
     /// Issues a no-data command and returns its raw response words.
@@ -1430,17 +1427,10 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         // Wait for completion or a command-phase error.
         let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
         let mut sts = 0;
-        let mut completed = false;
-        for _ in 0..POLL_LIMIT {
+        poll_until(|| {
             sts = r.rintsts().read().bits();
-            if sts & done != 0 {
-                completed = true;
-                break;
-            }
-        }
-        if !completed {
-            return Err(Error::Timeout);
-        }
+            sts & done != 0
+        })?;
         map_rintsts(sts)?;
 
         let resp = read_response(resp_len);
@@ -1624,7 +1614,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     async fn cmd_async<'a, C: sdio::ControlCommand + 'a>(
         &mut self,
         cmd: C,
-    ) -> Result<C::Resp<'a>, sdio::MmcError> {
+    ) -> Result<C::Resp<'a>, MmcError> {
         let resp_len = match <C::Resp<'a> as sdio::Response>::LEN {
             sdio::ResponseLen::Zero => ResponseLen::None,
             sdio::ResponseLen::R48 => ResponseLen::Short,
@@ -1655,7 +1645,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         block_size: u16,
         block_count: u32,
         bounce: &mut Bounce,
-    ) -> Result<[u32; 4], sdio::MmcError> {
+    ) -> Result<[u32; 4], MmcError> {
         // A cache-unaligned caller buffer can't be DMA'd directly on cached
         // SoCs: invalidating its partial edge cache lines would clobber data
         // sharing those lines. Transfer the cache-aligned middle in place and
@@ -1739,7 +1729,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         block_size: u16,
         block_count: u32,
         bounce: &mut Bounce,
-    ) -> Result<[u32; 4], sdio::MmcError> {
+    ) -> Result<[u32; 4], MmcError> {
         // Cached SoCs: the IDMAC reads the source straight from memory, so the
         // CPU's dirty cache lines must be flushed first. A cache-unaligned
         // caller buffer can't be flushed in place without touching neighbours,
@@ -1867,7 +1857,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
 }
 
 impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
-    async fn send_command<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
+    async fn send_command<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::ControlCommand + 'a,
     {
@@ -1875,7 +1865,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         self.cmd_async::<C>(cmd).await
     }
 
-    async fn read_blocks<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
+    async fn read_blocks<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::BlockReadCommand + 'a,
     {
@@ -1887,7 +1877,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
-    async fn write_blocks<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
+    async fn write_blocks<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::BlockWriteCommand + 'a,
     {
@@ -1899,7 +1889,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
-    async fn read_bytes<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
+    async fn read_bytes<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::ByteReadCommand + 'a,
     {
@@ -1911,7 +1901,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
-    async fn write_bytes<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, sdio::MmcError>
+    async fn write_bytes<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::ByteWriteCommand + 'a,
     {
@@ -1923,25 +1913,25 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
-    async fn init_idle(&mut self, hz: u32) -> Result<(), sdio::MmcError> {
+    async fn init_idle(&mut self, hz: u32) -> Result<(), MmcError> {
         let _lock = STATE.select_slot(slot_id(S)).await;
-        self.validate_pins().map_err(|_| sdio::MmcError::Other)?;
+        self.validate_pins().map_err(|_| MmcError::Other)?;
         self.set_bus_low_level(BusWidth::Bit1, hz)?;
         self.send_init_sequence()?;
         Ok(())
     }
 
-    fn set_bus(&mut self, width: sdio::BusWidth, hz: u32) -> Result<(), sdio::MmcError> {
+    fn set_bus(&mut self, width: sdio::BusWidth, hz: u32) -> Result<(), MmcError> {
         let w = match width {
             sdio::BusWidth::W1 => BusWidth::Bit1,
             sdio::BusWidth::W4 => BusWidth::Bit4,
-            sdio::BusWidth::W8 => return Err(sdio::MmcError::Unsupported),
+            sdio::BusWidth::W8 => return Err(MmcError::Unsupported),
         };
         if matches!(w, BusWidth::Bit4) && self.data_pins < 4 {
-            return Err(sdio::MmcError::Unsupported);
+            return Err(MmcError::Unsupported);
         }
         if hz > 40_000_000 {
-            return Err(sdio::MmcError::Unsupported);
+            return Err(MmcError::Unsupported);
         }
         self.set_bus_low_level(w, hz)?;
         Ok(())
@@ -2153,8 +2143,9 @@ fn wait_command_accepted() -> Result<(), Error> {
             return Ok(());
         }
         // Hardware-locked error: clear and report.
-        if (r.rintsts().read().bits() & (1 << 12)) != 0 {
-            r.rintsts().write(|w| unsafe { w.bits(1 << 12) });
+        const HW_LOCKED: u32 = 1 << 12;
+        if (r.rintsts().read().bits() & HW_LOCKED) != 0 {
+            r.rintsts().write(|w| unsafe { w.bits(HW_LOCKED) });
             return Err(Error::Timeout);
         }
     }
@@ -2338,19 +2329,12 @@ fn run_data_phase(
     let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
 
     // Command response phase.
-    let cmd_done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
+    let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
     let mut sts = 0;
-    let mut got = false;
-    for _ in 0..POLL_LIMIT {
+    poll_until(|| {
         sts = r.rintsts().read().bits();
-        if sts & cmd_done != 0 {
-            got = true;
-            break;
-        }
-    }
-    if !got {
-        return Err(Error::Timeout);
-    }
+        sts & done != 0
+    })?;
     map_rintsts(sts)?;
     r.rintsts().write(|w| unsafe { w.bits(consume) });
 
