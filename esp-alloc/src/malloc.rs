@@ -98,11 +98,6 @@ unsafe fn realloc_with_caps(
     new_size: usize,
     caps: enumset::EnumSet<crate::MemoryCapability>,
 ) -> *mut u8 {
-    use core::ffi::c_void;
-    unsafe extern "C" {
-        fn memcpy(d: *mut c_void, s: *const c_void, l: usize) -> *mut c_void;
-    }
-
     unsafe {
         let p = malloc_with_caps(new_size, caps);
         if !p.is_null() && !ptr.is_null() {
@@ -110,7 +105,7 @@ unsafe fn realloc_with_caps(
                 (ptr as *const u32).sub(1).read_volatile() as usize - 4,
                 new_size,
             );
-            memcpy(p.cast(), ptr.cast(), len);
+            p.copy_from_nonoverlapping(ptr, len);
             free(ptr);
         }
         p
