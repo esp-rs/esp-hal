@@ -764,13 +764,15 @@ fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
 fn on_interrupt() {
     let r = SDHOST::regs();
     let rint = r.rintsts().read().bits();
+    let rint_mask = r.intmask().read().bits();
+    let rint_armed = rint & rint_mask;
     let idsts = r.idsts().read().bits();
 
     STATE.engine.with(|eng| {
         if eng.wait_busy {
             // For an R1b/no-data command the SBE bit doubles as the Busy
             // Clear Interrupt, fired when the card releases DAT0.
-            if rint & EVT_SBE != 0 {
+            if rint_armed & EVT_SBE != 0 {
                 eng.result = Some(Ok(()));
             }
         } else {
@@ -787,26 +789,27 @@ fn on_interrupt() {
             }
 
             if eng.result.is_none() {
-                let err = map_rintsts(rint)
-                    .err()
-                    .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
-                        Some(Error::DmaError)
-                    } else {
-                        None
-                    });
+                let err =
+                    map_rintsts(rint_armed)
+                        .err()
+                        .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
+                            Some(Error::DmaError)
+                        } else {
+                            None
+                        });
                 if let Some(e) = err {
                     eng.result = Some(Err(e));
                 } else if eng.expect_data {
-                    if rint & EVT_DATA_OVER != 0 {
+                    if rint_armed & EVT_DATA_OVER != 0 {
                         eng.over_seen = true;
                     }
-                    if rint & EVT_ACD != 0 {
+                    if rint_armed & EVT_ACD != 0 {
                         eng.acd_seen = true;
                     }
                     if eng.over_seen && (!eng.multiblock || eng.acd_seen) {
                         eng.result = Some(Ok(()));
                     }
-                } else if rint & EVT_CMD_DONE != 0 {
+                } else if rint_armed & EVT_CMD_DONE != 0 {
                     eng.result = Some(Ok(()));
                 }
             }
@@ -823,13 +826,13 @@ fn on_interrupt() {
 
     // SDIO card interrupt (level-triggered): mask the bit and wake; the
     // caller re-arms after servicing the function via CMD52/53.
-    if rint & EVT_IO_SLOT0 != 0 {
+    if rint_armed & EVT_IO_SLOT0 != 0 {
         SLOT_STATE[0].io_armed.store(false, Ordering::Release);
         r.intmask()
             .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT0) });
         SLOT_STATE[0].io_waker.wake();
     }
-    if rint & EVT_IO_SLOT1 != 0 {
+    if rint_armed & EVT_IO_SLOT1 != 0 {
         SLOT_STATE[1].io_armed.store(false, Ordering::Release);
         r.intmask()
             .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT1) });
@@ -837,13 +840,13 @@ fn on_interrupt() {
     }
 
     // Card-detect change: wake both slot listeners.
-    if rint & EVT_CD != 0 {
+    if rint_armed & EVT_CD != 0 {
         SLOT_STATE[0].cd_waker.wake();
         SLOT_STATE[1].cd_waker.wake();
     }
 
     // Write-1-clear the bits handled this pass.
-    r.rintsts().write(|w| unsafe { w.bits(rint) });
+    r.rintsts().write(|w| unsafe { w.bits(rint_armed) });
     r.idsts().write(|w| unsafe { w.bits(idsts) });
 }
 
@@ -2294,7 +2297,8 @@ fn reset_transfer() -> Result<(), Error> {
     r.ctrl().modify(|_, w| w.fifo_reset().set_bit());
     let res = poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set());
 
-    r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+    r.rintsts()
+        .write(|w| unsafe { w.bits(0xFFFF_FFFF & !(EVT_IO_SLOT0 | EVT_IO_SLOT1)) });
     r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
 
     res
