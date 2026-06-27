@@ -326,12 +326,50 @@ impl Desc {
     };
 }
 
+/// One contiguous DMA segment: `(buffer address, remaining bytes)`.
+type Seg = (u32, usize);
+
 /// Tracks progress while filling the descriptor ring.
+///
+/// A transfer is described as up to three back-to-back segments so that a
+/// cache-unaligned caller buffer can still be DMA'd: the aligned middle is
+/// transferred in place, while the unaligned head and tail are bounced
+/// through an aligned scratch buffer. A fully aligned buffer uses a single
+/// segment ([`Transfer::single`]) and the other two are left empty.
 #[derive(Clone, Copy)]
 struct Transfer {
-    ptr: u32,
-    remaining: usize,
+    segs: [Seg; 3],
+    /// Index of the segment currently being linked into descriptors.
+    seg: usize,
     next_desc: usize,
+}
+
+impl Transfer {
+    /// A single, already-DMA-capable contiguous segment.
+    fn single(ptr: u32, len: usize) -> Self {
+        Transfer {
+            segs: [(ptr, len), (0, 0), (0, 0)],
+            seg: 0,
+            next_desc: 0,
+        }
+    }
+
+    /// Head / middle / tail segments; any zero-length entry is skipped while
+    /// filling descriptors.
+    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+    fn split(head: Seg, middle: Seg, tail: Seg) -> Self {
+        Transfer {
+            segs: [head, middle, tail],
+            seg: 0,
+            next_desc: 0,
+        }
+    }
+
+    /// Bytes not yet linked into a descriptor. Before any descriptor is
+    /// filled this equals the total transfer length.
+    fn remaining(&self) -> usize {
+        self.segs.iter().map(|(_, len)| *len).sum()
+    }
 }
 
 /// Driver-owned descriptor ring in internal DMA-capable RAM.
@@ -346,11 +384,18 @@ fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
 // On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
 // both base address and length, otherwise a read invalidate would discard
 // neighbouring data and a write would miss CPU-cached bytes. Control
-// transfers (SCR = 8 B, SSR / SWITCH = 64 B) and single-block I/O (512 B)
-// come from caller buffers we cannot align (e.g. `BufStream`), so they are
-// bounced through an aligned scratch buffer. One block covers every case.
+// transfers (SCR = 8 B, SSR / SWITCH = 64 B) we cannot align, so they are
+// bounced through an aligned scratch buffer. Two L2 cachelines cover every case.
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-const BOUNCE_LEN: usize = 512;
+const BOUNCE_LEN: usize = 256;
+
+// Scratch layout for a bounced, cache-unaligned caller buffer: the unaligned
+// head occupies `[0, head_len)` and the unaligned tail
+// `[BOUNCE_TAIL_OFF, BOUNCE_TAIL_OFF + tail_len)`. Each edge is shorter than
+// the region's DMA alignment (<= 128 B), so the two never overlap and both fit
+// within `BOUNCE_LEN`.
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+const BOUNCE_TAIL_OFF: usize = BOUNCE_LEN / 2;
 
 /// Per-transaction scratch owned by `engine_lock`. On SoCs with a data
 /// cache it holds a DMA-aligned bounce buffer for cache-unaligned caller
@@ -778,7 +823,7 @@ fn on_interrupt() {
         } else {
             // Refill descriptors the engine has released mid-transfer.
             if let Some(t) = eng.transfer.as_mut()
-                && t.remaining > 0
+                && t.remaining() > 0
             {
                 let mut ring = ring();
                 let free = free_descriptors(ring.reborrow(), t.next_desc);
@@ -1310,8 +1355,14 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         select_slot_sync(self.id);
         let total = buf.len();
         let ptr = dma_ptr(buf.reborrow())?;
-        let resp =
-            self.transfer_blocking(cmd_index, arg, false, ptr, total, block_size, block_count)?;
+        let resp = self.transfer_blocking(
+            cmd_index,
+            arg,
+            false,
+            Transfer::single(ptr, total),
+            block_size,
+            block_count,
+        )?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         buf.invalidate();
         Ok(resp)
@@ -1331,7 +1382,14 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         buf.writeback();
         let total = buf.len();
         let ptr = dma_ptr(buf.reborrow())?;
-        self.transfer_blocking(cmd_index, arg, true, ptr, total, block_size, block_count)
+        self.transfer_blocking(
+            cmd_index,
+            arg,
+            true,
+            Transfer::single(ptr, total),
+            block_size,
+            block_count,
+        )
     }
 
     fn note_data_pin(&mut self, count: u8) {
@@ -1382,20 +1440,19 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Single- or multi-block data transfer over the IDMAC, blocking.
-    #[expect(clippy::too_many_arguments)]
     fn transfer_blocking(
         &mut self,
         index: u8,
         arg: u32,
         write: bool,
-        buf_ptr: u32,
-        total_len: usize,
+        mut t: Transfer,
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
         let r = SDHOST::regs();
 
         reset_transfer()?;
+        let total_len = t.remaining();
         r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
         r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
 
@@ -1403,11 +1460,6 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         let mut ring = ring();
         *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
         ring[0].flags |= DESC_FIRST;
-        let mut t = Transfer {
-            ptr: buf_ptr,
-            remaining: total_len,
-            next_desc: 0,
-        };
         fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
@@ -1590,20 +1642,55 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         block_count: u32,
         bounce: &mut Bounce,
     ) -> Result<[u32; 4], sdio::MmcError> {
-        // Small control reads (SCR/SSR/SWITCH) from a cache-unaligned caller
-        // buffer can't be DMA'd directly on cached SoCs: invalidation would
-        // clobber data sharing the cache line. Bounce them through the
-        // aligned scratch buffer and copy the result out.
+        // A cache-unaligned caller buffer can't be DMA'd directly on cached
+        // SoCs: invalidating its partial edge cache lines would clobber data
+        // sharing those lines. Transfer the cache-aligned middle in place and
+        // bounce only the unaligned head/tail through the aligned scratch,
+        // copying them out afterwards. This handles buffers of any length.
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if buf.len() <= BOUNCE_LEN && DmaAlignedMut::new(&mut buf[..]).is_err() {
-            let total = buf.len();
-            let mut dma = bounce.buf.get_mut();
-            let ptr = dma_ptr(dma.reborrow().unsize())?;
+        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
+            && (head != 0 || tail != 0)
+        {
+            let len = buf.len();
+            let middle_len = len - head - tail;
+
+            let scratch = bounce.buf.get_mut();
+            debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
+            // Drop any dirty scratch lines so they can't be evicted over the
+            // data the DMA is about to write.
+            scratch.invalidate();
+            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+
+            let middle_ptr = if middle_len != 0 {
+                dma_ptr_from_raw(unsafe { buf.as_ptr().add(head) })?
+            } else {
+                0
+            };
+
             let resp = self
-                .transfer_async(index, arg, false, ptr, total, block_size, block_count)
+                .transfer_async(
+                    index,
+                    arg,
+                    false,
+                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
+                    block_size,
+                    block_count,
+                )
                 .await?;
-            dma.invalidate();
-            buf.copy_from_slice(&dma[..total]);
+
+            // The middle was written in place; drop its stale cached copy.
+            if middle_len != 0 {
+                // SAFETY: `[head, head + middle_len)` is aligned in address and
+                // size by construction, so it owns its cache lines.
+                unsafe { DmaAlignedMut::new_unchecked(&mut buf[head..head + middle_len]) }
+                    .invalidate();
+            }
+
+            // Copy the DMA-written edges out of the scratch buffer.
+            scratch.invalidate();
+            buf[..head].copy_from_slice(&scratch[..head]);
+            buf[len - tail..].copy_from_slice(&scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]);
             return Ok(resp);
         }
 
@@ -1614,7 +1701,14 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         let ptr = dma_ptr(dma.reborrow())?;
         let total = dma.len();
         let resp = self
-            .transfer_async(index, arg, false, ptr, total, block_size, block_count)
+            .transfer_async(
+                index,
+                arg,
+                false,
+                Transfer::single(ptr, total),
+                block_size,
+                block_count,
+            )
             .await?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         dma.invalidate();
@@ -1635,25 +1729,59 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         block_count: u32,
         bounce: &mut Bounce,
     ) -> Result<[u32; 4], sdio::MmcError> {
-        // Cached SoCs: the IDMAC reads the source straight from memory, so
-        // the CPU's dirty cache lines must be flushed first. A cache-
-        // unaligned caller buffer also can't be flushed in place without
-        // touching neighbours, so bounce it through the aligned scratch.
+        // Cached SoCs: the IDMAC reads the source straight from memory, so the
+        // CPU's dirty cache lines must be flushed first. A cache-unaligned
+        // caller buffer can't be flushed in place without touching neighbours,
+        // so transfer the cache-aligned middle in place and bounce only the
+        // unaligned head/tail through the aligned scratch. Handles any length.
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if buf.len() <= BOUNCE_LEN {
-            let total = buf.len();
-            let mut dma = bounce.buf.get_mut();
-            dma[..total].copy_from_slice(buf);
-            dma.writeback();
-            let ptr = dma_ptr(dma.unsize())?;
+        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
+            && (head != 0 || tail != 0)
+        {
+            let len = buf.len();
+            let middle_len = len - head - tail;
+
+            let mut scratch = bounce.buf.get_mut();
+            debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
+            scratch[..head].copy_from_slice(&buf[..head]);
+            scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail].copy_from_slice(&buf[len - tail..]);
+            scratch.writeback();
+            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+
+            let middle_ptr = if middle_len != 0 {
+                let middle = &buf[head..head + middle_len];
+                // SAFETY: `middle` is aligned in address and size by
+                // construction, so it owns its cache lines. Flush them so the
+                // IDMAC reads the latest CPU writes from memory.
+                unsafe { crate::dma::aligned::DmaAlignedRef::new_unchecked(middle) }.writeback();
+                dma_ptr_from_raw(middle.as_ptr())?
+            } else {
+                0
+            };
+
             return Ok(self
-                .transfer_async(index, arg, true, ptr, total, block_size, block_count)
+                .transfer_async(
+                    index,
+                    arg,
+                    true,
+                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
+                    block_size,
+                    block_count,
+                )
                 .await?);
         }
 
         let ptr = dma_ptr_from_raw(buf.as_ptr())?;
         Ok(self
-            .transfer_async(index, arg, true, ptr, buf.len(), block_size, block_count)
+            .transfer_async(
+                index,
+                arg,
+                true,
+                Transfer::single(ptr, buf.len()),
+                block_size,
+                block_count,
+            )
             .await?)
     }
 
@@ -1685,14 +1813,12 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Single- or multi-block data transfer over the IDMAC, interrupt-driven.
-    #[expect(clippy::too_many_arguments)]
     async fn transfer_async(
         &mut self,
         index: u8,
         arg: u32,
         write: bool,
-        buf_ptr: u32,
-        total_len: usize,
+        mut t: Transfer,
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
@@ -1700,6 +1826,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         let r = SDHOST::regs();
 
         reset_transfer()?;
+        let total_len = t.remaining();
         r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
         r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
 
@@ -1707,11 +1834,6 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         let mut ring = ring();
         *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
         ring[0].flags |= DESC_FIRST;
-        let mut t = Transfer {
-            ptr: buf_ptr,
-            remaining: total_len,
-            next_desc: 0,
-        };
         fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
@@ -2178,6 +2300,22 @@ fn dma_ptr_from_raw(addr: *const u8) -> Result<u32, Error> {
     Err(Error::BufferNotDmaCapable)
 }
 
+/// Splits a caller buffer at `addr` of length `len` into the lengths of its
+/// cache-unaligned head and tail. The middle slice `[head, len - tail)` is
+/// aligned in both address and size for in-place DMA, while `head` and `tail`
+/// (each shorter than the region's DMA alignment) must be bounced through the
+/// aligned scratch buffer and copied.
+///
+/// Returns `None` if the buffer is not in a DMA-capable region; the caller
+/// then falls back to the validating direct path which reports the error.
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+fn unaligned_split(addr: usize, len: usize) -> Option<(usize, usize)> {
+    let align = crate::dma::aligned::region_dma_alignment(addr)?;
+    let head = ((align - addr % align) % align).min(len);
+    let tail = (len - head) % align;
+    Some((head, tail))
+}
+
 /// Waits for the command response then the data phase, refilling the ring.
 fn run_data_phase(
     t: &mut Transfer,
@@ -2220,7 +2358,7 @@ fn run_data_phase(
         if id_sts.fbe().bit_is_set() || id_sts.du().bit_is_set() {
             return Err(Error::DmaError);
         }
-        if t.remaining > 0 {
+        if t.remaining() > 0 {
             let free = free_descriptors(ring.reborrow(), t.next_desc);
             if free > 0 {
                 fill_descriptors(ring.reborrow(), t, free);
@@ -2266,12 +2404,22 @@ fn free_descriptors(ring: DmaAlignedMut<'_, [Desc; RING_LEN]>, next: usize) -> u
 /// blocking/async refill; mirrors `sd_host_fill_dma_descriptors`).
 fn fill_descriptors(mut ring: DmaAlignedMut<'_, [Desc; RING_LEN]>, t: &mut Transfer, count: usize) {
     for _ in 0..count {
-        if t.remaining == 0 {
+        // Skip exhausted (or empty) segments to find the next bytes to link.
+        while t.seg < t.segs.len() && t.segs[t.seg].1 == 0 {
+            t.seg += 1;
+        }
+        if t.seg >= t.segs.len() {
             break;
         }
+
+        let (ptr, rem) = t.segs[t.seg];
         let i = t.next_desc;
-        let size = t.remaining.min(DMA_MAX_BUF_LEN);
-        let last = size == t.remaining;
+        let size = rem.min(DMA_MAX_BUF_LEN);
+        // The transfer ends here only if this chunk drains the current segment
+        // and no later segment still has data to link.
+        let exhausts_seg = size == rem;
+        let later_data = t.segs[t.seg + 1..].iter().any(|(_, len)| *len > 0);
+        let last = exhausts_seg && !later_data;
         let next_ptr = if last {
             0
         } else {
@@ -2281,10 +2429,10 @@ fn fill_descriptors(mut ring: DmaAlignedMut<'_, [Desc; RING_LEN]>, t: &mut Trans
         let d = &mut ring[i];
         d.flags = DESC_OWN | DESC_CHAINED | first | if last { DESC_LAST } else { 0 };
         d.sizes = ((size + 3) & !3) as u32;
-        d.buf1 = t.ptr;
+        d.buf1 = ptr;
         d.next = next_ptr;
-        t.remaining -= size;
-        t.ptr += size as u32;
+        t.segs[t.seg].0 = ptr + size as u32;
+        t.segs[t.seg].1 = rem - size;
         t.next_desc = (i + 1) % RING_LEN;
     }
 
