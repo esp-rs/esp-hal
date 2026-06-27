@@ -20,6 +20,8 @@ use portable_atomic::AtomicBool;
 use procmacros::{BuilderLite, handler};
 use sdio::{self as _, MmcError};
 
+#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+use crate::dma::aligned::DmaAlignedRef;
 #[cfg(sdmmc_has_gpio_matrix)]
 use crate::gpio::{OutputSignal, PinGuard, Pull};
 use crate::{
@@ -27,7 +29,10 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
-    dma::aligned::{DmaAlignedMut, InternalMemory},
+    dma::{
+        DmaBufError,
+        aligned::{DmaAlignedMut, InternalMemory},
+    },
     gpio::{
         InputSignal,
         OutputConfig,
@@ -50,7 +55,6 @@ pub enum SlotId {
 
 impl SlotId {
     /// Zero-based slot index.
-    #[cfg_attr(not(esp32s3), allow(dead_code))]
     fn index(self) -> u8 {
         match self {
             SlotId::_0 => 0,
@@ -270,6 +274,16 @@ impl From<Error> for MmcError {
             | Error::BufferNotDmaCapable => MmcError::Io,
             Error::HardwareLocked => MmcError::Other,
             Error::Unsupported => MmcError::Unsupported,
+        }
+    }
+}
+
+impl From<DmaBufError> for MmcError {
+    fn from(error: DmaBufError) -> Self {
+        warn!("{:?}", error);
+        match error {
+            DmaBufError::InvalidAlignment(_) => MmcError::Other,
+            _ => MmcError::Io,
         }
     }
 }
@@ -1694,10 +1708,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             return Ok(resp);
         }
 
-        let mut dma = DmaAlignedMut::new(buf).map_err(|e| match e {
-            crate::dma::DmaBufError::InvalidAlignment(_) => sdio::MmcError::Other,
-            _ => sdio::MmcError::Io,
-        })?;
+        let mut dma = DmaAlignedMut::new(buf)?;
         let ptr = dma_ptr(dma.reborrow())?;
         let total = dma.len();
         let resp = self
@@ -1754,7 +1765,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
                 // SAFETY: `middle` is aligned in address and size by
                 // construction, so it owns its cache lines. Flush them so the
                 // IDMAC reads the latest CPU writes from memory.
-                unsafe { crate::dma::aligned::DmaAlignedRef::new_unchecked(middle) }.writeback();
+                unsafe { DmaAlignedRef::new_unchecked(middle) }.writeback();
                 dma_ptr_from_raw(middle.as_ptr())?
             } else {
                 0
