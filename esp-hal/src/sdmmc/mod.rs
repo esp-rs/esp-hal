@@ -9,8 +9,9 @@ use core::{
     cell::UnsafeCell,
     future::poll_fn,
     marker::PhantomData,
+    pin::Pin,
     sync::atomic::Ordering,
-    task::Poll,
+    task::{Context, Poll},
 };
 
 use embassy_futures::yield_now;
@@ -669,7 +670,9 @@ impl SlotPins {
 struct SlotState {
     io_waker: AtomicWaker,
     cd_waker: AtomicWaker,
-    io_armed: AtomicBool,
+    /// Edge latch: set by the ISR when a card interrupt fires, consumed
+    /// (swapped to `false`) by the waiter. Decouples the edge from the await.
+    io_pending: AtomicBool,
     #[cfg(sdmmc_has_gpio_matrix)]
     pins: UnsafeCell<SlotPins>,
 }
@@ -684,7 +687,7 @@ impl SlotState {
         Self {
             io_waker: AtomicWaker::new(),
             cd_waker: AtomicWaker::new(),
-            io_armed: AtomicBool::new(false),
+            io_pending: AtomicBool::new(false),
             #[cfg(sdmmc_has_gpio_matrix)]
             pins: UnsafeCell::new(SlotPins::new()),
         }
@@ -789,17 +792,11 @@ fn slot_info(id: SlotId) -> &'static SlotInfo {
     &SLOT_INFO[id.index() as usize]
 }
 
-/// Interrupt mask kept armed while idle: card-detect plus any armed SDIO
-/// card interrupts. Preserves IO arming across transfers.
+/// Interrupt mask kept armed while idle: card-detect plus the SDIO card
+/// interrupt of any slot that is listening. Preserves listening across
+/// transfers (the transfer paths OR their bits onto this base).
 fn idle_intmask() -> u32 {
-    let mut m = INTMASK_IDLE;
-    if SLOT_STATE[0].io_armed.load(Ordering::Acquire) {
-        m |= EVT_IO_SLOT0;
-    }
-    if SLOT_STATE[1].io_armed.load(Ordering::Acquire) {
-        m |= EVT_IO_SLOT1;
-    }
-    m
+    SDHOST::regs().intmask().read().bits() & (EVT_IO_SLOT0 | EVT_IO_SLOT1) | INTMASK_IDLE
 }
 
 /// Arms the engine for a new operation and clears stale status.
@@ -880,18 +877,15 @@ fn on_interrupt() {
         }
     });
 
-    // SDIO card interrupt (level-triggered): mask the bit and wake; the
-    // caller re-arms after servicing the function via CMD52/53.
+    // SDIO card interrupt (edge-triggered): latch it and wake. The write-1-clear
+    // of `rintsts` below disarms the edge, so it won't refire until the card
+    // signals again; no need to mask. The waiter consumes the latch on wake.
     if pending & EVT_IO_SLOT0 != 0 {
-        SLOT_STATE[0].io_armed.store(false, Ordering::Release);
-        r.intmask()
-            .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT0) });
+        SLOT_STATE[0].io_pending.store(true, Ordering::Release);
         SLOT_STATE[0].io_waker.wake();
     }
     if pending & EVT_IO_SLOT1 != 0 {
-        SLOT_STATE[1].io_armed.store(false, Ordering::Release);
-        r.intmask()
-            .modify(|rd, w| unsafe { w.bits(rd.bits() & !EVT_IO_SLOT1) });
+        SLOT_STATE[1].io_pending.store(true, Ordering::Release);
         SLOT_STATE[1].io_waker.wake();
     }
 
@@ -1586,28 +1580,12 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Waits for the SDIO card interrupt (card pulls DAT1 low).
-    ///
-    /// Usage contract: `await` this, service the function via CMD52/53, then
-    /// `await` again to re-arm. The interrupt is level-triggered and is
-    /// masked on wake to avoid an IRQ storm until the caller re-arms.
-    pub async fn wait_for_sdio_interrupt(&mut self) {
-        let slot = self.id.index() as usize;
-        let bit = slot_info(self.id).io_event;
+    pub fn wait_for_sdio_interrupt(&mut self) -> impl Future<Output = ()> {
+        let slot_id = slot_id(S);
+        let slot = slot_id.index() as usize;
+        let bit = slot_info(slot_id).io_event;
 
-        SLOT_STATE[slot].io_armed.store(true, Ordering::Release);
-        SDHOST::regs()
-            .intmask()
-            .modify(|rd, w| unsafe { w.bits(rd.bits() | bit) });
-
-        poll_fn(|cx| {
-            SLOT_STATE[slot].io_waker.register(cx.waker());
-            if SLOT_STATE[slot].io_armed.load(Ordering::Acquire) {
-                Poll::Pending
-            } else {
-                Poll::Ready(())
-            }
-        })
-        .await
+        WaitForInterruptFuture { slot, bit }
     }
 
     /// Issues a control command, mapping protocol types to the engine core.
@@ -1857,6 +1835,11 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
 }
 
 impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
+    async fn wait_for_event(&mut self) -> Result<(), MmcError> {
+        self.wait_for_sdio_interrupt().await;
+        Ok(())
+    }
+
     async fn send_command<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::ControlCommand + 'a,
@@ -2515,4 +2498,38 @@ fn set_input_delay_phase(phase: DelayPhase) {
     SDHOST::regs()
         .clk_edge_sel()
         .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
+}
+
+struct WaitForInterruptFuture {
+    slot: usize,
+    bit: u32,
+}
+
+impl Future for WaitForInterruptFuture {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Register before consuming so an edge racing the check wakes us.
+        SLOT_STATE[self.slot].io_waker.register(cx.waker());
+
+        SDHOST::regs()
+            .intmask()
+            .modify(|rd, w| unsafe { w.bits(rd.bits() | self.bit) });
+
+        if SLOT_STATE[self.slot]
+            .io_pending
+            .swap(false, Ordering::AcqRel)
+        {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl Drop for WaitForInterruptFuture {
+    fn drop(&mut self) {
+        SDHOST::regs()
+            .intmask()
+            .modify(|rd, w| unsafe { w.bits(rd.bits() & !self.bit) });
+    }
 }
