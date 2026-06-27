@@ -990,7 +990,6 @@ impl<'d> SdHostController<'d> {
             .settings
             .with(|s| s.slots[idx].input_delay_phase = config.input_delay_phase);
         Ok(Slot {
-            id: slot_id(S),
             config,
             data_pins: 0,
             clk_connected: false,
@@ -1158,7 +1157,6 @@ for_each_iomux_function! {
 
 /// A configured card slot, generic over the slot index and driver mode.
 pub struct Slot<'d, const S: u8, Dm: DriverMode> {
-    id: SlotId,
     config: SlotConfig,
     data_pins: u8,
     clk_connected: bool,
@@ -1217,7 +1215,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     pub fn with_card_detect(mut self, cd: impl PeripheralInput<'d>) -> Self {
         let pin = cd.into();
         pin.set_input_enable(true);
-        slot_info(self.id).cd_in.unwrap().connect_to(&pin);
+        slot_info(slot_id(S)).cd_in.unwrap().connect_to(&pin);
         self.cd_connected = true;
         self
     }
@@ -1226,7 +1224,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     pub fn with_write_protect(mut self, wp: impl PeripheralInput<'d>) -> Self {
         let pin = wp.into();
         pin.set_input_enable(true);
-        slot_info(self.id).wp_in.unwrap().connect_to(&pin);
+        slot_info(slot_id(S)).wp_in.unwrap().connect_to(&pin);
         self.wp_connected = true;
         self
     }
@@ -1247,7 +1245,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         if !self.cd_connected {
             return true;
         }
-        (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << self.id.index())) == 0
+        (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << S)) == 0
     }
 
     /// Returns `true` if the card reports write protection. Returns `false`
@@ -1257,8 +1255,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         if !self.wp_connected {
             return false;
         }
-        let level =
-            (SDHOST::regs().wrtprt().read().write_protect().bits() & (1 << self.id.index())) != 0;
+        let level = (SDHOST::regs().wrtprt().read().write_protect().bits() & (1 << S)) != 0;
         level == self.config.wp_active_high
     }
 
@@ -1273,8 +1270,8 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
 
         // Immediately apply slot-specific configuration
         STATE.engine.with(|eng| {
-            eng.set_card_width(self.id, width);
-            eng.set_card_clock(self.id, card_div)?;
+            eng.set_card_width(slot_id(S), width);
+            eng.set_card_clock(slot_id(S), card_div)?;
             Ok(())
         })?;
 
@@ -1284,10 +1281,9 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         // active slot still re-applies the input-delay phase.
         #[cfg(esp32s3)]
         STATE.settings.with(|s| {
-            let idx = self.id.index() as usize;
-            s.slots[idx].hz = hz;
-            s.active_slot = Some(self.id);
-            configure_for_slot(s, self.id);
+            s.slots[S as usize].hz = hz;
+            s.active_slot = Some(slot_id(S));
+            configure_for_slot(s, slot_id(S));
         });
 
         // Let the freshly (re-)started card clock propagate before the next
@@ -1310,26 +1306,24 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
 
     /// Issues the 80-clock SD init sequence (no command index).
     pub fn send_init_sequence(&mut self) -> Result<(), Error> {
-        select_slot_sync(self.id);
+        select_slot_sync(slot_id(S));
         let r = SDHOST::regs();
         r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
         r.cmdarg().write(|w| unsafe { w.bits(0) });
         r.cmd().write(|w| unsafe {
             w.send_initialization().set_bit();
             w.wait_prvdata_complete().set_bit();
-            w.card_number().bits(self.id.index());
+            w.card_number().bits(S);
             w.start_cmd().set_bit()
         });
         wait_command_accepted()?;
 
         // Wait for the 80 init clocks to actually finish before any command.
-        match poll_until(|| r.rintsts().read().bits() & EVT_CMD_DONE != 0) {
-            Ok(_) => {
-                r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
-                Ok(())
-            }
-            Err(e) => return Err(e),
+        let result = poll_until(|| r.rintsts().read().bits() & EVT_CMD_DONE != 0);
+        if result.is_ok() {
+            r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
         }
+        result
     }
 
     /// Issues a no-data command and returns its raw response words.
@@ -1344,7 +1338,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         if !self.is_card_present() {
             return Err(Error::NoCard);
         }
-        select_slot_sync(self.id);
+        select_slot_sync(slot_id(S));
         self.send_command_blocking(index, arg, resp_len, check_crc, flags)
     }
 
@@ -1357,7 +1351,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
-        select_slot_sync(self.id);
+        select_slot_sync(slot_id(S));
         let total = buf.len();
         let ptr = dma_ptr(buf.reborrow())?;
         let resp = self.transfer_blocking(
@@ -1382,7 +1376,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         block_size: u16,
         block_count: u32,
     ) -> Result<[u32; 4], Error> {
-        select_slot_sync(self.id);
+        select_slot_sync(slot_id(S));
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         buf.writeback();
         let total = buf.len();
@@ -1495,7 +1489,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
             w.wait_prvdata_complete().bit(flags.wait_complete);
             w.stop_abort_cmd().bit(flags.stop_abort);
             w.use_hole().set_bit();
-            w.card_number().bits(self.id.index());
+            w.card_number().bits(S);
             w.start_cmd().set_bit()
         });
         wait_command_accepted()
@@ -1521,7 +1515,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
             w.send_auto_stop().bit(needs_auto_stop(index, block_count));
             w.wait_prvdata_complete().set_bit();
             w.use_hole().set_bit();
-            w.card_number().bits(self.id.index());
+            w.card_number().bits(S);
             w.start_cmd().set_bit()
         });
         wait_command_accepted()
@@ -1542,7 +1536,6 @@ impl<'d, const S: u8> Slot<'d, S, Blocking> {
         crate::interrupt::bind_handler(Interrupt::SDIO_HOST, on_interrupt);
 
         Slot {
-            id: self.id,
             config: self.config,
             data_pins: self.data_pins,
             clk_connected: self.clk_connected,
@@ -1566,7 +1559,6 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
         crate::interrupt::disable(crate::system::Cpu::current(), Interrupt::SDIO_HOST);
 
         Slot {
-            id: self.id,
             config: self.config,
             data_pins: self.data_pins,
             clk_connected: self.clk_connected,
@@ -2424,7 +2416,7 @@ fn reset_transfer() -> Result<(), Error> {
     let res = poll_until(|| !r.ctrl().read().fifo_reset().bit_is_set());
 
     r.rintsts()
-        .write(|w| unsafe { w.bits(0xFFFF_FFFF & !(EVT_IO_SLOT0 | EVT_IO_SLOT1)) });
+        .write(|w| unsafe { w.bits(!(EVT_IO_SLOT0 | EVT_IO_SLOT1)) });
     r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
 
     res
