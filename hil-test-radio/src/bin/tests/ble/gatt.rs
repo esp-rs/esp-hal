@@ -31,7 +31,8 @@ mod tests {
         let address = Address::random(crate::PERIPHERAL_ADDRESS);
         let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
         let stack = trouble_host::new(controller, &mut resources)
-            .set_random_address(Address::random([0xff, 0x48, 0x49, 0x4c, 0x43, 0xff])).build();
+            .set_random_address(Address::random([0xff, 0x48, 0x49, 0x4c, 0x43, 0xff]))
+            .build();
         let mut central = stack.central();
         let runner = stack.runner();
 
