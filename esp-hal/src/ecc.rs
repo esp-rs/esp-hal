@@ -597,10 +597,11 @@ impl Info {
 
     #[inline]
     fn read_mem(&self, mut word_ptr: *const u32, out: &mut [u8]) {
-        for word_bytes in out.chunks_exact_mut(4) {
+        let (chunks, _) = out.as_chunks_mut::<4>();
+        for word_bytes in chunks {
             let word = unsafe { word_ptr.read_volatile() };
             word_ptr = word_ptr.wrapping_add(1);
-            word_bytes.copy_from_slice(&word.to_le_bytes());
+            *word_bytes = word.to_le_bytes();
         }
     }
 

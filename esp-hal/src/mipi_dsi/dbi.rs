@@ -84,13 +84,12 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
             h.gen_pld_data().write(|w| unsafe { w.bits(word) });
 
             let rest = &params[merged..];
-            let mut chunks = rest.chunks_exact(4);
-            for chunk in chunks.by_ref() {
-                let w32 = u32::from_le_bytes(chunk.try_into().unwrap());
+            let (chunks, tail) = rest.as_chunks::<4>();
+            for chunk in chunks {
+                let w32 = u32::from_le_bytes(*chunk);
                 while h.cmd_pkt_status().read().gen_pld_w_full().bit_is_set() {}
                 h.gen_pld_data().write(|w| unsafe { w.bits(w32) });
             }
-            let tail = chunks.remainder();
             if !tail.is_empty() {
                 let mut w32: u32 = 0;
                 for (i, &b) in tail.iter().enumerate() {

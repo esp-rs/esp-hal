@@ -231,11 +231,12 @@ mod alignment_helper {
             ));
 
             if !to_write.is_empty() {
-                for (i, v) in to_write.chunks_exact(U32_ALIGN_SIZE).enumerate() {
+                let (chunks, _) = to_write.as_chunks::<U32_ALIGN_SIZE>();
+                for (i, v) in chunks.iter().enumerate() {
                     unsafe {
                         dst_ptr
                             .add(i + cursor)
-                            .write_volatile(E::u32_from_bytes(v.try_into().unwrap()));
+                            .write_volatile(E::u32_from_bytes(*v));
                     }
                 }
             }
@@ -261,11 +262,10 @@ mod alignment_helper {
             assert!(src.len() <= dst_bound * 4);
 
             if !src.is_empty() {
-                for (i, v) in src.chunks_exact(U32_ALIGN_SIZE).enumerate() {
+                let (chunks, _) = src.as_chunks::<U32_ALIGN_SIZE>();
+                for (i, v) in chunks.iter().enumerate() {
                     unsafe {
-                        dst_ptr
-                            .add(i)
-                            .write_volatile(E::u32_from_bytes(v.try_into().unwrap()));
+                        dst_ptr.add(i).write_volatile(E::u32_from_bytes(*v));
                     }
                 }
             }
@@ -275,11 +275,11 @@ mod alignment_helper {
             let dst_bound = dst_bound / U32_ALIGN_SIZE;
             assert!(dst.len() >= dst_bound * 4);
 
-            let chunks = dst.chunks_exact_mut(U32_ALIGN_SIZE);
-            for (i, chunk) in chunks.enumerate() {
+            let (chunks, _) = dst.as_chunks_mut::<U32_ALIGN_SIZE>();
+            for (i, chunk) in chunks.iter_mut().enumerate() {
                 let read_val: [u8; U32_ALIGN_SIZE] =
                     unsafe { E::u32_to_bytes(src_ptr.add(i).read_volatile()) };
-                chunk.copy_from_slice(&read_val);
+                *chunk = read_val;
             }
         }
     }

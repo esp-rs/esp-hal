@@ -315,19 +315,14 @@ impl Driver {
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn fill_fifo(&self, chunk: &[u8]) {
-        // TODO: replace with `array_chunks` and `from_le_bytes`
-        let mut c_iter = chunk.chunks_exact(4);
+        let (chunks, rem) = chunk.as_chunks::<4>();
         let mut w_iter = self.regs().w_iter();
-        for c in c_iter.by_ref() {
+        for c in chunks {
             if let Some(w_reg) = w_iter.next() {
-                let word = (c[0] as u32)
-                    | ((c[1] as u32) << 8)
-                    | ((c[2] as u32) << 16)
-                    | ((c[3] as u32) << 24);
+                let word = u32::from_le_bytes(*c);
                 w_reg.write(|w| w.buf().set(word));
             }
         }
-        let rem = c_iter.remainder();
         if !rem.is_empty()
             && let Some(w_reg) = w_iter.next()
         {
