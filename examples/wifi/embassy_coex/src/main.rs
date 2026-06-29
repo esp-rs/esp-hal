@@ -196,15 +196,13 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
 
     println!("Our address = {:?}", address);
 
-    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+    let mut resources: HostResources<_, DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
         HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-
-    let Host {
-        mut peripheral,
-        mut runner,
-        ..
-    } = stack.build();
+    let stack = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .build();
+    let mut peripheral = stack.peripheral();
+    let mut runner = stack.runner();
 
     let mut adv_data = [0; 31];
     let adv_len = AdStructure::encode_slice(
@@ -277,10 +275,12 @@ async fn gatt_events_task<P: PacketPool>(
                     }
                     GattEvent::Write(event) => {
                         if event.handle() == level.handle {
-                            println!(
-                                "[gatt] Write Event to Level Characteristic: {:?}",
-                                event.data()
-                            );
+                            event.with_data(|offset, data| {
+                                println!(
+                                    "[gatt] Write Event to Level Characteristic at {}: {:?}",
+                                    offset, data
+                                )
+                            });
                         }
                     }
                     _ => {}

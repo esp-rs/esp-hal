@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
-
+- Update to `bt-hci` version 0.9 and `trouble-host` version 0.7 (#XXXX)
 
 ### Fixed
 
