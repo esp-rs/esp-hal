@@ -460,7 +460,9 @@ pub struct Config {
     /// async context-switch cost exceeds the benefit. For
     /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
     /// both blocking and async DMA modes: when met, DMA is disabled and the
-    /// transfer is performed by the CPU.
+    /// transfer is performed by the CPU. This applies to both full-duplex and
+    /// half-duplex transfers; for half-duplex transfers the CPU-driven path is
+    /// only taken when the data also fits in the hardware FIFO.
     ///
     /// A value of `0` (the default) disables the threshold — all transfers use
     /// the driver's default method.
@@ -1217,30 +1219,8 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        if buffer.is_empty() {
-            error!("Half-duplex mode does not support empty buffer");
-            return Err(Error::Unsupported);
-        }
-
-        self.flush()?;
-        self.driver().setup_half_duplex(
-            false,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        self.driver().configure_datalen(buffer.len(), 0);
-        self.driver().start_operation();
-        self.driver().flush()?;
-        self.driver().read_from_fifo(buffer)
+        self.driver()
+            .half_duplex_read(data_mode, cmd, address, dummy, buffer)
     }
 
     /// Half-duplex write.
@@ -1262,57 +1242,8 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        self.flush()?;
-
-        cfg_select! {
-            all(spi_master_version = "1", spi_address_workaround) => {
-                let mut buffer = buffer;
-                let mut data_mode = data_mode;
-                let mut address = address;
-                let addr_bytes;
-                if buffer.is_empty() && !address.is_none() {
-                    // If the buffer is empty, we need to send a dummy byte
-                    // to trigger the address phase.
-                    let bytes_to_write = address.width().div_ceil(8);
-                    // The address register is read in big-endian order,
-                    // we have to prepare the emulated write in the same way.
-                    addr_bytes = address.value().to_be_bytes();
-                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-                    data_mode = address.mode();
-                    address = Address::None;
-                }
-
-                if dummy > 0 {
-                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
-                    error!("Dummy bits are not supported without data");
-                    return Err(Error::Unsupported);
-                }
-            }
-            _ => {}
-        }
-
-        self.driver().setup_half_duplex(
-            true,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        if !buffer.is_empty() {
-            self.driver().configure_datalen(0, buffer.len());
-            self.driver().fill_fifo(buffer);
-        }
-
-        self.driver().start_operation();
-
-        self.driver().flush()
+        self.driver()
+            .half_duplex_write(data_mode, cmd, address, dummy, buffer)
     }
 
     fn use_blocking_transfer(&self, transfer_size: usize) -> bool {
