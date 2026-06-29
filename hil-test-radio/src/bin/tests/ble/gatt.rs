@@ -37,7 +37,7 @@ mod tests {
         let runner = stack.runner();
 
         let _ = select(ble_task(runner), async {
-            let accept_list = [(address.kind, &address.addr)];
+            let accept_list = [address];
             let connect_config = ConnectConfig {
                 scan_config: ScanConfig {
                     filter_accept_list: &accept_list,
@@ -46,6 +46,7 @@ mod tests {
                     interval: Duration::from_millis(100),
                     window: Duration::from_millis(100),
                     timeout: Duration::from_secs(10),
+                    ..Default::default()
                 },
                 connect_params: RequestedConnParams::default(),
             };
@@ -55,7 +56,7 @@ mod tests {
                 .expect("BLE connect timed out")
                 .expect("BLE connect failed");
 
-            assert_eq!(conn.peer_address(), address.addr);
+            assert_eq!(conn.peer_address(), address);
             assert!(conn.is_connected());
 
             let client = GattClient::<_, DefaultPacketPool, 4>::new(&stack, &conn)
