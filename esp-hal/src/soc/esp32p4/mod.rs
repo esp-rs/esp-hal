@@ -12,6 +12,11 @@ pub(crate) mod regi2c;
 pub(crate) use esp32p4 as pac;
 
 pub(crate) fn pre_init() {
+    // workaround: this shouldn't be needed - done by the 2nd stage bootloader
+    unsafe {
+        cache_invalidate_addr(0x40000000, 64 * 1024 * 1024);
+    }
+
     #[cfg(multi_core)]
     unsafe {
         // Stall Core 1 first (PMU stall), then disable its clock and assert
