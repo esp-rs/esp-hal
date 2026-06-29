@@ -325,40 +325,6 @@ pub(crate) fn raw_core() -> usize {
 
 use crate::rtc_cntl::SocResetReason;
 
-/// Source of the wakeup event
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum SleepSource {
-    /// In case of deep sleep, reset was not caused by exit from deep sleep
-    Undefined = 0,
-    /// Not a wakeup cause, used to disable all wakeup sources with
-    /// esp_sleep_disable_wakeup_source
-    All,
-    /// Wakeup caused by external signal using RTC_IO
-    Ext0,
-    /// Wakeup caused by external signal using RTC_CNTL
-    Ext1,
-    /// Wakeup caused by timer
-    Timer,
-    /// Wakeup caused by touchpad
-    TouchPad,
-    /// Wakeup caused by ULP program
-    Ulp,
-    /// Wakeup caused by GPIO (light sleep only on ESP32, S2 and S3)
-    Gpio,
-    /// Wakeup caused by UART (light sleep only)
-    Uart,
-    /// Wakeup caused by WIFI (light sleep only)
-    Wifi,
-    /// Wakeup caused by COCPU int
-    Cocpu,
-    /// Wakeup caused by COCPU crash
-    CocpuTrapTrig,
-    /// Wakeup caused by BT (light sleep only)
-    BT,
-}
-
 #[procmacros::doc_replace]
 /// Performs a software reset on the chip.
 ///
@@ -451,9 +417,12 @@ pub fn reset_reason() -> Option<SocResetReason> {
     crate::rtc_cntl::reset_reason(Cpu::current())
 }
 
-/// Retrieves the cause of the last wakeup event as a SleepSource enum value.
+/// Retrieves the cause(s) of the last wakeup event.
+///
+/// Returns the set of [`WakeupReason`][crate::rtc_cntl::WakeupReason] flags that ended the most
+/// recent sleep. The result is empty if the chip was not woken from sleep.
 #[instability::unstable]
 #[inline]
-pub fn wakeup_cause() -> SleepSource {
+pub fn wakeup_cause() -> crate::rtc_cntl::WakeupReason {
     crate::rtc_cntl::wakeup_cause()
 }

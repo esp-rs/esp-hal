@@ -119,11 +119,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripherals::Interrupt,
 };
-use crate::{
-    peripherals::LPWR,
-    system::{Cpu, SleepSource},
-    time::Duration,
-};
+use crate::{peripherals::LPWR, system::Cpu, time::Duration};
 // only include sleep where it's been implemented
 #[cfg(sleep_driver_supported)]
 pub mod sleep;
@@ -155,56 +151,73 @@ cfg_select! {
 }
 
 bitflags::bitflags! {
-    #[allow(unused)]
-    struct WakeupReason: u32 {
-        const NoSleep         = 0;
+    /// The source(s) that caused the most recent wakeup from sleep.
+    ///
+    /// Returned by [`wakeup_cause`].
+    ///
+    /// Note that the available flags depend on the target chip.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct WakeupReason: u32 {
+        /// The chip was not woken from sleep.
+        const NoSleep     = 0;
         #[cfg(pm_support_ext0_wakeup)]
-        /// EXT0 GPIO wakeup
-        const ExtEvent0Trig   = 1 << 0;
+        /// EXT0 wakeup, via an RTC GPIO (`RTC_IO`).
+        const Ext0        = 1 << 0;
         #[cfg(all(pm_support_ext1_wakeup, not(esp32p4)))]
-        /// EXT1 GPIO wakeup
-        const ExtEvent1Trig   = 1 << 1;
+        /// EXT1 wakeup, via one or more RTC GPIOs (`RTC_CNTL`).
+        const Ext1        = 1 << 1;
         #[cfg(esp32p4)]
-        /// EXT1 GPIO wakeup (ESP32-P4 PMU bitmap)
-        const ExtEvent1Trig   = 1 << 12;
-        /// GPIO wakeup (light sleep only)
-        const GpioTrigEn      = 1 << 2;
-        #[cfg(not(any(esp32c6, esp32h2, esp32p4)))]
-        /// Timer wakeup
-        const TimerTrigEn     = 1 << 3;
-        #[cfg(any(esp32c6, esp32h2))]
-        /// Timer wakeup
-        const TimerTrigEn     = 1 << 4;
+        /// EXT1 wakeup (ESP32-P4 PMU bitmap).
+        const Ext1        = 1 << 12;
+        /// GPIO wakeup.
+        const Gpio        = 1 << 2;
+        // The wakeup-cause bit layout follows `WakeTriggers`: the timer bit is 3 on the
+        // RTC_CNTL-based chips, 4 on the PMU-based chips, and 13 on the ESP32-P4 PMU bitmap.
+        #[cfg(not(soc_has_pmu))]
+        /// Timer wakeup.
+        const Timer       = 1 << 3;
+        #[cfg(all(soc_has_pmu, not(esp32p4)))]
+        /// Timer wakeup.
+        const Timer       = 1 << 4;
         #[cfg(esp32p4)]
-        /// Timer wakeup (ESP32-P4 PMU bitmap: PMU_RTC_TIMER_WAKEUP_EN)
-        const TimerTrigEn     = 1 << 13;
+        /// Timer wakeup (ESP32-P4 PMU bitmap: PMU_RTC_TIMER_WAKEUP_EN).
+        const Timer       = 1 << 13;
         #[cfg(pm_support_wifi_wakeup)]
-        /// MAC wakeup (light sleep only)
-        const WifiTrigEn      = 1 << 5;
+        /// Wi-Fi (MAC) wakeup.
+        const Wifi        = 1 << 5;
         #[cfg(not(esp32p4))]
-        /// UART0 wakeup (light sleep only)
-        const Uart0TrigEn     = 1 << 6;
+        /// UART0 wakeup.
+        const Uart0       = 1 << 6;
         #[cfg(esp32p4)]
-        /// UART0 wakeup (ESP32-P4 PMU bitmap)
-        const Uart0TrigEn     = 1 << 8;
-        /// UART1 wakeup (light sleep only)
-        const Uart1TrigEn     = 1 << 7;
+        /// UART0 wakeup (ESP32-P4 PMU bitmap).
+        const Uart0       = 1 << 8;
+        /// UART1 wakeup.
+        const Uart1       = 1 << 7;
         #[cfg(all(pm_support_touch_sensor_wakeup, not(esp32p4)))]
-        /// Touch wakeup
-        const TouchTrigEn     = 1 << 8;
+        /// Touch sensor wakeup.
+        const Touch       = 1 << 8;
         #[cfg(all(pm_support_touch_sensor_wakeup, esp32p4))]
-        /// Touch wakeup (ESP32-P4 PMU bitmap)
-        const TouchTrigEn     = 1 << 11;
+        /// Touch sensor wakeup (ESP32-P4 PMU bitmap).
+        const Touch       = 1 << 11;
         #[cfg(ulp_supported)]
-        /// ULP wakeup
-        const UlpTrigEn       = 1 << 9;
+        /// ULP wakeup.
+        const Ulp         = 1 << 9;
         #[cfg(pm_support_bt_wakeup)]
-        /// BT wakeup (light sleep only)
-        const BtTrigEn        = 1 << 10;
+        /// Bluetooth wakeup.
+        const Bluetooth   = 1 << 10;
         #[cfg(riscv_coproc_supported)]
-        const CocpuTrigEn     = 1 << 11;
+        /// ULP RISC-V coprocessor wakeup.
+        const Cocpu       = 1 << 11;
         #[cfg(riscv_coproc_supported)]
-        const CocpuTrapTrigEn = 1 << 13;
+        /// ULP RISC-V coprocessor trap (crash) wakeup.
+        const CocpuTrap   = 1 << 13;
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for WakeupReason {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "WakeupReason({=u32:#x})", self.bits());
     }
 }
 
@@ -924,12 +937,16 @@ pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 /// Tracks whether the chip has just returned from a light sleep.
 static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
 
-/// Return wakeup reason.
-pub fn wakeup_cause() -> SleepSource {
+/// Return the cause(s) of the most recent wakeup.
+///
+/// A sleep can be ended by more than one source simultaneously, so all matching flags are returned.
+/// The result is [`WakeupReason::NoSleep`] (an empty set) if the chip was not woken from sleep (for
+/// example on a cold boot, or after a reset unrelated to deep sleep).
+pub fn wakeup_cause() -> WakeupReason {
     if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep)
         && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed)
     {
-        return SleepSource::Undefined;
+        return WakeupReason::NoSleep;
     }
 
     cfg_select! {
@@ -949,55 +966,7 @@ pub fn wakeup_cause() -> SleepSource {
         }
     }
 
-    let wakeup_cause = WakeupReason::from_bits_retain(wakeup_cause_bits);
-
-    if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
-        return SleepSource::Timer;
-    }
-    if wakeup_cause.contains(WakeupReason::GpioTrigEn) {
-        return SleepSource::Gpio;
-    }
-    if wakeup_cause.intersects(WakeupReason::Uart0TrigEn | WakeupReason::Uart1TrigEn) {
-        return SleepSource::Uart;
-    }
-
-    #[cfg(pm_support_ext0_wakeup)]
-    if wakeup_cause.contains(WakeupReason::ExtEvent0Trig) {
-        return SleepSource::Ext0;
-    }
-    #[cfg(pm_support_ext1_wakeup)]
-    if wakeup_cause.contains(WakeupReason::ExtEvent1Trig) {
-        return SleepSource::Ext1;
-    }
-
-    #[cfg(pm_support_touch_sensor_wakeup)]
-    if wakeup_cause.contains(WakeupReason::TouchTrigEn) {
-        return SleepSource::TouchPad;
-    }
-
-    #[cfg(ulp_supported)]
-    if wakeup_cause.contains(WakeupReason::UlpTrigEn) {
-        return SleepSource::Ulp;
-    }
-
-    #[cfg(pm_support_wifi_wakeup)]
-    if wakeup_cause.contains(WakeupReason::WifiTrigEn) {
-        return SleepSource::Wifi;
-    }
-
-    #[cfg(pm_support_bt_wakeup)]
-    if wakeup_cause.contains(WakeupReason::BtTrigEn) {
-        return SleepSource::BT;
-    }
-
-    #[cfg(riscv_coproc_supported)]
-    if wakeup_cause.contains(WakeupReason::CocpuTrigEn) {
-        return SleepSource::Ulp;
-    } else if wakeup_cause.contains(WakeupReason::CocpuTrapTrigEn) {
-        return SleepSource::CocpuTrapTrig;
-    }
-
-    SleepSource::Undefined
+    WakeupReason::from_bits_truncate(wakeup_cause_bits)
 }
 
 #[cfg(sleep_light_sleep)]

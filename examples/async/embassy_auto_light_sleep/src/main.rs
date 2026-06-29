@@ -7,6 +7,10 @@
 //! `periodic` wakes once a second, letting the system sleep in between.
 //! `wake_lock_demo` shows a region guarded by a manual [`WakeLock`]: while the
 //! guard is alive, the idle hook falls back to `WFI` and the chip never sleeps.
+//!
+//! Both the `periodic` and `gpio` tasks print `wakeup_cause()`, so you can
+//! observe the chip waking from light sleep via the timer (`WakeupReason::Timer`)
+//! or via the BOOT button (`WakeupReason::Gpio`).
 
 //% CHIP_FILTER: sleep_light_sleep
 
@@ -21,6 +25,7 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     peripherals,
     rtc_cntl::WakeLock,
+    system::wakeup_cause,
     timer::timg::TimerGroup,
 };
 
@@ -29,7 +34,11 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[embassy_executor::task]
 async fn periodic() {
     loop {
-        esp_println::println!("tick @ {:?}", esp_hal::time::Instant::now());
+        esp_println::println!(
+            "tick @ {:?} (wakeup cause: {:?})",
+            esp_hal::time::Instant::now(),
+            wakeup_cause(),
+        );
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
@@ -62,7 +71,7 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
             )
             .await
             .unwrap();
-        esp_println::println!("button low");
+        esp_println::println!("button low (wakeup cause: {:?})", wakeup_cause());
 
         input
             .wait_for_with_options(
