@@ -21,7 +21,20 @@ define_regi2c! {
     }
     master: REGI2C_SAR_I2C(0x69, 0) {}
     master: REGI2C_BIAS(0x6a, 0) {}
-    master: REGI2C_DIG_REG(0x6d, 0) {}
+    master: REGI2C_DIG_REG(0x6d, 0) {
+        reg: I2C_DIG_REG9(9) {
+            field: I2C_DIG_REG_OR_EN_CONT_CAL(7..7)
+        }
+        reg: I2C_DIG_REG10(10) {
+            field: I2C_DIG_REG_FORCE_RTC_DREG(0..0),
+            field: I2C_DIG_REG_FORCE_DIG_DREG(1..1)
+        }
+        reg: I2C_DIG_REG_XPD(13) {
+            field: I2C_DIG_REG_XPD_RTC_REG(2..2),
+            field: I2C_DIG_REG_XPD_DIG_REG(3..3)
+        }
+        reg: I2C_DIG_REG_SCK_DCAP(14) {}
+    }
     master: REGI2C_PLLA(0x6f, 0) {}
 }
 

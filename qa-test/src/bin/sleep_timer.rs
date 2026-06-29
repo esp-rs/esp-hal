@@ -1,4 +1,4 @@
-//! Demonstrates deep sleep with timer wakeup
+//! Demonstrates waking from deep sleep with timer
 
 //% CHIP_FILTER: sleep_driver_supported
 

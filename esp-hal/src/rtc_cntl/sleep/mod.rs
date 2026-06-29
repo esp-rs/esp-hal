@@ -14,8 +14,8 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
-// ESP32-C5/C61 currently only support timer wakeup, which does not use `RefCell`.
-#[cfg(not(any(esp32c5, esp32c61)))]
+// ESP32-C5/C61/P4 currently only support timer wakeup, which does not use `RefCell`.
+#[cfg(not(any(esp32c5, esp32c61, esp32p4)))]
 use core::cell::RefCell;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -618,7 +618,7 @@ bitfield::bitfield! {
     pub bt, set_bt: 10;
 }
 
-#[cfg(soc_has_pmu)]
+#[cfg(all(soc_has_pmu, not(esp32p4)))]
 bitfield::bitfield! {
     /// Represents the wakeup triggers.
     #[derive(Default, Clone, Copy)]
@@ -649,6 +649,39 @@ bitfield::bitfield! {
     pub lp_core, set_lp_core: 11;
     /// USB wakeup
     pub usb, set_usb: 14;
+}
+
+// ESP32-P4 has a different PMU wakeup-source bitmap than the other PMU chips.
+// In particular the LP/RTC timer wakeup is bit 13 (PMU_RTC_TIMER_WAKEUP_EN),
+// not bit 4. See esp-idf `pmu_bit_defs.h` for the ESP32-P4.
+#[cfg(esp32p4)]
+bitfield::bitfield! {
+    /// Represents the wakeup triggers.
+    #[derive(Default, Clone, Copy)]
+    pub struct WakeTriggers(u16);
+    impl Debug;
+
+    /// SDIO wakeup
+    pub sdio, set_sdio: 0;
+    /// GPIO wakeup
+    pub gpio, set_gpio: 2;
+    /// USB wakeup
+    pub usb, set_usb: 3;
+    /// UART1 wakeup
+    pub uart1, set_uart1: 7;
+    /// UART0 wakeup
+    pub uart0, set_uart0: 8;
+    /// EXT1 GPIO wakeup
+    pub ext1, set_ext1: 12;
+    /// Timer (LP/RTC timer) wakeup
+    pub timer, set_timer: 13;
+    // The following sources do not exist on ESP32-P4. They are declared so the
+    // shared wake-source code keeps compiling; they are never set on this
+    // target, so their (overlapping, unused bit 1) position is irrelevant.
+    /// EXT0 GPIO wakeup (unused on ESP32-P4)
+    pub ext0, set_ext0: 1;
+    /// LP core wakeup (unused on ESP32-P4)
+    pub lp_core, set_lp_core: 1;
 }
 
 /// Trait representing a wakeup source.
