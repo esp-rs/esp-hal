@@ -76,7 +76,7 @@ where
 {
     let address = Address::random(PERIPHERAL_ADDRESS);
 
-    let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
+    let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
     let stack = trouble_host::new(controller, &mut resources)
         .set_random_address(address)
         .build();
