@@ -77,12 +77,10 @@ where
     let address = Address::random(PERIPHERAL_ADDRESS);
 
     let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-    let Host {
-        mut peripheral,
-        runner,
-        ..
-    } = stack.build();
+    let stack = trouble_host::new(controller, &mut resources).set_random_address(address).build();
+    let mut peripheral = stack.peripheral();
+    let runner = stack.runner();
+
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
         name: DEVICE_NAME,
         appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
@@ -121,7 +119,7 @@ where
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+            AdStructure::IncompleteServiceUuids16(&[[0x0f, 0x18]]),
             AdStructure::CompleteLocalName(DEVICE_NAME.as_bytes()),
         ],
         &mut adv_data,
