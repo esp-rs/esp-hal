@@ -2694,32 +2694,24 @@ mod private {
 
         #[cfg(not(i2s_version = "1"))]
         fn mclk_dividers(&self) -> I2sMclkDividers {
-            let x;
-            let y;
-            let z;
-            let yn1;
-
-            if self.denominator == 0 || self.numerator == 0 {
-                x = 0;
-                y = 0;
-                z = 0;
-                yn1 = true;
+            let (x, y, z, yn1) = if self.denominator == 0 || self.numerator == 0 {
+                (0, 0, 0, true)
             } else if self.numerator > self.denominator / 2 {
-                x = self
+                let x = self
                     .denominator
                     .overflowing_div(self.denominator.overflowing_sub(self.numerator).0)
                     .0
                     .overflowing_sub(1)
                     .0;
-                y = self.denominator % (self.denominator.overflowing_sub(self.numerator).0);
-                z = self.denominator.overflowing_sub(self.numerator).0;
-                yn1 = true;
+                let y = self.denominator % (self.denominator.overflowing_sub(self.numerator).0);
+                let z = self.denominator.overflowing_sub(self.numerator).0;
+                (x, y, z, true)
             } else {
-                x = self.denominator / self.numerator - 1;
-                y = self.denominator % self.numerator;
-                z = self.numerator;
-                yn1 = false;
-            }
+                let x = self.denominator / self.numerator - 1;
+                let y = self.denominator % self.numerator;
+                let z = self.numerator;
+                (x, y, z, false)
+            };
 
             I2sMclkDividers { x, y, z, yn1 }
         }
