@@ -363,7 +363,7 @@ pub fn enable_direct(
         // Write back the cache to make sure the new interrupt handler is visible to the CPU.
         crate::soc::cache_writeback_addr(mtvt_table as u32, 48 * 4);
         // Invalidate the cache to make sure the CPU does not read from a stale instruction cache.
-        crate::soc::cache_invalidate_addr(mtvt_table as u32, 48 * 4);
+        crate::soc::cache_invalidate_icache_addr(mtvt_table as u32, 48 * 4);
     }
 
     super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
