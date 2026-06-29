@@ -1147,10 +1147,10 @@ impl<'d> UartRx<'d, Async> {
             let events = UartRxFuture::new(self.uart.reborrow(), events).await;
 
             let result = rx_event_check_for_error(events, self.reported_errors);
+            if events.contains(RxEvent::FifoOvf) {
+                self.uart.info().rxfifo_reset();
+            }
             if let Err(error) = result {
-                if error == RxError::FifoOverflowed {
-                    self.uart.info().rxfifo_reset();
-                }
                 return Err(error);
             }
         }
@@ -1321,7 +1321,7 @@ where
     /// Only errors enabled in [`RxConfig::with_reported_errors`] are returned;
     /// disabled errors are cleared and ignored.
     ///
-    /// If a reported FIFO overflow is detected, the RX FIFO is reset.
+    /// If a FIFO overflow is detected, the RX FIFO is reset.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         self.uart.info().check_for_errors(self.reported_errors)

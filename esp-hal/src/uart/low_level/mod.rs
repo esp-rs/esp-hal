@@ -696,21 +696,30 @@ impl Info {
             .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
     }
 
-    pub(super) fn check_for_errors(
+    fn check_for_errors_and_reset_fifo(
         &self,
         reported_errors: EnumSet<RxErrorKind>,
-    ) -> Result<(), RxError> {
+    ) -> Result<bool, RxError> {
         let errors =
             RxEvent::FifoOvf | RxEvent::GlitchDetected | RxEvent::FrameError | RxEvent::ParityError;
         let events = self.rx_events().intersection(errors);
         let result = rx_event_check_for_error(events, reported_errors);
+        let fifo_overflowed = events.contains(RxEvent::FifoOvf);
         if !events.is_empty() {
             self.clear_rx_events(events);
-            if result == Err(RxError::FifoOverflowed) {
+            if fifo_overflowed {
                 self.rxfifo_reset();
             }
         }
-        result
+        result.map(|()| fifo_overflowed)
+    }
+
+    pub(super) fn check_for_errors(
+        &self,
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<(), RxError> {
+        self.check_for_errors_and_reset_fifo(reported_errors)
+            .map(|_| ())
     }
 
     pub(super) fn check_rx_break_detected(&self) -> bool {
@@ -750,12 +759,17 @@ impl Info {
             return Ok(0);
         }
 
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-            self.check_for_errors(reported_errors)?;
-        }
+        loop {
+            while self.rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+                self.check_for_errors(reported_errors)?;
+            }
 
-        self.read_buffered(buf, reported_errors)
+            let read = self.read_buffered(buf, reported_errors)?;
+            if read > 0 {
+                break Ok(read);
+            }
+        }
     }
 
     pub(super) fn read_buffered(
@@ -766,7 +780,9 @@ impl Info {
         // Get the count first, to avoid accidentally reading a corrupted byte received
         // after the error check.
         let to_read = (self.rx_fifo_count() as usize).min(buf.len());
-        self.check_for_errors(reported_errors)?;
+        if self.check_for_errors_and_reset_fifo(reported_errors)? {
+            return Ok(0);
+        }
 
         for byte_into in buf[..to_read].iter_mut() {
             *byte_into = self.read_next_from_fifo();
