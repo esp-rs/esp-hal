@@ -191,6 +191,8 @@ options:
   - name: min-chip-revision
     description: "The minimum chip revision required for the application to run, in format: major * 100 + minor."
     default:
+      - value: 300
+        if: "esp32"
       - value: 0
 
   - name: use_rwdata_ld_hook

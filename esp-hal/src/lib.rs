@@ -735,6 +735,15 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
+    let min_rev = esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
+    assert!(
+        crate::efuse::chip_revision() >= crate::efuse::ChipRevision::from_combined(min_rev),
+        "This chip's hardware revision is older than the minimum required \
+         v{}.{} (ESP_HAL_CONFIG_MIN_CHIP_REVISION).",
+        min_rev / 100,
+        min_rev % 100,
+    );
+
     #[cfg(soc_cpu_has_branch_predictor)]
     crate::soc::enable_branch_predictor();
 
