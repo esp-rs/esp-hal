@@ -44,43 +44,36 @@ pub(crate) fn map_flash_page(paddr: u32) -> Result<FlashMmapGuard, FlashStorageE
         });
     }
 
-    let entry_id = {
-        #[cfg(esp32s2)]
-        {
-            s2_alloc_entry()
-        }
-        #[cfg(not(esp32s2))]
-        {
-            find_free_entry().ok_or(FlashStorageError::NotSupported)?
-        }
-    };
+    cfg_select! {
+        esp32s2 => {
+            let entry_id = s2_alloc_entry();
 
-    #[cfg(esp32s2)]
-    {
-        let vaddr = s2_map_entry(entry_id, page_paddr)?;
-        Ok(FlashMmapGuard {
-            entry_id,
-            vaddr,
-            page_size,
-            owned: true,
-        })
-    }
+            let vaddr = s2_map_entry(entry_id, page_paddr)?;
 
-    #[cfg(not(esp32s2))]
-    {
-        write_entry(entry_id, mmu_val)?;
-        let vaddr = entry_id_to_vaddr(entry_id);
-        if vaddr.is_null() {
-            set_entry_invalid(entry_id);
-            return Err(FlashStorageError::NotSupported);
+            Ok(FlashMmapGuard {
+                entry_id,
+                vaddr,
+                page_size,
+                owned: true,
+            })
+        },
+        _ => {
+            let entry_id = find_free_entry().ok_or(FlashStorageError::NotSupported)?;
+
+            write_entry(entry_id, mmu_val)?;
+            let vaddr = entry_id_to_vaddr(entry_id);
+            if vaddr.is_null() {
+                set_entry_invalid(entry_id);
+                return Err(FlashStorageError::NotSupported);
+            }
+
+            Ok(FlashMmapGuard {
+                entry_id,
+                vaddr,
+                page_size,
+                owned: true,
+            })
         }
-
-        Ok(FlashMmapGuard {
-            entry_id,
-            vaddr,
-            page_size,
-            owned: true,
-        })
     }
 }
 
