@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 embassy-executor = "0.10.0"
 embassy-futures = "0.1"
-embassy-sync = "0.7" # TODO: update once trouble supports 0.8
+embassy-sync = "0.8"
 embassy-time = "0.5.0"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
@@ -24,7 +24,7 @@ esp-radio = { path = "../../../esp-radio", features = [
     "unstable",
 ] }
 log = "0.4.27"
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",

@@ -85,7 +85,7 @@ defmt              = "1.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
-embassy-sync       = "0.7.0" # TODO: update after trouble-host has been released
+embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
@@ -105,7 +105,7 @@ portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",

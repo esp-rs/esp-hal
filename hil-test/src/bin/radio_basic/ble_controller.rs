@@ -150,15 +150,17 @@ mod tests {
 
         let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
 
-        let mut resources: HostResources<DefaultPacketPool, 1, 1> = HostResources::new();
-        let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-        let Host { mut peripheral, .. } = stack.build();
+        let mut resources: HostResources<_, DefaultPacketPool, 1, 1> = HostResources::new();
+        let stack = trouble_host::new(controller, &mut resources)
+            .set_random_address(address)
+            .build();
+        let mut peripheral = stack.peripheral();
 
         let mut advertiser_data = [0; 31];
         let len = AdStructure::encode_slice(
             &[
                 AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+                AdStructure::IncompleteServiceUuids16(&[[0x0f, 0x18]]),
                 AdStructure::CompleteLocalName("Peripheral".as_bytes()),
             ],
             &mut advertiser_data[..],

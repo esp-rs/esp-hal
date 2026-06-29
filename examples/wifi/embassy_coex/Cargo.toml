@@ -14,7 +14,7 @@ embassy-net = { version = "0.8.0", features = [
     "dns",
 ] }
 embassy-time = "0.5.1"
-embassy-sync = "0.7" # TODO: update once trouble supports 0.8
+embassy-sync = "0.8"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
@@ -33,7 +33,7 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 reqwless = { version = "0.14.0", default-features = false }
 static_cell = "2.1.0"
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
