@@ -21,7 +21,7 @@ pub fn set_module_clock(source: ClockSource, div: u8) {
     });
 }
 
-pub fn set_input_delay_phase(phase: DelayPhase) {
+pub fn set_input_delay_phase(phase: DelayPhase, _hz: u32) {
     let v = match phase {
         DelayPhase::_0 => 0u8,
         DelayPhase::_1 => 1,

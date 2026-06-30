@@ -375,7 +375,6 @@ impl Chip {
                     "rsa_size_increment=\"512\"",
                     "rsa_memory_size_bytes=\"512\"",
                     "sdmmc_slots=\"2\"",
-                    "sdmmc_delay_phase_num=\"0\"",
                     "sdmmc_has_iomux",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
@@ -604,7 +603,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_size_increment=\"512\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=sdmmc_slots=\"2\"",
-                    "cargo:rustc-cfg=sdmmc_delay_phase_num=\"0\"",
                     "cargo:rustc-cfg=sdmmc_has_iomux",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
@@ -4706,6 +4704,7 @@ impl Chip {
                     "rsa_memory_size_bytes=\"512\"",
                     "sdmmc_slots=\"2\"",
                     "sdmmc_delay_phase_num=\"8\"",
+                    "sdmmc_delay_phase_num_is_set",
                     "sdmmc_has_iomux",
                     "sdmmc_has_gpio_matrix",
                     "sdmmc_psram_dma",
@@ -4957,6 +4956,7 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=sdmmc_slots=\"2\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num=\"8\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
                     "cargo:rustc-cfg=sdmmc_has_iomux",
                     "cargo:rustc-cfg=sdmmc_has_gpio_matrix",
                     "cargo:rustc-cfg=sdmmc_psram_dma",
@@ -6156,6 +6156,7 @@ impl Chip {
                     "rsa_memory_size_bytes=\"512\"",
                     "sdmmc_slots=\"2\"",
                     "sdmmc_delay_phase_num=\"4\"",
+                    "sdmmc_delay_phase_num_is_set",
                     "sdmmc_has_gpio_matrix",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
@@ -6443,6 +6444,7 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=sdmmc_slots=\"2\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num=\"4\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
                     "cargo:rustc-cfg=sdmmc_has_gpio_matrix",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
@@ -7169,6 +7171,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(i2s_supports_pdm_rx_hp_filter)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num_is_set)");
     println!("cargo:rustc-check-cfg=cfg(sdmmc_has_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(sdmmc_psram_dma)");
     println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");
@@ -7273,7 +7276,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rsa_size_increment, values(\"512\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
     println!("cargo:rustc-check-cfg=cfg(sdmmc_slots, values(\"2\"))");
-    println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num, values(\"0\",\"8\",\"4\"))");
     println!("cargo:rustc-check-cfg=cfg(spi_master_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(spi_master_fifo_size, values(\"64\",\"72\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
@@ -7301,6 +7303,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_dma_engine, values(\"VDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num, values(\"8\",\"4\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_fifo_depth_words, values(\"896\"))");
     println!("cargo:rustc-check-cfg=cfg(rmt_dma_engine, values(\"AHB_GDMA\"))");
