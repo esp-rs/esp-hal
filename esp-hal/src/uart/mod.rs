@@ -165,6 +165,37 @@ pub enum RxError {
 
 impl core::error::Error for RxError {}
 
+/// UART RX error conditions that can be reported by read operations.
+///
+/// This enum can be used with [`RxConfig::with_reported_errors`] to choose
+/// which hardware RX error conditions should make read operations return an
+/// [`RxError`].
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum RxErrorKind {
+    /// An RX FIFO overflow happened.
+    FifoOverflowed,
+    /// A glitch was detected on the RX line.
+    GlitchOccurred,
+    /// A framing error was detected on the RX line.
+    FrameFormatViolated,
+    /// A parity error was detected on the RX line.
+    ParityMismatch,
+}
+
+impl From<RxErrorKind> for RxError {
+    fn from(value: RxErrorKind) -> Self {
+        match value {
+            RxErrorKind::FifoOverflowed => RxError::FifoOverflowed,
+            RxErrorKind::GlitchOccurred => RxError::GlitchOccurred,
+            RxErrorKind::FrameFormatViolated => RxError::FrameFormatViolated,
+            RxErrorKind::ParityMismatch => RxError::ParityMismatch,
+        }
+    }
+}
+
 impl core::fmt::Display for RxError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -401,6 +432,21 @@ pub struct RxConfig {
     fifo_full_threshold: u16,
     /// Optional timeout value for RX operations.
     timeout: Option<u8>,
+    /// RX error conditions that read operations should report.
+    ///
+    /// Error conditions not present in this set are cleared and ignored by
+    /// UART read operations.
+    #[builder_lite(unstable, into)]
+    reported_errors: EnumSet<RxErrorKind>,
+    /// Whether received bytes with UART errors are discarded by the hardware.
+    ///
+    /// When set to `true` (the default), bytes with UART errors (for example
+    /// parity or framing errors) are not stored in the RX FIFO. Set this to
+    /// `false` to keep those bytes in the RX FIFO. Use
+    /// [`Self::with_reported_errors`] to control whether those error
+    /// conditions make read operations fail.
+    #[builder_lite(unstable)]
+    discard_erroneous_bytes: bool,
 }
 
 impl Default for RxConfig {
@@ -410,6 +456,8 @@ impl Default for RxConfig {
             fifo_full_threshold: 120,
             // see <https://github.com/espressif/esp-idf/blob/8760e6d2a/components/esp_driver_uart/src/uart.c#L63>
             timeout: Some(10),
+            reported_errors: EnumSet::all(),
+            discard_erroneous_bytes: true,
         }
     }
 }
@@ -503,7 +551,9 @@ where
                 phantom: PhantomData,
                 guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
+                // Receiving data continuously, the peripheral can't let the system sleep.
                 _wake_lock: WakeLock::new(),
+                reported_errors: config.rx.reported_errors,
             },
             tx: UartTx {
                 uart: self.uart,
@@ -560,8 +610,9 @@ pub struct UartRx<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
-    // Receiving data continuously, the peripheral can't let the system to sleep.
+    // Receiving data continuously, the peripheral can't let the system sleep.
     _wake_lock: WakeLock,
+    reported_errors: EnumSet<RxErrorKind>,
 }
 
 /// A configuration error.
@@ -1026,6 +1077,7 @@ impl<'d> UartRx<'d, Blocking> {
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
+            reported_errors: self.reported_errors,
         }
     }
 }
@@ -1048,6 +1100,7 @@ impl<'d> UartRx<'d, Async> {
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
+            reported_errors: self.reported_errors,
         }
     }
 
@@ -1095,13 +1148,10 @@ impl<'d> UartRx<'d, Async> {
 
             let events = UartRxFuture::new(self.uart.reborrow(), events).await;
 
-            let result = rx_event_check_for_error(events);
-            if let Err(error) = result {
-                if error == RxError::FifoOverflowed {
-                    self.uart.info().rxfifo_reset();
-                }
-                return Err(error);
+            if events.contains(RxEvent::FifoOvf) {
+                self.uart.info().rxfifo_reset();
             }
+            rx_event_check_for_error(events, self.reported_errors)?;
         }
 
         Ok(())
@@ -1155,7 +1205,7 @@ impl<'d> UartRx<'d, Async> {
         }
 
         // Drain the buffer first, there's no point in waiting for data we've already received.
-        let read = self.uart.info().read_buffered(buf)?;
+        let read = self.read_buffered(buf)?;
         buf = &mut buf[read..];
 
         while !buf.is_empty() {
@@ -1165,7 +1215,7 @@ impl<'d> UartRx<'d, Async> {
             self.wait_for_buffered_data(buf.len(), buf.len(), false)
                 .await?;
 
-            let read = self.uart.info().read_buffered(buf)?;
+            let read = self.read_buffered(buf)?;
             buf = &mut buf[read..];
         }
 
@@ -1256,17 +1306,24 @@ where
         self.uart
             .info()
             .set_rx_timeout(config.rx.timeout, self.uart.info().current_symbol_length())?;
+        self.uart
+            .info()
+            .set_discard_erroneous_bytes(config.rx.discard_erroneous_bytes);
+        self.reported_errors = config.rx.reported_errors;
 
         self.uart.info().rxfifo_reset();
         Ok(())
     }
 
-    /// Reads and clears errors set by received data.
+    /// Reads and clears RX error conditions set by received data.
+    ///
+    /// Only errors enabled in [`RxConfig::with_reported_errors`] are returned;
+    /// disabled errors are cleared and ignored.
     ///
     /// If a FIFO overflow is detected, the RX FIFO is reset.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
-        self.uart.info().check_for_errors()
+        self.uart.info().check_for_errors(self.reported_errors)
     }
 
     /// Returns whether the UART buffer has data.
@@ -1291,15 +1348,15 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an [`RxError`] if an error occurred since the last
-    /// call to [`Self::check_for_errors`], [`Self::read_buffered`], or this
-    /// function.
+    /// This function returns an [`RxError`] if a reported error occurred since
+    /// the last call to [`Self::check_for_errors`], [`Self::read_buffered`], or
+    /// this function.
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
     #[instability::unstable]
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        self.uart.info().read(buf)
+        self.uart.info().read(buf, self.reported_errors)
     }
 
     /// Read already received bytes.
@@ -1313,15 +1370,15 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an [`RxError`] if an error occurred since the last
-    /// call to [`Self::check_for_errors`], [`Self::read`], or this
+    /// This function returns an [`RxError`] if a reported error occurred since
+    /// the last call to [`Self::check_for_errors`], [`Self::read`], or this
     /// function.
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
     #[instability::unstable]
     pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        self.uart.info().read_buffered(buf)
+        self.uart.info().read_buffered(buf, self.reported_errors)
     }
 
     /// Disables all RX-related interrupts for this UART instance.
@@ -1937,8 +1994,8 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an [`RxError`] if an error occurred since the last
-    /// check for errors.
+    /// This function returns an [`RxError`] if a reported error occurred since
+    /// the last check for errors.
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
@@ -2055,7 +2112,10 @@ where
         (&mut self.rx, &mut self.tx)
     }
 
-    /// Reads and clears errors set by received data.
+    /// Reads and clears RX error conditions set by received data.
+    ///
+    /// Only errors enabled in [`RxConfig::with_reported_errors`] are returned;
+    /// disabled errors are cleared and ignored.
     #[instability::unstable]
     pub fn check_for_rx_errors(&mut self) -> Result<(), RxError> {
         self.rx.check_for_errors()
@@ -2072,8 +2132,8 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an [`RxError`] if an error occurred since the last
-    /// check for errors.
+    /// This function returns an [`RxError`] if a reported error occurred since
+    /// the last check for errors.
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
@@ -2133,11 +2193,6 @@ where
         self.regs()
             .idle_conf()
             .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
-
-        // Setting err_wr_mask stops uart from storing data when data is wrong according
-        // to reference manual
-        self.regs().conf0().modify(|_, w| w.err_wr_mask().set_bit());
-        sync_regs(self.regs());
 
         crate::rom::ets_delay_us(15);
 

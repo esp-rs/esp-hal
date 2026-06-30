@@ -558,7 +558,7 @@ mod async_tx_rx {
         Async,
         interrupt::software::SoftwareInterruptControl,
         timer::timg::TimerGroup,
-        uart::{self, RxConfig, RxError, UartRx, UartTx},
+        uart::{self, RxConfig, RxError, RxErrorKind, UartRx, UartTx},
     };
     use hil_test::{assert, assert_eq, assert_ne};
 
@@ -566,6 +566,14 @@ mod async_tx_rx {
         rx: UartRx<'static, Async>,
         tx: UartTx<'static, Async>,
     }
+
+    fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
+        needle.is_empty()
+            || haystack
+                .windows(needle.len())
+                .any(|window| window == needle)
+    }
+
     #[init]
     async fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -608,6 +616,43 @@ mod async_tx_rx {
             ctx.tx.send_break_async(&mut delay, 100).await;
         })
         .await;
+    }
+
+    #[test]
+    async fn read_async_can_ignore_break_related_errors(ctx: Context) {
+        let mut rx = ctx.rx;
+        let mut tx = ctx.tx;
+        let mut delay = Delay;
+        const PAYLOAD: &[u8] = &[0x55, 0x12, 0x34];
+
+        rx.apply_config(
+            &uart::Config::default().with_rx(
+                RxConfig::default()
+                    .with_discard_erroneous_bytes(false)
+                    .with_reported_errors(RxErrorKind::FifoOverflowed),
+            ),
+        )
+        .unwrap();
+
+        let read = async {
+            let mut received = [0u8; 16];
+            let mut received_len = 0;
+
+            while !contains_subslice(&received[..received_len], PAYLOAD) {
+                assert!(received_len < received.len());
+                let read = rx.read_async(&mut received[received_len..]).await.unwrap();
+                received_len += read;
+            }
+        };
+
+        let write = async {
+            tx.flush_async().await.unwrap();
+            tx.send_break_async(&mut delay, 100).await;
+            tx.write_async(PAYLOAD).await.unwrap();
+            tx.flush_async().await.unwrap();
+        };
+
+        join(read, write).await;
     }
 
     #[test]
