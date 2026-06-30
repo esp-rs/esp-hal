@@ -1148,13 +1148,10 @@ impl<'d> UartRx<'d, Async> {
 
             let events = UartRxFuture::new(self.uart.reborrow(), events).await;
 
-            let result = rx_event_check_for_error(events, self.reported_errors);
             if events.contains(RxEvent::FifoOvf) {
                 self.uart.info().rxfifo_reset();
             }
-            if let Err(error) = result {
-                return Err(error);
-            }
+            rx_event_check_for_error(events, self.reported_errors)?;
         }
 
         Ok(())
