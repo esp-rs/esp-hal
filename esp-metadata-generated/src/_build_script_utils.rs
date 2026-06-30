@@ -372,7 +372,6 @@ impl Chip {
                     "rsa_version=\"1\"",
                     "rsa_size_increment=\"512\"",
                     "rsa_memory_size_bytes=\"512\"",
-                    "sdmmc_slots=\"2\"",
                     "sdmmc_has_iomux",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
@@ -598,7 +597,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"1\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"512\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
-                    "cargo:rustc-cfg=sdmmc_slots=\"2\"",
                     "cargo:rustc-cfg=sdmmc_has_iomux",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
@@ -4689,7 +4687,6 @@ impl Chip {
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
-                    "sdmmc_slots=\"2\"",
                     "sdmmc_delay_phase_num=\"8\"",
                     "sdmmc_delay_phase_num_is_set",
                     "sdmmc_has_iomux",
@@ -4940,7 +4937,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
-                    "cargo:rustc-cfg=sdmmc_slots=\"2\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num=\"8\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
                     "cargo:rustc-cfg=sdmmc_has_iomux",
@@ -6132,7 +6128,6 @@ impl Chip {
                     "rsa_version=\"2\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
-                    "sdmmc_slots=\"2\"",
                     "sdmmc_delay_phase_num=\"4\"",
                     "sdmmc_delay_phase_num_is_set",
                     "sdmmc_has_gpio_matrix",
@@ -6418,7 +6413,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"2\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
-                    "cargo:rustc-cfg=sdmmc_slots=\"2\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num=\"4\"",
                     "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
                     "cargo:rustc-cfg=sdmmc_has_gpio_matrix",
@@ -7250,7 +7244,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rsa_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_size_increment, values(\"512\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
-    println!("cargo:rustc-check-cfg=cfg(sdmmc_slots, values(\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(spi_master_version, values(\"1\",\"3\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(spi_master_fifo_size, values(\"64\",\"72\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");

@@ -719,7 +719,6 @@ channel_count = 8
 
 [device.sdmmc]
 support_status = "partial"
-slots = 2
 has_iomux = true
 has_gpio_matrix = false
 psram_dma = false

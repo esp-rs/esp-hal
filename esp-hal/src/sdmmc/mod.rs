@@ -26,8 +26,6 @@ use portable_atomic::AtomicBool;
 use procmacros::{BuilderLite, handler};
 use sdio::{self as _, MmcError};
 
-#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-use crate::dma::aligned::DmaAlignedRef;
 #[cfg(sdmmc_has_gpio_matrix)]
 use crate::gpio::{OutputSignal, PinGuard, Pull};
 use crate::{
@@ -53,26 +51,6 @@ use crate::{
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
 mod chip_specific;
-
-/// Selects one of the controller's card slots.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum SlotId {
-    /// Slot 0.
-    _0,
-    /// Slot 1.
-    _1,
-}
-
-impl SlotId {
-    /// Zero-based slot index.
-    fn index(self) -> u8 {
-        match self {
-            SlotId::_0 => 0,
-            SlotId::_1 => 1,
-        }
-    }
-}
 
 /// Card clock source feeding the controller's divider.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -448,46 +426,150 @@ fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
     unsafe { &mut *DESC_RING.0.get() }.get_mut()
 }
 
-// On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
-// both base address and length, otherwise a read invalidate would discard
-// neighbouring data and a write would miss CPU-cached bytes. Control
-// transfers (SCR = 8 B, SSR / SWITCH = 64 B) we cannot align, so they are
-// bounced through an aligned scratch buffer. Two L2 cachelines cover every case.
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-const BOUNCE_LEN: usize = 256;
+mod bounce {
+    use super::*;
+    use crate::dma::aligned::DmaAlignedRef;
 
-// Scratch layout for a bounced, cache-unaligned caller buffer: the unaligned
-// head occupies `[0, head_len)` and the unaligned tail
-// `[BOUNCE_TAIL_OFF, BOUNCE_TAIL_OFF + tail_len)`. Each edge is shorter than
-// the region's DMA alignment (<= 128 B), so the two never overlap and both fit
-// within `BOUNCE_LEN`.
-#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-const BOUNCE_TAIL_OFF: usize = BOUNCE_LEN / 2;
+    // On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
+    // both base address and length, otherwise a read invalidate would discard
+    // neighbouring data and a write would miss CPU-cached bytes. Control
+    // transfers (SCR = 8 B, SSR / SWITCH = 64 B) we cannot align, so they are
+    // bounced through an aligned scratch buffer. Two L2 cachelines cover every case.
+    const BOUNCE_LEN: usize = 256;
 
-/// Per-transaction scratch in [`EngineSession`]. On cached SoCs it holds the
-/// DMA bounce buffer; the engine mutex provides exclusive access.
-struct Bounce {
-    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-    buf: InternalMemory<[u8; BOUNCE_LEN]>,
-}
+    // Scratch layout for a bounced, cache-unaligned caller buffer: the unaligned
+    // head occupies `[0, head_len)` and the unaligned tail
+    // `[BOUNCE_TAIL_OFF, BOUNCE_TAIL_OFF + tail_len)`. Each edge is shorter than
+    // the region's DMA alignment (<= 128 B), so the two never overlap and both fit
+    // within `BOUNCE_LEN`.
+    const BOUNCE_TAIL_OFF: usize = BOUNCE_LEN / 2;
 
-impl Bounce {
-    const INIT: Self = Bounce {
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        buf: InternalMemory::new([0; BOUNCE_LEN]),
-    };
+    /// Per-transaction scratch in [`EngineSession`]. On cached SoCs it holds the
+    /// DMA bounce buffer; the engine mutex provides exclusive access.
+    pub struct Bounce {
+        buf: InternalMemory<[u8; BOUNCE_LEN]>,
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct Split {
+        pub head: usize,
+        pub tail: usize,
+    }
+    impl Split {
+        fn middle(self, len: usize) -> usize {
+            len - self.head - self.tail
+        }
+    }
+
+    impl Bounce {
+        pub const INIT: Self = Bounce {
+            buf: InternalMemory::new([0; BOUNCE_LEN]),
+        };
+
+        /// Splits a caller buffer into cache-unaligned head/tail lengths.
+        pub fn split(buf: &[u8]) -> Option<Split> {
+            let addr = buf.as_ptr() as usize;
+            let len = buf.len();
+            let align = crate::dma::aligned::region_dma_alignment(addr)?;
+            let head = ((align - addr % align) % align).min(len);
+            let tail = (len - head) % align;
+
+            if head != 0 || tail != 0 {
+                debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
+
+                Some(Split { head, tail })
+            } else {
+                None
+            }
+        }
+
+        /// Prepares DMA pointers for an unaligned read (head/tail via scratch).
+        pub fn read_dma_setup(&mut self, buf: &[u8], split: Split) -> Result<Transfer, Error> {
+            let len = buf.len();
+            let middle_len = split.middle(len);
+
+            let scratch = self.buf.get_mut();
+            // Must invalidate before handing to DMA, otherwise evicting dirty cachelines can
+            // corrupt the buffer contents.
+            scratch.invalidate();
+            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+            let middle_ptr = if middle_len != 0 {
+                let middle = &buf[split.head..split.head + middle_len];
+                unsafe {
+                    // Safety: middle comes from Bounce::split which uses DMA requirements to split
+                    // the buffer.
+                    DmaAlignedRef::new_unchecked(middle)
+                }
+                .invalidate();
+                dma_ptr_from_raw(middle.as_ptr())?
+            } else {
+                0
+            };
+
+            Ok(Transfer::split(
+                (head_ptr, split.head),
+                (middle_ptr, middle_len),
+                (tail_ptr, split.tail),
+            ))
+        }
+
+        /// Copies bounced head/tail from scratch into `buf` after a DMA read.
+        pub fn read_finish(&mut self, buf: &mut [u8], split: Split) {
+            let len = buf.len();
+            let middle_len = split.middle(len);
+            if middle_len != 0 {}
+            let scratch = self.buf.get_ref();
+            buf[..split.head].copy_from_slice(&scratch[..split.head]);
+            buf[len - split.tail..]
+                .copy_from_slice(&scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + split.tail]);
+        }
+
+        /// Prepares DMA pointers for an unaligned write (head/tail via scratch).
+        pub fn write_dma_setup(&mut self, buf: &[u8], split: Split) -> Result<Transfer, Error> {
+            let len = buf.len();
+            let middle_len = split.middle(len);
+
+            let mut scratch = self.buf.get_mut();
+            scratch[..split.head].copy_from_slice(&buf[..split.head]);
+            scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + split.tail]
+                .copy_from_slice(&buf[len - split.tail..]);
+            scratch.writeback();
+            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+            let middle_ptr = if middle_len != 0 {
+                let middle = &buf[split.head..split.head + middle_len];
+                unsafe {
+                    // Safety: middle comes from Bounce::split which uses DMA requirements to split
+                    // the buffer.
+                    DmaAlignedRef::new_unchecked(middle)
+                }
+                .writeback();
+                dma_ptr_from_raw(middle.as_ptr())?
+            } else {
+                0
+            };
+            Ok(Transfer::split(
+                (head_ptr, split.head),
+                (middle_ptr, middle_len),
+                (tail_ptr, split.tail),
+            ))
+        }
+    }
 }
 
 /// Exclusive engine session: bounce scratch and last HW-programmed slot.
 struct EngineSession {
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-    bounce: Bounce,
+    bounce: bounce::Bounce,
     active_slot: Option<SlotId>,
 }
 
 impl EngineSession {
     const INIT: Self = EngineSession {
-        bounce: Bounce::INIT,
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        bounce: bounce::Bounce::INIT,
         active_slot: None,
     };
 
@@ -640,6 +722,7 @@ impl EngineSession {
         Ok(resp)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn transfer_blocking(
         &mut self,
         slot: SlotId,
@@ -755,6 +838,7 @@ impl EngineSession {
         Ok(resp)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn transfer_async(
         &mut self,
         slot: SlotId,
@@ -806,47 +890,17 @@ impl EngineSession {
         block_count: u32,
     ) -> Result<[u32; 4], MmcError> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
-            && (head != 0 || tail != 0)
-        {
-            let len = buf.len();
-            let middle_len = len - head - tail;
-
-            let (head_ptr, middle_ptr, tail_ptr) = {
-                let scratch = self.bounce.buf.get_mut();
-                debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
-                scratch.invalidate();
-                let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
-                let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
-                let middle_ptr = if middle_len != 0 {
-                    dma_ptr_from_raw(unsafe { buf.as_ptr().add(head) })?
-                } else {
-                    0
-                };
-                (head_ptr, middle_ptr, tail_ptr)
-            };
+        if let Some(split) = bounce::Bounce::split(buf) {
+            let transfer = self
+                .bounce
+                .read_dma_setup(buf, split)
+                .map_err(MmcError::from)?;
 
             let resp = self
-                .transfer_async(
-                    slot,
-                    index,
-                    arg,
-                    false,
-                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
-                    block_size,
-                    block_count,
-                )
+                .transfer_async(slot, index, arg, false, transfer, block_size, block_count)
                 .await?;
 
-            if middle_len != 0 {
-                unsafe { DmaAlignedMut::new_unchecked(&mut buf[head..head + middle_len]) }
-                    .invalidate();
-            }
-
-            let scratch = self.bounce.buf.get_mut();
-            scratch.invalidate();
-            buf[..head].copy_from_slice(&scratch[..head]);
-            buf[len - tail..].copy_from_slice(&scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]);
+            self.bounce.read_finish(buf, split);
             return Ok(resp);
         }
 
@@ -879,41 +933,14 @@ impl EngineSession {
         block_count: u32,
     ) -> Result<[u32; 4], MmcError> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
-            && (head != 0 || tail != 0)
-        {
-            let len = buf.len();
-            let middle_len = len - head - tail;
-
-            let (head_ptr, middle_ptr, tail_ptr) = {
-                let mut scratch = self.bounce.buf.get_mut();
-                debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
-                scratch[..head].copy_from_slice(&buf[..head]);
-                scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]
-                    .copy_from_slice(&buf[len - tail..]);
-                scratch.writeback();
-                let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
-                let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
-                let middle_ptr = if middle_len != 0 {
-                    let middle = &buf[head..head + middle_len];
-                    unsafe { DmaAlignedRef::new_unchecked(middle) }.writeback();
-                    dma_ptr_from_raw(middle.as_ptr())?
-                } else {
-                    0
-                };
-                (head_ptr, middle_ptr, tail_ptr)
-            };
+        if let Some(split) = bounce::Bounce::split(buf) {
+            let transfer = self
+                .bounce
+                .write_dma_setup(buf, split)
+                .map_err(MmcError::from)?;
 
             return Ok(self
-                .transfer_async(
-                    slot,
-                    index,
-                    arg,
-                    true,
-                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
-                    block_size,
-                    block_count,
-                )
+                .transfer_async(slot, index, arg, true, transfer, block_size, block_count)
                 .await?);
         }
 
@@ -988,7 +1015,7 @@ impl TransferState {
 /// Persistent controller/slot settings consulted on slot selection.
 struct Settings {
     module: Config,
-    slots: [SlotSettings; 2],
+    slots: [SlotSettings; SLOT_COUNT],
 }
 
 impl Settings {
@@ -997,7 +1024,7 @@ impl Settings {
             clock_source: ClockSource::Pll160m,
             module_div: 2,
         },
-        slots: [SlotSettings::INIT; 2],
+        slots: [SlotSettings::INIT; SLOT_COUNT],
     };
 
     fn set_slot_bus(&mut self, slot: SlotId, width: BusWidth, hz: u32) -> Result<(), Error> {
@@ -1101,7 +1128,6 @@ impl SlotState {
     }
 }
 
-const SLOT_COUNT: usize = 2;
 static SLOT_STATE: [SlotState; SLOT_COUNT] = [const { SlotState::new() }; SLOT_COUNT];
 
 /// Mutable runtime state for a slot.
@@ -1172,7 +1198,8 @@ for_each_sdmmc! {
         [$($cd:ident)?], [$($wp:ident)?], [$($card_int:ident)?],
         [$($data_strobe:ident)?], [$($rst:ident)?]
     ) ),*) => {
-        static SLOT_INFO: [SlotInfo; 2] = [ $(
+        const SLOT_COUNT: usize = 0 $(+ { crate::ignore!($slot); 1 })*;
+        static SLOT_INFO: [SlotInfo; SLOT_COUNT] = [ $(
             SlotInfo {
                 io_event: 1u32 << (16 + $idx),
 
@@ -1191,6 +1218,37 @@ for_each_sdmmc! {
                 wp_in: opt_in!($($wp)?),
             }
         ),* ];
+
+        paste::paste! {
+            /// Selects one of the controller's card slots.
+            #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            pub enum SlotId {
+                $(
+                    #[doc = concat!("Slot ", stringify!($idx), ".")]
+                    [<_ $idx>],
+                )*
+            }
+
+            impl SlotId {
+                /// Zero-based slot index.
+                fn index(self) -> u8 {
+                    match self {
+                        $(
+                            SlotId::[<_ $idx >] => $idx,
+                        )*
+                    }
+                }
+            }
+
+            /// Maps a const slot index to its [`SlotId`].
+            const fn slot_id(s: u8) -> SlotId {
+                match s {
+                    $($idx => SlotId::[<_ $idx>],)*
+                    _ => ::core::unreachable!(),
+                }
+            }
+        }
     };
 }
 
@@ -1313,7 +1371,7 @@ fn on_interrupt() {
 pub struct SdHostController<'d> {
     _peri: SDHOST<'d>,
     _guard: PeripheralGuard,
-    taken: [AtomicBool; 2],
+    taken: [AtomicBool; SLOT_COUNT],
 }
 
 impl<'d> SdHostController<'d> {
@@ -1329,7 +1387,7 @@ impl<'d> SdHostController<'d> {
         let this = Self {
             _peri: peri,
             _guard: guard,
-            taken: [const { AtomicBool::new(false) }; 2],
+            taken: [const { AtomicBool::new(false) }; SLOT_COUNT],
         };
 
         // Module clock first, then the DesignWare reset, then quiesce
@@ -1408,11 +1466,6 @@ impl<'d> SdHostController<'d> {
             _pd: PhantomData,
         })
     }
-}
-
-/// Maps a const slot index to its [`SlotId`].
-const fn slot_id(s: u8) -> SlotId {
-    if s == 0 { SlotId::_0 } else { SlotId::_1 }
 }
 
 /// Card-clock output pin for slot `S`.
@@ -2199,22 +2252,6 @@ fn dma_ptr_from_raw(addr: *const u8) -> Result<u32, Error> {
     }
 
     Err(Error::BufferNotDmaCapable)
-}
-
-/// Splits a caller buffer at `addr` of length `len` into the lengths of its
-/// cache-unaligned head and tail. The middle slice `[head, len - tail)` is
-/// aligned in both address and size for in-place DMA, while `head` and `tail`
-/// (each shorter than the region's DMA alignment) must be bounced through the
-/// aligned scratch buffer and copied.
-///
-/// Returns `None` if the buffer is not in a DMA-capable region; the caller
-/// then falls back to the validating direct path which reports the error.
-#[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-fn unaligned_split(addr: usize, len: usize) -> Option<(usize, usize)> {
-    let align = crate::dma::aligned::region_dma_alignment(addr)?;
-    let head = ((align - addr % align) % align).min(len);
-    let tail = (len - head) % align;
-    Some((head, tail))
 }
 
 /// Waits for the command response then the data phase, refilling the ring.

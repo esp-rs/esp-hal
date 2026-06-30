@@ -335,7 +335,6 @@ support_status = "partial"
 
 [device.sdmmc]
 support_status = "partial"
-slots = 2
 delay_phase_num = 8
 has_iomux = true
 has_gpio_matrix = true
