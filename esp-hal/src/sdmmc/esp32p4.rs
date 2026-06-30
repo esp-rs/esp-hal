@@ -99,3 +99,33 @@ pub fn set_module_clock(_source: ClockSource, div: u8) {
     c.peri_clk_ctrl02()
         .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
 }
+
+/// Card-clock frequency at which the P4 DLL delay path is used (SDR104).
+const SDR104_HZ: u32 = 200_000_000;
+
+/// Programs the input sampling delay phase (LS edge select below SDR104, DLL above).
+pub fn set_input_delay_phase(phase: DelayPhase, hz: u32) {
+    let v = match phase {
+        DelayPhase::_0 => 0u8,
+        DelayPhase::_1 => 1,
+        DelayPhase::_2 => 2,
+        DelayPhase::_3 => 3,
+    };
+
+    if hz >= SDR104_HZ {
+        let bits = v << 3;
+        SDHOST::regs().dll_clk_conf().modify(|_, w| unsafe {
+            w.dll_cclk_in_sam_phase().bits(bits);
+            w.dll_cclk_in_drv_phase().bits(bits)
+        });
+        return;
+    }
+
+    let c = crate::peripherals::HP_SYS_CLKRST::regs();
+    c.peri_clk_ctrl02()
+        .modify(|_, w| unsafe { w.sdio_ls_sam_clk_edge_sel().bits(v) });
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().set_bit());
+    c.peri_clk_ctrl02()
+        .modify(|_, w| w.sdio_ls_clk_edge_cfg_update().clear_bit());
+}

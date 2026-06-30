@@ -343,12 +343,6 @@ macro_rules! property {
     ("sdmmc.slots", str) => {
         stringify!(2)
     };
-    ("sdmmc.delay_phase_num") => {
-        0
-    };
-    ("sdmmc.delay_phase_num", str) => {
-        stringify!(0)
-    };
     ("sdmmc.has_iomux") => {
         true
     };

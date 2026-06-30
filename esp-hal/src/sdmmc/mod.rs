@@ -86,7 +86,7 @@ pub enum ClockSource {
 }
 
 /// Clock input sampling phase used for high-speed tuning.
-#[cfg(esp32s3)]
+#[cfg(sdmmc_delay_phase_num_is_set)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DelayPhase {
@@ -153,8 +153,8 @@ impl Config {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SlotConfig {
-    /// Input sampling delay phase used for high-speed tuning (esp32s3 only).
-    #[cfg(esp32s3)]
+    /// Input sampling delay phase used for high-speed tuning.
+    #[cfg(sdmmc_delay_phase_num_is_set)]
     input_delay_phase: DelayPhase,
 
     /// Write-protect signal polarity (active-high or active-low).
@@ -520,9 +520,9 @@ impl EngineSession {
         let card_div =
             freq_to_card_div(module_hz(module.clock_source, module.module_div), cached.hz);
         self.set_card_clock(slot, card_div)?;
-        #[cfg(esp32s3)]
+        #[cfg(sdmmc_delay_phase_num_is_set)]
         if cached.hz > 25_000_000 {
-            chip_specific::set_input_delay_phase(cached.input_delay_phase);
+            chip_specific::set_input_delay_phase(cached.input_delay_phase, cached.hz);
         }
         Ok(())
     }
@@ -1017,7 +1017,7 @@ struct SlotSettings {
     hz: u32,
     width: BusWidth,
     dirty: bool,
-    #[cfg(esp32s3)]
+    #[cfg(sdmmc_delay_phase_num_is_set)]
     input_delay_phase: DelayPhase,
 }
 
@@ -1026,7 +1026,7 @@ impl SlotSettings {
         hz: 25_000_000,
         width: BusWidth::Bit1,
         dirty: true,
-        #[cfg(esp32s3)]
+        #[cfg(sdmmc_delay_phase_num_is_set)]
         input_delay_phase: DelayPhase::_0,
     };
 }
@@ -1391,7 +1391,7 @@ impl<'d> SdHostController<'d> {
         if self.taken[idx].swap(true, Ordering::Relaxed) {
             return Err(ConfigError::SlotInUse);
         }
-        #[cfg(esp32s3)]
+        #[cfg(sdmmc_delay_phase_num_is_set)]
         SETTINGS.with(|s| {
             s.slots[idx].input_delay_phase = config.input_delay_phase;
             s.slots[idx].dirty = true;
