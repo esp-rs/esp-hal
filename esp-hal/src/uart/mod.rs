@@ -172,6 +172,7 @@ impl core::error::Error for RxError {}
 /// [`RxError`].
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 #[non_exhaustive]
 pub enum RxErrorKind {
     /// An RX FIFO overflow happened.
@@ -435,7 +436,7 @@ pub struct RxConfig {
     ///
     /// Error conditions not present in this set are cleared and ignored by
     /// UART read operations.
-    #[builder_lite(into)]
+    #[builder_lite(unstable, into)]
     reported_errors: EnumSet<RxErrorKind>,
     /// Whether received bytes with UART errors are discarded by the hardware.
     ///
@@ -444,6 +445,7 @@ pub struct RxConfig {
     /// `false` to keep those bytes in the RX FIFO. Use
     /// [`Self::with_reported_errors`] to control whether those error
     /// conditions make read operations fail.
+    #[builder_lite(unstable)]
     discard_erroneous_bytes: bool,
 }
 
