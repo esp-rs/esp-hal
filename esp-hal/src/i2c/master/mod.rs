@@ -1297,4 +1297,22 @@ where
         self.driver().reset_fsm(false);
         Ok(())
     }
+
+    /// Drives SCL low (`true`) or releases it (`false`).
+    ///
+    /// Forcing a line low interrupts normal peripheral operation — no
+    /// transactions should be started while a line is held low.
+    #[instability::unstable]
+    pub fn force_scl_low(&mut self, low: bool) {
+        self.driver().force_scl_low(low);
+    }
+
+    /// Drives SDA low (`true`) or releases it (`false`).
+    ///
+    /// Forcing a line low interrupts normal peripheral operation — no
+    /// transactions should be started while a line is held low.
+    #[instability::unstable]
+    pub fn force_sda_low(&mut self, low: bool) {
+        self.driver().force_sda_low(low);
+    }
 }

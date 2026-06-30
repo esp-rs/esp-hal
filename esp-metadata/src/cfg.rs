@@ -447,6 +447,10 @@ driver_configs![
             has_tx_fifo_watermark: bool,
             #[serde(default)]
             bus_timeout_is_exponential: bool,
+            /// Whether `I2C_SCL_SP_CONF_REG` has `scl_pd_en`/`sda_pd_en` bits for
+            /// actively holding a line low. All chips except ESP32 have these.
+            #[serde(default)]
+            has_pd_en: bool,
             #[serde(default)]
             i2c0_data_register_ahb_address: Option<u32>,
             max_bus_timeout: u32,

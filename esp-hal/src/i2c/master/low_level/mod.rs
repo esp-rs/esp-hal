@@ -446,9 +446,8 @@ impl Driver<'_> {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
-            // Use open drain output for SDA and SCL
-            w.sda_force_out().set_bit();
-            w.scl_force_out().set_bit();
+            w.sda_force_out().open_drain();
+            w.scl_force_out().open_drain();
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
@@ -583,6 +582,94 @@ impl Driver<'_> {
             }
         })
         .await;
+    }
+
+    pub(super) fn force_scl_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_scl_pd(low),
+            _ => self.force_pin_low(low, self.config.scl_pin.pin_number(), &self.info.scl_output),
+        }
+    }
+
+    pub(super) fn force_sda_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_sda_pd(low),
+            _ => self.force_pin_low(low, self.config.sda_pin.pin_number(), &self.info.sda_output),
+        }
+    }
+
+    /// Restores force_out to open-drain mode for both lines.
+    #[cfg(i2c_master_has_pd_en)]
+    fn restore_force_out(&self) {
+        self.regs().ctr().modify(|_, w| {
+            w.scl_force_out().open_drain();
+            w.sda_force_out().open_drain()
+        });
+        self.update_registers();
+    }
+
+    #[cfg(not(i2c_master_has_pd_en))]
+    fn force_pin_low(
+        &self,
+        low: bool,
+        pin_number: Option<u8>,
+        output_signal: &crate::gpio::OutputSignal,
+    ) {
+        use crate::gpio::AnyPin;
+        let Some(n) = pin_number else { return };
+        let pin = unsafe { AnyPin::steal(n) };
+        if low {
+            pin.set_output_high(false);
+            output_signal.disconnect_from(&pin);
+        } else {
+            output_signal.connect_to(&pin);
+        }
+    }
+
+    /// Sets or clears `scl_pd_en`. Switches `scl_force_out` to direct-output while
+    /// pd_en is active (required on all chips), restoring OD mode when both pd_en
+    /// bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    fn set_scl_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.scl_force_out().direct_output());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.scl_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+                return;
+            }
+        }
+        self.update_registers();
+    }
+
+    /// Sets or clears `sda_pd_en`. Switches `sda_force_out` to direct-output while
+    /// pd_en is active (required on all chips), restoring OD mode when both pd_en
+    /// bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    fn set_sda_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.sda_force_out().direct_output());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.sda_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+                return;
+            }
+        }
+        self.update_registers();
     }
 
     /// Resets the I2C peripheral's command registers.
