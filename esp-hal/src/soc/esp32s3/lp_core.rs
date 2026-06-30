@@ -22,7 +22,7 @@
 //!     0xbf, 0x00, 0x00, 0x00, 0x00,
 //! ];
 //!
-//! let mut ulp_core = esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//! let mut ulp_core = esp_hal::lp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! ulp_core.stop();
 //!
 //! // copy code to RTC ram
@@ -32,7 +32,7 @@
 //! }
 //!
 //! // start ULP core
-//! ulp_core.run(esp_hal::ulp_core::UlpCoreWakeupSource::HpCpu);
+//! ulp_core.run(esp_hal::lp_core::UlpCoreWakeupSource::HpCpu);
 //!
 //! unsafe {
 //!     let data = 0x5000_0010 as *mut u32;
