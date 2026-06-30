@@ -100,6 +100,8 @@ pub enum BusWidth {
     Bit1,
     /// 4-bit bus (DAT0–DAT3).
     Bit4,
+    /// 8-bit bus (DAT0–DAT7, Card slot 0 only).
+    Bit8,
 }
 
 /// Controller-wide (engine) configuration.
@@ -485,11 +487,12 @@ impl Engine {
     fn set_card_width(&mut self, id: SlotId, width: BusWidth) {
         let slot = id.index();
         SDHOST::regs().ctype().modify(|rd, w| unsafe {
-            let mut w4 = rd.card_width4().bits();
-            let w8 = rd.card_width8().bits() & !(1 << slot);
+            let mut w4 = rd.card_width4().bits() & !(1 << slot);
+            let mut w8 = rd.card_width8().bits() & !(1 << slot);
             match width {
+                BusWidth::Bit8 => w8 |= 1 << slot,
                 BusWidth::Bit4 => w4 |= 1 << slot,
-                BusWidth::Bit1 => w4 &= !(1 << slot),
+                BusWidth::Bit1 => {}
             }
             w.card_width4().bits(w4);
             w.card_width8().bits(w8)
@@ -1135,9 +1138,8 @@ macro_rules! impl_signal_trait {
     };
 }
 
-// Arms for functions absent on a given chip simply never match (the generated
-// macro ignores unmatched functions), so ESP32's `HS*_*` and P4's `SD1_*` can
-// coexist here. P4 wires only slot 0 (`SD1_*`) to fixed pads; slot 1 is matrix.
+// Arms for functions absent on a given chip simply never match (the generated macro ignores
+// unmatched functions). P4 wires only slot 0 (`SD1_*`) to fixed pads; slot 1 is matrix.
 #[cfg(sdmmc_has_iomux)]
 for_each_iomux_function! {
     (SD1_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 0); };
@@ -1146,6 +1148,10 @@ for_each_iomux_function! {
     (SD1_DATA1, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 1); };
     (SD1_DATA2, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 2); };
     (SD1_DATA3, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 3); };
+    (SD1_DATA4, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 4); };
+    (SD1_DATA5, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 5); };
+    (SD1_DATA6, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 6); };
+    (SD1_DATA7, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotData, $af, 0, 7); };
 
     (SD2_CLK, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotClk, $af, 1); };
     (SD2_CMD, $gpio:ident, $af:ident) => { impl_signal_trait!($gpio, SlotCmd, $af, 1); };
@@ -1208,6 +1214,34 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     pub fn with_data3(mut self, d3: impl SlotData<'d, S, 3>) -> Self {
         d3.configure();
         self.note_data_pin(4);
+        self
+    }
+
+    /// Connects data line 4.
+    pub fn with_data4(mut self, d4: impl SlotData<'d, S, 4>) -> Self {
+        d4.configure();
+        self.note_data_pin(5);
+        self
+    }
+
+    /// Connects data line 5.
+    pub fn with_data5(mut self, d5: impl SlotData<'d, S, 5>) -> Self {
+        d5.configure();
+        self.note_data_pin(6);
+        self
+    }
+
+    /// Connects data line 6.
+    pub fn with_data6(mut self, d6: impl SlotData<'d, S, 6>) -> Self {
+        d6.configure();
+        self.note_data_pin(7);
+        self
+    }
+
+    /// Connects data line 7 (completes the 8-bit bus).
+    pub fn with_data7(mut self, d7: impl SlotData<'d, S, 7>) -> Self {
+        d7.configure();
+        self.note_data_pin(8);
         self
     }
 
@@ -1900,9 +1934,12 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let w = match width {
             sdio::BusWidth::W1 => BusWidth::Bit1,
             sdio::BusWidth::W4 => BusWidth::Bit4,
-            sdio::BusWidth::W8 => return Err(MmcError::Unsupported),
+            sdio::BusWidth::W8 => BusWidth::Bit8,
         };
         if matches!(w, BusWidth::Bit4) && self.data_pins < 4 {
+            return Err(MmcError::Unsupported);
+        }
+        if matches!(w, BusWidth::Bit8) && self.data_pins < 8 {
             return Err(MmcError::Unsupported);
         }
         if hz > 40_000_000 {
@@ -1918,7 +1955,9 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     }
 
     fn supports_bus_width(&self) -> sdio::BusWidth {
-        if self.data_pins >= 4 {
+        if self.data_pins >= 8 {
+            sdio::BusWidth::W8
+        } else if self.data_pins >= 4 {
             sdio::BusWidth::W4
         } else {
             sdio::BusWidth::W1
