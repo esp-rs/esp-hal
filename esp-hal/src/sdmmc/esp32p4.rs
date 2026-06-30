@@ -1,3 +1,5 @@
+//! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
+//! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
 /// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.

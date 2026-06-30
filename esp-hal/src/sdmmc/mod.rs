@@ -4,6 +4,11 @@
 //!
 //! Driver for the SDMMC/SDIO host controller (`SDHOST`). The controller exposes
 //! up to two independent card slots that share a single transfer engine.
+//!
+//! Blocking engine operations return [`BlockingError`]; [`BlockingError::Busy`]
+//! if another slot or an async transfer holds the engine. Async ops await the
+//! engine mutex instead. Bus width and card clock are cached and applied on
+//! engine acquire (lock order: engine, then settings).
 
 use core::{
     cell::UnsafeCell,
@@ -268,6 +273,44 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
+/// Error from blocking engine operations ([`BlockingError::Busy`] is mutex contention, not CIU
+/// HLE).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum BlockingError {
+    /// The shared engine is held by another slot or an async transfer.
+    Busy,
+    /// The operation failed after the engine was acquired.
+    Op(Error),
+}
+
+impl core::error::Error for BlockingError {}
+
+impl core::fmt::Display for BlockingError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            BlockingError::Busy => write!(f, "The shared SDMMC engine is busy"),
+            BlockingError::Op(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl From<Error> for BlockingError {
+    fn from(error: Error) -> Self {
+        BlockingError::Op(error)
+    }
+}
+
+impl From<BlockingError> for MmcError {
+    fn from(error: BlockingError) -> Self {
+        match error {
+            BlockingError::Busy => MmcError::Other,
+            BlockingError::Op(e) => e.into(),
+        }
+    }
+}
+
 impl From<Error> for MmcError {
     fn from(error: Error) -> Self {
         warn!("{:?}", error);
@@ -396,11 +439,13 @@ impl Transfer {
 
 /// Driver-owned descriptor ring in internal DMA-capable RAM.
 struct DescRing(UnsafeCell<InternalMemory<[Desc; RING_LEN]>>);
-// Access is serialized by the single controller / per-slot mutex.
+// Access only while `ENGINE` is held.
 unsafe impl Sync for DescRing {}
 
+static DESC_RING: DescRing = DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN])));
+
 fn ring() -> DmaAlignedMut<'static, [Desc; RING_LEN]> {
-    unsafe { &mut *STATE.desc_ring.0.get() }.get_mut()
+    unsafe { &mut *DESC_RING.0.get() }.get_mut()
 }
 
 // On SoCs with a data cache the IDMAC buffer must be cache-line aligned in
@@ -419,11 +464,8 @@ const BOUNCE_LEN: usize = 256;
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
 const BOUNCE_TAIL_OFF: usize = BOUNCE_LEN / 2;
 
-/// Per-transaction scratch owned by `engine_lock`. On SoCs with a data
-/// cache it holds a DMA-aligned bounce buffer for cache-unaligned caller
-/// buffers; `InternalMemory` provides the alignment and the lock provides
-/// the exclusive access, so no `UnsafeCell` is needed. Elsewhere it is an
-/// empty marker carried by the same lock.
+/// Per-transaction scratch in [`EngineSession`]. On cached SoCs it holds the
+/// DMA bounce buffer; the engine mutex provides exclusive access.
 struct Bounce {
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
     buf: InternalMemory<[u8; BOUNCE_LEN]>,
@@ -434,6 +476,460 @@ impl Bounce {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         buf: InternalMemory::new([0; BOUNCE_LEN]),
     };
+}
+
+/// Exclusive engine session: bounce scratch and last HW-programmed slot.
+struct EngineSession {
+    #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+    bounce: Bounce,
+    active_slot: Option<SlotId>,
+}
+
+impl EngineSession {
+    const INIT: Self = EngineSession {
+        bounce: Bounce::INIT,
+        active_slot: None,
+    };
+
+    fn select_and_apply(&mut self, slot: SlotId) -> Result<(), Error> {
+        let wait = SETTINGS.with(|s| {
+            let idx = slot.index() as usize;
+            let cached = &mut s.slots[idx];
+            if self.active_slot == Some(slot) && !cached.dirty {
+                return Ok(false);
+            }
+            self.program_slot_hw(slot, cached, s.module)?;
+            cached.dirty = false;
+            self.active_slot = Some(slot);
+            Ok(true)
+        })?;
+
+        if wait {
+            crate::rom::ets_delay_us(10);
+        }
+        Ok(())
+    }
+
+    fn program_slot_hw(
+        &mut self,
+        slot: SlotId,
+        cached: &SlotSettings,
+        module: Config,
+    ) -> Result<(), Error> {
+        self.set_card_width(slot, cached.width);
+        let card_div =
+            freq_to_card_div(module_hz(module.clock_source, module.module_div), cached.hz);
+        self.set_card_clock(slot, card_div)?;
+        #[cfg(esp32s3)]
+        if cached.hz > 25_000_000 {
+            chip_specific::set_input_delay_phase(cached.input_delay_phase);
+        }
+        Ok(())
+    }
+
+    fn set_card_width(&mut self, id: SlotId, width: BusWidth) {
+        let slot = id.index();
+        SDHOST::regs().ctype().modify(|rd, w| unsafe {
+            let mut w4 = rd.card_width4().bits() & !(1 << slot);
+            let mut w8 = rd.card_width8().bits() & !(1 << slot);
+            match width {
+                BusWidth::Bit8 => w8 |= 1 << slot,
+                BusWidth::Bit4 => w4 |= 1 << slot,
+                BusWidth::Bit1 => {}
+            }
+            w.card_width4().bits(w4);
+            w.card_width8().bits(w8)
+        });
+    }
+
+    fn set_card_clock(&mut self, id: SlotId, card_div: u8) -> Result<(), Error> {
+        let slot = id.index();
+        let r = SDHOST::regs();
+
+        r.clkena().modify(|rd, w| unsafe {
+            w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
+        });
+        self.apply_clock_update(id)?;
+
+        r.clksrc().modify(|rd, w| unsafe {
+            let mut v = rd.clksrc().bits();
+            match id {
+                SlotId::_0 => v &= !0b11,
+                SlotId::_1 => {
+                    v &= !0b1100;
+                    v |= 1 << 2;
+                }
+            }
+            w.clksrc().bits(v)
+        });
+        r.clkdiv().modify(|_, w| unsafe {
+            match id {
+                SlotId::_0 => w.clk_divider0().bits(card_div),
+                SlotId::_1 => w.clk_divider1().bits(card_div),
+            }
+        });
+
+        r.clkena().modify(|rd, w| unsafe {
+            w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
+            w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
+        });
+        self.apply_clock_update(id)
+    }
+
+    fn apply_clock_update(&mut self, id: SlotId) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(0) });
+        r.cmd().write(|w| unsafe {
+            w.update_clock_registers_only().set_bit();
+            w.wait_prvdata_complete().set_bit();
+            w.card_number().bits(id.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
+    }
+
+    fn send_init_sequence(&mut self, slot: SlotId) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
+        r.cmdarg().write(|w| unsafe { w.bits(0) });
+        r.cmd().write(|w| unsafe {
+            w.send_initialization().set_bit();
+            w.wait_prvdata_complete().set_bit();
+            w.card_number().bits(slot.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()?;
+
+        let result = poll_until(|| r.rintsts().read().bits() & EVT_CMD_DONE != 0);
+        if result.is_ok() {
+            r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
+        }
+        result
+    }
+
+    fn send_command_blocking(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+        let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
+
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        self.issue_command(slot, index, arg, resp_len, check_crc, flags)?;
+
+        let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
+        let mut sts = 0;
+        poll_until(|| {
+            sts = r.rintsts().read().bits();
+            sts & done != 0
+        })?;
+        map_rintsts(sts)?;
+
+        let resp = read_response(resp_len);
+        r.rintsts().write(|w| unsafe { w.bits(consume) });
+
+        if flags.busy {
+            wait_busy_cleared()?;
+        }
+        Ok(resp)
+    }
+
+    fn transfer_blocking(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        write: bool,
+        mut t: Transfer,
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+
+        reset_transfer()?;
+        let total_len = t.remaining();
+        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
+
+        let mut ring = ring();
+        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
+        ring[0].flags |= DESC_FIRST;
+        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
+        enable_idmac(ring.as_ptr() as u32);
+        r.pldmnd().write(|w| unsafe { w.bits(1) });
+
+        self.issue_data_command(slot, index, arg, write, block_count)?;
+
+        let result = run_data_phase(&mut t, ring, write, needs_auto_stop(index, block_count));
+
+        disable_idmac();
+        r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+        r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+
+        result?;
+        Ok(read_response(ResponseLen::Short))
+    }
+
+    fn issue_command(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect()
+                .bit(!matches!(resp_len, ResponseLen::None));
+            w.response_length()
+                .bit(matches!(resp_len, ResponseLen::Long));
+            w.check_response_crc().bit(check_crc);
+            w.wait_prvdata_complete().bit(flags.wait_complete);
+            w.stop_abort_cmd().bit(flags.stop_abort);
+            w.use_hole().set_bit();
+            w.card_number().bits(slot.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
+    }
+
+    fn issue_data_command(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        write: bool,
+        block_count: u32,
+    ) -> Result<(), Error> {
+        let r = SDHOST::regs();
+        r.cmdarg().write(|w| unsafe { w.bits(arg) });
+        r.cmd().write(|w| unsafe {
+            w.index().bits(index);
+            w.response_expect().set_bit();
+            w.check_response_crc().set_bit();
+            w.data_expected().set_bit();
+            w.read_write().bit(write);
+            w.send_auto_stop().bit(needs_auto_stop(index, block_count));
+            w.wait_prvdata_complete().set_bit();
+            w.use_hole().set_bit();
+            w.card_number().bits(slot.index());
+            w.start_cmd().set_bit()
+        });
+        wait_command_accepted()
+    }
+
+    async fn send_command_async(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        resp_len: ResponseLen,
+        check_crc: bool,
+        flags: CommandFlags,
+    ) -> Result<[u32; 4], Error> {
+        let r = SDHOST::regs();
+        let guard = DropGuard::new((), |()| abort_transfer());
+
+        r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
+        arm_transfer(false, false, None);
+        r.intmask()
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
+
+        self.issue_command(slot, index, arg, resp_len, check_crc, flags)?;
+        wait_result().await?;
+        let resp = read_response(resp_len);
+        if flags.busy {
+            wait_busy_poll().await?;
+        }
+        guard.defuse();
+        Ok(resp)
+    }
+
+    async fn transfer_async(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        write: bool,
+        mut t: Transfer,
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], Error> {
+        let guard = DropGuard::new((), |()| abort_transfer());
+        let r = SDHOST::regs();
+
+        reset_transfer()?;
+        let total_len = t.remaining();
+        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
+        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
+
+        let mut ring = ring();
+        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
+        ring[0].flags |= DESC_FIRST;
+        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
+        enable_idmac(ring.as_ptr() as u32);
+        r.pldmnd().write(|w| unsafe { w.bits(1) });
+
+        arm_transfer(true, needs_auto_stop(index, block_count), Some(t));
+        r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
+        r.intmask()
+            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
+
+        self.issue_data_command(slot, index, arg, write, block_count)?;
+        wait_result().await?;
+        if write {
+            wait_busy_async().await?;
+        }
+        disable_idmac();
+        let resp = read_response(ResponseLen::Short);
+        guard.defuse();
+        Ok(resp)
+    }
+
+    async fn read_async(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        buf: &mut [u8],
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], MmcError> {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
+            && (head != 0 || tail != 0)
+        {
+            let len = buf.len();
+            let middle_len = len - head - tail;
+
+            let (head_ptr, middle_ptr, tail_ptr) = {
+                let scratch = self.bounce.buf.get_mut();
+                debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
+                scratch.invalidate();
+                let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+                let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+                let middle_ptr = if middle_len != 0 {
+                    dma_ptr_from_raw(unsafe { buf.as_ptr().add(head) })?
+                } else {
+                    0
+                };
+                (head_ptr, middle_ptr, tail_ptr)
+            };
+
+            let resp = self
+                .transfer_async(
+                    slot,
+                    index,
+                    arg,
+                    false,
+                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
+                    block_size,
+                    block_count,
+                )
+                .await?;
+
+            if middle_len != 0 {
+                unsafe { DmaAlignedMut::new_unchecked(&mut buf[head..head + middle_len]) }
+                    .invalidate();
+            }
+
+            let scratch = self.bounce.buf.get_mut();
+            scratch.invalidate();
+            buf[..head].copy_from_slice(&scratch[..head]);
+            buf[len - tail..].copy_from_slice(&scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]);
+            return Ok(resp);
+        }
+
+        let mut dma = DmaAlignedMut::new(buf)?;
+        let ptr = dma_ptr(dma.reborrow())?;
+        let total = dma.len();
+        let resp = self
+            .transfer_async(
+                slot,
+                index,
+                arg,
+                false,
+                Transfer::single(ptr, total),
+                block_size,
+                block_count,
+            )
+            .await?;
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        dma.invalidate();
+        Ok(resp)
+    }
+
+    async fn write_async(
+        &mut self,
+        slot: SlotId,
+        index: u8,
+        arg: u32,
+        buf: &[u8],
+        block_size: u16,
+        block_count: u32,
+    ) -> Result<[u32; 4], MmcError> {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
+            && (head != 0 || tail != 0)
+        {
+            let len = buf.len();
+            let middle_len = len - head - tail;
+
+            let (head_ptr, middle_ptr, tail_ptr) = {
+                let mut scratch = self.bounce.buf.get_mut();
+                debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
+                scratch[..head].copy_from_slice(&buf[..head]);
+                scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]
+                    .copy_from_slice(&buf[len - tail..]);
+                scratch.writeback();
+                let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
+                let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
+                let middle_ptr = if middle_len != 0 {
+                    let middle = &buf[head..head + middle_len];
+                    unsafe { DmaAlignedRef::new_unchecked(middle) }.writeback();
+                    dma_ptr_from_raw(middle.as_ptr())?
+                } else {
+                    0
+                };
+                (head_ptr, middle_ptr, tail_ptr)
+            };
+
+            return Ok(self
+                .transfer_async(
+                    slot,
+                    index,
+                    arg,
+                    true,
+                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
+                    block_size,
+                    block_count,
+                )
+                .await?);
+        }
+
+        let ptr = dma_ptr_from_raw(buf.as_ptr())?;
+        Ok(self
+            .transfer_async(
+                slot,
+                index,
+                arg,
+                true,
+                Transfer::single(ptr, buf.len()),
+                block_size,
+                block_count,
+            )
+            .await?)
+    }
 }
 
 // `rintsts` card-detect change bit.
@@ -464,8 +960,8 @@ const INTMASK_DATA: u32 = INTMASK_CMD
 // `idinten` bits: TX/RX done, fatal/unavailable, normal/abnormal summaries.
 const IDINTEN_ALL: u32 = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4) | (1 << 8) | (1 << 9);
 
-/// Per-controller async engine state shared with the interrupt handler.
-struct Engine {
+/// ISR/task transfer handshake (distinct from CIU access via `EngineSession`).
+struct TransferState {
     transfer: Option<Transfer>,
     result: Option<Result<(), Error>>,
     expect_data: bool,
@@ -476,8 +972,8 @@ struct Engine {
     waker: WakerRegistration,
 }
 
-impl Engine {
-    const IDLE: Self = Engine {
+impl TransferState {
+    const IDLE: Self = TransferState {
         transfer: None,
         result: None,
         expect_data: false,
@@ -487,84 +983,11 @@ impl Engine {
         wait_busy: false,
         waker: WakerRegistration::new(),
     };
-
-    /// Sets the bus width bits for a slot.
-    fn set_card_width(&mut self, id: SlotId, width: BusWidth) {
-        let slot = id.index();
-        SDHOST::regs().ctype().modify(|rd, w| unsafe {
-            let mut w4 = rd.card_width4().bits() & !(1 << slot);
-            let mut w8 = rd.card_width8().bits() & !(1 << slot);
-            match width {
-                BusWidth::Bit8 => w8 |= 1 << slot,
-                BusWidth::Bit4 => w4 |= 1 << slot,
-                BusWidth::Bit1 => {}
-            }
-            w.card_width4().bits(w4);
-            w.card_width8().bits(w8)
-        });
-    }
-
-    /// Sets a slot's card clock divider and (re-)enables the card clock.
-    fn set_card_clock(&mut self, id: SlotId, card_div: u8) -> Result<(), Error> {
-        let slot = id.index();
-        let r = SDHOST::regs();
-
-        // Disable card clock before changing the divider.
-        r.clkena().modify(|rd, w| unsafe {
-            w.cclk_enable().bits(rd.cclk_enable().bits() & !(1 << slot))
-        });
-        self.apply_clock_update(id)?;
-
-        // Select per-slot divider register and program the divider value.
-        r.clksrc().modify(|rd, w| unsafe {
-            let mut v = rd.clksrc().bits();
-            match id {
-                SlotId::_0 => v &= !0b11,
-                SlotId::_1 => {
-                    v &= !0b1100;
-                    v |= 1 << 2;
-                }
-            }
-            w.clksrc().bits(v)
-        });
-        r.clkdiv().modify(|_, w| unsafe {
-            match id {
-                SlotId::_0 => w.clk_divider0().bits(card_div),
-                SlotId::_1 => w.clk_divider1().bits(card_div),
-            }
-        });
-
-        // Re-enable card clock with low-power gating, then commit.
-        r.clkena().modify(|rd, w| unsafe {
-            w.cclk_enable().bits(rd.cclk_enable().bits() | (1 << slot));
-            w.lp_enable().bits(rd.lp_enable().bits() | (1 << slot))
-        });
-        self.apply_clock_update(id)
-    }
-
-    /// Commits clock-register changes via an `update_clock_registers_only`
-    /// command.
-    fn apply_clock_update(&mut self, id: SlotId) -> Result<(), Error> {
-        let r = SDHOST::regs();
-        r.cmdarg().write(|w| unsafe { w.bits(0) });
-        r.cmd().write(|w| unsafe {
-            w.update_clock_registers_only().set_bit();
-            w.wait_prvdata_complete().set_bit();
-            w.card_number().bits(id.index());
-            w.start_cmd().set_bit()
-        });
-        wait_command_accepted()
-    }
 }
 
 /// Persistent controller/slot settings consulted on slot selection.
-///
-/// Kept separate from [`Engine`] (which is reset between transfers) so the
-/// engine-wide module clock and per-slot tuning survive across operations.
 struct Settings {
     module: Config,
-    active_slot: Option<SlotId>,
-    #[cfg(esp32s3)]
     slots: [SlotSettings; 2],
 }
 
@@ -574,82 +997,58 @@ impl Settings {
             clock_source: ClockSource::Pll160m,
             module_div: 2,
         },
-        active_slot: None,
-        #[cfg(esp32s3)]
         slots: [SlotSettings::INIT; 2],
     };
+
+    fn set_slot_bus(&mut self, slot: SlotId, width: BusWidth, hz: u32) -> Result<(), Error> {
+        if hz == 0 || hz > 40_000_000 {
+            return Err(Error::Unsupported);
+        }
+        let idx = slot.index() as usize;
+        self.slots[idx].hz = hz;
+        self.slots[idx].width = width;
+        self.slots[idx].dirty = true;
+        Ok(())
+    }
 }
 
-/// Per-slot settings needed to (re-)apply shared registers on selection.
-#[cfg(esp32s3)]
 #[derive(Clone, Copy)]
 struct SlotSettings {
     hz: u32,
+    width: BusWidth,
+    dirty: bool,
+    #[cfg(esp32s3)]
     input_delay_phase: DelayPhase,
 }
 
-#[cfg(esp32s3)]
 impl SlotSettings {
     const INIT: Self = SlotSettings {
-        hz: 0,
+        hz: 25_000_000,
+        width: BusWidth::Bit1,
+        dirty: true,
+        #[cfg(esp32s3)]
         input_delay_phase: DelayPhase::_0,
     };
 }
 
-/// Mutable controller state shared with the interrupt handler.
-///
-/// `engine_lock` serializes whole transactions over the single shared
-/// transfer engine so a second slot cannot clobber
-/// `blksiz`/`bytcnt`/`dbaddr`/`cmd` mid-transfer. Uncontended (and so
-/// near-free) in the common single-slot case.
-struct State {
-    engine: NonReentrantMutex<Engine>,
-    engine_lock: embassy_sync::mutex::Mutex<RawMutex, Bounce>,
-    settings: NonReentrantMutex<Settings>,
-    desc_ring: DescRing,
-}
-unsafe impl Sync for State {}
+static ENGINE: embassy_sync::mutex::Mutex<RawMutex, EngineSession> =
+    embassy_sync::mutex::Mutex::new(EngineSession::INIT);
+static SETTINGS: NonReentrantMutex<Settings> = NonReentrantMutex::new(Settings::INIT);
+static TRANSFER: NonReentrantMutex<TransferState> = NonReentrantMutex::new(TransferState::IDLE);
 
-impl State {
-    async fn select_slot(&self, slot_id: SlotId) -> MutexGuard<'_, RawMutex, Bounce> {
-        let guard = self.engine_lock.lock().await;
-        select_slot_sync(slot_id);
-        guard
-    }
+fn with_engine_try<R>(
+    slot: SlotId,
+    f: impl FnOnce(&mut EngineSession) -> Result<R, Error>,
+) -> Result<R, BlockingError> {
+    let mut session = ENGINE.try_lock().map_err(|_| BlockingError::Busy)?;
+    session.select_and_apply(slot).map_err(BlockingError::Op)?;
+    f(&mut session).map_err(BlockingError::Op)
 }
 
-static STATE: State = State {
-    engine: NonReentrantMutex::new(Engine::IDLE),
-    engine_lock: embassy_sync::mutex::Mutex::new(Bounce::INIT),
-    settings: NonReentrantMutex::new(Settings::INIT),
-    desc_ring: DescRing(UnsafeCell::new(InternalMemory::new([Desc::ZERO; RING_LEN]))),
-};
-
-/// Applies the active slot's shared-register settings when the active slot
-/// changes. Serializes nothing; transaction ordering is handled separately.
-fn select_slot_sync(slot_id: SlotId) {
-    STATE.settings.with(|s| {
-        if s.active_slot != Some(slot_id) {
-            configure_for_slot(s, slot_id);
-            s.active_slot = Some(slot_id);
-        }
-    });
-}
-
-/// Applies shared registers that depend on which slot is active. Only the
-/// high-speed input-delay phase is slot-specific (esp32s3); other chips have
-/// nothing to re-apply.
-fn configure_for_slot(settings: &Settings, slot_id: SlotId) {
-    #[cfg(esp32s3)]
-    {
-        let sl = &settings.slots[slot_id.index() as usize];
-        // Keep the high-speed input-delay gate: only meaningful above SDR25.
-        if sl.hz > 25_000_000 {
-            set_input_delay_phase(sl.input_delay_phase);
-        }
-    }
-    #[cfg(not(esp32s3))]
-    let _ = (settings, slot_id);
+async fn lock_engine(slot: SlotId) -> Result<MutexGuard<'static, RawMutex, EngineSession>, Error> {
+    let mut guard = ENGINE.lock().await;
+    guard.select_and_apply(slot)?;
+    Ok(guard)
 }
 
 /// Matrix-routed pin guards owned by the slot for its whole lifetime.
@@ -807,10 +1206,10 @@ fn idle_intmask() -> u32 {
     SDHOST::regs().intmask().read().bits() & (EVT_IO_SLOT0 | EVT_IO_SLOT1) | INTMASK_IDLE
 }
 
-/// Arms the engine for a new operation and clears stale status.
-fn arm_engine(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
-    STATE.engine.with(|eng| {
-        *eng = Engine {
+/// Arms `TRANSFER` for a new operation and clears stale status.
+fn arm_transfer(expect_data: bool, multiblock: bool, transfer: Option<Transfer>) {
+    TRANSFER.with(|ts| {
+        *ts = TransferState {
             transfer,
             result: None,
             expect_data,
@@ -830,16 +1229,16 @@ fn on_interrupt() {
     let pending = r.mintsts().read().bits();
     let idsts = r.idsts().read().bits();
 
-    STATE.engine.with(|eng| {
-        if eng.wait_busy {
+    TRANSFER.with(|ts| {
+        if ts.wait_busy {
             // For an R1b/no-data command the SBE bit doubles as the Busy
             // Clear Interrupt, fired when the card releases DAT0.
             if pending & EVT_SBE != 0 {
-                eng.result = Some(Ok(()));
+                ts.result = Some(Ok(()));
             }
         } else {
             // Refill descriptors the engine has released mid-transfer.
-            if let Some(t) = eng.transfer.as_mut()
+            if let Some(t) = ts.transfer.as_mut()
                 && t.remaining() > 0
             {
                 let mut ring = ring();
@@ -850,7 +1249,7 @@ fn on_interrupt() {
                 }
             }
 
-            if eng.result.is_none() {
+            if ts.result.is_none() {
                 let err = map_rintsts(pending)
                     .err()
                     .or(if idsts & (IDSTS_FBE | IDSTS_DU) != 0 {
@@ -859,29 +1258,29 @@ fn on_interrupt() {
                         None
                     });
                 if let Some(e) = err {
-                    eng.result = Some(Err(e));
-                } else if eng.expect_data {
+                    ts.result = Some(Err(e));
+                } else if ts.expect_data {
                     if pending & EVT_DATA_OVER != 0 {
-                        eng.over_seen = true;
+                        ts.over_seen = true;
                     }
                     if pending & EVT_ACD != 0 {
-                        eng.acd_seen = true;
+                        ts.acd_seen = true;
                     }
-                    if eng.over_seen && (!eng.multiblock || eng.acd_seen) {
-                        eng.result = Some(Ok(()));
+                    if ts.over_seen && (!ts.multiblock || ts.acd_seen) {
+                        ts.result = Some(Ok(()));
                     }
                 } else if pending & EVT_CMD_DONE != 0 {
-                    eng.result = Some(Ok(()));
+                    ts.result = Some(Ok(()));
                 }
             }
         }
 
-        if eng.result.is_some() {
-            eng.wait_busy = false;
-            eng.transfer = None;
+        if ts.result.is_some() {
+            ts.wait_busy = false;
+            ts.transfer = None;
             r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
             r.idinten().write(|w| unsafe { w.bits(0) });
-            eng.waker.wake();
+            ts.waker.wake();
         }
     });
 
@@ -942,7 +1341,7 @@ impl<'d> SdHostController<'d> {
         chip_specific::set_module_clock(config.clock_source, config.module_div);
         this.reset_engine();
 
-        STATE.settings.with(|s| s.module = config);
+        SETTINGS.with(|s| s.module = config);
         let r = SDHOST::regs();
         r.tmout().write(|w| unsafe {
             w.response_timeout().bits(0xFF);
@@ -976,9 +1375,10 @@ impl<'d> SdHostController<'d> {
 
     /// Returns a builder for the given slot in blocking mode.
     ///
-    /// Both slots can be taken (once each) and driven independently; the
-    /// shared engine serializes their transactions. Requesting the same slot
-    /// twice returns [`ConfigError::SlotInUse`].
+    /// Both slots can be taken (once each); the shared engine serializes their
+    /// transactions. Requesting the same slot twice returns
+    /// [`ConfigError::SlotInUse`]. Blocking engine ops return
+    /// [`BlockingError::Busy`] on contention.
     ///
     /// The returned slot borrows the controller, so the controller cannot be
     /// dropped while any of its slots are alive.
@@ -991,12 +1391,11 @@ impl<'d> SdHostController<'d> {
         if self.taken[idx].swap(true, Ordering::Relaxed) {
             return Err(ConfigError::SlotInUse);
         }
-        // Publish this slot's tuning so the engine can re-apply it whenever
-        // the slot becomes active.
         #[cfg(esp32s3)]
-        STATE
-            .settings
-            .with(|s| s.slots[idx].input_delay_phase = config.input_delay_phase);
+        SETTINGS.with(|s| {
+            s.slots[idx].input_delay_phase = config.input_delay_phase;
+            s.slots[idx].dirty = true;
+        });
         Ok(Slot {
             config,
             data_pins: 0,
@@ -1298,38 +1697,9 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         level == self.config.wp_active_high
     }
 
-    /// Applies bus width + card clock for the slot. Used during card init.
+    /// Caches bus width and card clock; HW is programmed on the next engine op.
     pub fn set_bus_low_level(&mut self, width: BusWidth, hz: u32) -> Result<(), Error> {
-        // The engine-wide module clock is programmed once at construction;
-        // here we only derive this slot's card divider from it.
-        let (source, div) = STATE
-            .settings
-            .with(|s| (s.module.clock_source, s.module.module_div));
-        let card_div = freq_to_card_div(module_hz(source, div), hz);
-
-        // Immediately apply slot-specific configuration
-        STATE.engine.with(|eng| {
-            eng.set_card_width(slot_id(S), width);
-            eng.set_card_clock(slot_id(S), card_div)?;
-            Ok(())
-        })?;
-
-        // Record this slot's frequency and (re-)apply its slot-specific
-        // shared-register tuning now that it is the active slot. Done here
-        // (not via `select_slot_sync`) so a frequency change on the already
-        // active slot still re-applies the input-delay phase.
-        #[cfg(esp32s3)]
-        STATE.settings.with(|s| {
-            s.slots[S as usize].hz = hz;
-            s.active_slot = Some(slot_id(S));
-            configure_for_slot(s, slot_id(S));
-        });
-
-        // Let the freshly (re-)started card clock propagate before the next
-        // command, matching esp-idf's `sd_host_set_clk_div`. Without this the
-        // first response command after a clock change can be missed.
-        crate::rom::ets_delay_us(10);
-        Ok(())
+        SETTINGS.with(|s| s.set_slot_bus(slot_id(S), width, hz))
     }
 
     /// Checks that the mandatory pins for a transfer were connected.
@@ -1344,25 +1714,8 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
     }
 
     /// Issues the 80-clock SD init sequence (no command index).
-    pub fn send_init_sequence(&mut self) -> Result<(), Error> {
-        select_slot_sync(slot_id(S));
-        let r = SDHOST::regs();
-        r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
-        r.cmdarg().write(|w| unsafe { w.bits(0) });
-        r.cmd().write(|w| unsafe {
-            w.send_initialization().set_bit();
-            w.wait_prvdata_complete().set_bit();
-            w.card_number().bits(S);
-            w.start_cmd().set_bit()
-        });
-        wait_command_accepted()?;
-
-        // Wait for the 80 init clocks to actually finish before any command.
-        let result = poll_until(|| r.rintsts().read().bits() & EVT_CMD_DONE != 0);
-        if result.is_ok() {
-            r.rintsts().write(|w| unsafe { w.bits(EVT_CMD_DONE) });
-        }
-        result
+    pub fn send_init_sequence(&mut self) -> Result<(), BlockingError> {
+        with_engine_try(slot_id(S), |session| session.send_init_sequence(slot_id(S)))
     }
 
     /// Issues a no-data command and returns its raw response words.
@@ -1373,12 +1726,14 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         resp_len: ResponseLen,
         check_crc: bool,
         flags: CommandFlags,
-    ) -> Result<[u32; 4], Error> {
+    ) -> Result<[u32; 4], BlockingError> {
         if !self.is_card_present() {
-            return Err(Error::NoCard);
+            return Err(BlockingError::Op(Error::NoCard));
         }
-        select_slot_sync(slot_id(S));
-        self.send_command_blocking(index, arg, resp_len, check_crc, flags)
+        let slot = slot_id(S);
+        with_engine_try(slot, |session| {
+            session.send_command_blocking(slot, index, arg, resp_len, check_crc, flags)
+        })
     }
 
     /// Reads `block_count` blocks into a DMA-capable buffer (CMD17/CMD18).
@@ -1389,21 +1744,24 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         mut buf: DmaAlignedMut<'_, [u8]>,
         block_size: u16,
         block_count: u32,
-    ) -> Result<[u32; 4], Error> {
-        select_slot_sync(slot_id(S));
-        let total = buf.len();
-        let ptr = dma_ptr(buf.reborrow())?;
-        let resp = self.transfer_blocking(
-            cmd_index,
-            arg,
-            false,
-            Transfer::single(ptr, total),
-            block_size,
-            block_count,
-        )?;
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        buf.invalidate();
-        Ok(resp)
+    ) -> Result<[u32; 4], BlockingError> {
+        let slot = slot_id(S);
+        with_engine_try(slot, |session| {
+            let total = buf.len();
+            let ptr = dma_ptr(buf.reborrow())?;
+            let resp = session.transfer_blocking(
+                slot,
+                cmd_index,
+                arg,
+                false,
+                Transfer::single(ptr, total),
+                block_size,
+                block_count,
+            )?;
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            buf.invalidate();
+            Ok(resp)
+        })
     }
 
     /// Writes `block_count` blocks from a DMA-capable buffer (CMD24/CMD25).
@@ -1414,150 +1772,27 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         mut buf: DmaAlignedMut<'_, [u8]>,
         block_size: u16,
         block_count: u32,
-    ) -> Result<[u32; 4], Error> {
-        select_slot_sync(slot_id(S));
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        buf.writeback();
-        let total = buf.len();
-        let ptr = dma_ptr(buf.reborrow())?;
-        self.transfer_blocking(
-            cmd_index,
-            arg,
-            true,
-            Transfer::single(ptr, total),
-            block_size,
-            block_count,
-        )
+    ) -> Result<[u32; 4], BlockingError> {
+        let slot = slot_id(S);
+        with_engine_try(slot, |session| {
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            buf.writeback();
+            let total = buf.len();
+            let ptr = dma_ptr(buf.reborrow())?;
+            session.transfer_blocking(
+                slot,
+                cmd_index,
+                arg,
+                true,
+                Transfer::single(ptr, total),
+                block_size,
+                block_count,
+            )
+        })
     }
 
     fn note_data_pin(&mut self, count: u8) {
         self.data_pins = self.data_pins.max(count);
-    }
-
-    /// Issues a no-data command and waits for completion in blocking mode.
-    fn send_command_blocking(
-        &mut self,
-        index: u8,
-        arg: u32,
-        resp_len: ResponseLen,
-        check_crc: bool,
-        flags: CommandFlags,
-    ) -> Result<[u32; 4], Error> {
-        let r = SDHOST::regs();
-        let consume = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR | EVT_HLE;
-
-        // Clear stale command/response status before issuing.
-        r.rintsts().write(|w| unsafe { w.bits(consume) });
-
-        self.issue_command(index, arg, resp_len, check_crc, flags)?;
-
-        // Wait for completion or a command-phase error.
-        let done = EVT_CMD_DONE | EVT_RTO | EVT_RCRC | EVT_RESP_ERR;
-        let mut sts = 0;
-        poll_until(|| {
-            sts = r.rintsts().read().bits();
-            sts & done != 0
-        })?;
-        map_rintsts(sts)?;
-
-        let resp = read_response(resp_len);
-        r.rintsts().write(|w| unsafe { w.bits(consume) });
-
-        // R1b / busy: DesignWare only IRQs busy-clear for writes, so always poll.
-        if flags.busy {
-            wait_busy_cleared()?;
-        }
-        Ok(resp)
-    }
-
-    /// Single- or multi-block data transfer over the IDMAC, blocking.
-    fn transfer_blocking(
-        &mut self,
-        index: u8,
-        arg: u32,
-        write: bool,
-        mut t: Transfer,
-        block_size: u16,
-        block_count: u32,
-    ) -> Result<[u32; 4], Error> {
-        let r = SDHOST::regs();
-
-        reset_transfer()?;
-        let total_len = t.remaining();
-        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
-        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
-
-        // Build the descriptor chain for the whole transfer.
-        let mut ring = ring();
-        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
-        ring[0].flags |= DESC_FIRST;
-        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
-        enable_idmac(ring.as_ptr() as u32);
-        r.pldmnd().write(|w| unsafe { w.bits(1) });
-
-        self.issue_data_command(index, arg, write, block_count)?;
-
-        let result = run_data_phase(&mut t, ring, write, needs_auto_stop(index, block_count));
-
-        disable_idmac();
-        r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-        r.idsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-
-        result?;
-        Ok(read_response(ResponseLen::Short))
-    }
-
-    /// Programs `cmdarg`/`cmd` for a no-data command and submits it to the CIU.
-    fn issue_command(
-        &mut self,
-        index: u8,
-        arg: u32,
-        resp_len: ResponseLen,
-        check_crc: bool,
-        flags: CommandFlags,
-    ) -> Result<(), Error> {
-        let r = SDHOST::regs();
-        r.cmdarg().write(|w| unsafe { w.bits(arg) });
-        r.cmd().write(|w| unsafe {
-            w.index().bits(index);
-            w.response_expect()
-                .bit(!matches!(resp_len, ResponseLen::None));
-            w.response_length()
-                .bit(matches!(resp_len, ResponseLen::Long));
-            w.check_response_crc().bit(check_crc);
-            w.wait_prvdata_complete().bit(flags.wait_complete);
-            w.stop_abort_cmd().bit(flags.stop_abort);
-            w.use_hole().set_bit();
-            w.card_number().bits(S);
-            w.start_cmd().set_bit()
-        });
-        wait_command_accepted()
-    }
-
-    /// Programs `cmdarg`/`cmd` for a data-transfer command and submits it to the
-    /// CIU.
-    fn issue_data_command(
-        &mut self,
-        index: u8,
-        arg: u32,
-        write: bool,
-        block_count: u32,
-    ) -> Result<(), Error> {
-        let r = SDHOST::regs();
-        r.cmdarg().write(|w| unsafe { w.bits(arg) });
-        r.cmd().write(|w| unsafe {
-            w.index().bits(index);
-            w.response_expect().set_bit();
-            w.check_response_crc().set_bit();
-            w.data_expected().set_bit();
-            w.read_write().bit(write);
-            w.send_auto_stop().bit(needs_auto_stop(index, block_count));
-            w.wait_prvdata_complete().set_bit();
-            w.use_hole().set_bit();
-            w.card_number().bits(S);
-            w.start_cmd().set_bit()
-        });
-        wait_command_accepted()
     }
 }
 
@@ -1622,8 +1857,10 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     /// Issues a control command, mapping protocol types to the engine core.
     async fn cmd_async<'a, C: sdio::ControlCommand + 'a>(
         &mut self,
+        session: &mut EngineSession,
         cmd: C,
     ) -> Result<C::Resp<'a>, MmcError> {
+        let slot = slot_id(S);
         let resp_len = match <C::Resp<'a> as sdio::Response>::LEN {
             sdio::ResponseLen::Zero => ResponseLen::None,
             sdio::ResponseLen::R48 => ResponseLen::Short,
@@ -1635,233 +1872,10 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
             busy: <C::Resp<'a> as sdio::Response>::BUSY,
         };
         let crc = <C::Resp<'a> as sdio::Response>::CRC;
-        let words = self
-            .send_command_async(C::INDEX, cmd.arg(), resp_len, crc, flags)
+        let words = session
+            .send_command_async(slot, C::INDEX, cmd.arg(), resp_len, crc, flags)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
-    }
-
-    /// Reads blocks/bytes into the command's buffer via the IDMAC.
-    #[cfg_attr(
-        not(any(soc_internal_memory_cached, dma_can_access_psram)),
-        expect(unused_variables) // bounce
-    )]
-    async fn read_async(
-        &mut self,
-        index: u8,
-        arg: u32,
-        buf: &mut [u8],
-        block_size: u16,
-        block_count: u32,
-        bounce: &mut Bounce,
-    ) -> Result<[u32; 4], MmcError> {
-        // A cache-unaligned caller buffer can't be DMA'd directly on cached
-        // SoCs: invalidating its partial edge cache lines would clobber data
-        // sharing those lines. Transfer the cache-aligned middle in place and
-        // bounce only the unaligned head/tail through the aligned scratch,
-        // copying them out afterwards. This handles buffers of any length.
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
-            && (head != 0 || tail != 0)
-        {
-            let len = buf.len();
-            let middle_len = len - head - tail;
-
-            let scratch = bounce.buf.get_mut();
-            debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
-            // Drop any dirty scratch lines so they can't be evicted over the
-            // data the DMA is about to write.
-            scratch.invalidate();
-            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
-            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
-
-            let middle_ptr = if middle_len != 0 {
-                dma_ptr_from_raw(unsafe { buf.as_ptr().add(head) })?
-            } else {
-                0
-            };
-
-            let resp = self
-                .transfer_async(
-                    index,
-                    arg,
-                    false,
-                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
-                    block_size,
-                    block_count,
-                )
-                .await?;
-
-            // The middle was written in place; drop its stale cached copy.
-            if middle_len != 0 {
-                // SAFETY: `[head, head + middle_len)` is aligned in address and
-                // size by construction, so it owns its cache lines.
-                unsafe { DmaAlignedMut::new_unchecked(&mut buf[head..head + middle_len]) }
-                    .invalidate();
-            }
-
-            // Copy the DMA-written edges out of the scratch buffer.
-            scratch.invalidate();
-            buf[..head].copy_from_slice(&scratch[..head]);
-            buf[len - tail..].copy_from_slice(&scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail]);
-            return Ok(resp);
-        }
-
-        let mut dma = DmaAlignedMut::new(buf)?;
-        let ptr = dma_ptr(dma.reborrow())?;
-        let total = dma.len();
-        let resp = self
-            .transfer_async(
-                index,
-                arg,
-                false,
-                Transfer::single(ptr, total),
-                block_size,
-                block_count,
-            )
-            .await?;
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        dma.invalidate();
-        Ok(resp)
-    }
-
-    /// Writes blocks/bytes from the command's buffer via the IDMAC.
-    #[cfg_attr(
-        not(any(soc_internal_memory_cached, dma_can_access_psram)),
-        expect(unused_variables) // bounce
-    )]
-    async fn write_async(
-        &mut self,
-        index: u8,
-        arg: u32,
-        buf: &[u8],
-        block_size: u16,
-        block_count: u32,
-        bounce: &mut Bounce,
-    ) -> Result<[u32; 4], MmcError> {
-        // Cached SoCs: the IDMAC reads the source straight from memory, so the
-        // CPU's dirty cache lines must be flushed first. A cache-unaligned
-        // caller buffer can't be flushed in place without touching neighbours,
-        // so transfer the cache-aligned middle in place and bounce only the
-        // unaligned head/tail through the aligned scratch. Handles any length.
-        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-        if let Some((head, tail)) = unaligned_split(buf.as_ptr() as usize, buf.len())
-            && (head != 0 || tail != 0)
-        {
-            let len = buf.len();
-            let middle_len = len - head - tail;
-
-            let mut scratch = bounce.buf.get_mut();
-            debug_assert!(head <= BOUNCE_TAIL_OFF && tail <= BOUNCE_LEN - BOUNCE_TAIL_OFF);
-            scratch[..head].copy_from_slice(&buf[..head]);
-            scratch[BOUNCE_TAIL_OFF..BOUNCE_TAIL_OFF + tail].copy_from_slice(&buf[len - tail..]);
-            scratch.writeback();
-            let head_ptr = dma_ptr_from_raw(scratch[..].as_ptr())?;
-            let tail_ptr = dma_ptr_from_raw(scratch[BOUNCE_TAIL_OFF..].as_ptr())?;
-
-            let middle_ptr = if middle_len != 0 {
-                let middle = &buf[head..head + middle_len];
-                // SAFETY: `middle` is aligned in address and size by
-                // construction, so it owns its cache lines. Flush them so the
-                // IDMAC reads the latest CPU writes from memory.
-                unsafe { DmaAlignedRef::new_unchecked(middle) }.writeback();
-                dma_ptr_from_raw(middle.as_ptr())?
-            } else {
-                0
-            };
-
-            return Ok(self
-                .transfer_async(
-                    index,
-                    arg,
-                    true,
-                    Transfer::split((head_ptr, head), (middle_ptr, middle_len), (tail_ptr, tail)),
-                    block_size,
-                    block_count,
-                )
-                .await?);
-        }
-
-        let ptr = dma_ptr_from_raw(buf.as_ptr())?;
-        Ok(self
-            .transfer_async(
-                index,
-                arg,
-                true,
-                Transfer::single(ptr, buf.len()),
-                block_size,
-                block_count,
-            )
-            .await?)
-    }
-
-    /// Issues a no-data command and awaits completion via the interrupt handler.
-    async fn send_command_async(
-        &mut self,
-        index: u8,
-        arg: u32,
-        resp_len: ResponseLen,
-        check_crc: bool,
-        flags: CommandFlags,
-    ) -> Result<[u32; 4], Error> {
-        let r = SDHOST::regs();
-        let guard = DropGuard::new((), |()| abort_transfer());
-
-        r.rintsts().write(|w| unsafe { w.bits(INTMASK_CMD) });
-        arm_engine(false, false, None);
-        r.intmask()
-            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_CMD) });
-
-        self.issue_command(index, arg, resp_len, check_crc, flags)?;
-        wait_result().await?;
-        let resp = read_response(resp_len);
-        if flags.busy {
-            wait_busy_poll().await?;
-        }
-        guard.defuse();
-        Ok(resp)
-    }
-
-    /// Single- or multi-block data transfer over the IDMAC, interrupt-driven.
-    async fn transfer_async(
-        &mut self,
-        index: u8,
-        arg: u32,
-        write: bool,
-        mut t: Transfer,
-        block_size: u16,
-        block_count: u32,
-    ) -> Result<[u32; 4], Error> {
-        let guard = DropGuard::new((), |()| abort_transfer());
-        let r = SDHOST::regs();
-
-        reset_transfer()?;
-        let total_len = t.remaining();
-        r.blksiz().write(|w| unsafe { w.bits(block_size as u32) });
-        r.bytcnt().write(|w| unsafe { w.bits(total_len as u32) });
-
-        // Build the descriptor chain and prime the IDMAC.
-        let mut ring = ring();
-        *ring.reborrow().into_inner() = [Desc::ZERO; RING_LEN];
-        ring[0].flags |= DESC_FIRST;
-        fill_descriptors(ring.reborrow(), &mut t, RING_LEN);
-        enable_idmac(ring.as_ptr() as u32);
-        r.pldmnd().write(|w| unsafe { w.bits(1) });
-
-        arm_engine(true, needs_auto_stop(index, block_count), Some(t));
-        r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
-        r.intmask()
-            .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
-
-        self.issue_data_command(index, arg, write, block_count)?;
-        wait_result().await?;
-        if write {
-            wait_busy_async().await?;
-        }
-        disable_idmac();
-        let resp = read_response(ResponseLen::Short);
-        guard.defuse();
-        Ok(resp)
     }
 }
 
@@ -1875,18 +1889,19 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     where
         C: sdio::ControlCommand + 'a,
     {
-        let _lock = STATE.select_slot(slot_id(S)).await;
-        self.cmd_async::<C>(cmd).await
+        let mut session = lock_engine(slot_id(S)).await?;
+        self.cmd_async(&mut session, cmd).await
     }
 
     async fn read_blocks<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::BlockReadCommand + 'a,
     {
-        let mut lock = STATE.select_slot(slot_id(S)).await;
+        let mut session = lock_engine(slot_id(S)).await?;
+        let slot = slot_id(S);
         let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
-        let words = self
-            .read_async(C::INDEX, arg, cmd.buf(), bs, bc, &mut lock)
+        let words = session
+            .read_async(slot, C::INDEX, arg, cmd.buf(), bs, bc)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1895,10 +1910,11 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     where
         C: sdio::BlockWriteCommand + 'a,
     {
-        let mut lock = STATE.select_slot(slot_id(S)).await;
+        let mut session = lock_engine(slot_id(S)).await?;
+        let slot = slot_id(S);
         let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
-        let words = self
-            .write_async(C::INDEX, arg, cmd.buf(), bs, bc, &mut lock)
+        let words = session
+            .write_async(slot, C::INDEX, arg, cmd.buf(), bs, bc)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1907,10 +1923,11 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     where
         C: sdio::ByteReadCommand + 'a,
     {
-        let mut lock = STATE.select_slot(slot_id(S)).await;
+        let mut session = lock_engine(slot_id(S)).await?;
+        let slot = slot_id(S);
         let (n, arg) = (cmd.byte_count(), cmd.arg());
-        let words = self
-            .read_async(C::INDEX, arg, cmd.buf(), n as u16, 1, &mut lock)
+        let words = session
+            .read_async(slot, C::INDEX, arg, cmd.buf(), n as u16, 1)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1919,19 +1936,20 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     where
         C: sdio::ByteWriteCommand + 'a,
     {
-        let mut lock = STATE.select_slot(slot_id(S)).await;
+        let mut session = lock_engine(slot_id(S)).await?;
+        let slot = slot_id(S);
         let (n, arg) = (cmd.byte_count(), cmd.arg());
-        let words = self
-            .write_async(C::INDEX, arg, cmd.buf(), n as u16, 1, &mut lock)
+        let words = session
+            .write_async(slot, C::INDEX, arg, cmd.buf(), n as u16, 1)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
     async fn init_idle(&mut self, hz: u32) -> Result<(), MmcError> {
-        let _lock = STATE.select_slot(slot_id(S)).await;
+        let mut session = lock_engine(slot_id(S)).await?;
         self.validate_pins().map_err(|_| MmcError::Other)?;
         self.set_bus_low_level(BusWidth::Bit1, hz)?;
-        self.send_init_sequence()?;
+        session.send_init_sequence(slot_id(S))?;
         Ok(())
     }
 
@@ -2033,23 +2051,23 @@ fn wait_command_accepted() -> Result<(), Error> {
     Err(Error::Timeout)
 }
 
-/// Masks interrupts, tears down the IDMAC and clears engine state.
+/// Masks interrupts, tears down the IDMAC and clears transfer state.
 fn abort_transfer() {
     let r = SDHOST::regs();
     r.intmask().write(|w| unsafe { w.bits(idle_intmask()) });
     r.idinten().write(|w| unsafe { w.bits(0) });
     disable_idmac();
     let _ = reset_transfer();
-    STATE.engine.with(|eng| *eng = Engine::IDLE);
+    TRANSFER.with(|ts| *ts = TransferState::IDLE);
 }
 
 /// Awaits the terminal result the interrupt handler records.
 fn wait_result() -> impl Future<Output = Result<(), Error>> {
     poll_fn(|cx| {
-        STATE.engine.with(|eng| match eng.result.take() {
+        TRANSFER.with(|ts| match ts.result.take() {
             Some(res) => Poll::Ready(res),
             None => {
-                eng.waker.register(cx.waker());
+                ts.waker.register(cx.waker());
                 Poll::Pending
             }
         })
@@ -2073,10 +2091,10 @@ async fn wait_busy_async() -> Result<(), Error> {
 
     // Enable Busy Clear Interrupt generation, then arm and unmask it.
     r.cardthrctl().modify(|_, w| w.cardclrinten().set_bit());
-    STATE.engine.with(|eng| {
-        *eng = Engine {
+    TRANSFER.with(|ts| {
+        *ts = TransferState {
             wait_busy: true,
-            ..Engine::IDLE
+            ..TransferState::IDLE
         };
     });
     r.rintsts().write(|w| unsafe { w.bits(EVT_SBE) });
@@ -2087,7 +2105,7 @@ async fn wait_busy_async() -> Result<(), Error> {
     // unmask, the rising edge is already gone, so bail out instead of
     // waiting for an interrupt that will never fire.
     let res = if !r.status().read().data_busy().bit_is_set() {
-        STATE.engine.with(|eng| *eng = Engine::IDLE);
+        TRANSFER.with(|ts| *ts = TransferState::IDLE);
         Ok(())
     } else {
         wait_result().await
@@ -2379,23 +2397,6 @@ fn freq_to_card_div(module_hz: u32, target_hz: u32) -> u8 {
     }
     let div = module_hz.div_ceil(2 * target_hz);
     div.clamp(1, 255) as u8
-}
-
-/// Sets the input sampling delay phase used for high-speed clocking.
-///
-/// The `cclkin_edge_sam_sel` encoding is non-linear; mirror esp-idf's
-/// `sdmmc_ll_set_din_delay_phase` (0°, 90°, 180°, 270°).
-#[cfg(esp32s3)]
-fn set_input_delay_phase(phase: DelayPhase) {
-    let v = match phase {
-        DelayPhase::_0 => 0u8,
-        DelayPhase::_1 => 1,
-        DelayPhase::_2 => 4,
-        DelayPhase::_3 => 6,
-    };
-    SDHOST::regs()
-        .clk_edge_sel()
-        .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
 }
 
 struct WaitForInterruptFuture {

@@ -1,3 +1,5 @@
+//! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
+//! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
 /// Programs the shared module clock register (divider, phases).

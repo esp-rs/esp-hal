@@ -1,3 +1,5 @@
+//! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
+//! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
 /// Programs the shared module clock register (divider, source, phases).
@@ -17,4 +19,16 @@ pub fn set_module_clock(source: ClockSource, div: u8) {
         w.ccllkin_edge_n().bits(n);
         w.cclk_en().bit(matches!(source, ClockSource::Pll160m))
     });
+}
+
+pub fn set_input_delay_phase(phase: DelayPhase) {
+    let v = match phase {
+        DelayPhase::_0 => 0u8,
+        DelayPhase::_1 => 1,
+        DelayPhase::_2 => 4,
+        DelayPhase::_3 => 6,
+    };
+    SDHOST::regs()
+        .clk_edge_sel()
+        .modify(|_, w| unsafe { w.cclkin_edge_sam_sel().bits(v) });
 }
