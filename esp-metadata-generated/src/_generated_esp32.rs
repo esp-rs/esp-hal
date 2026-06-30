@@ -337,12 +337,6 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
-    ("sdmmc.slots") => {
-        2
-    };
-    ("sdmmc.slots", str) => {
-        stringify!(2)
-    };
     ("sdmmc.has_iomux") => {
         true
     };

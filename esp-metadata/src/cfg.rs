@@ -653,7 +653,6 @@ driver_configs![
         driver: sdmmc,
         name: "SDMMC/SDIO host",
         properties: {
-            slots: u32,
             delay_phase_num: Option<u32>,
             has_iomux: bool,
             has_gpio_matrix: bool,
