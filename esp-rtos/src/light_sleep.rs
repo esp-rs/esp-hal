@@ -1,3 +1,5 @@
+#[cfg(multi_core)]
+use esp_hal::{peripherals::CPU_CTRL, system::Cpu, system::CpuControl};
 use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
@@ -5,10 +7,11 @@ use esp_hal::{
         WakeLock,
         sleep::{GpioWakeupSource, TimerWakeupSource},
     },
-    system::Cpu,
 };
 
 use crate::{SCHEDULER, task::IdleFn};
+#[cfg(multi_core)]
+use crate::{run_queue::RunSchedulerOn, task};
 
 const LIGHT_SLEEP_MIN_US: u64 =
     esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US") as u64;
@@ -21,7 +24,7 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// Each time the scheduler runs out of ready tasks, the hook (with interrupts
 /// disabled) checks that:
 /// - no [`WakeLock`] is held,
-/// - this is the primary core and no second core scheduler is running,
+/// - all cores are idle,
 /// - there is a finite next scheduled wakeup, and
 /// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
@@ -29,10 +32,9 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// it falls back to `WFI`. The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
-/// # Limitations
-///
-/// - **Single-core only.** On a system with a started second core, the hook degrades to `WFI` and
-///   never puts the chip to sleep.
+/// On multi-core chips, the core that commits to sleep hardware-stalls the other core(s)
+/// for the duration of the sleep so their CPU state is frozen and restored coherently,
+/// then thaws them on wakeup.
 ///
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
@@ -49,14 +51,30 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return;
             }
 
-            // MVP: only commit to sleep on the primary core, and never while a second
-            // core scheduler is running (it would keep running while the chip sleeps).
-            if Cpu::current() != Cpu::ProCpu {
-                return;
-            }
             #[cfg(multi_core)]
-            if scheduler.per_cpu[1].initialized {
-                return;
+            {
+                if scheduler.run_queue.has_ready_tasks() {
+                    return;
+                }
+                for cpu in Cpu::all() {
+                    if !scheduler.cpu_idle(cpu) {
+                        return;
+                    }
+                }
+
+                // All cores are ready to sleep. Since we are here in a critical section,
+                // the other core must be waiting for the scheduler lock. We will go to sleep,
+                // and after wakeup the other core will reattempt this check.
+
+                // FIXME: We hardware-stall the other core(s) for the duration of the sleep so
+                // their CPU state is frozen and restored coherently. The other core is frozen
+                // wherever it happens to be - including in the middle of an interrupt handler
+                // that holds a cross-core lock (e.g. the clock tree, peripheral refcount, or
+                // UART locks taken by the light-sleep enter/exit path in `Rtc::sleep`). If that
+                // happens, this core will spin forever trying to take that lock during sleep
+                // prep, because the frozen core can never release it. We accept this (unlikely)
+                // deadlock risk for now rather than ordering all lock-taking work before the
+                // stall.
             }
 
             let Some(time_driver) = scheduler.time_driver.as_mut() else {
@@ -73,6 +91,24 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return;
             }
 
+            // We have committed to sleeping. Park (hardware-stall) the other core(s) so their
+            // CPU state is frozen and restored coherently across the sleep, then enter light
+            // sleep, then thaw them.
+            cfg_select! {
+                multi_core => {
+                    let mut cpu_control = CpuControl::new(unsafe { CPU_CTRL::steal() });
+                    for cpu in Cpu::other() {
+                        if scheduler.per_cpu[cpu as usize].initialized {
+                            unsafe { cpu_control.park_core(cpu) };
+                            // FIXME: this is insufficient when we power down the CPU - we will
+                            // need to force the other core to be parked in a known place, saving
+                            // its state so we can restore it after wakeup.
+                        }
+                    }
+                }
+                _ => {}
+            }
+
             unsafe {
                 let mut rtc = Rtc::new(LPWR::steal());
                 let timer =
@@ -85,6 +121,16 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             // stale. Force a re-arm against the restored time base so the tick handler
             // fires promptly and drains the timer queue.
             time_driver.rearm(crate::now());
+
+            // Trigger the scheduler on the other core to prevent it from putting
+            // the system back to sleep immediately.
+            #[cfg(multi_core)]
+            for cpu in Cpu::other() {
+                if scheduler.per_cpu[cpu as usize].initialized {
+                    cpu_control.unpark_core(cpu);
+                    task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+                }
+            }
         });
 
         esp_hal::interrupt::wait_for_interrupt();

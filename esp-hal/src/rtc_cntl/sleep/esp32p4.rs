@@ -995,6 +995,7 @@ impl RtcSleepConfig {
     }
 
     /// Configures wakeup options and enters sleep.
+    #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         // ESP32-P4 PMU wakeup-source bitmap (esp-idf `pmu_bit_defs.h`).
         const PMU_SDIO_WAKEUP_EN: u32 = 1 << 0;
@@ -1143,6 +1144,7 @@ impl RtcSleepConfig {
     }
 
     /// Cleans up after sleep.
+    #[crate::ram]
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish(): switch the pad configuration back from
         // the sleep state to the active state. In deep sleep we never get here.

@@ -459,6 +459,7 @@ impl<'d> Rtc<'d> {
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
     #[cfg(sleep_driver_supported)]
+    #[crate::ram]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
