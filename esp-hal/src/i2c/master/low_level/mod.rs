@@ -584,6 +584,20 @@ impl Driver<'_> {
         .await;
     }
 
+    pub(super) fn force_scl_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_scl_pd(low),
+            _ => self.force_pin_low(low, self.config.scl_pin.pin_number(), &self.info.scl_output),
+        }
+    }
+
+    pub(super) fn force_sda_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_sda_pd(low),
+            _ => self.force_pin_low(low, self.config.sda_pin.pin_number(), &self.info.sda_output),
+        }
+    }
+
     /// Restores force_out to open-drain mode for both lines.
     #[cfg(i2c_master_has_pd_en)]
     fn restore_force_out(&self) {
@@ -594,11 +608,29 @@ impl Driver<'_> {
         self.update_registers();
     }
 
+    #[cfg(not(i2c_master_has_pd_en))]
+    fn force_pin_low(
+        &self,
+        low: bool,
+        pin_number: Option<u8>,
+        output_signal: &crate::gpio::OutputSignal,
+    ) {
+        use crate::gpio::AnyPin;
+        let Some(n) = pin_number else { return };
+        let pin = unsafe { AnyPin::steal(n) };
+        if low {
+            pin.set_output_high(false);
+            output_signal.disconnect_from(&pin);
+        } else {
+            output_signal.connect_to(&pin);
+        }
+    }
+
     /// Sets or clears `scl_pd_en`. Switches `scl_force_out` to direct-output while
     /// pd_en is active (required on all chips), restoring OD mode when both pd_en
     /// bits clear.
     #[cfg(i2c_master_has_pd_en)]
-    pub(super) fn set_scl_pd(&self, low: bool) {
+    fn set_scl_pd(&self, low: bool) {
         if low {
             self.regs()
                 .ctr()
@@ -621,7 +653,7 @@ impl Driver<'_> {
     /// pd_en is active (required on all chips), restoring OD mode when both pd_en
     /// bits clear.
     #[cfg(i2c_master_has_pd_en)]
-    pub(super) fn set_sda_pd(&self, low: bool) {
+    fn set_sda_pd(&self, low: bool) {
         if low {
             self.regs()
                 .ctr()

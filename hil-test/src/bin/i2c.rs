@@ -412,7 +412,6 @@ mod tests {
     // clocking, and that `force_scl_low(false)` releases the line and
     // restores normal operation.
     #[test]
-    #[cfg(i2c_master_has_pd_en)]
     fn test_force_scl_low(mut ctx: Context) {
         ctx.i2c
             .apply_config(
@@ -442,7 +441,6 @@ mod tests {
     // Verify that `force_sda_low(true)` drives SDA low and that
     // `force_sda_low(false)` releases the line and restores normal operation.
     #[test]
-    #[cfg(i2c_master_has_pd_en)]
     fn test_force_sda_low(mut ctx: Context) {
         ctx.i2c
             .apply_config(

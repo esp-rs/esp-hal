@@ -1298,21 +1298,21 @@ where
         Ok(())
     }
 
-    /// Drives SCL low (`true`) or releases it (`false`) via `scl_pd_en`.
+    /// Drives SCL low (`true`) or releases it (`false`).
     ///
-    /// Useful for manual clock-stretching and bus recovery sequences.
-    #[cfg(i2c_master_has_pd_en)]
+    /// Forcing a line low interrupts normal peripheral operation — no
+    /// transactions should be started while a line is held low.
     #[instability::unstable]
     pub fn force_scl_low(&mut self, low: bool) {
-        self.driver().set_scl_pd(low);
+        self.driver().force_scl_low(low);
     }
 
-    /// Drives SDA low (`true`) or releases it (`false`) via `sda_pd_en`.
+    /// Drives SDA low (`true`) or releases it (`false`).
     ///
-    /// Useful for manual STOP condition generation and bus recovery sequences.
-    #[cfg(i2c_master_has_pd_en)]
+    /// Forcing a line low interrupts normal peripheral operation — no
+    /// transactions should be started while a line is held low.
     #[instability::unstable]
     pub fn force_sda_low(&mut self, low: bool) {
-        self.driver().set_sda_pd(low);
+        self.driver().force_sda_low(low);
     }
 }
