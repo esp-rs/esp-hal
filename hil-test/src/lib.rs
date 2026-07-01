@@ -43,6 +43,12 @@ macro_rules! assert_ne {
     ($($t:tt)*) => { defmt::assert_ne!($($t)*) }
 }
 
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! panic {
+    ($($t:tt)*) => { defmt::panic!($($t)*) }
+}
+
 #[cfg(not(feature = "defmt"))]
 #[macro_export]
 macro_rules! assert {
@@ -59,6 +65,12 @@ macro_rules! assert_eq {
 #[macro_export]
 macro_rules! assert_ne {
     ($($t:tt)*) => { ::core::assert_ne!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! panic {
+    ($($t:tt)*) => { ::core::panic!($($t)*) }
 }
 
 #[macro_export]
