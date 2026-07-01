@@ -5,44 +5,10 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
-        sleep::{TimerWakeupSource, WakeSource, WakeTriggers},
+        sleep::WakeTriggers,
     },
     soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
 };
-
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-
-        let lp_timer = unsafe { &*esp32c61::LP_TIMER::ptr() };
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            lp_timer.tar0_high().write(|w| {
-                w.main_timer_tar_high0()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-            });
-            lp_timer.tar0_low().write(|w| {
-                w.main_timer_tar_low0()
-                    .bits((time_in_ticks & 0xffffffff) as u32)
-            });
-            lp_timer
-                .int_clr()
-                .write(|w| w.soc_wakeup().clear_bit_by_one());
-            lp_timer
-                .tar0_high()
-                .modify(|_, w| w.main_timer_tar_en0().set_bit());
-        }
-    }
-}
 
 /// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]

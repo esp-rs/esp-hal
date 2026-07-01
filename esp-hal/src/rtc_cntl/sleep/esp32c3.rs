@@ -1,4 +1,4 @@
-use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
+use super::{WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, GPIO, IO_MUX, LPWR, NRX, SPI0, SPI1, SYSTEM},
@@ -87,38 +87,6 @@ pub const PIN_FUNC_GPIO: u8 = 1;
 pub const SIG_GPIO_OUT_IDX: u32 = 128;
 /// Maximum number of GPIO pins supported.
 pub const GPIO_NUM_MAX: usize = 22;
-
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            LPWR::regs()
-                .slp_timer0()
-                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-
-            LPWR::regs()
-                .int_clr()
-                .write(|w| w.main_timer().clear_bit_by_one());
-
-            LPWR::regs().slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
-            });
-        }
-    }
-}
 
 impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {

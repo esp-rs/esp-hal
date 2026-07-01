@@ -22,7 +22,7 @@ use core::cell::RefCell;
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2, esp32h2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
-use crate::{rtc_cntl::Rtc, time::Duration};
+use crate::rtc_cntl::Rtc;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -35,8 +35,10 @@ use crate::{rtc_cntl::Rtc, time::Duration};
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
 mod sleep_impl;
-
 pub use sleep_impl::*;
+
+mod wakeup_sources;
+pub use wakeup_sources::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 /// Level at which a wake-up event is triggered
@@ -46,44 +48,6 @@ pub enum WakeupLevel {
     #[default]
     ///  The wake-up event is triggered when the pin is high.
     High,
-}
-
-#[procmacros::doc_replace]
-/// Represents a timer wake-up source, triggering an event after a specified
-/// duration.
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::delay::Delay;
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
-/// # use esp_hal::system::Cpu;
-/// # use esp_hal::time::Duration;
-///
-/// let delay = Delay::new();
-/// let mut rtc = Rtc::new(peripherals.LPWR);
-///
-/// let reason = reset_reason(Cpu::ProCpu);
-/// let wake_reason = wakeup_cause();
-///
-/// println!("{:?} {?}", reason, wake_reason);
-///
-/// let timer = TimerWakeupSource::new(Duration::from_secs(5));
-/// delay.delay_millis(100);
-/// rtc.sleep_deep(&[&timer]);
-///
-/// # {after_snippet}
-/// ```
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TimerWakeupSource {
-    /// The duration after which the wake-up event is triggered.
-    duration: Duration,
-}
-
-impl TimerWakeupSource {
-    /// Creates a new timer wake-up source with the specified duration.
-    pub fn new(duration: Duration) -> Self {
-        Self { duration }
-    }
 }
 
 /// Errors that can occur when configuring RTC wake-up sources.
@@ -117,7 +81,7 @@ pub enum Error {
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
 ///
-/// println!("{:?} {?}", reason, wake_reason);
+/// println!("{:?} {:?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -171,7 +135,7 @@ impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
 ///
-/// println!("{:?} {?}", reason, wake_reason);
+/// println!("{:?} {:?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -235,7 +199,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
 ///
-/// println!("{:?} {?}", reason, wake_reason);
+/// println!("{:?} {:?}", reason, wake_reason);
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
@@ -306,7 +270,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
 ///
-/// println!("{:?} {?}", reason, wake_reason);
+/// println!("{:?} {:?}", reason, wake_reason);
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));

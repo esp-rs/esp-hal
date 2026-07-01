@@ -11,7 +11,7 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
-        sleep::{TimerWakeupSource, WakeSource, WakeTriggers},
+        sleep::WakeTriggers,
     },
     soc::clocks::{self, ClockTree, CpuRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
 };
@@ -289,38 +289,6 @@ fn pmu_sleep_dcdc_to_ldo_handover() {
     });
     pmu.hp_active_hp_regulator0()
         .modify(|_, w| unsafe { w.hp_active_hp_regulator_dbias().bits(HP_CALI_ACTIVE_DBIAS) });
-}
-
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-
-        let lp_timer = unsafe { &*esp32p4::LP_TIMER::ptr() };
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            lp_timer.tar0_high().write(|w| {
-                w.main_timer_tar_high0()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-            });
-            lp_timer.tar0_low().write(|w| {
-                w.main_timer_tar_low0()
-                    .bits((time_in_ticks & 0xffffffff) as u32)
-            });
-            lp_timer
-                .int_clr()
-                .write(|w| w.soc_wakeup().clear_bit_by_one());
-            lp_timer
-                .tar0_high()
-                .modify(|_, w| w.main_timer_tar_en0().set_bit());
-        }
-    }
 }
 
 /// Configuration controlling the analog behavior during sleep.
