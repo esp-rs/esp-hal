@@ -1,6 +1,8 @@
 use esp_metadata_generated::{Chip, emit_check_cfg_directives};
 
 fn main() -> Result<(), String> {
+    println!("cargo::rustc-check-cfg=cfg(__test_esp_storage)");
+
     if !cfg!(feature = "emulation") {
         // Load the configuration file for the configured device:
         let chip = Chip::from_cargo_feature()?;

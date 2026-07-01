@@ -4,7 +4,12 @@
 //! For higher-level functionality which works with partitions defined in the partition table, see
 //! `esp-bootloader-esp-idf`.
 //!
-//! The `embedded-storage` feature flag only implements traits from [`embedded_storage`].
+//! Encrypted flash read/write is available on chips with hardware flash encryption support when
+//! flash encryption is enabled in eFuses. See [`FlashStorage::read_encrypted`] and
+//! [`FlashStorage::write_encrypted`].
+//!
+//! The `embedded-storage` feature flag only implements traits from [`embedded_storage`]
+//! and always assume to access non-encrypted flash.
 //!
 //! If you need to use this struct where traits from [`embedded_storage_async`] are needed, you can
 //! use [`embassy_embedded_hal::adapter::BlockingAsync`] or
@@ -34,6 +39,11 @@ mod nor_flash;
 mod storage;
 
 #[cfg(not(feature = "emulation"))]
+mod mmu;
+
+mod encrypted;
+
+#[cfg(not(feature = "emulation"))]
 #[inline(always)]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
@@ -50,4 +60,10 @@ fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
 #[cfg(feature = "emulation")]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     f()
+}
+
+/// Whether flash encryption is enabled or not.
+#[cfg(not(feature = "emulation"))]
+pub fn flash_encryption() -> bool {
+    esp_hal::efuse::flash_encryption()
 }

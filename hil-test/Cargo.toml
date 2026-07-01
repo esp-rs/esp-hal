@@ -71,7 +71,7 @@ name              = "spi"
 harness           = false
 
 [[bin]]
-name              = "storage_read_app_desc"
+name              = "storage"
 harness           = false
 
 [[bin]]

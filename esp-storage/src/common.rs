@@ -27,6 +27,8 @@ pub enum FlashStorageError {
     NotAligned,
     /// Address or length out of bounds.
     OutOfBounds,
+    /// Operation not supported (e.g. no free MMU entry).
+    NotSupported,
     /// Cannot write to flash as more than one core is running.
     /// Either manually suspend the other core, or use one of the available strategies:
     /// * [`FlashStorage::multicore_auto_park`]
@@ -180,6 +182,38 @@ impl<'d> FlashStorage<'d> {
         check_rc(chip_specific::spiflash_write(
             offset,
             bytes.as_ptr() as *const u32,
+            bytes.len() as u32,
+        ))?;
+
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
+
+        Ok(())
+    }
+
+    pub(crate) fn internal_read_encrypted(
+        &mut self,
+        offset: u32,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), FlashStorageError> {
+        // SAFETY: `read_flash_encrypted` fully initializes every byte in `bytes`.
+        let initialized = unsafe {
+            core::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast::<u8>(), bytes.len())
+        };
+        chip_specific::read_flash_encrypted(offset, initialized)
+    }
+
+    pub(crate) fn internal_write_encrypted(
+        &mut self,
+        offset: u32,
+        bytes: &[u8],
+    ) -> Result<(), FlashStorageError> {
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
+
+        check_rc(chip_specific::spiflash_write_encrypted(
+            offset,
+            bytes.as_ptr() as *mut u32,
             bytes.len() as u32,
         ))?;
 
