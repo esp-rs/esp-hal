@@ -570,6 +570,12 @@ pub struct RtcSleepConfig {
     pub deep: bool,
     /// Power Down flags
     pub pd_flags: PowerDownFlags,
+    /// Power down the CPU power domain during light sleep. See
+    /// [`Self::with_cpu_power_down`].
+    cpu_power_down: bool,
+    /// Power down the digital TOP power domain during light sleep. See
+    /// [`Self::with_top_power_down`].
+    top_power_down: bool,
 }
 
 impl Default for RtcSleepConfig {
@@ -580,7 +586,59 @@ impl Default for RtcSleepConfig {
         Self {
             deep: false,
             pd_flags: PowerDownFlags(0),
+            cpu_power_down: false,
+            top_power_down: false,
         }
+    }
+}
+
+impl RtcSleepConfig {
+    /// Power down the CPU power domain during light sleep.
+    ///
+    /// When enabled, the CPU's register state is saved before sleeping and
+    /// restored on wakeup entirely in software (the regDMA/PAU engine is not
+    /// involved), allowing the CPU domain to be powered off for additional
+    /// savings. This has no effect on deep sleep, where the CPU is always
+    /// powered down.
+    ///
+    /// Use [`cpu_retention::cpu_power_down_wake_count`] to confirm the CPU
+    /// domain actually lost power across a sleep.
+    ///
+    /// [`cpu_retention::cpu_power_down_wake_count`]: crate::rtc_cntl::cpu_retention::cpu_power_down_wake_count
+    #[instability::unstable]
+    #[must_use]
+    pub fn with_cpu_power_down(mut self, enable: bool) -> Self {
+        self.cpu_power_down = enable;
+        self
+    }
+
+    /// Returns whether the CPU power domain is powered down during light sleep.
+    #[instability::unstable]
+    pub fn cpu_power_down(&self) -> bool {
+        self.cpu_power_down
+    }
+
+    /// Power down the digital `TOP` power domain during light sleep.
+    ///
+    /// The `TOP` domain holds the core system peripherals (interrupt matrix,
+    /// HP system, TEE/APM, IO MUX, flash SPI mem, SysTimer, and the PCR clock
+    /// config). When enabled, their register state is backed up to RAM by the
+    /// regDMA/PAU engine before sleeping and restored on wakeup, so the domain
+    /// can be powered off for additional savings. Execution resumes in place
+    /// (the CPU domain is unaffected unless [`Self::with_cpu_power_down`] is also
+    /// set). This has no effect on deep sleep.
+    #[instability::unstable]
+    #[must_use]
+    pub fn with_top_power_down(mut self, enable: bool) -> Self {
+        self.top_power_down = enable;
+        self
+    }
+
+    /// Returns whether the digital TOP power domain is powered down during light
+    /// sleep.
+    #[instability::unstable]
+    pub fn top_power_down(&self) -> bool {
+        self.top_power_down
     }
 }
 
@@ -733,6 +791,25 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
+
+            // Optionally power down the CPU domain. Its register state is saved
+            // and restored in software around the sleep (see `cpu_retention`).
+            if self.cpu_power_down {
+                self.pd_flags.set_pd_cpu(true);
+            }
+
+            // Optionally power down the digital TOP domain. Its peripheral
+            // register state is backed up/restored by regDMA around the sleep
+            // (see `retention`). On C6 the CPU cannot survive a TOP power-down
+            // (its execution context is torn down and the ROM restarts on
+            // wakeup), so TOP power-down implies CPU power-down: IDF routes
+            // both through the software CPU-retention wake-stub path (see
+            // esp-idf sleep_modes.c `esp_sleep_cpu_retention` gated on
+            // PMU_SLEEP_PD_CPU | PMU_SLEEP_PD_TOP).
+            if self.top_power_down {
+                self.pd_flags.set_pd_top(true);
+                self.pd_flags.set_pd_cpu(true);
+            }
         }
     }
 
@@ -853,17 +930,48 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        // pmu_ll_hp_set_sleep_enable
-        PMU::regs()
-            .slp_wakeup_cntl0()
-            .write(|w| w.sleep_req().bit(true));
+        // Arm regDMA retention of the TOP-domain peripherals so the PMU backs
+        // them up on sleep entry and restores them on wakeup. Must happen after
+        // the power config write above (which resets the PMU backup-enable bits)
+        // and before the sleep request.
+        if !self.deep && self.pd_flags.pd_top() {
+            crate::rtc_cntl::retention::enable_top_retention();
+        }
 
-        // In pd_cpu lightsleep and deepsleep mode, we never get here
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
+        if !self.deep && self.pd_flags.pd_cpu() {
+            // CPU power-down light sleep: save the CPU register state, trigger
+            // sleep and (on the same call) resume here after wakeup with the
+            // state restored. The sleep trigger + wait loop happen inside.
+            unsafe {
+                crate::rtc_cntl::cpu_retention::sleep_with_cpu_retention();
             }
+        } else {
+            // pmu_ll_hp_set_sleep_enable
+            PMU::regs()
+                .slp_wakeup_cntl0()
+                .write(|w| w.sleep_req().bit(true));
+
+            // In pd_cpu lightsleep and deepsleep mode, we never get here
+            loop {
+                let int_raw = PMU::regs().int_raw().read();
+                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
+                    break;
+                }
+            }
+        }
+
+        // After a TOP-domain power-down light sleep, TIMG0's flashboot watchdog
+        // comes back armed: TIMG0 sits in the TOP domain, is reset when TOP
+        // powers up, and is deliberately not part of the regDMA retention list.
+        // IDF disables it in software on wakeup (misc_modules_wake_prepare(),
+        // sleep_modes.c). Do the same here or it will reset the chip shortly
+        // after we resume.
+        if !self.deep && self.pd_flags.pd_top() {
+            let tg0 = crate::peripherals::TIMG0::regs();
+            tg0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+            tg0.wdtconfig0()
+                .modify(|_, w| w.wdt_flashboot_mod_en().bit(false));
+            tg0.wdtwprotect().write(|w| unsafe { w.bits(0) });
         }
     }
 
