@@ -220,6 +220,21 @@ macro_rules! property {
     ("i2s.clock_configured_by_pcr") => {
         false
     };
+    ("i2s.supports_pdm_tx") => {
+        false
+    };
+    ("i2s.supports_pdm_rx") => {
+        false
+    };
+    ("i2s.supports_pcm2pdm") => {
+        false
+    };
+    ("i2s.supports_pdm2pcm") => {
+        false
+    };
+    ("i2s.supports_pdm_rx_hp_filter") => {
+        false
+    };
     ("interrupts.status_registers") => {
         3
     };

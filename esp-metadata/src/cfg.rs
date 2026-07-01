@@ -478,6 +478,25 @@ driver_configs![
             #[serde(default)]
             /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,
+            #[serde(default)]
+            /// Whether the chip supports PDM TX mode.
+            supports_pdm_tx: bool,
+            #[serde(default)]
+            /// Whether the chip supports PDM RX mode.
+            supports_pdm_rx: bool,
+            #[serde(default)]
+            /// Whether the chip supports the hardware PCM-to-PDM filter on TX.
+            supports_pcm2pdm: bool,
+            #[serde(default)]
+            /// Whether the chip supports the hardware PDM-to-PCM filter on RX.
+            supports_pdm2pcm: bool,
+            #[serde(default)]
+            /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
+            supports_pdm_rx_hp_filter: bool,
+            /// Maximum number of PDM TX data lines.
+            pdm_max_tx_lines: Option<u32>,
+            /// Maximum number of PDM RX data lines.
+            pdm_max_rx_lines: Option<u32>,
         }
     },
     IeeeProperties {

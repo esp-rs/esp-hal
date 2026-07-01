@@ -548,7 +548,7 @@ mod interrupt_spi_dma {
         let other_peripheral = esp_hal::i2s::master::I2s::new(
             peripherals.I2S0,
             dma_channel2,
-            esp_hal::i2s::master::Config::new_tdm_philips()
+            esp_hal::i2s::master::TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_khz(8))
                 .with_data_format(esp_hal::i2s::master::DataFormat::Data16Channel16)
                 .with_channels(esp_hal::i2s::master::Channels::STEREO),

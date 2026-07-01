@@ -18,7 +18,7 @@ mod tests {
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
-        i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
+        i2s::master::{Channels, Config, DataFormat, I2s, I2sTx, TdmConfig},
         peripherals::I2S0,
         time::Rate,
     };
@@ -138,7 +138,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
@@ -205,7 +205,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
@@ -333,7 +333,7 @@ mod tests {
         let _i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -383,7 +383,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -440,7 +440,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -501,7 +501,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -543,7 +543,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -587,7 +587,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -635,7 +635,7 @@ mod tests {
         let i2s = I2s::new(
             ctx.i2s,
             ctx.dma_channel,
-            Config::new_tdm_philips()
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -726,6 +726,110 @@ mod parallel_tests {
             .map_err(|_| "failed to send buffer")
             .unwrap();
         xfer.wait_for_done().await.unwrap();
+    }
+}
+
+#[cfg(i2s_supports_pdm_tx)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod pdm_tx_tests {
+    use esp_hal::{
+        dma_tx_buffer,
+        i2s::master::{I2s, PdmSlotMode, PdmTxConfig},
+        time::Rate,
+    };
+
+    #[test]
+    fn pdm_tx_config_validate() {
+        let tx = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
+        assert!(tx.validate().is_ok());
+    }
+
+    #[test]
+    fn pdm_tx_init_and_write() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                peripherals.DMA_I2S0
+            },
+            _ => {
+                peripherals.DMA_CH0
+            },
+        };
+
+        let tx_cfg = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
+        let pdm_cfg = esp_hal::i2s::master::PdmConfig::tx_only(tx_cfg);
+
+        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+            .unwrap()
+            .i2s_tx
+            .with_clk(peripherals.GPIO1)
+            .with_dout(peripherals.GPIO2)
+            .build();
+
+        let mut buffer = dma_tx_buffer!(512).unwrap();
+        buffer.set_length(512);
+
+        let transfer = i2s.write(buffer).unwrap();
+        let (_, i2s, _) = transfer.wait();
+        let _ = i2s;
+    }
+}
+
+#[cfg(i2s_supports_pdm_rx)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod pdm_rx_tests {
+    use esp_hal::{
+        dma_rx_buffer,
+        i2s::master::{I2s, PdmConfig, PdmRxConfig, PdmSlotMode},
+        time::Rate,
+    };
+
+    fn default_rx_config() -> PdmRxConfig {
+        cfg_select! {
+            any(esp32, esp32s3, esp32p4) => {
+                PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
+            }
+            _ => {
+                PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            }
+        }
+    }
+
+    #[test]
+    fn pdm_rx_config_validate() {
+        let rx = default_rx_config();
+        assert!(rx.validate().is_ok());
+    }
+
+    #[test]
+    fn pdm_rx_init_and_read() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                peripherals.DMA_I2S0
+            },
+            _ => {
+                peripherals.DMA_CH0
+            },
+        };
+
+        let pdm_cfg = PdmConfig::rx_only(default_rx_config());
+
+        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+            .unwrap()
+            .i2s_rx
+            .with_clk(peripherals.GPIO1)
+            .with_din(peripherals.GPIO2)
+            .build();
+
+        let mut buffer = dma_rx_buffer!(512).unwrap();
+        buffer.set_length(512);
+
+        let transfer = i2s.read(buffer).unwrap();
+        let (_, i2s, _) = transfer.wait();
+        let _ = i2s;
     }
 }
 
