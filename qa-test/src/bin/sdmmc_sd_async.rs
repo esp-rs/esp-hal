@@ -28,7 +28,7 @@ use embedded_fatfs::{FileSystem, FsOptions, ReadWriteSeek};
 use embedded_io_async::{Read, Write};
 use embedded_partitions::mbr::Scheme;
 use esp_backtrace as _;
-#[cfg(feature = "esp32s3")]
+#[cfg(any(feature = "esp32s3", feature = "esp32p4"))]
 use esp_hal::sdmmc::DelayPhase;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
@@ -42,11 +42,11 @@ use sdio::{BlockDevice, sd::Card};
 esp_bootloader_esp_idf::esp_app_desc!();
 
 /// Target card clock. 40 MHz exercises the SD high-speed (SDR25) path.
-const CARD_HZ: u32 = 25_000_000;
+const CARD_HZ: u32 = 40_000_000;
 
-/// Input sampling phase for the high-speed path (esp32s3 only). If 40 MHz
+/// Input sampling phase for the high-speed path (esp32s3/p4 only). If 40 MHz
 /// init fails with a timeout, try `_1`, `_2`, then `_3`.
-#[cfg(feature = "esp32s3")]
+#[cfg(any(feature = "esp32s3", feature = "esp32p4"))]
 const INPUT_DELAY_PHASE: DelayPhase = DelayPhase::_0;
 
 /// Test-owned file (8.3 name); assumed not to exist on the card.
@@ -83,7 +83,7 @@ async fn main(_spawner: Spawner) {
                 .with_data3(peripherals.GPIO13);
         }
         feature = "esp32p4" => {
-            let slot = controller.slot::<0>(slot_config).unwrap();
+            let slot = controller.slot::<0>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE)).unwrap();
             let slot = slot
                 .with_clk(peripherals.GPIO43)
                 .with_cmd(peripherals.GPIO44)
