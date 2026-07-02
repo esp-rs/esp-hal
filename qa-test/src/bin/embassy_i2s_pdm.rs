@@ -4,7 +4,7 @@
 //! e.g. ESP32-C3-LCDKit (on-board NS4150), PDM data goes to the on-board NS4150 on **GPIO3**
 //! (`AUDIO_PA`). No separate clock pin. (DAC case)
 
-//% CHIP_FILTER: i2s_supports_pdm_tx
+//% CHIP_FILTER: i2s_driver_supported && i2s_supports_pdm_tx
 //% FEATURES: unstable
 
 #![no_std]
