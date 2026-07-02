@@ -153,6 +153,10 @@ mod low_level;
 pub use low_level::{AnyI2c, Instance};
 use low_level::{Driver, I2cClockGuard};
 
+#[cfg(esp32c6)]
+#[instability::unstable]
+pub use crate::rtc_cntl::retention::I2cRetentionMemory;
+
 const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
@@ -680,6 +684,12 @@ pub struct I2c<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     config: DriverConfig,
+    // Active keeps `TOP` powered; `I2c::with_retention_memory` swaps to retained.
+    #[cfg(esp32c6)]
+    power: crate::rtc_cntl::retention::PowerManagement<
+        'd,
+        crate::rtc_cntl::retention::I2cRetentionMemory,
+    >,
 }
 
 #[derive(Debug)]
@@ -736,6 +746,8 @@ impl<'d> I2c<'d, Blocking> {
                 sda_pin,
                 scl_pin,
             },
+            #[cfg(esp32c6)]
+            power: crate::rtc_cntl::retention::PowerManagement::new(),
         };
 
         // Make sure inputs are well-defined.
@@ -759,6 +771,8 @@ impl<'d> I2c<'d, Blocking> {
             phantom: PhantomData,
             guard: self.guard,
             config: self.config,
+            #[cfg(esp32c6)]
+            power: self.power,
         }
     }
 
@@ -851,6 +865,8 @@ impl<'d> I2c<'d, Async> {
             phantom: PhantomData,
             guard: self.guard,
             config: self.config,
+            #[cfg(esp32c6)]
+            power: self.power,
         }
     }
 
@@ -1036,6 +1052,17 @@ where
         // Timeout errors mean our hardware is (possibly) working when it gets reset. Clear the bus
         // in this case, to prevent leaving the I2C device mid-transfer.
         self.driver().reset_fsm(*error == Error::Timeout)
+    }
+
+    /// Retain this I2C's config registers in `mem` across a `TOP` power-down in
+    /// light sleep. While active the driver keeps `TOP` powered; this drops that
+    /// lock and lets regDMA save/restore the config so `TOP` can power down.
+    #[cfg(esp32c6)]
+    #[instability::unstable]
+    pub fn with_retention_memory(mut self, mem: &'d mut I2cRetentionMemory) -> Self {
+        let base = self.i2c.info().regs() as *const RegisterBlock as usize as u32;
+        self.power.retain(mem, base);
+        self
     }
 
     #[procmacros::doc_replace]

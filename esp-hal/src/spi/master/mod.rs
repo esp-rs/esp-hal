@@ -51,6 +51,9 @@ pub use low_level::{Info, Instance, QspiInstance, State};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
+#[cfg(esp32c6)]
+#[instability::unstable]
+pub use crate::rtc_cntl::retention::SpiRetentionMemory;
 use crate::{
     Async,
     Blocking,
@@ -882,6 +885,17 @@ impl<'d, Dm> Spi<'d, Dm>
 where
     Dm: DriverMode,
 {
+    /// Retain this SPI's config registers in `mem` across a `TOP` power-down in
+    /// light sleep. While active the driver keeps `TOP` powered; this drops that
+    /// lock and lets regDMA save/restore the config so `TOP` can power down.
+    #[cfg(esp32c6)]
+    #[instability::unstable]
+    pub fn with_retention_memory(mut self, mem: &'d mut SpiRetentionMemory) -> Self {
+        let base = self.driver().regs() as *const _ as usize as u32;
+        self.spi.power.retain(mem, base);
+        self
+    }
+
     fn connect_sio_pin(&self, pin: interconnect::OutputSignal<'d>, n: usize) -> PinGuard {
         let in_signal = self.spi.info().sio_input(n);
         let out_signal = self.spi.info().sio_output(n);
