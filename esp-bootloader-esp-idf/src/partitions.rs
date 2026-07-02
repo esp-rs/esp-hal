@@ -681,7 +681,7 @@ impl FlashRegion<'_, '_> {
             return Err(Error::OutOfBounds);
         }
 
-        if !self.range().contains(&address_to) {
+        if address_to > self.range().end || address_to < address_from {
             return Err(Error::OutOfBounds);
         }
 
