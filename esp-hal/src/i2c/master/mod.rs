@@ -127,6 +127,7 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
+    clock::ll::{ClockTree, I2cFunctionClockConfig},
     gpio::{
         DriveMode,
         InputSignal,
@@ -678,7 +679,6 @@ pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
-    clock_guard: I2cClockGuard<'d>,
     config: DriverConfig,
 }
 
@@ -712,17 +712,25 @@ impl<'d> I2c<'d, Blocking> {
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
+        ClockTree::with(|clocks| {
+            let clock = i2c.info().clock_instance;
+            let config = I2cFunctionClockConfig::new(
+                Default::default(),
+                #[cfg(i2c_master_version = "3")]
+                0,
+            );
+            clock.configure_function_clock(clocks, config);
+        });
+
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
         let i2c_any = i2c.degrade();
-        let clock_guard = I2cClockGuard::new(unsafe { i2c_any.clone_unchecked() });
 
         let i2c = I2c {
             i2c: i2c_any,
             phantom: PhantomData,
             guard,
-            clock_guard,
             config: DriverConfig {
                 config,
                 sda_pin,
@@ -750,7 +758,6 @@ impl<'d> I2c<'d, Blocking> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
-            clock_guard: self.clock_guard,
             config: self.config,
         }
     }
@@ -843,7 +850,6 @@ impl<'d> I2c<'d, Async> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
-            clock_guard: self.clock_guard,
             config: self.config,
         }
     }
@@ -1006,6 +1012,7 @@ impl<'d> I2c<'d, Async> {
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
+        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
         self.driver()
             .transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
             .await
@@ -1268,6 +1275,7 @@ where
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
+        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
         self.driver()
             .transaction_impl(address.into(), operations.into_iter().map(Operation::from))
             .inspect_err(|error| self.internal_recover(error))

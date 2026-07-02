@@ -1,8 +1,5 @@
 use super::*;
-use crate::{
-    rtc_cntl::WakeLock,
-    soc::clocks::{ClockTree, I2cFunctionClockConfig},
-};
+use crate::{rtc_cntl::WakeLock, soc::clocks::ClockTree};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -358,35 +355,21 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-#[derive(Debug)]
-pub(super) struct I2cClockGuard<'t> {
-    i2c: AnyI2c<'t>,
+pub(super) struct I2cClockGuard {
+    clock: crate::clock::ll::I2cInstance,
 }
 
-impl<'t> I2cClockGuard<'t> {
-    pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
-        ClockTree::with(|clocks| {
-            let clock = i2c.info().clock_instance;
-            let config = I2cFunctionClockConfig::new(
-                Default::default(),
-                #[cfg(i2c_master_version = "3")]
-                0,
-            );
-            clock.configure_function_clock(clocks, config);
-            clock.request_function_clock(clocks);
-        });
-        Self { i2c }
+impl I2cClockGuard {
+    pub(super) fn new(i2c: AnyI2c<'_>) -> Self {
+        let clock = i2c.info().clock_instance;
+        ClockTree::with(|clocks| clock.request_function_clock(clocks));
+        Self { clock }
     }
 }
 
-impl Drop for I2cClockGuard<'_> {
+impl Drop for I2cClockGuard {
     fn drop(&mut self) {
-        ClockTree::with(|clocks| {
-            self.i2c
-                .info()
-                .clock_instance
-                .release_function_clock(clocks);
-        });
+        ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
     }
 }
 
