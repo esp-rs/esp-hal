@@ -1,4 +1,4 @@
-use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
+use super::{Ext0WakeupSource, Ext1WakeupSource, WakeSource, WakeTriggers};
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{BB, DPORT, I2S0, LPWR, NRX, RTC_IO},
@@ -68,28 +68,6 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 /// Default wait cycles to enable the 8MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
-impl WakeSource for TimerWakeupSource {
-    fn apply(&self, rtc: &Rtc<'_>, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
-
-        triggers.set_timer(true);
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            LPWR::regs()
-                .slp_timer0()
-                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-            LPWR::regs().slp_timer1().write(|w| {
-                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
-                w.main_timer_alarm_en().set_bit()
-            });
-        }
-    }
-}
 
 impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     fn apply(
