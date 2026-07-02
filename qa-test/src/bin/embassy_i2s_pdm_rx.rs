@@ -15,7 +15,7 @@
 //! Values are printed as `i16` like IDF's example — on raw-PDM targets that means line
 //! bitstream words, not decoded PCM.
 
-//% CHIP_FILTER: i2s_driver_supported &&i2s_supports_pdm_rx
+//% CHIP_FILTER: i2s_driver_supported && i2s_supports_pdm_rx
 //% FEATURES: unstable
 
 #![no_std]
