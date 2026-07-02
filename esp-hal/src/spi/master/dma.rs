@@ -38,7 +38,7 @@ use crate::{
     pac::spi2::RegisterBlock,
     private::DropGuard,
     soc::is_slice_in_dram,
-    spi::DmaError,
+    spi::{DmaError, master::low_level::SpiClockGuard},
 };
 #[cfg(dma_can_access_psram)]
 use crate::{dma::ManualWritebackBuffer, soc::is_slice_in_psram};
@@ -421,7 +421,8 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -466,13 +467,13 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
             self.dma_driver().disable_dma();
-            self.driver().write(words)?;
-            return self.driver().flush();
+            return self.driver().write(words);
         }
 
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
@@ -507,19 +508,19 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(read.len().max(write.len())) {
             self.dma_driver().disable_dma();
-            if read.is_empty() {
-                self.driver().write(write)?;
-                return self.driver().flush();
+            return if read.is_empty() {
+                self.driver().write(write)
             } else if write.is_empty() {
-                return self.driver().read(read);
+                self.driver().read(read)
             } else {
-                return self.driver().transfer(read, write);
-            }
+                self.driver().transfer(read, write)
+            };
         }
 
         let common_length = min(read.len(), write.len());
@@ -588,7 +589,7 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -653,7 +654,7 @@ impl<'d> SpiDma<'d, Async> {
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
 
         if buffer.is_empty() {
             let rx_buffer = unsafe { NoBuffer(self.spi.dma_state().rx_buffer().prepare()) };
@@ -721,7 +722,7 @@ impl<'d> SpiDma<'d, Async> {
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        self.wait_for_idle_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
 
         if buffer.is_empty() {
             let tx_buffer = unsafe { NoBuffer(self.spi.dma_state().tx_buffer().prepare()) };
@@ -774,6 +775,8 @@ impl<'d> SpiDma<'d, Async> {
         mut rx_buffer: impl DmaRxBuffer,
         mut tx_buffer: impl DmaTxBuffer,
     ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         unsafe {
             spi.start_dma_transfer(read_bytes, write_bytes, &mut rx_buffer, &mut tx_buffer)?;
@@ -792,6 +795,8 @@ impl<'d> SpiDma<'d, Async> {
         bytes_to_read: usize,
         mut rx_buffer: impl DmaRxBuffer,
     ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         unsafe {
             spi.start_half_duplex_read(
@@ -817,6 +822,8 @@ impl<'d> SpiDma<'d, Async> {
         bytes_to_write: usize,
         mut tx_buffer: impl DmaTxBuffer,
     ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         let mut spi = DropGuard::new(&mut *self, |spi| spi.cancel_transfer());
         unsafe {
             spi.start_half_duplex_write(
@@ -1207,12 +1214,13 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_write: usize,
         mut buffer: TX,
     ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
-        self.wait_for_idle();
+        let clock = SpiClockGuard::new(self.spi.info());
+
         if let Err(e) = self.driver().setup_full_duplex() {
             return Err((e, self, buffer));
         };
         match unsafe { self.start_dma_write(bytes_to_write, &mut buffer) } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer, clock)),
             Err(e) => Err((e, self, buffer)),
         }
     }
@@ -1245,12 +1253,13 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_read: usize,
         mut buffer: RX,
     ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
-        self.wait_for_idle();
+        let clock = SpiClockGuard::new(self.spi.info());
+
         if let Err(e) = self.driver().setup_full_duplex() {
             return Err((e, self, buffer));
         };
         match unsafe { self.start_dma_read(bytes_to_read, &mut buffer) } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer, clock)),
             Err(e) => Err((e, self, buffer)),
         }
     }
@@ -1287,7 +1296,8 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_write: usize,
         mut tx_buffer: TX,
     ) -> Result<SpiDmaTransfer<'d, Dm, (RX, TX)>, (Error, Self, RX, TX)> {
-        self.wait_for_idle();
+        let clock = SpiClockGuard::new(self.spi.info());
+
         if let Err(e) = self.driver().setup_full_duplex() {
             return Err((e, self, rx_buffer, tx_buffer));
         };
@@ -1299,7 +1309,7 @@ aligned, otherwise the driver requires copying the entire buffer."
                 &mut tx_buffer,
             )
         } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer))),
+            Ok(_) => Ok(SpiDmaTransfer::new(self, (rx_buffer, tx_buffer), clock)),
             Err(e) => Err((e, self, rx_buffer, tx_buffer)),
         }
     }
@@ -1346,12 +1356,12 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_read: usize,
         mut buffer: RX,
     ) -> Result<SpiDmaTransfer<'d, Dm, RX>, (Error, Self, RX)> {
-        self.wait_for_idle();
+        let clock = SpiClockGuard::new(self.spi.info());
 
         match unsafe {
             self.start_half_duplex_read(data_mode, cmd, address, dummy, bytes_to_read, &mut buffer)
         } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer, clock)),
             Err(e) => Err((e, self, buffer)),
         }
     }
@@ -1407,7 +1417,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         bytes_to_write: usize,
         mut buffer: TX,
     ) -> Result<SpiDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
-        self.wait_for_idle();
+        let clock = SpiClockGuard::new(self.spi.info());
 
         match unsafe {
             self.start_half_duplex_write(
@@ -1419,7 +1429,7 @@ aligned, otherwise the driver requires copying the entire buffer."
                 &mut buffer,
             )
         } {
-            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer)),
+            Ok(_) => Ok(SpiDmaTransfer::new(self, buffer, clock)),
             Err(e) => Err((e, self, buffer)),
         }
     }
@@ -1458,7 +1468,8 @@ aligned, otherwise the driver requires copying the entire buffer."
     /// Reads data from the SPI bus using DMA.
     #[instability::unstable]
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -1498,13 +1509,13 @@ aligned, otherwise the driver requires copying the entire buffer."
     /// Writes data to the SPI bus using DMA.
     #[instability::unstable]
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
             self.dma_driver().disable_dma();
-            self.driver().write(words)?;
-            return self.driver().flush();
+            return self.driver().write(words);
         }
 
         let mut descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
@@ -1533,14 +1544,14 @@ aligned, otherwise the driver requires copying the entire buffer."
     /// Transfers data to and from the SPI bus simultaneously using DMA.
     #[instability::unstable]
     pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(read.len().max(write.len())) {
             self.dma_driver().disable_dma();
             if read.is_empty() {
-                self.driver().write(write)?;
-                return self.driver().flush();
+                return self.driver().write(write);
             } else if write.is_empty() {
                 return self.driver().read(read);
             } else {
@@ -1608,7 +1619,8 @@ aligned, otherwise the driver requires copying the entire buffer."
     /// Transfers data in place on the SPI bus using DMA.
     #[instability::unstable]
     pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -1667,7 +1679,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
 
         let rx_buffer = unsafe { self.dma_driver().rx_buffer() };
         if rx_buffer.capacity() == 0 {
@@ -1698,7 +1710,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        self.wait_for_idle();
+        let _clock = SpiClockGuard::new(self.spi.info());
 
         let tx_buffer = unsafe { self.dma_driver().tx_buffer() };
         if tx_buffer.capacity() == 0 {
@@ -1731,6 +1743,7 @@ where
 {
     spi_dma: ManuallyDrop<SpiDma<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf>,
+    clock: ManuallyDrop<SpiClockGuard>,
 }
 
 impl<Buf> SpiDmaTransfer<'_, Async, Buf> {
@@ -1747,10 +1760,11 @@ impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
 {
-    fn new(spi_dma: SpiDma<'d, Dm>, dma_buf: Buf) -> Self {
+    fn new(spi_dma: SpiDma<'d, Dm>, dma_buf: Buf, clock: SpiClockGuard) -> Self {
         Self {
             spi_dma: ManuallyDrop::new(spi_dma),
             dma_buf: ManuallyDrop::new(dma_buf),
+            clock: ManuallyDrop::new(clock),
         }
     }
 
@@ -1776,6 +1790,7 @@ where
                 ManuallyDrop::take(&mut self.dma_buf),
             )
         };
+        let _ = unsafe { ManuallyDrop::take(&mut self.clock) };
         core::mem::forget(self);
         retval
     }
@@ -1803,6 +1818,7 @@ where
             ManuallyDrop::drop(&mut self.spi_dma);
             ManuallyDrop::drop(&mut self.dma_buf);
         }
+        let _ = unsafe { ManuallyDrop::take(&mut self.clock) };
     }
 }
 
