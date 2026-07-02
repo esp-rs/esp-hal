@@ -1,15 +1,64 @@
 //! PDM (pulse-density modulation) configuration for the I2S master driver.
+//!
+//! Default configurations and clock calculations follow Espressif's I2S PDM driver
+//! (<https://github.com/espressif/esp-idf/tree/master/components/esp_driver_i2s>).
 
 mod clock;
 #[cfg(not(i2s_version = "1"))]
 mod hp_filter;
-#[cfg(i2s_version = "1")]
-mod regs_v1;
-#[cfg(not(i2s_version = "1"))]
-mod regs_v2;
+#[cfg_attr(i2s_version = "1", path = "regs_v1.rs")]
+#[cfg_attr(i2s_version = "2", path = "regs_v2.rs")]
+#[cfg_attr(i2s_version = "3", path = "regs_v2.rs")]
+mod ll;
 
 use super::master::{ConfigError, Instance};
 use crate::time::Rate;
+
+/// PDM configuration errors.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PdmError {
+    /// PDM is not supported on this I2S peripheral instance (I2S1).
+    UnsupportedInstance,
+    /// PCM format requested but hardware PCM2PDM/PDM2PCM is unavailable.
+    PcmFormatUnsupported,
+    /// PDM clock configuration is invalid.
+    InvalidClock,
+    /// PDM slot mask selects no active channels.
+    InvalidSlotMask,
+    /// PDM config must enable at least one of TX or RX.
+    DirectionMissing,
+    /// Simultaneous PDM TX and RX is not supported.
+    DuplexUnsupported,
+    /// PDM data line index is not available on this chip.
+    InvalidLine,
+}
+
+impl core::error::Error for PdmError {}
+
+impl core::fmt::Display for PdmError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnsupportedInstance => write!(f, "PDM mode is only supported on I2S0"),
+            Self::PcmFormatUnsupported => write!(
+                f,
+                "PCM PDM format is not supported on this chip; use raw PDM format"
+            ),
+            Self::InvalidClock => write!(f, "PDM clock configuration is out of supported range"),
+            Self::InvalidSlotMask => {
+                write!(f, "PDM slot mask must select at least one active slot")
+            }
+            Self::DirectionMissing => {
+                write!(f, "PDM configuration must include TX and/or RX settings")
+            }
+            Self::DuplexUnsupported => {
+                write!(f, "PDM full duplex (TX and RX together) is not supported")
+            }
+            Self::InvalidLine => write!(f, "PDM data line index is not available on this chip"),
+        }
+    }
+}
 
 /// A peripheral singleton that supports PDM mode (I2S0 only).
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
@@ -335,26 +384,22 @@ impl PdmTxConfig {
     }
 
     /// Validate TX configuration against hardware capabilities.
-    pub fn validate(&self) -> Result<(), ConfigError> {
+    pub fn validate(&self) -> Result<(), PdmError> {
         #[cfg(not(i2s_supports_pcm2pdm))]
         if self.slot.data_format == PdmDataFormat::Pcm {
-            return Err(ConfigError::PcmFormatUnsupported);
+            return Err(PdmError::PcmFormatUnsupported);
         }
         if self.clock.up_sample_fs > 480 {
-            return Err(ConfigError::InvalidPdmClock);
+            return Err(PdmError::InvalidClock);
         }
         Ok(())
     }
 }
 
 fn default_tx_slot(mode: PdmSlotMode) -> PdmTxSlotConfig {
-    #[cfg(i2s_supports_pcm2pdm)]
-    {
-        PdmTxSlotConfig::codec_pcm_default(mode)
-    }
-    #[cfg(not(i2s_supports_pcm2pdm))]
-    {
-        PdmTxSlotConfig::raw_default(mode)
+    cfg_select! {
+        i2s_supports_pcm2pdm => PdmTxSlotConfig::codec_pcm_default(mode),
+        _ => PdmTxSlotConfig::raw_default(mode),
     }
 }
 
@@ -394,26 +439,22 @@ impl PdmRxConfig {
     }
 
     /// Validate RX configuration against hardware capabilities.
-    pub fn validate(&self) -> Result<(), ConfigError> {
+    pub fn validate(&self) -> Result<(), PdmError> {
         #[cfg(not(i2s_supports_pdm2pcm))]
         if self.slot.data_format == PdmDataFormat::Pcm {
-            return Err(ConfigError::PcmFormatUnsupported);
+            return Err(PdmError::PcmFormatUnsupported);
         }
         if self.slot.slot_mask.bits() == 0 {
-            return Err(ConfigError::InvalidSlotMask);
+            return Err(PdmError::InvalidSlotMask);
         }
         Ok(())
     }
 }
 
 fn default_rx_slot(mode: PdmSlotMode) -> PdmRxSlotConfig {
-    #[cfg(i2s_supports_pdm2pcm)]
-    {
-        PdmRxSlotConfig::pcm_default(mode)
-    }
-    #[cfg(not(i2s_supports_pdm2pcm))]
-    {
-        PdmRxSlotConfig::raw_default(mode)
+    cfg_select! {
+        i2s_supports_pdm2pcm => PdmRxSlotConfig::pcm_default(mode),
+        _ => PdmRxSlotConfig::raw_default(mode),
     }
 }
 
@@ -447,12 +488,12 @@ impl PdmConfig {
     }
 
     /// Validate that exactly one direction is configured and settings are valid.
-    pub fn validate(&self) -> Result<(), ConfigError> {
+    pub fn validate(&self) -> Result<(), PdmError> {
         if self.tx.is_none() && self.rx.is_none() {
-            return Err(ConfigError::PdmDirectionMissing);
+            return Err(PdmError::DirectionMissing);
         }
         if self.tx.is_some() && self.rx.is_some() {
-            return Err(ConfigError::PdmDuplexUnsupported);
+            return Err(PdmError::DuplexUnsupported);
         }
         if let Some(tx) = &self.tx {
             tx.validate()?;
@@ -468,14 +509,6 @@ pub(crate) fn configure_pdm<I: super::master::private::RegisterAccessPrivate + ?
     i2s: &I,
     config: &PdmConfig,
 ) -> Result<(), ConfigError> {
-    config.validate()?;
-
-    #[cfg(i2s_version = "1")]
-    {
-        regs_v1::configure_pdm(i2s, config)
-    }
-    #[cfg(not(i2s_version = "1"))]
-    {
-        regs_v2::configure_pdm(i2s, config)
-    }
+    config.validate().map_err(ConfigError::Pdm)?;
+    ll::configure_pdm(i2s, config).map_err(ConfigError::Pdm)
 }

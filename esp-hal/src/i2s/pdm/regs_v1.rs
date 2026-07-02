@@ -1,7 +1,7 @@
 //! PDM register programming for ESP32 (I2S hardware v1).
 
-use super::{PdmConfig, PdmDataFormat, PdmSlotMode, clock};
-use crate::i2s::master::{ConfigError, private::RegisterAccessPrivate};
+use super::{PdmConfig, PdmDataFormat, PdmError, PdmSlotMode, clock};
+use crate::i2s::master::private::RegisterAccessPrivate;
 #[cfg(soc_has_i2s0)]
 use crate::pac::i2s0::RegisterBlock as I2s0RegisterBlock;
 
@@ -14,9 +14,9 @@ fn i2s0_regs() -> &'static I2s0RegisterBlock {
 pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &PdmConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     if i2s.peripheral() != crate::system::Peripheral::I2s0 {
-        return Err(ConfigError::PdmUnsupportedInstance);
+        return Err(PdmError::UnsupportedInstance);
     }
 
     i2s0_regs().conf2().modify(|_, w| {
@@ -43,7 +43,7 @@ pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
 fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &super::PdmTxConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     config.validate()?;
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
@@ -94,8 +94,7 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
 
     let slot_mask = config.slot.slot_mask.bits();
     regs.conf_chan().modify(|_, w| unsafe {
-        // IDF: `i2s_ll_tx_select_pdm_slot` (mono uses 3/4/1, stereo uses 1/2/0).
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32/include/hal/i2s_ll.h#L790-L820>
+        // Mono uses 3/4/1, stereo uses 1/2/0.
         let chan_mod = if is_mono {
             match slot_mask {
                 0b01 => 3u8,
@@ -123,7 +122,7 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
 fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &super::PdmRxConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     config.validate()?;
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
@@ -155,8 +154,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     });
 
     regs.conf_chan().modify(|_, w| unsafe {
-        // IDF: `i2s_ll_rx_select_pdm_slot` (always 1/2/0, not TDM mono 3/4/0).
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32/include/hal/i2s_ll.h#L827-L837>
+        // PDM RX always uses 1/2/0, not TDM mono 3/4/0.
         let chan_mod = match slot_mask {
             0b01 => 1u8,
             0b10 => 2u8,

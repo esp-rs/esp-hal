@@ -18,7 +18,7 @@ mod tests {
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
-        i2s::master::{Channels, Config, DataFormat, I2s, I2sTx, TdmConfig},
+        i2s::master::{Channels, DataFormat, I2s, I2sTx, TdmConfig},
         peripherals::I2S0,
         time::Rate,
     };

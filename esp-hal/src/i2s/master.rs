@@ -134,7 +134,7 @@ use enumset::{EnumSet, EnumSetType, enum_set};
 use private::*;
 
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-pub use super::pdm::{PdmConfig, PdmInstance, PdmRxConfig, PdmSlotMode, PdmTxConfig};
+pub use super::pdm::{PdmConfig, PdmError, PdmInstance, PdmRxConfig, PdmSlotMode, PdmTxConfig};
 #[cfg(i2s_version = "1")]
 use crate::RegisterToggle;
 use crate::{
@@ -224,9 +224,9 @@ impl<'d> I2s<'d, crate::Blocking> {
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sMasterDmaChannel<'d, I>,
-        config: impl Into<Config>,
+        config: TdmConfig,
     ) -> Result<Self, ConfigError> {
-        Self::new_internal(i2s, channel.into(), config.into())
+        Self::new_internal(i2s, channel.into(), Config::Tdm(config))
     }
 
     /// Construct a new I2S instance in PDM mode (I2S0 only).
@@ -781,12 +781,12 @@ impl Channels {
     }
 }
 
-/// I2S peripheral configuration (TDM or PDM mode).
+/// Internal I2S peripheral configuration (TDM or PDM mode).
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(not(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx)), derive(Eq, Hash))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum Config {
+pub(crate) enum Config {
     /// Time-division multiplexed (TDM) configuration.
     Tdm(TdmConfig),
     /// Pulse-density modulation (PDM) configuration (I2S0 only).
@@ -818,32 +818,11 @@ pub struct TdmConfig {
 }
 
 impl Config {
-    /// TDM Philips standard configuration with two 16-bit active channels
-    pub fn new_tdm_philips() -> Self {
-        Self::Tdm(TdmConfig::new_tdm_philips())
-    }
-
-    /// TDM MSB standard configuration with two 16-bit active channels
-    pub fn new_tdm_msb() -> Self {
-        Self::Tdm(TdmConfig::new_tdm_msb())
-    }
-
-    /// TDM PCM short frame standard configuration with two 16-bit active channels
-    pub fn new_tdm_pcm_short() -> Self {
-        Self::Tdm(TdmConfig::new_tdm_pcm_short())
-    }
-
-    /// TDM PCM long frame standard configuration with two 16-bit active channels
-    #[cfg(not(i2s_version = "1"))]
-    pub fn new_tdm_pcm_long() -> Self {
-        Self::Tdm(TdmConfig::new_tdm_pcm_long())
-    }
-
     fn validate(&self) -> Result<(), ConfigError> {
         match self {
             Self::Tdm(c) => c.validate(),
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            Self::Pdm(c) => c.validate(),
+            Self::Pdm(c) => c.validate().map_err(ConfigError::Pdm),
         }
     }
 
@@ -854,19 +833,6 @@ impl Config {
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
             Self::Pdm(_) => unreachable!(),
         }
-    }
-}
-
-impl From<TdmConfig> for Config {
-    fn from(config: TdmConfig) -> Self {
-        Self::Tdm(config)
-    }
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for Config {
-    fn default() -> Self {
-        Self::Tdm(TdmConfig::default())
     }
 }
 
@@ -1153,27 +1119,16 @@ pub enum ConfigError {
     /// Requested WS signal width is out of range
     #[cfg(not(i2s_version = "1"))]
     WsWidthOutOfRange,
-    /// PDM is not supported on this I2S peripheral instance (I2S1)
+    /// PDM configuration error
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    PdmUnsupportedInstance,
-    /// PCM format requested but hardware PCM2PDM/PDM2PCM is unavailable
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    PcmFormatUnsupported,
-    /// PDM clock configuration is invalid
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    InvalidPdmClock,
-    /// PDM slot mask selects no active channels
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    InvalidSlotMask,
-    /// PDM config must enable at least one of TX or RX
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    PdmDirectionMissing,
-    /// Simultaneous PDM TX and RX is not supported
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    PdmDuplexUnsupported,
-    /// PDM data line index is not available on this chip
-    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-    InvalidPdmLine,
+    Pdm(PdmError),
+}
+
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+impl From<PdmError> for ConfigError {
+    fn from(err: PdmError) -> Self {
+        Self::Pdm(err)
+    }
 }
 
 impl core::error::Error for ConfigError {}
@@ -1197,36 +1152,7 @@ impl core::fmt::Display for ConfigError {
                 )
             }
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::PdmUnsupportedInstance => {
-                write!(f, "PDM mode is only supported on I2S0")
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::PcmFormatUnsupported => {
-                write!(
-                    f,
-                    "PCM PDM format is not supported on this chip; use raw PDM format"
-                )
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::InvalidPdmClock => {
-                write!(f, "PDM clock configuration is out of supported range")
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::InvalidSlotMask => {
-                write!(f, "PDM slot mask must select at least one active slot")
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::PdmDirectionMissing => {
-                write!(f, "PDM configuration must include TX and/or RX settings")
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::PdmDuplexUnsupported => {
-                write!(f, "PDM full duplex (TX and RX together) is not supported")
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            ConfigError::InvalidPdmLine => {
-                write!(f, "PDM data line is not available on this chip")
-            }
+            ConfigError::Pdm(err) => write!(f, "{err}"),
         }
     }
 }
@@ -1623,7 +1549,7 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: RegisterAccessPrivate + super::any::Degrade {}
+pub trait Instance: private::Sealed + super::any::Degrade {}
 #[cfg(soc_has_i2s0)]
 impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
@@ -1654,6 +1580,9 @@ pub(crate) mod private {
     // by accident
     #[cfg(soc_has_i2s1)]
     use crate::{pac::i2s1::RegisterBlock, peripherals::I2S1};
+
+    /// Sealed trait to restrict [`super::Instance`] implementations.
+    pub trait Sealed {}
 
     pub struct TxCreator<'d, Dm>
     where
@@ -1714,8 +1643,7 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal, per IDF).
-        /// see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L197>
+        /// Connect the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
@@ -1728,10 +1656,7 @@ pub(crate) mod private {
             dout.apply_output_config(&OutputConfig::default());
             dout.set_output_enable(true);
 
-            let signal = self
-                .i2s
-                .dout_line_signal(1)
-                .ok_or(ConfigError::InvalidPdmLine)?;
+            let signal = self.i2s.dout_line_signal(1).ok_or(PdmError::InvalidLine)?;
             signal.connect_to(&dout);
 
             Ok(self)
@@ -1797,8 +1722,7 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal, per IDF).
-        /// see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L545>
+        /// Connect the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
@@ -1818,7 +1742,7 @@ pub(crate) mod private {
             let signal = self
                 .i2s
                 .din_line_signal(line)
-                .ok_or(ConfigError::InvalidPdmLine)?;
+                .ok_or(PdmError::InvalidLine)?;
             signal.connect_to(&din);
 
             Ok(self)
@@ -1858,7 +1782,7 @@ pub(crate) mod private {
     }
 
     #[cfg(i2s_version = "1")]
-    pub trait RegisterAccessPrivate: Signals + RegBlock {
+    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -2145,14 +2069,6 @@ pub(crate) mod private {
             self.regs().state().read().tx_idle().bit_is_set()
         }
 
-        fn wait_for_tx_done(&self) {
-            while !self.is_tx_done() {
-                // wait
-            }
-
-            self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
-        }
-
         fn reset_rx(&self) {
             self.regs().conf().toggle(|w, bit| {
                 w.rx_reset().bit(bit);
@@ -2199,20 +2115,10 @@ pub(crate) mod private {
         fn is_rx_done(&self) -> bool {
             self.regs().int_raw().read().in_dscr_empty().bit_is_set()
         }
-
-        fn wait_for_rx_done(&self) {
-            while !self.is_rx_done() {
-                // wait
-            }
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.in_suc_eof().clear_bit_by_one());
-        }
     }
 
     #[cfg(not(i2s_version = "1"))]
-    pub trait RegisterAccessPrivate: Signals + RegBlock {
+    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -2225,14 +2131,6 @@ pub(crate) mod private {
                 }
                 w
             });
-        }
-
-        fn listen(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), true);
-        }
-
-        fn unlisten(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), false);
         }
 
         fn interrupts(&self) -> EnumSet<I2sInterrupt> {
@@ -2339,9 +2237,8 @@ pub(crate) mod private {
             let clkm_div = clock_settings.mclk_dividers();
             let pcr = PCR::regs();
 
-            // IDF `i2s_ll_tx_set_raw_clk_div`: pulse a small divider before the target
-            // coefficients to avoid the double-division hardware glitch on C6 et al.
-            // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L328-L344>
+            // Pulse a temporary divider before applying the target coefficients to avoid
+            // a hardware glitch where the clock divider applies twice on PCR chips.
             pcr.i2s_tx_clkm_conf()
                 .modify(|_, w| unsafe { w.i2s_tx_clkm_div_num().bits(2) });
             pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
@@ -2388,9 +2285,8 @@ pub(crate) mod private {
             let clkm_div = clock_settings.mclk_dividers();
             let pcr = PCR::regs();
 
-            // IDF `i2s_ll_rx_set_raw_clk_div`: pulse a small divider before the target
-            // coefficients to avoid the double-division hardware glitch on C6 et al.
-            // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L357-L373>
+            // Pulse a temporary divider before applying the target coefficients to avoid
+            // a hardware glitch where the clock divider applies twice on PCR chips.
             pcr.i2s_rx_clkm_conf()
                 .modify(|_, w| unsafe { w.i2s_rx_clkm_div_num().bits(2) });
             pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
@@ -2628,16 +2524,6 @@ pub(crate) mod private {
             self.regs().state().read().tx_idle().bit_is_set()
         }
 
-        fn wait_for_tx_done(&self) {
-            while !self.is_tx_done() {
-                // wait
-            }
-
-            self.regs()
-                .tx_conf()
-                .modify(|_, w| w.tx_start().clear_bit());
-        }
-
         fn reset_rx(&self) {
             self.regs()
                 .rx_conf()
@@ -2660,8 +2546,7 @@ pub(crate) mod private {
             self.regs()
                 .rxeof_num()
                 .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
-            // IDF `i2s_ll_rx_start`: sync config into the I2S clock domain first.
-            // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L471-L475>
+            // Sync configuration into the I2S clock domain before starting RX.
             self.update_rx();
             self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
@@ -2675,17 +2560,9 @@ pub(crate) mod private {
         fn is_rx_done(&self) -> bool {
             self.regs().int_raw().read().rx_done().bit_is_set()
         }
-
-        fn wait_for_rx_done(&self) {
-            while !self.is_rx_done() {
-                // wait
-            }
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.rx_done().clear_bit_by_one());
-        }
     }
+
+    impl Sealed for I2S0<'_> {}
 
     impl RegBlock for I2S0<'_> {
         fn regs(&self) -> &RegisterBlock {
@@ -2847,6 +2724,9 @@ pub(crate) mod private {
     }
 
     #[cfg(soc_has_i2s1)]
+    impl Sealed for I2S1<'_> {}
+
+    #[cfg(soc_has_i2s1)]
     impl RegisterAccessPrivate for I2S1<'_> {}
 
     #[cfg(soc_has_i2s1)]
@@ -2916,6 +2796,8 @@ pub(crate) mod private {
             }
         }
     }
+
+    impl Sealed for super::AnyI2s<'_> {}
 
     impl RegisterAccessPrivate for super::AnyI2s<'_> {}
 

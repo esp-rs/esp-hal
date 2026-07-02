@@ -1,12 +1,8 @@
-//! High-pass filter coefficient lookup for PDM PCM filters (ESP-IDF compatible).
-//!
-//! Table from `cut_off_coef` in ESP-IDF `i2s_hal.c`
-//! (<https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/i2s_hal.c#L18-L42>).
+//! High-pass filter coefficient lookup for PDM PCM filters.
 
 /// Returns `(param0, param5)` for the closest cut-off frequency.
 ///
 /// `freq_hz_x10` is the cut-off frequency multiplied by 10 (e.g. 355 for 35.5 Hz).
-#[cfg(not(i2s_version = "1"))]
 pub(crate) fn cut_off_coefficients(freq_hz_x10: u32) -> (u32, u32) {
     const TABLE: [[u32; 3]; 21] = [
         [1850, 0, 0],

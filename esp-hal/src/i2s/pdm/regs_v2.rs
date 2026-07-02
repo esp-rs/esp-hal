@@ -1,18 +1,17 @@
-//! PDM register programming for I2S hardware after ESP32 (v1).
+//! PDM register programming for I2S hardware after ESP32 (v2+).
 //!
-//! This module is used for all targets with `i2s_version` `"2"` or `"3"` (see
-//! `i2s/pdm/mod.rs`). The filename reflects the first revision in this family;
-//! chip-specific differences are handled via `#[cfg(i2s_version = "...")]`.
+//! Chip-specific differences are handled via `#[cfg(i2s_version = "...")]`.
 
 use super::{
     PdmConfig,
     PdmDataFormat,
+    PdmError,
     PdmSlotMode,
     PdmTxLineMode,
     clock,
     hp_filter::cut_off_coefficients,
 };
-use crate::i2s::master::{ConfigError, private::RegisterAccessPrivate};
+use crate::i2s::master::private::RegisterAccessPrivate;
 #[cfg(soc_has_i2s0)]
 use crate::pac::i2s0::RegisterBlock as I2s0RegisterBlock;
 
@@ -25,9 +24,9 @@ fn i2s0_regs() -> &'static I2s0RegisterBlock {
 pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &PdmConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     if i2s.peripheral() != crate::system::Peripheral::I2s0 {
-        return Err(ConfigError::PdmUnsupportedInstance);
+        return Err(PdmError::UnsupportedInstance);
     }
 
     if let Some(tx) = &config.tx {
@@ -42,7 +41,7 @@ pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
 fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &super::PdmTxConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     config.validate()?;
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
@@ -51,28 +50,20 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
     let regs = i2s0_regs();
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
 
-    // Slot/filter setup first (IDF: `i2s_pdm_tx_set_slot` before `i2s_pdm_tx_set_clock`).
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L231-L235>
+    // Slot/filter setup before clock enable.
     regs.tx_conf().modify(|_, w| w.tx_reset().set_bit());
     regs.tx_conf().modify(|_, w| {
         w.tx_slave_mod().clear_bit();
         w.tx_tdm_en().clear_bit();
         w.tx_pcm_bypass().clear_bit();
-        // `i2s_ll_tx_pdm_dma_take_mode(..., is_mono, true)`.
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/i2s_hal.c#L218> and
-        // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L1139-L1143>
         w.tx_mono().bit(is_mono);
         w.tx_mono_fst_vld().set_bit();
         #[cfg(i2s_version = "3")]
         w.tx_msb_shift().clear_bit();
         w.tx_ws_idle_pol().clear_bit()
     });
-    regs.tx_conf().modify(|_, w| unsafe {
-        // `i2s_ll_tx_pdm_slot_mode(..., is_mono, false, I2S_PDM_SLOT_BOTH)`.
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/i2s_hal.c#L219> and
-        // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L1169-L1174>
-        w.tx_chan_mod().bits(if is_mono { 3 } else { 0 })
-    });
+    regs.tx_conf()
+        .modify(|_, w| unsafe { w.tx_chan_mod().bits(if is_mono { 3 } else { 0 }) });
 
     #[cfg(i2s_version = "2")]
     regs.tx_conf1().modify(|_, w| w.tx_msb_shift().clear_bit());
@@ -89,8 +80,7 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
         let freq_x10 = (config.slot.hp_cut_off_freq_hz * 10.0) as u32;
         let (param0, param5) = cut_off_coefficients(freq_x10);
 
-        // Set fp/fs before clock enable (IDF: `i2s_pdm_tx_calculate_clock`).
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L63-L65>
+        // Set fp/fs before clock enable.
         regs.tx_pcm2pdm_conf1().modify(|_, w| unsafe {
             w.tx_pdm_fp().bits(config.clock.up_sample_fp as u16);
             w.tx_pdm_fs().bits(config.clock.up_sample_fs as u16);
@@ -120,9 +110,6 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
         });
     }
 
-    // IDF init order: slot → gpio (`mclk_bind`) → clock.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L231-L235> and
-    // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L200-L202>
     #[cfg(not(i2s_clock_configured_by_pcr))]
     regs.rx_clkm_conf().modify(|_, w| w.mclk_sel().clear_bit());
     #[cfg(i2s_clock_configured_by_pcr)]
@@ -135,8 +122,6 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
 
     set_pdm_tx_clock(i2s, &clock);
 
-    // `i2s_ll_tx_enable_pdm`: PDM on, TDM off, PCM2PDM on for PCM data.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L801-L806>
     regs.tx_conf().modify(|_, w| {
         w.tx_pdm_en().set_bit();
         w.tx_tdm_en().clear_bit()
@@ -167,7 +152,7 @@ fn stereo_pdm_rx_slot_mask(slot_mask: u16) -> u16 {
 fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     config: &super::PdmRxConfig,
-) -> Result<(), ConfigError> {
+) -> Result<(), PdmError> {
     config.validate()?;
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
@@ -180,8 +165,6 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
 
     let regs = i2s0_regs();
 
-    // IDF: `i2s_ll_rx_reset` / `i2s_ll_rx_reset_fifo` — WT bits, write 1 to trigger.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L199-L224>
     regs.rx_conf().modify(|_, w| {
         w.rx_reset().set_bit();
         w.rx_fifo_reset().set_bit()
@@ -189,8 +172,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     regs.rx_conf().modify(|_, w| {
         w.rx_slave_mod().clear_bit();
         w.rx_pcm_bypass().set_bit();
-        // IDF `i2s_hal_pdm_set_rx_slot` (HW v2): mono mode stays disabled for PDM RX.
-        // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/i2s_hal.c#L268>
+        // Mono mode stays disabled for PDM RX on HW v2+.
         w.rx_mono().clear_bit();
         w
     });
@@ -200,9 +182,6 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     regs.rx_conf()
         .modify(|_, w| unsafe { w.rx_stop_mode().bits(2) });
 
-    // IDF init order: slot → gpio (`mclk_bind`) → clock.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L582-L585> and
-    // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L551-L553>
     #[cfg(i2s_version = "2")]
     regs.rx_conf1().modify(|_, w| w.rx_msb_shift().clear_bit());
 
@@ -213,8 +192,6 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     });
 
     // PDM always uses a 2-slot frame; mono DMA expects one active slot only.
-    // IDF `i2s_ll_rx_select_std_slot` sets `tot_chan_num = 1` before the mask.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L689>
     regs.rx_tdm_ctrl()
         .modify(|_, w| unsafe { w.rx_tdm_tot_chan_num().bits(1) });
     regs.rx_tdm_ctrl()
@@ -247,9 +224,6 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
         });
     }
 
-    // IDF init order ends with `i2s_ll_rx_enable_pdm` after slot, GPIO, and clock.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L590> and
-    // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L814-L818>
     regs.rx_conf().modify(|_, w| {
         w.rx_pdm_en().set_bit();
         w.rx_tdm_en().clear_bit();
@@ -280,9 +254,6 @@ fn set_pdm_tx_clock_common<I: RegisterAccessPrivate + ?Sized>(
     i2s: &I,
     clock: &clock::PdmTxClockResult,
 ) {
-    // IDF: precise MCLK first; non-PCR chips then apply the PDM raw-div workaround.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L100-L102> and
-    // <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_hal_i2s/esp32c3/include/hal/i2s_ll.h#L328-L344>
     use crate::i2s::master::private::I2sClockDividers;
     let dividers = I2sClockDividers {
         mclk_divider: clock.dividers.mclk_divider,

@@ -1,9 +1,8 @@
-//! PDM clock calculations ported from ESP-IDF `i2s_pdm.c`
-//! (<https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c>).
+//! PDM clock calculations.
 
-use super::{PdmDownsampleRate, PdmRxClockConfig, PdmTxClockConfig};
+use super::{PdmDownsampleRate, PdmError, PdmRxClockConfig, PdmTxClockConfig};
 use crate::{
-    i2s::master::{ConfigError, I2S_LL_MCLK_DIVIDER_MAX, private::I2sClockDividers},
+    i2s::master::{I2S_LL_MCLK_DIVIDER_MAX, private::I2sClockDividers},
     soc,
     time::Rate,
 };
@@ -28,16 +27,15 @@ fn gcd(mut a: u32, mut b: u32) -> u32 {
     a
 }
 
-fn calculate_mclk_dividers(sclk: u32, mclk: u32) -> Result<I2sClockDividers, ConfigError> {
-    // IDF: `(float)sclk > mclk * 1.99` — use integer math to avoid soft-float.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L59>
+fn calculate_mclk_dividers(sclk: u32, mclk: u32) -> Result<I2sClockDividers, PdmError> {
+    // Require `sclk > mclk * 1.99` — use integer math to avoid soft-float.
     if (sclk as u64) * 100 <= (mclk as u64) * 199 {
-        return Err(ConfigError::InvalidPdmClock);
+        return Err(PdmError::InvalidClock);
     }
 
     let mut mclk_divider = sclk / mclk;
     if mclk_divider >= 256 {
-        return Err(ConfigError::InvalidPdmClock);
+        return Err(PdmError::InvalidClock);
     }
 
     let freq_diff = sclk.abs_diff(mclk * mclk_divider);
@@ -49,7 +47,7 @@ fn calculate_mclk_dividers(sclk: u32, mclk: u32) -> Result<I2sClockDividers, Con
         if decimal > 1250000 / 126 {
             mclk_divider += 1;
             if mclk_divider >= 256 {
-                return Err(ConfigError::InvalidPdmClock);
+                return Err(PdmError::InvalidClock);
             }
         } else {
             let max_fract = I2S_LL_MCLK_DIVIDER_MAX as u32;
@@ -93,13 +91,12 @@ fn calculate_mclk_dividers(sclk: u32, mclk: u32) -> Result<I2sClockDividers, Con
     })
 }
 
-// see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L34-L70>
 pub(crate) fn calculate_tx_clock(
     clk: &PdmTxClockConfig,
     pcm: bool,
-) -> Result<PdmTxClockResult, ConfigError> {
+) -> Result<PdmTxClockResult, PdmError> {
     if clk.up_sample_fs > 480 {
-        return Err(ConfigError::InvalidPdmClock);
+        return Err(PdmError::InvalidClock);
     }
 
     let rate = clk.sample_rate.as_hz();
@@ -129,20 +126,17 @@ pub(crate) fn calculate_rx_clock(
     clk: &PdmRxClockConfig,
     pcm: bool,
     slot_mask: u16,
-) -> Result<PdmRxClockResult, ConfigError> {
+) -> Result<PdmRxClockResult, PdmError> {
     let rate = clk.sample_rate.as_hz();
     let dn_sample_factor = PDM_BCK_FACTOR * clk.downsample_rate.factor();
     let slot_num = slot_mask.count_ones().max(1);
 
-    // IDF `i2s_pdm_rx_calculate_clock`.
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L387-L422>
     let bclk = if pcm {
         rate * dn_sample_factor
     } else {
         rate * 2
     };
 
-    // see <https://github.com/espressif/esp-idf/blob/04f7908b1207d945b3fce94aca661379c8ab7afb/components/esp_driver_i2s/i2s_pdm.c#L407-L408>
     let bclk_limit = (PDM_RX_CLK_LIMIT_COEFF * slot_num).div_ceil(dn_sample_factor);
     let bclk_div = clk.bclk_div.max(PDM_RX_BCLK_DIV_MIN).max(bclk_limit);
 
