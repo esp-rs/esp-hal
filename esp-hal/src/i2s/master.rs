@@ -1765,13 +1765,14 @@ pub(crate) mod private {
         fn din_signal(&self) -> InputSignal;
 
         /// Additional PDM TX data line signal (line 1 for two-line DAC).
-        #[cfg(not(i2s_version = "1"))]
+        #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
         fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
             let _ = line;
             None
         }
 
         /// PDM RX data line signal (line 0 is the default DIN signal).
+        #[cfg(i2s_supports_pdm_rx)]
         fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
             if line == 0 {
                 Some(self.din_signal())
@@ -2836,8 +2837,9 @@ pub(crate) mod private {
                 fn bclk_rx_signal(&self) -> OutputSignal;
                 fn ws_rx_signal(&self) -> OutputSignal;
                 fn din_signal(&self) -> InputSignal;
-                #[cfg(not(i2s_version = "1"))]
+                #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
                 fn dout_line_signal(&self, line: u8) -> Option<OutputSignal>;
+                #[cfg(i2s_supports_pdm_rx)]
                 fn din_line_signal(&self, line: u8) -> Option<InputSignal>;
             }
         }
