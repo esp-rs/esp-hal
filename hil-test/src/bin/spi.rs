@@ -308,7 +308,7 @@ mod tests {
         #[cfg(all(dma_can_access_psram, feature = "unstable"))]
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let (_, miso) = hil_test::common_test_pins!(peripherals);
+        let (miso, _) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);
 
         // A bit ugly but the peripheral interconnect APIs aren't yet stable.
@@ -1424,7 +1424,7 @@ mod psram_dma {
         );
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let (_, miso) = hil_test::common_test_pins!(peripherals);
+        let (miso, _) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);
         let mosi = unsafe { miso.clone_unchecked() };
 
@@ -1499,8 +1499,8 @@ mod half_duplex_write_psram {
         );
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let sclk = peripherals.GPIO0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
+        let sclk = hil_test::unconnected_pin!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -1657,8 +1657,8 @@ mod read {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.GPIO0;
         let (miso, miso_mirror) = hil_test::common_test_pins!(peripherals);
+        let sclk = hil_test::unconnected_pin!(peripherals);
 
         let miso_mirror = Output::new(miso_mirror, Level::High, OutputConfig::default());
 
@@ -1907,8 +1907,8 @@ mod write {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.GPIO0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
+        let sclk = hil_test::unconnected_pin!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -2190,8 +2190,8 @@ mod spi_slave {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let (mosi_pin, miso_pin) = hil_test::i2c_pins!(peripherals);
-        let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
-        let cs_pin = hil_test::unconnected_pin!(peripherals);
+        let (cs_pin, _) = hil_test::common_test_pins!(peripherals);
+        let sclk_pin = hil_test::unconnected_pin!(peripherals);
 
         #[cfg(spi_slave_supports_dma)]
         let dma_channel = cfg_select! {
