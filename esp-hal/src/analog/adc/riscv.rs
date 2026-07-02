@@ -20,7 +20,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
 pub use self::calibration::*;
-use super::{AdcCalSource, AdcConfig, Attenuation};
+use super::{AdcCalSource, AdcConfig, Attenuation, SarAdcGuard};
 #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))]
 use crate::efuse::AdcCalibUnit;
 use crate::{
@@ -31,7 +31,6 @@ use crate::{
     peripherals::{APB_SARADC, Interrupt},
     rtc_cntl::WakeLock,
     soc::regi2c,
-    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -317,7 +316,7 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     _adc: ADCX,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
-    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _guard: SarAdcGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -328,7 +327,7 @@ where
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
-        let guard = GenericPeripheralGuard::new();
+        let guard = SarAdcGuard::new();
 
         APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
             w.start_force().set_bit();
