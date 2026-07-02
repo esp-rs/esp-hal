@@ -1,6 +1,7 @@
 use embedded_hal::i2c::Operation as EhalOperation;
 
 use super::{Async, DriverMode, Error, I2c, I2cAddress, Operation};
+use crate::i2c::master::I2cClockGuard;
 
 impl embedded_hal::i2c::Error for Error {
     fn kind(&self) -> embedded_hal::i2c::ErrorKind {
@@ -35,6 +36,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
+        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
         self.driver()
             .transaction_impl(
                 I2cAddress::SevenBit(address),
@@ -50,6 +52,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
         address: u8,
         operations: &mut [EhalOperation<'_>],
     ) -> Result<(), Self::Error> {
+        let _clock_guard = I2cClockGuard::new(self.i2c.reborrow());
         self.driver()
             .transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
             .await
