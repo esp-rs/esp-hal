@@ -302,6 +302,12 @@ impl RunQueue {
         self.ready_tasks[level.get()].is_empty()
     }
 
+    /// Returns `true` if any task is ready to run (queued at any priority level).
+    #[cfg(all(multi_core, sleep_light_sleep))]
+    pub(crate) fn has_ready_tasks(&self) -> bool {
+        self.ready_priority.mask != 0
+    }
+
     pub(crate) fn remove(&mut self, to_delete: TaskPtr) {
         let priority = to_delete.priority(self).get();
         self.ready_tasks[priority].remove(to_delete);

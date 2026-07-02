@@ -792,13 +792,31 @@ pub(crate) mod implem {
         // value we stage the new 64-bit count in the load registers and then
         // trigger a software reload, which copies the staged value into the
         // counter immediately.
+        //
+        // A manual `LACTLOAD` while the timer is running (`en = 1`) is silently
+        // dropped when executed from the AppCpu, leaving the monotonic clock stuck
+        // (this is why the post-light-sleep time correction is lost on AppCpu). We
+        // therefore disable the timer around the load (preserving the divider) and
+        // re-enable it afterwards, mirroring `time_init`. Callers run this with
+        // interrupts disabled and the other core parked, so the brief disable is
+        // safe from concurrent reads.
         let tg0 = TIMG0::regs();
+
+        let divider = tg0.lactconfig().read().divider().bits();
+        tg0.lactconfig().write(|w| unsafe { w.bits(0) });
 
         tg0.lactloadhi()
             .write(|w| unsafe { w.load_hi().bits((counter >> 32) as u32) });
         tg0.lactloadlo()
             .write(|w| unsafe { w.load_lo().bits(counter as u32) });
         tg0.lactload().write(|w| unsafe { w.load().bits(1) });
+
+        tg0.lactconfig().write(|w| {
+            unsafe { w.divider().bits(divider) };
+            w.increase().bit(true);
+            w.autoreload().bit(true);
+            w.en().bit(true)
+        });
     }
 }
 

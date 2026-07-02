@@ -11,6 +11,8 @@
 //! Both the `periodic` and `gpio` tasks print `wakeup_cause()`, so you can
 //! observe the chip waking from light sleep via the timer (`WakeupReason::Timer`)
 //! or via the BOOT button (`WakeupReason::Gpio`).
+//!
+//! Use the UART port for this example - USB Serial/JTAG will break when the device enters sleep.
 
 //% CHIP_FILTER: sleep_light_sleep
 
@@ -26,6 +28,7 @@ use esp_hal::{
     peripherals,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
+    time::Instant,
     timer::timg::TimerGroup,
 };
 
@@ -35,8 +38,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn periodic() {
     loop {
         esp_println::println!(
-            "tick @ {:?} (wakeup cause: {:?})",
-            esp_hal::time::Instant::now(),
+            "tick @ {} (wakeup cause: {:?})",
+            Instant::now().duration_since_epoch().as_millis(),
             wakeup_cause(),
         );
         Timer::after(Duration::from_millis(1_000)).await;
@@ -84,6 +87,18 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
     }
 }
 
+#[cfg(feature = "multi_core")]
+#[embassy_executor::task]
+async fn periodic_core2() {
+    loop {
+        esp_println::println!(
+            "tick on core 2 @ {}",
+            Instant::now().duration_since_epoch().as_millis()
+        );
+        Timer::after(Duration::from_millis(1_500)).await;
+    }
+}
+
 #[embassy_executor::task]
 async fn wake_lock_demo() {
     loop {
@@ -123,4 +138,27 @@ async fn main(spawner: Spawner) {
     spawner.spawn(gpio(boot_btn).unwrap());
     spawner.spawn(periodic().unwrap());
     spawner.spawn(wake_lock_demo().unwrap());
+
+    #[cfg(feature = "multi_core")]
+    {
+        use esp_hal::system::Stack;
+        use esp_rtos::embassy::Executor;
+        use static_cell::StaticCell;
+
+        static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+        let app_core_stack = APP_CORE_STACK.init(Stack::new());
+
+        esp_rtos::start_second_core(
+            p.CPU_CTRL,
+            sw_int.software_interrupt1,
+            app_core_stack,
+            move || {
+                static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+                let executor = EXECUTOR.init(Executor::new());
+                executor.run(|spawner| {
+                    spawner.spawn(periodic_core2().unwrap());
+                });
+            },
+        );
+    }
 }

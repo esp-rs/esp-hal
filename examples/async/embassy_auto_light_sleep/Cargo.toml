@@ -14,10 +14,14 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "log-04"] }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-println = { path = "../../../esp-println", default-features = false, features = ["uart", "log-04", "critical-section"] }
+static_cell = { version = "2.1.1", optional = true }
 
 [features]
+multi_core = ["dep:static_cell"]
+
 esp32 = [
+    "multi_core",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-rtos/esp32",
@@ -60,6 +64,7 @@ esp32h2 = [
     "esp-hal/esp32h2",
 ]
 esp32p4 = [
+    "multi_core",
     "esp-backtrace/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-rtos/esp32p4",
@@ -72,6 +77,7 @@ esp32s2 = [
     "esp-hal/esp32s2",
 ]
 esp32s3 = [
+    "multi_core",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-rtos/esp32s3",
