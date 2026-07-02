@@ -149,11 +149,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
         SPI0::regs()
             .mmu_item_index()
             .write(|w| unsafe { w.mmu_item_index().bits(i) });
-        SPI0::regs()
-            .mmu_item_content()
-            .read()
-            .mmu_item_content()
-            .bits()
+        SPI0::regs().mmu_item_content().read().bits()
     }
 
     fn write_mmu_entry(i: u32, entry: u32) {
@@ -162,7 +158,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
             .write(|w| unsafe { w.mmu_item_index().bits(i) });
         SPI0::regs()
             .mmu_item_content()
-            .write(|w| unsafe { w.mmu_item_content().bits(entry) });
+            .write(|w| unsafe { w.bits(entry) });
     }
 
     // calculate the PSRAM start address to map

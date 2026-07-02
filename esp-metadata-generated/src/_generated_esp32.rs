@@ -4240,6 +4240,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "LEDC peripheral singleton"]
         LEDC <= LEDC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MMU_TABLE peripheral singleton"] MMU_TABLE <= MMU_TABLE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "MCPWM1 peripheral singleton"]
         MCPWM1 <= MCPWM1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "NRX peripheral singleton"] NRX <= NRX() (unstable)));
@@ -4584,12 +4586,13 @@ macro_rules! for_each_peripheral {
         = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
         #[doc = "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)), (@ peri_type
         #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)), (@
-        peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1() (unstable)),
-        (@ peri_type #[doc = "NRX peripheral singleton"] NRX <= NRX() (unstable)), (@
-        peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT() (unstable)), (@
-        peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT() (unstable)), (@
-        peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@
-        peri_type #[doc = "RSA peripheral singleton"] RSA <= RSA(RSA : {
+        peri_type #[doc = "MMU_TABLE peripheral singleton"] MMU_TABLE <= MMU_TABLE()
+        (unstable)), (@ peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <=
+        MCPWM1() (unstable)), (@ peri_type #[doc = "NRX peripheral singleton"] NRX <=
+        NRX() (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <=
+        PCNT() (unstable)), (@ peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT()
+        (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG()
+        (unstable)), (@ peri_type #[doc = "RSA peripheral singleton"] RSA <= RSA(RSA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <= RTC_CNTL()
         (unstable)), (@ peri_type #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <=

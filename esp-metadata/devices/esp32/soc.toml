@@ -56,6 +56,7 @@ peripherals = [
     { name = "IO_MUX" },
     { name = "LEDC" },
     { name = "MCPWM0", clock_group = "MCPWM" },
+    { name = "MMU_TABLE", hidden = true },
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
     { name = "PCNT" },
