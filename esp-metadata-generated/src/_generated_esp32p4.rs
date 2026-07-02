@@ -205,8 +205,59 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("i2s.version") => {
+        2
+    };
+    ("i2s.version", str) => {
+        stringify!(2)
+    };
+    ("i2s.default_clock_source") => {
+        2
+    };
+    ("i2s.default_clock_source", str) => {
+        stringify!(2)
+    };
+    ("i2s.mclk_divider_bit_width") => {
+        6
+    };
+    ("i2s.mclk_divider_bit_width", str) => {
+        stringify!(6)
+    };
+    ("i2s.max_ws_width") => {
+        128
+    };
+    ("i2s.max_ws_width", str) => {
+        stringify!(128)
+    };
     ("i2s.clock_configured_by_pcr") => {
         false
+    };
+    ("i2s.supports_pdm_tx") => {
+        true
+    };
+    ("i2s.supports_pdm_rx") => {
+        true
+    };
+    ("i2s.supports_pcm2pdm") => {
+        true
+    };
+    ("i2s.supports_pdm2pcm") => {
+        true
+    };
+    ("i2s.supports_pdm_rx_hp_filter") => {
+        true
+    };
+    ("i2s.pdm_max_tx_lines") => {
+        2
+    };
+    ("i2s.pdm_max_tx_lines", str) => {
+        stringify!(2)
+    };
+    ("i2s.pdm_max_rx_lines") => {
+        4
+    };
+    ("i2s.pdm_max_rx_lines", str) => {
+        stringify!(4)
     };
     ("interrupts.status_registers") => {
         5

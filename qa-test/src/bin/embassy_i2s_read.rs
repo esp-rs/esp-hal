@@ -20,7 +20,7 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     dma_rx_stream_buffer,
-    i2s::master::{Channels, Config, DataFormat, I2s},
+    i2s::master::{Channels, DataFormat, I2s, TdmConfig},
     interrupt::software::SoftwareInterruptControl,
     time::Rate,
     timer::timg::TimerGroup,
@@ -48,7 +48,7 @@ async fn main(_spawner: Spawner) {
     let i2s = I2s::new(
         peripherals.I2S0,
         dma_channel,
-        Config::new_tdm_philips()
+        TdmConfig::new_tdm_philips()
             .with_sample_rate(Rate::from_hz(44100))
             .with_data_format(DataFormat::Data16Channel16)
             .with_channels(Channels::STEREO),

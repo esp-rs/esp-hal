@@ -229,6 +229,33 @@ macro_rules! property {
     ("i2s.clock_configured_by_pcr") => {
         false
     };
+    ("i2s.supports_pdm_tx") => {
+        true
+    };
+    ("i2s.supports_pdm_rx") => {
+        true
+    };
+    ("i2s.supports_pcm2pdm") => {
+        true
+    };
+    ("i2s.supports_pdm2pcm") => {
+        false
+    };
+    ("i2s.supports_pdm_rx_hp_filter") => {
+        false
+    };
+    ("i2s.pdm_max_tx_lines") => {
+        2
+    };
+    ("i2s.pdm_max_tx_lines", str) => {
+        stringify!(2)
+    };
+    ("i2s.pdm_max_rx_lines") => {
+        1
+    };
+    ("i2s.pdm_max_rx_lines", str) => {
+        stringify!(1)
+    };
     ("interrupts.status_registers") => {
         2
     };

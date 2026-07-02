@@ -41,6 +41,7 @@ trouble-host = { version = "0.7.0", features = [
     "scan",
 ] }
 log = "0.4"
+libm = "0.2"
 
 [features]
 unstable = []

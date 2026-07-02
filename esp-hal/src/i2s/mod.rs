@@ -2,6 +2,9 @@
 
 pub mod master;
 
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+pub mod pdm;
+
 #[cfg(esp32)]
 pub mod parallel;
 

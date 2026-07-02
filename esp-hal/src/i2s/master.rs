@@ -36,9 +36,10 @@
 //!
 //! ### Standards
 //!
-//! I2S supports different standards, which you can access using [Config]`::new_*` methods. You
-//! can also configure custom data formats using methods such as [Config::with_msb_shift],
-//! [Config::with_ws_width], [Config::with_ws_polarity], etc.
+//! I2S supports different standards, which you can access using [`TdmConfig::new_tdm_philips`]
+//! and related helpers. You can also configure custom data formats using methods such as
+//! [`TdmConfig::with_msb_shift`], [`TdmConfig::with_ws_width`], [`TdmConfig::with_ws_polarity`],
+//! etc.
 //!
 //! In TDM mode, WS (word select, sometimes called LRCLK or left/right clock) becomes a frame
 //! synchronization signal that signals the first slot of a frame. The two sides of the TDM link
@@ -75,14 +76,14 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, Config};
+//! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, TdmConfig};
 //! # use esp_hal::dma_rx_stream_buffer;
 //! let rx_buffer = dma_rx_stream_buffer!(4 * 4092, 1024);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
 //!     peripherals.__dma_channel__,
-//!     Config::new_tdm_philips()
+//!     TdmConfig::new_tdm_philips()
 //!         .with_sample_rate(Rate::from_hz(44100))
 //!         .with_data_format(DataFormat::Data16Channel16)
 //!         .with_channels(Channels::STEREO),
@@ -107,16 +108,33 @@
 //! }
 //! # }
 //! ```
-//!
-//! ## Implementation State
-//!
-//! - Only TDM mode is supported.
+#![cfg_attr(
+    any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
+    doc = "## PDM mode\n\n\
+PDM (pulse-density modulation) is supported on **I2S0 only** on chips where the \
+hardware provides PDM filters. Use [`I2s::new_pdm`] with [`PdmConfig`]. PDM uses a \
+single clock pin (`with_clk` on [`I2s::i2s_tx`] / [`I2s::i2s_rx`]) instead of \
+separate BCLK and WS lines. Only simplex operation (TX *or* RX) is supported.\n\n\
+```rust, no_run\n\
+# {before_snippet}\n\
+# use esp_hal::i2s::master::{I2s, PdmSlotMode, PdmTxConfig, PdmConfig};\n\
+# use esp_hal::time::Rate;\n\
+let pdm = PdmConfig::tx_only(PdmTxConfig::new_codec_default(\n\
+    Rate::from_hz(16_000),\n\
+    PdmSlotMode::Mono,\n\
+));\n\
+let i2s = I2s::new_pdm(peripherals.I2S0, peripherals.__dma_channel__, pdm).unwrap();\n\
+# {after_snippet}\n\
+```\n"
+)]
 
 use core::mem::ManuallyDrop;
 
 use enumset::{EnumSet, EnumSetType, enum_set};
 use private::*;
 
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+pub use super::pdm::{PdmConfig, PdmError, PdmInstance, PdmRxConfig, PdmSlotMode, PdmTxConfig};
 #[cfg(i2s_version = "1")]
 use crate::RegisterToggle;
 use crate::{
@@ -202,13 +220,23 @@ with_i2s_dma_engine! {
 }
 
 impl<'d> I2s<'d, crate::Blocking> {
-    /// Construct a new I2s instance.
+    /// Construct a new I2S instance in TDM mode.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sMasterDmaChannel<'d, I>,
-        config: Config,
+        config: TdmConfig,
     ) -> Result<Self, ConfigError> {
-        Self::new_internal(i2s, channel.into(), config)
+        Self::new_internal(i2s, channel.into(), Config::Tdm(config))
+    }
+
+    /// Construct a new I2S instance in PDM mode (I2S0 only).
+    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+    pub fn new_pdm<I: Instance + PdmInstance + 'd>(
+        i2s: I,
+        channel: impl I2sMasterDmaChannel<'d, I>,
+        config: PdmConfig,
+    ) -> Result<Self, ConfigError> {
+        Self::new_internal(i2s, channel.into(), Config::Pdm(config))
     }
 }
 
@@ -753,19 +781,31 @@ impl Channels {
     }
 }
 
-/// I2S peripheral configuration.
+/// Internal I2S peripheral configuration (TDM or PDM mode).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(not(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx)), derive(Eq, Hash))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub(crate) enum Config {
+    /// Time-division multiplexed (TDM) configuration.
+    Tdm(TdmConfig),
+    /// Pulse-density modulation (PDM) configuration (I2S0 only).
+    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+    Pdm(PdmConfig),
+}
+
+/// TDM mode peripheral configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct Config {
+pub struct TdmConfig {
     /// Receiver unit config
-    rx_config: UnitConfig,
+    rx_config: TdmUnitConfig,
 
     /// Transmitter unit config
-    tx_config: UnitConfig,
+    tx_config: TdmUnitConfig,
 
     /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK.
-    /// Also sets RX to slave mode, following TX's clocks, TX stays master.
     signal_loopback: bool,
 
     /// The target sample rate
@@ -778,114 +818,60 @@ pub struct Config {
 }
 
 impl Config {
-    /// TDM Philips standard configuration with two 16-bit active channels
-    pub fn new_tdm_philips() -> Self {
-        Self {
-            rx_config: UnitConfig::new_tdm_philips(),
-            tx_config: UnitConfig::new_tdm_philips(),
-            ..Default::default()
+    fn validate(&self) -> Result<(), ConfigError> {
+        match self {
+            Self::Tdm(c) => c.validate(),
+            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+            Self::Pdm(c) => c.validate().map_err(ConfigError::Pdm),
         }
-    }
-
-    /// TDM MSB standard configuration with two 16-bit active channels
-    pub fn new_tdm_msb() -> Self {
-        Self {
-            rx_config: UnitConfig::new_tdm_msb(),
-            tx_config: UnitConfig::new_tdm_msb(),
-            ..Default::default()
-        }
-    }
-
-    /// TDM PCM short frame standard configuration with two 16-bit active channels
-    pub fn new_tdm_pcm_short() -> Self {
-        Self {
-            rx_config: UnitConfig::new_tdm_pcm_short(),
-            tx_config: UnitConfig::new_tdm_pcm_short(),
-            ..Default::default()
-        }
-    }
-
-    /// TDM PCM long frame standard configuration with two 16-bit active channels
-    #[cfg(not(i2s_version = "1"))]
-    pub fn new_tdm_pcm_long() -> Self {
-        Self {
-            rx_config: UnitConfig::new_tdm_pcm_long(),
-            tx_config: UnitConfig::new_tdm_pcm_long(),
-            ..Default::default()
-        }
-    }
-
-    /// Assign the given value to the `sample_rate` field in both units.
-    #[must_use]
-    #[cfg(not(i2s_version = "1"))]
-    pub fn with_sample_rate(mut self, sample_rate: Rate) -> Self {
-        self.rx_config.sample_rate = sample_rate;
-        self.tx_config.sample_rate = sample_rate;
-        self
-    }
-
-    /// Assign the given value to the `channels` field in both units.
-    #[must_use]
-    pub fn with_channels(mut self, channels: Channels) -> Self {
-        self.rx_config.channels = channels;
-        self.tx_config.channels = channels;
-        self
-    }
-
-    /// Assign the given value to the `data_format` field in both units.
-    #[must_use]
-    #[cfg(not(i2s_version = "1"))]
-    pub fn with_data_format(mut self, data_format: DataFormat) -> Self {
-        self.rx_config.data_format = data_format;
-        self.tx_config.data_format = data_format;
-        self
-    }
-
-    /// Assign the given value to the `ws_width` field in both units.
-    #[must_use]
-    pub fn with_ws_width(mut self, ws_width: WsWidth) -> Self {
-        self.rx_config.ws_width = ws_width;
-        self.tx_config.ws_width = ws_width;
-        self
-    }
-
-    /// Assign the given value to the `ws_polarity` field in both units.
-    #[must_use]
-    pub fn with_ws_polarity(mut self, ws_polarity: Polarity) -> Self {
-        self.rx_config.ws_polarity = ws_polarity;
-        self.tx_config.ws_polarity = ws_polarity;
-        self
-    }
-
-    /// Assign the given value to the `msb_shift` field in both units.
-    #[must_use]
-    pub fn with_msb_shift(mut self, msb_shift: bool) -> Self {
-        self.rx_config.msb_shift = msb_shift;
-        self.tx_config.msb_shift = msb_shift;
-        self
-    }
-
-    /// Assign the given value to the `endianness` field in both units.
-    #[cfg(not(esp32))]
-    #[must_use]
-    pub fn with_endianness(mut self, endianness: Endianness) -> Self {
-        self.rx_config.endianness = endianness;
-        self.tx_config.endianness = endianness;
-        self
-    }
-
-    /// Assign the given value to the `bit_order` field in both units.
-    #[cfg(not(i2s_version = "1"))]
-    #[must_use]
-    pub fn with_bit_order(mut self, bit_order: BitOrder) -> Self {
-        self.rx_config.bit_order = bit_order;
-        self.tx_config.bit_order = bit_order;
-        self
     }
 
     #[cfg(i2s_version = "1")]
     fn calculate_clock(&self) -> I2sClockDividers {
-        I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits())
+        match self {
+            Self::Tdm(c) => c.calculate_clock(),
+            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+            Self::Pdm(_) => unreachable!(),
+        }
+    }
+}
+
+impl TdmConfig {
+    /// TDM Philips standard configuration with two 16-bit active channels.
+    pub fn new_tdm_philips() -> Self {
+        Self {
+            rx_config: TdmUnitConfig::new_tdm_philips(),
+            tx_config: TdmUnitConfig::new_tdm_philips(),
+            ..Default::default()
+        }
+    }
+
+    /// TDM MSB standard configuration with two 16-bit active channels.
+    pub fn new_tdm_msb() -> Self {
+        Self {
+            rx_config: TdmUnitConfig::new_tdm_msb(),
+            tx_config: TdmUnitConfig::new_tdm_msb(),
+            ..Default::default()
+        }
+    }
+
+    /// TDM PCM short frame standard configuration with two 16-bit active channels.
+    pub fn new_tdm_pcm_short() -> Self {
+        Self {
+            rx_config: TdmUnitConfig::new_tdm_pcm_short(),
+            tx_config: TdmUnitConfig::new_tdm_pcm_short(),
+            ..Default::default()
+        }
+    }
+
+    /// TDM PCM long frame standard configuration with two 16-bit active channels.
+    #[cfg(not(i2s_version = "1"))]
+    pub fn new_tdm_pcm_long() -> Self {
+        Self {
+            rx_config: TdmUnitConfig::new_tdm_pcm_long(),
+            tx_config: TdmUnitConfig::new_tdm_pcm_long(),
+            ..Default::default()
+        }
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
@@ -893,14 +879,103 @@ impl Config {
         self.tx_config.validate()?;
         Ok(())
     }
+
+    #[cfg(i2s_version = "1")]
+    fn calculate_clock(&self) -> I2sClockDividers {
+        I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits())
+    }
+
+    /// Assign the given value to the `sample_rate` field in both units.
+    #[must_use]
+    #[cfg(not(i2s_version = "1"))]
+    pub fn with_sample_rate(self, sample_rate: Rate) -> Self {
+        Self {
+            rx_config: self.rx_config.with_sample_rate(sample_rate),
+            tx_config: self.tx_config.with_sample_rate(sample_rate),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `channels` field in both units.
+    #[must_use]
+    pub fn with_channels(self, channels: Channels) -> Self {
+        Self {
+            rx_config: self.rx_config.with_channels(channels),
+            tx_config: self.tx_config.with_channels(channels),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `data_format` field in both units.
+    #[must_use]
+    #[cfg(not(i2s_version = "1"))]
+    pub fn with_data_format(self, data_format: DataFormat) -> Self {
+        Self {
+            rx_config: self.rx_config.with_data_format(data_format),
+            tx_config: self.tx_config.with_data_format(data_format),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `ws_width` field in both units.
+    #[must_use]
+    pub fn with_ws_width(self, ws_width: WsWidth) -> Self {
+        Self {
+            rx_config: self.rx_config.with_ws_width(ws_width),
+            tx_config: self.tx_config.with_ws_width(ws_width),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `ws_polarity` field in both units.
+    #[must_use]
+    pub fn with_ws_polarity(self, ws_polarity: Polarity) -> Self {
+        Self {
+            rx_config: self.rx_config.with_ws_polarity(ws_polarity),
+            tx_config: self.tx_config.with_ws_polarity(ws_polarity),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `msb_shift` field in both units.
+    #[must_use]
+    pub fn with_msb_shift(self, msb_shift: bool) -> Self {
+        Self {
+            rx_config: self.rx_config.with_msb_shift(msb_shift),
+            tx_config: self.tx_config.with_msb_shift(msb_shift),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `endianness` field in both units.
+    #[cfg(not(esp32))]
+    #[must_use]
+    pub fn with_endianness(self, endianness: Endianness) -> Self {
+        Self {
+            rx_config: self.rx_config.with_endianness(endianness),
+            tx_config: self.tx_config.with_endianness(endianness),
+            ..self
+        }
+    }
+
+    /// Assign the given value to the `bit_order` field in both units.
+    #[cfg(not(i2s_version = "1"))]
+    #[must_use]
+    pub fn with_bit_order(self, bit_order: BitOrder) -> Self {
+        Self {
+            rx_config: self.rx_config.with_bit_order(bit_order),
+            tx_config: self.tx_config.with_bit_order(bit_order),
+            ..self
+        }
+    }
 }
 
 #[allow(clippy::derivable_impls)]
-impl Default for Config {
+impl Default for TdmConfig {
     fn default() -> Self {
         Self {
-            rx_config: UnitConfig::new_tdm_philips(),
-            tx_config: UnitConfig::new_tdm_philips(),
+            rx_config: TdmUnitConfig::new_tdm_philips(),
+            tx_config: TdmUnitConfig::new_tdm_philips(),
             signal_loopback: false,
             #[cfg(i2s_version = "1")]
             sample_rate: Rate::from_hz(44100),
@@ -910,11 +985,11 @@ impl Default for Config {
     }
 }
 
-/// I2S receiver/transmitter unit configuration
+/// I2S receiver/transmitter unit configuration (TDM mode).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct UnitConfig {
+pub struct TdmUnitConfig {
     /// The target sample rate
     #[cfg(not(i2s_version = "1"))]
     sample_rate: Rate,
@@ -944,7 +1019,10 @@ pub struct UnitConfig {
     bit_order: BitOrder,
 }
 
-impl UnitConfig {
+/// Alias for [`TdmUnitConfig`] (TDM mode unit configuration).
+pub type UnitConfig = TdmUnitConfig;
+
+impl TdmUnitConfig {
     /// TDM Philips standard configuration with two 16-bit active channels
     pub fn new_tdm_philips() -> Self {
         Self {
@@ -1024,7 +1102,7 @@ impl UnitConfig {
     }
 }
 
-impl Default for UnitConfig {
+impl Default for TdmUnitConfig {
     fn default() -> Self {
         Self::new_tdm_philips()
     }
@@ -1041,6 +1119,16 @@ pub enum ConfigError {
     /// Requested WS signal width is out of range
     #[cfg(not(i2s_version = "1"))]
     WsWidthOutOfRange,
+    /// PDM configuration error
+    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+    Pdm(PdmError),
+}
+
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+impl From<PdmError> for ConfigError {
+    fn from(err: PdmError) -> Self {
+        Self::Pdm(err)
+    }
 }
 
 impl core::error::Error for ConfigError {}
@@ -1063,6 +1151,8 @@ impl core::fmt::Display for ConfigError {
                     "The requested WS signal width is out of supported range (1..=128)"
                 )
             }
+            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+            ConfigError::Pdm(err) => write!(f, "{err}"),
         }
     }
 }
@@ -1165,7 +1255,21 @@ impl<'d> I2s<'d, Blocking> {
 
         i2s.set_master();
         i2s.configure(&config)?;
-        i2s.update();
+        match &config {
+            Config::Tdm(_) => {
+                i2s.update_tx();
+                i2s.update_rx();
+            }
+            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+            Config::Pdm(c) => {
+                if c.tx.is_some() {
+                    i2s.update_tx();
+                }
+                if c.rx.is_some() {
+                    i2s.update_rx();
+                }
+            }
+        }
 
         Ok(Self {
             i2s_rx: RxCreator {
@@ -1173,14 +1277,22 @@ impl<'d> I2s<'d, Blocking> {
                 rx_channel: channel.rx,
                 guard: rx_guard,
                 #[cfg(i2s_version = "1")]
-                data_format: config.data_format,
+                data_format: match config {
+                    Config::Tdm(c) => c.data_format,
+                    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                    Config::Pdm(_) => DataFormat::Data16Channel16,
+                },
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 guard: tx_guard,
                 #[cfg(i2s_version = "1")]
-                data_format: config.data_format,
+                data_format: match config {
+                    Config::Tdm(c) => c.data_format,
+                    #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                    Config::Pdm(_) => DataFormat::Data16Channel16,
+                },
             },
         })
     }
@@ -1437,14 +1549,14 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: RegisterAccessPrivate + super::any::Degrade {}
+pub trait Instance: private::Sealed + super::any::Degrade {}
 #[cfg(soc_has_i2s0)]
 impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
 impl Instance for crate::peripherals::I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
-mod private {
+pub(crate) mod private {
     use enumset::EnumSet;
 
     use super::*;
@@ -1468,6 +1580,9 @@ mod private {
     // by accident
     #[cfg(soc_has_i2s1)]
     use crate::{pac::i2s1::RegisterBlock, peripherals::I2S1};
+
+    /// Sealed trait to restrict [`super::Instance`] implementations.
+    pub trait Sealed {}
 
     pub struct TxCreator<'d, Dm>
     where
@@ -1526,6 +1641,25 @@ mod private {
             self.i2s.dout_signal().connect_to(&dout);
 
             self
+        }
+
+        /// Connect the PDM clock pin (maps to the WS output signal).
+        pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
+            self.with_ws(clk)
+        }
+
+        /// Connect a second PDM TX data line (line 1, two-line DAC mode, HW v2+).
+        #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
+        pub fn with_dout2(self, dout: impl PeripheralOutput<'d>) -> Result<Self, ConfigError> {
+            let dout = dout.into();
+
+            dout.apply_output_config(&OutputConfig::default());
+            dout.set_output_enable(true);
+
+            let signal = self.i2s.dout_line_signal(1).ok_or(PdmError::InvalidLine)?;
+            signal.connect_to(&dout);
+
+            Ok(self)
         }
     }
 
@@ -1587,6 +1721,32 @@ mod private {
 
             self
         }
+
+        /// Connect the PDM clock pin (maps to the WS output signal).
+        pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
+            self.with_ws(clk)
+        }
+
+        /// Connect a PDM RX data line (`line` 0..=`pdm_max_rx_lines`-1).
+        #[cfg(i2s_supports_pdm_rx)]
+        pub fn with_din_line(
+            self,
+            line: u8,
+            din: impl PeripheralInput<'d>,
+        ) -> Result<Self, ConfigError> {
+            let din = din.into();
+
+            din.apply_input_config(&InputConfig::default());
+            din.set_input_enable(true);
+
+            let signal = self
+                .i2s
+                .din_line_signal(line)
+                .ok_or(PdmError::InvalidLine)?;
+            signal.connect_to(&din);
+
+            Ok(self)
+        }
     }
 
     pub trait RegBlock: crate::private::Sealed {
@@ -1603,10 +1763,27 @@ mod private {
         fn bclk_rx_signal(&self) -> OutputSignal;
         fn ws_rx_signal(&self) -> OutputSignal;
         fn din_signal(&self) -> InputSignal;
+
+        /// Additional PDM TX data line signal (line 1 for two-line DAC).
+        #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
+        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
+            let _ = line;
+            None
+        }
+
+        /// PDM RX data line signal (line 0 is the default DIN signal).
+        #[cfg(i2s_supports_pdm_rx)]
+        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
+            if line == 0 {
+                Some(self.din_signal())
+            } else {
+                None
+            }
+        }
     }
 
     #[cfg(i2s_version = "1")]
-    pub trait RegisterAccessPrivate: Signals + RegBlock {
+    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -1672,51 +1849,60 @@ mod private {
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
             config.validate()?;
 
-            self.configure_tx(&config.tx_config, config.data_format)?;
-            self.configure_rx(&config.rx_config, config.data_format)?;
+            match config {
+                Config::Tdm(c) => {
+                    self.configure_tx(&c.tx_config, c.data_format)?;
+                    self.configure_rx(&c.rx_config, c.data_format)?;
 
-            self.set_clock(config.calculate_clock());
+                    self.set_clock(config.calculate_clock());
 
-            self.regs().sample_rate_conf().modify(|_, w| unsafe {
-                // Having different data formats for each direction would make clock calculations
-                // more tricky
-                w.tx_bits_mod().bits(config.data_format.data_bits());
-                w.rx_bits_mod().bits(config.data_format.data_bits())
-            });
+                    self.regs().sample_rate_conf().modify(|_, w| unsafe {
+                        // Having different data formats for each direction would make clock
+                        // calculations more tricky
+                        w.tx_bits_mod().bits(c.data_format.data_bits());
+                        w.rx_bits_mod().bits(c.data_format.data_bits())
+                    });
 
-            self.regs().conf().modify(|_, w| {
-                w.tx_slave_mod().clear_bit();
-                w.rx_slave_mod().bit(config.signal_loopback);
-                // Send MSB to the right channel to be consistent with ESP32-S3 et al.
-                w.tx_msb_right().set_bit();
-                w.rx_msb_right().set_bit();
-                // ESP32 generates two clock pulses first. If the WS is low, those first clock
-                // pulses are indistinguishable from real data, which corrupts the first few
-                // samples. So we send the right channel first (which means WS is high during
-                // the first sample) to prevent this issue.
-                w.tx_right_first().set_bit();
-                w.rx_right_first().set_bit();
-                w.tx_mono().clear_bit();
-                w.rx_mono().clear_bit();
-                w.sig_loopback().bit(config.signal_loopback)
-            });
+                    self.regs().conf().modify(|_, w| {
+                        w.tx_slave_mod().clear_bit();
+                        w.rx_slave_mod().bit(c.signal_loopback);
+                        // Send MSB to the right channel to be consistent with ESP32-S3 et al.
+                        w.tx_msb_right().set_bit();
+                        w.rx_msb_right().set_bit();
+                        // ESP32 generates two clock pulses first. If the WS is low, those first
+                        // clock pulses are indistinguishable from real
+                        // data, which corrupts the first few samples. So we
+                        // send the right channel first (which means WS is high during
+                        // the first sample) to prevent this issue.
+                        w.tx_right_first().set_bit();
+                        w.rx_right_first().set_bit();
+                        w.tx_mono().clear_bit();
+                        w.rx_mono().clear_bit();
+                        w.sig_loopback().bit(c.signal_loopback)
+                    });
 
-            self.regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
+                    self.regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
 
-            self.regs().conf1().modify(|_, w| {
-                w.tx_pcm_bypass().set_bit();
-                w.rx_pcm_bypass().set_bit()
-            });
+                    self.regs().conf1().modify(|_, w| {
+                        w.tx_pcm_bypass().set_bit();
+                        w.rx_pcm_bypass().set_bit()
+                    });
 
-            self.regs().pd_conf().modify(|_, w| {
-                w.fifo_force_pu().set_bit();
-                w.fifo_force_pd().clear_bit()
-            });
+                    self.regs().pd_conf().modify(|_, w| {
+                        w.fifo_force_pu().set_bit();
+                        w.fifo_force_pd().clear_bit()
+                    });
 
-            self.regs().conf2().modify(|_, w| {
-                w.camera_en().clear_bit();
-                w.lcd_en().clear_bit()
-            });
+                    self.regs().conf2().modify(|_, w| {
+                        w.camera_en().clear_bit();
+                        w.lcd_en().clear_bit()
+                    });
+                }
+                #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                Config::Pdm(c) => {
+                    crate::i2s::pdm::configure_pdm(self, c)?;
+                }
+            }
 
             Ok(())
         }
@@ -1834,7 +2020,11 @@ mod private {
             });
         }
 
-        fn update(&self) {
+        fn update_tx(&self) {
+            // nothing to do
+        }
+
+        fn update_rx(&self) {
             // nothing to do
         }
 
@@ -1878,14 +2068,6 @@ mod private {
 
         fn is_tx_done(&self) -> bool {
             self.regs().state().read().tx_idle().bit_is_set()
-        }
-
-        fn wait_for_tx_done(&self) {
-            while !self.is_tx_done() {
-                // wait
-            }
-
-            self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
         }
 
         fn reset_rx(&self) {
@@ -1934,20 +2116,10 @@ mod private {
         fn is_rx_done(&self) -> bool {
             self.regs().int_raw().read().in_dscr_empty().bit_is_set()
         }
-
-        fn wait_for_rx_done(&self) {
-            while !self.is_rx_done() {
-                // wait
-            }
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.in_suc_eof().clear_bit_by_one());
-        }
     }
 
     #[cfg(not(i2s_version = "1"))]
-    pub trait RegisterAccessPrivate: Signals + RegBlock {
+    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -1960,14 +2132,6 @@ mod private {
                 }
                 w
             });
-        }
-
-        fn listen(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), true);
-        }
-
-        fn unlisten(&self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
-            self.enable_listen(interrupts.into(), false);
         }
 
         fn interrupts(&self) -> EnumSet<I2sInterrupt> {
@@ -2072,15 +2236,27 @@ mod private {
             use crate::peripherals::PCR;
 
             let clkm_div = clock_settings.mclk_dividers();
+            let pcr = PCR::regs();
 
-            PCR::regs().i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
+            // Pulse a temporary divider before applying the target coefficients to avoid
+            // a hardware glitch where the clock divider applies twice on PCR chips.
+            pcr.i2s_tx_clkm_conf()
+                .modify(|_, w| unsafe { w.i2s_tx_clkm_div_num().bits(2) });
+            pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
+                w.i2s_tx_clkm_div_yn1().clear_bit();
+                w.i2s_tx_clkm_div_y().bits(1);
+                w.i2s_tx_clkm_div_z().bits(0);
+                w.i2s_tx_clkm_div_x().bits(0)
+            });
+
+            pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_div_x().bits(clkm_div.x as u16);
                 w.i2s_tx_clkm_div_y().bits(clkm_div.y as u16);
                 w.i2s_tx_clkm_div_yn1().bit(clkm_div.yn1);
                 w.i2s_tx_clkm_div_z().bits(clkm_div.z as u16)
             });
 
-            PCR::regs().i2s_tx_clkm_conf().modify(|_, w| unsafe {
+            pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_tx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_tx_clkm_sel()
@@ -2108,15 +2284,27 @@ mod private {
             use crate::peripherals::PCR;
 
             let clkm_div = clock_settings.mclk_dividers();
+            let pcr = PCR::regs();
 
-            PCR::regs().i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
+            // Pulse a temporary divider before applying the target coefficients to avoid
+            // a hardware glitch where the clock divider applies twice on PCR chips.
+            pcr.i2s_rx_clkm_conf()
+                .modify(|_, w| unsafe { w.i2s_rx_clkm_div_num().bits(2) });
+            pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
+                w.i2s_rx_clkm_div_yn1().clear_bit();
+                w.i2s_rx_clkm_div_y().bits(1);
+                w.i2s_rx_clkm_div_z().bits(0);
+                w.i2s_rx_clkm_div_x().bits(0)
+            });
+
+            pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_div_x().bits(clkm_div.x as u16);
                 w.i2s_rx_clkm_div_y().bits(clkm_div.y as u16);
                 w.i2s_rx_clkm_div_yn1().bit(clkm_div.yn1);
                 w.i2s_rx_clkm_div_z().bits(clkm_div.z as u16)
             });
 
-            PCR::regs().i2s_rx_clkm_conf().modify(|_, w| unsafe {
+            pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
                 w.i2s_rx_clkm_en().set_bit();
                 // for now fixed at 160MHz for C6 and 96MHz for H2
                 w.i2s_rx_clkm_sel()
@@ -2142,15 +2330,23 @@ mod private {
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
             config.validate()?;
 
-            self.configure_tx(&config.tx_config)?;
-            self.configure_rx(&config.rx_config)?;
+            match config {
+                Config::Tdm(c) => {
+                    self.configure_tx(&c.tx_config)?;
+                    self.configure_rx(&c.rx_config)?;
 
-            self.regs()
-                .tx_conf()
-                .modify(|_, w| w.sig_loopback().bit(config.signal_loopback));
-            self.regs()
-                .rx_conf()
-                .modify(|_, w| w.rx_slave_mod().bit(config.signal_loopback));
+                    self.regs()
+                        .tx_conf()
+                        .modify(|_, w| w.sig_loopback().bit(c.signal_loopback));
+                    self.regs()
+                        .rx_conf()
+                        .modify(|_, w| w.rx_slave_mod().bit(c.signal_loopback));
+                }
+                #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+                Config::Pdm(c) => {
+                    crate::i2s::pdm::configure_pdm(self, c)?;
+                }
+            }
 
             Ok(())
         }
@@ -2289,14 +2485,16 @@ mod private {
                 .modify(|_, w| w.rx_slave_mod().clear_bit());
         }
 
-        fn update(&self) {
-            self.regs().tx_conf().modify(|_, w| w.tx_update().bit(true));
+        fn update_tx(&self) {
+            self.regs().tx_conf().modify(|_, w| w.tx_update().set_bit());
+            while self.regs().tx_conf().read().tx_update().bit_is_set() {
+                // wait
+            }
+        }
 
-            self.regs().rx_conf().modify(|_, w| w.rx_update().bit(true));
-
-            while self.regs().tx_conf().read().tx_update().bit_is_set()
-                || self.regs().rx_conf().read().rx_update().bit_is_set()
-            {
+        fn update_rx(&self) {
+            self.regs().rx_conf().modify(|_, w| w.rx_update().set_bit());
+            while self.regs().rx_conf().read().rx_update().bit_is_set() {
                 // wait
             }
         }
@@ -2327,16 +2525,6 @@ mod private {
             self.regs().state().read().tx_idle().bit_is_set()
         }
 
-        fn wait_for_tx_done(&self) {
-            while !self.is_tx_done() {
-                // wait
-            }
-
-            self.regs()
-                .tx_conf()
-                .modify(|_, w| w.tx_start().clear_bit());
-        }
-
         fn reset_rx(&self) {
             self.regs()
                 .rx_conf()
@@ -2359,6 +2547,8 @@ mod private {
             self.regs()
                 .rxeof_num()
                 .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
+            // Sync configuration into the I2S clock domain before starting RX.
+            self.update_rx();
             self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
@@ -2371,17 +2561,9 @@ mod private {
         fn is_rx_done(&self) -> bool {
             self.regs().int_raw().read().rx_done().bit_is_set()
         }
-
-        fn wait_for_rx_done(&self) {
-            while !self.is_rx_done() {
-                // wait
-            }
-
-            self.regs()
-                .int_clr()
-                .write(|w| w.rx_done().clear_bit_by_one());
-        }
     }
+
+    impl Sealed for I2S0<'_> {}
 
     impl RegBlock for I2S0<'_> {
         fn regs(&self) -> &RegisterBlock {
@@ -2483,9 +2665,50 @@ mod private {
                 esp32s3 => {
                     InputSignal::I2S0I_SD
                 }
+                esp32p4 => {
+                    InputSignal::I2S0_I_SD
+                }
                 _ => {
                     InputSignal::I2SI_SD
                 }
+            }
+        }
+
+        #[cfg(esp32s3)]
+        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
+            match line {
+                1 => Some(OutputSignal::I2S0O_SD1),
+                _ => None,
+            }
+        }
+
+        #[cfg(esp32p4)]
+        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
+            match line {
+                1 => Some(OutputSignal::I2S0_O_SD1),
+                _ => None,
+            }
+        }
+
+        #[cfg(esp32s3)]
+        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
+            match line {
+                0 => Some(InputSignal::I2S0I_SD),
+                1 => Some(InputSignal::I2S0I_SD1),
+                2 => Some(InputSignal::I2S0I_SD2),
+                3 => Some(InputSignal::I2S0I_SD3),
+                _ => None,
+            }
+        }
+
+        #[cfg(esp32p4)]
+        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
+            match line {
+                0 => Some(InputSignal::I2S0_I_SD),
+                1 => Some(InputSignal::I2S0_I_SD1),
+                2 => Some(InputSignal::I2S0_I_SD2),
+                3 => Some(InputSignal::I2S0_I_SD3),
+                _ => None,
             }
         }
     }
@@ -2500,6 +2723,9 @@ mod private {
             crate::system::Peripheral::I2s1
         }
     }
+
+    #[cfg(soc_has_i2s1)]
+    impl Sealed for I2S1<'_> {}
 
     #[cfg(soc_has_i2s1)]
     impl RegisterAccessPrivate for I2S1<'_> {}
@@ -2572,6 +2798,8 @@ mod private {
         }
     }
 
+    impl Sealed for super::AnyI2s<'_> {}
+
     impl RegisterAccessPrivate for super::AnyI2s<'_> {}
 
     impl super::AnyI2s<'_> {
@@ -2609,15 +2837,19 @@ mod private {
                 fn bclk_rx_signal(&self) -> OutputSignal;
                 fn ws_rx_signal(&self) -> OutputSignal;
                 fn din_signal(&self) -> InputSignal;
+                #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
+                fn dout_line_signal(&self, line: u8) -> Option<OutputSignal>;
+                #[cfg(i2s_supports_pdm_rx)]
+                fn din_line_signal(&self, line: u8) -> Option<InputSignal>;
             }
         }
     }
 
     pub struct I2sClockDividers {
-        mclk_divider: u32,
-        bclk_divider: u32,
-        denominator: u32,
-        numerator: u32,
+        pub(crate) mclk_divider: u32,
+        pub(crate) bclk_divider: u32,
+        pub(crate) denominator: u32,
+        pub(crate) numerator: u32,
     }
 
     #[cfg(not(i2s_version = "1"))]
