@@ -1361,6 +1361,9 @@ mod tests {
         }
 
         fn check_typical_values(ctx: &mut Context, source: SpiFunctionClockConfig) {
+            esp_hal::clock::ll::ClockTree::with(|clocks| {
+                SpiInstance::Spi2.request_function_clock(clocks)
+            });
             let f_min = SpiInstance::function_clock_source_frequency(source) / 1024;
             assert_frequency_roundtrips(ctx, source, f_min);
             assert_frequency_roundtrips(
