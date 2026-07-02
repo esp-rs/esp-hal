@@ -20,7 +20,7 @@ rustdoc-args   = ["--cfg", "docsrs"]
 skip-doctests = true
 targets_lp_core = true
 doc-config = { features = ["embedded-hal"], append = [
-    { features = ["embedded-io"], if = 'lp_core' },
+    { features = ["embedded-io"], if = 'ulp_riscv_driver_supported' },
 ] }
 check-configs = [
     { features = [] },

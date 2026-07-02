@@ -319,18 +319,15 @@ mod macros;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
-#[cfg(any(lp_core, ulp_riscv_core))]
+#[cfg(ulp_riscv_driver_supported)]
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]
-#[cfg(lp_core)]
+#[cfg(ulp_riscv_driver_supported)]
 pub use self::soc::lp_core;
-#[instability::unstable]
-#[cfg(ulp_riscv_core)]
-pub use self::soc::ulp_core;
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
@@ -395,7 +392,7 @@ unstable_driver! {
     pub mod rsa;
     #[cfg(sha_driver_supported)]
     pub mod sha;
-    #[cfg(touch)]
+    #[cfg(touch_driver_supported)]
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;

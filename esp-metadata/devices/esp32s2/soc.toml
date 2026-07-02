@@ -13,10 +13,6 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "ulp_riscv_core",
-
     # ROM capabilities
     "rom_crc_le",
     "rom_md5_bsd",
@@ -26,7 +22,6 @@ symbols = [
     "pm_support_ext1_wakeup",
     "pm_support_touch_sensor_wakeup",
     "pm_support_wifi_wakeup",
-    "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
 ]

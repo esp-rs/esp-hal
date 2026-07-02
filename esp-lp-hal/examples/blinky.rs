@@ -7,6 +7,8 @@
 //!
 //! Make sure the LP RAM is cleared before loading the code.
 
+//% CHIP_FILTER: ulp_riscv_driver_supported
+
 #![no_std]
 #![no_main]
 

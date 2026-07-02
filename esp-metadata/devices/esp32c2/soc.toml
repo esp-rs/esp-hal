@@ -13,8 +13,6 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
 symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
     "swd",
 
     # ROM capabilities
@@ -25,8 +23,6 @@ symbols = [
     # Wakeup SOC based on ESP-IDF:
     "pm_support_wifi_wakeup",
     "pm_support_bt_wakeup",
-    "uart_support_wakeup_int",
-    "gpio_support_deepsleep_wakeup",
 ]
 
 [device.soc]

@@ -333,8 +333,8 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     };
     #[cfg(feature = "has-ulp-core")]
     let imports = quote! {
-        use #hal_crate::ulp_core::UlpCore as LpCore;
-        use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
+        use #hal_crate::lp_core::UlpCore as LpCore;
+        use #hal_crate::lp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
         use #hal_crate::gpio::*;
     };
 

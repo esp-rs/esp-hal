@@ -13,9 +13,6 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
 symbols = [
-    # Additional peripherals defined by us (the developers):
-    # "lp_core",
-
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
@@ -23,10 +20,7 @@ symbols = [
 
     # Wakeup SOC based on ESP-IDF:
     "pm_support_wifi_wakeup",
-    "pm_support_beacon_wakeup",
     "pm_support_bt_wakeup",
-    "gpio_support_deepsleep_wakeup",
-    "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
 ]
 

@@ -259,8 +259,6 @@ impl Chip {
                     "soc_has_psram",
                     "soc_has_sw_interrupt",
                     "soc_has_touch",
-                    "phy",
-                    "touch",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -476,8 +474,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_touch",
-                    "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=touch",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -830,15 +826,12 @@ impl Chip {
                     "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
-                    "phy",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_mbedtls",
                     "pm_support_wifi_wakeup",
                     "pm_support_bt_wakeup",
-                    "uart_support_wakeup_int",
-                    "gpio_support_deepsleep_wakeup",
                     "adc_driver_supported",
                     "assist_debug_driver_supported",
                     "bt_driver_supported",
@@ -1002,15 +995,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_mbedtls",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
-                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=assist_debug_driver_supported",
                     "cargo:rustc-cfg=bt_driver_supported",
@@ -1294,15 +1284,12 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_tsens",
                     "soc_has_wifi",
-                    "phy",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "pm_support_wifi_wakeup",
                     "pm_support_bt_wakeup",
-                    "uart_support_wakeup_int",
-                    "gpio_support_deepsleep_wakeup",
                     "adc_driver_supported",
                     "aes_driver_supported",
                     "assist_debug_driver_supported",
@@ -1525,15 +1512,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_tsens",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
-                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=aes_driver_supported",
                     "cargo:rustc-cfg=assist_debug_driver_supported",
@@ -1894,10 +1878,7 @@ impl Chip {
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "pm_support_wifi_wakeup",
-                    "pm_support_beacon_wakeup",
                     "pm_support_bt_wakeup",
-                    "gpio_support_deepsleep_wakeup",
-                    "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
                     "adc_driver_supported",
                     "aes_driver_supported",
@@ -2173,10 +2154,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
-                    "cargo:rustc-cfg=pm_support_beacon_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=aes_driver_supported",
@@ -2591,17 +2569,12 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_tsens",
                     "soc_has_wifi",
-                    "phy",
-                    "lp_core",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "pm_support_wifi_wakeup",
-                    "pm_support_beacon_wakeup",
                     "pm_support_bt_wakeup",
-                    "gpio_support_deepsleep_wakeup",
-                    "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
                     "adc_driver_supported",
                     "aes_driver_supported",
@@ -2885,17 +2858,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_tsens",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=lp_core",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
-                    "cargo:rustc-cfg=pm_support_beacon_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=adc_driver_supported",
                     "cargo:rustc-cfg=aes_driver_supported",
@@ -3308,10 +3276,7 @@ impl Chip {
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "pm_support_wifi_wakeup",
-                    "pm_support_beacon_wakeup",
                     "pm_support_bt_wakeup",
-                    "gpio_support_deepsleep_wakeup",
-                    "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
                     "assist_debug_driver_supported",
                     "bt_driver_supported",
@@ -3525,10 +3490,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
-                    "cargo:rustc-cfg=pm_support_beacon_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=assist_debug_driver_supported",
                     "cargo:rustc-cfg=bt_driver_supported",
@@ -3889,7 +3851,6 @@ impl Chip {
                     "soc_has_flash",
                     "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
-                    "phy",
                     "swd",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -4147,7 +4108,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_flash",
                     "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
-                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -4509,7 +4469,6 @@ impl Chip {
                     "soc_has_flash",
                     "soc_has_sw_interrupt",
                     "soc_has_cpu_ctrl",
-                    "spi_octal",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -4737,7 +4696,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_flash",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_cpu_ctrl",
-                    "cargo:rustc-cfg=spi_octal",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -5199,15 +5157,12 @@ impl Chip {
                     "soc_has_psram",
                     "soc_has_sw_interrupt",
                     "soc_has_ulp_riscv_core",
-                    "phy",
-                    "ulp_riscv_core",
                     "rom_crc_le",
                     "rom_md5_bsd",
                     "pm_support_ext0_wakeup",
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
                     "pm_support_wifi_wakeup",
-                    "uart_support_wakeup_int",
                     "ulp_supported",
                     "riscv_coproc_supported",
                     "adc_driver_supported",
@@ -5436,15 +5391,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
-                    "cargo:rustc-cfg=phy",
-                    "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_ext0_wakeup",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=ulp_supported",
                     "cargo:rustc-cfg=riscv_coproc_supported",
                     "cargo:rustc-cfg=adc_driver_supported",
@@ -5876,9 +5828,7 @@ impl Chip {
                     "soc_has_sw_interrupt",
                     "soc_has_ulp_riscv_core",
                     "soc_has_wifi",
-                    "phy",
                     "swd",
-                    "ulp_riscv_core",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -5887,7 +5837,6 @@ impl Chip {
                     "pm_support_touch_sensor_wakeup",
                     "pm_support_wifi_wakeup",
                     "pm_support_bt_wakeup",
-                    "uart_support_wakeup_int",
                     "ulp_supported",
                     "riscv_coproc_supported",
                     "adc_driver_supported",
@@ -6152,9 +6101,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
                     "cargo:rustc-cfg=soc_has_wifi",
-                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=swd",
-                    "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -6163,7 +6110,6 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=pm_support_wifi_wakeup",
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
-                    "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=ulp_supported",
                     "cargo:rustc-cfg=riscv_coproc_supported",
                     "cargo:rustc-cfg=adc_driver_supported",
@@ -6680,8 +6626,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_psram)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_sw_interrupt)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_touch)");
-    println!("cargo:rustc-check-cfg=cfg(phy)");
-    println!("cargo:rustc-check-cfg=cfg(touch)");
     println!("cargo:rustc-check-cfg=cfg(rom_crc_le)");
     println!("cargo:rustc-check-cfg=cfg(rom_crc_be)");
     println!("cargo:rustc-check-cfg=cfg(rom_md5_bsd)");
@@ -6816,8 +6760,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rom_md5_mbedtls)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_wifi_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");
-    println!("cargo:rustc-check-cfg=cfg(uart_support_wakeup_int)");
-    println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(assist_debug_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ecc_driver_supported)");
@@ -6926,7 +6868,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_pvt_monitor)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
-    println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
@@ -6977,7 +6918,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_plic_mx)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
-    println!("cargo:rustc-check-cfg=cfg(lp_core)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
@@ -7016,7 +6956,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_fs)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_hs)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_usb_wrap)");
-    println!("cargo:rustc-check-cfg=cfg(spi_octal)");
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_driver_supported)");
@@ -7050,7 +6989,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_syscon)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
-    println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
     println!("cargo:rustc-check-cfg=cfg(dma_ext_mem_configurable_block_size)");

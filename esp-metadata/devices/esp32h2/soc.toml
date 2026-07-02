@@ -13,8 +13,6 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
 
 symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
     "swd",
 
     # ROM capabilities

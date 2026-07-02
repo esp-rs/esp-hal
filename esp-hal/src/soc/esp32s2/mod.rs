@@ -8,7 +8,7 @@
 crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
-    pub mod ulp_core;
+    pub mod lp_core;
 }
 pub mod gpio;
 pub(crate) mod regi2c;

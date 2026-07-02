@@ -5,7 +5,7 @@
 //! It is neccessary to use Serial-Uart bridge connected to TX and RX to see
 //! logs from LP_UART. Make sure the LP RAM is cleared before loading the code.
 
-//% CHIP_FILTER: lp_core
+//% CHIP_FILTER: ulp_riscv_driver_supported && soc_has_lp_uart
 
 #![no_std]
 #![no_main]

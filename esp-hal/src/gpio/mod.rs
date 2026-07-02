@@ -486,7 +486,7 @@ pub trait AnalogPin: Pin {
 }
 
 /// Trait implemented by pins which can be used as Touchpad pins
-#[cfg(touch)]
+#[cfg(touch_driver_supported)]
 #[instability::unstable]
 pub trait TouchPin: Pin {
     /// Configure the pin for analog operation
