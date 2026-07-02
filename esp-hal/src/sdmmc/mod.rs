@@ -2116,7 +2116,7 @@ fn dma_ptr_from_raw(addr: *const u8) -> Result<u32, Error> {
     if crate::soc::is_valid_ram_address(addr as usize) {
         return Ok(addr as u32);
     }
-    #[cfg(all(soc_has_psram, not(sdmmc_psram_dma)))]
+    #[cfg(all(soc_has_psram, sdmmc_psram_dma))]
     if crate::soc::is_valid_psram_address(addr as usize) {
         return Ok(addr as u32);
     }
