@@ -34,6 +34,10 @@ esp-storage = { path = "../esp-storage", optional = true }
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
 static_cell = "2.1.1"
+sdio = "0.4"
+block-device-adapters = "0.2.0"
+embedded-fatfs = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
+embedded-partitions = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 rtos-trace = { version = "0.2.0", optional = true }
 trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
@@ -141,3 +145,7 @@ debug            = 2
 debug-assertions = true
 lto              = "fat"
 codegen-units    = 1
+
+[patch.crates-io]
+block-device-driver = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
+block-device-adapters = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }

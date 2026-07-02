@@ -287,6 +287,7 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
+                    "sdmmc_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -371,6 +372,7 @@ impl Chip {
                     "rsa_version=\"1\"",
                     "rsa_size_increment=\"512\"",
                     "rsa_memory_size_bytes=\"512\"",
+                    "sdmmc_has_iomux",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_multi_core_enabled",
@@ -510,6 +512,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
+                    "cargo:rustc-cfg=sdmmc_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -594,6 +597,7 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"1\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"512\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
+                    "cargo:rustc-cfg=sdmmc_has_iomux",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
@@ -4572,6 +4576,7 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
+                    "sdmmc_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -4682,6 +4687,11 @@ impl Chip {
                     "rsa_version=\"3\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
+                    "sdmmc_delay_phase_num=\"8\"",
+                    "sdmmc_delay_phase_num_is_set",
+                    "sdmmc_has_iomux",
+                    "sdmmc_has_gpio_matrix",
+                    "sdmmc_psram_dma",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_cpu_has_branch_predictor",
@@ -4816,6 +4826,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
+                    "cargo:rustc-cfg=sdmmc_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -4926,6 +4937,11 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"3\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num=\"8\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
+                    "cargo:rustc-cfg=sdmmc_has_iomux",
+                    "cargo:rustc-cfg=sdmmc_has_gpio_matrix",
+                    "cargo:rustc-cfg=sdmmc_psram_dma",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
@@ -5982,6 +5998,7 @@ impl Chip {
                     "rng_driver_supported",
                     "rsa_driver_supported",
                     "lp_timer_driver_supported",
+                    "sdmmc_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -6111,6 +6128,9 @@ impl Chip {
                     "rsa_version=\"2\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
+                    "sdmmc_delay_phase_num=\"4\"",
+                    "sdmmc_delay_phase_num_is_set",
+                    "sdmmc_has_gpio_matrix",
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "soc_multi_core_enabled",
@@ -6263,6 +6283,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
                     "cargo:rustc-cfg=lp_timer_driver_supported",
+                    "cargo:rustc-cfg=sdmmc_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -6392,6 +6413,9 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_version=\"2\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num=\"4\"",
+                    "cargo:rustc-cfg=sdmmc_delay_phase_num_is_set",
+                    "cargo:rustc-cfg=sdmmc_has_gpio_matrix",
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=soc_multi_core_enabled",
@@ -6790,6 +6814,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rng_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(rsa_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_timer_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sha_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sleep_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_driver_supported)");
@@ -6841,6 +6866,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(phy_combo_module)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_per_channel_clock)");
     println!("cargo:rustc-check-cfg=cfg(rng_trng_supported)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_has_iomux)");
     println!("cargo:rustc-check-cfg=cfg(sleep_light_sleep)");
     println!("cargo:rustc-check-cfg=cfg(sleep_deep_sleep)");
     println!("cargo:rustc-check-cfg=cfg(soc_multi_core_enabled)");
@@ -7114,6 +7140,9 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
     println!("cargo:rustc-check-cfg=cfg(i2s_supports_pdm_rx_hp_filter)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_has_gpio_matrix)");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_psram_dma)");
     println!("cargo:rustc-check-cfg=cfg(soc_internal_memory_cached)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_spll_clk)");
@@ -7242,6 +7271,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_dma_engine, values(\"VDMA\"))");
+    println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num, values(\"8\",\"4\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_fifo_depth_words, values(\"200\",\"256\"))");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_hs_fifo_depth_words, values(\"896\"))");
     println!("cargo:rustc-check-cfg=cfg(rmt_dma_engine, values(\"AHB_GDMA\"))");
