@@ -293,12 +293,9 @@ mod indexed {
     }
 
     fn select_entry(entry_id: u32) {
-        spi0().mmu_item_index().write(|w| unsafe {
-            cfg_select! {
-                any(esp32c5, esp32c61) => w.mmu_item_index().bits(entry_id),
-                _ => w.spi_mmu_item_index().bits(entry_id),
-            }
-        });
+        spi0()
+            .mmu_item_index()
+            .write(|w| unsafe { w.mmu_item_index().bits(entry_id) });
     }
 
     pub(super) fn write_flash_entry(entry_id: u32, page_paddr: u32) {

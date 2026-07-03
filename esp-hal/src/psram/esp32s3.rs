@@ -1,7 +1,10 @@
 use core::ops::Range;
 
 use super::{EXTMEM_ORIGIN, PsramSize};
-use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
+use crate::{
+    peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1},
+    soc::pac,
+};
 
 /// PSRAM interface mode
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -134,10 +137,15 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     }
 
     const MMU_PAGE_SIZE: u32 = 0x10000;
-    const ICACHE_MMU_SIZE: usize = 0x800;
-    const FLASH_MMU_TABLE_SIZE: usize = ICACHE_MMU_SIZE / core::mem::size_of::<u32>();
-    const MMU_INVALID: u32 = 1 << 14;
-    const DR_REG_MMU_TABLE: u32 = 0x600C5000;
+    const FLASH_MMU_TABLE_SIZE: usize = {
+        const BLOCK: usize = core::mem::size_of::<pac::mmu_table::RegisterBlock>();
+        const ENTRY: usize = core::mem::size_of::<pac::mmu_table::ENTRY>();
+        BLOCK / ENTRY
+    };
+
+    fn mmu_entry_is_valid(entry_id: usize) -> bool {
+        !MMU_TABLE::regs().entry(entry_id).read().invalid().bit()
+    }
 
     // calculate the PSRAM start address to map
     // the linker scripts can produce a gap between mapped IROM and DROM segments
@@ -146,13 +154,12 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     //
     // More general information about the MMU can be found here:
     // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
-    let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
     let mut mapped_pages = 0;
 
     // the bootloader is using the last page to access flash internally
     // (e.g. to read the app descriptor) so we just skip that
     for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
-        if unsafe { mmu_table_ptr.add(i).read_volatile() } != MMU_INVALID {
+        if mmu_entry_is_valid(i) {
             mapped_pages = (i + 1) as u32;
             break;
         }
