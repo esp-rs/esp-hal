@@ -8,6 +8,7 @@ use esp_hal::{
         WakeLock,
         sleep::{GpioWakeupSource, LowPower, TimerWakeupSource, WakeSource},
     },
+    time::Duration,
 };
 
 use crate::{SCHEDULER, task::IdleFn};
@@ -53,8 +54,7 @@ impl DeepSleep {
 /// disabled) checks that:
 /// - no [`WakeLock`] is held,
 /// - all cores are idle,
-/// - there is a finite next scheduled wakeup, and
-/// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
+/// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
 /// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup; otherwise
 /// it falls back to `WFI`. The minimum-residency threshold is configurable via the
@@ -112,15 +112,17 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return;
             };
             let next_wakeup = time_driver.next_wakeup();
-            if next_wakeup == u64::MAX {
-                return;
-            }
 
-            let now = crate::now();
-            let sleep_duration = next_wakeup.saturating_sub(now);
-            if sleep_duration < LIGHT_SLEEP_MIN_US {
-                return;
-            }
+            let sleep_duration = if next_wakeup != u64::MAX {
+                let now = crate::now();
+                let sleep_duration = next_wakeup.saturating_sub(now);
+                if sleep_duration < LIGHT_SLEEP_MIN_US {
+                    return;
+                }
+                Some(Duration::from_micros(sleep_duration))
+            } else {
+                None
+            };
 
             // We have committed to sleeping. Park (hardware-stall) the other core(s) so their
             // CPU state is frozen and restored coherently across the sleep, then enter light
@@ -141,11 +143,21 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             }
 
             unsafe {
-                let mut rtc = LowPower::new(LPWR::steal());
-                let timer =
-                    TimerWakeupSource::new(esp_hal::time::Duration::from_micros(sleep_duration));
+                let mut lpwr = LowPower::new(LPWR::steal());
+
+                // Set up wake sources. We could use heapless here, but this
+                // code should be replaced by something more flexible anyway.
                 let gpio = GpioWakeupSource::new();
-                rtc.sleep_light(&[&timer, &gpio]);
+                let timer;
+
+                let mut wakeup_sources: [&dyn WakeSource; 2] = [&gpio, &gpio];
+
+                if let Some(duration) = sleep_duration {
+                    timer = TimerWakeupSource::new(duration);
+                    wakeup_sources[0] = &timer;
+                }
+
+                lpwr.sleep_light(&wakeup_sources);
             }
 
             // The alarm timer was gated during light sleep, so its pre-armed alarm is
