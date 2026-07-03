@@ -65,6 +65,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     private::Sealed,
+    spi::master::low_level::SpiClockGuard,
     time::Rate,
 };
 
@@ -794,7 +795,6 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.driver().flush_async().await;
         Ok(())
     }
 
@@ -826,9 +826,8 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -841,9 +840,8 @@ impl<'d> Spi<'d, Async> {
     // TODO: These inherent methods should be public
 
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -854,14 +852,12 @@ impl<'d> Spi<'d, Async> {
     }
 
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
-            self.driver().write(words)?;
-            return self.driver().flush();
+            return self.driver().write(words);
         }
 
         self.driver().write_async(words).await
@@ -1130,18 +1126,10 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
-
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().write_one(chunk)?;
-            // NOTE: While we don't need to flush after the last chunk, changing
-            // that would change the behavior of the function.
-            // https://github.com/esp-rs/esp-hal/issues/5257
-            self.driver().flush()?;
-        }
-
-        Ok(())
+        self.driver().write(words)
     }
 
     #[procmacros::doc_replace]
@@ -1168,7 +1156,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
@@ -1197,7 +1185,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
@@ -1219,6 +1207,7 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver()
             .half_duplex_read(data_mode, cmd, address, dummy, buffer)
     }
@@ -1242,6 +1231,7 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver()
             .half_duplex_write(data_mode, cmd, address, dummy, buffer)
     }
@@ -1292,19 +1282,11 @@ where
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        // Do not call the inherent `write` method. The trait impl does not flush after.
-        // Flush before starting to ensure the bus is clear before we reconfigure to full duplex.
-        self.driver().flush()?;
-        self.driver().setup_full_duplex()?;
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().flush()?;
-            self.driver().write_one(chunk)?;
-        }
-        Ok(())
+        self.write(words)
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
 
         if read.is_empty() {
@@ -1317,13 +1299,13 @@ where
     }
 
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.driver().flush()
+        Ok(())
     }
 }
 
@@ -1337,18 +1319,18 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(read.len().max(write.len())) {
-            if read.is_empty() {
-                self.driver().write(write)?;
-                return self.driver().flush();
+            return if read.is_empty() {
+                self.driver().write(write)
             } else if write.is_empty() {
-                return self.driver().read(read);
+                self.driver().read(read)
             } else {
-                return self.driver().transfer(read, write);
-            }
+                self.driver().transfer(read, write)
+            };
         }
 
         if read.is_empty() {
@@ -1365,7 +1347,7 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_async().await
+        Ok(())
     }
 }
 

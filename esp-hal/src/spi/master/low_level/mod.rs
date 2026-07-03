@@ -26,6 +26,7 @@ use super::{
 };
 use crate::{
     asynch::AtomicWaker,
+    clock::ll::SpiInstance,
     gpio::{InputSignal, OutputSignal},
     handler,
     interrupt::InterruptHandler,
@@ -96,13 +97,25 @@ impl Drop for SpiWrapper<'_> {
         unsafe {
             // SAFETY: we "own" the state, we are allowed to deinit it
             self.spi.state().deinit();
-            crate::clock::ll::ClockTree::with(|clocks| {
-                self.spi
-                    .info()
-                    .clock_instance
-                    .release_function_clock(clocks);
-            });
         }
+    }
+}
+
+pub(super) struct SpiClockGuard {
+    clock: SpiInstance,
+}
+
+impl SpiClockGuard {
+    pub(super) fn new(spi: &Info) -> Self {
+        let clock = spi.clock_instance;
+        crate::clock::ll::ClockTree::with(|clocks| clock.request_function_clock(clocks));
+        Self { clock }
+    }
+}
+
+impl Drop for SpiClockGuard {
+    fn drop(&mut self) {
+        crate::clock::ll::ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
     }
 }
 
@@ -202,26 +215,29 @@ impl Driver {
     /// Initialize for full-duplex 1 bit mode
     pub(super) fn init(&self) {
         version::enable_peripheral_clock(self);
+
         crate::soc::clocks::ClockTree::with(|clocks| {
             self.info.clock_instance.configure_function_clock(
                 clocks,
                 crate::soc::clocks::SpiFunctionClockConfig::default(),
             );
             self.info.clock_instance.request_function_clock(clocks);
-        });
-        self.regs().user().modify(|_, w| {
-            w.usr_miso_highpart().clear_bit();
-            w.usr_mosi_highpart().clear_bit();
-            w.doutdin().set_bit();
-            w.usr_miso().set_bit();
-            w.usr_mosi().set_bit();
-            w.cs_hold().set_bit();
-            w.usr_dummy_idle().set_bit();
-            w.usr_addr().clear_bit();
-            w.usr_command().clear_bit()
-        });
 
-        version::init(self);
+            self.regs().user().modify(|_, w| {
+                w.usr_miso_highpart().clear_bit();
+                w.usr_mosi_highpart().clear_bit();
+                w.doutdin().set_bit();
+                w.usr_miso().set_bit();
+                w.usr_mosi().set_bit();
+                w.cs_hold().set_bit();
+                w.usr_dummy_idle().set_bit();
+                w.usr_addr().clear_bit();
+                w.usr_command().clear_bit()
+            });
+
+            version::init(self);
+            self.info.clock_instance.release_function_clock(clocks);
+        });
 
         self.regs().slave().write(|w| unsafe { w.bits(0) });
     }
@@ -260,17 +276,20 @@ impl Driver {
             self.info
                 .clock_instance
                 .configure_function_clock(clocks, config.clock_source);
+            self.info.clock_instance.request_function_clock(clocks);
 
             self.regs().clock().write(|w| unsafe { w.bits(raw) });
+
+            self.set_bit_order(config.read_bit_order, config.write_bit_order);
+            self.set_data_mode(config.mode);
+
+            version::apply_config(self);
+            self.info.clock_instance.release_function_clock(clocks);
         });
 
-        self.set_bit_order(config.read_bit_order, config.write_bit_order);
-        self.set_data_mode(config.mode);
         self.state
             .min_async_transfer_size
             .store(config.min_async_transfer_size, Ordering::Relaxed);
-
-        version::apply_config(self);
 
         Ok(())
     }
@@ -349,15 +368,11 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
-    ///
-    /// This function will return before all bytes of the last chunk to transmit
-    /// have been sent to the wire. If you must ensure that the whole
-    /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
-            self.flush()?;
             self.write_one(chunk)?;
+            self.flush()?;
         }
         Ok(())
     }
@@ -474,8 +489,6 @@ impl Driver {
                 break;
             }
 
-            self.flush()?;
-
             if write_inc < read_inc {
                 // Read more than we write, must pad writing part with zeros
                 let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -485,8 +498,9 @@ impl Driver {
                 self.write_one(&write[write_from..][..write_inc])?;
             }
 
+            self.flush()?;
+
             if read_inc > 0 {
-                self.flush()?;
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
 
@@ -519,7 +533,6 @@ impl Driver {
             return Err(Error::Unsupported);
         }
 
-        self.flush()?;
         self.setup_half_duplex(
             false,
             cmd,
@@ -553,8 +566,6 @@ impl Driver {
         if buffer.len() > FIFO_SIZE {
             return Err(Error::FifoSizeExeeded);
         }
-
-        self.flush()?;
 
         cfg_select! {
             all(spi_master_version = "1", spi_address_workaround) => {
@@ -610,7 +621,7 @@ impl Driver {
             // while to ensure the peripheral is idle.
             let cancel_on_drop = DropGuard::new((), |_| {
                 self.abort_transfer();
-                while self.busy() {}
+                let _ = self.flush();
             });
             let res = self.write_one(chunk);
             self.flush_async().await;
@@ -649,8 +660,8 @@ impl Driver {
                 self.write_one(&write[write_from..][..write_inc])?;
             }
 
-            // Preserve previous semantics - see https://github.com/esp-rs/esp-hal/issues/5257
             self.flush_async().await;
+
             if read_inc > 0 {
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
