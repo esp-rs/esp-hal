@@ -1,10 +1,7 @@
 use core::ops::Range;
 
 use super::{EXTMEM_ORIGIN, PsramSize};
-use crate::{
-    peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1},
-    soc::pac,
-};
+use crate::peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1};
 
 /// PSRAM interface mode
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -137,11 +134,6 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     }
 
     const MMU_PAGE_SIZE: u32 = 0x10000;
-    const FLASH_MMU_TABLE_SIZE: usize = {
-        const BLOCK: usize = core::mem::size_of::<pac::mmu_table::RegisterBlock>();
-        const ENTRY: usize = core::mem::size_of::<pac::mmu_table::ENTRY>();
-        BLOCK / ENTRY
-    };
 
     fn mmu_entry_is_valid(entry_id: usize) -> bool {
         !MMU_TABLE::regs().entry(entry_id).read().invalid().bit()
@@ -158,7 +150,8 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
 
     // the bootloader is using the last page to access flash internally
     // (e.g. to read the app descriptor) so we just skip that
-    for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
+    let flash_mmu_table_size: usize = MMU_TABLE::regs().entry_iter().count();
+    for i in (0..(flash_mmu_table_size - 1)).rev() {
         if mmu_entry_is_valid(i) {
             mapped_pages = (i + 1) as u32;
             break;

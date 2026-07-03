@@ -227,7 +227,7 @@ fn mmu_entry_scan_range() -> (u32, u32) {
     cfg_select! {
         not(soc_has_mmu_table) => (0, indexed::entry_count()),
         esp32s2 => (s2::DATA_ENTRY_START, s2::DATA_ENTRY_END),
-        _ => (0, table::ENTRY_COUNT),
+        _ => (0, table::entry_count()),
     }
 }
 
@@ -348,13 +348,6 @@ mod table {
 
     const PAGE_SIZE: u32 = 0x10000;
 
-    #[cfg(not(esp32s2))]
-    pub(super) const ENTRY_COUNT: u32 = {
-        const BLOCK: usize = core::mem::size_of::<pac::mmu_table::RegisterBlock>();
-        const ENTRY: usize = core::mem::size_of::<pac::mmu_table::ENTRY>();
-        (BLOCK / ENTRY) as u32
-    };
-
     pub(super) fn mmu_page_size() -> u32 {
         PAGE_SIZE
     }
@@ -418,6 +411,11 @@ mod table {
     #[cfg(not(esp32s2))]
     pub(super) fn write_flash_entry(entry_id: u32, page_paddr: u32) {
         write_flash_entry_inner(entry_id, flash_page_number(page_paddr) as u16);
+    }
+
+    #[cfg(not(esp32s2))]
+    pub(super) fn entry_count() -> u32 {
+        esp_hal::peripherals::MMU_TABLE::regs().entry_iter().count() as u32
     }
 }
 
