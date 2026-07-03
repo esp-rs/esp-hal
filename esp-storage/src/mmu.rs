@@ -303,10 +303,10 @@ mod indexed {
         let encrypted = esp_hal::efuse::flash_encryption();
         select_entry(entry_id);
         spi0().mmu_item_content().write(|w| {
-            let w = unsafe { w.paddr().bits(page) };
+            unsafe { w.paddr().bits(page) };
             #[cfg(any(esp32c5, esp32c61))]
-            let w = w.access_spiram().clear_bit();
-            let w = w.valid().set_bit();
+            w.access_spiram().clear_bit();
+            w.valid().set_bit();
             if encrypted {
                 w.sensitive().set_bit()
             } else {
@@ -390,13 +390,13 @@ mod table {
     #[cfg(not(esp32s2))]
     fn write_flash_entry_inner(entry_id: u32, page: u16) {
         mmu_table().entry(entry_id as usize).write(|w| {
-            let w = cfg_select! {
+            cfg_select! {
                 any(esp32, esp32c2, esp32c3) => unsafe { w.paddr().bits(page as u8) },
                 _ => unsafe { w.paddr().bits(page) },
             };
-            let w = w.invalid().clear_bit();
+            w.invalid().clear_bit();
             #[cfg(all(soc_has_psram, not(any(esp32, esp32s2))))]
-            let w = w.access_spiram().clear_bit();
+            w.access_spiram().clear_bit();
             w
         });
     }

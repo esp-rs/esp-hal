@@ -687,8 +687,8 @@ fn select_psram_mmu_entry(entry_id: u32) {
 fn write_psram_mmu_entry(entry_id: u32, page: u16) {
     select_psram_mmu_entry(entry_id);
     psram_mspi0().mmu_item_content().write(|w| {
-        let w = unsafe { w.paddr().bits(page) };
-        let w = w.access_spiram().set_bit();
+        unsafe { w.paddr().bits(page) };
+        w.access_spiram().set_bit();
         w.spiram_valid().set_bit()
     });
 }
