@@ -312,32 +312,20 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-
-        // In terms of registers, STORE2 and STORE3 are used on all current chips
-        // (esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61,
-        // esp32s2, esp32s3)
-
-        // In terms of peripherals:
-
-        // - LPWR is used on the following chips: esp32, esp32p4, esp32c2, esp32c3, esp32s2, esp32s3
-
-        // - LP_AON is used on the following chips: esp32c5, esp32c6, esp32c61, esp32h2
-
-        // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
-
-        let rtc_cntl = LP_AON::regs();
-
-        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        let regs = LP_AON::regs();
         cfg_select! {
             esp32p4 => {
-                let l = rtc_cntl.lp_store2().read().bits() as u64;
-                let h = rtc_cntl.lp_store3().read().bits() as u64;
+                let low_reg = regs.lp_store2();
+                let high_reg = regs.lp_store3();
             }
             _ => {
-                let l = rtc_cntl.store2().read().bits() as u64;
-                let h = rtc_cntl.store3().read().bits() as u64;
+                let low_reg = regs.store2();
+                let high_reg = regs.store3();
             }
         }
+
+        let l = low_reg.read().bits() as u64;
+        let h = high_reg.read().bits() as u64;
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
@@ -349,28 +337,24 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let rtc_cntl = LP_AON::regs();
-
-        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
-        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        let regs = LP_AON::regs();
         cfg_select! {
             esp32p4 => {
-                rtc_cntl
-                    .lp_store2() // Low bits
-                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-                rtc_cntl
-                    .lp_store3() // High bits
-                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+                let low_reg = regs.lp_store2();
+                let high_reg = regs.lp_store3();
             }
             _ => {
-                rtc_cntl
-                    .store2() // Low bits
-                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-                rtc_cntl
-                    .store3() // High bits
-                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+                let low_reg = regs.store2();
+                let high_reg = regs.store3();
             }
         }
+
+        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
+
+        low_reg // Low bits
+            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+        high_reg // High bits
+            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
     #[procmacros::doc_replace]
@@ -518,14 +502,10 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        cfg_select! {
-            esp32p4 => {
-                let reg = LP_AON::regs().lp_store4();
-            }
-            _ => {
-                let reg = LP_AON::regs().store4();
-            }
-        }
+        let reg = cfg_select! {
+            esp32p4 => LP_AON::regs().lp_store4(),
+            _ => LP_AON::regs().store4(),
+        };
         reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 
@@ -536,17 +516,11 @@ impl<'d> Rtc<'d> {
     #[instability::unstable]
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        cfg_select! {
-            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
-                let interrupt = Interrupt::LP_WDT;
-            }
-            esp32p4 => {
-                let interrupt = Interrupt::LP_TIMER0;
-            }
-            _ => {
-                let interrupt = Interrupt::RTC_CORE;
-            }
-        }
+        let interrupt = cfg_select! {
+            esp32p4 => Interrupt::LP_TIMER0,
+            soc_has_lp_wdt => Interrupt::LP_WDT,
+            _ => Interrupt::RTC_CORE,
+        };
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
