@@ -13,6 +13,8 @@ cores  = 2
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
 symbols = [
+    "swd",
+
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",

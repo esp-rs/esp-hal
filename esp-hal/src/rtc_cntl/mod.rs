@@ -238,9 +238,9 @@ impl<'d> Rtc<'d> {
     pub fn new(rtc_cntl: LPWR<'d>) -> Self {
         Self {
             _inner: rtc_cntl,
-            rwdt: Rwdt(()),
+            rwdt: Rwdt,
             #[cfg(swd)]
-            swd: Swd(()),
+            swd: Swd,
         }
     }
 
@@ -312,32 +312,20 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-
-        // In terms of registers, STORE2 and STORE3 are used on all current chips
-        // (esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61,
-        // esp32s2, esp32s3)
-
-        // In terms of peripherals:
-
-        // - LPWR is used on the following chips: esp32, esp32p4, esp32c2, esp32c3, esp32s2, esp32s3
-
-        // - LP_AON is used on the following chips: esp32c5, esp32c6, esp32c61, esp32h2
-
-        // For registers and peripherals used in esp-idf, see https://github.com/search?q=repo%3Aespressif%2Fesp-idf+RTC_BOOT_TIME_LOW_REG+RTC_BOOT_TIME_HIGH_REG+path%3A**%2Frtc.h&type=code
-
-        let rtc_cntl = LP_AON::regs();
-
-        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        let regs = LP_AON::regs();
         cfg_select! {
             esp32p4 => {
-                let l = rtc_cntl.lp_store2().read().bits() as u64;
-                let h = rtc_cntl.lp_store3().read().bits() as u64;
+                let low_reg = regs.lp_store2();
+                let high_reg = regs.lp_store3();
             }
             _ => {
-                let l = rtc_cntl.store2().read().bits() as u64;
-                let h = rtc_cntl.store3().read().bits() as u64;
+                let low_reg = regs.store2();
+                let high_reg = regs.store3();
             }
         }
+
+        let l = low_reg.read().bits() as u64;
+        let h = high_reg.read().bits() as u64;
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
@@ -349,28 +337,24 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let rtc_cntl = LP_AON::regs();
-
-        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
-        // On P4 the AON store registers live in LP_SYS and are named `lp_storeN`.
+        let regs = LP_AON::regs();
         cfg_select! {
             esp32p4 => {
-                rtc_cntl
-                    .lp_store2() // Low bits
-                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-                rtc_cntl
-                    .lp_store3() // High bits
-                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+                let low_reg = regs.lp_store2();
+                let high_reg = regs.lp_store3();
             }
             _ => {
-                rtc_cntl
-                    .store2() // Low bits
-                    .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
-                rtc_cntl
-                    .store3() // High bits
-                    .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+                let low_reg = regs.store2();
+                let high_reg = regs.store3();
             }
         }
+
+        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
+
+        low_reg // Low bits
+            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+        high_reg // High bits
+            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
     #[procmacros::doc_replace]
@@ -518,14 +502,10 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        cfg_select! {
-            esp32p4 => {
-                let reg = LP_AON::regs().lp_store4();
-            }
-            _ => {
-                let reg = LP_AON::regs().store4();
-            }
-        }
+        let reg = cfg_select! {
+            esp32p4 => LP_AON::regs().lp_store4(),
+            _ => LP_AON::regs().store4(),
+        };
         reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
 
@@ -536,17 +516,11 @@ impl<'d> Rtc<'d> {
     #[instability::unstable]
     #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        cfg_select! {
-            any(esp32c5, esp32c6, esp32c61, esp32h2) => {
-                let interrupt = Interrupt::LP_WDT;
-            }
-            esp32p4 => {
-                let interrupt = Interrupt::LP_TIMER0;
-            }
-            _ => {
-                let interrupt = Interrupt::RTC_CORE;
-            }
-        }
+        let interrupt = cfg_select! {
+            esp32p4 => Interrupt::LP_TIMER0,
+            soc_has_lp_wdt => Interrupt::LP_WDT,
+            _ => Interrupt::RTC_CORE,
+        };
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
@@ -598,13 +572,10 @@ pub enum RwdtStage {
 }
 
 /// RTC Watchdog Timer.
-pub struct Rwdt(());
+#[non_exhaustive]
+pub struct Rwdt;
 
 /// RTC Watchdog Timer driver.
-///
-/// ESP32-P4 LP_WDT PAC uses different register names (config0 vs wdtconfig0,
-/// lp_wdt vs wdt, etc.). P4-specific implementation is a TODO.
-#[cfg(not(esp32p4))]
 impl Rwdt {
     /// Enable the watchdog timer instance.
     /// Watchdog starts with default settings (`stage 0` resets the system, the
@@ -618,118 +589,129 @@ impl Rwdt {
         self.set_enabled(false);
     }
 
-    /// Listen for interrupts on stage 0.
-    pub fn listen(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
+    fn set_listen(&mut self, enable: bool) {
+        let regs = LP_WDT::regs();
 
         self.set_write_protection(false);
 
         // Configure STAGE0 to trigger an interrupt upon expiration
-        rtc_cntl
-            .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
+        let cfg_reg = cfg_select! {
+            esp32p4 => regs.config0(),
+            _ => regs.wdtconfig0(),
+        };
+        cfg_reg.modify(|_, w| unsafe {
+            w.wdt_stg0().bits(if enable {
+                RwdtStageAction::Interrupt as u8
+            } else {
+                RwdtStageAction::ResetSystem as u8
+            })
+        });
 
-        rtc_cntl.int_ena().modify(|_, w| w.wdt().set_bit());
+        regs.int_ena().modify(|_, w| {
+            cfg_select! {
+                esp32p4 => w.lp_wdt().bit(enable),
+                _ => w.wdt().bit(enable),
+            }
+        });
 
         self.set_write_protection(true);
     }
 
+    /// Listen for interrupts on stage 0.
+    pub fn listen(&mut self) {
+        self.set_listen(true);
+    }
+
     /// Stop listening for interrupts on stage 0.
     pub fn unlisten(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
-
-        self.set_write_protection(false);
-
-        // Configure STAGE0 to reset the main system and the RTC upon expiration.
-        rtc_cntl
-            .wdtconfig0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8) });
-
-        rtc_cntl.int_ena().modify(|_, w| w.wdt().clear_bit());
-
-        self.set_write_protection(true);
+        self.set_listen(false);
     }
 
     /// Clear interrupt.
     pub fn clear_interrupt(&mut self) {
         self.set_write_protection(false);
 
-        LP_WDT::regs()
-            .int_clr()
-            .write(|w| w.wdt().clear_bit_by_one());
+        LP_WDT::regs().int_clr().write(|w| {
+            cfg_select! {
+                esp32p4 => w.lp_wdt().clear_bit_by_one(),
+                _ => w.wdt().clear_bit_by_one(),
+            }
+        });
 
         self.set_write_protection(true);
     }
 
     /// Check if the interrupt is set.
     pub fn is_interrupt_set(&self) -> bool {
-        LP_WDT::regs().int_st().read().wdt().bit_is_set()
+        cfg_select! {
+            esp32p4 => LP_WDT::regs().int_st().read().lp_wdt().bit_is_set(),
+            _ => LP_WDT::regs().int_st().read().wdt().bit_is_set(),
+        }
     }
 
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
         self.set_write_protection(false);
-        LP_WDT::regs().wdtfeed().write(|w| w.wdt_feed().set_bit());
+
+        cfg_select! {
+            esp32p4 => LP_WDT::regs().feed().write(|w| w.feed().set_bit()),
+            _ => LP_WDT::regs().wdtfeed().write(|w| w.wdt_feed().set_bit()),
+        };
+
         self.set_write_protection(true);
     }
 
     fn set_write_protection(&mut self, enable: bool) {
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
-
-        LP_WDT::regs()
-            .wdtwprotect()
-            .write(|w| unsafe { w.bits(wkey) });
+        let reg = cfg_select! {
+            esp32p4 => LP_WDT::regs().wprotect(),
+            _ => LP_WDT::regs().wdtwprotect(),
+        };
+        reg.write(|w| unsafe { w.bits(wkey) });
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        let rtc_cntl = LP_WDT::regs();
-
         self.set_write_protection(false);
 
-        if !enable {
-            rtc_cntl.wdtconfig0().modify(|_, w| unsafe { w.bits(0) });
-        } else {
-            rtc_cntl
-                .wdtconfig0()
-                .write(|w| w.wdt_flashboot_mod_en().bit(false));
+        let regs = LP_WDT::regs();
+        let config0 = cfg_select! {
+            esp32p4 => regs.config0(),
+            _ => regs.wdtconfig0(),
+        };
 
-            rtc_cntl
-                .wdtconfig0()
-                .modify(|_, w| w.wdt_en().bit(enable).wdt_pause_in_slp().bit(enable));
-
-            // Apply default settings for WDT
-            unsafe {
-                rtc_cntl.wdtconfig0().modify(|_, w| {
-                    w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8);
-                    w.wdt_cpu_reset_length().bits(7);
-                    w.wdt_sys_reset_length().bits(7);
-                    w.wdt_stg1().bits(RwdtStageAction::Off as u8);
-                    w.wdt_stg2().bits(RwdtStageAction::Off as u8);
-                    w.wdt_stg3().bits(RwdtStageAction::Off as u8);
-                    w.wdt_en().set_bit()
-                });
+        config0.write(|w| unsafe {
+            if enable {
+                w.wdt_flashboot_mod_en().bit(false);
+                w.wdt_pause_in_slp().set_bit();
+                w.wdt_cpu_reset_length().bits(7);
+                w.wdt_sys_reset_length().bits(7);
+                w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8);
+                w.wdt_stg1().bits(RwdtStageAction::Off as u8);
+                w.wdt_stg2().bits(RwdtStageAction::Off as u8);
+                w.wdt_stg3().bits(RwdtStageAction::Off as u8);
+                w.wdt_en().set_bit()
+            } else {
+                w.bits(0)
             }
-        }
+        });
 
         self.set_write_protection(true);
     }
 
     /// Configure timeout value for the selected stage.
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
-        let rtc_cntl = LP_WDT::regs();
-
         let timeout_raw = crate::clock::us_to_rtc_ticks(timeout.as_micros()) as u32;
-        self.set_write_protection(false);
-
-        let config_reg = match stage {
-            RwdtStage::Stage0 => rtc_cntl.wdtconfig1(),
-            RwdtStage::Stage1 => rtc_cntl.wdtconfig2(),
-            RwdtStage::Stage2 => rtc_cntl.wdtconfig3(),
-            RwdtStage::Stage3 => rtc_cntl.wdtconfig4(),
-        };
 
         #[cfg(not(esp32))]
         let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
+
+        self.set_write_protection(false);
+
+        let regs = LP_WDT::regs();
+        let config_reg = cfg_select! {
+            esp32p4 => regs.config(stage as usize),
+            _ => regs.wdtconfig(stage as usize),
+        };
 
         config_reg.modify(|_, w| unsafe { w.hold().bits(timeout_raw) });
 
@@ -740,143 +722,12 @@ impl Rwdt {
     pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
         self.set_write_protection(false);
 
-        LP_WDT::regs().wdtconfig0().modify(|_, w| unsafe {
-            match stage {
-                RwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
-                RwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
-                RwdtStage::Stage2 => w.wdt_stg2().bits(action as u8),
-                RwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
-            }
-        });
-
-        self.set_write_protection(true);
-    }
-}
-
-/// ESP32-P4 LP_WDT implementation.
-/// P4 PAC uses config0/config1/.../feed/wprotect (no "wdt" prefix),
-/// and interrupt field is `lp_wdt` (not `wdt`).
-/// Ref: TRM v0.5 Ch 19 (Watchdog Timers)
-/// Write protection key: 0x50D8_3AA1 (same as other chips)
-#[cfg(esp32p4)]
-impl Rwdt {
-    /// Enable the watchdog timer instance.
-    pub fn enable(&mut self) {
-        self.set_enabled(true);
-    }
-
-    /// Disable the watchdog timer instance.
-    pub fn disable(&mut self) {
-        self.set_enabled(false);
-    }
-
-    /// Listen for interrupts on stage 0.
-    pub fn listen(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
-        self.set_write_protection(false);
-        rtc_cntl
-            .config0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::Interrupt as u8) });
-        // P4 PAC: int_ena().lp_wdt() (not .wdt())
-        rtc_cntl.int_ena().modify(|_, w| w.lp_wdt().set_bit());
-        self.set_write_protection(true);
-    }
-
-    /// Stop listening for interrupts on stage 0.
-    pub fn unlisten(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
-        self.set_write_protection(false);
-        rtc_cntl
-            .config0()
-            .modify(|_, w| unsafe { w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8) });
-        rtc_cntl.int_ena().modify(|_, w| w.lp_wdt().clear_bit());
-        self.set_write_protection(true);
-    }
-
-    /// Clear interrupt.
-    pub fn clear_interrupt(&mut self) {
-        self.set_write_protection(false);
-        LP_WDT::regs()
-            .int_clr()
-            .write(|w| w.lp_wdt().clear_bit_by_one());
-        self.set_write_protection(true);
-    }
-
-    /// Check if the interrupt is set.
-    pub fn is_interrupt_set(&self) -> bool {
-        LP_WDT::regs().int_st().read().lp_wdt().bit_is_set()
-    }
-
-    /// Feed the watchdog timer.
-    pub fn feed(&mut self) {
-        self.set_write_protection(false);
-        // P4 PAC: feed().feed() (not wdtfeed().wdt_feed())
-        LP_WDT::regs().feed().write(|w| w.feed().set_bit());
-        self.set_write_protection(true);
-    }
-
-    fn set_write_protection(&mut self, enable: bool) {
-        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
-        LP_WDT::regs().wprotect().write(|w| unsafe { w.bits(wkey) });
-    }
-
-    fn set_enabled(&mut self, enable: bool) {
-        let rtc_cntl = LP_WDT::regs();
-        self.set_write_protection(false);
-
-        if !enable {
-            rtc_cntl.config0().modify(|_, w| unsafe { w.bits(0) });
-        } else {
-            rtc_cntl
-                .config0()
-                .write(|w| w.wdt_flashboot_mod_en().bit(false));
-            rtc_cntl
-                .config0()
-                .modify(|_, w| w.wdt_en().bit(enable).wdt_pause_in_slp().bit(enable));
-            unsafe {
-                rtc_cntl.config0().modify(|_, w| {
-                    w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8);
-                    w.wdt_cpu_reset_length().bits(7);
-                    w.wdt_sys_reset_length().bits(7);
-                    w.wdt_stg1().bits(RwdtStageAction::Off as u8);
-                    w.wdt_stg2().bits(RwdtStageAction::Off as u8);
-                    w.wdt_stg3().bits(RwdtStageAction::Off as u8);
-                    w.wdt_en().set_bit()
-                });
-            }
-        }
-        self.set_write_protection(true);
-    }
-
-    /// Configure timeout value for the selected stage.
-    pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
-        let rtc_cntl = LP_WDT::regs();
-        let timeout_raw = crate::clock::us_to_rtc_ticks(timeout.as_micros()) as u32;
-        self.set_write_protection(false);
-
-        // P4 PAC: config1().wdt_stg0_hold(), config2().wdt_stg1_hold(), etc.
-        let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
-        match stage {
-            RwdtStage::Stage0 => rtc_cntl
-                .config1()
-                .modify(|_, w| unsafe { w.wdt_stg0_hold().bits(timeout_raw) }),
-            RwdtStage::Stage1 => rtc_cntl
-                .config2()
-                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
-            RwdtStage::Stage2 => rtc_cntl
-                .config3()
-                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
-            RwdtStage::Stage3 => rtc_cntl
-                .config4()
-                .modify(|_, w| unsafe { w.bits(timeout_raw) }),
+        let regs = LP_WDT::regs();
+        let cfg_reg = cfg_select! {
+            esp32p4 => regs.config0(),
+            _ => regs.wdtconfig0(),
         };
-        self.set_write_protection(true);
-    }
-
-    /// Set the action for a specific stage.
-    pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
-        self.set_write_protection(false);
-        LP_WDT::regs().config0().modify(|_, w| unsafe {
+        cfg_reg.modify(|_, w| unsafe {
             match stage {
                 RwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
                 RwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
@@ -884,13 +735,15 @@ impl Rwdt {
                 RwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
             }
         });
+
         self.set_write_protection(true);
     }
 }
 
 /// Super Watchdog
 #[cfg(swd)]
-pub struct Swd(());
+#[non_exhaustive]
+pub struct Swd;
 
 /// Super Watchdog driver
 #[cfg(swd)]
@@ -907,10 +760,13 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let wkey = if enable { 0u32 } else { 0x8F1D_312A };
-        #[cfg(any(esp32c6, esp32h2))]
-        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
+        let wkey = if enable {
+            0u32
+        } else if cfg!(any(esp32c2, esp32c3, esp32s2, esp32s3)) {
+            0x8F1D_312A
+        } else {
+            0x50D8_3AA1
+        };
 
         LP_WDT::regs()
             .swd_wprotect()
@@ -920,9 +776,11 @@ impl Swd {
     fn set_enabled(&mut self, enable: bool) {
         self.set_write_protection(false);
 
-        LP_WDT::regs()
-            .swd_conf()
-            .write(|w| w.swd_auto_feed_en().bit(!enable));
+        let reg = cfg_select! {
+            esp32p4 => LP_WDT::regs().swd_config(),
+            _ => LP_WDT::regs().swd_conf(),
+        };
+        reg.write(|w| w.swd_auto_feed_en().bit(!enable));
 
         self.set_write_protection(true);
     }
@@ -950,22 +808,14 @@ pub fn wakeup_cause() -> WakeupReason {
         return WakeupReason::NoSleep;
     }
 
-    cfg_select! {
-        esp32 => {
-            let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        }
-        soc_has_pmu => {
-            // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
-            let wakeup_cause_bits = crate::peripherals::PMU::regs()
-                .slp_wakeup_status0()
-                .read()
-                .wakeup_cause()
-                .bits();
-        }
-        _ => {
-            let wakeup_cause_bits = LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits();
-        }
-    }
+    let reg = cfg_select! {
+        soc_has_pmu => crate::peripherals::PMU::regs().slp_wakeup_status0(),
+        esp32 => LPWR::regs().wakeup_state(),
+        _ => LPWR::regs().slp_wakeup_cause(),
+    };
+
+    #[allow(clippy::unnecessary_cast)]
+    let wakeup_cause_bits = reg.read().wakeup_cause().bits() as u32;
 
     WakeupReason::from_bits_truncate(wakeup_cause_bits)
 }

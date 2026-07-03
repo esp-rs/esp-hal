@@ -50,16 +50,6 @@ pub enum WakeupLevel {
     High,
 }
 
-/// Errors that can occur when configuring RTC wake-up sources.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// The selected pin is not a valid RTC pin.
-    NotRtcPin,
-    /// The maximum number of wake-up sources has been exceeded.
-    TooManyWakeupSources,
-}
-
 #[procmacros::doc_replace]
 /// External wake-up source (Ext0).
 ///
