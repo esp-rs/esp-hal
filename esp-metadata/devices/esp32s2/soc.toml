@@ -13,6 +13,8 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 symbols = [
+    "swd",
+
     # ROM capabilities
     "rom_crc_le",
     "rom_md5_bsd",

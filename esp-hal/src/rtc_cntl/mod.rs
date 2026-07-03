@@ -768,7 +768,8 @@ impl Rwdt {
 
 /// Super Watchdog
 #[cfg(swd)]
-pub struct Swd(());
+#[non_exhaustive]
+pub struct Swd;
 
 /// Super Watchdog driver
 #[cfg(swd)]
@@ -785,10 +786,13 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        #[cfg(not(any(esp32c6, esp32h2)))]
-        let wkey = if enable { 0u32 } else { 0x8F1D_312A };
-        #[cfg(any(esp32c6, esp32h2))]
-        let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
+        let wkey = if enable {
+            0u32
+        } else if cfg!(any(esp32c2, esp32c3, esp32s2, esp32s3)) {
+            0x8F1D_312A
+        } else {
+            0x50D8_3AA1
+        };
 
         LP_WDT::regs()
             .swd_wprotect()
@@ -798,9 +802,11 @@ impl Swd {
     fn set_enabled(&mut self, enable: bool) {
         self.set_write_protection(false);
 
-        LP_WDT::regs()
-            .swd_conf()
-            .write(|w| w.swd_auto_feed_en().bit(!enable));
+        let reg = cfg_select! {
+            esp32p4 => LP_WDT::regs().swd_config(),
+            _ => LP_WDT::regs().swd_conf(),
+        };
+        reg.write(|w| w.swd_auto_feed_en().bit(!enable));
 
         self.set_write_protection(true);
     }
@@ -828,22 +834,14 @@ pub fn wakeup_cause() -> WakeupReason {
         return WakeupReason::NoSleep;
     }
 
-    cfg_select! {
-        esp32 => {
-            let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        }
-        soc_has_pmu => {
-            // C5/C6/C61/H2/P4: PMU.slp_wakeup_status0.wakeup_cause
-            let wakeup_cause_bits = crate::peripherals::PMU::regs()
-                .slp_wakeup_status0()
-                .read()
-                .wakeup_cause()
-                .bits();
-        }
-        _ => {
-            let wakeup_cause_bits = LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits();
-        }
-    }
+    let reg = cfg_select! {
+        soc_has_pmu => crate::peripherals::PMU::regs().slp_wakeup_status0(),
+        esp32 => LPWR::regs().wakeup_state(),
+        _ => LPWR::regs().slp_wakeup_cause(),
+    };
+
+    #[allow(clippy::unnecessary_cast)]
+    let wakeup_cause_bits = reg.read().wakeup_cause().bits() as u32;
 
     WakeupReason::from_bits_truncate(wakeup_cause_bits)
 }
