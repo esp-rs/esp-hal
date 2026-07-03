@@ -4624,11 +4624,12 @@ macro_rules! for_each_peripheral {
         = "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
         LPWR <= RTC_CNTL() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "MCPWM1 peripheral singleton"]
-        MCPWM1 <= MCPWM1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PCNT peripheral singleton"] PCNT <= PCNT() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MCPWM0 peripheral singleton"]
+        MCPWM0 <= MCPWM0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
+        PCNT <= PCNT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "PERI_BACKUP peripheral singleton"] PERI_BACKUP <= PERI_BACKUP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4749,6 +4750,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LCD_CAM(unstable)));
         _for_each_inner_peripheral!((LEDC(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
+        _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((MCPWM0(unstable)));
         _for_each_inner_peripheral!((MCPWM1(unstable)));
         _for_each_inner_peripheral!((PCNT(unstable)));
@@ -5022,12 +5024,13 @@ macro_rules! for_each_peripheral {
         = "LCD_CAM peripheral singleton"] LCD_CAM <= LCD_CAM() (unstable)), (@ peri_type
         #[doc = "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)), (@ peri_type
         #[doc = "LPWR peripheral singleton"] LPWR <= RTC_CNTL() (unstable)), (@ peri_type
-        #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)), (@
-        peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1() (unstable)),
-        (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT() (unstable)), (@
-        peri_type #[doc = "PERI_BACKUP peripheral singleton"] PERI_BACKUP <=
-        PERI_BACKUP() (unstable)), (@ peri_type #[doc = "RMT peripheral singleton"] RMT
-        <= RMT() (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <=
+        #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)), (@
+        peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)),
+        (@ peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1()
+        (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT()
+        (unstable)), (@ peri_type #[doc = "PERI_BACKUP peripheral singleton"] PERI_BACKUP
+        <= PERI_BACKUP() (unstable)), (@ peri_type #[doc = "RMT peripheral singleton"]
+        RMT <= RMT() (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <=
         RNG() (unstable)), (@ peri_type #[doc = "RSA peripheral singleton"] RSA <=
         RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "RTC_CNTL peripheral singleton"] RTC_CNTL <=
@@ -5094,7 +5097,7 @@ macro_rules! for_each_peripheral {
         (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
         (I2S1(unstable)), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
         (IO_MUX(unstable)), (LCD_CAM(unstable)), (LEDC(unstable)), (LPWR(unstable)),
-        (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)),
+        (RTC_TIMER(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)),
         (PERI_BACKUP(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
         (RTC_CNTL(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)),
         (SDHOST(unstable)), (SENS(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),

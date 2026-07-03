@@ -713,7 +713,7 @@ mod lp_timekeeping {
     fn init() -> Rtc<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        Rtc::new(peripherals.LPWR)
+        Rtc::new(peripherals.RTC_TIMER)
     }
 
     #[test]

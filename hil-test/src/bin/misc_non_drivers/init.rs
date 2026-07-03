@@ -106,7 +106,7 @@ mod tests {
     fn test_feeding_rtc_wdt() {
         let p = esp_hal::init(Config::default());
 
-        let mut rtc = Rtc::new(p.LPWR);
+        let mut rtc = Rtc::new(p.RTC_TIMER);
 
         rtc.rwdt
             .set_timeout(RwdtStage::Stage0, Duration::from_millis(500));

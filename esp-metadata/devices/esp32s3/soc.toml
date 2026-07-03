@@ -61,6 +61,7 @@ peripherals = [
     { name = "LCD_CAM" },
     { name = "LEDC" },
     { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "RTC_TIMER", pac = "RTC_CNTL" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "PCNT" },

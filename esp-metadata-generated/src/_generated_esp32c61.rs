@@ -3384,10 +3384,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LPPERI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_TIMER peripheral singleton"]
-        LP_TIMER <= LP_TIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_WDT peripheral singleton"]
+        LP_WDT <= LP_WDT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "MODEM_LPCON peripheral singleton"] MODEM_LPCON <= MODEM_LPCON() (unstable)));
@@ -3483,7 +3483,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_IO_MUX(unstable)));
         _for_each_inner_peripheral!((LP_PERI(unstable)));
         _for_each_inner_peripheral!((LP_TEE(unstable)));
-        _for_each_inner_peripheral!((LP_TIMER(unstable)));
+        _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((LP_WDT(unstable)));
         _for_each_inner_peripheral!((MEM_MONITOR(unstable)));
         _for_each_inner_peripheral!((MODEM_LPCON(unstable)));
@@ -3689,7 +3689,7 @@ macro_rules! for_each_peripheral {
         LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LPPERI() (unstable)), (@ peri_type #[doc =
         "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@ peri_type #[doc
-        = "LP_TIMER peripheral singleton"] LP_TIMER <= LP_TIMER() (unstable)), (@
+        = "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)), (@
         peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)),
         (@ peri_type #[doc = "MEM_MONITOR peripheral singleton"] MEM_MONITOR <=
         MEM_MONITOR() (unstable)), (@ peri_type #[doc =
@@ -3744,7 +3744,7 @@ macro_rules! for_each_peripheral {
         (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
         (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)),
         (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
-        (LP_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
+        (RTC_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
         (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
         (SLC(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),

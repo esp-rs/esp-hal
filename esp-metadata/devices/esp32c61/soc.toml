@@ -71,7 +71,7 @@ peripherals = [
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
     { name = "LP_TEE" },
-    { name = "LP_TIMER" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "MEM_MONITOR" },
     { name = "MODEM_LPCON" },

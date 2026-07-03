@@ -121,10 +121,11 @@ async fn main(spawner: Spawner) {
     let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
     let timg0 = TimerGroup::new(p.TIMG0);
 
+    let sleep = esp_rtos::sleep::configure(p.LPWR);
     esp_rtos::start_with_idle_hook(
         timg0.timer0,
         sw_int.software_interrupt0,
-        esp_rtos::auto_light_sleep(),
+        sleep.light_sleep_hook,
     );
 
     let boot_btn = cfg_select! {

@@ -69,7 +69,7 @@ peripherals = [
     { name = "LP_IO" },
     { name = "LP_PERI" },
     { name = "LP_TEE" },
-    { name = "LP_TIMER" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "LP_UART" },
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_CLKRST" },

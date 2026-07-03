@@ -67,8 +67,8 @@ and wake up when a task is ready to run. This can help reduce power consumption.
 Because waking up from automatic light sleep can increase latency, the minimum expected idle time
 can be configured using `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US`.
 
-To enable automatic light sleep, call the [`auto_light_sleep`] function and pass the
-idle hook it returns to [`start_with_idle_hook`].
+To enable automatic light sleep, call the [`sleep::configure`] function and pass the
+idle hook from the returned [`Sleep`](sleep::Sleep) object to [`start_with_idle_hook`].
 
 To prevent the CPU from entering light sleep, take a [`WakeLock`]. Drop the lock when you are done
 with the critical code.
@@ -115,10 +115,12 @@ let p = esp_hal::init(esp_hal::Config::default());
 let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 let timg0 = TimerGroup::new(p.TIMG0);
 
+let sleep = esp_rtos::sleep::configure(p.LPWR);
+
 esp_rtos::start_with_idle_hook(
     timg0.timer0,
     sw_int.software_interrupt0,
-    esp_rtos::auto_light_sleep(),
+    sleep.light_sleep_hook,
 );
 # }
 ```
@@ -146,10 +148,10 @@ mod fmt;
 
 #[cfg(feature = "esp-radio")]
 mod esp_radio;
-#[cfg(sleep_light_sleep)]
-mod light_sleep;
 mod run_queue;
 mod scheduler;
+#[cfg(sleep_light_sleep)]
+pub mod sleep;
 mod syscall;
 mod task;
 mod timer;
@@ -182,8 +184,6 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::Duration,
 };
-#[cfg(sleep_light_sleep)]
-pub use light_sleep::auto_light_sleep;
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::main;

@@ -60,6 +60,7 @@ peripherals = [
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "RTC_TIMER", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },

@@ -14,12 +14,12 @@ mod timer;
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
+/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
 /// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
-/// let mut rtc = Rtc::new(peripherals.LPWR);
+/// let mut lpwr = LowPower::new(peripherals.LPWR);
 ///
 /// let reason = reset_reason(Cpu::ProCpu);
 /// let wake_reason = wakeup_cause();
@@ -28,7 +28,7 @@ mod timer;
 ///
 /// let timer = TimerWakeupSource::new(Duration::from_secs(5));
 /// delay.delay_millis(100);
-/// rtc.sleep_deep(&[&timer]);
+/// lpwr.sleep_deep(&[&timer]);
 ///
 /// # {after_snippet}
 /// ```

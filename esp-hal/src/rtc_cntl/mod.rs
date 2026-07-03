@@ -27,7 +27,7 @@
 # {before_snippet}
 # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 
-let rtc = Rtc::new(peripherals.LPWR);
+let rtc = Rtc::new(peripherals.RTC_TIMER);
 let delay = Delay::new();
 
 loop {
@@ -54,7 +54,7 @@ loop {
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 let mut delay = Delay::new();
-let mut rtc = Rtc::new(peripherals.LPWR);
+let mut rtc = Rtc::new(peripherals.RTC_TIMER);
 
 rtc.set_interrupt_handler(interrupt_handler);
 rtc.rwdt
@@ -95,7 +95,7 @@ fn interrupt_handler() {
 # {before_snippet}
 # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 
-let rtc = Rtc::new(peripherals.LPWR);
+let rtc = Rtc::new(peripherals.RTC_TIMER);
 let delay = Delay::new();
 
 loop {
@@ -119,7 +119,7 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripherals::Interrupt,
 };
-use crate::{peripherals::LPWR, system::Cpu, time::Duration};
+use crate::{peripherals::RTC_TIMER, system::Cpu, time::Duration};
 // only include sleep where it's been implemented
 #[cfg(sleep_driver_supported)]
 pub mod sleep;
@@ -139,13 +139,11 @@ pub(crate) mod rtc;
 cfg_select! {
     soc_has_lp_wdt => {
         use crate::peripherals::LP_WDT;
-        #[cfg(lp_timer_driver_supported)]
-        use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
     }
     _ => {
+        use crate::peripherals::LPWR;
         use crate::peripherals::LPWR as LP_WDT;
-        use crate::peripherals::LPWR as LP_TIMER;
         use crate::peripherals::LPWR as LP_AON;
     }
 }
@@ -221,9 +219,9 @@ impl defmt::Format for WakeupReason {
     }
 }
 
-/// Low-power Management
+/// RTC clock.
 pub struct Rtc<'d> {
-    _inner: LPWR<'d>,
+    rtc_timer: RTC_TIMER<'d>,
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     /// Super Watchdog
@@ -235,9 +233,9 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rtc_cntl: LPWR<'d>) -> Self {
+    pub fn new(rtc_timer: RTC_TIMER<'d>) -> Self {
         Self {
-            _inner: rtc_cntl,
+            rtc_timer,
             rwdt: Rwdt,
             #[cfg(swd)]
             swd: Swd,
@@ -247,7 +245,7 @@ impl<'d> Rtc<'d> {
     /// Get the time since boot in the raw register units.
     #[cfg(lp_timer_driver_supported)]
     fn time_since_boot_raw(&self) -> u64 {
-        let rtc_cntl = LP_TIMER::regs();
+        let rtc = self.rtc_timer.register_block();
 
         // Load counter value
         cfg_select! {
@@ -260,39 +258,33 @@ impl<'d> Rtc<'d> {
                     10
                 };
                 for _ in 0..UPDATE_COUNT {
-                    rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                    rtc.time_update().write(|w| w.time_update().set_bit());
                     crate::rom::ets_delay_us(1);
                 }
             }
             _ => {
-                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+                rtc.update().write(|w| w.main_timer_update().set_bit());
             }
         }
 
         // Read counter value
         cfg_select! {
             esp32 => {
-                while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
+                while rtc.time_update().read().time_valid().bit_is_clear() {
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
                 }
 
-                rtc_cntl.int_clr().write(|w| w.time_valid().clear_bit_by_one());
-
-                let h = rtc_cntl.time1().read().time_hi().bits();
-                let l = rtc_cntl.time0().read().time_lo().bits();
+                let h = rtc.time1().read().time_hi().bits();
+                let l = rtc.time0().read().time_lo().bits();
             }
             any(esp32s2, esp32s3, esp32c2, esp32c3) => {
-                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
-                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
+                let h = rtc.time_high0().read().timer_value0_high().bits();
+                let l = rtc.time_low0().read().timer_value0_low().bits();
             }
             _ => {
-                let h = rtc_cntl
-                    .main_buf0_high()
-                    .read()
-                    .main_timer_buf0_high()
-                    .bits();
-                let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
+                let h = rtc.main_buf0_high().read().main_timer_buf0_high().bits();
+                let l = rtc.main_buf0_low().read().main_timer_buf0_low().bits();
             }
         }
 
@@ -376,7 +368,7 @@ impl<'d> Rtc<'d> {
     ///
     /// static TZ: TimeZone = tz::get!("America/New_York");
     ///
-    /// let rtc = Rtc::new(peripherals.LPWR);
+    /// let rtc = Rtc::new(peripherals.RTC_TIMER);
     /// let now = Timestamp::from_microsecond(rtc.current_time_us() as i64)?;
     /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
     /// # {after_snippet}
@@ -416,78 +408,6 @@ impl<'d> Rtc<'d> {
             self.set_boot_time_us(u64::MAX - rtc_time_us + current_time_us)
         } else {
             self.set_boot_time_us(current_time_us - rtc_time_us)
-        }
-    }
-
-    /// Enter deep sleep and wake with the provided `wake_sources`.
-    ///
-    /// In Deep-sleep mode, the CPUs, most of the RAM, and all digital
-    /// peripherals that are clocked from APB_CLK are powered off.
-    ///
-    /// You can use the [`#[esp_hal::ram(persistent)]`][procmacros::ram]
-    /// attribute to persist a variable though deep sleep.
-    #[cfg(sleep_deep_sleep)]
-    pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
-        let config = RtcSleepConfig::deep();
-        self.sleep(&config, wake_sources);
-        unreachable!();
-    }
-
-    /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(sleep_light_sleep)]
-    pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
-        let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources);
-    }
-
-    /// Enter sleep with the provided `config` and wake with the provided
-    /// `wake_sources`.
-    #[cfg(sleep_driver_supported)]
-    #[crate::ram]
-    pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
-        let mut config = *config;
-        let mut wakeup_triggers = WakeTriggers::default();
-        for wake_source in wake_sources {
-            wake_source.apply(self, &mut wakeup_triggers, &mut config)
-        }
-
-        config.apply();
-
-        sleep_uart_prepare();
-
-        // Latch the systimer value *before* sleeping. The systimer keeps running during
-        // the sleep enter/exit sequences, so we must not advance from the post-wake
-        // value (that would count the enter/exit time twice). Instead we set an absolute
-        // target of `before + slept`, measured by the always-running LP timer.
-        let before_ticks = crate::time::implem::raw_counter();
-        let before = self.time_since_boot_raw();
-
-        let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
-        config.start_sleep(wakeup_triggers);
-
-        if config.is_deep_sleep() {
-            // Because RTC is in a slower clock domain than the CPU, it
-            // can take several CPU cycles for the sleep mode to start.
-            loop {
-                core::hint::spin_loop();
-            }
-        }
-
-        config.finish_sleep();
-
-        let after = self.time_since_boot_raw();
-
-        let slept_us = crate::clock::rtc_ticks_to_us(after.wrapping_sub(before));
-        let slept_ticks = crate::time::implem::us_to_ticks(slept_us);
-
-        unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
-        sleep_uart_resume();
-
-        // Unlike deep sleep, light sleep does not reset the chip, so `wakeup_cause` cannot rely on
-        // the reset reason to tell whether a wakeup occurred.
-        // https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/esp_hw_support/sleep_modes.c#L2158
-        if !config.deep_slp() {
-            LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
         }
     }
 
@@ -913,29 +833,5 @@ impl Default for WakeLock {
 impl Drop for WakeLock {
     fn drop(&mut self) {
         Self::release();
-    }
-}
-
-#[cfg(sleep_driver_supported)]
-fn sleep_uart_prepare() {
-    use crate::uart::Instance;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
-            unsafe {
-                crate::peripherals::$inst::steal().info().suspend_for_sleep();
-            }
-        };
-    }
-}
-
-#[cfg(sleep_driver_supported)]
-fn sleep_uart_resume() {
-    use crate::uart::Instance;
-    for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
-            unsafe {
-                crate::peripherals::$inst::steal().info().resume_from_sleep();
-            }
-        };
     }
 }
