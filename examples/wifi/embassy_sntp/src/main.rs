@@ -89,7 +89,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-    let rtc = Rtc::new(peripherals.LPWR);
+    let rtc = Rtc::new(peripherals.RTC_TIMER);
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 

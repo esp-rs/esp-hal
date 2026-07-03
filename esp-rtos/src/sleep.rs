@@ -1,11 +1,12 @@
+//! Power management utilities.
+
 #[cfg(multi_core)]
 use esp_hal::{peripherals::CPU_CTRL, system::Cpu, system::CpuControl};
 use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
-        Rtc,
         WakeLock,
-        sleep::{GpioWakeupSource, TimerWakeupSource},
+        sleep::{GpioWakeupSource, LowPower, TimerWakeupSource, WakeSource},
     },
 };
 
@@ -16,10 +17,37 @@ use crate::{run_queue::RunSchedulerOn, task};
 const LIGHT_SLEEP_MIN_US: u64 =
     esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US") as u64;
 
-/// Builds an idle hook that automatically enters light sleep when the system is
-/// idle.
+/// Sleep handles.
+pub struct Sleep {
+    /// The handle that allows you to enter deep sleep.
+    #[cfg(sleep_deep_sleep)]
+    pub deep_sleep: DeepSleep,
+
+    /// The idle hook to use for light sleep.
+    pub light_sleep_hook: IdleFn,
+}
+
+/// A handle you can use to enter deep sleep.
+#[cfg(sleep_deep_sleep)]
+pub struct DeepSleep {
+    lpwr: LPWR<'static>,
+}
+
+#[cfg(sleep_deep_sleep)]
+impl DeepSleep {
+    /// Puts the system into deep sleep, waking up from the specified wake sources.
+    pub fn deep_sleep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
+        let mut lpwr = LowPower::new(self.lpwr.reborrow());
+        lpwr.sleep_deep(wake_sources)
+    }
+}
+
+/// Creates resources for managing light/deep sleep with `esp-rtos`.
 ///
-/// Pass the returned hook to [`start_with_idle_hook`].
+/// The returned [`Sleep`] struct contains the idle hook and a deep sleep handle,
+/// if deep sleep is supported.
+///
+/// Pass the idle hook to [`start_with_idle_hook`] to enable automatic light sleep.
 ///
 /// Each time the scheduler runs out of ready tasks, the hook (with interrupts
 /// disabled) checks that:
@@ -28,7 +56,7 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// - there is a finite next scheduled wakeup, and
 /// - that wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
-/// If all hold, it calls [`Rtc::light_sleep`] for the next wakeup; otherwise
+/// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup; otherwise
 /// it falls back to `WFI`. The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
@@ -39,9 +67,12 @@ const LIGHT_SLEEP_MIN_US: u64 =
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
-/// [`Rtc::light_sleep`]: esp_hal::rtc_cntl::Rtc::light_sleep
-pub fn auto_light_sleep() -> IdleFn {
-    auto_light_sleep_hook
+pub fn configure(lpwr: LPWR<'static>) -> Sleep {
+    Sleep {
+        #[cfg(sleep_deep_sleep)]
+        deep_sleep: DeepSleep { lpwr },
+        light_sleep_hook: auto_light_sleep_hook,
+    }
 }
 
 extern "C" fn auto_light_sleep_hook() -> ! {
@@ -110,7 +141,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             }
 
             unsafe {
-                let mut rtc = Rtc::new(LPWR::steal());
+                let mut rtc = LowPower::new(LPWR::steal());
                 let timer =
                     TimerWakeupSource::new(esp_hal::time::Duration::from_micros(sleep_duration));
                 let gpio = GpioWakeupSource::new();

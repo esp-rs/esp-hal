@@ -11,7 +11,11 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    rtc_cntl::{self, Rtc, sleep::RtcSleepConfig},
+    rtc_cntl::{
+        self,
+        Rtc,
+        sleep::{LowPower, RtcSleepConfig},
+    },
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -45,7 +49,8 @@ async fn main(_spawner: Spawner) {
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut rtc = Rtc::new(peripherals.RTC_TIMER);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     let boot_count = unsafe { BOOT_COUNT };
     let pre_sleep_us = unsafe { PRE_SLEEP_US };
@@ -117,5 +122,5 @@ async fn main(_spawner: Spawner) {
 
     delay.delay_millis(100);
 
-    rtc.sleep(&config, &[&timer]);
+    lpwr.sleep(&config, &[&timer]);
 }

@@ -75,7 +75,7 @@ peripherals = [
     { name = "LP_AON", pac = "LP_SYS" },
     { name = "LP_AON_CLKRST" },
     { name = "LP_SYS" },
-    { name = "LP_TIMER" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
     { name = "PMU" },

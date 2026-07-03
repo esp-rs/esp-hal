@@ -19,10 +19,9 @@ use esp_hal::{
     gpio::RtcPinWithResistors,
     main,
     rtc_cntl::{
-        Rtc,
         SocResetReason,
         reset_reason,
-        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
+        sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
     },
     system::Cpu,
@@ -36,7 +35,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     cfg_select! {
         feature = "esp32c6" => {
@@ -74,5 +73,5 @@ fn main() -> ! {
     let rtcio = Ext1WakeupSource::new(wakeup_pins);
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer, &rtcio]);
+    lpwr.sleep_deep(&[&timer, &rtcio]);
 }

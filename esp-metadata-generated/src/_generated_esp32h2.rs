@@ -4241,7 +4241,7 @@ macro_rules! for_each_peripheral {
         = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LP_PERI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "LP_TIMER peripheral singleton"] LP_TIMER <= LP_TIMER() (unstable)));
+        = "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_WDT peripheral singleton"]
         LP_WDT <= LP_WDT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)));
@@ -4350,7 +4350,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_APM0(unstable)));
         _for_each_inner_peripheral!((LP_CLKRST(unstable)));
         _for_each_inner_peripheral!((LP_PERI(unstable)));
-        _for_each_inner_peripheral!((LP_TIMER(unstable)));
+        _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((LP_WDT(unstable)));
         _for_each_inner_peripheral!((MCPWM0(unstable)));
         _for_each_inner_peripheral!((MEM_MONITOR(unstable)));
@@ -4528,7 +4528,7 @@ macro_rules! for_each_peripheral {
         LP_APM0 <= LP_APM0() (unstable)), (@ peri_type #[doc =
         "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)), (@
         peri_type #[doc = "LP_PERI peripheral singleton"] LP_PERI <= LP_PERI()
-        (unstable)), (@ peri_type #[doc = "LP_TIMER peripheral singleton"] LP_TIMER <=
+        (unstable)), (@ peri_type #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <=
         LP_TIMER() (unstable)), (@ peri_type #[doc = "LP_WDT peripheral singleton"]
         LP_WDT <= LP_WDT() (unstable)), (@ peri_type #[doc =
         "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)), (@ peri_type #[doc
@@ -4591,7 +4591,7 @@ macro_rules! for_each_peripheral {
         (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
         (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)), (LP_ANA(unstable)),
         (LP_AON(unstable)), (LP_APM(unstable)), (LP_APM0(unstable)),
-        (LP_CLKRST(unstable)), (LP_PERI(unstable)), (LP_TIMER(unstable)),
+        (LP_CLKRST(unstable)), (LP_PERI(unstable)), (RTC_TIMER(unstable)),
         (LP_WDT(unstable)), (MCPWM0(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (OTP_DEBUG(unstable)),
         (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),

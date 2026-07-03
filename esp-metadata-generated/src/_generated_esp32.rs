@@ -4252,45 +4252,46 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
         LPWR <= RTC_CNTL() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RTC_I2C peripheral singleton"] RTC_I2C <= RTC_I2C() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "RTC_IO peripheral singleton"]
-        RTC_IO <= RTC_IO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SENS peripheral singleton"]
-        SENS <= SENS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SHA peripheral singleton"] SHA <= SHA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SLC peripheral singleton"] SLC
-        <= SLC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SLCHOST peripheral singleton"] SLCHOST <= SLCHOST() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI0 peripheral singleton"]
-        SPI0 <= SPI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI2 peripheral singleton"]
-        SPI2 <= SPI2(SPI2_DMA : { bind_dma_interrupt, enable_dma_interrupt,
-        disable_dma_interrupt }, SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
+        "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RTC_I2C peripheral singleton"]
+        RTC_I2C <= RTC_I2C() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "RTC_IO peripheral singleton"] RTC_IO <= RTC_IO() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SDHOST peripheral singleton"]
+        SDHOST <= SDHOST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SENS peripheral singleton"] SENS <= SENS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
+        <= SHA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SLC peripheral singleton"] SLC <= SLC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SLCHOST peripheral singleton"]
+        SLCHOST <= SLCHOST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI1 peripheral singleton"]
+        SPI1 <= SPI1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2_DMA : { bind_dma_interrupt,
+        enable_dma_interrupt, disable_dma_interrupt }, SPI2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI3 peripheral singleton"]
+        SPI3 <= SPI3(SPI3_DMA : { bind_dma_interrupt, enable_dma_interrupt,
+        disable_dma_interrupt }, SPI3 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SPI3 peripheral singleton"] SPI3 <= SPI3(SPI3_DMA : { bind_dma_interrupt,
-        enable_dma_interrupt, disable_dma_interrupt }, SPI3 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
-        TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TWAI0 peripheral singleton"]
-        TWAI0 <= TWAI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
-        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
+        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TWAI0 peripheral singleton"] TWAI0 <= TWAI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
+        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
+        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
-        UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UHCI1 peripheral singleton"] UHCI1 <= UHCI1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
-        WIFI <= WIFI(WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
-        disable_mac_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART2 peripheral singleton"]
+        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI1 peripheral singleton"]
+        UHCI1 <= UHCI1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "WIFI peripheral singleton"] WIFI <= WIFI(WIFI_MAC : { bind_mac_interrupt,
+        enable_mac_interrupt, disable_mac_interrupt }))); _for_each_inner_peripheral!((@
+        peri_type #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC2 peripheral singleton"]
         ADC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "BT peripheral singleton"] BT <= virtual(BT_BB : { bind_bb_interrupt,
@@ -4353,6 +4354,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((RSA(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
+        _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((RTC_I2C(unstable)));
         _for_each_inner_peripheral!((RTC_IO(unstable)));
         _for_each_inner_peripheral!((SDHOST(unstable)));
@@ -4590,19 +4592,21 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "RSA peripheral singleton"] RSA <= RSA(RSA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <= RTC_CNTL()
-        (unstable)), (@ peri_type #[doc = "RTC_I2C peripheral singleton"] RTC_I2C <=
-        RTC_I2C() (unstable)), (@ peri_type #[doc = "RTC_IO peripheral singleton"] RTC_IO
-        <= RTC_IO() (unstable)), (@ peri_type #[doc = "SDHOST peripheral singleton"]
-        SDHOST <= SDHOST() (unstable)), (@ peri_type #[doc = "SENS peripheral singleton"]
-        SENS <= SENS() (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA
-        <= SHA() (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <=
-        SLC() (unstable)), (@ peri_type #[doc = "SLCHOST peripheral singleton"] SLCHOST
-        <= SLCHOST() (unstable)), (@ peri_type #[doc = "SPI0 peripheral singleton"] SPI0
-        <= SPI0() (unstable)), (@ peri_type #[doc = "SPI1 peripheral singleton"] SPI1 <=
-        SPI1() (unstable)), (@ peri_type #[doc = "SPI2 peripheral singleton"] SPI2 <=
-        SPI2(SPI2_DMA : { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt
-        }, SPI2 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        })), (@ peri_type #[doc = "SPI3 peripheral singleton"] SPI3 <= SPI3(SPI3_DMA : {
+        (unstable)), (@ peri_type #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <=
+        RTC_CNTL() (unstable)), (@ peri_type #[doc = "RTC_I2C peripheral singleton"]
+        RTC_I2C <= RTC_I2C() (unstable)), (@ peri_type #[doc =
+        "RTC_IO peripheral singleton"] RTC_IO <= RTC_IO() (unstable)), (@ peri_type #[doc
+        = "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type
+        #[doc = "SENS peripheral singleton"] SENS <= SENS() (unstable)), (@ peri_type
+        #[doc = "SHA peripheral singleton"] SHA <= SHA() (unstable)), (@ peri_type #[doc
+        = "SLC peripheral singleton"] SLC <= SLC() (unstable)), (@ peri_type #[doc =
+        "SLCHOST peripheral singleton"] SLCHOST <= SLCHOST() (unstable)), (@ peri_type
+        #[doc = "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)), (@ peri_type
+        #[doc = "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)), (@ peri_type
+        #[doc = "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2_DMA : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }, SPI2 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "SPI3 peripheral singleton"] SPI3 <= SPI3(SPI3_DMA : {
         bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }, SPI3 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)), (@
@@ -4644,16 +4648,17 @@ macro_rules! for_each_peripheral {
         (GPIO_SD(unstable)), (HINF(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
         (I2S1(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
         (MCPWM1(unstable)), (NRX(unstable)), (PCNT(unstable)), (RMT(unstable)),
-        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_I2C(unstable)),
-        (RTC_IO(unstable)), (SDHOST(unstable)), (SENS(unstable)), (SHA(unstable)),
-        (SLC(unstable)), (SLCHOST(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2),
-        (SPI3), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)), (UART0),
-        (UART1), (UART2), (UHCI0(unstable)), (UHCI1(unstable)), (WIFI), (ADC1(unstable)),
-        (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (DAC1(unstable)),
-        (DAC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
-        (TOUCH(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0,
-        SpiDmaChannel), (I2S0, I2s0, 0, I2sDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel),
-        (I2S1, I2s1, 1, I2sDmaChannel)));
+        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_TIMER(unstable)),
+        (RTC_I2C(unstable)), (RTC_IO(unstable)), (SDHOST(unstable)), (SENS(unstable)),
+        (SHA(unstable)), (SLC(unstable)), (SLCHOST(unstable)), (SPI0(unstable)),
+        (SPI1(unstable)), (SPI2), (SPI3), (TIMG0(unstable)), (TIMG1(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UART2), (UHCI0(unstable)),
+        (UHCI1(unstable)), (WIFI), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
+        (CPU_CTRL(unstable)), (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
+        (PSRAM(unstable)), (SW_INTERRUPT(unstable)), (TOUCH(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, SpiDmaChannel), (I2S0,
+        I2s0, 0, I2sDmaChannel), (SPI3, Spi3, 1, SpiDmaChannel), (I2S1, I2s1, 1,
+        I2sDmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

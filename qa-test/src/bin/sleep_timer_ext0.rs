@@ -14,10 +14,9 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
     rtc_cntl::{
-        Rtc,
         SocResetReason,
         reset_reason,
-        sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
+        sleep::{Ext0WakeupSource, LowPower, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
     },
     system::Cpu,
@@ -31,7 +30,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     let mut pin4 = peripherals.GPIO4;
     let ext0_pin = Input::new(
@@ -53,5 +52,5 @@ fn main() -> ! {
     let ext0 = Ext0WakeupSource::new(pin4, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer, &ext0]);
+    lpwr.sleep_deep(&[&timer, &ext0]);
 }

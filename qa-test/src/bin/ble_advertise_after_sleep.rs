@@ -18,7 +18,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     interrupt::software::SoftwareInterruptControl,
-    rtc_cntl::{Rtc, sleep::TimerWakeupSource},
+    rtc_cntl::sleep::{LowPower, TimerWakeupSource},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -65,7 +65,7 @@ async fn main(_s: Spawner) {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     let sleep_config = esp_hal::rtc_cntl::sleep::RtcSleepConfig::default();
     let timer = TimerWakeupSource::new(esp_hal::time::Duration::from_secs(SLEEP_SECS));
@@ -110,7 +110,7 @@ async fn main(_s: Spawner) {
             Timer::after(Duration::from_millis(200)).await;
 
             info!("[iter {iteration}] entering light sleep for {SLEEP_SECS}s");
-            rtc.sleep(&sleep_config, &[&timer]);
+            lpwr.sleep(&sleep_config, &[&timer]);
 
             println!(
                 "[iter {iteration}] woke up - scan for \"TrouBLE\" now: on an affected C6 it will \

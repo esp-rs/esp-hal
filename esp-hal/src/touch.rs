@@ -286,7 +286,7 @@ impl<'d> Touch<'d, Continuous, Async> {
     /// # {before_snippet}
     /// # use esp_hal::rtc_cntl::Rtc;
     /// # use esp_hal::touch::{Touch, TouchConfig};
-    /// let mut rtc = Rtc::new(peripherals.LPWR);
+    /// let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     /// let touch = Touch::async_mode(peripherals.TOUCH, &mut rtc, None);
     /// # {after_snippet}
     /// ```

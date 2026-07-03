@@ -1,6 +1,6 @@
 use super::TimerWakeupSource;
 use crate::{
-    peripherals::LPWR,
+    peripherals::RTC_TIMER,
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers},
 };
 
@@ -16,15 +16,15 @@ impl WakeSource for TimerWakeupSource {
         let time_in_ticks = now.wrapping_add(ticks);
 
         unsafe {
-            LPWR::regs()
+            RTC_TIMER::regs()
                 .int_clr()
                 .write(|w| w.main_timer().clear_bit_by_one());
 
-            LPWR::regs()
+            RTC_TIMER::regs()
                 .slp_timer0()
                 .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
 
-            LPWR::regs().slp_timer1().write(|w| {
+            RTC_TIMER::regs().slp_timer1().write(|w| {
                 w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
                 w.main_timer_alarm_en().set_bit()
             });

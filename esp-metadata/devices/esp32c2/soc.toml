@@ -50,6 +50,7 @@ peripherals = [
     { name = "LEDC" },
     { name = "RNG" },
     { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "RTC_TIMER", pac = "RTC_CNTL" },
     { name = "MODEM_CLKRST" },
     { name = "SENSITIVE" },
     { name = "SHA", interrupts = { peri = "SHA" } },

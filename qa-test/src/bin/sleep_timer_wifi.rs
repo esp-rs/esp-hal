@@ -13,7 +13,12 @@ use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
     main,
     ram,
-    rtc_cntl::{Rtc, SocResetReason, reset_reason, sleep::TimerWakeupSource, wakeup_cause},
+    rtc_cntl::{
+        SocResetReason,
+        reset_reason,
+        sleep::{LowPower, TimerWakeupSource},
+        wakeup_cause,
+    },
     system::Cpu,
     time::Duration,
     timer::timg::TimerGroup,
@@ -41,7 +46,7 @@ async fn main(_spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let delay = Delay::new();
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -75,5 +80,5 @@ async fn main(_spawner: Spawner) -> ! {
     let timer = TimerWakeupSource::new(Duration::from_secs(5));
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer]);
+    lpwr.sleep_deep(&[&timer]);
 }

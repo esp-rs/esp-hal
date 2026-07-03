@@ -59,7 +59,7 @@ peripherals = [
     { name = "LP_APM0" },
     { name = "LP_CLKRST" },
     { name = "LP_PERI" },
-    { name = "LP_TIMER" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MEM_MONITOR" },

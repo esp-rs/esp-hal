@@ -3711,6 +3711,8 @@ macro_rules! for_each_peripheral {
         "RNG peripheral singleton"] RNG <= RNG() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
         LPWR <= RTC_CNTL() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "MODEM_CLKRST peripheral singleton"] MODEM_CLKRST <= MODEM_CLKRST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "SENSITIVE peripheral singleton"] SENSITIVE <= SENSITIVE() (unstable)));
@@ -3773,6 +3775,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LEDC(unstable)));
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
+        _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((MODEM_CLKRST(unstable)));
         _for_each_inner_peripheral!((SENSITIVE(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
@@ -3909,9 +3912,11 @@ macro_rules! for_each_peripheral {
         = "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)), (@ peri_type #[doc =
         "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@ peri_type #[doc =
         "LPWR peripheral singleton"] LPWR <= RTC_CNTL() (unstable)), (@ peri_type #[doc =
-        "MODEM_CLKRST peripheral singleton"] MODEM_CLKRST <= MODEM_CLKRST() (unstable)),
-        (@ peri_type #[doc = "SENSITIVE peripheral singleton"] SENSITIVE <= SENSITIVE()
-        (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
+        "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)), (@
+        peri_type #[doc = "MODEM_CLKRST peripheral singleton"] MODEM_CLKRST <=
+        MODEM_CLKRST() (unstable)), (@ peri_type #[doc =
+        "SENSITIVE peripheral singleton"] SENSITIVE <= SENSITIVE() (unstable)), (@
+        peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SPI0 peripheral singleton"] SPI0 <= SPI0()
         (unstable)), (@ peri_type #[doc = "SPI1 peripheral singleton"] SPI1 <= SPI1()
@@ -3944,13 +3949,14 @@ macro_rules! for_each_peripheral {
         (BB(unstable)), (ASSIST_DEBUG(unstable)), (DMA(unstable)), (ECC(unstable)),
         (EXTMEM(unstable)), (GPIO(unstable)), (I2C_ANA_MST(unstable)), (I2C0),
         (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
-        (RNG(unstable)), (LPWR(unstable)), (MODEM_CLKRST(unstable)),
-        (SENSITIVE(unstable)), (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)),
-        (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0),
-        (UART1), (XTS_AES(unstable)), (ADC1(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)),
-        (WIFI))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0,
-        AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel)));
+        (RNG(unstable)), (LPWR(unstable)), (RTC_TIMER(unstable)),
+        (MODEM_CLKRST(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
+        (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0), (UART1), (XTS_AES(unstable)),
+        (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI)));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, AhbGdmaChannel), (SHA,
+        Sha, 7, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

@@ -758,7 +758,7 @@ pub fn init(config: Config) -> Peripherals {
     crate::clock::init(config.clock_config());
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
+    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());
 
     #[cfg(sleep_driver_supported)]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
