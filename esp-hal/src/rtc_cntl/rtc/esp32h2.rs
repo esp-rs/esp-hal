@@ -2,10 +2,7 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{PCR, PMU},
-    soc::{
-        clocks::{ClockConfig, ClockTree, CpuClkConfig, HpRootClkConfig},
-        regi2c,
-    },
+    soc::{clocks::ClockConfig, regi2c},
 };
 
 pub(crate) fn init(_config: &ClockConfig) {
@@ -196,35 +193,4 @@ bitfield::bitfield! {
     pub bool, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
     pub bool, dig_pause_wdt  , set_dig_pause_wdt  : 28;
     pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    /// The clock from which CPU clock is derived
-    old_hp_root_clk: Option<HpRootClkConfig>,
-
-    /// CPU divider
-    old_cpu_divider: Option<CpuClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        let old_hp_root_clk = clocks.hp_root_clk();
-        let old_cpu_divider = clocks.cpu_clk();
-
-        SavedClockConfig {
-            old_hp_root_clk,
-            old_cpu_divider,
-        }
-    }
-
-    // rtc_clk_cpu_freq_set_config
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old_hp_root_clk) = self.old_hp_root_clk {
-            crate::soc::clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
-        }
-        if let Some(old_cpu_divider) = self.old_cpu_divider {
-            crate::soc::clocks::configure_cpu_clk(clocks, old_cpu_divider);
-        }
-    }
 }

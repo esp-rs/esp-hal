@@ -3,7 +3,7 @@ use strum::FromRepr;
 use crate::{
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
     soc::{
-        clocks::{ClockConfig, ClockTree, HpRootClkConfig, LpSlowClkConfig},
+        clocks::{ClockConfig, LpSlowClkConfig},
         regi2c,
     },
 };
@@ -1127,25 +1127,4 @@ pub enum SocResetReason {
     PowerGlitch   = 0x19,
     /// CPU lockup reset
     CpuLockup     = 0x1A,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    /// The clock from which CPU clock is derived
-    old_hp_root_clk: Option<HpRootClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        let old_hp_root_clk = clocks.hp_root_clk();
-
-        SavedClockConfig { old_hp_root_clk }
-    }
-
-    // rtc_clk_cpu_freq_set_config
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old_hp_root_clk) = self.old_hp_root_clk {
-            crate::soc::clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
-        }
-    }
 }

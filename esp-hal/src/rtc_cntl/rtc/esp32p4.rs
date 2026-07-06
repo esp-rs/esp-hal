@@ -2,10 +2,7 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::PMU,
-    soc::{
-        clocks::{self, ClockConfig, ClockTree, CpuRootClkConfig},
-        regi2c,
-    },
+    soc::{clocks::ClockConfig, regi2c},
 };
 
 // `dig_sysclk_sel` codes (SOC_CPU_CLK_SRC_*).
@@ -495,27 +492,4 @@ pub(crate) fn init(_config: &ClockConfig) {
         w.tie_high_xpd_pll().bits(0xF);
         w.tie_high_xpd_pll_i2c().bits(0xF)
     });
-}
-
-/// Saves and restores the CPU root clock source around sleep.
-///
-/// Before entering sleep the CPU root clock is switched to XTAL (the PMU runs
-/// the sleep FSM from a known clock); on wake we restore the previous source.
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    old_cpu_root_clk: Option<CpuRootClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        SavedClockConfig {
-            old_cpu_root_clk: clocks.cpu_root_clk(),
-        }
-    }
-
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old) = self.old_cpu_root_clk {
-            clocks::configure_cpu_root_clk(clocks, old);
-        }
-    }
 }

@@ -3,10 +3,7 @@ use strum::FromRepr;
 use crate::{
     clock::ClockConfig,
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    soc::{
-        clocks::{ClockTree, LpSlowClkConfig, SocRootClkConfig},
-        regi2c,
-    },
+    soc::{clocks::LpSlowClkConfig, regi2c},
 };
 
 fn pmu_power_domain_force_default() {
@@ -1117,25 +1114,4 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
     Cpu0JtagCpu   = 0x18,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    /// The clock from which CPU clock is derived
-    old_soc_root_clk: Option<SocRootClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        let old_soc_root_clk = clocks.soc_root_clk();
-
-        SavedClockConfig { old_soc_root_clk }
-    }
-
-    // rtc_clk_cpu_freq_set_config
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old_soc_root_clk) = self.old_soc_root_clk {
-            crate::soc::clocks::configure_soc_root_clk(clocks, old_soc_root_clk);
-        }
-    }
 }

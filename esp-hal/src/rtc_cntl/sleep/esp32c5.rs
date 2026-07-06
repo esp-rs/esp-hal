@@ -2,9 +2,10 @@ use core::ops::Not;
 
 use crate::{
     clock::RtcClock,
+    private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
+        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::WakeTriggers,
     },
     soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
@@ -867,10 +868,19 @@ impl RtcSleepConfig {
             wakeup_mask & reject_mask
         };
 
-        let cpu_freq_config = ClockTree::with(|clocks| {
-            let cpu_freq_config = SavedClockConfig::save(clocks);
-            crate::soc::clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
-            cpu_freq_config
+        let _restore_clock_config = ClockTree::with(|clocks| {
+            let old_root = clocks.hp_root_clk();
+
+            clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
+
+            // Restore the old clock settings when we return
+            DropGuard::new((), move |_| {
+                ClockTree::with(|clocks| {
+                    if let Some(old_root) = old_root {
+                        clocks::configure_hp_root_clk(clocks, old_root);
+                    }
+                });
+            })
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -914,10 +924,8 @@ impl RtcSleepConfig {
 
             // pmu_ll_hp_set_reject_enable
             pmu().slp_wakeup_cntl1().modify(|_, w| {
-                w.slp_reject_en()
-                    .bit(true)
-                    .sleep_reject_ena()
-                    .bits(reject_mask)
+                w.slp_reject_en().bit(true);
+                w.sleep_reject_ena().bits(reject_mask)
             });
 
             // pmu_ll_hp_clear_reject_cause
@@ -926,12 +934,12 @@ impl RtcSleepConfig {
                 .write(|w| w.slp_reject_cause_clr().bit(true));
 
             pmu().int_clr().write(|w| {
-                w.sw() // pmu_ll_hp_clear_sw_intr_status
-                    .clear_bit_by_one()
-                    .soc_sleep_reject() // pmu_ll_hp_clear_reject_intr_status
-                    .clear_bit_by_one()
-                    .soc_wakeup() // pmu_ll_hp_clear_wakeup_intr_status
-                    .clear_bit_by_one()
+                // pmu_ll_hp_clear_sw_intr_status
+                w.sw().clear_bit_by_one();
+                // pmu_ll_hp_clear_reject_intr_status
+                w.soc_sleep_reject().clear_bit_by_one();
+                // pmu_ll_hp_clear_wakeup_intr_status
+                w.soc_wakeup().clear_bit_by_one()
             });
 
             // misc_modules_sleep_prepare
@@ -957,12 +965,6 @@ impl RtcSleepConfig {
                 }
             }
         }
-
-        // esp-idf returns if the sleep was rejected, we don't return anything
-
-        ClockTree::with(|clocks| {
-            cpu_freq_config.restore(clocks);
-        });
     }
 
     /// Cleans up after sleep

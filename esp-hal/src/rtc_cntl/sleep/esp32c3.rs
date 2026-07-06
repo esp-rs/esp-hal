@@ -683,48 +683,46 @@ impl RtcSleepConfig {
 
         if self.wifi_pd_en() {
             rtc_cntl.dig_iso().modify(|_, w| {
-                w.wifi_force_noiso()
-                    .clear_bit()
-                    .wifi_force_iso()
-                    .clear_bit()
+                w.wifi_force_noiso().clear_bit();
+                w.wifi_force_iso().clear_bit()
             });
 
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
+            rtc_cntl.dig_pwc().modify(|_, w| {
+                w.wifi_force_pu().clear_bit();
+                w.wifi_pd_en().set_bit()
+            });
         } else {
             rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
         }
         if self.bt_pd_en() {
-            rtc_cntl
-                .dig_iso()
-                .modify(|_, w| w.bt_force_noiso().clear_bit().bt_force_iso().clear_bit());
+            rtc_cntl.dig_iso().modify(|_, w| {
+                w.bt_force_noiso().clear_bit();
+                w.bt_force_iso().clear_bit()
+            });
 
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.bt_force_pu().clear_bit().bt_pd_en().set_bit());
+            rtc_cntl.dig_pwc().modify(|_, w| {
+                w.bt_force_pu().clear_bit();
+                w.bt_pd_en().set_bit()
+            });
         } else {
             rtc_cntl.dig_pwc().modify(|_, w| w.bt_pd_en().clear_bit());
         }
 
-        rtc_cntl
-            .dig_pwc()
-            .modify(|_, w| w.cpu_top_pd_en().bit(self.cpu_pd_en()));
-
-        rtc_cntl
-            .dig_pwc()
-            .modify(|_, w| w.dg_peri_pd_en().bit(self.dig_peri_pd_en()));
+        rtc_cntl.dig_pwc().modify(|_, w| {
+            w.cpu_top_pd_en().bit(self.cpu_pd_en());
+            w.dg_peri_pd_en().bit(self.dig_peri_pd_en())
+        });
 
         unsafe {
             rtc_cntl.bias_conf().modify(|_, w| {
                 w.dbg_atten_monitor()
-                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT)
-                    // We have config values for this in self, so I don't know why we're setting
-                    // hardcoded defaults for these next two. It's what IDF does...
-                    .bias_sleep_monitor()
-                    .bit(RTC_CNTL_BIASSLP_MONITOR_DEFAULT)
-                    .pd_cur_monitor()
-                    .bit(RTC_CNTL_PD_CUR_MONITOR_DEFAULT)
+                    .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
+
+                // We have config values for this in self, so I don't know why we're setting
+                // hardcoded defaults for these next two. It's what IDF does...
+
+                w.bias_sleep_monitor().bit(RTC_CNTL_BIASSLP_MONITOR_DEFAULT);
+                w.pd_cur_monitor().bit(RTC_CNTL_PD_CUR_MONITOR_DEFAULT)
             });
 
             assert!(!self.pd_cur_slp() || self.bias_sleep_slp());
@@ -733,12 +731,9 @@ impl RtcSleepConfig {
             regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp()
-                    .bits(self.dbg_atten_slp())
-                    .bias_sleep_deep_slp()
-                    .bit(self.bias_sleep_slp())
-                    .pd_cur_deep_slp()
-                    .bit(self.pd_cur_slp())
+                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
+                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
+                w.pd_cur_deep_slp().bit(self.pd_cur_slp())
             });
 
             if self.deep_slp() {
@@ -749,14 +744,10 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.dg_wrap_pd_en().set_bit());
 
                 rtc_cntl.ana_conf().modify(|_, w| {
-                    w.ckgen_i2c_pu()
-                        .clear_bit()
-                        .pll_i2c_pu()
-                        .clear_bit()
-                        .rfrx_pbus_pu()
-                        .clear_bit()
-                        .txrf_i2c_pu()
-                        .clear_bit()
+                    w.ckgen_i2c_pu().clear_bit();
+                    w.pll_i2c_pu().clear_bit();
+                    w.rfrx_pbus_pu().clear_bit();
+                    w.txrf_i2c_pu().clear_bit()
                 });
 
                 rtc_cntl
@@ -764,10 +755,8 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.bb_i2c_force_pu().clear_bit());
             } else {
                 rtc_cntl.bias_conf().modify(|_, w| {
-                    w.dg_vdd_drv_b_slp_en()
-                        .set_bit()
-                        .dg_vdd_drv_b_slp()
-                        .bits(RTC_CNTL_DG_VDD_DRV_B_SLP_DEFAULT)
+                    w.dg_vdd_drv_b_slp_en().set_bit();
+                    w.dg_vdd_drv_b_slp().bits(RTC_CNTL_DG_VDD_DRV_B_SLP_DEFAULT)
                 });
 
                 rtc_cntl
@@ -786,26 +775,20 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.regulator_force_pu().bit(self.rtc_regulator_fpu()));
 
             rtc_cntl.clk_conf().modify(|_, w| {
-                w.ck8m_force_pu()
-                    .bit(!self.int_8m_pd_en())
-                    .ck8m_force_nogating()
-                    .bit(!self.int_8m_pd_en())
+                w.ck8m_force_pu().bit(!self.int_8m_pd_en());
+                w.ck8m_force_nogating().bit(!self.int_8m_pd_en())
             });
 
             // enable VDDSDIO control by state machine
 
             rtc_cntl.sdio_conf().modify(|_, w| {
-                w.sdio_force()
-                    .clear_bit()
-                    .sdio_reg_pd_en()
-                    .bit(self.vddsdio_pd_en())
+                w.sdio_force().clear_bit();
+                w.sdio_reg_pd_en().bit(self.vddsdio_pd_en())
             });
 
             rtc_cntl.slp_reject_conf().modify(|_, w| {
-                w.deep_slp_reject_en()
-                    .bit(self.deep_slp_reject())
-                    .light_slp_reject_en()
-                    .bit(self.light_slp_reject())
+                w.deep_slp_reject_en().bit(self.deep_slp_reject());
+                w.light_slp_reject_en().bit(self.light_slp_reject())
             });
 
             rtc_cntl

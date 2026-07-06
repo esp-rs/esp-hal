@@ -4,12 +4,20 @@ use crate::{
     clock::RtcClock,
     gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::APB_SARADC,
+    private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpSysCntlReg, HpSysPower, LpSysPower, SavedClockConfig},
+        rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
-    soc::clocks::{self, ClockTree, LpSlowClkConfig, TimgCalibrationClockConfig},
+    soc::clocks::{
+        self,
+        ClockTree,
+        CpuClkConfig,
+        HpRootClkConfig,
+        LpSlowClkConfig,
+        TimgCalibrationClockConfig,
+    },
 };
 
 impl Ext1WakeupSource<'_, '_> {
@@ -701,14 +709,24 @@ impl RtcSleepConfig {
             wakeup_mask & reject_mask
         };
 
-        let cpu_freq_config = ClockTree::with(|clocks| {
-            let cpu_freq_config = SavedClockConfig::save(clocks);
-            crate::soc::clocks::configure_hp_root_clk(
-                clocks,
-                crate::soc::clocks::HpRootClkConfig::Xtal,
-            );
-            crate::soc::clocks::configure_cpu_clk(clocks, crate::soc::clocks::CpuClkConfig::new(0));
-            cpu_freq_config
+        let _restore_clock_config = ClockTree::with(|clocks| {
+            let old_hp_root_clk = clocks.hp_root_clk();
+            let old_cpu_divider = clocks.cpu_clk();
+
+            clocks::configure_hp_root_clk(clocks, HpRootClkConfig::Xtal);
+            clocks::configure_cpu_clk(clocks, CpuClkConfig::new(0));
+
+            // Restore the old clock settings when we return
+            DropGuard::new((), move |_| {
+                ClockTree::with(|clocks| {
+                    if let Some(old_hp_root_clk) = old_hp_root_clk {
+                        clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
+                    }
+                    if let Some(old_cpu_divider) = old_cpu_divider {
+                        clocks::configure_cpu_clk(clocks, old_cpu_divider);
+                    }
+                });
+            })
         });
 
         // misc_modules_sleep_prepare
@@ -783,12 +801,6 @@ impl RtcSleepConfig {
                 }
             }
         }
-
-        // esp-idf returns if the sleep was rejected, we don't return anything
-
-        ClockTree::with(|clocks| {
-            cpu_freq_config.restore(clocks);
-        });
     }
 
     /// Cleans up after sleep
