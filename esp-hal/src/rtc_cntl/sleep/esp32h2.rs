@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    clock::RtcClock,
+    clock::{RtcClock, rtc_slow_cal_period},
     gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::{LP_AON, PMU},
     private::DropGuard,
@@ -473,7 +473,7 @@ impl SleepTimeConfig {
     }
 
     fn new() -> Self {
-        let slowclk_period = LP_AON::regs().store1().read().data().bits();
+        let slowclk_period = rtc_slow_cal_period();
 
         // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
         const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;

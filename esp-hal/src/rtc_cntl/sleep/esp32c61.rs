@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    clock::RtcClock,
+    clock::{RtcClock, rtc_slow_cal_period},
     peripherals::{LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
@@ -526,11 +526,7 @@ impl SleepTimeConfig {
     }
 
     fn new(_deep: bool) -> Self {
-        // https://github.com/espressif/esp-idf/commit/e1d24ebd7f43c7c7ded183bc8800b20af3bf014b
-
-        // Calibrate rtc slow clock
-        // TODO: do an actual calibration instead of a read
-        let slowclk_period = LP_AON::regs().store1().read().lp_aon_store1().bits();
+        let slowclk_period = rtc_slow_cal_period();
 
         // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
         const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;

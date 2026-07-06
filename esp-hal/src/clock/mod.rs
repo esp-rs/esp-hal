@@ -82,6 +82,15 @@ use crate::{
     time::Rate,
 };
 
+cfg_select! {
+    soc_has_lp_aon => {
+        use crate::peripherals::LP_AON;
+    }
+    _ => {
+        use crate::peripherals::LPWR as LP_AON;
+    }
+}
+
 impl CpuClock {
     #[procmacros::doc_replace]
     /// Use the highest possible frequency for a particular chip.
@@ -473,23 +482,10 @@ fn calibrate_rtc_slow_clock() {
 
     let cal_val = RtcClock::calibrate(slow_clk, 1024);
 
-    cfg_select! {
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
-
-    cfg_select! {
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
+    let reg = cfg_select! {
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
     reg.write(|w| unsafe { w.bits(cal_val) });
 }
@@ -510,36 +506,19 @@ pub fn xtal_clock() -> Rate {
 /// with `RtcClock::CAL_FRACT` fractional bits.
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
-fn rtc_slow_cal_period() -> u64 {
-    cfg_select! {
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
+pub(crate) fn rtc_slow_cal_period() -> u32 {
+    let reg = cfg_select! {
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
-    // P4: LP_SYS (mapped as LP_AON in esp-hal) names its scratch registers
-    // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
-    // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
-    // Once that lands this cfg branch can disappear.
-    cfg_select! {
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
-
-    reg.read().bits() as u64
+    reg.read().bits()
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.
 #[cfg(lp_timer_driver_supported)]
 pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
-    let period = rtc_slow_cal_period();
+    let period = rtc_slow_cal_period() as u64;
 
     // The LP timer is a 48-bit counter running from RTC_SLOW_CLK.
     // `period` is a fixed point number with 19 fractional bits, it may be a 24-bit value if
@@ -557,7 +536,7 @@ pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
 
 /// Convert microseconds to RTC slow clock ticks using the calibrated period.
 pub(crate) fn us_to_rtc_ticks(time_in_us: u64) -> u64 {
-    let period = rtc_slow_cal_period();
+    let period = rtc_slow_cal_period() as u64;
 
     if time_in_us > (u64::MAX >> RtcClock::CAL_FRACT) {
         ((time_in_us / period) << RtcClock::CAL_FRACT)
