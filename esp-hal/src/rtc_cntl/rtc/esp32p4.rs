@@ -465,7 +465,6 @@ fn pmu_lp_system_init() {
 }
 
 /// Minimal init for bare-metal boot.
-
 pub(crate) fn init(_config: &ClockConfig) {
     pmu_power_domain_force_default();
 
