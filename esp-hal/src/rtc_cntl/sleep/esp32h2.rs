@@ -6,17 +6,10 @@ use crate::{
     peripherals::APB_SARADC,
     rtc_cntl::{
         Rtc,
-        rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
+        rtc::{HpSysCntlReg, HpSysPower, LpSysPower, SavedClockConfig},
         sleep::{Ext1WakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
-    soc::clocks::{
-        self,
-        ClockTree,
-        CpuClkConfig,
-        HpRootClkConfig,
-        LpSlowClkConfig,
-        TimgCalibrationClockConfig,
-    },
+    soc::clocks::{self, ClockTree, LpSlowClkConfig, TimgCalibrationClockConfig},
 };
 
 impl Ext1WakeupSource<'_, '_> {
@@ -762,17 +755,15 @@ impl RtcSleepConfig {
 
             // pmu_ll_hp_set_reject_enable
             pmu().slp_wakeup_cntl1().modify(|_, w| {
-                w.slp_reject_en()
-                    .bit(true)
-                    .sleep_reject_ena()
-                    .bits(reject_mask)
+                w.slp_reject_en().bit(true);
+                w.sleep_reject_ena().bits(reject_mask)
             });
 
             pmu().int_clr().write(|w| {
-                w.soc_wakeup() // pmu_ll_hp_clear_wakeup_intr_status
-                    .clear_bit_by_one()
-                    .soc_sleep_reject() // pmu_ll_hp_clear_reject_intr_status
-                    .clear_bit_by_one()
+                // pmu_ll_hp_clear_wakeup_intr_status
+                w.soc_wakeup().clear_bit_by_one();
+                // pmu_ll_hp_clear_reject_intr_status
+                w.soc_sleep_reject().clear_bit_by_one()
             });
 
             // pmu_ll_hp_clear_reject_cause
@@ -803,36 +794,5 @@ impl RtcSleepConfig {
     /// Cleans up after sleep
     pub(crate) fn finish_sleep(&self) {
         Self::wake_io_reset();
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    /// The clock from which CPU clock is derived
-    old_hp_root_clk: Option<HpRootClkConfig>,
-
-    /// CPU divider
-    old_cpu_divider: Option<CpuClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        let old_hp_root_clk = clocks.hp_root_clk();
-        let old_cpu_divider = clocks.cpu_clk();
-
-        SavedClockConfig {
-            old_hp_root_clk,
-            old_cpu_divider,
-        }
-    }
-
-    // rtc_clk_cpu_freq_set_config
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old_hp_root_clk) = self.old_hp_root_clk {
-            crate::soc::clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
-        }
-        if let Some(old_cpu_divider) = self.old_cpu_divider {
-            crate::soc::clocks::configure_cpu_clk(clocks, old_cpu_divider);
-        }
     }
 }

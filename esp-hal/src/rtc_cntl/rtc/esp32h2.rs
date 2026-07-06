@@ -2,10 +2,13 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{PCR, PMU},
-    soc::regi2c,
+    soc::{
+        clocks::{ClockConfig, ClockTree, CpuClkConfig, HpRootClkConfig},
+        regi2c,
+    },
 };
 
-pub(crate) fn init() {
+pub(crate) fn init(_config: &ClockConfig) {
     // * No peripheral reg i2c power up required on the target */
     regi2c::I2C_PMU_EN_I2C_RTC_DREG.write_field(0);
     regi2c::I2C_PMU_EN_I2C_DIG_DREG.write_field(0);
@@ -31,40 +34,27 @@ pub(crate) fn init() {
             .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
 
         pmu.hp_sleep_dig_power().modify(|_, w| {
-            w.hp_sleep_vdd_spi_pd_en()
-                .set_bit()
-                .hp_sleep_pd_hp_wifi_pd_en()
-                .set_bit()
-                .hp_sleep_pd_hp_cpu_pd_en()
-                .set_bit()
-                .hp_sleep_pd_top_pd_en()
-                .set_bit()
+            w.hp_sleep_vdd_spi_pd_en().set_bit();
+            w.hp_sleep_pd_hp_wifi_pd_en().set_bit();
+            w.hp_sleep_pd_hp_cpu_pd_en().set_bit();
+            w.hp_sleep_pd_top_pd_en().set_bit()
         });
 
         pmu.hp_active_hp_ck_power().modify(|_, w| {
-            w.hp_active_xpd_bbpll()
-                .set_bit()
-                .hp_active_xpd_bb_i2c()
-                .set_bit()
-                .hp_active_xpd_bbpll_i2c()
-                .set_bit()
+            w.hp_active_xpd_bbpll().set_bit();
+            w.hp_active_xpd_bb_i2c().set_bit();
+            w.hp_active_xpd_bbpll_i2c().set_bit()
         });
 
         pmu.hp_active_sysclk().modify(|_, w| {
-            w.hp_active_icg_sys_clock_en()
-                .set_bit()
-                .hp_active_sys_clk_slp_sel()
-                .clear_bit()
-                .hp_active_icg_slp_sel()
-                .clear_bit()
+            w.hp_active_icg_sys_clock_en().set_bit();
+            w.hp_active_sys_clk_slp_sel().clear_bit();
+            w.hp_active_icg_slp_sel().clear_bit()
         });
         pmu.hp_sleep_sysclk().modify(|_, w| {
-            w.hp_sleep_icg_sys_clock_en()
-                .clear_bit()
-                .hp_sleep_sys_clk_slp_sel()
-                .set_bit()
-                .hp_sleep_icg_slp_sel()
-                .set_bit()
+            w.hp_sleep_icg_sys_clock_en().clear_bit();
+            w.hp_sleep_sys_clk_slp_sel().set_bit();
+            w.hp_sleep_icg_slp_sel().set_bit()
         });
 
         pmu.slp_wakeup_cntl5()
@@ -206,4 +196,35 @@ bitfield::bitfield! {
     pub bool, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
     pub bool, dig_pause_wdt  , set_dig_pause_wdt  : 28;
     pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct SavedClockConfig {
+    /// The clock from which CPU clock is derived
+    old_hp_root_clk: Option<HpRootClkConfig>,
+
+    /// CPU divider
+    old_cpu_divider: Option<CpuClkConfig>,
+}
+
+impl SavedClockConfig {
+    pub(crate) fn save(clocks: &ClockTree) -> Self {
+        let old_hp_root_clk = clocks.hp_root_clk();
+        let old_cpu_divider = clocks.cpu_clk();
+
+        SavedClockConfig {
+            old_hp_root_clk,
+            old_cpu_divider,
+        }
+    }
+
+    // rtc_clk_cpu_freq_set_config
+    pub(crate) fn restore(self, clocks: &mut ClockTree) {
+        if let Some(old_hp_root_clk) = self.old_hp_root_clk {
+            crate::soc::clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
+        }
+        if let Some(old_cpu_divider) = self.old_cpu_divider {
+            crate::soc::clocks::configure_cpu_clk(clocks, old_cpu_divider);
+        }
+    }
 }

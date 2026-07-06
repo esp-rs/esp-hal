@@ -195,7 +195,7 @@ impl RtcClock {
 
 pub(crate) fn init(cpu_clock_config: ClockConfig) {
     ClockTree::with(|clocks| {
-        crate::rtc_cntl::rtc::init();
+        crate::rtc_cntl::rtc::init(&cpu_clock_config);
 
         cpu_clock_config.configure(clocks);
 
