@@ -5,6 +5,7 @@
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
+    clock::ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
     efuse,
     peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
     soc::{pac, regi2c},
@@ -60,62 +61,33 @@ pub enum PsramMode {
     // Oct,
 }
 
-/// PSRAM bus frequency.
+/// Maximum PSRAM bus frequency.
 ///
-/// Choice ties together MPLL freq + bus divider + chip-side read/write latency.
+/// This value should be tuned together with the MPLL frequency. The effective bus clock
+/// will be at most the SpiRamFreq value, obtained by dividing MPLL using an integer divider.
 ///
 /// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits | Use case               |
 /// |-----------|------|-----|--------|--------|---------------|------------------------|
 /// | `Mhz20`   | 400  | 20  | 2      | 2      | 18            | Low-power / debug      |
 /// | `Mhz80`   | 320  | 4   | 2      | 2      | 18            | Conservative SI margin |
 /// | `Mhz200`  | 400  | 2   | 4      | 1      | 26            | IDF default            |
-/// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Overclock              |
+/// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Default                |
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum SpiRamFreq {
-    /// 20 MHz bus (MPLL 400 / div 20).
+    /// 20 MHz.
     Mhz20  = 20,
 
-    /// 80 MHz bus (MPLL 320 / div 4).
-    ///
-    /// Conservative; widest timing margin.
+    /// 80 MHz.
     Mhz80  = 80,
 
-    /// 200 MHz bus (MPLL 400 / div 2).
-    ///
-    /// IDF default for AP HEX PSRAM.
-    #[default]
+    /// 200 MHz.
     Mhz200 = 200,
 
-    /// 250 MHz bus (MPLL 500 / div 2).
+    /// 250 MHz.
+    #[default]
     Mhz250 = 250,
-}
-
-/// MPLL target frequency override.
-///
-/// IDF only programs three discrete MPLL frequencies for the PSRAM
-/// clock domain (`MSPI_TIMING_MPLL_FREQ_MHZ` in
-/// `mspi_timing_tuning_configs.h`):
-///
-///   - `Mhz320` -> paired with `SpiRamFreq::Mhz80`
-///   - `Mhz400` -> paired with `SpiRamFreq::Mhz20` / `Mhz200`
-///   - `Mhz500` -> paired with `SpiRamFreq::Mhz250` (silicon v3+)
-///
-/// The MPLL itself can in principle be set to any value that satisfies
-/// the formula `XTAL(40) * (div+1) / (ref_div+1)`, but only these three
-/// have been silicon-validated.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum MpllFreq {
-    /// 320 MHz. IDF pairing: `SpiRamFreq::Mhz80`.
-    Mhz320 = 320,
-    /// 400 MHz. IDF pairing: `SpiRamFreq::Mhz20` or `Mhz200`. Default
-    /// when `core_clock = None` and `ram_frequency = Mhz200`.
-    Mhz400 = 400,
-    /// 500 MHz. IDF pairing: `SpiRamFreq::Mhz250` (silicon v3.0+).
-    Mhz500 = 500,
 }
 
 /// PSRAM configuration.
@@ -127,10 +99,7 @@ pub struct PsramConfig {
     pub mode: PsramMode,
     /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
     pub size: PsramSize,
-    /// MPLL override. `None` (default) derives the MPLL frequency
-    /// from `ram_frequency` per the table on `SpiRamFreq`.
-    pub core_clock: Option<MpllFreq>,
-    /// PSRAM bus frequency. Default: 200 MHz.
+    /// PSRAM bus frequency. Default: 250 MHz.
     pub ram_frequency: SpiRamFreq,
     // TODO: ECC enable.
     // The MSPI0 controller has a ECC engine.
@@ -147,12 +116,9 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     start..start + config.size.get()
 }
 
-/// Per-speed timing parameters. Mirrors IDF's `#if CONFIG_SPIRAM_SPEED_*`
-/// branches in `esp_psram_impl_ap_hex.c` + `mspi_timing_tuning_configs.h`.
+/// Per-speed timing parameters.
 #[derive(Copy, Clone)]
 struct SpeedParams {
-    /// MPLL freq the analog block must run at.
-    mpll_mhz: u32,
     /// Bus clock divider applied to MPLL.
     bus_div: u32,
     /// MR0.read_latency field value (cycles = 2 * value + 6).
@@ -168,11 +134,12 @@ struct SpeedParams {
 }
 
 impl SpeedParams {
-    const fn for_freq(f: SpiRamFreq) -> Self {
+    const fn for_freq(f: SpiRamFreq, mpll_mhz: u32) -> Self {
+        let ram_freq = f as u32;
+        let bus_div = mpll_mhz.div_ceil(ram_freq);
         match f {
             SpiRamFreq::Mhz20 => Self {
-                mpll_mhz: 400,
-                bus_div: 20,
+                bus_div,
                 mr0_rl: 2,
                 mr4_wl: 2,
                 rd_dummy_bits: 18, // 2*(10-1)
@@ -180,8 +147,7 @@ impl SpeedParams {
                 reg_dummy_bits: 8, // 2*(5-1)
             },
             SpiRamFreq::Mhz80 => Self {
-                mpll_mhz: 320,
-                bus_div: 4,
+                bus_div,
                 mr0_rl: 2,
                 mr4_wl: 2,
                 rd_dummy_bits: 18,
@@ -189,8 +155,7 @@ impl SpeedParams {
                 reg_dummy_bits: 8,
             },
             SpiRamFreq::Mhz200 => Self {
-                mpll_mhz: 400,
-                bus_div: 2,
+                bus_div,
                 mr0_rl: 4,
                 mr4_wl: 1,
                 rd_dummy_bits: 26, // 2*(14-1)
@@ -198,8 +163,7 @@ impl SpeedParams {
                 reg_dummy_bits: 12,
             },
             SpiRamFreq::Mhz250 => Self {
-                mpll_mhz: 500,
-                bus_div: 2,
+                bus_div,
                 mr0_rl: 6,
                 mr4_wl: 3,
                 rd_dummy_bits: 34, // 2*(18-1)
@@ -218,19 +182,11 @@ const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
 #[crate::ram]
 fn init_psram_inner(config: &mut PsramConfig) -> bool {
-    // Resolve the speed parameter set from `ram_frequency`. The MPLL
-    // override (`config.core_clock`) lets the caller bypass the default
-    // pairing (e.g. force 400 MHz MPLL with `Mhz20` bus); `None`
-    // selects the table-default for the chosen `ram_frequency`.
-    let mut params = SpeedParams::for_freq(config.ram_frequency);
-    if let Some(mpll) = config.core_clock {
-        params.mpll_mhz = mpll as u32;
-    }
-
     psram_phy_ldo_init();
-    if !configure_mpll(params.mpll_mhz) {
-        return false;
-    }
+
+    ClockTree::with(request_mpll_clk);
+
+    let params = SpeedParams::for_freq(config.ram_frequency, mpll_clk_frequency() / 1_000_000);
 
     // Module clock + clock source
     HP_SYS_CLKRST::regs()
@@ -796,60 +752,6 @@ fn psram_phy_ldo_init() {
 
     // Allow LDO output to settle before the MSPI PHY is exercised.
     crate::rom::ets_delay_us(50);
-}
-
-/// Configure MPLL to target frequency for PSRAM clock.
-fn configure_mpll(freq_mhz: u32) -> bool {
-    // Power up the MPLL analog block.
-    PMU::regs()
-        .rf_pwc()
-        .modify(|_, w| w.mspi_phy_xpd().set_bit());
-    LP_AON_CLKRST::regs()
-        .lp_aonclkrst_hp_clk_ctrl()
-        .modify(|_, w| w.lp_aonclkrst_hp_mpll_500m_clk_en().set_bit());
-
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().clear_bit());
-
-    regi2c::I2C_MPLL_DHREF_DHREF.write_field(3);
-
-    let rstb = regi2c::I2C_MPLL_IR_CAL_RSTB.read();
-    regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb & 0xDF);
-    regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb | (1 << 5));
-
-    // div = freq_mhz/20 - 1, ref_div = 1 -> MPLL = XTAL(40) * (div+1) / (ref_div+1)
-    let ref_div: u8 = 1;
-    let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
-    let div_val: u8 = (div << 3) | ref_div;
-    regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
-
-    let mut t = 1_000_u32;
-    let mut success = true;
-    while HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .read()
-        .mspi_cal_end()
-        .bit_is_clear()
-    {
-        t = t.saturating_sub(1);
-        if t == 0 {
-            warn!("PSRAM MPLL calibration timeout");
-            success = false;
-            break;
-        }
-        crate::rom::ets_delay_us(1);
-    }
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().set_bit());
-
-    if success {
-        debug!("Calibration timeout left: {}us", t);
-        crate::rom::ets_delay_us(10);
-    }
-
-    success
 }
 
 fn reset_psram_mspi() {

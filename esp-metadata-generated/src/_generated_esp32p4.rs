@@ -1093,15 +1093,39 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
+/// fn configure_cpll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<CpllClkConfig>,
+///     _new_config: CpllClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // SPLL_CLK
 ///
 /// fn enable_spll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 ///     todo!()
 /// }
 ///
+/// fn configure_spll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<SpllClkConfig>,
+///     _new_config: SpllClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // MPLL_CLK
 ///
 /// fn enable_mpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_mpll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<MpllClkConfig>,
+///     _new_config: MpllClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -1469,6 +1493,60 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum MipiDsiInstance {
             MipiDsi = 0,
+        }
+        /// Selects the output frequency of `CPLL_CLK`. Depends on `XTAL_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum CpllClkConfig {
+            /// 360 MHz
+            _360,
+            /// 400 MHz
+            _400,
+        }
+        impl CpllClkConfig {
+            pub fn value(&self) -> u32 {
+                match self {
+                    CpllClkConfig::_360 => 360000000,
+                    CpllClkConfig::_400 => 400000000,
+                }
+            }
+        }
+        /// Selects the output frequency of `SPLL_CLK`. Depends on `XTAL_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SpllClkConfig {
+            /// 240 MHz
+            _240,
+            /// 480 MHz
+            _480,
+        }
+        impl SpllClkConfig {
+            pub fn value(&self) -> u32 {
+                match self {
+                    SpllClkConfig::_240 => 240000000,
+                    SpllClkConfig::_480 => 480000000,
+                }
+            }
+        }
+        /// Selects the output frequency of `MPLL_CLK`. Depends on `XTAL_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum MpllClkConfig {
+            /// 320 MHz
+            _320,
+            /// 400 MHz
+            _400,
+            /// 500 MHz
+            _500,
+        }
+        impl MpllClkConfig {
+            pub fn value(&self) -> u32 {
+                match self {
+                    MpllClkConfig::_320 => 320000000,
+                    MpllClkConfig::_400 => 400000000,
+                    MpllClkConfig::_500 => 500000000,
+                }
+            }
         }
         /// The list of clock signals that the `CPU_ROOT_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1877,6 +1955,9 @@ macro_rules! define_clock_tree_types {
         }
         /// Represents the device's clock tree.
         pub struct ClockTree {
+            cpll_clk: Option<CpllClkConfig>,
+            spll_clk: Option<SpllClkConfig>,
+            mpll_clk: Option<MpllClkConfig>,
             cpu_root_clk: Option<CpuRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
             mem_clk: Option<MemClkConfig>,
@@ -1920,6 +2001,18 @@ macro_rules! define_clock_tree_types {
             /// Locks the clock tree for exclusive access.
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
+            }
+            /// Returns the current configuration of the CPLL_CLK clock tree node
+            pub fn cpll_clk(&self) -> Option<CpllClkConfig> {
+                self.cpll_clk
+            }
+            /// Returns the current configuration of the SPLL_CLK clock tree node
+            pub fn spll_clk(&self) -> Option<SpllClkConfig> {
+                self.spll_clk
+            }
+            /// Returns the current configuration of the MPLL_CLK clock tree node
+            pub fn mpll_clk(&self) -> Option<MpllClkConfig> {
+                self.mpll_clk
             }
             /// Returns the current configuration of the CPU_ROOT_CLK clock tree node
             pub fn cpu_root_clk(&self) -> Option<CpuRootClkConfig> {
@@ -2040,6 +2133,9 @@ macro_rules! define_clock_tree_types {
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
+                cpll_clk: None,
+                spll_clk: None,
+                mpll_clk: None,
                 cpu_root_clk: None,
                 cpu_clk: None,
                 mem_clk: None,
@@ -2079,6 +2175,12 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_phy_pll_refclk_refcount: [0; 1],
                 mipi_dsi_phy_cfg_clk_refcount: [0; 1],
             });
+        static CPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static SPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static MPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
         static CPU_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CPU_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -2118,6 +2220,14 @@ macro_rules! define_clock_tree_types {
         pub fn xtal_clk_frequency() -> u32 {
             40000000
         }
+        pub fn configure_cpll_clk(clocks: &mut ClockTree, config: CpllClkConfig) {
+            let old_config = clocks.cpll_clk.replace(config);
+            refresh_cpll_clk_downstream(clocks);
+            configure_cpll_clk_impl(clocks, old_config, config);
+        }
+        pub fn cpll_clk_config(clocks: &mut ClockTree) -> Option<CpllClkConfig> {
+            clocks.cpll_clk
+        }
         pub fn request_cpll_clk(clocks: &mut ClockTree) {
             trace!("Requesting CPLL_CLK");
             if increment_reference_count(&mut clocks.cpll_clk_refcount) {
@@ -2134,11 +2244,23 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
+        #[allow(unused_variables)]
+        pub fn cpll_clk_config_frequency(clocks: &mut ClockTree, config: CpllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn cpll_clk_frequency() -> u32 {
-            400000000
+            CPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn cpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
+        }
+        pub fn configure_spll_clk(clocks: &mut ClockTree, config: SpllClkConfig) {
+            let old_config = clocks.spll_clk.replace(config);
+            refresh_spll_clk_downstream(clocks);
+            configure_spll_clk_impl(clocks, old_config, config);
+        }
+        pub fn spll_clk_config(clocks: &mut ClockTree) -> Option<SpllClkConfig> {
+            clocks.spll_clk
         }
         pub fn request_spll_clk(clocks: &mut ClockTree) {
             trace!("Requesting SPLL_CLK");
@@ -2156,11 +2278,23 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
+        #[allow(unused_variables)]
+        pub fn spll_clk_config_frequency(clocks: &mut ClockTree, config: SpllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn spll_clk_frequency() -> u32 {
-            480000000
+            SPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn spll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
+        }
+        pub fn configure_mpll_clk(clocks: &mut ClockTree, config: MpllClkConfig) {
+            let old_config = clocks.mpll_clk.replace(config);
+            refresh_mpll_clk_downstream(clocks);
+            configure_mpll_clk_impl(clocks, old_config, config);
+        }
+        pub fn mpll_clk_config(clocks: &mut ClockTree) -> Option<MpllClkConfig> {
+            clocks.mpll_clk
         }
         pub fn request_mpll_clk(clocks: &mut ClockTree) {
             trace!("Requesting MPLL_CLK");
@@ -2178,8 +2312,12 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
+        #[allow(unused_variables)]
+        pub fn mpll_clk_config_frequency(clocks: &mut ClockTree, config: MpllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn mpll_clk_frequency() -> u32 {
-            500000000
+            MPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn mpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
@@ -3515,6 +3653,12 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[instability::unstable]
         pub struct ClockConfig {
+            /// `CPLL_CLK` configuration.
+            pub cpll_clk: Option<CpllClkConfig>,
+            /// `SPLL_CLK` configuration.
+            pub spll_clk: Option<SpllClkConfig>,
+            /// `MPLL_CLK` configuration.
+            pub mpll_clk: Option<MpllClkConfig>,
             /// `CPU_ROOT_CLK` configuration.
             pub cpu_root_clk: Option<CpuRootClkConfig>,
             /// `CPU_CLK` configuration.
@@ -3534,6 +3678,15 @@ macro_rules! define_clock_tree_types {
         }
         impl ClockConfig {
             fn apply(&self, clocks: &mut ClockTree) {
+                if let Some(config) = self.cpll_clk {
+                    configure_cpll_clk(clocks, config);
+                }
+                if let Some(config) = self.spll_clk {
+                    configure_spll_clk(clocks, config);
+                }
+                if let Some(config) = self.mpll_clk {
+                    configure_mpll_clk(clocks, config);
+                }
                 if let Some(config) = self.cpu_root_clk {
                     configure_cpu_root_clk(clocks, config);
                 }
@@ -3569,6 +3722,62 @@ macro_rules! define_clock_tree_types {
             *refcount = refcount.saturating_sub(1);
             let last = *refcount == 0;
             last
+        }
+        fn refresh_cpll_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.cpll_clk {
+                CPLL_CLK_FREQ_CACHE.store(
+                    cpll_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            refresh_cpu_root_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [MipiDsiInstance::MipiDsi] {
+                refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_spll_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.spll_clk {
+                SPLL_CLK_FREQ_CACHE.store(
+                    spll_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_function_clock_downstream(clocks, child_instance);
+                refresh_timg_wdt_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+                UartInstance::Uart3,
+                UartInstance::Uart4,
+            ] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [MipiDsiInstance::MipiDsi] {
+                refresh_mipi_dsi_dpi_clk_downstream(clocks, child_instance);
+                refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
+                refresh_mipi_dsi_phy_cfg_clk_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_mpll_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.mpll_clk {
+                MPLL_CLK_FREQ_CACHE.store(
+                    mpll_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [MipiDsiInstance::MipiDsi] {
+                refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
+                refresh_mipi_dsi_phy_cfg_clk_downstream(clocks, child_instance);
+            }
         }
         fn refresh_cpu_root_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.cpu_root_clk {
