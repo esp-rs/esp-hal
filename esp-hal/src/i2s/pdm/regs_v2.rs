@@ -233,7 +233,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
             w.rx_pdm_hp_bypass().bit(!config.slot.hp_en);
             unsafe {
                 w.rx_pdm2pcm_amplify_num()
-                    .bits(config.slot.amplify_num.max(1).min(15) as u8);
+                    .bits(config.slot.amplify_num.clamp(1, 15) as u8);
                 w.rx_iir_hp_mult12_0().bits(param0 as u8);
                 w.rx_iir_hp_mult12_5().bits(param5 as u8)
             }
