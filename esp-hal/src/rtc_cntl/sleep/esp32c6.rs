@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    clock::{RtcClock, rtc_slow_cal_period},
+    clock::{RtcClock, calibrate_rtc_slow_clock, rtc_slow_cal_period},
     gpio::RtcFunction,
     peripherals::{LP_AON, PMU},
     private::DropGuard,
@@ -607,28 +607,32 @@ const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
 impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
-    fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(TimgCalibrationClockConfig::RcFastDivClk, slowclk_cycles)
-    }
-
-    fn new(_deep: bool) -> Self {
-        let slowclk_period = rtc_slow_cal_period();
-
+    fn rtc_clk_cal_fast() -> u32 {
         // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
         const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;
-        let fastclk_period = Self::rtc_clk_cal_fast(FAST_CLK_SRC_CAL_CYCLES);
+        RtcClock::calibrate(
+            TimgCalibrationClockConfig::RcFastDivClk,
+            FAST_CLK_SRC_CAL_CYCLES,
+        )
+    }
 
+    fn rtc_clk_cal_slow() -> u32 {
+        calibrate_rtc_slow_clock();
+        rtc_slow_cal_period()
+    }
+
+    fn new() -> Self {
         Self {
             sleep_time_adjustment: 0,
-            slowclk_period,
-            fastclk_period,
+            slowclk_period: Self::rtc_clk_cal_slow(),
+            fastclk_period: Self::rtc_clk_cal_fast(),
         }
     }
 
     fn light_sleep(pd_flags: PowerDownFlags) -> Self {
         const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 56;
 
-        let mut this = Self::new(false);
+        let mut this = Self::new();
 
         let sw = LIGHT_SLEEP_TIME_OVERHEAD_US; // TODO
         let hw = this.pmu_sleep_calculate_hw_wait_time(pd_flags);
@@ -639,7 +643,7 @@ impl SleepTimeConfig {
     }
 
     fn deep_sleep() -> Self {
-        let mut this = Self::new(true);
+        let mut this = Self::new();
 
         this.sleep_time_adjustment = 250 + 100 * 240 / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
 
