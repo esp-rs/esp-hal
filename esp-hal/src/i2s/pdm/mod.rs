@@ -64,6 +64,8 @@ impl core::fmt::Display for PdmError {
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
 pub trait PdmInstance: Instance {}
 
+// TODO on ESP32-P4 instances other than I2S0 can support PDM, but those DON'T support
+// PCM2PDM/PDM2PCM
 #[cfg(all(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx), soc_has_i2s0))]
 impl PdmInstance for crate::peripherals::I2S0<'_> {}
 

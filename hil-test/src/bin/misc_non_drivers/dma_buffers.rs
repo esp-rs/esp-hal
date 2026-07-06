@@ -192,14 +192,14 @@ mod tests {
     fn test_dma_tx_stream_buf_view_unprefilled_has_no_available_space() {
         with_tx_stream_buffer(|mut buf| {
             buf.prepare();
-            let view = buf.into_view();
+            let mut view = buf.into_view();
             core::assert_eq!(view.available_bytes(), 0);
         })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_view_available_bytes() {
-        with_tx_view(true, |view| {
+        with_tx_view(true, |mut view| {
             core::assert_eq!(view.available_bytes(), BUFFER_SIZE);
         });
     }
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_dma_rx_stream_buf_view_empty() {
-        with_rx_view(&[], false, |view| {
+        with_rx_view(&[], false, |mut view| {
             core::assert_eq!(view.available_bytes(), 0);
             core::assert_eq!(view.peek(), &[] as &[u8]);
         });
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn test_dma_rx_stream_buf_view_peek_and_available_bytes() {
         let data = b"peek me";
-        with_rx_view(data, false, |view| {
+        with_rx_view(data, false, |mut view| {
             core::assert_eq!(view.available_bytes(), data.len());
             core::assert_eq!(view.peek(), data);
         });
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_dma_rx_stream_buf_view_peek_until_eof() {
         let data = b"eof test";
-        with_rx_view(data, true, |view| {
+        with_rx_view(data, true, |mut view| {
             let (slice, eof) = view.peek_until_eof();
             core::assert_eq!(slice, data);
             core::assert!(eof);
@@ -309,7 +309,7 @@ mod tests {
         const SECOND_LEN: usize = 128;
         let first = [1u8; CHUNK_SIZE];
         let second = [2u8; SECOND_LEN];
-        with_rx_view_multi(&[(&first, false), (&second, false)], |view| {
+        with_rx_view_multi(&[(&first, false), (&second, false)], |mut view| {
             core::assert_eq!(view.available_bytes(), CHUNK_SIZE + SECOND_LEN);
             let peeked = view.peek();
             core::assert_eq!(peeked.len(), CHUNK_SIZE + SECOND_LEN);
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_dma_tx_stream_buf_initial() {
-        with_tx_view(false, |view| {
+        with_tx_view(false, |mut view| {
             // initially all descriptors are owned by the DMA, so no space should be available
             core::assert_eq!(view.available_bytes(), 0);
 

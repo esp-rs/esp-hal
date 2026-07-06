@@ -292,6 +292,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
 
     /// Return the number of bytes that was received by this buf.
     pub fn number_of_received_bytes(&self) -> usize {
+        self.sync_received_from_dma();
         self.descriptors
             .linked_iter()
             .map(|d| d.len())
@@ -322,6 +323,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
 
     /// Returns the received data as an iterator of slices.
     pub fn received_data(&self) -> impl Iterator<Item = &[u8]> {
+        self.sync_received_from_dma();
         self.descriptors.linked_iter().map(|desc| {
             // SAFETY: We set up the descriptor to point to a subslice of the buffer, and
             // here we are only recreating that slice with a perhaps shorter length.
@@ -329,6 +331,28 @@ impl<'a> ScopedDmaRxBuf<'a> {
             // are not violating any aliasing rules.
             unsafe { core::slice::from_raw_parts(desc.buffer.cast_const(), desc.len()) }
         })
+    }
+
+    /// Read DMA-written RX data from memory on cached SoCs.
+    fn sync_received_from_dma(&self) {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        {
+            let descriptors = &*self.descriptors.descriptors;
+            unsafe {
+                crate::soc::cache_invalidate_addr(
+                    descriptors.as_ptr() as u32,
+                    core::mem::size_of_val(descriptors) as u32,
+                );
+            }
+            for desc in self.descriptors.linked_iter() {
+                let len = desc.len();
+                if len > 0 {
+                    unsafe {
+                        crate::soc::cache_invalidate_addr(desc.buffer as u32, len as u32);
+                    }
+                }
+            }
+        }
     }
 }
 

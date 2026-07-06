@@ -244,6 +244,9 @@ macro_rules! property {
     ("i2s.clock_configured_by_pcr") => {
         true
     };
+    ("i2s.clock_configured_by_hp_sys_clkrst") => {
+        false
+    };
     ("i2s.supports_pdm_tx") => {
         true
     };

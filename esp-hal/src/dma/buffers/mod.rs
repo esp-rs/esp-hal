@@ -1092,7 +1092,10 @@ pub struct DmaRxStreamBufView {
 
 impl DmaRxStreamBufView {
     /// Returns the number of bytes that are available to read from the buf.
-    pub fn available_bytes(&self) -> usize {
+    pub fn available_bytes(&mut self) -> usize {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buf.descriptors.invalidate();
+
         let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
         let mut result = 0;
         for desc in head.iter().chain(tail) {
@@ -1140,7 +1143,7 @@ impl DmaRxStreamBufView {
     ///
     /// Note: This function ignores EOFs, see [Self::peek_until_eof] if you need
     /// EOF support.
-    pub fn peek(&self) -> &[u8] {
+    pub fn peek(&mut self) -> &[u8] {
         let (slice, _) = self.peek_internal(false);
         slice
     }
@@ -1149,7 +1152,7 @@ impl DmaRxStreamBufView {
     ///
     /// It also returns a boolean indicating whether this slice ends with an EOF
     /// or not.
-    pub fn peek_until_eof(&self) -> (&[u8], bool) {
+    pub fn peek_until_eof(&mut self) -> (&[u8], bool) {
         self.peek_internal(true)
     }
 
@@ -1160,6 +1163,10 @@ impl DmaRxStreamBufView {
     /// Returns the number of bytes that were actually consumed.
     pub fn consume(&mut self, n: usize) -> usize {
         let mut remaining_bytes_to_consume = n;
+        let mut descriptors_modified = false;
+
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buf.descriptors.invalidate();
 
         loop {
             let desc = &mut self.buf.descriptors[self.descriptor_idx];
@@ -1196,6 +1203,7 @@ impl DmaRxStreamBufView {
 
             // Connect this consumed descriptor to the end of the chain.
             self.buf.descriptors[prev_descriptor_index].next = desc_ptr;
+            descriptors_modified = true;
 
             self.descriptor_idx += 1;
             if self.descriptor_idx >= self.buf.descriptors.len() {
@@ -1206,10 +1214,18 @@ impl DmaRxStreamBufView {
             remaining_bytes_to_consume -= remaining_bytes_in_descriptor;
         }
 
+        if descriptors_modified {
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            self.buf.descriptors.writeback();
+        }
+
         n - remaining_bytes_to_consume
     }
 
-    fn peek_internal(&self, stop_at_eof: bool) -> (&[u8], bool) {
+    fn peek_internal(&mut self, stop_at_eof: bool) -> (&[u8], bool) {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buf.descriptors.invalidate();
+
         let descriptors = &self.buf.descriptors[self.descriptor_idx..];
 
         // There must be at least one descriptor.
@@ -1223,8 +1239,18 @@ impl DmaRxStreamBufView {
             } else {
                 let length = last_descriptor.len() - self.descriptor_offset;
                 let chunk_size = last_descriptor.size();
+                let buffer_start = self.buf.buffer.len() - chunk_size;
+                #[cfg(soc_internal_memory_cached)]
+                if length != 0 {
+                    unsafe {
+                        crate::soc::cache_invalidate_addr(
+                            self.buf.buffer.as_ptr().add(buffer_start) as u32,
+                            length as u32,
+                        );
+                    }
+                }
                 (
-                    &self.buf.buffer[self.buf.buffer.len() - chunk_size..][..length],
+                    &self.buf.buffer[buffer_start..][..length],
                     last_descriptor.flags.suc_eof(),
                 )
             }
@@ -1246,6 +1272,20 @@ impl DmaRxStreamBufView {
                 // If the length is smaller than the size, the contiguous-ness ends here.
                 if desc.len() < desc.size() {
                     break;
+                }
+            }
+
+            #[cfg(soc_internal_memory_cached)]
+            {
+                let buffer_start = chunk_size * self.descriptor_idx + self.descriptor_offset;
+                let buffer_len = number_of_contiguous_bytes - self.descriptor_offset;
+                if buffer_len != 0 {
+                    unsafe {
+                        crate::soc::cache_invalidate_addr(
+                            self.buf.buffer.as_ptr().add(buffer_start) as u32,
+                            buffer_len as u32,
+                        );
+                    }
                 }
             }
 
@@ -1378,6 +1418,12 @@ impl DmaTxStreamBuf {
             &mut self.view_descriptor_offset,
             pre_filled,
         );
+        #[cfg(soc_internal_memory_cached)]
+        if pre_filled != 0 {
+            unsafe {
+                crate::soc::cache_writeback_addr(self.buffer.as_ptr() as u32, pre_filled as u32);
+            }
+        }
     }
 }
 
@@ -1412,6 +1458,8 @@ fn mark_tx_stream_descriptors_ready(
             desc.set_owner(Owner::Dma);
             desc.set_length(*descriptor_offset);
             desc.set_suc_eof(true);
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            descriptors.writeback();
             return;
         }
 
@@ -1450,6 +1498,8 @@ fn advance_tx_stream_descriptors(
         if bytes_in_d + bytes_filled > bytes_pushed {
             *descriptor_idx = d;
             *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            descriptors.writeback();
             return;
         }
         bytes_filled += bytes_in_d;
@@ -1527,7 +1577,10 @@ pub struct DmaTxStreamBufView {
 
 impl DmaTxStreamBufView {
     /// Returns the number of bytes available for writing.
-    pub fn available_bytes(&self) -> usize {
+    pub fn available_bytes(&mut self) -> usize {
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        self.buf.descriptors.invalidate();
+
         let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
         head.iter()
             .chain(tail)
@@ -1544,6 +1597,15 @@ impl DmaTxStreamBufView {
         let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
         let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
         let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
+        #[cfg(soc_internal_memory_cached)]
+        if bytes_pushed != 0 {
+            unsafe {
+                crate::soc::cache_writeback_addr(
+                    self.buf.buffer.as_ptr().add(dma_start) as u32,
+                    bytes_pushed as u32,
+                );
+            }
+        }
 
         self.advance(bytes_pushed);
         bytes_pushed
