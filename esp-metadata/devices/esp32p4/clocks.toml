@@ -64,7 +64,7 @@ system_clocks = { clock_tree = [
         #{ name = "SDIO_PLL0_CLK",   outputs = "SDIO_PLL0_CLK" },
         #{ name = "SDIO_PLL1_CLK",   outputs = "SDIO_PLL1_CLK" },
         #{ name = "SDIO_PLL2_CLK",   outputs = "SDIO_PLL2_CLK" },
-        { name = "RC_FAST_CLK",     outputs = "RC_FAST_CLK" },
+        { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
         { name = "RC_SLOW_CLK",     outputs = "LP_SLOW_CLK" },
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
         #{ name = "PLL_LP_CLK",      outputs = "PLL_LP_CLK" },

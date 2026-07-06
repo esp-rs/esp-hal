@@ -1783,7 +1783,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `CPLL_CLK`.
             CpllClk,
             /// Selects `RC_FAST_CLK`.
-            RcFastClk,
+            RcFastDivClk,
             /// Selects `LP_SLOW_CLK`.
             RcSlowClk,
             /// Selects `XTAL32K_CLK`.
@@ -2964,7 +2964,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::MpllClk => request_mpll_clk(clocks),
                     TimgCalibrationClockConfig::SpllClk => request_spll_clk(clocks),
                     TimgCalibrationClockConfig::CpllClk => request_cpll_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
                     TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
                 }
@@ -2974,7 +2974,7 @@ macro_rules! define_clock_tree_types {
                         TimgCalibrationClockConfig::MpllClk => release_mpll_clk(clocks),
                         TimgCalibrationClockConfig::SpllClk => release_spll_clk(clocks),
                         TimgCalibrationClockConfig::CpllClk => release_cpll_clk(clocks),
-                        TimgCalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
                         TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
                         TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
                     }
@@ -2997,7 +2997,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::MpllClk => request_mpll_clk(clocks),
                     TimgCalibrationClockConfig::SpllClk => request_spll_clk(clocks),
                     TimgCalibrationClockConfig::CpllClk => request_cpll_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
                     TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
                 }
@@ -3014,7 +3014,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::MpllClk => release_mpll_clk(clocks),
                     TimgCalibrationClockConfig::SpllClk => release_spll_clk(clocks),
                     TimgCalibrationClockConfig::CpllClk => release_cpll_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
                     TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
                 }
@@ -3029,7 +3029,7 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::MpllClk => mpll_clk_frequency(),
                 TimgCalibrationClockConfig::SpllClk => spll_clk_frequency(),
                 TimgCalibrationClockConfig::CpllClk => cpll_clk_frequency(),
-                TimgCalibrationClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
                 TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(),
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
@@ -3042,7 +3042,7 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::MpllClk => mpll_clk_frequency(),
                 TimgCalibrationClockConfig::SpllClk => spll_clk_frequency(),
                 TimgCalibrationClockConfig::CpllClk => cpll_clk_frequency(),
-                TimgCalibrationClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
                 TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(),
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }

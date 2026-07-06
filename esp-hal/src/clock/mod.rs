@@ -51,6 +51,7 @@ use clocks::LpSlowClkConfig;
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg_function_clock)]
 use clocks::TimgFunctionClockConfig;
+use portable_atomic::AtomicU32;
 
 /// # Low-level clock control
 ///
@@ -134,20 +135,17 @@ use crate::soc::clocks::TimgCalibrationClockConfig;
 
 /// RTC Watchdog Timer driver.
 impl RtcClock {
-    const CAL_FRACT: u32 = 19;
+    pub(crate) const CAL_FRACT: u32 = 19;
 
     /// Get the nominal value of the RTC_SLOW_CLK source.
     #[instability::unstable]
     #[cfg(any(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
-        cfg_select! {
-            soc_has_clock_node_rtc_slow_clk => {
-                let freq = clocks::rtc_slow_clk_frequency();
-            }
-            _ => {
-                let freq = clocks::lp_slow_clk_frequency();
-            }
-        }
+        let freq = cfg_select! {
+            soc_has_clock_node_rtc_slow_clk => clocks::rtc_slow_clk_frequency(),
+            _ => clocks::lp_slow_clk_frequency(),
+        };
+
         Rate::from_hz(freq)
     }
 
@@ -238,6 +236,7 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
     });
 
     calibrate_rtc_slow_clock();
+    calibrate_rtc_fast_clock();
 }
 
 impl RtcClock {
@@ -480,7 +479,9 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         _ => {}
     }
 
-    let cal_val = RtcClock::calibrate(slow_clk, 1024);
+    // Clock is in order of 30-150kHz.
+    const SLOW_CLK_SRC_CAL_CYCLES: u32 = 16;
+    let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
     let reg = cfg_select! {
         esp32p4 => LP_AON::regs().lp_store1(),
@@ -488,6 +489,26 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     };
 
     reg.write(|w| unsafe { w.bits(cal_val) });
+}
+
+static RC_FAST_CAL_VAL: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(soc_has_clock_node_timg_calibration_clock)]
+pub(crate) fn calibrate_rtc_fast_clock() {
+    // Clock is in order of 10 MHz
+    const FAST_CLK_SRC_CAL_CYCLES: u32 = 128;
+
+    let cal_val = RtcClock::calibrate(
+        TimgCalibrationClockConfig::RcFastDivClk,
+        FAST_CLK_SRC_CAL_CYCLES,
+    );
+
+    RC_FAST_CAL_VAL.store(cal_val, core::sync::atomic::Ordering::Relaxed);
+}
+
+#[cfg(not(soc_has_clock_node_timg_calibration_clock))]
+fn calibrate_rtc_fast_clock() {
+    // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
 }
 
 /// The CPU clock frequency.
@@ -513,6 +534,12 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
     };
 
     reg.read().bits()
+}
+
+/// Read the calibrated RTC fast clock period from memory.
+#[cfg_attr(not(soc_has_pmu), expect(dead_code))]
+pub(crate) fn rtc_fast_cal_period() -> u32 {
+    RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.
