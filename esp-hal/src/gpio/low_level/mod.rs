@@ -152,10 +152,6 @@ pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
     version::gpio_intr_enable(int_enable, nmi_enable)
 }
 
-pub(crate) fn for_each_interrupt_core(f: impl FnMut(crate::system::Cpu)) {
-    version::for_each_interrupt_core(f);
-}
-
 #[cfg(feature = "rt")]
 pub(crate) fn enable_additional_default_interrupts(
     interrupt: crate::peripherals::Interrupt,

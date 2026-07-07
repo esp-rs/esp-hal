@@ -62,15 +62,13 @@ use crate::{
         InputPin,
         low_level::{InterruptStatusRegisterAccess, set_int_enable},
     },
-    interrupt::Priority,
+    interrupt::{self, Priority},
     peripherals::Interrupt,
     ram,
+    system::Cpu,
 };
 #[cfg(feature = "rt")]
-use crate::{
-    handler,
-    interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
-};
+use crate::{handler, interrupt::DEFAULT_INTERRUPT_HANDLER};
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
@@ -109,11 +107,11 @@ pub(crate) fn bind_default_interrupt_handler() {
     // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
     let mut is_mapped = false;
-    super::low_level::for_each_interrupt_core(|cpu| {
+    for cpu in Cpu::all() {
         if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
             is_mapped = true;
         }
-    });
+    }
 
     if is_mapped {
         info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
@@ -130,13 +128,13 @@ pub(crate) fn bind_default_interrupt_handler() {
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
 pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    super::low_level::for_each_interrupt_core(|cpu| {
+    for cpu in Cpu::all() {
         // Only change priority if the interrupt is mapped to the core, otherwise we would enable
         // the interrupt unconditionally, which we don't want to do.
-        if crate::interrupt::mapped_to(cpu, interrupt).is_some() {
-            crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
+        if interrupt::mapped_to(cpu, interrupt).is_some() {
+            interrupt::enable_on_cpu(cpu, interrupt, priority);
         }
-    });
+    }
 }
 
 /// The default GPIO interrupt handler, when the user has not set one.
