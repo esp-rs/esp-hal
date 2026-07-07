@@ -1,7 +1,17 @@
 fn ble_ieee802154_clock_enable(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_zb_apb_en().bit(en);
-        w.clk_zb_mac_en().bit(en)
+        w.clk_zb_mac_en().bit(en);
+        // Modem security engine (AES-ECB/CCM) clocks — required by the BLE
+        // controller's hardware `r_ble_hw_encrypt_block` for link-layer
+        // encryption, and by 802.15.4 frame security. Mirrors esp32c6.
+        w.clk_etm_en().bit(en);
+        w.clk_modem_sec_en().bit(en);
+        w.clk_modem_sec_ecb_en().bit(en);
+        w.clk_modem_sec_ccm_en().bit(en);
+        w.clk_modem_sec_bah_en().bit(en);
+        w.clk_modem_sec_apb_en().bit(en);
+        w.clk_ble_timer_en().bit(en)
     });
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
