@@ -1,5 +1,10 @@
 use super::GpioBank;
 use crate::{gpio::AnyPin, peripherals::GPIO};
+#[cfg(feature = "rt")]
+use crate::{
+    interrupt::{self, InterruptHandler},
+    peripherals::Interrupt,
+};
 
 pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     match bank {
@@ -24,4 +29,6 @@ pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
 }
 
 #[cfg(feature = "rt")]
-pub(crate) fn enable_interrupt_on_second_core(_priority: crate::interrupt::Priority) {}
+pub(crate) fn enable_interrupt(handler: InterruptHandler) {
+    interrupt::bind_handler(Interrupt::GPIO, handler);
+}

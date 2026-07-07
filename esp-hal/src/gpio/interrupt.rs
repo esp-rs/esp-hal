@@ -112,9 +112,7 @@ pub(crate) fn bind_default_interrupt_handler() {
         return;
     }
 
-    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
-
-    super::low_level::enable_interrupt_on_second_core(Priority::Priority1);
+    super::low_level::enable_interrupt(default_gpio_interrupt_handler);
 }
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.

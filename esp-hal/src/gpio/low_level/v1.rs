@@ -1,8 +1,9 @@
 use super::GpioBank;
+use crate::{gpio::AnyPin, peripherals::GPIO, system::Cpu};
+#[cfg(feature = "rt")]
 use crate::{
-    gpio::AnyPin,
-    peripherals::{GPIO, Interrupt},
-    system::Cpu,
+    interrupt::{self, InterruptHandler},
+    peripherals::Interrupt,
 };
 
 pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
@@ -33,8 +34,9 @@ pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
 }
 
 #[cfg(feature = "rt")]
-pub(crate) fn enable_interrupt_on_second_core(priority: crate::interrupt::Priority) {
-    crate::interrupt::enable_on_cpu(Cpu::AppCpu, Interrupt::GPIO, priority);
+pub(crate) fn enable_interrupt(handler: InterruptHandler) {
+    interrupt::bind_handler(Interrupt::GPIO, handler);
+    interrupt::enable_on_cpu(Cpu::AppCpu, Interrupt::GPIO, handler.priority());
 }
 
 fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
