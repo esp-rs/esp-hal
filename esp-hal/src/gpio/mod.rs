@@ -1360,7 +1360,7 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
-        unwrap!(self.pin.listen_with_options(event, true, false, false));
+        unwrap!(self.pin.listen_with_options(event, true, false));
     }
 
     /// Stop listening for interrupts.
@@ -1413,8 +1413,7 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.pin
-            .listen_with_options(event.into(), false, false, enable)
+        self.pin.listen_with_options(event.into(), false, enable)
     }
 
     // Output functions
@@ -1888,7 +1887,6 @@ impl<'lt> AnyPin<'lt> {
         &self,
         event: Event,
         int_enable: bool,
-        nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) -> Result<(), WakeConfigError> {
         if wake_up_from_light_sleep {
@@ -1908,7 +1906,7 @@ impl<'lt> AnyPin<'lt> {
 
             set_int_enable(
                 self.number(),
-                Some(gpio_intr_enable(int_enable, nmi_enable)),
+                Some(gpio_intr_enable(int_enable)),
                 event as u8,
                 wake_up_from_light_sleep,
             );

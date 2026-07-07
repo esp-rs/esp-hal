@@ -148,8 +148,8 @@ pub(crate) fn prepare_pin_pull(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool)
     version::prepare_pin_pull(pin, pull_up, pull_down);
 }
 
-pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    version::gpio_intr_enable(int_enable, nmi_enable)
+pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
+    version::gpio_intr_enable(int_enable)
 }
 
 #[cfg(feature = "rt")]

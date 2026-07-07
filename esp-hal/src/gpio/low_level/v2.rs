@@ -19,8 +19,8 @@ pub(super) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u3
 
 pub(super) fn prepare_pin_pull(_pin: &AnyPin<'_>, _pull_up: bool, _pull_down: bool) {}
 
-pub(super) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8 | ((nmi_enable as u8) << 1)
+pub(super) fn gpio_intr_enable(int_enable: bool) -> u8 {
+    int_enable as u8
 }
 
 #[cfg(feature = "rt")]

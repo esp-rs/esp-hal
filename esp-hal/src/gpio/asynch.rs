@@ -90,7 +90,7 @@ impl Flex<'_> {
         // Start listening for the event. We only need to do this once, as disabling
         // the interrupt will signal the future to complete.
         self.pin
-            .listen_with_options(event, true, false, options.wake_enable)?;
+            .listen_with_options(event, true, options.wake_enable)?;
 
         // Hold a wake lock for the duration of the wait so automatic light sleep does
         // not gate the GPIO interrupt. When the pin is configured as a light-sleep wake
