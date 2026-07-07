@@ -20,7 +20,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -768,68 +768,5 @@ impl RmtInstance {
                 .chconf1(ch_num)
                 .modify(|_, w| w.ref_always_on().bit(new_config == RmtSclkConfig::ApbClk));
         }
-    }
-}
-
-impl UartInstance {
-    // UART_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        new_config: UartFunctionClockConfig,
-    ) {
-        let regs = match self {
-            Self::Uart0 => UART0::regs(),
-            Self::Uart1 => UART1::regs(),
-            Self::Uart2 => UART2::regs(),
-        };
-        regs.conf0().modify(|_, w| {
-            w.tick_ref_always_on()
-                .bit(new_config.sclk == UartFunctionClockSclk::Apb)
-        });
-    }
-
-    // UART_MEM_CLOCK
-
-    fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_mem_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartMemClockConfig>,
-        _new_config: UartMemClockConfig,
-    ) {
-        // Nothing to do.
-    }
-
-    // UART_BAUD_RATE_GENERATOR
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        new_config: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            Self::Uart0 => UART0::regs(),
-            Self::Uart1 => UART1::regs(),
-            Self::Uart2 => UART2::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new_config.integral as _);
-            w.frag().bits(new_config.fractional as _)
-        });
     }
 }

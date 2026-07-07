@@ -47,10 +47,15 @@ crate::unstable_driver! {
     pub mod uhci;
 }
 
+#[cfg_attr(uart_version = "1", path = "clocks/v1.rs")]
+#[cfg_attr(soc_has_pcr, path = "clocks/v2_pcr.rs")]
+#[cfg_attr(esp32p4, path = "clocks/v2_esp32p4.rs")]
+mod clocks;
+
 mod compat;
 mod low_level;
 
-use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
+use core::{marker::PhantomData, sync::atomic::Ordering};
 
 use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
@@ -73,20 +78,15 @@ use crate::{
     DriverMode,
     gpio::{
         InputConfig,
-        InputSignal,
         OutputConfig,
-        OutputSignal,
         PinGuard,
         Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    handler,
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     private::DropGuard,
-    ram,
     rtc_cntl::WakeLock,
-    soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
 
@@ -225,10 +225,6 @@ impl core::error::Error for TxError {}
 
 #[instability::unstable]
 pub use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
-use crate::soc::clocks::{
-    UartBaudRateGeneratorConfig as BaudRateConfig,
-    UartFunctionClockConfig as ClockConfig,
-};
 
 /// Number of data bits
 ///

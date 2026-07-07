@@ -1,7 +1,39 @@
+use core::task::Poll;
+
+use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
-use super::*;
-use crate::asynch::AtomicWaker;
+#[cfg(feature = "unstable")]
+use super::BaudrateTolerance;
+use super::{
+    AnyUart,
+    Config,
+    ConfigError,
+    DataBits,
+    HwFlowControl,
+    Parity,
+    RxError,
+    RxErrorKind,
+    StopBits,
+    SwFlowControl,
+    TxError,
+    UartInterrupt,
+    any,
+};
+use crate::{
+    asynch::AtomicWaker,
+    gpio::{InputSignal, OutputSignal},
+    handler,
+    interrupt::InterruptHandler,
+    pac::uart0::RegisterBlock,
+    ram,
+    soc::clocks::{
+        self,
+        ClockTree,
+        UartBaudRateGeneratorConfig as BaudRateConfig,
+        UartFunctionClockConfig as ClockConfig,
+    },
+};
 
 #[cfg_attr(uart_version = "1", path = "v1.rs")]
 #[cfg_attr(uart_version = "2", path = "v2.rs")]

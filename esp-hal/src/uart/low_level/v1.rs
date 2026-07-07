@@ -1,12 +1,12 @@
-use super::{
+use crate::uart::{
     ConfigError,
     CtsConfig,
     HwFlowControl,
-    Info,
     RegisterBlock,
     RtsConfig,
     StopBits,
     SwFlowControl,
+    low_level::Info,
 };
 
 #[inline(always)]
@@ -39,22 +39,19 @@ pub(super) fn set_rx_timeout(
 
     if let Some(timeout) = timeout {
         #[cfg(esp32)]
-        let timeout_reg = timeout;
-        #[cfg(not(esp32))]
-        let timeout_reg = timeout as u16 * _symbol_len as u16;
+        let timeout_reg = cfg_select! {
+            esp32 => timeout,
+            _ => timeout as u16 * _symbol_len as u16,
+        };
 
         if timeout_reg > MAX_THRHD {
             return Err(ConfigError::TimeoutTooLong);
         }
 
-        cfg_select! {
-            esp32 => {
-                let reg_thrhd = info.regs().conf1();
-            }
-            _ => {
-                let reg_thrhd = info.regs().mem_conf();
-            }
-        }
+        let reg_thrhd = cfg_select! {
+            esp32 => info.regs().conf1(),
+            _ => info.regs().mem_conf(),
+        };
         reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
     }
 
@@ -72,14 +69,10 @@ pub(super) fn rx_timeout_enabled(info: &Info) -> bool {
 }
 
 pub(super) fn is_tx_idle(info: &Info) -> bool {
-    cfg_select! {
-        esp32 => {
-            let status = info.regs().status();
-        }
-        _ => {
-            let status = info.regs().fsm_status();
-        }
-    }
+    let status = cfg_select! {
+        esp32 => info.regs().status(),
+        _ => info.regs().fsm_status(),
+    };
 
     status.read().st_utx_out().bits() == 0x0
 }

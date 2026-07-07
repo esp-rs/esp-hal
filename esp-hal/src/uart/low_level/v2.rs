@@ -1,12 +1,12 @@
-use super::{
+use crate::uart::{
     ConfigError,
     CtsConfig,
     HwFlowControl,
-    Info,
     RegisterBlock,
     RtsConfig,
     StopBits,
     SwFlowControl,
+    low_level::Info,
 };
 
 #[inline(always)]
