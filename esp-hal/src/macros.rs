@@ -579,3 +579,23 @@ macro_rules! impl_dma_channel_trait {
     };
 }
 pub(crate) use impl_dma_channel_trait;
+
+/// Macro to allow using unstable HAL features conditionally. Other crates can
+/// use this to "detect" the esp-hal/unstable feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(feature = "unstable")]
+macro_rules! if_unstable_hal {
+    ($($tt:tt)*) => {
+        $($tt)*
+    };
+}
+
+/// Macro to allow using unstable HAL features conditionally. Other crates can
+/// use this to "detect" the esp-hal/unstable feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(not(feature = "unstable"))]
+macro_rules! if_unstable_hal {
+    ($($tt:tt)*) => {};
+}

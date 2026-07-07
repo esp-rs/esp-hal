@@ -183,8 +183,6 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(all(esp32, feature = "unstable"))]
-use hal::analog::adc::{release_adc2, try_claim_adc2};
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
@@ -301,15 +299,15 @@ const _: () = {
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
 pub(crate) fn init() {
-    #[cfg(all(esp32, feature = "unstable"))]
-    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
-        panic!(
-            "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
-        );
+    esp_hal::if_unstable_hal! {
+        #[cfg(esp32)]
+        if hal::analog::adc::try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+            panic!(
+                "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
+            );
+        }
+        esp_hal::rtc_cntl::WakeLock::acquire();
     }
-
-    #[cfg(feature = "unstable")]
-    esp_hal::rtc_cntl::WakeLock::acquire();
 
     if !preempt::initialized() {
         panic!("The scheduler must be initialized before initializing the radio.");
@@ -352,12 +350,13 @@ pub(crate) fn deinit() {
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
 
-    #[cfg(all(esp32, feature = "unstable"))]
-    // Allow using `ADC2` again
-    release_adc2(unsafe { esp_hal::Internal::conjure() });
+    esp_hal::if_unstable_hal! {
+        // Allow using `ADC2` again
+        #[cfg(esp32)]
+        hal::analog::adc::release_adc2(unsafe { esp_hal::Internal::conjure() });
 
-    #[cfg(feature = "unstable")]
-    esp_hal::rtc_cntl::WakeLock::release();
+        esp_hal::rtc_cntl::WakeLock::release();
+    }
 
     debug!("Radio deinitialized");
 }

@@ -2276,10 +2276,12 @@ impl Drop for WifiController<'_> {
                 warn!("Failed to cleanly deinit wifi: {:?}", e);
             }
 
-            #[cfg(all(rng_trng_supported, feature = "unstable"))]
-            esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-                esp_hal::Internal::conjure()
-            });
+            #[cfg(rng_trng_supported)]
+            esp_hal::if_unstable_hal! {
+                esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                    esp_hal::Internal::conjure()
+                });
+            }
         })
     }
 }
@@ -2379,10 +2381,12 @@ impl<'d> WifiController<'d> {
         crate::wifi::wifi_init(device)?;
 
         // At some point the "High-speed ADC" entropy source became available.
-        #[cfg(all(rng_trng_supported, feature = "unstable"))]
-        unsafe {
-            esp_hal::rng::TrngSource::increase_entropy_source_counter()
-        };
+        #[cfg(rng_trng_supported)]
+        esp_hal::if_unstable_hal! {
+            unsafe {
+                esp_hal::rng::TrngSource::increase_entropy_source_counter()
+            };
+        }
 
         // Only create WifiController after we've enabled TRNG - otherwise returning an
         // error from this function will cause panic because WifiController::drop tries
