@@ -7,8 +7,8 @@ use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     clock::ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
     efuse,
-    peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
-    soc::{pac, regi2c},
+    peripherals::{HP_SYS, HP_SYS_CLKRST, PMU},
+    soc::pac,
 };
 
 /// MMU page size (64 KB)
@@ -61,35 +61,6 @@ pub enum PsramMode {
     // Oct,
 }
 
-/// Maximum PSRAM bus frequency.
-///
-/// This value should be tuned together with the MPLL frequency. The effective bus clock
-/// will be at most the SpiRamFreq value, obtained by dividing MPLL using an integer divider.
-///
-/// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits | Use case               |
-/// |-----------|------|-----|--------|--------|---------------|------------------------|
-/// | `Mhz20`   | 400  | 20  | 2      | 2      | 18            | Low-power / debug      |
-/// | `Mhz80`   | 320  | 4   | 2      | 2      | 18            | Conservative SI margin |
-/// | `Mhz200`  | 400  | 2   | 4      | 1      | 26            | IDF default            |
-/// | `Mhz250`  | 500  | 2   | 6      | 3      | 34            | Default                |
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum SpiRamFreq {
-    /// 20 MHz.
-    Mhz20  = 20,
-
-    /// 80 MHz.
-    Mhz80  = 80,
-
-    /// 200 MHz.
-    Mhz200 = 200,
-
-    /// 250 MHz.
-    #[default]
-    Mhz250 = 250,
-}
-
 /// PSRAM configuration.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -97,10 +68,12 @@ pub enum SpiRamFreq {
 pub struct PsramConfig {
     /// PSRAM interface mode (Hex 16-line vs Oct 8-line). Default: Hex.
     pub mode: PsramMode,
+
     /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
     pub size: PsramSize,
-    /// PSRAM bus frequency. Default: 250 MHz.
-    pub ram_frequency: SpiRamFreq,
+
+    /// PSRAM timing parameters. Default: 250 MHz.
+    pub timing: PsramTimingParams,
     // TODO: ECC enable.
     // The MSPI0 controller has a ECC engine.
     // pub ecc: bool, // or any other enum.
@@ -116,62 +89,96 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     start..start + config.size.get()
 }
 
-/// Per-speed timing parameters.
-#[derive(Copy, Clone)]
-struct SpeedParams {
-    /// Bus clock divider applied to MPLL.
-    bus_div: u32,
+/// PSRAM timing parameters.
+///
+/// These values should be tuned together with the MPLL frequency. The MPLL frequency must be an
+/// integer multiple of the PSRAM frequency.
+///
+/// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits
+/// |-----------|------|-----|--------|--------|--------------
+/// | `MHZ_20`  | 400  | 20  | 2      | 2      | 18
+/// | `MHZ_80`  | 320  | 4   | 2      | 2      | 18
+/// | `MHZ_125` | 500  | 4   | 2      | 2      | 18
+/// | `MHZ_200` | 400  | 2   | 4      | 1      | 26
+/// | `MHZ_250` | 500  | 2   | 6      | 3      | 34
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PsramTimingParams {
+    /// Bus clock frequency in MHz. Must divide MPLL evenly.
+    pub clock: u32,
+
     /// MR0.read_latency field value (cycles = 2 * value + 6).
-    mr0_rl: u8,
+    pub mr0_rl: u8,
+
     /// MR4.wr_latency field value.
-    mr4_wl: u8,
+    pub mr4_wl: u8,
+
     /// Read dummy length in bits for sync data reads (cache path).
-    rd_dummy_bits: u32,
+    pub rd_dummy_bits: u32,
+
     /// Write dummy length in bits for sync data writes (cache path).
-    wr_dummy_bits: u32,
+    pub wr_dummy_bits: u32,
+
     /// Register-read dummy length for direct command path (MSPI3).
-    reg_dummy_bits: u32,
+    pub reg_dummy_bits: u32,
 }
 
-impl SpeedParams {
-    const fn for_freq(f: SpiRamFreq, mpll_mhz: u32) -> Self {
-        let ram_freq = f as u32;
-        let bus_div = mpll_mhz.div_ceil(ram_freq);
-        match f {
-            SpiRamFreq::Mhz20 => Self {
-                bus_div,
-                mr0_rl: 2,
-                mr4_wl: 2,
-                rd_dummy_bits: 18, // 2*(10-1)
-                wr_dummy_bits: 8,  // 2*(5-1)
-                reg_dummy_bits: 8, // 2*(5-1)
-            },
-            SpiRamFreq::Mhz80 => Self {
-                bus_div,
-                mr0_rl: 2,
-                mr4_wl: 2,
-                rd_dummy_bits: 18,
-                wr_dummy_bits: 8,
-                reg_dummy_bits: 8,
-            },
-            SpiRamFreq::Mhz200 => Self {
-                bus_div,
-                mr0_rl: 4,
-                mr4_wl: 1,
-                rd_dummy_bits: 26, // 2*(14-1)
-                wr_dummy_bits: 12, // 2*(7-1)
-                reg_dummy_bits: 12,
-            },
-            SpiRamFreq::Mhz250 => Self {
-                bus_div,
-                mr0_rl: 6,
-                mr4_wl: 3,
-                rd_dummy_bits: 34, // 2*(18-1)
-                wr_dummy_bits: 16, // 2*(9-1)
-                reg_dummy_bits: 16,
-            },
-        }
+impl Default for PsramTimingParams {
+    fn default() -> Self {
+        Self::MHZ_250
     }
+}
+
+impl PsramTimingParams {
+    /// Preset for 20 MHz clock speed.
+    pub const MHZ_20: Self = Self {
+        clock: 20,
+        mr0_rl: 2,
+        mr4_wl: 2,
+        rd_dummy_bits: 18,
+        wr_dummy_bits: 8,
+        reg_dummy_bits: 8,
+    };
+
+    /// Preset for 80 MHz clock speed.
+    pub const MHZ_80: Self = Self {
+        clock: 80,
+        mr0_rl: 2,
+        mr4_wl: 2,
+        rd_dummy_bits: 18,
+        wr_dummy_bits: 8,
+        reg_dummy_bits: 8,
+    };
+
+    /// Preset for 125 MHz clock speed.
+    pub const MHZ_125: Self = Self {
+        clock: 125,
+        mr0_rl: 2,
+        mr4_wl: 2,
+        rd_dummy_bits: 18,
+        wr_dummy_bits: 8,
+        reg_dummy_bits: 8,
+    };
+
+    /// Preset for 200 MHz clock speed.
+    pub const MHZ_200: Self = Self {
+        clock: 200,
+        mr0_rl: 4,
+        mr4_wl: 1,
+        rd_dummy_bits: 26,
+        wr_dummy_bits: 12,
+        reg_dummy_bits: 12,
+    };
+
+    /// Preset for 250 MHz clock speed.
+    pub const MHZ_250: Self = Self {
+        clock: 250,
+        mr0_rl: 6,
+        mr4_wl: 3,
+        rd_dummy_bits: 34,
+        wr_dummy_bits: 16,
+        reg_dummy_bits: 16,
+    };
 }
 
 /// CS timing constants (matches IDF AP_HEX_PSRAM_CS_*). Independent of
@@ -185,8 +192,6 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
     psram_phy_ldo_init();
 
     ClockTree::with(request_mpll_clk);
-
-    let params = SpeedParams::for_freq(config.ram_frequency, mpll_clk_frequency() / 1_000_000);
 
     // Module clock + clock source
     HP_SYS_CLKRST::regs()
@@ -204,19 +209,21 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
         });
 
     // Controller + PHY pad bring-up.
-    set_bus_clock(params.bus_div);
+    if !set_bus_clock(config.timing.clock) {
+        return false;
+    }
     enable_dll();
     psram_pad_init(); // required for DDR strobe latch
     set_cs_timing();
 
     // SoC MR init (via MSPI3 SPI direct)
-    init_mr_registers(params);
+    init_mr_registers(&config.timing);
 
     if config.size.is_auto() {
-        config.size = PsramSize::Size(psram_detect_size(params));
+        config.size = PsramSize::Size(psram_detect_size(&config.timing));
     }
 
-    configure_psram_mspi(params, MSPI0_BASE); // basic AXI configuration here
+    configure_psram_mspi(&config.timing, MSPI0_BASE); // basic AXI configuration here
 
     // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
     // reset before the real MMU mapping is committed.  Port of IDF's
@@ -235,7 +242,18 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
 /// PSRAM_MSPI1 (CLOCK at 0x14). For divider=2 the value is
 /// (N=1)<<16 | (H=0)<<8 | (L=1)<<0 = 0x00010001. For divider=1 the
 /// fast path bit `CLK_EQU_SYSCLK` (bit 31) is set instead.
-fn set_bus_clock(div: u32) {
+fn set_bus_clock(clock: u32) -> bool {
+    let mpll_mhz = mpll_clk_frequency() / 1_000_000;
+    if !mpll_mhz.is_multiple_of(clock) {
+        error!(
+            "MPLL frequency must be an integer multiple of PSRAM frequency. MPLL={} MHz, PSRAM={} MHz",
+            mpll_mhz, clock
+        );
+        return false;
+    }
+
+    let div = mpll_mhz / clock;
+
     const MSPI0_SRAM_CLK: u32 = MSPI0_BASE + 0x50;
     const MSPI1_CLOCK: u32 = MSPI1_BASE + 0x14;
 
@@ -248,6 +266,8 @@ fn set_bus_clock(div: u32) {
         mmio_write_32(MSPI0_SRAM_CLK, val);
         mmio_write_32(MSPI1_CLOCK, val);
     }
+
+    true
 }
 
 /// Enable DLL timing calibration for both controllers. Both DLL bits
@@ -419,8 +439,8 @@ const MR_ADDR_MR8_MR9: u32 = 0x8;
 /// (MR_ADDR_MR4_MR5 / MR_ADDR_MR6 / MR_ADDR_MR8_MR9 — see the table at the
 /// `MR_ADDR_*` constants), the `high` value is don't-care and the
 /// caller should ignore it.
-fn psram_mr_read(speed_params: SpeedParams, mr_addr: u32) -> (u8, u8) {
-    let pair = mspi1_reg_read16(speed_params, mr_addr);
+fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
+    let pair = mspi1_reg_read16(timing, mr_addr);
     ((pair & 0xFF) as u8, ((pair >> 8) & 0xFF) as u8)
 }
 
@@ -440,23 +460,23 @@ fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
 /// MR8: bl[1:0], bt[2], rbx[3], x16[6]
-fn init_mr_registers(speed_params: SpeedParams) {
+fn init_mr_registers(timing: &PsramTimingParams) {
     // Read+modify+write MR0 (preserve MR1 high byte).
-    let (mut mr0, mr1) = psram_mr_read(speed_params, MR_ADDR_MR0_MR1);
+    let (mut mr0, mr1) = psram_mr_read(timing, MR_ADDR_MR0_MR1);
     mr0 &= !(0x3 | (0x7 << 2) | (1 << 5));
-    mr0 |= ((speed_params.mr0_rl & 0x7) << 2) | (1 << 5);
+    mr0 |= ((timing.mr0_rl & 0x7) << 2) | (1 << 5);
     psram_mr_write(MR_ADDR_MR0_MR1, mr0, mr1);
 
     // Read+modify+write MR4 (preserve MR5 reserved high byte).
-    let (mut mr4, mr5) = psram_mr_read(speed_params, MR_ADDR_MR4_MR5);
+    let (mut mr4, mr5) = psram_mr_read(timing, MR_ADDR_MR4_MR5);
     mr4 &= !(0x7 << 5);
-    mr4 |= (speed_params.mr4_wl & 0x7) << 5;
+    mr4 |= (timing.mr4_wl & 0x7) << 5;
     psram_mr_write(MR_ADDR_MR4_MR5, mr4, mr5);
 
     // do nothing for MR6 and MR7
 
     // Read+modify+write MR8 (high byte is reserved/absent — pass 0).
-    let (mut mr8, mr9) = psram_mr_read(speed_params, MR_ADDR_MR8_MR9); // MR9 is unused
+    let (mut mr8, mr9) = psram_mr_read(timing, MR_ADDR_MR8_MR9); // MR9 is unused
     mr8 &= !(0x3 | (1 << 2) | (1 << 3) | (1 << 6));
     mr8 |= 3 // bt = 0
         | (1 << 3) // rbx = 1
@@ -500,10 +520,6 @@ unsafe extern "C" {
 
     /// `Cache_Invalidate_All = 0x4fc00404`. Invalidates all cache levels.
     fn Cache_Invalidate_All();
-}
-
-unsafe fn rom_cache_invalidate_all() {
-    unsafe { Cache_Invalidate_All() }
 }
 
 /// Kick the controller (set `SPI_USR` bit 18 in CMD_REG) and poll
@@ -556,7 +572,7 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
 /// 32-bit address, 16-bit MISO) through `PSRAM_MSPI1`. Setup via ROM
 /// helpers (`set_op_mode` + `cmd_config`); kick + poll done manually
 /// with a timeout (avoids ROM `cmd_start` poll-forever pitfall).
-fn mspi1_reg_read16(speed_params: SpeedParams, addr: u32) -> u16 {
+fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     const REG_READ_CMD: u16 = 0x4040;
     const CMD_BITLEN: u16 = 16;
     const ADDR_BITLEN: u32 = 32;
@@ -573,7 +589,7 @@ fn mspi1_reg_read16(speed_params: SpeedParams, addr: u32) -> u16 {
         tx_data_bit_len: 0,
         rx_data: rx.as_mut_ptr() as *mut u32,
         rx_data_bit_len: DATA_BITLEN,
-        dummy_bit_len: speed_params.reg_dummy_bits,
+        dummy_bit_len: timing.reg_dummy_bits,
     };
 
     unsafe {
@@ -616,7 +632,7 @@ fn mspi1_reg_write16(addr: u32, data: u16) {
 }
 
 /// Detect PSRAM size by reading mode register MR2 via MSPI1.
-fn psram_detect_size(speed_params: SpeedParams) -> usize {
+fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
     let (mr2, _mr3) = psram_mr_read(speed_params, MR_ADDR_MR2_MR3);
     match mr2 & 0x7 {
         0x1 => 4 * 1024 * 1024,  //  32 Mbit
@@ -678,7 +694,7 @@ fn mmu_map_psram(config: &PsramConfig) {
         write_psram_mmu_entry(page as u32, page as u16);
     }
     unsafe {
-        rom_cache_invalidate_all();
+        Cache_Invalidate_All();
     }
 }
 
@@ -876,10 +892,10 @@ fn p4_rev3_psram_workaround() {
 ///                    bit 2 `smem_ddr_rdat_swp`, bit 3 `smem_ddr_wdat_swp`.
 ///
 /// `CACHE_FCTRL` (0x3C): bit 0 `mem_axi_req_en`, bit 1 `close_axi_inf_en`.
-fn configure_psram_mspi(speed_params: SpeedParams, base: u32) {
+fn configure_psram_mspi(timing: &PsramTimingParams, base: u32) {
     // Dummy bit-counts come from the active speed parameter table.
-    let rd_dummy_n = speed_params.rd_dummy_bits;
-    let wr_dummy_n = speed_params.wr_dummy_bits;
+    let rd_dummy_n = timing.rd_dummy_bits;
+    let wr_dummy_n = timing.wr_dummy_bits;
 
     unsafe {
         // CACHE_SCTRL.
