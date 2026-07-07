@@ -120,10 +120,7 @@ pub(crate) fn bind_default_interrupt_handler() {
 
     interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
 
-    // On ESP32, there are separate interrupt status registers for each core, we need to enable the
-    // interrupt handler on each core otherwise GPIOs listening on the App CPU will not receive
-    // interrupts.
-    super::low_level::enable_additional_default_interrupts(Interrupt::GPIO, Priority::Priority1);
+    super::low_level::enable_interrupt_on_second_core(Priority::Priority1);
 }
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.

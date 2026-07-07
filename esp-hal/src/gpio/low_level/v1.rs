@@ -1,7 +1,11 @@
 use super::{GpioBank, InterruptStatusRegisterAccess};
-use crate::{gpio::AnyPin, peripherals::GPIO, system::Cpu};
+use crate::{
+    gpio::AnyPin,
+    peripherals::{GPIO, Interrupt},
+    system::Cpu,
+};
 
-pub(super) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
+pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     match bank {
         GpioBank::_0 => GPIO::regs().status().read().bits(),
         #[cfg(gpio_has_bank_1)]
@@ -9,7 +13,7 @@ pub(super) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     }
 }
 
-pub(super) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u32 {
+pub(crate) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u32 {
     match access {
         InterruptStatusRegisterAccess::Bank0 => GPIO::regs().status().read().bits(),
         #[cfg(gpio_has_bank_1)]
@@ -17,11 +21,11 @@ pub(super) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u3
     }
 }
 
-pub(super) fn prepare_pin_pull(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
+pub(crate) fn prepare_pin_pull(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
     errata36(pin, pull_up, pull_down);
 }
 
-pub(super) fn gpio_intr_enable(int_enable: bool) -> u8 {
+pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
     match Cpu::current() {
         Cpu::AppCpu => int_enable as u8,
         Cpu::ProCpu => (int_enable as u8) << 2,
@@ -29,11 +33,8 @@ pub(super) fn gpio_intr_enable(int_enable: bool) -> u8 {
 }
 
 #[cfg(feature = "rt")]
-pub(super) fn enable_additional_default_interrupts(
-    interrupt: crate::peripherals::Interrupt,
-    priority: crate::interrupt::Priority,
-) {
-    crate::interrupt::enable_on_cpu(Cpu::AppCpu, interrupt, priority);
+pub(crate) fn enable_interrupt_on_second_core(priority: crate::interrupt::Priority) {
+    crate::interrupt::enable_on_cpu(Cpu::AppCpu, Interrupt::GPIO, priority);
 }
 
 fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {

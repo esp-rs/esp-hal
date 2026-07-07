@@ -5,8 +5,8 @@ mod version;
 
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
+pub(crate) use version::{enable_interrupt_on_second_core, gpio_intr_enable, prepare_pin_pull};
 
-use super::AnyPin;
 use crate::peripherals::GPIO;
 
 #[doc(hidden)]
@@ -142,22 +142,6 @@ pub(crate) fn bank(_gpio_num: u8) -> GpioBank {
     }
 
     GpioBank::_0
-}
-
-pub(crate) fn prepare_pin_pull(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
-    version::prepare_pin_pull(pin, pull_up, pull_down);
-}
-
-pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
-    version::gpio_intr_enable(int_enable)
-}
-
-#[cfg(feature = "rt")]
-pub(crate) fn enable_additional_default_interrupts(
-    interrupt: crate::peripherals::Interrupt,
-    priority: crate::interrupt::Priority,
-) {
-    version::enable_additional_default_interrupts(interrupt, priority);
 }
 
 /// Set GPIO event listening.
