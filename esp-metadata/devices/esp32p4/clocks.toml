@@ -1,9 +1,9 @@
 system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
-    { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "400_000_000" }, # eco5 default 400MHz
-    { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480_000_000" }, # System PLL
-    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500_000_000" }, # Media PLL
+    { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "360, 400", output = "VALUE * 1_000_000" },
+    { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "240, 480", output = "VALUE * 1_000_000" },
+    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "320, 400, 500", output = "VALUE * 1_000_000" },
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
     # Low-speed clocks
@@ -21,7 +21,7 @@ system_clocks = { clock_tree = [
 
     # MPLL divider taps
     { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
-    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10"  },
+    { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10" },
 
     # XTAL half
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
