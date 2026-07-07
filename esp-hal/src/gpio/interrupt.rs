@@ -55,13 +55,7 @@ use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;
 
 use crate::{
-    gpio::{
-        AnyPin,
-        GPIO_LOCK,
-        GpioBank,
-        InputPin,
-        low_level::{InterruptStatusRegisterAccess, set_int_enable},
-    },
+    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
     interrupt::{self, Priority},
     peripherals::Interrupt,
     ram,
@@ -241,10 +235,10 @@ pub(super) unsafe fn wake_pin_impl(pin: u8) {
 }
 
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
+    let intrs_bank0 = GpioBank::_0.read_interrupt_status_of_current_cpu();
 
     #[cfg(gpio_has_bank_1)]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
+    let intrs_bank1 = GpioBank::_1.read_interrupt_status_of_current_cpu();
 
     [
         (GpioBank::_0, intrs_bank0),

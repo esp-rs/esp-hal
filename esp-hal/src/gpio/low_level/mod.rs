@@ -85,6 +85,10 @@ impl GpioBank {
         version::read_bank_interrupt_status(self)
     }
 
+    pub(crate) fn read_interrupt_status_of_current_cpu(self) -> u32 {
+        version::read_interrupt_status_of_current_cpu(self)
+    }
+
     pub(crate) fn write_interrupt_status_clear(self, word: u32) {
         match self {
             Self::_0 => GPIO::regs()
@@ -119,19 +123,6 @@ impl GpioBank {
             #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) }),
         };
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-    #[cfg(gpio_has_bank_1)]
-    Bank1,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        version::read_interrupt_status(self)
     }
 }
 

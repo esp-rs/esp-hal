@@ -1,4 +1,4 @@
-use super::{GpioBank, InterruptStatusRegisterAccess};
+use super::GpioBank;
 use crate::{
     gpio::AnyPin,
     peripherals::{GPIO, Interrupt},
@@ -8,16 +8,16 @@ use crate::{
 pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     match bank {
         GpioBank::_0 => GPIO::regs().status().read().bits(),
-        #[cfg(gpio_has_bank_1)]
         GpioBank::_1 => GPIO::regs().status1().read().bits(),
     }
 }
 
-pub(crate) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u32 {
-    match access {
-        InterruptStatusRegisterAccess::Bank0 => GPIO::regs().status().read().bits(),
-        #[cfg(gpio_has_bank_1)]
-        InterruptStatusRegisterAccess::Bank1 => GPIO::regs().status1().read().bits(),
+pub(crate) fn read_interrupt_status_of_current_cpu(bank: GpioBank) -> u32 {
+    match (Cpu::current(), bank) {
+        (Cpu::AppCpu, GpioBank::_0) => GPIO::regs().acpu_int().read().bits(),
+        (Cpu::AppCpu, GpioBank::_1) => GPIO::regs().acpu_int1().read().bits(),
+        (Cpu::ProCpu, GpioBank::_0) => GPIO::regs().pcpu_int().read().bits(),
+        (Cpu::ProCpu, GpioBank::_1) => GPIO::regs().pcpu_int1().read().bits(),
     }
 }
 
