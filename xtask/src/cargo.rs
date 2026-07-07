@@ -355,13 +355,51 @@ pub struct BuiltCommand {
     pub artifact_name: String,
     pub command: Vec<String>,
     pub env_vars: Vec<(String, String)>,
+    pub artifact_dir: Option<PathBuf>,
 }
 
 impl BuiltCommand {
     pub fn run(&self, capture: bool) -> Result<String> {
         let env_vars = self.env_vars.clone();
         let cwd = std::env::current_dir()?;
-        run_with_env(&self.command, &cwd, env_vars, capture)
+        let output = run_with_env(&self.command, &cwd, env_vars, capture)?;
+
+        if let Some(artifact_dir) = self.artifact_dir.as_deref() {
+            self.copy_artifacts(artifact_dir, &cwd).with_context(|| {
+                format!("Failed to copy artifacts to {}", artifact_dir.display())
+            })?;
+        }
+
+        Ok(output)
+    }
+
+    /// Copies the executables built by this command into `artifact_dir`.
+    ///
+    /// Re-runs the finished build with `--message-format=json` to look up the
+    /// executable paths. The second build is a no-op, so this is quick.
+    fn copy_artifacts(&self, artifact_dir: &Path, cwd: &Path) -> Result<()> {
+        let mut command = self.command.clone();
+        command.push("--message-format=json".to_string());
+
+        let output = run_with_env(&command, cwd, self.env_vars.clone(), true)?;
+
+        std::fs::create_dir_all(artifact_dir)?;
+
+        let mut copied = 0;
+        for line in output.lines() {
+            if let Ok(artifact) = serde_json::from_str::<Artifact>(line)
+                && let Some(file_name) = artifact.executable.file_name()
+            {
+                std::fs::copy(&artifact.executable, artifact_dir.join(file_name))?;
+                copied += 1;
+            }
+        }
+
+        if copied == 0 {
+            bail!("The build did not produce any executables");
+        }
+
+        Ok(())
     }
 }
 
@@ -429,6 +467,7 @@ impl CargoCommandBatcher {
                         artifact_name: String::from("batch"),
                         command: std::mem::take(&mut command),
                         env_vars: key.env_vars.clone(),
+                        artifact_dir: None,
                     });
                 }
 
@@ -466,6 +505,7 @@ impl CargoCommandBatcher {
                     artifact_name: String::from("batch"),
                     command,
                     env_vars: key.env_vars.clone(),
+                    artifact_dir: None,
                 });
             }
         }
@@ -486,22 +526,28 @@ impl CargoCommandBatcher {
     }
 
     pub fn build_one_for_cargo(item: &CargoArgsBuilder) -> BuiltCommand {
+        // `--artifact-dir` is unstable and would require `-Zunstable-options`,
+        // which stable cargo rejects. Strip it from the command and copy the
+        // artifacts after the build, instead.
+        let mut item = item.clone();
+        let artifact_dir = item
+            .args
+            .iter()
+            .position(|arg| arg == "--artifact-dir")
+            .map(|position| {
+                item.args.remove(position);
+                PathBuf::from(item.args.remove(position))
+            });
+
         BuiltCommand {
             artifact_name: item.artifact_name.clone(),
-            command: {
-                let mut args = item.build();
-
-                if item.args.iter().any(|arg| arg == "--artifact-dir") {
-                    args.push("-Zunstable-options".to_string());
-                }
-
-                args
-            },
+            command: item.build(),
             env_vars: item
                 .env_vars
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
+            artifact_dir,
         }
     }
 
