@@ -38,7 +38,6 @@ pub(super) fn set_rx_timeout(
     }
 
     if let Some(timeout) = timeout {
-        #[cfg(esp32)]
         let timeout_reg = cfg_select! {
             esp32 => timeout,
             _ => timeout as u16 * _symbol_len as u16,
