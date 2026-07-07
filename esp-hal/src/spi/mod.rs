@@ -30,7 +30,7 @@ crate::unstable_module! {
 )]
 #[cfg_attr(esp32p4, path = "clocks/esp32p4.rs")]
 #[cfg_attr(soc_has_pcr, path = "clocks/v3_pcr.rs")]
-mod v3_pcr;
+mod clocks;
 
 /// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
