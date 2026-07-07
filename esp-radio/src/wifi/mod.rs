@@ -3225,7 +3225,8 @@ ignored."
             // Compare the new ap config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.
             let mut current: wifi_config_t = core::mem::zeroed();
-            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_AP, &mut current) == include::ESP_OK as i32
+            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_AP, &mut current)
+                == include::ESP_OK as i32
                 && current.ap == cfg.ap
             {
                 return Ok(());
@@ -3278,7 +3279,8 @@ ignored."
             // Compare the new sta config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.
             let mut current: wifi_config_t = core::mem::zeroed();
-            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_STA, &mut current) == include::ESP_OK as i32
+            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_STA, &mut current)
+                == include::ESP_OK as i32
                 && current.sta == cfg.sta
             {
                 return Ok(());
