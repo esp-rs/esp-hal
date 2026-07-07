@@ -786,20 +786,3 @@ impl I2cInstance {
         });
     }
 }
-
-impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SpiFunctionClockConfig>,
-        _new_config: SpiFunctionClockConfig,
-    ) {
-        // ESP32-S2 SPI is hardwired to APB; no clock source selection register.
-    }
-}

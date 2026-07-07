@@ -563,33 +563,3 @@ impl I2cInstance {
         });
     }
 }
-
-impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs()
-                .spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_en().bit(en)),
-        };
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SpiFunctionClockConfig>,
-        new_config: SpiFunctionClockConfig,
-    ) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs().spi2_clkm_conf().modify(|_, w| unsafe {
-                w.spi2_clkm_div_num().bits(0);
-                w.spi2_clkm_sel().bits(match new_config {
-                    SpiFunctionClockConfig::Xtal => 0,
-                    SpiFunctionClockConfig::PllF160m => 1,
-                    SpiFunctionClockConfig::RcFast => 2,
-                })
-            }),
-        };
-    }
-}
