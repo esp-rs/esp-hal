@@ -42,6 +42,7 @@ peripherals = [
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
+    { name = "MMU_TABLE", hidden = true },
     { name = "GPIO" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },

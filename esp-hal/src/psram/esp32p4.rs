@@ -7,7 +7,7 @@ use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     efuse,
     peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
-    soc::regi2c,
+    soc::{pac, regi2c},
 };
 
 /// MMU page size (64 KB)
@@ -270,7 +270,7 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
         p4_rev3_psram_workaround();
     }
 
-    mmu_map_psram(MSPI0_BASE, config); // MMU mapping here
+    mmu_map_psram(config); // MMU mapping here
 
     true
 }
@@ -672,6 +672,27 @@ fn psram_detect_size(speed_params: SpeedParams) -> usize {
     }
 }
 
+/// PSRAM_MSPI0 register block (same layout as `SPI0`, different base address).
+#[inline(always)]
+fn psram_mspi0() -> &'static pac::spi0::RegisterBlock {
+    unsafe { &*(MSPI0_BASE as *const pac::spi0::RegisterBlock) }
+}
+
+fn select_psram_mmu_entry(entry_id: u32) {
+    psram_mspi0()
+        .mmu_item_index()
+        .write(|w| unsafe { w.mmu_item_index().bits(entry_id) });
+}
+
+fn write_psram_mmu_entry(entry_id: u32, page: u16) {
+    select_psram_mmu_entry(entry_id);
+    psram_mspi0().mmu_item_content().write(|w| {
+        unsafe { w.paddr().bits(page) };
+        w.access_spiram().set_bit();
+        w.spiram_valid().set_bit()
+    });
+}
+
 /// Map PSRAM physical pages into the virtual address space via MMU.
 ///
 /// ESP32-P4 has TWO independent MMUs:
@@ -689,13 +710,7 @@ fn psram_detect_size(speed_params: SpeedParams) -> usize {
 /// is a separate table from the flash MMU, so PSRAM entries start at
 /// **entry index 0**, not at some offset relative to the flash range.
 /// `entry_id = (vaddr - 0x4800_0000) / 0x10000`.
-fn mmu_map_psram(mspi_base: u32, config: &PsramConfig) {
-    const MMU_ITEM_CONTENT: u32 = 0x37C;
-    const MMU_ITEM_INDEX: u32 = 0x380;
-    const MMU_PSRAM_VALID: u32 = 1 << 11;
-    const MMU_ACCESS_PSRAM: u32 = 1 << 10;
-    const MMU_PADDR_MASK: u32 = 0x3FF; // 10 bits of physical page number
-
+fn mmu_map_psram(config: &PsramConfig) {
     let page_count = config.size.get() / MMU_PAGE_SIZE;
 
     // Note: we do NOT call Cache_Suspend_*. The ROM helpers expect
@@ -703,15 +718,10 @@ fn mmu_map_psram(mspi_base: u32, config: &PsramConfig) {
     // hang. Since at init time nothing else is reading PSRAM via cache
     // yet, we can write the MMU entries unsynchronized and then
     // invalidate to drop any stale prefetched lines.
+    for page in 0..page_count {
+        write_psram_mmu_entry(page as u32, page as u16);
+    }
     unsafe {
-        let index_reg = mspi_base + MMU_ITEM_INDEX;
-        let content_reg = mspi_base + MMU_ITEM_CONTENT;
-        for page in 0..page_count {
-            let entry_id = page as u32; // PSRAM table starts at entry 0
-            let content = MMU_PSRAM_VALID | MMU_ACCESS_PSRAM | (page as u32 & MMU_PADDR_MASK);
-            mmio_write_32(index_reg, entry_id);
-            mmio_write_32(content_reg, content);
-        }
         rom_cache_invalidate_all();
     }
 }
@@ -904,15 +914,7 @@ fn p4_rev3_psram_workaround() {
     unsafe {
         // Map physical PSRAM page 0 to MMU entry 0 so both 0x4800_0000 and
         // its uncached alias 0x8800_0000 reach the PSRAM hardware.
-        const MMU_ITEM_INDEX: u32 = MSPI0_BASE + 0x380;
-        const MMU_ITEM_CONTENT: u32 = MSPI0_BASE + 0x37C;
-        const PSRAM_VALID: u32 = 1 << 11;
-        const ACCESS_PSRAM: u32 = 1 << 10;
-        mmio_write_32(MMU_ITEM_INDEX, 0);
-        mmio_write_32(
-            MMU_ITEM_CONTENT,
-            PSRAM_VALID | ACCESS_PSRAM, // phys page 0
-        );
+        write_psram_mmu_entry(0, 0);
 
         // Two dummy reads at the uncached PSRAM alias; result is discarded.
         // The reads are expected to fail (garbage data) but must hit the controller.

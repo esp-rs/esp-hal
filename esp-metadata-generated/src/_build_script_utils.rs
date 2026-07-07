@@ -222,6 +222,7 @@ impl Chip {
                     "soc_has_io_mux",
                     "soc_has_ledc",
                     "soc_has_mcpwm0",
+                    "soc_has_mmu_table",
                     "soc_has_mcpwm1",
                     "soc_has_nrx",
                     "soc_has_pcnt",
@@ -446,6 +447,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_io_mux",
                     "cargo:rustc-cfg=soc_has_ledc",
                     "cargo:rustc-cfg=soc_has_mcpwm0",
+                    "cargo:rustc-cfg=soc_has_mmu_table",
                     "cargo:rustc-cfg=soc_has_mcpwm1",
                     "cargo:rustc-cfg=soc_has_nrx",
                     "cargo:rustc-cfg=soc_has_pcnt",
@@ -818,6 +820,7 @@ impl Chip {
                     "soc_has_ecc",
                     "soc_has_efuse",
                     "soc_has_extmem",
+                    "soc_has_mmu_table",
                     "soc_has_gpio",
                     "soc_has_i2c_ana_mst",
                     "soc_has_i2c0",
@@ -988,6 +991,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ecc",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_extmem",
+                    "cargo:rustc-cfg=soc_has_mmu_table",
                     "cargo:rustc-cfg=soc_has_gpio",
                     "cargo:rustc-cfg=soc_has_i2c_ana_mst",
                     "cargo:rustc-cfg=soc_has_i2c0",
@@ -1265,6 +1269,7 @@ impl Chip {
                     "soc_has_ds",
                     "soc_has_efuse",
                     "soc_has_extmem",
+                    "soc_has_mmu_table",
                     "soc_has_fe",
                     "soc_has_fe2",
                     "soc_has_gpio",
@@ -1501,6 +1506,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ds",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_extmem",
+                    "cargo:rustc-cfg=soc_has_mmu_table",
                     "cargo:rustc-cfg=soc_has_fe",
                     "cargo:rustc-cfg=soc_has_fe2",
                     "cargo:rustc-cfg=soc_has_gpio",
@@ -5236,6 +5242,7 @@ impl Chip {
                     "soc_has_ds",
                     "soc_has_efuse",
                     "soc_has_extmem",
+                    "soc_has_mmu_table",
                     "soc_has_fe",
                     "soc_has_fe2",
                     "soc_has_gpio",
@@ -5472,6 +5479,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ds",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_extmem",
+                    "cargo:rustc-cfg=soc_has_mmu_table",
                     "cargo:rustc-cfg=soc_has_fe",
                     "cargo:rustc-cfg=soc_has_fe2",
                     "cargo:rustc-cfg=soc_has_gpio",
@@ -5904,6 +5912,7 @@ impl Chip {
                     "soc_has_ds",
                     "soc_has_efuse",
                     "soc_has_extmem",
+                    "soc_has_mmu_table",
                     "soc_has_gpio",
                     "soc_has_gpio_sd",
                     "soc_has_hmac",
@@ -6186,6 +6195,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ds",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_extmem",
+                    "cargo:rustc-cfg=soc_has_mmu_table",
                     "cargo:rustc-cfg=soc_has_gpio",
                     "cargo:rustc-cfg=soc_has_gpio_sd",
                     "cargo:rustc-cfg=soc_has_hmac",
@@ -6739,6 +6749,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_io_mux)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ledc)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mmu_table)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mcpwm1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_nrx)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pcnt)");

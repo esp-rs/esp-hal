@@ -41,6 +41,7 @@ peripherals = [
     { name = "DS" },
     { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
+    { name = "MMU_TABLE", hidden = true },
     { name = "FE" },
     { name = "FE2" },
     { name = "GPIO" },
