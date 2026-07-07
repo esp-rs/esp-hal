@@ -18,13 +18,13 @@ pub(super) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u3
 }
 
 pub(super) fn prepare_pin_pull(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
-    crate::soc::gpio::errata36(unsafe { pin.clone_unchecked() }, pull_up, pull_down);
+    errata36(pin, pull_up, pull_down);
 }
 
 pub(super) fn gpio_intr_enable(int_enable: bool) -> u8 {
     match Cpu::current() {
         Cpu::AppCpu => int_enable as u8,
-        Cpu::ProCpu => ((int_enable as u8) << 2),
+        Cpu::ProCpu => (int_enable as u8) << 2,
     }
 }
 
@@ -34,4 +34,19 @@ pub(super) fn enable_additional_default_interrupts(
     priority: crate::interrupt::Priority,
 ) {
     crate::interrupt::enable_on_cpu(Cpu::AppCpu, interrupt, priority);
+}
+
+fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
+    use crate::gpio::{Pin, RtcPinWithResistors};
+
+    for_each_lp_function! {
+        (all_expanded $( (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) ),* ) => {
+            const RTC_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
+        };
+    };
+
+    if RTC_IO_PINS.contains(&pin.number()) && pin.is_output() {
+        pin.rtcio_pullup(pull_up);
+        pin.rtcio_pulldown(pull_down);
+    }
 }

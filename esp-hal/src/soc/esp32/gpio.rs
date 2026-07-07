@@ -274,21 +274,6 @@ macro_rules! touch {
     };
 }
 
-pub(crate) fn errata36(pin: crate::gpio::AnyPin<'_>, pull_up: bool, pull_down: bool) {
-    use crate::gpio::{Pin, RtcPinWithResistors};
-
-    for_each_lp_function! {
-        (all_expanded $( (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) ),* ) => {
-            const RTC_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
-        };
-    };
-
-    if RTC_IO_PINS.contains(&pin.number()) && pin.is_output() {
-        pin.rtcio_pullup(pull_up);
-        pin.rtcio_pulldown(pull_down);
-    }
-}
-
 rtcio_analog! {
     (GPIO36, 0,  sensor_pads(),    sense1_, sense1    )
     (GPIO37, 1,  sensor_pads(),    sense2_, sense2    )
