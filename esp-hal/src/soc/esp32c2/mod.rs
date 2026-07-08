@@ -14,4 +14,5 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c2 as pac;
 
+pub(crate) fn riscv_preinit() {}
 pub(crate) fn pre_init() {}
