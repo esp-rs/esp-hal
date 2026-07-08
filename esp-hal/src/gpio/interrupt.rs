@@ -55,22 +55,14 @@ use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;
 
 use crate::{
-    gpio::{
-        AnyPin,
-        GPIO_LOCK,
-        GpioBank,
-        InputPin,
-        low_level::{InterruptStatusRegisterAccess, set_int_enable},
-    },
-    interrupt::Priority,
+    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
+    interrupt::{self, Priority},
     peripherals::Interrupt,
     ram,
+    system::Cpu,
 };
 #[cfg(feature = "rt")]
-use crate::{
-    handler,
-    interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
-};
+use crate::{handler, interrupt::DEFAULT_INTERRUPT_HANDLER};
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
@@ -109,34 +101,29 @@ pub(crate) fn bind_default_interrupt_handler() {
     // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
     let mut is_mapped = false;
-    super::low_level::for_each_interrupt_core(|cpu| {
+    for cpu in Cpu::all() {
         if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
             is_mapped = true;
         }
-    });
+    }
 
     if is_mapped {
         info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
         return;
     }
 
-    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
-
-    // On ESP32, there are separate interrupt status registers for each core, we need to enable the
-    // interrupt handler on each core otherwise GPIOs listening on the App CPU will not receive
-    // interrupts.
-    super::low_level::enable_additional_default_interrupts(Interrupt::GPIO, Priority::Priority1);
+    super::low_level::enable_interrupt(default_gpio_interrupt_handler);
 }
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
 pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    super::low_level::for_each_interrupt_core(|cpu| {
+    for cpu in Cpu::all() {
         // Only change priority if the interrupt is mapped to the core, otherwise we would enable
         // the interrupt unconditionally, which we don't want to do.
-        if crate::interrupt::mapped_to(cpu, interrupt).is_some() {
-            crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
+        if interrupt::mapped_to(cpu, interrupt).is_some() {
+            interrupt::enable_on_cpu(cpu, interrupt, priority);
         }
-    });
+    }
 }
 
 /// The default GPIO interrupt handler, when the user has not set one.
@@ -246,10 +233,10 @@ pub(super) unsafe fn wake_pin_impl(pin: u8) {
 }
 
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
+    let intrs_bank0 = GpioBank::_0.read_interrupt_status_of_current_cpu();
 
     #[cfg(gpio_has_bank_1)]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
+    let intrs_bank1 = GpioBank::_1.read_interrupt_status_of_current_cpu();
 
     [
         (GpioBank::_0, intrs_bank0),

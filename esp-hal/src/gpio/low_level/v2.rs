@@ -1,7 +1,12 @@
-use super::{GpioBank, InterruptStatusRegisterAccess};
+use super::GpioBank;
 use crate::{gpio::AnyPin, peripherals::GPIO};
+#[cfg(feature = "rt")]
+use crate::{
+    interrupt::{self, InterruptHandler},
+    peripherals::Interrupt,
+};
 
-pub(super) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
+pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     match bank {
         GpioBank::_0 => GPIO::regs().status().read().bits(),
         #[cfg(gpio_has_bank_1)]
@@ -9,27 +14,21 @@ pub(super) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
     }
 }
 
-pub(super) fn read_interrupt_status(access: InterruptStatusRegisterAccess) -> u32 {
-    match access {
-        InterruptStatusRegisterAccess::Bank0 => GPIO::regs().pcpu_int().read().bits(),
+pub(crate) fn read_interrupt_status_of_current_cpu(bank: GpioBank) -> u32 {
+    match bank {
+        GpioBank::_0 => GPIO::regs().pcpu_int().read().bits(),
         #[cfg(gpio_has_bank_1)]
-        InterruptStatusRegisterAccess::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
+        GpioBank::_1 => GPIO::regs().pcpu_int1().read().bits(),
     }
 }
 
-pub(super) fn prepare_pin_pull(_pin: &AnyPin<'_>, _pull_up: bool, _pull_down: bool) {}
+pub(crate) fn prepare_pin_pull(_pin: &AnyPin<'_>, _pull_up: bool, _pull_down: bool) {}
 
-pub(super) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8 | ((nmi_enable as u8) << 1)
-}
-
-pub(super) fn for_each_interrupt_core(mut f: impl FnMut(crate::system::Cpu)) {
-    f(crate::system::Cpu::current());
+pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
+    int_enable as u8
 }
 
 #[cfg(feature = "rt")]
-pub(super) fn enable_additional_default_interrupts(
-    _interrupt: crate::peripherals::Interrupt,
-    _priority: crate::interrupt::Priority,
-) {
+pub(crate) fn enable_interrupt(handler: InterruptHandler) {
+    interrupt::bind_handler(Interrupt::GPIO, handler);
 }
