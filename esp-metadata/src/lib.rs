@@ -344,6 +344,7 @@ impl PeripheralDef {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Device {
     name: String,
     arch: Arch,

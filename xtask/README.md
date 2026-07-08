@@ -41,6 +41,8 @@ Usage: esp-devtool build examples [OPTIONS] <EXAMPLE>
 ```
 
 > Tip: To avoid rebuilding the xtask, you can install it using `cargo install-xtask` from the repo root once, then call `esp-devtool <command>`.
+>
+> You will need to reinstall from time to time, for example when a new driver is added to `esp-metadata`.
 
 ## Releasing crates
 
