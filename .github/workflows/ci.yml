@@ -523,18 +523,18 @@ jobs:
       - name: Build xtask for HIL runners
         if: steps.xtask-cache.outputs.cache-hit != 'true'
         run: |
-          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
-          cross build --release --target aarch64-unknown-linux-gnu -p xtask
+          cross build --release --target armv7-unknown-linux-gnueabihf -p esp-devtool
+          cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
 
       - uses: actions/upload-artifact@v6
         with:
           name: xtask-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/xtask
+          path: target/armv7-unknown-linux-gnueabihf/release/esp-devtool
 
       - uses: actions/upload-artifact@v6
         with:
           name: xtask-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/xtask
+          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
 
       - name: Build hil-test tests
         run: |
@@ -609,14 +609,14 @@ jobs:
           [ -f ~/setup.sh ] && source ~/setup.sh
 
           export PATH=$PATH:/home/espressif/.cargo/bin
-          chmod +x xtask
-          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
+          chmod +x esp-devtool
+          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
 
       - name: Clean up
         if: always()
         run: |
           rm -rf tests/ || true
-          rm -f xtask || true
+          rm -f esp-devtool || true
 
   # Radio HIL device runs — wifi/BT capable chips on dedicated radio runners.
   # Not gated by hil-gate or ci-result.
@@ -691,15 +691,15 @@ jobs:
           [ -f ~/setup.sh ] && source ~/setup.sh
 
           export PATH=$PATH:/home/espressif/.cargo/bin
-          chmod +x xtask
+          chmod +x esp-devtool
 
-          ./xtask run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
+          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
 
       - name: Clean up
         if: always()
         run: |
           rm -rf tests/ || true
-          rm -f xtask || true
+          rm -f esp-devtool || true
 
   # Merge gate for hil-run matrix legs.  Blocks when ≥50% of legs that actually
   # ran tests failed or were cancelled.  Skipped legs (no ELFs for that chip)
