@@ -166,6 +166,11 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 ## API Surface
 
 - API documentation must be provided for every new driver and API.
+- All new public API must be marked as unstable until it is deliberately stabilized.
+  - Prefer `#[instability::unstable]` on each public item (type, function, trait, constant, etc.).
+  - Use the attribute on each public function instead of inherent impl blocks.
+  - For entire modules, use the `unstable_module!` macro.
+  - Downstream libraries must not enable the `unstable` feature; use `requires-unstable` instead.
 - Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
     - For the time being, this includes any `Instance` traits, and `State` or `Info` structs as well.
@@ -201,9 +206,7 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 - Generally, follow common "good practices" and idiomatic Rust style
 - All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
 - Prefer `core::cfg_select!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_select!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
-- When marking an API as `unstable`:
-  - Prefer to use `#[instability::unstable]`.
-  - Use the attribute on each public function instead of inherent impl blocks.
+- When marking an API as `unstable`, prefer `#[instability::unstable]` (see [API Surface](#api-surface)).
 - The documentation should contain no more than three primary impl blocks (excluding trait implementations):
   - Blocking: Should be listed first, as it serves as the entry point for creating most drivers.
   - Async: Should appear second in the documentation.
