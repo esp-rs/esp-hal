@@ -1546,6 +1546,7 @@ mod bus_clear {
 
     use super::*;
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ClearBusFuture<'a> {
         driver: Driver<'a>,
     }
@@ -1673,6 +1674,7 @@ mod bus_clear {
         SendClock(u8, bool),
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ClearBusFuture<'a> {
         driver: Driver<'a>,
         wait: Instant,

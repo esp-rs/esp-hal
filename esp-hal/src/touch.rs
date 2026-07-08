@@ -19,7 +19,7 @@
 //! # {after_snippet}
 //! ```
 //!
-//! ## Implementation State:
+//! ## Implementation State
 //!
 //! Mostly feature complete, missing:
 //!

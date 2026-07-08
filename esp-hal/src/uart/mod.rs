@@ -1683,7 +1683,7 @@ impl<'d> Uart<'d, Async> {
     /// uart.flush_async().await?;
     ///
     /// let mut buf = [0u8; MESSAGE.len()];
-    /// uart.read_async(&mut buf[..]).await.unwrap();
+    /// uart.read_async(&mut buf[..]).await?;
     /// # {after_snippet}
     /// ```
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {

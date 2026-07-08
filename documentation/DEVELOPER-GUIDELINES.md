@@ -204,7 +204,8 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 - If necessary provide further context as comments (consider linking to code, PRs, TRM - make sure to use permanent links, e.g. include the hash when linking to a Git repository, include the revision, page number etc. when linking to TRMs)
 - Prefer line comments (//) to block comments (/* ... */)
 - Generally, follow common "good practices" and idiomatic Rust style
-- All `Future` objects (public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
+- All named `Future` types (structs or enums that implement `Future`, public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
+  - Functions that return `impl Future` do **not** need `#[must_use]` — put the attribute on the concrete future type they construct instead.
 - Prefer `core::cfg_select!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_select!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
 - When marking an API as `unstable`, prefer `#[instability::unstable]` (see [API Surface](#api-surface)).
 - The documentation should contain no more than three primary impl blocks (excluding trait implementations):

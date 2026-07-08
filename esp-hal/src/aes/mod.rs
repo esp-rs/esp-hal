@@ -742,9 +742,7 @@ pub mod dma {
     /// let input_buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
     /// let mut output_buffer: [u8; 16] = [0; 16];
     ///
-    /// let operation_handle = ecb_encrypt
-    ///     .process(&input_buffer, &mut output_buffer)
-    ///     .unwrap();
+    /// let operation_handle = ecb_encrypt.process(&input_buffer, &mut output_buffer)?;
     /// operation_handle.wait_blocking();
     ///
     /// // output_buffer now contains the ciphertext
@@ -1403,9 +1401,7 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 /// let input_buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
 /// let mut output_buffer: [u8; 16] = [0; 16];
 ///
-/// let operation_handle = ecb_encrypt
-///     .process(&input_buffer, &mut output_buffer)
-///     .unwrap();
+/// let operation_handle = ecb_encrypt.process(&input_buffer, &mut output_buffer)?;
 /// operation_handle.wait_blocking();
 ///
 /// // output_buffer now contains the ciphertext
@@ -1611,7 +1607,7 @@ impl AesContext {
     /// // the length of the data is a multiple of the block (16 bytes) size.
     /// let mut buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
     ///
-    /// let operation_handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
+    /// let operation_handle = ecb_encrypt.process_in_place(&mut buffer)?;
     /// operation_handle.wait_blocking();
     ///
     /// // Instead of the plaintext message, buffer now contains the ciphertext.

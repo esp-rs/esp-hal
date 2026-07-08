@@ -194,8 +194,7 @@ impl Input<'_> {
     ///         Event::HighLevel,
     ///         WaitForOptions::default().with_wake_enable(true),
     ///     )
-    ///     .await
-    ///     .unwrap();
+    ///     .await?;
     /// # {after_snippet}
     /// ```
     ///
