@@ -22,6 +22,7 @@ use crate::{
 fn load_device_config(relative_path: &str) -> Config {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let path = manifest_dir.join(relative_path);
+    log::debug!("Loading device config from {}", path.display());
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Failed to read device configuration: {}", path.display()))
         .unwrap();
