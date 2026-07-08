@@ -5,7 +5,7 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 ## Usage
 
 ```text
-Usage: xtask <COMMAND>
+Usage: esp-devtool <COMMAND>
 
 Commands:
   build                      Build-related subcommands
@@ -35,10 +35,12 @@ cargo xtask build examples --help
 
 Build all examples for the specified chip
 
-Usage: xtask build examples [OPTIONS] <EXAMPLE>
+Usage: esp-devtool build examples [OPTIONS] <EXAMPLE>
 
 [...]
 ```
+
+> Tip: To avoid rebuilding the xtask, you can install it using `cargo install-xtask` from the repo root once, then call `esp-devtool <command>`.
 
 ## Releasing crates
 

@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
+use esp_devtool as xtask;
 use esp_metadata::{Chip, Config};
 use object::{Object, ObjectSymbol, SymbolKind, read::archive::ArchiveFile};
 use rustc_demangle::try_demangle;
