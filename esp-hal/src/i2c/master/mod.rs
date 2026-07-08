@@ -684,7 +684,7 @@ pub struct I2c<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     config: DriverConfig,
-    // Active keeps `TOP` powered; `I2c::with_retention_memory` swaps to retained.
+    // Active keeps `TOP` powered; `with_retention_memory` swaps to retained.
     #[cfg(esp32c6)]
     power: crate::rtc_cntl::retention::PowerManagement<
         'd,
@@ -1055,8 +1055,7 @@ where
     }
 
     /// Retain this I2C's config registers in `mem` across a `TOP` power-down in
-    /// light sleep. While active the driver keeps `TOP` powered; this drops that
-    /// lock and lets regDMA save/restore the config so `TOP` can power down.
+    /// light sleep, dropping the lock that would otherwise keep `TOP` powered.
     #[cfg(esp32c6)]
     #[instability::unstable]
     pub fn with_retention_memory(mut self, mem: &'d mut I2cRetentionMemory) -> Self {
