@@ -886,12 +886,17 @@ where
     Dm: DriverMode,
 {
     /// Retain this SPI's config registers in `mem` across a `TOP` power-down in
-    /// light sleep. While active the driver keeps `TOP` powered; this drops that
-    /// lock and lets regDMA save/restore the config so `TOP` can power down.
+    /// light sleep, dropping the lock that would otherwise keep `TOP` powered.
     #[cfg(esp32c6)]
     #[instability::unstable]
     pub fn with_retention_memory(mut self, mem: &'d mut SpiRetentionMemory) -> Self {
         let base = self.driver().regs() as *const _ as usize as u32;
+        // Keep the function clock on for the retention lifetime: the SPI config
+        // registers are only reachable while it runs, so regDMA would otherwise
+        // back up/restore zeros at a `TOP` power-down (unlike UART/I2C, whose
+        // config sits behind the always-held APB clock).
+        let info = self.spi.info();
+        self.spi._retention_clock = Some(SpiClockGuard::new(info));
         self.spi.power.retain(mem, base);
         self
     }

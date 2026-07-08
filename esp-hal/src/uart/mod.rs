@@ -614,7 +614,7 @@ pub struct UartRx<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
-    // Active keeps `TOP` powered; `Uart::with_retention_memory` swaps to retained.
+    // Active keeps `TOP` powered; `with_retention_memory` swaps to retained.
     #[cfg(esp32c6)]
     power: crate::rtc_cntl::retention::PowerManagement<'d, UartRetentionMemory>,
     // Receiving data continuously, the peripheral can't let the system sleep.
@@ -1865,9 +1865,8 @@ where
     }
 
     /// Retain this UART's config registers in `mem` across a `TOP` power-down in
-    /// light sleep. While active the driver keeps `TOP` powered; this drops that
-    /// lock and lets regDMA save/restore the config so `TOP` can power down. The
-    /// console/log UART is retained automatically and does not need this.
+    /// light sleep, dropping the lock that would otherwise keep `TOP` powered.
+    /// The console/log UART is retained automatically and does not need this.
     #[cfg(esp32c6)]
     #[instability::unstable]
     pub fn with_retention_memory(mut self, mem: &'d mut UartRetentionMemory) -> Self {

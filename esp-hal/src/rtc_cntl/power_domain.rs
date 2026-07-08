@@ -1,10 +1,9 @@
 //! Power-domain locks for light sleep (ESP32-C6).
 //!
-//! An active, un-retained peripheral in a power-downable domain holds a
-//! [`PowerDomainLock`]: unlike a [`WakeLock`](crate::rtc_cntl::WakeLock) it
-//! doesn't prevent light sleep, only powering its domain down (which degrades to
-//! clock-gating), so it can't lose state. Retaining the peripheral drops the
-//! lock and lets regDMA save/restore its state around the power-down instead.
+//! An active, un-retained peripheral holds a [`PowerDomainLock`]. Unlike a
+//! [`WakeLock`](crate::rtc_cntl::WakeLock) it doesn't prevent sleep, only the
+//! power-down of its domain (degrading to clock-gating), so it can't lose state.
+//! Retaining it drops the lock and lets regDMA save/restore its state instead.
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
