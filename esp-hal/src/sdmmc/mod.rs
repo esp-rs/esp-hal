@@ -9,6 +9,24 @@
 //! if another slot or an async transfer holds the engine. Async ops await the
 //! engine mutex instead. Bus width and card clock are cached and applied on
 //! engine acquire (lock order: engine, then settings).
+//!
+//! ## Configuration
+//!
+//! [`SdHostController::new`] takes a [`Config`] for the shared module clock.
+//! Each slot is obtained via [`SdHostController::slot`] with a [`SlotConfig`],
+//! then wired with `with_clk`, `with_cmd`, `with_data*`, and optional
+//! card-detect / write-protect pins.
+//!
+//! ## Usage
+//!
+//! Blocking commands and block transfers are available on [`Slot`] in
+//! [`Blocking`] mode. [`Slot::into_async`] enables interrupt-driven operation
+//! and implements [`sdio::MmcBus`] for the `sdio` crate stack.
+//!
+//! ## Implementation State
+//!
+//! SDIO device (I/O) mode is supported via [`sdio::MmcBus`]. SPI mode and
+//! UHS-I (1.8 V switching) are not implemented.
 
 use core::{
     cell::UnsafeCell,
@@ -56,7 +74,7 @@ mod chip_specific;
 mod bounce;
 
 /// Card clock source feeding the controller's divider.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
     /// 160 MHz PLL.
@@ -68,7 +86,7 @@ pub enum ClockSource {
 
 /// Clock input sampling phase used for high-speed tuning.
 #[cfg(sdmmc_delay_phase_num_is_set)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DelayPhase {
     /// 0°.
@@ -83,7 +101,7 @@ pub enum DelayPhase {
 }
 
 /// Card data bus width.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BusWidth {
     /// 1-bit bus (DAT0 only).
@@ -99,7 +117,7 @@ pub enum BusWidth {
 ///
 /// These settings drive the shared module clock and therefore apply to the
 /// whole controller, not an individual slot.
-#[derive(Clone, Copy, Debug, BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
@@ -130,7 +148,7 @@ impl Config {
 }
 
 /// Per-slot configuration.
-#[derive(Clone, Copy, Debug, Default, BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SlotConfig {
@@ -143,7 +161,7 @@ pub struct SlotConfig {
 }
 
 /// Length of the response a command expects.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ResponseLen {
     /// No response.
@@ -155,7 +173,7 @@ pub enum ResponseLen {
 }
 
 /// Per-command engine flags.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandFlags {
     /// Wait for the data line to be free before issuing.
@@ -167,7 +185,7 @@ pub struct CommandFlags {
 }
 
 /// Error returned by host operations.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[expect(clippy::enum_variant_names)]
@@ -225,7 +243,7 @@ impl core::fmt::Display for Error {
 }
 
 /// Error returned when applying a [`Config`].
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
@@ -256,7 +274,7 @@ impl core::fmt::Display for ConfigError {
 
 /// Error from blocking engine operations ([`BlockingError::Busy`] is mutex contention, not CIU
 /// HLE).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum BlockingError {
@@ -1091,7 +1109,7 @@ for_each_sdmmc! {
 
         paste::paste! {
             /// Selects one of the controller's card slots.
-            #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub enum SlotId {
                 $(
@@ -1769,6 +1787,7 @@ impl<'d, const S: u8> Slot<'d, S, Async> {
     }
 
     /// Waits for the SDIO card interrupt (card pulls DAT1 low).
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub fn wait_for_sdio_interrupt(&mut self) -> impl Future<Output = ()> {
         let slot_id = slot_id(S);
         let slot = slot_id.index() as usize;
@@ -1985,6 +2004,7 @@ fn abort_transfer() {
 }
 
 /// Awaits the terminal result the interrupt handler records.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 fn wait_result() -> impl Future<Output = Result<(), Error>> {
     poll_fn(|cx| {
         TRANSFER.with(|ts| match ts.result.take() {
@@ -2306,6 +2326,7 @@ fn freq_to_card_div(module_hz: u32, target_hz: u32) -> u8 {
     div.clamp(1, 255) as u8
 }
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct WaitForInterruptFuture {
     slot: usize,
     bit: u32,

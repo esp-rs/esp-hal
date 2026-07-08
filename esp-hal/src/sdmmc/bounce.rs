@@ -19,12 +19,12 @@ const BOUNCE_TAIL_OFF: usize = BOUNCE_LEN / 2;
 
 /// Per-transaction scratch in [`EngineSession`]. On cached SoCs it holds the
 /// DMA bounce buffer; the engine mutex provides exclusive access.
-pub struct Bounce {
+pub(crate) struct Bounce {
     buf: InternalMemory<[u8; BOUNCE_LEN]>,
 }
 
 #[derive(Clone, Copy)]
-pub struct Split {
+pub(crate) struct Split {
     pub head: usize,
     pub tail: usize,
 }
