@@ -896,6 +896,7 @@ pub(super) fn handle_async(info: &'static Info, state: &'static State) {
     }
 }
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct SpiFuture<'a> {
     driver: &'a Driver,
 }

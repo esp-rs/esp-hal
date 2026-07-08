@@ -489,6 +489,7 @@ impl<'d> DsiDpi<'d> {
     }
 }
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct VsyncFuture<'a, 'b> {
     _dpi: &'a mut DsiDpi<'b>,
 }

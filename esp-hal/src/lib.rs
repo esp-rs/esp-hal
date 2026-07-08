@@ -274,17 +274,21 @@ metadata!(
     esp_config::esp_config_str!("ESP_HAL_CONFIG_MIN_CHIP_REVISION")
 );
 
-#[cfg(all(riscv, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use esp_riscv_rt::{self, riscv};
-pub(crate) use peripherals::pac;
-#[cfg(xtensa)]
-#[cfg(all(xtensa, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use xtensa_lx_rt::{self, xtensa_lx};
+#[cfg(feature = "rt")]
+cfg_select! {
+    riscv => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use esp_riscv_rt::{self, riscv};
+    }
+    xtensa => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use xtensa_lx_rt::{self, xtensa_lx};
+    }
+}
 
+pub(crate) use peripherals::pac;
 pub(crate) mod private;
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
@@ -308,7 +312,6 @@ mod reg_access;
 pub mod rng;
 #[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
-#[cfg_attr(any(esp32c5, esp32c61), allow(dead_code))]
 pub mod system;
 pub mod time;
 #[cfg(uart_driver_supported)]
