@@ -393,6 +393,8 @@ unstable_driver! {
     pub mod rmt;
     #[cfg(rsa_driver_supported)]
     pub mod rsa;
+    #[cfg(sdmmc_driver_supported)]
+    pub mod sdmmc;
     #[cfg(sha_driver_supported)]
     pub mod sha;
     #[cfg(touch_driver_supported)]

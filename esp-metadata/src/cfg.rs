@@ -6,6 +6,7 @@ pub(crate) mod i2c_master;
 pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
+pub(crate) mod sdmmc;
 pub(crate) mod sha;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
@@ -20,6 +21,7 @@ pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
+pub(crate) use sdmmc::*;
 pub(crate) use sha::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
@@ -647,10 +649,19 @@ driver_configs![
         name: "RTC Timekeeping",
         properties: {}
     },
-    SdHostProperties {
-        driver: sd_host,
-        name: "SDIO host",
-        properties: {}
+    Sdmmc {
+        driver: sdmmc,
+        name: "SDMMC/SDIO host",
+        properties: {
+            delay_phase_num: Option<u32>,
+            has_iomux: bool,
+            has_gpio_matrix: bool,
+            psram_dma: bool,
+            uhs: bool,
+            /// Per-slot signal routing; generates `for_each_sdmmc!`.
+            #[serde(default)]
+            slot_config: SdmmcSlots,
+        }
     },
     SdSlaveProperties {
         driver: sd_slave,

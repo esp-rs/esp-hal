@@ -331,6 +331,24 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sdmmc.delay_phase_num") => {
+        8
+    };
+    ("sdmmc.delay_phase_num", str) => {
+        stringify!(8)
+    };
+    ("sdmmc.has_iomux") => {
+        true
+    };
+    ("sdmmc.has_gpio_matrix") => {
+        true
+    };
+    ("sdmmc.psram_dma") => {
+        true
+    };
+    ("sdmmc.uhs") => {
+        false
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -1053,6 +1071,57 @@ macro_rules! for_each_rsa_multiplication {
         (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536),
         (1568), (1600), (1632), (1664), (1696), (1728), (1760), (1792), (1824), (1856),
         (1888), (1920), (1952), (1984), (2016), (2048)));
+    };
+}
+/// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($slot:ident, $idx:literal, $iomux:literal, [$($clk:ident)?]
+/// [$($cmd_in:ident)?] [$($cmd_out:ident)?] [$($data_in:ident),*] [$($data_out:ident),*]
+/// [$($cd:ident)?] [$($wp:ident)?] [$($card_int:ident)?] [$($data_strobe:ident)?]
+/// [$($rst:ident)?])`
+///
+/// Macro fragments:
+///
+/// - `$slot`: the name of the slot (`slot0`, `slot1`).
+/// - `$idx`: the zero-based slot index.
+/// - `$iomux`: `true` if the slot's clock/command/data signals are IO_MUX-routed.
+/// - `$clk`, `$cmd_in`, `$cmd_out`, `$data_in`, `$data_out`: GPIO-matrix bus signal names (absent
+///   for IO_MUX-routed slots).
+/// - `$cd`, `$wp`, `$card_int`, `$data_strobe`, `$rst`: auxiliary signal names, each present only
+///   when the slot routes that signal through the GPIO matrix.
+///
+/// Each optional signal is wrapped in brackets so the branch shape stays uniform: a set
+/// signal appears as `[SIGNAL]`, an absent one as `[]`.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdmmc {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdmmc { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [],
+        [SDHOST_CARD_DETECT_N_1], [SDHOST_CARD_WRITE_PRT_1], [SDHOST_CARD_INT_N_1],
+        [SDHOST_DATA_STROBE_1], [SD_RST_N_1])); _for_each_inner_sdmmc!((slot1, 1, false,
+        [SDHOST_CCLK_OUT_2], [SDHOST_CCMD_IN_2], [SDHOST_CCMD_OUT_2],
+        [SDHOST_CDATA_IN_20, SDHOST_CDATA_IN_21, SDHOST_CDATA_IN_22, SDHOST_CDATA_IN_23,
+        SDHOST_CDATA_IN_24, SDHOST_CDATA_IN_25, SDHOST_CDATA_IN_26, SDHOST_CDATA_IN_27],
+        [SDHOST_CDATA_OUT_20, SDHOST_CDATA_OUT_21, SDHOST_CDATA_OUT_22,
+        SDHOST_CDATA_OUT_23, SDHOST_CDATA_OUT_24, SDHOST_CDATA_OUT_25,
+        SDHOST_CDATA_OUT_26, SDHOST_CDATA_OUT_27], [SDHOST_CARD_DETECT_N_2],
+        [SDHOST_CARD_WRITE_PRT_2], [SDHOST_CARD_INT_N_2], [SDHOST_DATA_STROBE_2],
+        [SD_RST_N_2])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [],
+        [SDHOST_CARD_DETECT_N_1], [SDHOST_CARD_WRITE_PRT_1], [SDHOST_CARD_INT_N_1],
+        [SDHOST_DATA_STROBE_1], [SD_RST_N_1]), (slot1, 1, false, [SDHOST_CCLK_OUT_2],
+        [SDHOST_CCMD_IN_2], [SDHOST_CCMD_OUT_2], [SDHOST_CDATA_IN_20, SDHOST_CDATA_IN_21,
+        SDHOST_CDATA_IN_22, SDHOST_CDATA_IN_23, SDHOST_CDATA_IN_24, SDHOST_CDATA_IN_25,
+        SDHOST_CDATA_IN_26, SDHOST_CDATA_IN_27], [SDHOST_CDATA_OUT_20,
+        SDHOST_CDATA_OUT_21, SDHOST_CDATA_OUT_22, SDHOST_CDATA_OUT_23,
+        SDHOST_CDATA_OUT_24, SDHOST_CDATA_OUT_25, SDHOST_CDATA_OUT_26,
+        SDHOST_CDATA_OUT_27], [SDHOST_CARD_DETECT_N_2], [SDHOST_CARD_WRITE_PRT_2],
+        [SDHOST_CARD_INT_N_2], [SDHOST_DATA_STROBE_2], [SD_RST_N_2])));
     };
 }
 #[macro_export]
@@ -3992,8 +4061,8 @@ macro_rules! implement_peripheral_clocks {
             Rmt,
             /// RSA peripheral clock signal
             Rsa,
-            /// SDMMC peripheral clock signal
-            Sdmmc,
+            /// SDIO_HOST peripheral clock signal
+            SdioHost,
             /// SHA peripheral clock signal
             Sha,
             /// SPI2 peripheral clock signal
@@ -4067,7 +4136,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Pcnt,
                 Self::Rmt,
                 Self::Rsa,
-                Self::Sdmmc,
+                Self::SdioHost,
                 Self::Sha,
                 Self::Spi2,
                 Self::Spi3,
@@ -4210,7 +4279,7 @@ macro_rules! implement_peripheral_clocks {
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.crypto_sys_clk_en().bit(enable));
                 }
-                Peripheral::Sdmmc => {
+                Peripheral::SdioHost => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.sdmmc_sys_clk_en().bit(enable));
@@ -4466,8 +4535,10 @@ macro_rules! implement_peripheral_clocks {
                         .hp_rst_en2()
                         .modify(|_, w| w.rst_en_rsa().bit(reset));
                 }
-                Peripheral::Sdmmc => {
-                    let _ = reset;
+                Peripheral::SdioHost => {
+                    crate::peripherals::LP_AON_CLKRST::regs()
+                        .lp_aonclkrst_hp_sdmmc_emac_rst_ctrl()
+                        .modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -5508,94 +5579,93 @@ macro_rules! for_each_gpio {
         [Output]))); _for_each_inner_gpio!((37, GPIO37(_2 => SPI2_IO7) (_0 => UART0_TXD
         _2 => SPI2_IO7) ([Input] [Output]))); _for_each_inner_gpio!((38, GPIO38(_0 =>
         UART0_RXD _2 => SPI2_DQS) (_2 => SPI2_DQS) ([Input] [Output])));
-        _for_each_inner_gpio!((39, GPIO39(_0 => SD1_CDATA0 _2 => BIST _3 => REF_50M_CLK
-        _4 => DBG_PSRAM_DQ8) (_0 => SD1_CDATA0 _2 => BIST _3 => REF_50M_CLK _4 =>
+        _for_each_inner_gpio!((39, GPIO39(_0 => SD1_DATA0 _2 => BIST _3 => REF_50M_CLK _4
+        => DBG_PSRAM_DQ8) (_0 => SD1_DATA0 _2 => BIST _3 => REF_50M_CLK _4 =>
         DBG_PSRAM_DQ8) ([Input] [Output]))); _for_each_inner_gpio!((40, GPIO40(_0 =>
-        SD1_CDATA1 _2 => BIST _4 => DBG_PSRAM_DQ9) (_0 => SD1_CDATA1 _2 => BIST _3 =>
+        SD1_DATA1 _2 => BIST _4 => DBG_PSRAM_DQ9) (_0 => SD1_DATA1 _2 => BIST _3 =>
         EMAC_TXEN _4 => DBG_PSRAM_DQ9) ([Input] [Output]))); _for_each_inner_gpio!((41,
-        GPIO41(_0 => SD1_CDATA2 _2 => BIST _4 => DBG_PSRAM_DQ10) (_0 => SD1_CDATA2 _2 =>
+        GPIO41(_0 => SD1_DATA2 _2 => BIST _4 => DBG_PSRAM_DQ10) (_0 => SD1_DATA2 _2 =>
         BIST _3 => EMAC_TXD0 _4 => DBG_PSRAM_DQ10) ([Input] [Output])));
-        _for_each_inner_gpio!((42, GPIO42(_0 => SD1_CDATA3 _2 => BIST _4 =>
-        DBG_PSRAM_DQ11) (_0 => SD1_CDATA3 _2 => BIST _3 => EMAC_TXD1 _4 =>
-        DBG_PSRAM_DQ11) ([Input] [Output]))); _for_each_inner_gpio!((43, GPIO43(_0 =>
-        SD1_CCLK _2 => BIST _4 => DBG_PSRAM_DQ12) (_0 => SD1_CCLK _2 => BIST _3 =>
-        EMAC_TXER _4 => DBG_PSRAM_DQ12) ([Input] [Output]))); _for_each_inner_gpio!((44,
-        GPIO44(_0 => SD1_CCMD _2 => BIST _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) (_0 =>
-        SD1_CCMD _2 => BIST _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) ([Input]
-        [Output]))); _for_each_inner_gpio!((45, GPIO45(_0 => SD1_CDATA4 _2 => BIST _3 =>
-        EMAC_RXDV _4 => DBG_PSRAM_DQ14) (_0 => SD1_CDATA4 _2 => BIST _4 =>
-        DBG_PSRAM_DQ14) ([Input] [Output]))); _for_each_inner_gpio!((46, GPIO46(_0 =>
-        SD1_CDATA5 _2 => BIST _3 => EMAC_RXD0 _4 => DBG_PSRAM_DQ15) (_0 => SD1_CDATA5 _2
-        => BIST _4 => DBG_PSRAM_DQ15) ([Input] [Output]))); _for_each_inner_gpio!((47,
-        GPIO47(_0 => SD1_CDATA6 _2 => BIST _3 => EMAC_RXD1 _4 => DBG_PSRAM_DQS_1) (_0 =>
-        SD1_CDATA6 _2 => BIST _4 => DBG_PSRAM_DQS_1) ([Input] [Output])));
-        _for_each_inner_gpio!((48, GPIO48(_0 => SD1_CDATA7 _2 => BIST _3 => EMAC_RXER)
-        (_0 => SD1_CDATA7 _2 => BIST) ([Input] [Output]))); _for_each_inner_gpio!((49,
-        GPIO49(_4 => DBG_FLASH_CS) (_3 => EMAC_TXEN _4 => DBG_FLASH_CS) ([Input]
-        [Output]))); _for_each_inner_gpio!((50, GPIO50(_3 => EMAC_RMII_CLK _4 =>
-        DBG_FLASH_Q) (_3 => EMAC_RMII_CLK _4 => DBG_FLASH_Q) ([Input] [Output])));
-        _for_each_inner_gpio!((51, GPIO51(_3 => EMAC_RXDV _4 => DBG_FLASH_WP) (_4 =>
-        DBG_FLASH_WP) ([Input] [Output]))); _for_each_inner_gpio!((52, GPIO52(_3 =>
-        EMAC_RXD0 _4 => DBG_FLASH_HOLD) (_4 => DBG_FLASH_HOLD) ([Input] [Output])));
-        _for_each_inner_gpio!((53, GPIO53(_3 => EMAC_RXD1 _4 => DBG_FLASH_CK) (_4 =>
-        DBG_FLASH_CK) ([Input] [Output]))); _for_each_inner_gpio!((54, GPIO54(_3 =>
-        EMAC_RXER _4 => DBG_FLASH_D) (_4 => DBG_FLASH_D) ([Input] [Output])));
-        _for_each_inner_gpio!((all(0, GPIO0() () ([Input] [Output])), (1, GPIO1() ()
-        ([Input] [Output])), (2, GPIO2(_0 => MTCK) (_0 => MTCK) ([Input] [Output])), (3,
-        GPIO3(_0 => MTDI) (_0 => MTDI) ([Input] [Output])), (4, GPIO4(_0 => MTMS) (_0 =>
-        MTMS) ([Input] [Output])), (5, GPIO5(_0 => MTDO) (_0 => MTDO) ([Input]
-        [Output])), (6, GPIO6(_3 => SPI2_HOLD) (_3 => SPI2_HOLD) ([Input] [Output])), (7,
-        GPIO7(_3 => SPI2_CS) (_3 => SPI2_CS) ([Input] [Output])), (8, GPIO8(_3 => SPI2_D)
-        (_2 => UART0_RTS _3 => SPI2_D) ([Input] [Output])), (9, GPIO9(_2 => UART0_CTS _3
-        => SPI2_CK) (_3 => SPI2_CK) ([Input] [Output])), (10, GPIO10(_3 => SPI2_Q) (_2 =>
-        UART1_TXD _3 => SPI2_Q) ([Input] [Output])), (11, GPIO11(_2 => UART1_RXD _3 =>
-        SPI2_WP) (_3 => SPI2_WP) ([Input] [Output])), (12, GPIO12() (_2 => UART1_RTS)
-        ([Input] [Output])), (13, GPIO13(_2 => UART1_CTS) () ([Input] [Output])), (14,
-        GPIO14() () ([Input] [Output])), (15, GPIO15() () ([Input] [Output])), (16,
-        GPIO16() () ([Input] [Output])), (17, GPIO17() () ([Input] [Output])), (18,
-        GPIO18() () ([Input] [Output])), (19, GPIO19() () ([Input] [Output])), (20,
-        GPIO20() () ([Input] [Output])), (21, GPIO21() () ([Input] [Output])), (22,
-        GPIO22(_4 => DBG_PSRAM_CK) (_4 => DBG_PSRAM_CK) ([Input] [Output])), (23,
-        GPIO23(_3 => REF_50M_CLK _4 => DBG_PSRAM_CS) (_3 => REF_50M_CLK _4 =>
-        DBG_PSRAM_CS) ([Input] [Output])), (24, GPIO24() () ([Input] [Output])), (25,
-        GPIO25() () ([Input] [Output])), (26, GPIO26() () ([Input] [Output])), (27,
-        GPIO27() () ([Input] [Output])), (28, GPIO28(_2 => SPI2_CS _3 => EMAC_RXDV _4 =>
-        DBG_PSRAM_D) (_2 => SPI2_CS _4 => DBG_PSRAM_D) ([Input] [Output])), (29,
-        GPIO29(_2 => SPI2_D _3 => EMAC_RXD0 _4 => DBG_PSRAM_Q) (_2 => SPI2_D _4 =>
-        DBG_PSRAM_Q) ([Input] [Output])), (30, GPIO30(_2 => SPI2_CK _3 => EMAC_RXD1 _4 =>
-        DBG_PSRAM_WP) (_2 => SPI2_CK _4 => DBG_PSRAM_WP) ([Input] [Output])), (31,
-        GPIO31(_2 => SPI2_Q _3 => EMAC_RXER _4 => DBG_PSRAM_HOLD) (_2 => SPI2_Q _4 =>
-        DBG_PSRAM_HOLD) ([Input] [Output])), (32, GPIO32(_2 => SPI2_HOLD _3 =>
-        EMAC_RMII_CLK _4 => DBG_PSRAM_DQ4) (_2 => SPI2_HOLD _3 => EMAC_RMII_CLK _4 =>
-        DBG_PSRAM_DQ4) ([Input] [Output])), (33, GPIO33(_2 => SPI2_WP _4 =>
-        DBG_PSRAM_DQ5) (_2 => SPI2_WP _3 => EMAC_TXEN _4 => DBG_PSRAM_DQ5) ([Input]
-        [Output])), (34, GPIO34(_2 => SPI2_IO4 _4 => DBG_PSRAM_DQ6) (_2 => SPI2_IO4 _3 =>
-        EMAC_TXD0 _4 => DBG_PSRAM_DQ6) ([Input] [Output])), (35, GPIO35(_2 => SPI2_IO5 _4
-        => DBG_PSRAM_DQ7) (_2 => SPI2_IO5 _3 => EMAC_TXD1 _4 => DBG_PSRAM_DQ7) ([Input]
-        [Output])), (36, GPIO36(_2 => SPI2_IO6 _4 => DBG_PSRAM_DQS_0) (_2 => SPI2_IO6 _3
-        => EMAC_TXER _4 => DBG_PSRAM_DQS_0) ([Input] [Output])), (37, GPIO37(_2 =>
-        SPI2_IO7) (_0 => UART0_TXD _2 => SPI2_IO7) ([Input] [Output])), (38, GPIO38(_0 =>
-        UART0_RXD _2 => SPI2_DQS) (_2 => SPI2_DQS) ([Input] [Output])), (39, GPIO39(_0 =>
-        SD1_CDATA0 _2 => BIST _3 => REF_50M_CLK _4 => DBG_PSRAM_DQ8) (_0 => SD1_CDATA0 _2
-        => BIST _3 => REF_50M_CLK _4 => DBG_PSRAM_DQ8) ([Input] [Output])), (40,
-        GPIO40(_0 => SD1_CDATA1 _2 => BIST _4 => DBG_PSRAM_DQ9) (_0 => SD1_CDATA1 _2 =>
-        BIST _3 => EMAC_TXEN _4 => DBG_PSRAM_DQ9) ([Input] [Output])), (41, GPIO41(_0 =>
-        SD1_CDATA2 _2 => BIST _4 => DBG_PSRAM_DQ10) (_0 => SD1_CDATA2 _2 => BIST _3 =>
-        EMAC_TXD0 _4 => DBG_PSRAM_DQ10) ([Input] [Output])), (42, GPIO42(_0 => SD1_CDATA3
-        _2 => BIST _4 => DBG_PSRAM_DQ11) (_0 => SD1_CDATA3 _2 => BIST _3 => EMAC_TXD1 _4
-        => DBG_PSRAM_DQ11) ([Input] [Output])), (43, GPIO43(_0 => SD1_CCLK _2 => BIST _4
-        => DBG_PSRAM_DQ12) (_0 => SD1_CCLK _2 => BIST _3 => EMAC_TXER _4 =>
-        DBG_PSRAM_DQ12) ([Input] [Output])), (44, GPIO44(_0 => SD1_CCMD _2 => BIST _3 =>
-        EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) (_0 => SD1_CCMD _2 => BIST _3 =>
+        _for_each_inner_gpio!((42, GPIO42(_0 => SD1_DATA3 _2 => BIST _4 =>
+        DBG_PSRAM_DQ11) (_0 => SD1_DATA3 _2 => BIST _3 => EMAC_TXD1 _4 => DBG_PSRAM_DQ11)
+        ([Input] [Output]))); _for_each_inner_gpio!((43, GPIO43(_0 => SD1_CLK _2 => BIST
+        _4 => DBG_PSRAM_DQ12) (_0 => SD1_CLK _2 => BIST _3 => EMAC_TXER _4 =>
+        DBG_PSRAM_DQ12) ([Input] [Output]))); _for_each_inner_gpio!((44, GPIO44(_0 =>
+        SD1_CMD _2 => BIST _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) (_0 => SD1_CMD _2 =>
+        BIST _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) ([Input] [Output])));
+        _for_each_inner_gpio!((45, GPIO45(_0 => SD1_DATA4 _2 => BIST _3 => EMAC_RXDV _4
+        => DBG_PSRAM_DQ14) (_0 => SD1_DATA4 _2 => BIST _4 => DBG_PSRAM_DQ14) ([Input]
+        [Output]))); _for_each_inner_gpio!((46, GPIO46(_0 => SD1_DATA5 _2 => BIST _3 =>
+        EMAC_RXD0 _4 => DBG_PSRAM_DQ15) (_0 => SD1_DATA5 _2 => BIST _4 => DBG_PSRAM_DQ15)
+        ([Input] [Output]))); _for_each_inner_gpio!((47, GPIO47(_0 => SD1_DATA6 _2 =>
+        BIST _3 => EMAC_RXD1 _4 => DBG_PSRAM_DQS_1) (_0 => SD1_DATA6 _2 => BIST _4 =>
+        DBG_PSRAM_DQS_1) ([Input] [Output]))); _for_each_inner_gpio!((48, GPIO48(_0 =>
+        SD1_DATA7 _2 => BIST _3 => EMAC_RXER) (_0 => SD1_DATA7 _2 => BIST) ([Input]
+        [Output]))); _for_each_inner_gpio!((49, GPIO49(_4 => DBG_FLASH_CS) (_3 =>
+        EMAC_TXEN _4 => DBG_FLASH_CS) ([Input] [Output]))); _for_each_inner_gpio!((50,
+        GPIO50(_3 => EMAC_RMII_CLK _4 => DBG_FLASH_Q) (_3 => EMAC_RMII_CLK _4 =>
+        DBG_FLASH_Q) ([Input] [Output]))); _for_each_inner_gpio!((51, GPIO51(_3 =>
+        EMAC_RXDV _4 => DBG_FLASH_WP) (_4 => DBG_FLASH_WP) ([Input] [Output])));
+        _for_each_inner_gpio!((52, GPIO52(_3 => EMAC_RXD0 _4 => DBG_FLASH_HOLD) (_4 =>
+        DBG_FLASH_HOLD) ([Input] [Output]))); _for_each_inner_gpio!((53, GPIO53(_3 =>
+        EMAC_RXD1 _4 => DBG_FLASH_CK) (_4 => DBG_FLASH_CK) ([Input] [Output])));
+        _for_each_inner_gpio!((54, GPIO54(_3 => EMAC_RXER _4 => DBG_FLASH_D) (_4 =>
+        DBG_FLASH_D) ([Input] [Output]))); _for_each_inner_gpio!((all(0, GPIO0() ()
+        ([Input] [Output])), (1, GPIO1() () ([Input] [Output])), (2, GPIO2(_0 => MTCK)
+        (_0 => MTCK) ([Input] [Output])), (3, GPIO3(_0 => MTDI) (_0 => MTDI) ([Input]
+        [Output])), (4, GPIO4(_0 => MTMS) (_0 => MTMS) ([Input] [Output])), (5, GPIO5(_0
+        => MTDO) (_0 => MTDO) ([Input] [Output])), (6, GPIO6(_3 => SPI2_HOLD) (_3 =>
+        SPI2_HOLD) ([Input] [Output])), (7, GPIO7(_3 => SPI2_CS) (_3 => SPI2_CS) ([Input]
+        [Output])), (8, GPIO8(_3 => SPI2_D) (_2 => UART0_RTS _3 => SPI2_D) ([Input]
+        [Output])), (9, GPIO9(_2 => UART0_CTS _3 => SPI2_CK) (_3 => SPI2_CK) ([Input]
+        [Output])), (10, GPIO10(_3 => SPI2_Q) (_2 => UART1_TXD _3 => SPI2_Q) ([Input]
+        [Output])), (11, GPIO11(_2 => UART1_RXD _3 => SPI2_WP) (_3 => SPI2_WP) ([Input]
+        [Output])), (12, GPIO12() (_2 => UART1_RTS) ([Input] [Output])), (13, GPIO13(_2
+        => UART1_CTS) () ([Input] [Output])), (14, GPIO14() () ([Input] [Output])), (15,
+        GPIO15() () ([Input] [Output])), (16, GPIO16() () ([Input] [Output])), (17,
+        GPIO17() () ([Input] [Output])), (18, GPIO18() () ([Input] [Output])), (19,
+        GPIO19() () ([Input] [Output])), (20, GPIO20() () ([Input] [Output])), (21,
+        GPIO21() () ([Input] [Output])), (22, GPIO22(_4 => DBG_PSRAM_CK) (_4 =>
+        DBG_PSRAM_CK) ([Input] [Output])), (23, GPIO23(_3 => REF_50M_CLK _4 =>
+        DBG_PSRAM_CS) (_3 => REF_50M_CLK _4 => DBG_PSRAM_CS) ([Input] [Output])), (24,
+        GPIO24() () ([Input] [Output])), (25, GPIO25() () ([Input] [Output])), (26,
+        GPIO26() () ([Input] [Output])), (27, GPIO27() () ([Input] [Output])), (28,
+        GPIO28(_2 => SPI2_CS _3 => EMAC_RXDV _4 => DBG_PSRAM_D) (_2 => SPI2_CS _4 =>
+        DBG_PSRAM_D) ([Input] [Output])), (29, GPIO29(_2 => SPI2_D _3 => EMAC_RXD0 _4 =>
+        DBG_PSRAM_Q) (_2 => SPI2_D _4 => DBG_PSRAM_Q) ([Input] [Output])), (30, GPIO30(_2
+        => SPI2_CK _3 => EMAC_RXD1 _4 => DBG_PSRAM_WP) (_2 => SPI2_CK _4 => DBG_PSRAM_WP)
+        ([Input] [Output])), (31, GPIO31(_2 => SPI2_Q _3 => EMAC_RXER _4 =>
+        DBG_PSRAM_HOLD) (_2 => SPI2_Q _4 => DBG_PSRAM_HOLD) ([Input] [Output])), (32,
+        GPIO32(_2 => SPI2_HOLD _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ4) (_2 => SPI2_HOLD
+        _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ4) ([Input] [Output])), (33, GPIO33(_2 =>
+        SPI2_WP _4 => DBG_PSRAM_DQ5) (_2 => SPI2_WP _3 => EMAC_TXEN _4 => DBG_PSRAM_DQ5)
+        ([Input] [Output])), (34, GPIO34(_2 => SPI2_IO4 _4 => DBG_PSRAM_DQ6) (_2 =>
+        SPI2_IO4 _3 => EMAC_TXD0 _4 => DBG_PSRAM_DQ6) ([Input] [Output])), (35, GPIO35(_2
+        => SPI2_IO5 _4 => DBG_PSRAM_DQ7) (_2 => SPI2_IO5 _3 => EMAC_TXD1 _4 =>
+        DBG_PSRAM_DQ7) ([Input] [Output])), (36, GPIO36(_2 => SPI2_IO6 _4 =>
+        DBG_PSRAM_DQS_0) (_2 => SPI2_IO6 _3 => EMAC_TXER _4 => DBG_PSRAM_DQS_0) ([Input]
+        [Output])), (37, GPIO37(_2 => SPI2_IO7) (_0 => UART0_TXD _2 => SPI2_IO7) ([Input]
+        [Output])), (38, GPIO38(_0 => UART0_RXD _2 => SPI2_DQS) (_2 => SPI2_DQS) ([Input]
+        [Output])), (39, GPIO39(_0 => SD1_DATA0 _2 => BIST _3 => REF_50M_CLK _4 =>
+        DBG_PSRAM_DQ8) (_0 => SD1_DATA0 _2 => BIST _3 => REF_50M_CLK _4 => DBG_PSRAM_DQ8)
+        ([Input] [Output])), (40, GPIO40(_0 => SD1_DATA1 _2 => BIST _4 => DBG_PSRAM_DQ9)
+        (_0 => SD1_DATA1 _2 => BIST _3 => EMAC_TXEN _4 => DBG_PSRAM_DQ9) ([Input]
+        [Output])), (41, GPIO41(_0 => SD1_DATA2 _2 => BIST _4 => DBG_PSRAM_DQ10) (_0 =>
+        SD1_DATA2 _2 => BIST _3 => EMAC_TXD0 _4 => DBG_PSRAM_DQ10) ([Input] [Output])),
+        (42, GPIO42(_0 => SD1_DATA3 _2 => BIST _4 => DBG_PSRAM_DQ11) (_0 => SD1_DATA3 _2
+        => BIST _3 => EMAC_TXD1 _4 => DBG_PSRAM_DQ11) ([Input] [Output])), (43, GPIO43(_0
+        => SD1_CLK _2 => BIST _4 => DBG_PSRAM_DQ12) (_0 => SD1_CLK _2 => BIST _3 =>
+        EMAC_TXER _4 => DBG_PSRAM_DQ12) ([Input] [Output])), (44, GPIO44(_0 => SD1_CMD _2
+        => BIST _3 => EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) (_0 => SD1_CMD _2 => BIST _3 =>
         EMAC_RMII_CLK _4 => DBG_PSRAM_DQ13) ([Input] [Output])), (45, GPIO45(_0 =>
-        SD1_CDATA4 _2 => BIST _3 => EMAC_RXDV _4 => DBG_PSRAM_DQ14) (_0 => SD1_CDATA4 _2
-        => BIST _4 => DBG_PSRAM_DQ14) ([Input] [Output])), (46, GPIO46(_0 => SD1_CDATA5
-        _2 => BIST _3 => EMAC_RXD0 _4 => DBG_PSRAM_DQ15) (_0 => SD1_CDATA5 _2 => BIST _4
-        => DBG_PSRAM_DQ15) ([Input] [Output])), (47, GPIO47(_0 => SD1_CDATA6 _2 => BIST
-        _3 => EMAC_RXD1 _4 => DBG_PSRAM_DQS_1) (_0 => SD1_CDATA6 _2 => BIST _4 =>
-        DBG_PSRAM_DQS_1) ([Input] [Output])), (48, GPIO48(_0 => SD1_CDATA7 _2 => BIST _3
-        => EMAC_RXER) (_0 => SD1_CDATA7 _2 => BIST) ([Input] [Output])), (49, GPIO49(_4
-        => DBG_FLASH_CS) (_3 => EMAC_TXEN _4 => DBG_FLASH_CS) ([Input] [Output])), (50,
+        SD1_DATA4 _2 => BIST _3 => EMAC_RXDV _4 => DBG_PSRAM_DQ14) (_0 => SD1_DATA4 _2 =>
+        BIST _4 => DBG_PSRAM_DQ14) ([Input] [Output])), (46, GPIO46(_0 => SD1_DATA5 _2 =>
+        BIST _3 => EMAC_RXD0 _4 => DBG_PSRAM_DQ15) (_0 => SD1_DATA5 _2 => BIST _4 =>
+        DBG_PSRAM_DQ15) ([Input] [Output])), (47, GPIO47(_0 => SD1_DATA6 _2 => BIST _3 =>
+        EMAC_RXD1 _4 => DBG_PSRAM_DQS_1) (_0 => SD1_DATA6 _2 => BIST _4 =>
+        DBG_PSRAM_DQS_1) ([Input] [Output])), (48, GPIO48(_0 => SD1_DATA7 _2 => BIST _3
+        => EMAC_RXER) (_0 => SD1_DATA7 _2 => BIST) ([Input] [Output])), (49, GPIO49(_4 =>
+        DBG_FLASH_CS) (_3 => EMAC_TXEN _4 => DBG_FLASH_CS) ([Input] [Output])), (50,
         GPIO50(_3 => EMAC_RMII_CLK _4 => DBG_FLASH_Q) (_3 => EMAC_RMII_CLK _4 =>
         DBG_FLASH_Q) ([Input] [Output])), (51, GPIO51(_3 => EMAC_RXDV _4 => DBG_FLASH_WP)
         (_4 => DBG_FLASH_WP) ([Input] [Output])), (52, GPIO52(_3 => EMAC_RXD0 _4 =>
@@ -5852,43 +5922,43 @@ macro_rules! for_each_iomux_function {
         _for_each_inner_iomux_function!((SPI2_IO7, GPIO37, _2));
         _for_each_inner_iomux_function!((UART0_RXD, GPIO38, _0));
         _for_each_inner_iomux_function!((SPI2_DQS, GPIO38, _2));
-        _for_each_inner_iomux_function!((SD1_CDATA0, GPIO39, _0));
+        _for_each_inner_iomux_function!((SD1_DATA0, GPIO39, _0));
         _for_each_inner_iomux_function!((BIST, GPIO39, _2));
         _for_each_inner_iomux_function!((REF_50M_CLK, GPIO39, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ8, GPIO39, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA1, GPIO40, _0));
+        _for_each_inner_iomux_function!((SD1_DATA1, GPIO40, _0));
         _for_each_inner_iomux_function!((BIST, GPIO40, _2));
         _for_each_inner_iomux_function!((EMAC_TXEN, GPIO40, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ9, GPIO40, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA2, GPIO41, _0));
+        _for_each_inner_iomux_function!((SD1_DATA2, GPIO41, _0));
         _for_each_inner_iomux_function!((BIST, GPIO41, _2));
         _for_each_inner_iomux_function!((EMAC_TXD0, GPIO41, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ10, GPIO41, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA3, GPIO42, _0));
+        _for_each_inner_iomux_function!((SD1_DATA3, GPIO42, _0));
         _for_each_inner_iomux_function!((BIST, GPIO42, _2));
         _for_each_inner_iomux_function!((EMAC_TXD1, GPIO42, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ11, GPIO42, _4));
-        _for_each_inner_iomux_function!((SD1_CCLK, GPIO43, _0));
+        _for_each_inner_iomux_function!((SD1_CLK, GPIO43, _0));
         _for_each_inner_iomux_function!((BIST, GPIO43, _2));
         _for_each_inner_iomux_function!((EMAC_TXER, GPIO43, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ12, GPIO43, _4));
-        _for_each_inner_iomux_function!((SD1_CCMD, GPIO44, _0));
+        _for_each_inner_iomux_function!((SD1_CMD, GPIO44, _0));
         _for_each_inner_iomux_function!((BIST, GPIO44, _2));
         _for_each_inner_iomux_function!((EMAC_RMII_CLK, GPIO44, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ13, GPIO44, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA4, GPIO45, _0));
+        _for_each_inner_iomux_function!((SD1_DATA4, GPIO45, _0));
         _for_each_inner_iomux_function!((BIST, GPIO45, _2));
         _for_each_inner_iomux_function!((EMAC_RXDV, GPIO45, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ14, GPIO45, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA5, GPIO46, _0));
+        _for_each_inner_iomux_function!((SD1_DATA5, GPIO46, _0));
         _for_each_inner_iomux_function!((BIST, GPIO46, _2));
         _for_each_inner_iomux_function!((EMAC_RXD0, GPIO46, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQ15, GPIO46, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA6, GPIO47, _0));
+        _for_each_inner_iomux_function!((SD1_DATA6, GPIO47, _0));
         _for_each_inner_iomux_function!((BIST, GPIO47, _2));
         _for_each_inner_iomux_function!((EMAC_RXD1, GPIO47, _3));
         _for_each_inner_iomux_function!((DBG_PSRAM_DQS_1, GPIO47, _4));
-        _for_each_inner_iomux_function!((SD1_CDATA7, GPIO48, _0));
+        _for_each_inner_iomux_function!((SD1_DATA7, GPIO48, _0));
         _for_each_inner_iomux_function!((BIST, GPIO48, _2));
         _for_each_inner_iomux_function!((EMAC_RXER, GPIO48, _3));
         _for_each_inner_iomux_function!((EMAC_TXEN, GPIO49, _3));
@@ -5937,29 +6007,29 @@ macro_rules! for_each_iomux_function {
         _for_each_inner_iomux_function!(((SPI2_IO7, SPIn_IOm, 2, 7), GPIO37, _2));
         _for_each_inner_iomux_function!(((UART0_RXD, UARTn_RXD, 0), GPIO38, _0));
         _for_each_inner_iomux_function!(((SPI2_DQS, SPIn_DQS, 2), GPIO38, _2));
-        _for_each_inner_iomux_function!(((SD1_CDATA0, SDn_CDATAm, 1, 0), GPIO39, _0));
+        _for_each_inner_iomux_function!(((SD1_DATA0, SDn_DATAm, 1, 0), GPIO39, _0));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4));
-        _for_each_inner_iomux_function!(((SD1_CDATA1, SDn_CDATAm, 1, 1), GPIO40, _0));
+        _for_each_inner_iomux_function!(((SD1_DATA1, SDn_DATAm, 1, 1), GPIO40, _0));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ9, DBG_PSRAM_DQn, 9), GPIO40, _4));
-        _for_each_inner_iomux_function!(((SD1_CDATA2, SDn_CDATAm, 1, 2), GPIO41, _0));
+        _for_each_inner_iomux_function!(((SD1_DATA2, SDn_DATAm, 1, 2), GPIO41, _0));
         _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO41, _3));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41,
-        _4)); _for_each_inner_iomux_function!(((SD1_CDATA3, SDn_CDATAm, 1, 3), GPIO42,
+        _4)); _for_each_inner_iomux_function!(((SD1_DATA3, SDn_DATAm, 1, 3), GPIO42,
         _0)); _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ11, DBG_PSRAM_DQn, 11), GPIO42,
-        _4)); _for_each_inner_iomux_function!(((SD1_CCLK, SDn_CCLK, 1), GPIO43, _0));
+        _4)); _for_each_inner_iomux_function!(((SD1_CLK, SDn_CLK, 1), GPIO43, _0));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ12, DBG_PSRAM_DQn, 12), GPIO43,
-        _4)); _for_each_inner_iomux_function!(((SD1_CCMD, SDn_CCMD, 1), GPIO44, _0));
+        _4)); _for_each_inner_iomux_function!(((SD1_CMD, SDn_CMD, 1), GPIO44, _0));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44,
-        _4)); _for_each_inner_iomux_function!(((SD1_CDATA4, SDn_CDATAm, 1, 4), GPIO45,
+        _4)); _for_each_inner_iomux_function!(((SD1_DATA4, SDn_DATAm, 1, 4), GPIO45,
         _0)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14),
-        GPIO45, _4)); _for_each_inner_iomux_function!(((SD1_CDATA5, SDn_CDATAm, 1, 5),
+        GPIO45, _4)); _for_each_inner_iomux_function!(((SD1_DATA5, SDn_DATAm, 1, 5),
         GPIO46, _0)); _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO46,
         _3)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15),
-        GPIO46, _4)); _for_each_inner_iomux_function!(((SD1_CDATA6, SDn_CDATAm, 1, 6),
+        GPIO46, _4)); _for_each_inner_iomux_function!(((SD1_DATA6, SDn_DATAm, 1, 6),
         GPIO47, _0)); _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO47,
         _3)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_1, DBG_PSRAM_DQS_n, 1),
-        GPIO47, _4)); _for_each_inner_iomux_function!(((SD1_CDATA7, SDn_CDATAm, 1, 7),
+        GPIO47, _4)); _for_each_inner_iomux_function!(((SD1_DATA7, SDn_DATAm, 1, 7),
         GPIO48, _0)); _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO52,
         _3)); _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO53, _3));
         _for_each_inner_iomux_function!((all(MTCK, GPIO2, _0), (MTDI, GPIO3, _0), (MTMS,
@@ -5978,19 +6048,19 @@ macro_rules! for_each_iomux_function {
         (SPI2_IO5, GPIO35, _2), (EMAC_TXD1, GPIO35, _3), (DBG_PSRAM_DQ7, GPIO35, _4),
         (SPI2_IO6, GPIO36, _2), (EMAC_TXER, GPIO36, _3), (DBG_PSRAM_DQS_0, GPIO36, _4),
         (UART0_TXD, GPIO37, _0), (SPI2_IO7, GPIO37, _2), (UART0_RXD, GPIO38, _0),
-        (SPI2_DQS, GPIO38, _2), (SD1_CDATA0, GPIO39, _0), (BIST, GPIO39, _2),
-        (REF_50M_CLK, GPIO39, _3), (DBG_PSRAM_DQ8, GPIO39, _4), (SD1_CDATA1, GPIO40, _0),
+        (SPI2_DQS, GPIO38, _2), (SD1_DATA0, GPIO39, _0), (BIST, GPIO39, _2),
+        (REF_50M_CLK, GPIO39, _3), (DBG_PSRAM_DQ8, GPIO39, _4), (SD1_DATA1, GPIO40, _0),
         (BIST, GPIO40, _2), (EMAC_TXEN, GPIO40, _3), (DBG_PSRAM_DQ9, GPIO40, _4),
-        (SD1_CDATA2, GPIO41, _0), (BIST, GPIO41, _2), (EMAC_TXD0, GPIO41, _3),
-        (DBG_PSRAM_DQ10, GPIO41, _4), (SD1_CDATA3, GPIO42, _0), (BIST, GPIO42, _2),
-        (EMAC_TXD1, GPIO42, _3), (DBG_PSRAM_DQ11, GPIO42, _4), (SD1_CCLK, GPIO43, _0),
+        (SD1_DATA2, GPIO41, _0), (BIST, GPIO41, _2), (EMAC_TXD0, GPIO41, _3),
+        (DBG_PSRAM_DQ10, GPIO41, _4), (SD1_DATA3, GPIO42, _0), (BIST, GPIO42, _2),
+        (EMAC_TXD1, GPIO42, _3), (DBG_PSRAM_DQ11, GPIO42, _4), (SD1_CLK, GPIO43, _0),
         (BIST, GPIO43, _2), (EMAC_TXER, GPIO43, _3), (DBG_PSRAM_DQ12, GPIO43, _4),
-        (SD1_CCMD, GPIO44, _0), (BIST, GPIO44, _2), (EMAC_RMII_CLK, GPIO44, _3),
-        (DBG_PSRAM_DQ13, GPIO44, _4), (SD1_CDATA4, GPIO45, _0), (BIST, GPIO45, _2),
-        (EMAC_RXDV, GPIO45, _3), (DBG_PSRAM_DQ14, GPIO45, _4), (SD1_CDATA5, GPIO46, _0),
+        (SD1_CMD, GPIO44, _0), (BIST, GPIO44, _2), (EMAC_RMII_CLK, GPIO44, _3),
+        (DBG_PSRAM_DQ13, GPIO44, _4), (SD1_DATA4, GPIO45, _0), (BIST, GPIO45, _2),
+        (EMAC_RXDV, GPIO45, _3), (DBG_PSRAM_DQ14, GPIO45, _4), (SD1_DATA5, GPIO46, _0),
         (BIST, GPIO46, _2), (EMAC_RXD0, GPIO46, _3), (DBG_PSRAM_DQ15, GPIO46, _4),
-        (SD1_CDATA6, GPIO47, _0), (BIST, GPIO47, _2), (EMAC_RXD1, GPIO47, _3),
-        (DBG_PSRAM_DQS_1, GPIO47, _4), (SD1_CDATA7, GPIO48, _0), (BIST, GPIO48, _2),
+        (SD1_DATA6, GPIO47, _0), (BIST, GPIO47, _2), (EMAC_RXD1, GPIO47, _3),
+        (DBG_PSRAM_DQS_1, GPIO47, _4), (SD1_DATA7, GPIO48, _0), (BIST, GPIO48, _2),
         (EMAC_RXER, GPIO48, _3), (EMAC_TXEN, GPIO49, _3), (DBG_FLASH_CS, GPIO49, _4),
         (EMAC_RMII_CLK, GPIO50, _3), (DBG_FLASH_Q, GPIO50, _4), (EMAC_RXDV, GPIO51, _3),
         (DBG_FLASH_WP, GPIO51, _4), (EMAC_RXD0, GPIO52, _3), (DBG_FLASH_HOLD, GPIO52,
@@ -6014,22 +6084,22 @@ macro_rules! for_each_iomux_function {
         GPIO35, _4), ((SPI2_IO6, SPIn_IOm, 2, 6), GPIO36, _2), ((DBG_PSRAM_DQS_0,
         DBG_PSRAM_DQS_n, 0), GPIO36, _4), ((UART0_TXD, UARTn_TXD, 0), GPIO37, _0),
         ((SPI2_IO7, SPIn_IOm, 2, 7), GPIO37, _2), ((UART0_RXD, UARTn_RXD, 0), GPIO38,
-        _0), ((SPI2_DQS, SPIn_DQS, 2), GPIO38, _2), ((SD1_CDATA0, SDn_CDATAm, 1, 0),
-        GPIO39, _0), ((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4), ((SD1_CDATA1,
-        SDn_CDATAm, 1, 1), GPIO40, _0), ((DBG_PSRAM_DQ9, DBG_PSRAM_DQn, 9), GPIO40, _4),
-        ((SD1_CDATA2, SDn_CDATAm, 1, 2), GPIO41, _0), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO41,
-        _3), ((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41, _4), ((SD1_CDATA3, SDn_CDATAm,
+        _0), ((SPI2_DQS, SPIn_DQS, 2), GPIO38, _2), ((SD1_DATA0, SDn_DATAm, 1, 0),
+        GPIO39, _0), ((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4), ((SD1_DATA1,
+        SDn_DATAm, 1, 1), GPIO40, _0), ((DBG_PSRAM_DQ9, DBG_PSRAM_DQn, 9), GPIO40, _4),
+        ((SD1_DATA2, SDn_DATAm, 1, 2), GPIO41, _0), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO41,
+        _3), ((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41, _4), ((SD1_DATA3, SDn_DATAm,
         1, 3), GPIO42, _0), ((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3), ((DBG_PSRAM_DQ11,
-        DBG_PSRAM_DQn, 11), GPIO42, _4), ((SD1_CCLK, SDn_CCLK, 1), GPIO43, _0),
-        ((DBG_PSRAM_DQ12, DBG_PSRAM_DQn, 12), GPIO43, _4), ((SD1_CCMD, SDn_CCMD, 1),
-        GPIO44, _0), ((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44, _4), ((SD1_CDATA4,
-        SDn_CDATAm, 1, 4), GPIO45, _0), ((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14), GPIO45,
-        _4), ((SD1_CDATA5, SDn_CDATAm, 1, 5), GPIO46, _0), ((EMAC_RXD0, EMAC_RXDn, 0),
-        GPIO46, _3), ((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15), GPIO46, _4), ((SD1_CDATA6,
-        SDn_CDATAm, 1, 6), GPIO47, _0), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO47, _3),
-        ((DBG_PSRAM_DQS_1, DBG_PSRAM_DQS_n, 1), GPIO47, _4), ((SD1_CDATA7, SDn_CDATAm, 1,
-        7), GPIO48, _0), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO52, _3), ((EMAC_RXD1, EMAC_RXDn,
-        1), GPIO53, _3)));
+        DBG_PSRAM_DQn, 11), GPIO42, _4), ((SD1_CLK, SDn_CLK, 1), GPIO43, _0),
+        ((DBG_PSRAM_DQ12, DBG_PSRAM_DQn, 12), GPIO43, _4), ((SD1_CMD, SDn_CMD, 1),
+        GPIO44, _0), ((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44, _4), ((SD1_DATA4,
+        SDn_DATAm, 1, 4), GPIO45, _0), ((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14), GPIO45, _4),
+        ((SD1_DATA5, SDn_DATAm, 1, 5), GPIO46, _0), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO46,
+        _3), ((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15), GPIO46, _4), ((SD1_DATA6, SDn_DATAm,
+        1, 6), GPIO47, _0), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO47, _3), ((DBG_PSRAM_DQS_1,
+        DBG_PSRAM_DQS_n, 1), GPIO47, _4), ((SD1_DATA7, SDn_DATAm, 1, 7), GPIO48, _0),
+        ((EMAC_RXD0, EMAC_RXDn, 0), GPIO52, _3), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO53,
+        _3)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
@@ -6044,164 +6114,164 @@ macro_rules! define_io_mux_signals {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum InputSignal {
-            SD_CARD_CCMD_2      = 1,
-            SD_CARD_CDATA0_2    = 2,
-            SD_CARD_CDATA1_2    = 3,
-            SD_CARD_CDATA2_2    = 4,
-            SD_CARD_CDATA3_2    = 5,
-            SD_CARD_CDATA4_2    = 6,
-            SD_CARD_CDATA5_2    = 7,
-            SD_CARD_CDATA6_2    = 8,
-            SD_CARD_CDATA7_2    = 9,
-            UART0_RXD           = 10,
-            UART0_CTS           = 11,
-            UART0_DSR           = 12,
-            UART1_RXD           = 13,
-            UART1_CTS           = 14,
-            UART1_DSR           = 15,
-            UART2_RXD           = 16,
-            UART2_CTS           = 17,
-            UART2_DSR           = 18,
-            UART3_RXD           = 19,
-            UART3_CTS           = 20,
-            UART3_DSR           = 21,
-            UART4_RXD           = 22,
-            UART4_CTS           = 23,
-            UART4_DSR           = 24,
-            I2S0_O_BCK          = 25,
-            I2S0_MCLK           = 26,
-            I2S0_O_WS           = 27,
-            I2S0_I_SD           = 28,
-            I2S0_I_BCK          = 29,
-            I2S0_I_WS           = 30,
-            I2S1_O_BCK          = 31,
-            I2S1_MCLK           = 32,
-            I2S1_O_WS           = 33,
-            I2S1_I_SD           = 34,
-            I2S1_I_BCK          = 35,
-            I2S1_I_WS           = 36,
-            I2S2_O_BCK          = 37,
-            I2S2_MCLK           = 38,
-            I2S2_O_WS           = 39,
-            I2S2_I_SD           = 40,
-            I2S2_I_BCK          = 41,
-            I2S2_I_WS           = 42,
-            I2S0_I_SD1          = 43,
-            I2S0_I_SD2          = 44,
-            I2S0_I_SD3          = 45,
-            SPI3_CK             = 47,
-            SPI3_Q              = 48,
-            SPI3_D              = 49,
-            SPI3_HOLD           = 50,
-            SPI3_WP             = 51,
-            SPI3_CS             = 52,
-            SPI2_CK             = 53,
-            SPI2_Q              = 54,
-            SPI2_D              = 55,
-            SPI2_HOLD           = 56,
-            SPI2_WP             = 57,
-            SPI2_IO4            = 58,
-            SPI2_IO5            = 59,
-            SPI2_IO6            = 60,
-            SPI2_IO7            = 61,
-            SPI2_CS             = 62,
-            I2C0_SCL            = 68,
-            I2C0_SDA            = 69,
-            I2C1_SCL            = 70,
-            I2C1_SDA            = 71,
-            UART0_SLP_CLK       = 74,
-            UART1_SLP_CLK       = 75,
-            UART2_SLP_CLK       = 76,
-            UART3_SLP_CLK       = 77,
-            UART4_SLP_CLK       = 78,
-            TWAI0_RX            = 80,
-            TWAI1_RX            = 83,
-            TWAI2_RX            = 86,
-            PWM0_SYNC0          = 89,
-            PWM0_SYNC1          = 90,
-            PWM0_SYNC2          = 91,
-            PWM0_F0             = 92,
-            PWM0_F1             = 93,
-            PWM0_F2             = 94,
-            PWM0_CAP0           = 95,
-            PWM0_CAP1           = 96,
-            PWM0_CAP2           = 97,
-            PWM1_SYNC0          = 98,
-            PWM1_SYNC1          = 99,
-            PWM1_SYNC2          = 100,
-            PWM1_F0             = 101,
-            PWM1_F1             = 102,
-            PWM1_F2             = 103,
-            PWM1_CAP0           = 104,
-            PWM1_CAP1           = 105,
-            PWM1_CAP2           = 106,
-            EMAC_MDI            = 107,
-            EMAC_COL            = 108,
-            EMAC_CRS            = 109,
-            USB_FS_IDDIG        = 110,
-            USB_FS_AVALID       = 111,
-            USB_FS_SRP_BVALID   = 112,
-            USB_FS_VBUSVALID    = 113,
-            USB_SRP_SESSEND     = 114,
-            ULPI_CLK            = 117,
-            USB_HSPHY_REFCLK    = 118,
-            SD_CARD_DETECT_N_1  = 126,
-            SD_CARD_DETECT_N_2  = 127,
-            SD_CARD_INT_N_1     = 128,
-            SD_CARD_INT_N_2     = 129,
-            SD_CARD_WRITE_PRT_1 = 130,
-            SD_CARD_WRITE_PRT_2 = 131,
-            SD_DATA_STROBE_1    = 132,
-            SD_DATA_STROBE_2    = 133,
-            I3C_MST_SCL         = 134,
-            I3C_MST_SDA         = 135,
-            I3C_SLV_SCL         = 136,
-            I3C_SLV_SDA         = 137,
-            USB_JTAG_TDO_BRIDGE = 140,
-            CAM_PCLK            = 158,
-            CAM_H_ENABLE        = 159,
-            CAM_H_SYNC          = 160,
-            CAM_V_SYNC          = 161,
-            EMAC_RXDV           = 178,
-            EMAC_RXD0           = 179,
-            EMAC_RXD1           = 180,
-            EMAC_RXD2           = 181,
-            EMAC_RXD3           = 182,
-            EMAC_RXER           = 183,
-            EMAC_RX_CLK         = 184,
-            EMAC_TX_CLK         = 185,
-            PARLIO_RX_CLK       = 186,
-            PARLIO_TX_CLK       = 187,
-            PARLIO_RX_DATA0     = 188,
-            PARLIO_RX_DATA1     = 189,
-            PARLIO_RX_DATA2     = 190,
-            PARLIO_RX_DATA3     = 191,
-            PARLIO_RX_DATA4     = 192,
-            PARLIO_RX_DATA5     = 193,
-            PARLIO_RX_DATA6     = 194,
-            PARLIO_RX_DATA7     = 195,
-            PARLIO_RX_DATA8     = 196,
-            PARLIO_RX_DATA9     = 197,
-            PARLIO_RX_DATA10    = 198,
-            PARLIO_RX_DATA11    = 199,
-            PARLIO_RX_DATA12    = 200,
-            PARLIO_RX_DATA13    = 201,
-            PARLIO_RX_DATA14    = 202,
-            PARLIO_RX_DATA15    = 203,
+            SDHOST_CCMD_IN_2        = 1,
+            SDHOST_CDATA_IN_20      = 2,
+            SDHOST_CDATA_IN_21      = 3,
+            SDHOST_CDATA_IN_22      = 4,
+            SDHOST_CDATA_IN_23      = 5,
+            SDHOST_CDATA_IN_24      = 6,
+            SDHOST_CDATA_IN_25      = 7,
+            SDHOST_CDATA_IN_26      = 8,
+            SDHOST_CDATA_IN_27      = 9,
+            UART0_RXD               = 10,
+            UART0_CTS               = 11,
+            UART0_DSR               = 12,
+            UART1_RXD               = 13,
+            UART1_CTS               = 14,
+            UART1_DSR               = 15,
+            UART2_RXD               = 16,
+            UART2_CTS               = 17,
+            UART2_DSR               = 18,
+            UART3_RXD               = 19,
+            UART3_CTS               = 20,
+            UART3_DSR               = 21,
+            UART4_RXD               = 22,
+            UART4_CTS               = 23,
+            UART4_DSR               = 24,
+            I2S0_O_BCK              = 25,
+            I2S0_MCLK               = 26,
+            I2S0_O_WS               = 27,
+            I2S0_I_SD               = 28,
+            I2S0_I_BCK              = 29,
+            I2S0_I_WS               = 30,
+            I2S1_O_BCK              = 31,
+            I2S1_MCLK               = 32,
+            I2S1_O_WS               = 33,
+            I2S1_I_SD               = 34,
+            I2S1_I_BCK              = 35,
+            I2S1_I_WS               = 36,
+            I2S2_O_BCK              = 37,
+            I2S2_MCLK               = 38,
+            I2S2_O_WS               = 39,
+            I2S2_I_SD               = 40,
+            I2S2_I_BCK              = 41,
+            I2S2_I_WS               = 42,
+            I2S0_I_SD1              = 43,
+            I2S0_I_SD2              = 44,
+            I2S0_I_SD3              = 45,
+            SPI3_CK                 = 47,
+            SPI3_Q                  = 48,
+            SPI3_D                  = 49,
+            SPI3_HOLD               = 50,
+            SPI3_WP                 = 51,
+            SPI3_CS                 = 52,
+            SPI2_CK                 = 53,
+            SPI2_Q                  = 54,
+            SPI2_D                  = 55,
+            SPI2_HOLD               = 56,
+            SPI2_WP                 = 57,
+            SPI2_IO4                = 58,
+            SPI2_IO5                = 59,
+            SPI2_IO6                = 60,
+            SPI2_IO7                = 61,
+            SPI2_CS                 = 62,
+            I2C0_SCL                = 68,
+            I2C0_SDA                = 69,
+            I2C1_SCL                = 70,
+            I2C1_SDA                = 71,
+            UART0_SLP_CLK           = 74,
+            UART1_SLP_CLK           = 75,
+            UART2_SLP_CLK           = 76,
+            UART3_SLP_CLK           = 77,
+            UART4_SLP_CLK           = 78,
+            TWAI0_RX                = 80,
+            TWAI1_RX                = 83,
+            TWAI2_RX                = 86,
+            PWM0_SYNC0              = 89,
+            PWM0_SYNC1              = 90,
+            PWM0_SYNC2              = 91,
+            PWM0_F0                 = 92,
+            PWM0_F1                 = 93,
+            PWM0_F2                 = 94,
+            PWM0_CAP0               = 95,
+            PWM0_CAP1               = 96,
+            PWM0_CAP2               = 97,
+            PWM1_SYNC0              = 98,
+            PWM1_SYNC1              = 99,
+            PWM1_SYNC2              = 100,
+            PWM1_F0                 = 101,
+            PWM1_F1                 = 102,
+            PWM1_F2                 = 103,
+            PWM1_CAP0               = 104,
+            PWM1_CAP1               = 105,
+            PWM1_CAP2               = 106,
+            EMAC_MDI                = 107,
+            EMAC_COL                = 108,
+            EMAC_CRS                = 109,
+            USB_FS_IDDIG            = 110,
+            USB_FS_AVALID           = 111,
+            USB_FS_SRP_BVALID       = 112,
+            USB_FS_VBUSVALID        = 113,
+            USB_SRP_SESSEND         = 114,
+            ULPI_CLK                = 117,
+            USB_HSPHY_REFCLK        = 118,
+            SDHOST_CARD_DETECT_N_1  = 126,
+            SDHOST_CARD_DETECT_N_2  = 127,
+            SDHOST_CARD_INT_N_1     = 128,
+            SDHOST_CARD_INT_N_2     = 129,
+            SDHOST_CARD_WRITE_PRT_1 = 130,
+            SDHOST_CARD_WRITE_PRT_2 = 131,
+            SDHOST_DATA_STROBE_1    = 132,
+            SDHOST_DATA_STROBE_2    = 133,
+            I3C_MST_SCL             = 134,
+            I3C_MST_SDA             = 135,
+            I3C_SLV_SCL             = 136,
+            I3C_SLV_SDA             = 137,
+            USB_JTAG_TDO_BRIDGE     = 140,
+            CAM_PCLK                = 158,
+            CAM_H_ENABLE            = 159,
+            CAM_H_SYNC              = 160,
+            CAM_V_SYNC              = 161,
+            EMAC_RXDV               = 178,
+            EMAC_RXD0               = 179,
+            EMAC_RXD1               = 180,
+            EMAC_RXD2               = 181,
+            EMAC_RXD3               = 182,
+            EMAC_RXER               = 183,
+            EMAC_RX_CLK             = 184,
+            EMAC_TX_CLK             = 185,
+            PARLIO_RX_CLK           = 186,
+            PARLIO_TX_CLK           = 187,
+            PARLIO_RX_DATA0         = 188,
+            PARLIO_RX_DATA1         = 189,
+            PARLIO_RX_DATA2         = 190,
+            PARLIO_RX_DATA3         = 191,
+            PARLIO_RX_DATA4         = 192,
+            PARLIO_RX_DATA5         = 193,
+            PARLIO_RX_DATA6         = 194,
+            PARLIO_RX_DATA7         = 195,
+            PARLIO_RX_DATA8         = 196,
+            PARLIO_RX_DATA9         = 197,
+            PARLIO_RX_DATA10        = 198,
+            PARLIO_RX_DATA11        = 199,
+            PARLIO_RX_DATA12        = 200,
+            PARLIO_RX_DATA13        = 201,
+            PARLIO_RX_DATA14        = 202,
+            PARLIO_RX_DATA15        = 203,
             MTCK,
             MTDI,
             MTMS,
             MTDO,
-            SD1_CDATA0,
-            SD1_CDATA1,
-            SD1_CDATA2,
-            SD1_CDATA3,
-            SD1_CCLK,
-            SD1_CCMD,
-            SD1_CDATA4,
-            SD1_CDATA5,
-            SD1_CDATA6,
-            SD1_CDATA7,
+            SD1_DATA0,
+            SD1_DATA1,
+            SD1_DATA2,
+            SD1_DATA3,
+            SD1_CLK,
+            SD1_CMD,
+            SD1_DATA4,
+            SD1_DATA5,
+            SD1_DATA6,
+            SD1_DATA7,
             EMAC_RMII_CLK,
             REF_50M_CLK,
             BIST,
@@ -6238,184 +6308,184 @@ macro_rules! define_io_mux_signals {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum OutputSignal {
-            SD_CARD_CCLK_2         = 0,
-            SD_CARD_CCMD_2         = 1,
-            SD_CARD_CDATA0_2       = 2,
-            SD_CARD_CDATA1_2       = 3,
-            SD_CARD_CDATA2_2       = 4,
-            SD_CARD_CDATA3_2       = 5,
-            SD_CARD_CDATA4_2       = 6,
-            SD_CARD_CDATA5_2       = 7,
-            SD_CARD_CDATA6_2       = 8,
-            SD_CARD_CDATA7_2       = 9,
-            UART0_TXD              = 10,
-            UART0_RTS              = 11,
-            UART0_DTR              = 12,
-            UART1_TXD              = 13,
-            UART1_RTS              = 14,
-            UART1_DTR              = 15,
-            UART2_TXD              = 16,
-            UART2_RTS              = 17,
-            UART2_DTR              = 18,
-            UART3_TXD              = 19,
-            UART3_RTS              = 20,
-            UART3_DTR              = 21,
-            UART4_TXD              = 22,
-            UART4_RTS              = 23,
-            UART4_DTR              = 24,
-            I2S0_O_BCK             = 25,
-            I2S0_MCLK              = 26,
-            I2S0_O_WS              = 27,
-            I2S0_O_SD              = 28,
-            I2S0_I_BCK             = 29,
-            I2S0_I_WS              = 30,
-            I2S1_O_BCK             = 31,
-            I2S1_MCLK              = 32,
-            I2S1_O_WS              = 33,
-            I2S1_O_SD              = 34,
-            I2S1_I_BCK             = 35,
-            I2S1_I_WS              = 36,
-            I2S2_O_BCK             = 37,
-            I2S2_MCLK              = 38,
-            I2S2_O_WS              = 39,
-            I2S2_O_SD              = 40,
-            I2S2_I_BCK             = 41,
-            I2S2_I_WS              = 42,
-            I2S0_O_SD1             = 43,
-            SPI2_DQS               = 44,
-            SPI3_CS2               = 45,
-            SPI3_CS1               = 46,
-            SPI3_CK                = 47,
-            SPI3_Q                 = 48,
-            SPI3_D                 = 49,
-            SPI3_HOLD              = 50,
-            SPI3_WP                = 51,
-            SPI3_CS                = 52,
-            SPI2_CK                = 53,
-            SPI2_Q                 = 54,
-            SPI2_D                 = 55,
-            SPI2_HOLD              = 56,
-            SPI2_WP                = 57,
-            SPI2_IO4               = 58,
-            SPI2_IO5               = 59,
-            SPI2_IO6               = 60,
-            SPI2_IO7               = 61,
-            SPI2_CS                = 62,
-            SPI2_CS1               = 63,
-            SPI2_CS2               = 64,
-            SPI2_CS3               = 65,
-            SPI2_CS4               = 66,
-            SPI2_CS5               = 67,
-            I2C0_SCL               = 68,
-            I2C0_SDA               = 69,
-            I2C1_SCL               = 70,
-            I2C1_SDA               = 71,
-            GPIO_SD0               = 72,
-            GPIO_SD1               = 73,
-            GPIO_SD2               = 74,
-            GPIO_SD3               = 75,
-            GPIO_SD4               = 76,
-            GPIO_SD5               = 77,
-            GPIO_SD6               = 78,
-            GPIO_SD7               = 79,
-            TWAI0_TX               = 80,
-            TWAI0_BUS_OFF_ON       = 81,
-            TWAI0_CLKOUT           = 82,
-            TWAI1_TX               = 83,
-            TWAI1_BUS_OFF_ON       = 84,
-            TWAI1_CLKOUT           = 85,
-            TWAI2_TX               = 86,
-            TWAI2_BUS_OFF_ON       = 87,
-            TWAI2_CLKOUT           = 88,
-            PWM0_CH0_A             = 89,
-            PWM0_CH0_B             = 90,
-            PWM0_CH1_A             = 91,
-            PWM0_CH1_B             = 92,
-            PWM0_CH2_A             = 93,
-            PWM0_CH2_B             = 94,
-            PWM1_CH0_A             = 95,
-            PWM1_CH0_B             = 96,
-            PWM1_CH1_A             = 97,
-            PWM1_CH1_B             = 98,
-            PWM1_CH2_A             = 99,
-            PWM1_CH2_B             = 100,
-            TWAI0_STANDBY          = 105,
-            TWAI1_STANDBY          = 106,
-            TWAI2_STANDBY          = 107,
-            EMAC_MDC               = 108,
-            EMAC_MDO               = 109,
-            USB_SRP_DISCHRGVBUS    = 110,
-            USB_OTG11_IDPULLUP     = 111,
-            USB_OTG11_DPPULLDOWN   = 112,
-            USB_OTG11_DMPULLDOWN   = 113,
-            USB_OTG11_DRVVBUS      = 114,
-            USB_SRP_CHRGVBUS       = 115,
-            RNG_CHAIN_CLK          = 117,
-            I3C_MST_SCL            = 134,
-            I3C_MST_SDA            = 135,
-            I3C_SLV_SCL            = 136,
-            I3C_SLV_SDA            = 137,
-            I3C_MST_SCL_PULLUP_EN  = 138,
-            I3C_MST_SDA_PULLUP_EN  = 139,
-            USB_JTAG_TDI_BRIDGE    = 140,
-            USB_JTAG_TMS_BRIDGE    = 141,
-            USB_JTAG_TCK_BRIDGE    = 142,
-            USB_JTAG_TRST_BRIDGE   = 143,
-            LCD_CS                 = 144,
-            LCD_DC                 = 145,
-            SD_RST_N_1             = 146,
-            SD_RST_N_2             = 147,
-            SD_CCMD_OD_PULLUP_EN_N = 148,
-            LCD_PCLK               = 149,
-            CAM_CLK                = 150,
-            LCD_H_ENABLE           = 151,
-            LCD_H_SYNC             = 152,
-            LCD_V_SYNC             = 153,
-            EMAC_TXEN              = 178,
-            EMAC_TXD0              = 179,
-            EMAC_TXD1              = 180,
-            EMAC_TXD2              = 181,
-            EMAC_TXD3              = 182,
-            EMAC_TXER              = 183,
-            PARLIO_RX_CLK          = 186,
-            PARLIO_TX_CLK          = 187,
-            PARLIO_TX_DATA0        = 188,
-            PARLIO_TX_DATA1        = 189,
-            PARLIO_TX_DATA2        = 190,
-            PARLIO_TX_DATA3        = 191,
-            PARLIO_TX_DATA4        = 192,
-            PARLIO_TX_DATA5        = 193,
-            PARLIO_TX_DATA6        = 194,
-            PARLIO_TX_DATA7        = 195,
-            PARLIO_TX_DATA8        = 196,
-            PARLIO_TX_DATA9        = 197,
-            PARLIO_TX_DATA10       = 198,
-            PARLIO_TX_DATA11       = 199,
-            PARLIO_TX_DATA12       = 200,
-            PARLIO_TX_DATA13       = 201,
-            PARLIO_TX_DATA14       = 202,
-            PARLIO_TX_DATA15       = 203,
-            CONSTANT0              = 212,
-            CONSTANT1              = 213,
-            PARLIO_TX_CS           = 242,
-            EMAC_PTP_PPS           = 243,
-            ANA_COMP0              = 244,
-            ANA_COMP1              = 245,
-            GPIO                   = 256,
+            SDHOST_CCLK_OUT_2          = 0,
+            SDHOST_CCMD_OUT_2          = 1,
+            SDHOST_CDATA_OUT_20        = 2,
+            SDHOST_CDATA_OUT_21        = 3,
+            SDHOST_CDATA_OUT_22        = 4,
+            SDHOST_CDATA_OUT_23        = 5,
+            SDHOST_CDATA_OUT_24        = 6,
+            SDHOST_CDATA_OUT_25        = 7,
+            SDHOST_CDATA_OUT_26        = 8,
+            SDHOST_CDATA_OUT_27        = 9,
+            UART0_TXD                  = 10,
+            UART0_RTS                  = 11,
+            UART0_DTR                  = 12,
+            UART1_TXD                  = 13,
+            UART1_RTS                  = 14,
+            UART1_DTR                  = 15,
+            UART2_TXD                  = 16,
+            UART2_RTS                  = 17,
+            UART2_DTR                  = 18,
+            UART3_TXD                  = 19,
+            UART3_RTS                  = 20,
+            UART3_DTR                  = 21,
+            UART4_TXD                  = 22,
+            UART4_RTS                  = 23,
+            UART4_DTR                  = 24,
+            I2S0_O_BCK                 = 25,
+            I2S0_MCLK                  = 26,
+            I2S0_O_WS                  = 27,
+            I2S0_O_SD                  = 28,
+            I2S0_I_BCK                 = 29,
+            I2S0_I_WS                  = 30,
+            I2S1_O_BCK                 = 31,
+            I2S1_MCLK                  = 32,
+            I2S1_O_WS                  = 33,
+            I2S1_O_SD                  = 34,
+            I2S1_I_BCK                 = 35,
+            I2S1_I_WS                  = 36,
+            I2S2_O_BCK                 = 37,
+            I2S2_MCLK                  = 38,
+            I2S2_O_WS                  = 39,
+            I2S2_O_SD                  = 40,
+            I2S2_I_BCK                 = 41,
+            I2S2_I_WS                  = 42,
+            I2S0_O_SD1                 = 43,
+            SPI2_DQS                   = 44,
+            SPI3_CS2                   = 45,
+            SPI3_CS1                   = 46,
+            SPI3_CK                    = 47,
+            SPI3_Q                     = 48,
+            SPI3_D                     = 49,
+            SPI3_HOLD                  = 50,
+            SPI3_WP                    = 51,
+            SPI3_CS                    = 52,
+            SPI2_CK                    = 53,
+            SPI2_Q                     = 54,
+            SPI2_D                     = 55,
+            SPI2_HOLD                  = 56,
+            SPI2_WP                    = 57,
+            SPI2_IO4                   = 58,
+            SPI2_IO5                   = 59,
+            SPI2_IO6                   = 60,
+            SPI2_IO7                   = 61,
+            SPI2_CS                    = 62,
+            SPI2_CS1                   = 63,
+            SPI2_CS2                   = 64,
+            SPI2_CS3                   = 65,
+            SPI2_CS4                   = 66,
+            SPI2_CS5                   = 67,
+            I2C0_SCL                   = 68,
+            I2C0_SDA                   = 69,
+            I2C1_SCL                   = 70,
+            I2C1_SDA                   = 71,
+            GPIO_SD0                   = 72,
+            GPIO_SD1                   = 73,
+            GPIO_SD2                   = 74,
+            GPIO_SD3                   = 75,
+            GPIO_SD4                   = 76,
+            GPIO_SD5                   = 77,
+            GPIO_SD6                   = 78,
+            GPIO_SD7                   = 79,
+            TWAI0_TX                   = 80,
+            TWAI0_BUS_OFF_ON           = 81,
+            TWAI0_CLKOUT               = 82,
+            TWAI1_TX                   = 83,
+            TWAI1_BUS_OFF_ON           = 84,
+            TWAI1_CLKOUT               = 85,
+            TWAI2_TX                   = 86,
+            TWAI2_BUS_OFF_ON           = 87,
+            TWAI2_CLKOUT               = 88,
+            PWM0_CH0_A                 = 89,
+            PWM0_CH0_B                 = 90,
+            PWM0_CH1_A                 = 91,
+            PWM0_CH1_B                 = 92,
+            PWM0_CH2_A                 = 93,
+            PWM0_CH2_B                 = 94,
+            PWM1_CH0_A                 = 95,
+            PWM1_CH0_B                 = 96,
+            PWM1_CH1_A                 = 97,
+            PWM1_CH1_B                 = 98,
+            PWM1_CH2_A                 = 99,
+            PWM1_CH2_B                 = 100,
+            TWAI0_STANDBY              = 105,
+            TWAI1_STANDBY              = 106,
+            TWAI2_STANDBY              = 107,
+            EMAC_MDC                   = 108,
+            EMAC_MDO                   = 109,
+            USB_SRP_DISCHRGVBUS        = 110,
+            USB_OTG11_IDPULLUP         = 111,
+            USB_OTG11_DPPULLDOWN       = 112,
+            USB_OTG11_DMPULLDOWN       = 113,
+            USB_OTG11_DRVVBUS          = 114,
+            USB_SRP_CHRGVBUS           = 115,
+            RNG_CHAIN_CLK              = 117,
+            I3C_MST_SCL                = 134,
+            I3C_MST_SDA                = 135,
+            I3C_SLV_SCL                = 136,
+            I3C_SLV_SDA                = 137,
+            I3C_MST_SCL_PULLUP_EN      = 138,
+            I3C_MST_SDA_PULLUP_EN      = 139,
+            USB_JTAG_TDI_BRIDGE        = 140,
+            USB_JTAG_TMS_BRIDGE        = 141,
+            USB_JTAG_TCK_BRIDGE        = 142,
+            USB_JTAG_TRST_BRIDGE       = 143,
+            LCD_CS                     = 144,
+            LCD_DC                     = 145,
+            SD_RST_N_1                 = 146,
+            SD_RST_N_2                 = 147,
+            SDHOST_CCMD_OD_PULLUP_EN_N = 148,
+            LCD_PCLK                   = 149,
+            CAM_CLK                    = 150,
+            LCD_H_ENABLE               = 151,
+            LCD_H_SYNC                 = 152,
+            LCD_V_SYNC                 = 153,
+            EMAC_TXEN                  = 178,
+            EMAC_TXD0                  = 179,
+            EMAC_TXD1                  = 180,
+            EMAC_TXD2                  = 181,
+            EMAC_TXD3                  = 182,
+            EMAC_TXER                  = 183,
+            PARLIO_RX_CLK              = 186,
+            PARLIO_TX_CLK              = 187,
+            PARLIO_TX_DATA0            = 188,
+            PARLIO_TX_DATA1            = 189,
+            PARLIO_TX_DATA2            = 190,
+            PARLIO_TX_DATA3            = 191,
+            PARLIO_TX_DATA4            = 192,
+            PARLIO_TX_DATA5            = 193,
+            PARLIO_TX_DATA6            = 194,
+            PARLIO_TX_DATA7            = 195,
+            PARLIO_TX_DATA8            = 196,
+            PARLIO_TX_DATA9            = 197,
+            PARLIO_TX_DATA10           = 198,
+            PARLIO_TX_DATA11           = 199,
+            PARLIO_TX_DATA12           = 200,
+            PARLIO_TX_DATA13           = 201,
+            PARLIO_TX_DATA14           = 202,
+            PARLIO_TX_DATA15           = 203,
+            CONSTANT0                  = 212,
+            CONSTANT1                  = 213,
+            PARLIO_TX_CS               = 242,
+            EMAC_PTP_PPS               = 243,
+            ANA_COMP0                  = 244,
+            ANA_COMP1                  = 245,
+            GPIO                       = 256,
             MTCK,
             MTDI,
             MTMS,
             MTDO,
-            SD1_CDATA0,
-            SD1_CDATA1,
-            SD1_CDATA2,
-            SD1_CDATA3,
-            SD1_CCLK,
-            SD1_CCMD,
-            SD1_CDATA4,
-            SD1_CDATA5,
-            SD1_CDATA6,
-            SD1_CDATA7,
+            SD1_DATA0,
+            SD1_DATA1,
+            SD1_DATA2,
+            SD1_DATA3,
+            SD1_CLK,
+            SD1_CMD,
+            SD1_DATA4,
+            SD1_DATA5,
+            SD1_DATA6,
+            SD1_DATA7,
             EMAC_RMII_CLK,
             REF_50M_CLK,
             BIST,

@@ -750,8 +750,44 @@ version = 2
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
-[device.sd_host]
-support_status = "not_supported"
+
+[device.sdmmc]
+support_status = "partial"
+delay_phase_num = 4
+has_iomux = false
+has_gpio_matrix = true
+psram_dma = false
+uhs = false
+# Both slots are routed entirely through the GPIO matrix.
+slot_config = [
+    {
+        iomux = false,
+        clk = "SDHOST_CCLK_OUT_1",
+        cmd_in = "SDHOST_CCMD_IN_1",
+        cmd_out = "SDHOST_CCMD_OUT_1",
+        data_in = ["SDHOST_CDATA_IN_10", "SDHOST_CDATA_IN_11", "SDHOST_CDATA_IN_12", "SDHOST_CDATA_IN_13", "SDHOST_CDATA_IN_14", "SDHOST_CDATA_IN_15", "SDHOST_CDATA_IN_16", "SDHOST_CDATA_IN_17"],
+        data_out = ["SDHOST_CDATA_OUT_10", "SDHOST_CDATA_OUT_11", "SDHOST_CDATA_OUT_12", "SDHOST_CDATA_OUT_13", "SDHOST_CDATA_OUT_14", "SDHOST_CDATA_OUT_15", "SDHOST_CDATA_OUT_16", "SDHOST_CDATA_OUT_17"],
+        cd = "SDHOST_CARD_DETECT_N_1",
+        wp = "SDHOST_CARD_WRITE_PRT_1",
+        card_int = "SDHOST_CARD_INT_N_1",
+        data_strobe = "SDHOST_DATA_STROBE_1",
+        rst = "SDHOST_RST_N_1",
+    },
+    {
+        iomux = false,
+        clk = "SDHOST_CCLK_OUT_2",
+        cmd_in = "SDHOST_CCMD_IN_2",
+        cmd_out = "SDHOST_CCMD_OUT_2",
+        data_in = ["SDHOST_CDATA_IN_20", "SDHOST_CDATA_IN_21", "SDHOST_CDATA_IN_22", "SDHOST_CDATA_IN_23", "SDHOST_CDATA_IN_24", "SDHOST_CDATA_IN_25", "SDHOST_CDATA_IN_26", "SDHOST_CDATA_IN_27"],
+        data_out = ["SDHOST_CDATA_OUT_20", "SDHOST_CDATA_OUT_21", "SDHOST_CDATA_OUT_22", "SDHOST_CDATA_OUT_23", "SDHOST_CDATA_OUT_24", "SDHOST_CDATA_OUT_25", "SDHOST_CDATA_OUT_26", "SDHOST_CDATA_OUT_27"],
+        cd = "SDHOST_CARD_DETECT_N_2",
+        wp = "SDHOST_CARD_WRITE_PRT_2",
+        card_int = "SDHOST_CARD_INT_N_2",
+        data_strobe = "SDHOST_DATA_STROBE_2",
+        rst = "SDHOST_RST_N_2",
+    },
+]
+
 [device.twai]
 [device.usb_otg]
 fifo_depth_words = 256
