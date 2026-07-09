@@ -4540,6 +4540,7 @@ impl Chip {
                     "soc_has_spi3",
                     "soc_has_i2c0",
                     "soc_has_i2c1",
+                    "soc_has_i2s0",
                     "soc_has_twai0",
                     "soc_has_twai1",
                     "soc_has_twai2",
@@ -4583,6 +4584,7 @@ impl Chip {
                     "ethernet_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
+                    "i2s_driver_supported",
                     "interrupts_driver_supported",
                     "mipi_dsi_driver_supported",
                     "psram_driver_supported",
@@ -4633,6 +4635,8 @@ impl Chip {
                     "soc_has_vdma_ch2",
                     "soc_has_vdma_ch3",
                     "dma_supports_mem2mem",
+                    "i2s_supports_dma",
+                    "i2s_dma_engine=\"AHB_GDMA\"",
                     "aes_supports_dma",
                     "aes_dma_engine=\"AXI_GDMA\"",
                     "sha_supports_dma",
@@ -4671,14 +4675,15 @@ impl Chip {
                     "i2c_master_max_bus_timeout=\"31\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
-                    "i2s_version=\"2\"",
+                    "i2s_version=\"3\"",
                     "i2s_version_is_set",
-                    "i2s_default_clock_source=\"2\"",
+                    "i2s_default_clock_source=\"3\"",
                     "i2s_default_clock_source_is_set",
                     "i2s_mclk_divider_bit_width=\"6\"",
                     "i2s_mclk_divider_bit_width_is_set",
                     "i2s_max_ws_width=\"128\"",
                     "i2s_max_ws_width_is_set",
+                    "i2s_clock_configured_by_hp_sys_clkrst",
                     "i2s_supports_pdm_tx",
                     "i2s_supports_pdm_rx",
                     "i2s_supports_pcm2pdm",
@@ -4791,6 +4796,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_spi3",
                     "cargo:rustc-cfg=soc_has_i2c0",
                     "cargo:rustc-cfg=soc_has_i2c1",
+                    "cargo:rustc-cfg=soc_has_i2s0",
                     "cargo:rustc-cfg=soc_has_twai0",
                     "cargo:rustc-cfg=soc_has_twai1",
                     "cargo:rustc-cfg=soc_has_twai2",
@@ -4834,6 +4840,7 @@ impl Chip {
                     "cargo:rustc-cfg=ethernet_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
+                    "cargo:rustc-cfg=i2s_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=mipi_dsi_driver_supported",
                     "cargo:rustc-cfg=psram_driver_supported",
@@ -4884,6 +4891,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_vdma_ch2",
                     "cargo:rustc-cfg=soc_has_vdma_ch3",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=i2s_supports_dma",
+                    "cargo:rustc-cfg=i2s_dma_engine=\"AHB_GDMA\"",
                     "cargo:rustc-cfg=aes_supports_dma",
                     "cargo:rustc-cfg=aes_dma_engine=\"AXI_GDMA\"",
                     "cargo:rustc-cfg=sha_supports_dma",
@@ -4922,14 +4931,15 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
-                    "cargo:rustc-cfg=i2s_version=\"2\"",
+                    "cargo:rustc-cfg=i2s_version=\"3\"",
                     "cargo:rustc-cfg=i2s_version_is_set",
-                    "cargo:rustc-cfg=i2s_default_clock_source=\"2\"",
+                    "cargo:rustc-cfg=i2s_default_clock_source=\"3\"",
                     "cargo:rustc-cfg=i2s_default_clock_source_is_set",
                     "cargo:rustc-cfg=i2s_mclk_divider_bit_width=\"6\"",
                     "cargo:rustc-cfg=i2s_mclk_divider_bit_width_is_set",
                     "cargo:rustc-cfg=i2s_max_ws_width=\"128\"",
                     "cargo:rustc-cfg=i2s_max_ws_width_is_set",
+                    "cargo:rustc-cfg=i2s_clock_configured_by_hp_sys_clkrst",
                     "cargo:rustc-cfg=i2s_supports_pdm_tx",
                     "cargo:rustc-cfg=i2s_supports_pdm_rx",
                     "cargo:rustc-cfg=i2s_supports_pcm2pdm",
@@ -7164,6 +7174,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_vdma_ch3)");
     println!("cargo:rustc-check-cfg=cfg(mipi_dsi_supports_dma)");
     println!("cargo:rustc-check-cfg=cfg(ethernet_mii_via_gpio_matrix)");
+    println!("cargo:rustc-check-cfg=cfg(i2s_clock_configured_by_hp_sys_clkrst)");
     println!("cargo:rustc-check-cfg=cfg(i2s_supports_pdm_rx_hp_filter)");
     println!("cargo:rustc-check-cfg=cfg(sdmmc_delay_phase_num_is_set)");
     println!("cargo:rustc-check-cfg=cfg(sdmmc_has_gpio_matrix)");
@@ -7241,7 +7252,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_ll_intr_mask, values(\"262143\",\"131071\"))");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_fifo_size, values(\"32\",\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_version, values(\"1\",\"2\",\"3\"))");
-    println!("cargo:rustc-check-cfg=cfg(i2s_default_clock_source, values(\"2\",\"1\"))");
+    println!("cargo:rustc-check-cfg=cfg(i2s_default_clock_source, values(\"2\",\"1\",\"3\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_mclk_divider_bit_width, values(\"6\",\"9\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_max_ws_width, values(\"128\",\"512\"))");
     println!("cargo:rustc-check-cfg=cfg(i2s_pdm_max_tx_lines, values(\"1\",\"2\"))");

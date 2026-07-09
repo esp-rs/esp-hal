@@ -2168,7 +2168,7 @@ pub(crate) mod private {
             });
         }
 
-        #[cfg(not(i2s_clock_configured_by_pcr))]
+        #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
         fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
             let clkm_div = clock_settings.mclk_dividers();
 
@@ -2199,7 +2199,7 @@ pub(crate) mod private {
             });
         }
 
-        #[cfg(not(i2s_clock_configured_by_pcr))]
+        #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
         fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
             let clkm_div = clock_settings.mclk_dividers();
 
@@ -2312,6 +2312,112 @@ pub(crate) mod private {
                 w.i2s_rx_clkm_div_num()
                     .bits(clock_settings.mclk_divider as u8);
                 w.i2s_mclk_sel().bit(true)
+            });
+
+            #[cfg(i2s_version = "2")]
+            self.regs().rx_conf1().modify(|_, w| unsafe {
+                w.rx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+
+            #[cfg(i2s_version = "3")]
+            self.regs().rx_conf().modify(|_, w| unsafe {
+                w.rx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+        }
+
+        // TODO support I2S1/I2S2 (ESP32-P4)
+        #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
+        fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
+            // I2S clocks are configured via HP_SYS_CLKRST (ESP32-P4).
+            use crate::peripherals::HP_SYS_CLKRST;
+
+            let clkm_div = clock_settings.mclk_dividers();
+            let clkrst = HP_SYS_CLKRST::regs();
+
+            HP_SYS_CLKRST::regs()
+                .peri_clk_ctrl14()
+                .modify(|_, w| w.i2s0_mst_clk_sel().set_bit());
+
+            // Workaround for the double-division issue documented in esp-idf i2s_ll.h.
+            clkrst
+                .peri_clk_ctrl13()
+                .modify(|_, w| unsafe { w.i2s0_tx_div_n().bits(2) });
+            clkrst.peri_clk_ctrl14().modify(|_, w| unsafe {
+                w.i2s0_tx_div_yn1().clear_bit();
+                w.i2s0_tx_div_y().bits(1);
+                w.i2s0_tx_div_z().bits(0)
+            });
+            clkrst
+                .peri_clk_ctrl13()
+                .modify(|_, w| unsafe { w.i2s0_tx_div_x().bits(0) });
+
+            clkrst.peri_clk_ctrl14().modify(|_, w| unsafe {
+                w.i2s0_tx_div_yn1().bit(clkm_div.yn1);
+                w.i2s0_tx_div_z().bits(clkm_div.z as u16);
+                w.i2s0_tx_div_y().bits(clkm_div.y as u16)
+            });
+            clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
+                w.i2s0_tx_div_x().bits(clkm_div.x as u16);
+                w.i2s0_tx_div_n().bits(clock_settings.mclk_divider as u8);
+                w.i2s0_tx_clk_en().set_bit();
+                w.i2s0_tx_clk_src_sel()
+                    .bits(property!("i2s.default_clock_source"))
+            });
+
+            #[cfg(i2s_version = "2")]
+            self.regs().tx_conf1().modify(|_, w| unsafe {
+                w.tx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+
+            #[cfg(i2s_version = "3")]
+            self.regs().tx_conf().modify(|_, w| unsafe {
+                w.tx_bck_div_num()
+                    .bits((clock_settings.bclk_divider - 1) as u8)
+            });
+        }
+
+        // TODO support I2S1/I2S2 (ESP32-P4)
+        #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
+        fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
+            // I2S clocks are configured via HP_SYS_CLKRST (ESP32-P4).
+            use crate::peripherals::HP_SYS_CLKRST;
+
+            let clkm_div = clock_settings.mclk_dividers();
+            let clkrst = HP_SYS_CLKRST::regs();
+
+            HP_SYS_CLKRST::regs()
+                .peri_clk_ctrl14()
+                .modify(|_, w| w.i2s0_mst_clk_sel().clear_bit());
+
+            // Workaround for the double-division issue documented in esp-idf i2s_ll.h.
+            clkrst
+                .peri_clk_ctrl12()
+                .modify(|_, w| unsafe { w.i2s0_rx_div_n().bits(2) });
+            clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
+                w.i2s0_rx_div_yn1().clear_bit();
+                w.i2s0_rx_div_z().bits(0)
+            });
+            clkrst.peri_clk_ctrl12().modify(|_, w| unsafe {
+                w.i2s0_rx_div_y().bits(1);
+                w.i2s0_rx_div_x().bits(0)
+            });
+
+            clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
+                w.i2s0_rx_div_yn1().bit(clkm_div.yn1);
+                w.i2s0_rx_div_z().bits(clkm_div.z as u16)
+            });
+            clkrst.peri_clk_ctrl12().modify(|_, w| unsafe {
+                w.i2s0_rx_div_x().bits(clkm_div.x as u16);
+                w.i2s0_rx_div_y().bits(clkm_div.y as u16);
+                w.i2s0_rx_div_n().bits(clock_settings.mclk_divider as u8)
+            });
+            clkrst.peri_clk_ctrl11().modify(|_, w| unsafe {
+                w.i2s0_rx_clk_en().set_bit();
+                w.i2s0_rx_clk_src_sel()
+                    .bits(property!("i2s.default_clock_source"))
             });
 
             #[cfg(i2s_version = "2")]
@@ -2500,6 +2606,7 @@ pub(crate) mod private {
         }
 
         fn reset_tx(&self) {
+            // I2S v2/v3: reset fields are write-to-trigger (WT); writing 0 has no effect.
             self.regs().tx_conf().modify(|_, w| {
                 w.tx_reset().set_bit();
                 w.tx_fifo_reset().set_bit()
@@ -2530,6 +2637,7 @@ pub(crate) mod private {
                 .rx_conf()
                 .modify(|_, w| w.rx_start().clear_bit());
 
+            // I2S v2/v3: reset fields are write-to-trigger (WT); writing 0 has no effect.
             self.regs().rx_conf().modify(|_, w| {
                 w.rx_reset().set_bit();
                 w.rx_fifo_reset().set_bit()
@@ -2584,7 +2692,7 @@ pub(crate) mod private {
                 esp32s2 => {
                     OutputSignal::CLK_I2S
                 }
-                esp32s3 => {
+                any(esp32s3, esp32p4) => {
                     OutputSignal::I2S0_MCLK
                 }
                 _ => {
@@ -2598,6 +2706,9 @@ pub(crate) mod private {
                 any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0O_BCK
                 }
+                esp32p4 => {
+                    OutputSignal::I2S0_O_BCK
+                }
                 _ => {
                     OutputSignal::I2SO_BCK
                 }
@@ -2608,6 +2719,9 @@ pub(crate) mod private {
             cfg_select! {
                 any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0O_WS
+                }
+                esp32p4 => {
+                    OutputSignal::I2S0_O_WS
                 }
                 _ => {
                     OutputSignal::I2SO_WS
@@ -2626,6 +2740,9 @@ pub(crate) mod private {
                 esp32s3 => {
                     OutputSignal::I2S0O_SD
                 }
+                esp32p4 => {
+                    OutputSignal::I2S0_O_SD
+                }
                 _ => {
                     OutputSignal::I2SO_SD
                 }
@@ -2637,6 +2754,9 @@ pub(crate) mod private {
                 any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0I_BCK
                 }
+                esp32p4 => {
+                    OutputSignal::I2S0_I_BCK
+                }
                 _ => {
                     OutputSignal::I2SI_BCK
                 }
@@ -2647,6 +2767,9 @@ pub(crate) mod private {
             cfg_select! {
                 any(i2s_version = "1", esp32s3) => {
                     OutputSignal::I2S0I_WS
+                }
+                esp32p4 => {
+                    OutputSignal::I2S0_I_WS
                 }
                 _ => {
                     OutputSignal::I2SI_WS

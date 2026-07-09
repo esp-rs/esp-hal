@@ -481,6 +481,9 @@ driver_configs![
             /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,
             #[serde(default)]
+            /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
+            clock_configured_by_hp_sys_clkrst: bool,
+            #[serde(default)]
             /// Whether the chip supports PDM TX mode.
             supports_pdm_tx: bool,
             #[serde(default)]

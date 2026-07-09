@@ -93,6 +93,8 @@ peripherals = [
     { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C" },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    # + I2S1, I2S2
     { name = "TWAI0", interrupts = { peri = "TWAI0" } },
     { name = "TWAI1", interrupts = { peri = "TWAI1" } },
     { name = "TWAI2", interrupts = { peri = "TWAI2" } },
@@ -207,9 +209,10 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 5,
         burst_sizes = [0, 4, 16, 32], # unclear if 64 byte (INCR16) is supported
-        drivers = [],
+        drivers = ["i2s"],
         peripheral_instances = [
-            # I3C, UHCI, I2S, ADC, RMT
+            { name = "I2S0", dma_id = 3 },
+            # I3C, UHCI, I2S1, I2S2, ADC, RMT
         ],
         channels = [
             { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
@@ -295,9 +298,10 @@ support_status = "not_supported"
 [device.i2c_slave]
 support_status = "not_supported"
 [device.i2s]
-support_status = "not_supported"  # 3 instances (I2S0/1/2)
-version = 2
-default_clock_source = 2
+support_status = "partial"  # TODO (I2S1/2)
+version = 3
+default_clock_source = 3
+clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 6
 max_ws_width = 128
 supports_pdm_tx = true
