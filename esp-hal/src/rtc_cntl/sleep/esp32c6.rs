@@ -571,15 +571,8 @@ pub struct RtcSleepConfig {
     /// Power Down flags. On the C6 `apply()` sets the `pd_cpu`/`pd_top` bits, so
     /// a domain can't power off without the caller's retention storage.
     pub(crate) pd_flags: PowerDownFlags,
-    /// See [`Self::with_cpu_power_down`].
-    cpu_power_down: bool,
-    /// See [`Self::with_top_power_down`].
-    top_power_down: bool,
-    /// CPU-domain retention store; null when only clock-gating. A raw pointer
-    /// (not a borrow) keeps `Self` `Copy`; the builders take a `&'static mut`.
-    cpu_retention_mem: *mut crate::rtc_cntl::cpu_retention::CpuRetentionMemory,
-    /// TOP-domain system-peripheral regDMA store; null when not opted in.
-    top_retention_mem: *mut crate::rtc_cntl::retention::SystemRetentionMemory,
+    /// Light-sleep CPU/TOP power-down retention (opt-in choices + caller memory).
+    retention: crate::rtc_cntl::retention::SleepRetention,
 }
 
 impl Default for RtcSleepConfig {
@@ -590,10 +583,7 @@ impl Default for RtcSleepConfig {
         Self {
             deep: false,
             pd_flags: PowerDownFlags(0),
-            cpu_power_down: false,
-            top_power_down: false,
-            cpu_retention_mem: core::ptr::null_mut(),
-            top_retention_mem: core::ptr::null_mut(),
+            retention: crate::rtc_cntl::retention::SleepRetention::new(),
         }
     }
 }
@@ -614,15 +604,14 @@ impl RtcSleepConfig {
         mut self,
         memory: &'static mut crate::rtc_cntl::cpu_retention::CpuRetentionMemory,
     ) -> Self {
-        self.cpu_power_down = true;
-        self.cpu_retention_mem = memory;
+        self.retention.set_cpu_power_down(memory);
         self
     }
 
     /// Returns whether the CPU power domain is powered down during light sleep.
     #[instability::unstable]
     pub fn cpu_power_down(&self) -> bool {
-        self.cpu_power_down
+        self.retention.cpu_power_down()
     }
 
     /// Power down the digital `TOP` power domain during light sleep.
@@ -641,16 +630,14 @@ impl RtcSleepConfig {
         cpu_memory: &'static mut crate::rtc_cntl::cpu_retention::CpuRetentionMemory,
         system_memory: &'static mut crate::rtc_cntl::retention::SystemRetentionMemory,
     ) -> Self {
-        self.top_power_down = true;
-        self.cpu_retention_mem = cpu_memory;
-        self.top_retention_mem = system_memory;
+        self.retention.set_top_power_down(cpu_memory, system_memory);
         self
     }
 
     /// Returns whether the TOP power domain is powered down during light sleep.
     #[instability::unstable]
     pub fn top_power_down(&self) -> bool {
-        self.top_power_down
+        self.retention.top_power_down()
     }
 }
 
@@ -804,21 +791,11 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
 
-            // Only power a domain down with the caller's retention storage and no
-            // active power-domain lock on it; otherwise fall back to clock-gating.
-            use crate::rtc_cntl::power_domain::{Domain, can_power_down};
-            let have_cpu_mem = !self.cpu_retention_mem.is_null();
-            let have_sys_mem = !self.top_retention_mem.is_null();
-
-            // TOP-pd needs both the CPU frame buffer (it implies CPU-pd) and the
-            // system-peripheral regDMA buffer.
-            let top_pd =
-                self.top_power_down && have_cpu_mem && have_sys_mem && can_power_down(Domain::Top);
-            let cpu_pd = self.cpu_power_down && have_cpu_mem && can_power_down(Domain::Cpu);
-
-            // The CPU can't survive a TOP power-down, so pd_top implies pd_cpu.
+            // A domain only powers down with the caller's retention storage and
+            // no active lock (else clock-gating); pd_top implies pd_cpu.
+            let (cpu_pd, top_pd) = self.retention.resolve();
             self.pd_flags.set_pd_top(top_pd);
-            self.pd_flags.set_pd_cpu(cpu_pd || top_pd);
+            self.pd_flags.set_pd_cpu(cpu_pd);
         }
     }
 
@@ -939,44 +916,15 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        // Arm regDMA TOP-domain retention: after the power config write above
-        // (which resets the backup-enable bits) and before the sleep request.
-        if !self.deep && self.pd_flags.pd_top() && !self.top_retention_mem.is_null() {
-            let system_memory = unsafe { &mut *self.top_retention_mem };
-            crate::rtc_cntl::retention::enable_top_retention(system_memory);
+        // Arm retention (if any) and enter sleep. Arming must run after the
+        // power config above, which resets the regDMA backup-enable bits.
+        unsafe {
+            self.retention
+                .enter(self.deep, self.pd_flags.pd_cpu(), self.pd_flags.pd_top());
         }
 
-        if !self.deep && self.pd_flags.pd_cpu() && !self.cpu_retention_mem.is_null() {
-            // CPU power-down light sleep: save state, sleep, resume with it
-            // restored. Non-null whenever apply() sets pd_cpu.
-            let memory = unsafe { &mut *self.cpu_retention_mem };
-            unsafe {
-                crate::rtc_cntl::cpu_retention::sleep_with_cpu_retention(memory);
-            }
-        } else {
-            // pmu_ll_hp_set_sleep_enable
-            PMU::regs()
-                .slp_wakeup_cntl0()
-                .write(|w| w.sleep_req().bit(true));
-
-            // In pd_cpu lightsleep and deepsleep mode, we never get here
-            loop {
-                let int_raw = PMU::regs().int_raw().read();
-                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                    break;
-                }
-            }
-        }
-
-        // After a TOP power-down TIMG0 (not retained) comes back with its
-        // flashboot watchdog armed; disable it (like IDF's
-        // misc_modules_wake_prepare()) or it soon resets the chip.
         if !self.deep && self.pd_flags.pd_top() {
-            let tg0 = crate::peripherals::TIMG0::regs();
-            tg0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
-            tg0.wdtconfig0()
-                .modify(|_, w| w.wdt_flashboot_mod_en().bit(false));
-            tg0.wdtwprotect().write(|w| unsafe { w.bits(0) });
+            crate::rtc_cntl::retention::disable_timg0_flashboot_wdt();
         }
     }
 

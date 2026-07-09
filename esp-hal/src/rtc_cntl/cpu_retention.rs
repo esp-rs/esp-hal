@@ -1,24 +1,20 @@
-//! CPU power-down retention during light sleep (ESP32-C6).
+//! CPU power-down retention during light sleep (RISC-V PMU chips).
 //!
-//! When the C6 powers down `pd_cpu` in light sleep the CPU loses all state.
-//! regDMA can't reach the register file/CSRs, so they are saved/restored in
-//! software. Backing RAM
-//! ([`CpuRetentionMemory`]) is caller-owned, opt-in via
-//! [`RtcSleepConfig::with_cpu_power_down`]; without it the CPU is clock-gated.
+//! When `pd_cpu` powers down, the CPU loses all state and regDMA can't reach the
+//! register file/CSRs, so they are saved/restored in software in three parts:
+//! critical registers (GP + machine CSRs) in assembly via a setjmp/longjmp-style
+//! trick, non-critical CSRs via `csrr`/`csrw`, and CPU-domain device registers
+//! (`INTPRI`, `PLIC`/`CLINT`, cache). Backing RAM ([`CpuRetentionMemory`]) is
+//! caller-owned, opt-in via
+//! [`RtcSleepConfig::with_cpu_power_down`](crate::rtc_cntl::sleep::RtcSleepConfig::with_cpu_power_down).
 //!
-//! [`RtcSleepConfig::with_cpu_power_down`]: crate::rtc_cntl::sleep::RtcSleepConfig::with_cpu_power_down
-//!
-//! Save/restore has three parts: critical registers (GP + machine CSRs) in
-//! assembly via a setjmp/longjmp-style trick; non-critical CSRs via `csrr`/
-//! `csrw`; and CPU-domain device registers (`INTPRI`, `PLIC`/`CLINT`, cache).
-//!
-//! Everything runs from IRAM (`.rwtext`): the ROM jumps to the wake stub with
-//! the flash cache lost, so every function is `#[ram]` and must not call
-//! flash-resident code until the cache config is restored.
+//! The logic is chip-agnostic - only the device-register base addresses are
+//! per-chip data (from the `retention::chip` module). Everything runs from IRAM
+//! (`.rwtext`): the ROM wakes with the flash cache lost, so no `#[ram]` function
+//! may call flash-resident code until the cache config is restored.
 
-// Software register retention here mirrors ESP-IDF's `esp_sleep_cpu_retention()`.
-// Ported from ESP-IDF `v5.4` `esp32c6` `sleep_cpu.c`, `sleep_cpu_asm.S`,
-// `rvsleep-frames.h`.
+// Mirrors ESP-IDF `v5.4` `esp_sleep_cpu_retention()` (`sleep_cpu.c`,
+// `sleep_cpu_asm.S`, `rvsleep-frames.h`).
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
@@ -364,68 +360,78 @@ const fn total_words(regions: &[Region]) -> usize {
     words
 }
 
-// Interrupt matrix priority registers (`INTPRI`, base 0x600C_5000).
+// Per-chip base addresses (the region layout below is chip-agnostic).
+use crate::rtc_cntl::retention::{
+    CACHE_BASE,
+    CLINT_MINT_BASE,
+    CLINT_UINT_BASE,
+    INTPRI_BASE,
+    PLIC_MX_BASE,
+    PLIC_UX_BASE,
+};
+
+// Interrupt matrix priority registers (`INTPRI`).
 const INTPRI_REGIONS: [Region; 2] = [
     // INTPRI_CORE0_CPU_INT_ENABLE_REG ..= INTPRI_RND_ECO_LOW_REG
     Region {
-        start: 0x600C_5000,
+        start: INTPRI_BASE,
         words: 45,
     },
     // INTPRI_RND_ECO_HIGH_REG
     Region {
-        start: 0x600C_53FC,
+        start: INTPRI_BASE + 0x3FC,
         words: 1,
     },
 ];
 
-// L1 cache control (`EXTMEM`, base 0x600C_8000).
+// L1 cache control (`EXTMEM`/`CACHE`).
 const CACHE_REGIONS: [Region; 2] = [
-    // EXTMEM_L1_CACHE_CTRL_REG
+    // *_L1_CACHE_CTRL_REG
     Region {
-        start: 0x600C_8004,
+        start: CACHE_BASE + 0x4,
         words: 1,
     },
-    // EXTMEM_L1_CACHE_WRAP_AROUND_CTRL_REG
+    // *_L1_CACHE_WRAP_AROUND_CTRL_REG
     Region {
-        start: 0x600C_8020,
+        start: CACHE_BASE + 0x20,
         words: 1,
     },
 ];
 
-// PLIC machine/user interrupt controllers (bases 0x2000_1000 / 0x2000_1400).
+// PLIC machine/user interrupt controllers.
 const PLIC_REGIONS: [Region; 4] = [
     // PLIC_MXINT_ENABLE_REG ..= PLIC_MXINT_CLAIM_REG
     Region {
-        start: 0x2000_1000,
+        start: PLIC_MX_BASE,
         words: 38,
     },
     // PLIC_MXINT_CONF_REG
     Region {
-        start: 0x2000_13FC,
+        start: PLIC_MX_BASE + 0x3FC,
         words: 1,
     },
     // PLIC_UXINT_ENABLE_REG ..= PLIC_UXINT_CLAIM_REG
     Region {
-        start: 0x2000_1400,
+        start: PLIC_UX_BASE,
         words: 38,
     },
     // PLIC_UXINT_CONF_REG
     Region {
-        start: 0x2000_17FC,
+        start: PLIC_UX_BASE + 0x3FC,
         words: 1,
     },
 ];
 
-// CLINT machine/user timers (bases 0x2000_1800 / 0x2000_1C00).
+// CLINT machine/user timers.
 const CLINT_REGIONS: [Region; 2] = [
     // CLINT_MINT_SIP_REG ..= CLINT_MINT_MTIMECMP_H_REG
     Region {
-        start: 0x2000_1800,
+        start: CLINT_MINT_BASE,
         words: 6,
     },
     // CLINT_UINT_SIP_REG ..= CLINT_UINT_UTIMECMP_H_REG
     Region {
-        start: 0x2000_1C00,
+        start: CLINT_UINT_BASE,
         words: 6,
     },
 ];
@@ -569,13 +575,23 @@ fn do_cpu_retention() {
 /// CPU-power-down light sleep with software register retention, wrapping the
 /// sleep trigger in save/restore.
 ///
+/// `top` is the TOP-domain regDMA store when the `TOP` domain is also powered
+/// down (null otherwise). On chips whose PAU powers down with `TOP`
+/// ([`SystemRetentionMemory`]'s software-triggered restore), the peripherals -
+/// including the flash SPI controller - must be restored here in RAM before this
+/// function returns to flash-resident code; on hardware-restore chips
+/// (and when `top` is null) that call is a no-op.
+///
 /// # Safety
 ///
 /// The PMU must already be configured for a `pd_cpu` light sleep, stopping the
-/// CPU must be safe, and `mem` must stay valid across the sleep.
+/// CPU must be safe, and `mem`/`top` must stay valid across the sleep.
 // Mirrors ESP-IDF's `esp_sleep_cpu_retention()`.
 #[ram]
-pub(crate) unsafe fn sleep_with_cpu_retention(mem: &mut CpuRetentionMemory) {
+pub(crate) unsafe fn sleep_with_cpu_retention(
+    mem: &mut CpuRetentionMemory,
+    top: *mut crate::rtc_cntl::retention::SystemRetentionMemory,
+) {
     unsafe {
         RV_CORE_CRITICAL_REGS_FRAME = mem.critical.as_mut_ptr();
 
@@ -588,6 +604,13 @@ pub(crate) unsafe fn sleep_with_cpu_retention(mem: &mut CpuRetentionMemory) {
         save_noncritical(mem.noncritical.as_mut_ptr());
 
         do_cpu_retention();
+
+        // Software-triggered regDMA restore (TOP powered down): bring the TOP
+        // peripherals - crucially the flash SPI controller - back first, while
+        // still running from RAM. No-op on hardware-restore chips / cpu-only pd.
+        if !top.is_null() {
+            crate::rtc_cntl::retention::restore_top_retention(&mut *top);
+        }
 
         // Restore in reverse order; the cache config must come back before we
         // return to flash-resident code.

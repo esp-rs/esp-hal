@@ -586,6 +586,9 @@ is_lp_sys = true
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+# esp-hal implements CPU/TOP power-down retention (software CPU retention +
+# regDMA TOP retention) for light sleep on this chip.
+pd_retention = true
 wakeup_sources = {
     Ext1 = 1,
     Gpio = 2,

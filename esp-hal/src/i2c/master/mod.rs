@@ -153,7 +153,7 @@ mod low_level;
 pub use low_level::{AnyI2c, Instance};
 use low_level::{Driver, I2cClockGuard};
 
-#[cfg(esp32c6)]
+#[cfg(sleep_pd_retention)]
 #[instability::unstable]
 pub use crate::rtc_cntl::retention::I2cRetentionMemory;
 
@@ -685,7 +685,7 @@ pub struct I2c<'d, Dm: DriverMode> {
     guard: PeripheralGuard,
     config: DriverConfig,
     // Active keeps `TOP` powered; `with_retention_memory` swaps to retained.
-    #[cfg(esp32c6)]
+    #[cfg(sleep_pd_retention)]
     power: crate::rtc_cntl::retention::PowerManagement<
         'd,
         crate::rtc_cntl::retention::I2cRetentionMemory,
@@ -746,7 +746,7 @@ impl<'d> I2c<'d, Blocking> {
                 sda_pin,
                 scl_pin,
             },
-            #[cfg(esp32c6)]
+            #[cfg(sleep_pd_retention)]
             power: crate::rtc_cntl::retention::PowerManagement::new(),
         };
 
@@ -771,7 +771,7 @@ impl<'d> I2c<'d, Blocking> {
             phantom: PhantomData,
             guard: self.guard,
             config: self.config,
-            #[cfg(esp32c6)]
+            #[cfg(sleep_pd_retention)]
             power: self.power,
         }
     }
@@ -865,7 +865,7 @@ impl<'d> I2c<'d, Async> {
             phantom: PhantomData,
             guard: self.guard,
             config: self.config,
-            #[cfg(esp32c6)]
+            #[cfg(sleep_pd_retention)]
             power: self.power,
         }
     }
@@ -1056,7 +1056,7 @@ where
 
     /// Retain this I2C's config registers in `mem` across a `TOP` power-down in
     /// light sleep, dropping the lock that would otherwise keep `TOP` powered.
-    #[cfg(esp32c6)]
+    #[cfg(sleep_pd_retention)]
     #[instability::unstable]
     pub fn with_retention_memory(mut self, mem: &'d mut I2cRetentionMemory) -> Self {
         let base = self.i2c.info().regs() as *const RegisterBlock as usize as u32;

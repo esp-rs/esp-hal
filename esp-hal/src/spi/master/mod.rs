@@ -51,7 +51,7 @@ pub use low_level::{Info, Instance, QspiInstance, State};
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
-#[cfg(esp32c6)]
+#[cfg(sleep_pd_retention)]
 #[instability::unstable]
 pub use crate::rtc_cntl::retention::SpiRetentionMemory;
 use crate::{
@@ -887,7 +887,7 @@ where
 {
     /// Retain this SPI's config registers in `mem` across a `TOP` power-down in
     /// light sleep, dropping the lock that would otherwise keep `TOP` powered.
-    #[cfg(esp32c6)]
+    #[cfg(sleep_pd_retention)]
     #[instability::unstable]
     pub fn with_retention_memory(mut self, mem: &'d mut SpiRetentionMemory) -> Self {
         let base = self.driver().regs() as *const _ as usize as u32;
