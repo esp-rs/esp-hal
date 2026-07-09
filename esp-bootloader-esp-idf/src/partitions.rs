@@ -696,7 +696,7 @@ impl FlashRegion<'_, '_> {
 
 #[cfg(feature = "embedded-storage")]
 /// [`NorFlash`] and [`MultiwriteNorFlash`] view of a non-encrypted [`FlashRegion`].
-pub struct FlashRegionPlainNorFlash<'r, 'a, 'd> {
+pub struct NorFlashRegion<'r, 'a, 'd> {
     region: &'r mut FlashRegion<'a, 'd>,
 }
 
@@ -705,7 +705,7 @@ pub struct FlashRegionPlainNorFlash<'r, 'a, 'd> {
 ///
 /// Write size is 4096 bytes ([`esp_storage::FlashStorage::SECTOR_SIZE`]): the ROM encrypts
 /// whole sectors.
-pub struct FlashRegionEncryptedNorFlash<'r, 'a, 'd> {
+pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
     region: &'r mut FlashRegion<'a, 'd>,
 }
 
@@ -728,35 +728,33 @@ mod embedded_storage_traits {
     use super::*;
 
     impl<'a, 'd> FlashRegion<'a, 'd> {
-        /// Returns a [`FlashRegionPlainNorFlash`] for [`NorFlash`] access.
+        /// Returns a [`NorFlashRegion`] for [`NorFlash`] access.
         ///
         /// # Errors
         ///
         /// Returns [`Error::NotSupported`] if this partition is treated as encrypted (e.g. app
         /// partitions when flash encryption is enabled).
-        pub fn as_nor_flash<'r>(
-            &'r mut self,
-        ) -> Result<FlashRegionPlainNorFlash<'r, 'a, 'd>, Error> {
+        pub fn as_nor_flash<'r>(&'r mut self) -> Result<NorFlashRegion<'r, 'a, 'd>, Error> {
             if self.raw.is_effectively_encrypted() {
                 return Err(Error::NotSupported);
             }
 
-            Ok(FlashRegionPlainNorFlash { region: self })
+            Ok(NorFlashRegion { region: self })
         }
 
-        /// Returns a [`FlashRegionEncryptedNorFlash`] for [`NorFlash`] access.
+        /// Returns a [`EncryptedNorFlashRegion`] for [`NorFlash`] access.
         ///
         /// # Errors
         ///
         /// Returns [`Error::NotSupported`] if this partition is not treated as encrypted.
         pub fn as_nor_flash_encrypted<'r>(
             &'r mut self,
-        ) -> Result<FlashRegionEncryptedNorFlash<'r, 'a, 'd>, Error> {
+        ) -> Result<EncryptedNorFlashRegion<'r, 'a, 'd>, Error> {
             if !self.raw.is_effectively_encrypted() {
                 return Err(Error::NotSupported);
             }
 
-            Ok(FlashRegionEncryptedNorFlash { region: self })
+            Ok(EncryptedNorFlashRegion { region: self })
         }
     }
 
@@ -793,11 +791,11 @@ mod embedded_storage_traits {
         }
     }
 
-    impl ErrorType for FlashRegionPlainNorFlash<'_, '_, '_> {
+    impl ErrorType for NorFlashRegion<'_, '_, '_> {
         type Error = Error;
     }
 
-    impl ReadNorFlash for FlashRegionPlainNorFlash<'_, '_, '_> {
+    impl ReadNorFlash for NorFlashRegion<'_, '_, '_> {
         const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
@@ -818,7 +816,7 @@ mod embedded_storage_traits {
         }
     }
 
-    impl NorFlash for FlashRegionPlainNorFlash<'_, '_, '_> {
+    impl NorFlash for NorFlashRegion<'_, '_, '_> {
         const WRITE_SIZE: usize = esp_storage::FlashStorage::WRITE_SIZE;
         const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
 
@@ -844,13 +842,13 @@ mod embedded_storage_traits {
         }
     }
 
-    impl MultiwriteNorFlash for FlashRegionPlainNorFlash<'_, '_, '_> {}
+    impl MultiwriteNorFlash for NorFlashRegion<'_, '_, '_> {}
 
-    impl ErrorType for FlashRegionEncryptedNorFlash<'_, '_, '_> {
+    impl ErrorType for EncryptedNorFlashRegion<'_, '_, '_> {
         type Error = Error;
     }
 
-    impl ReadNorFlash for FlashRegionEncryptedNorFlash<'_, '_, '_> {
+    impl ReadNorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
         const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
@@ -871,7 +869,7 @@ mod embedded_storage_traits {
         }
     }
 
-    impl NorFlash for FlashRegionEncryptedNorFlash<'_, '_, '_> {
+    impl NorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
         const WRITE_SIZE: usize = esp_storage::FlashStorage::SECTOR_SIZE as usize;
         const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
 
@@ -1152,7 +1150,7 @@ mod nor_flash_tests {
     #[test]
     fn plain_nor_flash_implements_multi_write() {
         fn assert_multi_write<N: MultiwriteNorFlash>() {}
-        assert_multi_write::<FlashRegionPlainNorFlash<'static, 'static, 'static>>();
+        assert_multi_write::<NorFlashRegion<'static, 'static, 'static>>();
     }
 
     #[test]
@@ -1178,19 +1176,19 @@ mod nor_flash_tests {
     #[test]
     fn nor_flash_write_sizes() {
         assert_eq!(
-            <FlashRegionPlainNorFlash<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
+            <NorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
             esp_storage::FlashStorage::WRITE_SIZE
         );
         assert_eq!(
-            <FlashRegionEncryptedNorFlash<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
+            <EncryptedNorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
             esp_storage::FlashStorage::SECTOR_SIZE as usize
         );
         assert_eq!(
-            <FlashRegionPlainNorFlash<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
+            <NorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
             esp_storage::FlashStorage::READ_SIZE
         );
         assert_eq!(
-            <FlashRegionEncryptedNorFlash<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
+            <EncryptedNorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
             esp_storage::FlashStorage::READ_SIZE
         );
     }
