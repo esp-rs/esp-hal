@@ -256,7 +256,7 @@ fn setup_stack_guard() {
     }
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(init_stack_ptr_range_check, feature = "rt"))]
 pub(crate) fn ensure_stack_pointer_in_range() {
     unsafe extern "C" {
         static _stack_end_cpu0: u32;
