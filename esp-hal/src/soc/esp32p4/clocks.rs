@@ -433,77 +433,6 @@ fn configure_lp_slow_clk_impl(
         });
 }
 
-// Per-instance clock impl for UART (called on UartInstance enum)
-
-impl UartInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // UART function clock enable is handled by peripheral clock gates in system.rs
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        _new_config: UartFunctionClockConfig,
-    ) {
-        // TODO: Configure UART clock source selection
-        // HP_SYS_CLKRST PERI_CLK_CTRL110-114 for UART0-4
-    }
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Baud rate generator is always on when UART is enabled
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        _new_config: UartBaudRateGeneratorConfig,
-    ) {
-        // Baud rate is configured directly in UART registers, not here
-    }
-}
-
-impl I2cInstance {
-    // I2C_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl10()
-            .modify(|_, w| match self {
-                I2cInstance::I2c0 => w.i2c0_clk_en().bit(en),
-                I2cInstance::I2c1 => w.i2c1_clk_en().bit(en),
-            });
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<I2cFunctionClockConfig>,
-        new_config: I2cFunctionClockConfig,
-    ) {
-        let rc_fast = matches!(new_config.sclk, I2cFunctionClockSclk::RcFast);
-        match self {
-            I2cInstance::I2c0 => {
-                HP_SYS_CLKRST::regs()
-                    .peri_clk_ctrl10()
-                    .modify(|_, w| unsafe {
-                        w.i2c0_clk_src_sel().bit(rc_fast);
-                        w.i2c0_clk_div_num().bits(new_config.div_num as _)
-                    });
-            }
-            I2cInstance::I2c1 => {
-                HP_SYS_CLKRST::regs()
-                    .peri_clk_ctrl10()
-                    .modify(|_, w| w.i2c1_clk_src_sel().bit(rc_fast));
-                HP_SYS_CLKRST::regs()
-                    .peri_clk_ctrl11()
-                    .modify(|_, w| unsafe { w.i2c1_clk_div_num().bits(new_config.div_num as _) });
-            }
-        }
-    }
-}
-
 // Per-instance clock impl for TIMG
 
 impl TimgInstance {
@@ -530,37 +459,6 @@ impl TimgInstance {
         _new_config: TimgWdtClockConfig,
     ) {
         // TODO: Configure TIMG WDT clock source
-    }
-}
-
-impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // SPI clock gates are managed by the peripheral clock infrastructure in system.rs.
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SpiFunctionClockConfig>,
-        new_config: SpiFunctionClockConfig,
-    ) {
-        let source = match new_config {
-            SpiFunctionClockConfig::Xtal => 0,
-            SpiFunctionClockConfig::RcFast => 1,
-            // SDIO_PLL0
-            // APLL
-            SpiFunctionClockConfig::Spll => 4,
-        };
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl116()
-            .modify(|_, w| unsafe {
-                match self {
-                    Self::Spi2 => w.gpspi2_clk_src_sel().bits(source),
-                    Self::Spi3 => w.gpspi3_clk_src_sel().bits(source),
-                }
-            });
     }
 }
 

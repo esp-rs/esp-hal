@@ -14,7 +14,7 @@
 #![allow(missing_docs, reason = "Experimental")]
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU},
     soc::regi2c,
 };
 
@@ -476,120 +476,5 @@ impl TimgInstance {
                     TimgWdtClockConfig::PllF80m => 2,
                 })
             });
-    }
-}
-
-impl UartInstance {
-    // UART_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let uart = match self {
-            UartInstance::Uart0 => 0,
-            UartInstance::Uart1 => 1,
-        };
-        PCR::regs()
-            .uart(uart)
-            .clk_conf()
-            .modify(|_, w| w.sclk_en().bit(en));
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        new_config: UartFunctionClockConfig,
-    ) {
-        PCR::regs()
-            .uart(match self {
-                UartInstance::Uart0 => 0,
-                UartInstance::Uart1 => 1,
-            })
-            .clk_conf()
-            .modify(|_, w| unsafe {
-                w.sclk_sel().bits(match new_config.sclk {
-                    UartFunctionClockSclk::Xtal => 0,
-                    UartFunctionClockSclk::RcFast => 1,
-                    UartFunctionClockSclk::PllF80m => 2,
-                });
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
-                w.sclk_div_num().bits(new_config.div_num as _);
-                w
-            });
-    }
-
-    // UART_BAUD_RATE_GENERATOR
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        new_config: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new_config.integral as _);
-            w.frag().bits(new_config.fractional as _)
-        });
-    }
-}
-
-impl I2cInstance {
-    // I2C_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        PCR::regs()
-            .i2c_sclk_conf(0)
-            .modify(|_, w| w.i2c_sclk_en().bit(en));
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<I2cFunctionClockConfig>,
-        new_config: I2cFunctionClockConfig,
-    ) {
-        PCR::regs().i2c_sclk_conf(0).modify(|_, w| unsafe {
-            w.i2c_sclk_sel()
-                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
-            w.i2c_sclk_div_num().bits(new_config.div_num as _)
-        });
-    }
-}
-
-impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs()
-                .spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_en().bit(en)),
-        };
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SpiFunctionClockConfig>,
-        new_config: SpiFunctionClockConfig,
-    ) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs().spi2_clkm_conf().modify(|_, w| unsafe {
-                w.spi2_clkm_div_num().bits(0);
-                w.spi2_clkm_sel().bits(match new_config {
-                    SpiFunctionClockConfig::Xtal => 0,
-                    SpiFunctionClockConfig::PllF160m => 1,
-                    SpiFunctionClockConfig::RcFast => 2,
-                })
-            }),
-        };
     }
 }

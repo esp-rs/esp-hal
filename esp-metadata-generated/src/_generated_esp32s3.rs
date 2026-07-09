@@ -1602,7 +1602,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            fn divisor(self) -> u32 {
+            pub(crate) fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1677,7 +1677,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            fn divisor(self) -> u32 {
+            pub(crate) fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1765,10 +1765,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            fn sclk(self) -> I2cFunctionClockSclk {
+            pub(crate) fn sclk(self) -> I2cFunctionClockSclk {
                 self.sclk
             }
-            fn div_num(self) -> u32 {
+            pub(crate) fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1846,10 +1846,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            fn sclk(self) -> UartFunctionClockSclk {
+            pub(crate) fn sclk(self) -> UartFunctionClockSclk {
                 self.sclk
             }
-            fn div_num(self) -> u32 {
+            pub(crate) fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1887,10 +1887,10 @@ macro_rules! define_clock_tree_types {
                     integral,
                 }
             }
-            fn fractional(self) -> u32 {
+            pub(crate) fn fractional(self) -> u32 {
                 self.fractional as u32
             }
-            fn integral(self) -> u32 {
+            pub(crate) fn integral(self) -> u32 {
                 self.integral as u32
             }
         }
