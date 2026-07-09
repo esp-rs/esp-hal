@@ -1566,6 +1566,126 @@ pub trait Instance: crate::private::Sealed + super::any::Degrade {
     fn info(&self) -> &'static Info;
 }
 
+impl Instance for I2S0<'_> {
+    fn info(&self) -> &'static Info {
+        static INFO: Info = Info {
+                register_block: I2S0::PTR.cast::<RegisterBlock>(),
+                peripheral: crate::system::Peripheral::I2s0,
+                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
+                mclk: cfg_select! {
+                    esp32s2 => OutputSignal::CLK_I2S,
+                    any(esp32s3, esp32p4) => OutputSignal::I2S0_MCLK,
+                    _ => OutputSignal::I2S_MCLK,
+                },
+                bclk: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_BCK,
+                    esp32p4 => OutputSignal::I2S0_O_BCK,
+                    _ => OutputSignal::I2SO_BCK,
+                },
+                ws: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_WS,
+                    esp32p4 => OutputSignal::I2S0_O_WS,
+                    _ => OutputSignal::I2SO_WS,
+                },
+                bclk_rx: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_BCK,
+                    esp32p4 => OutputSignal::I2S0_I_BCK,
+                    _ => OutputSignal::I2SI_BCK,
+                },
+                ws_rx: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_WS,
+                    esp32p4 => OutputSignal::I2S0_I_WS,
+                    _ => OutputSignal::I2SI_WS,
+                },
+                dout_lines: cfg_select! {
+                    esp32 => &[OutputSignal::I2S0O_DATA_23],
+                    esp32s2 => &[OutputSignal::I2S0O_DATA_OUT23],
+                    esp32s3 => &[OutputSignal::I2S0O_SD, OutputSignal::I2S0O_SD1],
+                    esp32p4 => &[OutputSignal::I2S0_O_SD, OutputSignal::I2S0_O_SD1],
+                    _ => &[OutputSignal::I2SO_SD],
+                },
+                din_lines: cfg_select! {
+                    esp32 => &[InputSignal::I2S0I_DATA_15],
+                    esp32s2 => &[InputSignal::I2S0I_DATA_IN15],
+                    esp32s3 => &[
+                        InputSignal::I2S0I_SD,
+                        InputSignal::I2S0I_SD1,
+                        InputSignal::I2S0I_SD2,
+                        InputSignal::I2S0I_SD3,
+                    ],
+                    esp32p4 => &[
+                        InputSignal::I2S0_I_SD,
+                        InputSignal::I2S0_I_SD1,
+                        InputSignal::I2S0_I_SD2,
+                        InputSignal::I2S0_I_SD3,
+                    ],
+                    _ => &[InputSignal::I2SI_SD],
+                },
+                pdm_tx: true,
+                pdm_rx: true,
+            };
+        &INFO
+    }
+}
+
+#[cfg(soc_has_i2s1)]
+impl Instance for I2S1<'_> {
+    fn info(&self) -> &'static Info {
+        static INFO: Info = Info {
+                register_block: I2S1::PTR.cast::<RegisterBlock>(),
+                peripheral: crate::system::Peripheral::I2s1,
+                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
+                mclk: OutputSignal::I2S1_MCLK,
+                bclk: OutputSignal::I2S1O_BCK,
+                ws: OutputSignal::I2S1O_WS,
+                bclk_rx: OutputSignal::I2S1I_BCK,
+                ws_rx: OutputSignal::I2S1I_WS,
+                dout_lines: cfg_select! {
+                    esp32 => &[OutputSignal::I2S1O_DATA_23],
+                    _ => &[OutputSignal::I2S1O_SD],
+                },
+                din_lines: cfg_select! {
+                    esp32 => &[InputSignal::I2S1I_DATA_15],
+                    _ => &[InputSignal::I2S1I_SD],
+                },
+                // Note: PDM is only supported on I2S0.
+                pdm_tx: false,
+                pdm_rx: false,
+            };
+        &INFO
+    }
+}
+
+impl Instance for AnyI2s<'_> {
+    fn info(&self) -> &'static Info {
+        match &self.0 {
+            #[cfg(soc_has_i2s0)]
+            AnyI2sInner::I2s0(i2s) => i2s.info(),
+            #[cfg(soc_has_i2s1)]
+            AnyI2sInner::I2s1(i2s) => i2s.info(),
+        }
+    }
+}
+
+impl AnyI2s<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(soc_has_i2s0)]
+            AnyI2sInner::I2s0(i2s) => i2s,
+            #[cfg(soc_has_i2s1)]
+            AnyI2sInner::I2s1(i2s) => i2s,
+        } {
+            fn bind_peri_interrupt(&self, handler: InterruptHandler);
+            fn disable_peri_interrupt_on_all_cores(&self);
+        }
+    }
+
+    pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.disable_peri_interrupt_on_all_cores();
+        self.bind_peri_interrupt(handler);
+    }
+}
+
 pub(crate) mod private {
     use super::*;
 
@@ -1728,126 +1848,6 @@ pub(crate) mod private {
             signal.connect_to(&din);
 
             Ok(self)
-        }
-    }
-
-    impl super::Instance for I2S0<'_> {
-        fn info(&self) -> &'static Info {
-            static INFO: Info = Info {
-                register_block: I2S0::PTR.cast::<RegisterBlock>(),
-                peripheral: crate::system::Peripheral::I2s0,
-                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
-                mclk: cfg_select! {
-                    esp32s2 => OutputSignal::CLK_I2S,
-                    any(esp32s3, esp32p4) => OutputSignal::I2S0_MCLK,
-                    _ => OutputSignal::I2S_MCLK,
-                },
-                bclk: cfg_select! {
-                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_BCK,
-                    esp32p4 => OutputSignal::I2S0_O_BCK,
-                    _ => OutputSignal::I2SO_BCK,
-                },
-                ws: cfg_select! {
-                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_WS,
-                    esp32p4 => OutputSignal::I2S0_O_WS,
-                    _ => OutputSignal::I2SO_WS,
-                },
-                bclk_rx: cfg_select! {
-                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_BCK,
-                    esp32p4 => OutputSignal::I2S0_I_BCK,
-                    _ => OutputSignal::I2SI_BCK,
-                },
-                ws_rx: cfg_select! {
-                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_WS,
-                    esp32p4 => OutputSignal::I2S0_I_WS,
-                    _ => OutputSignal::I2SI_WS,
-                },
-                dout_lines: cfg_select! {
-                    esp32 => &[OutputSignal::I2S0O_DATA_23],
-                    esp32s2 => &[OutputSignal::I2S0O_DATA_OUT23],
-                    esp32s3 => &[OutputSignal::I2S0O_SD, OutputSignal::I2S0O_SD1],
-                    esp32p4 => &[OutputSignal::I2S0_O_SD, OutputSignal::I2S0_O_SD1],
-                    _ => &[OutputSignal::I2SO_SD],
-                },
-                din_lines: cfg_select! {
-                    esp32 => &[InputSignal::I2S0I_DATA_15],
-                    esp32s2 => &[InputSignal::I2S0I_DATA_IN15],
-                    esp32s3 => &[
-                        InputSignal::I2S0I_SD,
-                        InputSignal::I2S0I_SD1,
-                        InputSignal::I2S0I_SD2,
-                        InputSignal::I2S0I_SD3,
-                    ],
-                    esp32p4 => &[
-                        InputSignal::I2S0_I_SD,
-                        InputSignal::I2S0_I_SD1,
-                        InputSignal::I2S0_I_SD2,
-                        InputSignal::I2S0_I_SD3,
-                    ],
-                    _ => &[InputSignal::I2SI_SD],
-                },
-                pdm_tx: true,
-                pdm_rx: true,
-            };
-            &INFO
-        }
-    }
-
-    #[cfg(soc_has_i2s1)]
-    impl super::Instance for I2S1<'_> {
-        fn info(&self) -> &'static Info {
-            static INFO: Info = Info {
-                register_block: I2S1::PTR.cast::<RegisterBlock>(),
-                peripheral: crate::system::Peripheral::I2s1,
-                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
-                mclk: OutputSignal::I2S1_MCLK,
-                bclk: OutputSignal::I2S1O_BCK,
-                ws: OutputSignal::I2S1O_WS,
-                bclk_rx: OutputSignal::I2S1I_BCK,
-                ws_rx: OutputSignal::I2S1I_WS,
-                dout_lines: cfg_select! {
-                    esp32 => &[OutputSignal::I2S1O_DATA_23],
-                    _ => &[OutputSignal::I2S1O_SD],
-                },
-                din_lines: cfg_select! {
-                    esp32 => &[InputSignal::I2S1I_DATA_15],
-                    _ => &[InputSignal::I2S1I_SD],
-                },
-                // Note: PDM is only supported on I2S0.
-                pdm_tx: false,
-                pdm_rx: false,
-            };
-            &INFO
-        }
-    }
-
-    impl super::Instance for super::AnyI2s<'_> {
-        fn info(&self) -> &'static Info {
-            match &self.0 {
-                #[cfg(soc_has_i2s0)]
-                AnyI2sInner::I2s0(i2s) => i2s.info(),
-                #[cfg(soc_has_i2s1)]
-                AnyI2sInner::I2s1(i2s) => i2s.info(),
-            }
-        }
-    }
-
-    impl super::AnyI2s<'_> {
-        delegate::delegate! {
-            to match &self.0 {
-                #[cfg(soc_has_i2s0)]
-                AnyI2sInner::I2s0(i2s) => i2s,
-                #[cfg(soc_has_i2s1)]
-                AnyI2sInner::I2s1(i2s) => i2s,
-            } {
-                fn bind_peri_interrupt(&self, handler: InterruptHandler);
-                fn disable_peri_interrupt_on_all_cores(&self);
-            }
-        }
-
-        pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            self.disable_peri_interrupt_on_all_cores();
-            self.bind_peri_interrupt(handler);
         }
     }
 
