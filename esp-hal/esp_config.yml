@@ -141,7 +141,6 @@ options:
       - type:
           validator: enumeration
           value:
-            - "16KB"
             - "32KB"
             - "64KB"
     active: "esp32s2 || esp32s3"

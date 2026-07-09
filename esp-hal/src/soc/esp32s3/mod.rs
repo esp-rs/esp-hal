@@ -39,7 +39,6 @@ pub(crate) const CONFIG_INSTRUCTION_CACHE_LINE_SIZE: usize = cfg_select! {
 pub(crate) const CONFIG_DATA_CACHE_SIZE: usize = cfg_select! {
     data_cache_size_64kb => 0x10000,
     data_cache_size_32kb => 0x8000,
-    data_cache_size_16kb => 0x4000,
 };
 pub(crate) const CONFIG_DCACHE_ASSOCIATED_WAYS: usize = cfg_select! {
     dcache_associated_ways_8 => 8,
