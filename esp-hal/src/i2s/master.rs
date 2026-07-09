@@ -6,7 +6,11 @@
     "mclk" => {
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
         _ => ""
-    }
+    },
+    "tdm_slot_philips" => include_str!("tdm_slot_philips.svg"),
+    "tdm_slot_msb" => include_str!("tdm_slot_msb.svg"),
+    "tdm_slot_pcm_short" => include_str!("tdm_slot_pcm_short.svg"),
+    "tdm_slot_pcm_long" => include_str!("tdm_slot_pcm_long.svg"),
 ))]
 //! # Inter-IC Sound (I2S)
 //!
@@ -49,24 +53,32 @@
 //!
 //! TDM Philips mode pulls the WS line low one BCK period before the first data bit of the first
 //! slot is sent and holds it low for 50% of the frame.
-#![doc = include_str!("tdm_slot_philips.svg")]
+//!
+//! # {tdm_slot_philips}
+//!
 //! #### TDM MSB Standard
 //!
 //! MSB (most-significant bit) mode is similar to Philips mode, except the WS line is pulled low at
 //! the same time the first data bit of the first slot is sent. It is held low for 50% of the frame.
-#![doc = include_str!("tdm_slot_msb.svg")]
+//!
+//! # {tdm_slot_msb}
+//!
 //! #### TDM PCM Short Standard
 //!
 //! PCM (pulse-code modulation) short mode pulls the WS line *high* one BCK period before the first
 //! data bit of the first slot is sent, keeps it high for one BCK, then pulls it low for the
 //! remainder of the frame.
-#![doc = include_str!("tdm_slot_pcm_short.svg")]
+//!
+//! # {tdm_slot_pcm_short}
+//!
 //! #### TDM PCM Long Standard
 //!
 //! PCM long mode pulls the WS line *high* one BCK period before the first data bit of the first
 //! slot is sent, keeps it high until just before the last data bit of the first slot is sent, then
 //! pulls it low for the remainder of the frame.
-#![doc = include_str!("tdm_slot_pcm_long.svg")]
+//!
+//! # {tdm_slot_pcm_long}
+//!
 //! Diagrams from _ESP-IDF Programming Guide_; rendered by Wavedrom.
 //!
 //! ## Examples
@@ -109,22 +121,26 @@
 //! ```
 #![cfg_attr(
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
-    doc = "## PDM mode\n\n\
-PDM (pulse-density modulation) is supported on **I2S0 only** on chips where the \
-hardware provides PDM filters. Use [`I2s::new_pdm`] with [`PdmConfig`]. PDM uses a \
-single clock pin (`with_clk` on [`I2s::i2s_tx`] / [`I2s::i2s_rx`]) instead of \
-separate BCLK and WS lines. Only simplex operation (TX *or* RX) is supported.\n\n\
-```rust, no_run\n\
-# {before_snippet}\n\
-# use esp_hal::i2s::master::{I2s, PdmSlotMode, PdmTxConfig, PdmConfig};\n\
-# use esp_hal::time::Rate;\n\
-let pdm = PdmConfig::tx_only(PdmTxConfig::new_codec_default(\n\
-    Rate::from_hz(16_000),\n\
-    PdmSlotMode::Mono,\n\
-));\n\
-let i2s = I2s::new_pdm(peripherals.I2S0, peripherals.__dma_channel__, pdm).unwrap();\n\
-# {after_snippet}\n\
-```\n"
+    doc = r"## PDM mode
+
+PDM (pulse-density modulation) is supported on **I2S0 only** on chips where the
+hardware provides PDM filters. Use [`I2s::new_pdm`] with [`PdmConfig`]. PDM uses a
+single clock pin (`with_clk` on [`I2s::i2s_tx`] / [`I2s::i2s_rx`]) instead of
+separate BCLK and WS lines. Only simplex operation (TX *or* RX) is supported.
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::i2s::master::{I2s, PdmSlotMode, PdmTxConfig, PdmConfig};
+use esp_hal::time::Rate;
+
+let pdm = PdmConfig::tx_only(PdmTxConfig::new_codec_default(
+    Rate::from_hz(16_000),
+    PdmSlotMode::Mono,
+));
+let i2s = I2s::new_pdm(peripherals.I2S0, peripherals.__dma_channel__, pdm)?;
+# {after_snippet}
+```
+"
 )]
 
 use core::mem::ManuallyDrop;
