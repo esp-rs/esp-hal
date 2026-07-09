@@ -190,7 +190,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         Some("zeroable")
     } else if persistent {
         Some("persistable")
-    } else if dram2_uninit {
+    } else if dram2_uninit || dcache_reclaimed {
         Some("uninit")
     } else {
         None
