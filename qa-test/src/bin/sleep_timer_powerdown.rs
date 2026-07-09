@@ -20,7 +20,7 @@
 //! GPIO5 is high while awake, low while asleep, to bracket each sleep on a
 //! current meter / logic analyzer.
 
-//% CHIP_FILTER: esp32c6
+//% CHIP_FILTER: esp32c6 || esp32h2
 
 #![no_std]
 #![no_main]

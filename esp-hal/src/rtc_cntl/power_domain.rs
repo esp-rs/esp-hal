@@ -1,4 +1,4 @@
-//! Power-domain locks for light sleep (ESP32-C6).
+//! Power-domain locks for light sleep (RISC-V PMU chips).
 //!
 //! An active, un-retained peripheral holds a [`PowerDomainLock`]. Unlike a
 //! [`WakeLock`](crate::rtc_cntl::WakeLock) it doesn't prevent sleep, only the
@@ -43,8 +43,8 @@ impl Drop for PowerDomainLock {
     }
 }
 
-/// Whether `domain` may be powered down. On the C6 powering `TOP` down also
-/// tears down the CPU domain, so `Top` requires both to be free.
+/// Whether `domain` may be powered down. Powering `TOP` down also tears down the
+/// CPU domain, so `Top` requires both to be free.
 pub(crate) fn can_power_down(domain: Domain) -> bool {
     let blocked = match domain {
         Domain::Cpu => LOCKS[Domain::Cpu as usize].load(Ordering::Acquire) != 0,
