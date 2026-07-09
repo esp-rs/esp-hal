@@ -1,25 +1,10 @@
 //! PDM register programming for ESP32 (I2S hardware v1).
 
 use super::{PdmConfig, PdmDataFormat, PdmError, PdmSlotMode, clock};
-use crate::i2s::master::private::RegisterAccessPrivate;
-#[cfg(soc_has_i2s0)]
-use crate::pac::i2s0::RegisterBlock as I2s0RegisterBlock;
+use crate::i2s::master::Info;
 
-#[cfg(soc_has_i2s0)]
-fn i2s0_regs() -> &'static I2s0RegisterBlock {
-    use crate::peripherals::I2S0;
-    unsafe { &*I2S0::PTR.cast::<I2s0RegisterBlock>() }
-}
-
-pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &PdmConfig,
-) -> Result<(), PdmError> {
-    if i2s.peripheral() != crate::system::Peripheral::I2s0 {
-        return Err(PdmError::UnsupportedInstance);
-    }
-
-    i2s0_regs().conf2().modify(|_, w| {
+pub(crate) fn configure_pdm(i2s: &Info, config: &PdmConfig) -> Result<(), PdmError> {
+    i2s.regs().conf2().modify(|_, w| {
         w.camera_en().clear_bit();
         w.lcd_en().clear_bit()
     });
@@ -31,8 +16,8 @@ pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
         configure_rx(i2s, rx)?;
     }
 
-    i2s0_regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
-    i2s0_regs().pd_conf().modify(|_, w| {
+    i2s.regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
+    i2s.regs().pd_conf().modify(|_, w| {
         w.fifo_force_pu().set_bit();
         w.fifo_force_pd().clear_bit()
     });
@@ -40,18 +25,17 @@ pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
     Ok(())
 }
 
-fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &super::PdmTxConfig,
-) -> Result<(), PdmError> {
-    config.validate()?;
+fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError> {
+    if !i2s.pdm_tx {
+        return Err(PdmError::UnsupportedInstance);
+    }
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
     let clock = clock::calculate_tx_clock(&config.clock, pcm)?;
     i2s.set_clock(clock.dividers);
 
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
-    let regs = i2s0_regs();
+    let regs = i2s.regs();
 
     regs.conf().modify(|_, w| {
         w.tx_msb_shift().clear_bit();
@@ -119,11 +103,10 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
     Ok(())
 }
 
-fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &super::PdmRxConfig,
-) -> Result<(), PdmError> {
-    config.validate()?;
+fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError> {
+    if !i2s.pdm_rx {
+        return Err(PdmError::UnsupportedInstance);
+    }
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
     #[cfg(i2s_supports_pdm2pcm)]
@@ -136,7 +119,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     i2s.set_clock(clock.dividers);
 
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
-    let regs = i2s0_regs();
+    let regs = i2s.regs();
 
     regs.conf().modify(|_, w| {
         w.rx_msb_shift().clear_bit();

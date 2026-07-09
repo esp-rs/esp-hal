@@ -12,7 +12,7 @@ mod hp_filter;
 mod ll;
 
 use super::master::{ConfigError, Instance};
-use crate::time::Rate;
+use crate::{i2s::master::Info, time::Rate};
 
 /// PDM configuration errors.
 #[non_exhaustive]
@@ -507,10 +507,7 @@ impl PdmConfig {
     }
 }
 
-pub(crate) fn configure_pdm<I: super::master::private::RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &PdmConfig,
-) -> Result<(), ConfigError> {
+pub(crate) fn configure_pdm(i2s: &Info, config: &PdmConfig) -> Result<(), ConfigError> {
     config.validate().map_err(ConfigError::Pdm)?;
     ll::configure_pdm(i2s, config).map_err(ConfigError::Pdm)
 }
