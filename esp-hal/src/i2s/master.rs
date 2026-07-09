@@ -7,7 +7,6 @@
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
         _ => ""
     }
-
 ))]
 //! # Inter-IC Sound (I2S)
 //!
