@@ -104,12 +104,8 @@ mod tests {
         );
 
         let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                peripherals.DMA_I2S0
-            },
-            _ => {
-                peripherals.DMA_CH0
-            },
+            i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
+            _ => peripherals.DMA_CH0,
         };
 
         #[cfg(not(esp32c5))]
@@ -734,14 +730,15 @@ mod parallel_tests {
 mod pdm_tx_tests {
     use esp_hal::{
         dma_tx_buffer,
-        i2s::master::{I2s, PdmSlotMode, PdmTxConfig},
+        i2s::master::{I2s, Instance, PdmSlotMode, PdmTxConfig},
         time::Rate,
     };
 
     #[test]
     fn pdm_tx_config_validate() {
         let tx = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
-        assert!(tx.validate().is_ok());
+        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        assert!(tx.validate(i2s.info()).is_ok());
     }
 
     #[test]
@@ -749,12 +746,8 @@ mod pdm_tx_tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                peripherals.DMA_I2S0
-            },
-            _ => {
-                peripherals.DMA_CH0
-            },
+            i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
+            _ => peripherals.DMA_CH0,
         };
 
         let tx_cfg = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
@@ -781,7 +774,7 @@ mod pdm_tx_tests {
 mod pdm_rx_tests {
     use esp_hal::{
         dma_rx_buffer,
-        i2s::master::{I2s, PdmConfig, PdmRxConfig, PdmSlotMode},
+        i2s::master::{I2s, Instance, PdmConfig, PdmRxConfig, PdmSlotMode},
         time::Rate,
     };
 
@@ -799,7 +792,8 @@ mod pdm_rx_tests {
     #[test]
     fn pdm_rx_config_validate() {
         let rx = default_rx_config();
-        assert!(rx.validate().is_ok());
+        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        assert!(rx.validate(i2s.info()).is_ok());
     }
 
     #[test]

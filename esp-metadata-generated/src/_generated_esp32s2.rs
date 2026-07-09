@@ -4074,7 +4074,8 @@ macro_rules! for_each_i2c_master {
 /// This macro has one option for its "Individual matcher" case:
 ///
 /// Syntax: `($instance:ident, $sys:ident, $mclk:ident, $bclk:ident, $ws:ident, $bclk_rx:ident,
-/// $ws_rx:ident, [$($dout:ident),*], [$($din:ident),*], $pdm_tx:literal, $pdm_rx:literal)`
+/// $ws_rx:ident, [$($dout:ident),*], [$($din:ident),*], $pdm_tx:literal, $pdm_rx:literal,
+/// $pcm2pdm:literal, $pdm2pcm:literal)`
 ///
 /// Macro fragments:
 ///
@@ -4085,10 +4086,12 @@ macro_rules! for_each_i2c_master {
 /// - `$bclk_rx`, `$ws_rx`: RX bit clock and word select output signals.
 /// - `$dout`, `$din`: data-out and data-in signal names.
 /// - `$pdm_tx`, `$pdm_rx`: whether the instance supports PDM TX/RX.
+/// - `$pcm2pdm`, `$pdm2pcm`: whether the instance supports the hardware PCM<->PDM format conversion
+///   filter on TX/RX.
 ///
 /// Example data:
 /// - `(I2S0, I2s0, I2S_MCLK, I2SO_BCK, I2SO_WS, I2SI_BCK, I2SI_WS, [I2SO_SD], [I2SI_SD], true,
-///   true)`
+///   true, true, true)`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_i2s {
@@ -4096,9 +4099,9 @@ macro_rules! for_each_i2s {
         macro_rules! _for_each_inner_i2s { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner_i2s!((I2S0)); _for_each_inner_i2s!((I2S0, I2s0, CLK_I2S,
         I2S0O_BCK, I2S0O_WS, I2S0I_BCK, I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15],
-        false, false)); _for_each_inner_i2s!((names(I2S0)));
+        false, false, false, false)); _for_each_inner_i2s!((names(I2S0)));
         _for_each_inner_i2s!((all(I2S0, I2s0, CLK_I2S, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
-        I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15], false, false)));
+        I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15], false, false, false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.

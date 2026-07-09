@@ -67,7 +67,7 @@ for_each_i2s! {
     (
         $instance:ident, $sys:ident, $mclk:ident,
         $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
-        $dout:tt, $din:tt, true, true
+        $dout:tt, $din:tt, true, true, $pcm2pdm:literal, $pdm2pcm:literal
     ) => {
         impl PdmInstance for crate::peripherals::$instance<'_> {}
     };
@@ -307,8 +307,10 @@ impl PdmTxSlotConfig {
 pub struct PdmRxClockConfig {
     /// Target PCM sample rate.
     pub sample_rate: Rate,
+
     /// PDM2PCM downsample rate.
     pub downsample_rate: PdmDownsampleRate,
+
     /// Bit clock divider.
     pub bclk_div: u32,
 }
@@ -320,16 +322,21 @@ pub struct PdmRxClockConfig {
 pub struct PdmRxSlotConfig {
     /// Mono or stereo slot mode.
     pub slot_mode: PdmSlotMode,
+
     /// Active RX slot mask.
     pub slot_mask: PdmSlotMask,
+
     /// PCM or raw PDM data format.
     pub data_format: PdmDataFormat,
+
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
     /// Enable the RX high-pass filter.
     pub hp_en: bool,
+
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
     /// High-pass filter cut-off frequency in Hz.
     pub hp_cut_off_freq_hz: f32,
+
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
     /// RX amplification factor (1–15).
     pub amplify_num: u32,
@@ -367,6 +374,7 @@ impl PdmRxSlotConfig {
 pub struct PdmTxConfig {
     /// TX clock settings.
     pub clock: PdmTxClockConfig,
+
     /// TX slot and filter settings.
     pub slot: PdmTxSlotConfig,
 }
@@ -390,9 +398,8 @@ impl PdmTxConfig {
     }
 
     /// Validate TX configuration against hardware capabilities.
-    pub fn validate(&self) -> Result<(), PdmError> {
-        #[cfg(not(i2s_supports_pcm2pdm))]
-        if self.slot.data_format == PdmDataFormat::Pcm {
+    pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
+        if self.slot.data_format == PdmDataFormat::Pcm && !info.pcm2pdm {
             return Err(PdmError::PcmFormatUnsupported);
         }
         if self.clock.up_sample_fs > 480 {
@@ -445,9 +452,8 @@ impl PdmRxConfig {
     }
 
     /// Validate RX configuration against hardware capabilities.
-    pub fn validate(&self) -> Result<(), PdmError> {
-        #[cfg(not(i2s_supports_pdm2pcm))]
-        if self.slot.data_format == PdmDataFormat::Pcm {
+    pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
+        if self.slot.data_format == PdmDataFormat::Pcm && !info.pdm2pcm {
             return Err(PdmError::PcmFormatUnsupported);
         }
         if self.slot.slot_mask.bits() == 0 {
@@ -493,8 +499,9 @@ impl PdmConfig {
         }
     }
 
-    /// Validate that exactly one direction is configured and settings are valid.
-    pub fn validate(&self) -> Result<(), PdmError> {
+    /// Validate that exactly one direction is configured and that the settings
+    /// are valid for the given I2S instance.
+    pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.tx.is_none() && self.rx.is_none() {
             return Err(PdmError::DirectionMissing);
         }
@@ -502,16 +509,15 @@ impl PdmConfig {
             return Err(PdmError::DuplexUnsupported);
         }
         if let Some(tx) = &self.tx {
-            tx.validate()?;
+            tx.validate(info)?;
         }
         if let Some(rx) = &self.rx {
-            rx.validate()?;
+            rx.validate(info)?;
         }
         Ok(())
     }
 }
 
 pub(crate) fn configure_pdm(i2s: &Info, config: &PdmConfig) -> Result<(), ConfigError> {
-    config.validate().map_err(ConfigError::Pdm)?;
     ll::configure_pdm(i2s, config).map_err(ConfigError::Pdm)
 }

@@ -828,11 +828,11 @@ pub struct TdmConfig {
 }
 
 impl Config {
-    fn validate(&self) -> Result<(), ConfigError> {
+    fn validate(&self, _info: &Info) -> Result<(), ConfigError> {
         match self {
             Self::Tdm(c) => c.validate(),
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            Self::Pdm(c) => c.validate().map_err(ConfigError::Pdm),
+            Self::Pdm(c) => c.validate(_info).map_err(ConfigError::Pdm),
         }
     }
 
@@ -1571,7 +1571,8 @@ for_each_i2s! {
     (
         $instance:ident, $sys:ident, $mclk:ident,
         $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
-        [$($dout:ident),+], [$($din:ident),+], $pdm_tx:literal, $pdm_rx:literal
+        [$($dout:ident),+], [$($din:ident),+], $pdm_tx:literal, $pdm_rx:literal,
+        $pcm2pdm:literal, $pdm2pcm:literal
     ) => {
         impl Instance for crate::peripherals::$instance<'_> {
             fn info(&self) -> &'static Info {
@@ -1589,6 +1590,8 @@ for_each_i2s! {
                     din_lines: &[$(InputSignal::$din),+],
                     pdm_tx: $pdm_tx,
                     pdm_rx: $pdm_rx,
+                    pcm2pdm: $pcm2pdm,
+                    pdm2pcm: $pdm2pcm,
                 };
                 &INFO
             }
@@ -1937,6 +1940,12 @@ pub struct Info {
 
     /// PDM RX supported.
     pub pdm_rx: bool,
+
+    /// Hardware PCM-to-PDM format conversion filter supported on TX.
+    pub pcm2pdm: bool,
+
+    /// Hardware PDM-to-PCM format conversion filter supported on RX.
+    pub pdm2pcm: bool,
 }
 
 // SAFETY: The register block pointer refers to a static peripheral memory region.
@@ -2047,7 +2056,7 @@ impl Info {
     }
 
     fn configure(&self, config: &Config) -> Result<(), ConfigError> {
-        config.validate()?;
+        config.validate(self)?;
 
         match config {
             Config::Tdm(c) => {
@@ -2590,7 +2599,7 @@ impl Info {
     }
 
     fn configure(&self, config: &Config) -> Result<(), ConfigError> {
-        config.validate()?;
+        config.validate(self)?;
 
         match config {
             Config::Tdm(c) => {

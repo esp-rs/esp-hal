@@ -109,11 +109,13 @@ pub(crate) fn generate_i2s_peripherals(i2s: &I2sProperties) -> TokenStream {
             let din = instance_config.din.iter().map(|s| format_ident!("{s}"));
             let pdm_tx = instance_config.pdm_tx;
             let pdm_rx = instance_config.pdm_rx;
+            let pcm2pdm = instance_config.pcm2pdm;
+            let pdm2pcm = instance_config.pdm2pcm;
 
             // The order and meaning of these tokens must match their use in the
             // `for_each_i2s!` call.
             quote! {
-                #instance, #sys, #mclk, #bclk, #ws, #bclk_rx, #ws_rx, [#(#dout),*], [#(#din),*], #pdm_tx, #pdm_rx
+                #instance, #sys, #mclk, #bclk, #ws, #bclk_rx, #ws_rx, [#(#dout),*], [#(#din),*], #pdm_tx, #pdm_rx, #pcm2pdm, #pdm2pcm
             }
         })
         .collect::<Vec<_>>();
@@ -127,7 +129,7 @@ pub(crate) fn generate_i2s_peripherals(i2s: &I2sProperties) -> TokenStream {
         ///
         /// This macro has one option for its "Individual matcher" case:
         ///
-        /// Syntax: `($instance:ident, $sys:ident, $mclk:ident, $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident, [$($dout:ident),*], [$($din:ident),*], $pdm_tx:literal, $pdm_rx:literal)`
+        /// Syntax: `($instance:ident, $sys:ident, $mclk:ident, $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident, [$($dout:ident),*], [$($din:ident),*], $pdm_tx:literal, $pdm_rx:literal, $pcm2pdm:literal, $pdm2pcm:literal)`
         ///
         /// Macro fragments:
         ///
@@ -138,9 +140,10 @@ pub(crate) fn generate_i2s_peripherals(i2s: &I2sProperties) -> TokenStream {
         /// - `$bclk_rx`, `$ws_rx`: RX bit clock and word select output signals.
         /// - `$dout`, `$din`: data-out and data-in signal names.
         /// - `$pdm_tx`, `$pdm_rx`: whether the instance supports PDM TX/RX.
+        /// - `$pcm2pdm`, `$pdm2pcm`: whether the instance supports the hardware PCM<->PDM format conversion filter on TX/RX.
         ///
         /// Example data:
-        /// - `(I2S0, I2s0, I2S_MCLK, I2SO_BCK, I2SO_WS, I2SI_BCK, I2SI_WS, [I2SO_SD], [I2SI_SD], true, true)`
+        /// - `(I2S0, I2s0, I2S_MCLK, I2SO_BCK, I2SO_WS, I2SI_BCK, I2SI_WS, [I2SO_SD], [I2SI_SD], true, true, true, true)`
         #for_each
     }
 }
