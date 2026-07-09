@@ -265,7 +265,7 @@ where
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.completed || self.i2s_tx.i2s.is_tx_done()
+        self.completed || self.i2s_tx.i2s.info().is_tx_done()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
@@ -283,7 +283,7 @@ where
     /// Immediately stop the transfer and return the peripheral and buffer.
     pub fn stop(mut self) -> (I2sTx<'d, Dm>, Buf::Final) {
         self.i2s_tx.tx_channel.stop_transfer();
-        self.i2s_tx.i2s.tx_stop();
+        self.i2s_tx.i2s.info().tx_stop();
 
         let (i2s_tx, buf) = self.release();
 
@@ -312,7 +312,7 @@ where
         if !self.completed {
             if let Err(err) = DmaTxFuture::new(&mut self.i2s_tx.tx_channel).await {
                 self.i2s_tx.tx_channel.stop_transfer();
-                self.i2s_tx.i2s.tx_stop();
+                self.i2s_tx.i2s.info().tx_stop();
                 let (i2s_tx, buf) = self.release();
                 return (Err(err), i2s_tx, Buf::from_view(buf));
             }
@@ -367,7 +367,7 @@ impl<Dm: DriverMode, BUF: DmaTxBuffer> core::ops::DerefMut for I2sTxDmaTransfer<
 impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for I2sTxDmaTransfer<'_, Dm, BUF> {
     fn drop(&mut self) {
         self.i2s_tx.tx_channel.stop_transfer();
-        self.i2s_tx.i2s.tx_stop();
+        self.i2s_tx.i2s.info().tx_stop();
 
         // SAFETY: This is Drop, we know that the parts are no longer used
         let view = unsafe {
@@ -400,7 +400,7 @@ where
 {
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.completed || self.i2s_rx.i2s.is_rx_done()
+        self.completed || self.i2s_rx.i2s.info().is_rx_done()
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
@@ -418,7 +418,7 @@ where
 
     /// Immediately stop the transfer and return the peripheral and buffer.
     pub fn stop(mut self) -> (I2sRx<'d, Dm>, Buf::Final) {
-        self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.i2s.info().rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
 
         let (i2s_rx, buf) = self.release();
@@ -454,7 +454,7 @@ where
             .await
             {
                 self.completed = true;
-                self.i2s_rx.i2s.rx_stop();
+                self.i2s_rx.i2s.info().rx_stop();
                 self.i2s_rx.rx_channel.stop_transfer();
                 let (i2s_rx, buf) = self.release();
                 return (Err(err), i2s_rx, Buf::from_view(buf));
@@ -518,7 +518,7 @@ impl<Dm: DriverMode, BUF: DmaRxBuffer> core::ops::DerefMut for I2sRxDmaTransfer<
 impl<Dm: DriverMode, BUF: DmaRxBuffer> Drop for I2sRxDmaTransfer<'_, Dm, BUF> {
     fn drop(&mut self) {
         self.i2s_rx.rx_channel.stop_transfer();
-        self.i2s_rx.i2s.rx_stop();
+        self.i2s_rx.i2s.info().rx_stop();
 
         // SAFETY: This is Drop, we know that the parts are no longer used
         let view = unsafe {
@@ -1196,28 +1196,34 @@ where
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.enable_listen(interrupts.into(), true);
+        self.i2s_tx
+            .i2s
+            .info()
+            .enable_listen(interrupts.into(), true);
     }
 
     /// Unlisten the given interrupts
     #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.enable_listen(interrupts.into(), false);
+        self.i2s_tx
+            .i2s
+            .info()
+            .enable_listen(interrupts.into(), false);
     }
 
     /// Gets asserted interrupts
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.interrupts()
+        self.i2s_tx.i2s.info().interrupts()
     }
 
     /// Resets asserted interrupts
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
-        self.i2s_tx.i2s.clear_interrupts(interrupts.into());
+        self.i2s_tx.i2s.info().clear_interrupts(interrupts.into());
     }
 }
 
@@ -1248,24 +1254,24 @@ impl<'d> I2s<'d, Blocking> {
         // the targets the same and force same configuration for both, TX and RX
 
         // make sure the peripheral is enabled before configuring it
-        let peripheral = i2s.peripheral();
+        let peripheral = i2s.info().peripheral;
         let rx_guard = PeripheralGuard::new(peripheral);
         let tx_guard = PeripheralGuard::new(peripheral);
 
-        i2s.set_master();
-        i2s.configure(&config)?;
+        i2s.info().set_master();
+        i2s.info().configure(&config)?;
         match &config {
             Config::Tdm(_) => {
-                i2s.update_tx();
-                i2s.update_rx();
+                i2s.info().update_tx();
+                i2s.info().update_rx();
             }
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
             Config::Pdm(c) => {
                 if c.tx.is_some() {
-                    i2s.update_tx();
+                    i2s.info().update_tx();
                 }
                 if c.rx.is_some() {
-                    i2s.update_rx();
+                    i2s.info().update_rx();
                 }
             }
         }
@@ -1363,7 +1369,7 @@ where
         mclk.apply_output_config(&OutputConfig::default());
         mclk.set_output_enable(true);
 
-        self.i2s_tx.i2s.mclk_signal().connect_to(&mclk);
+        self.i2s_tx.i2s.info().mclk.connect_to(&mclk);
 
         self
     }
@@ -1442,7 +1448,7 @@ where
         mut self,
         mut buffer: TX,
     ) -> Result<I2sTxDmaTransfer<'d, Dm, TX>, (Error, Self, TX)> {
-        self.i2s.reset_tx();
+        self.i2s.info().reset_tx();
         let res = unsafe {
             self.tx_channel
                 .prepare_transfer(self.i2s.dma_peripheral(), &mut buffer)
@@ -1452,7 +1458,7 @@ where
             return Err((Error::DmaError(err), self, buffer));
         }
 
-        self.i2s.tx_start();
+        self.i2s.info().tx_start();
 
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
@@ -1463,14 +1469,11 @@ where
 
     /// Change the I2S Tx unit configuration.
     pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_select! {
-            i2s_version = "1" => {
-                self.i2s.configure_tx(tx_config, self.data_format)
-            }
-            _ => {
-                self.i2s.configure_tx(tx_config)
-            }
-        }
+        self.i2s.info().configure_tx(
+            tx_config,
+            #[cfg(i2s_version = "1")]
+            self.data_format,
+        )
     }
 }
 
@@ -1513,7 +1516,7 @@ where
         BUF: DmaRxBuffer,
     {
         // Reset RX unit and RX FIFO
-        self.i2s.reset_rx();
+        self.i2s.info().reset_rx();
 
         let res = unsafe {
             self.rx_channel
@@ -1525,7 +1528,7 @@ where
         }
 
         // start: set I2S_RX_START
-        self.i2s.rx_start(usize::MAX); // really limited by exhausting DMA rx buffer
+        self.i2s.info().rx_start(usize::MAX); // really limited by exhausting DMA rx buffer
 
         Ok(I2sRxDmaTransfer {
             i2s_rx: ManuallyDrop::new(self),
@@ -1536,24 +1539,24 @@ where
 
     /// Change the I2S Rx unit configuration.
     pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
-        cfg_select! {
-            i2s_version = "1" => {
-                self.i2s.configure_rx(rx_config, self.data_format)
-            }
-            _ => {
-                self.i2s.configure_rx(rx_config)
-            }
-        }
+        self.i2s.info().configure_rx(
+            rx_config,
+            #[cfg(i2s_version = "1")]
+            self.data_format,
+        )
     }
 }
 
+/// Peripheral data describing a particular I2S instance.
+#[doc(hidden)]
+pub use private::Info;
+
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: private::Sealed + super::any::Degrade {}
-#[cfg(soc_has_i2s0)]
-impl Instance for crate::peripherals::I2S0<'_> {}
-#[cfg(soc_has_i2s1)]
-impl Instance for crate::peripherals::I2S1<'_> {}
-impl Instance for AnyI2s<'_> {}
+pub trait Instance: private::Sealed + super::any::Degrade {
+    /// Returns the peripheral data describing this instance.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
+}
 
 pub(crate) mod private {
     use enumset::EnumSet;
@@ -1599,7 +1602,7 @@ pub(crate) mod private {
         Dm: DriverMode,
     {
         pub fn build(self) -> I2sTx<'d, Dm> {
-            let peripheral = self.i2s.peripheral();
+            let peripheral = self.i2s.info().peripheral;
             I2sTx {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
@@ -1615,7 +1618,7 @@ pub(crate) mod private {
             bclk.apply_output_config(&OutputConfig::default());
             bclk.set_output_enable(true);
 
-            self.i2s.bclk_signal().connect_to(&bclk);
+            self.i2s.info().bclk.connect_to(&bclk);
 
             self
         }
@@ -1626,7 +1629,7 @@ pub(crate) mod private {
             ws.apply_output_config(&OutputConfig::default());
             ws.set_output_enable(true);
 
-            self.i2s.ws_signal().connect_to(&ws);
+            self.i2s.info().ws.connect_to(&ws);
 
             self
         }
@@ -1637,7 +1640,7 @@ pub(crate) mod private {
             dout.apply_output_config(&OutputConfig::default());
             dout.set_output_enable(true);
 
-            self.i2s.dout_signal().connect_to(&dout);
+            unwrap!(self.i2s.info().dout(0)).connect_to(&dout);
 
             self
         }
@@ -1655,7 +1658,7 @@ pub(crate) mod private {
             dout.apply_output_config(&OutputConfig::default());
             dout.set_output_enable(true);
 
-            let signal = self.i2s.dout_line_signal(1).ok_or(PdmError::InvalidLine)?;
+            let signal = self.i2s.info().dout(1).ok_or(PdmError::InvalidLine)?;
             signal.connect_to(&dout);
 
             Ok(self)
@@ -1678,7 +1681,7 @@ pub(crate) mod private {
         Dm: DriverMode,
     {
         pub fn build(self) -> I2sRx<'d, Dm> {
-            let peripheral = self.i2s.peripheral();
+            let peripheral = self.i2s.info().peripheral;
             I2sRx {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
@@ -1694,7 +1697,7 @@ pub(crate) mod private {
             bclk.apply_output_config(&OutputConfig::default());
             bclk.set_output_enable(true);
 
-            self.i2s.bclk_rx_signal().connect_to(&bclk);
+            self.i2s.info().bclk_rx.connect_to(&bclk);
 
             self
         }
@@ -1705,7 +1708,7 @@ pub(crate) mod private {
             ws.apply_output_config(&OutputConfig::default());
             ws.set_output_enable(true);
 
-            self.i2s.ws_rx_signal().connect_to(&ws);
+            self.i2s.info().ws_rx.connect_to(&ws);
 
             self
         }
@@ -1716,7 +1719,7 @@ pub(crate) mod private {
             din.apply_input_config(&InputConfig::default());
             din.set_input_enable(true);
 
-            self.i2s.din_signal().connect_to(&din);
+            unwrap!(self.i2s.info().din(0)).connect_to(&din);
 
             self
         }
@@ -1738,51 +1741,78 @@ pub(crate) mod private {
             din.apply_input_config(&InputConfig::default());
             din.set_input_enable(true);
 
-            let signal = self
-                .i2s
-                .din_line_signal(line)
-                .ok_or(PdmError::InvalidLine)?;
+            let signal = self.i2s.info().din(line).ok_or(PdmError::InvalidLine)?;
             signal.connect_to(&din);
 
             Ok(self)
         }
     }
 
-    pub trait RegBlock: crate::private::Sealed {
-        fn regs(&self) -> &RegisterBlock;
-        fn peripheral(&self) -> crate::system::Peripheral;
+    /// Peripheral data describing a particular I2S instance.
+    ///
+    /// All the per-instance data (register block pointer, system peripheral marker and the
+    /// GPIO matrix signals) is stored here, so that the driver can operate on a single
+    /// type-erased `&'static Info` regardless of which concrete I2S peripheral is used.
+    #[doc(hidden)]
+    #[non_exhaustive]
+    pub struct Info {
+        /// Pointer to the register block for this I2S instance.
+        pub register_block: *const RegisterBlock,
+
+        /// The system peripheral marker.
+        pub peripheral: crate::system::Peripheral,
+
+        /// MCLK output signal.
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
+        pub mclk: OutputSignal,
+
+        /// BCLK (TX) output signal.
+        pub bclk: OutputSignal,
+
+        /// WS (TX) output signal.
+        pub ws: OutputSignal,
+
+        /// BCLK (RX) output signal.
+        pub bclk_rx: OutputSignal,
+
+        /// WS (RX) output signal.
+        pub ws_rx: OutputSignal,
+
+        /// Data out signals.
+        pub dout_lines: &'static [OutputSignal],
+
+        /// Data in signals.
+        pub din_lines: &'static [InputSignal],
     }
 
-    pub trait Signals: RegBlock {
-        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
-        fn mclk_signal(&self) -> OutputSignal;
-        fn bclk_signal(&self) -> OutputSignal;
-        fn ws_signal(&self) -> OutputSignal;
-        fn dout_signal(&self) -> OutputSignal;
-        fn bclk_rx_signal(&self) -> OutputSignal;
-        fn ws_rx_signal(&self) -> OutputSignal;
-        fn din_signal(&self) -> InputSignal;
+    // SAFETY: The register block pointer refers to a static peripheral memory region.
+    unsafe impl Sync for Info {}
 
-        /// Additional PDM TX data line signal (line 1 for two-line DAC).
-        #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
-        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
-            let _ = line;
-            None
+    impl PartialEq for Info {
+        fn eq(&self, other: &Self) -> bool {
+            core::ptr::eq(self.register_block, other.register_block)
+        }
+    }
+
+    impl Sealed for Info {}
+
+    impl Info {
+        pub(super) fn dout(&self, line: u8) -> Option<OutputSignal> {
+            // (line 1 for two-line DAC).
+            self.dout_lines.get(line as usize).copied()
         }
 
-        /// PDM RX data line signal (line 0 is the default DIN signal).
-        #[cfg(i2s_supports_pdm_rx)]
-        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
-            if line == 0 {
-                Some(self.din_signal())
-            } else {
-                None
-            }
+        pub(super) fn din(&self, line: u8) -> Option<InputSignal> {
+            // (line 0 is the default DIN signal).
+            self.din_lines.get(line as usize).copied()
         }
     }
 
     #[cfg(i2s_version = "1")]
-    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
+    pub(crate) trait RegisterAccessPrivate: Sealed {
+        fn regs(&self) -> &RegisterBlock;
+        fn peripheral(&self) -> crate::system::Peripheral;
+
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -2091,15 +2121,11 @@ pub(crate) mod private {
                 .int_clr()
                 .write(|w| w.in_suc_eof().clear_bit_by_one());
 
-            cfg_select! {
-                esp32 => {
-                    // On ESP32, the eof_num count in words.
-                    let eof_num = len / 4;
-                }
-                _ => {
-                    let eof_num = len - 1;
-                }
-            }
+            let eof_num = cfg_select! {
+                // On ESP32, the eof_num count in words.
+                esp32 => len / 4,
+                _ => len - 1,
+            };
 
             self.regs()
                 .rxeof_num()
@@ -2118,7 +2144,10 @@ pub(crate) mod private {
     }
 
     #[cfg(not(i2s_version = "1"))]
-    pub(crate) trait RegisterAccessPrivate: Signals + RegBlock + Sealed {
+    pub(crate) trait RegisterAccessPrivate: Sealed {
+        fn regs(&self) -> &RegisterBlock;
+        fn peripheral(&self) -> crate::system::Peripheral;
+
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -2670,179 +2699,75 @@ pub(crate) mod private {
         }
     }
 
+    impl RegisterAccessPrivate for Info {
+        fn regs(&self) -> &RegisterBlock {
+            unsafe { &*self.register_block }
+        }
+
+        fn peripheral(&self) -> crate::system::Peripheral {
+            self.peripheral
+        }
+    }
+
     impl Sealed for I2S0<'_> {}
 
-    impl RegBlock for I2S0<'_> {
-        fn regs(&self) -> &RegisterBlock {
-            unsafe { &*I2S0::PTR.cast::<RegisterBlock>() }
-        }
-
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::I2s0
-        }
-    }
-
-    impl RegisterAccessPrivate for I2S0<'_> {}
-
-    impl Signals for crate::peripherals::I2S0<'_> {
-        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
-        fn mclk_signal(&self) -> OutputSignal {
-            cfg_select! {
-                esp32s2 => {
-                    OutputSignal::CLK_I2S
-                }
-                any(esp32s3, esp32p4) => {
-                    OutputSignal::I2S0_MCLK
-                }
-                _ => {
-                    OutputSignal::I2S_MCLK
-                }
-            }
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            cfg_select! {
-                any(i2s_version = "1", esp32s3) => {
-                    OutputSignal::I2S0O_BCK
-                }
-                esp32p4 => {
-                    OutputSignal::I2S0_O_BCK
-                }
-                _ => {
-                    OutputSignal::I2SO_BCK
-                }
-            }
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            cfg_select! {
-                any(i2s_version = "1", esp32s3) => {
-                    OutputSignal::I2S0O_WS
-                }
-                esp32p4 => {
-                    OutputSignal::I2S0_O_WS
-                }
-                _ => {
-                    OutputSignal::I2SO_WS
-                }
-            }
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            cfg_select! {
-                esp32 => {
-                    OutputSignal::I2S0O_DATA_23
-                }
-                esp32s2 => {
-                    OutputSignal::I2S0O_DATA_OUT23
-                }
-                esp32s3 => {
-                    OutputSignal::I2S0O_SD
-                }
-                esp32p4 => {
-                    OutputSignal::I2S0_O_SD
-                }
-                _ => {
-                    OutputSignal::I2SO_SD
-                }
-            }
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            cfg_select! {
-                any(i2s_version = "1", esp32s3) => {
-                    OutputSignal::I2S0I_BCK
-                }
-                esp32p4 => {
-                    OutputSignal::I2S0_I_BCK
-                }
-                _ => {
-                    OutputSignal::I2SI_BCK
-                }
-            }
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            cfg_select! {
-                any(i2s_version = "1", esp32s3) => {
-                    OutputSignal::I2S0I_WS
-                }
-                esp32p4 => {
-                    OutputSignal::I2S0_I_WS
-                }
-                _ => {
-                    OutputSignal::I2SI_WS
-                }
-            }
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            cfg_select! {
-                esp32 => {
-                    InputSignal::I2S0I_DATA_15
-                }
-                esp32s2 => {
-                    InputSignal::I2S0I_DATA_IN15
-                }
-                esp32s3 => {
-                    InputSignal::I2S0I_SD
-                }
-                esp32p4 => {
-                    InputSignal::I2S0_I_SD
-                }
-                _ => {
-                    InputSignal::I2SI_SD
-                }
-            }
-        }
-
-        #[cfg(esp32s3)]
-        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
-            match line {
-                1 => Some(OutputSignal::I2S0O_SD1),
-                _ => None,
-            }
-        }
-
-        #[cfg(esp32p4)]
-        fn dout_line_signal(&self, line: u8) -> Option<OutputSignal> {
-            match line {
-                1 => Some(OutputSignal::I2S0_O_SD1),
-                _ => None,
-            }
-        }
-
-        #[cfg(esp32s3)]
-        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
-            match line {
-                0 => Some(InputSignal::I2S0I_SD),
-                1 => Some(InputSignal::I2S0I_SD1),
-                2 => Some(InputSignal::I2S0I_SD2),
-                3 => Some(InputSignal::I2S0I_SD3),
-                _ => None,
-            }
-        }
-
-        #[cfg(esp32p4)]
-        fn din_line_signal(&self, line: u8) -> Option<InputSignal> {
-            match line {
-                0 => Some(InputSignal::I2S0_I_SD),
-                1 => Some(InputSignal::I2S0_I_SD1),
-                2 => Some(InputSignal::I2S0_I_SD2),
-                3 => Some(InputSignal::I2S0_I_SD3),
-                _ => None,
-            }
-        }
-    }
-
-    #[cfg(soc_has_i2s1)]
-    impl RegBlock for I2S1<'_> {
-        fn regs(&self) -> &RegisterBlock {
-            unsafe { &*I2S1::PTR.cast::<RegisterBlock>() }
-        }
-
-        fn peripheral(&self) -> crate::system::Peripheral {
-            crate::system::Peripheral::I2s1
+    impl super::Instance for I2S0<'_> {
+        fn info(&self) -> &'static Info {
+            static INFO: Info = Info {
+                register_block: I2S0::PTR.cast::<RegisterBlock>(),
+                peripheral: crate::system::Peripheral::I2s0,
+                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
+                mclk: cfg_select! {
+                    esp32s2 => OutputSignal::CLK_I2S,
+                    any(esp32s3, esp32p4) => OutputSignal::I2S0_MCLK,
+                    _ => OutputSignal::I2S_MCLK,
+                },
+                bclk: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_BCK,
+                    esp32p4 => OutputSignal::I2S0_O_BCK,
+                    _ => OutputSignal::I2SO_BCK,
+                },
+                ws: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0O_WS,
+                    esp32p4 => OutputSignal::I2S0_O_WS,
+                    _ => OutputSignal::I2SO_WS,
+                },
+                bclk_rx: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_BCK,
+                    esp32p4 => OutputSignal::I2S0_I_BCK,
+                    _ => OutputSignal::I2SI_BCK,
+                },
+                ws_rx: cfg_select! {
+                    any(i2s_version = "1", esp32s3) => OutputSignal::I2S0I_WS,
+                    esp32p4 => OutputSignal::I2S0_I_WS,
+                    _ => OutputSignal::I2SI_WS,
+                },
+                dout_lines: cfg_select! {
+                    esp32 => &[OutputSignal::I2S0O_DATA_23],
+                    esp32s2 => &[OutputSignal::I2S0O_DATA_OUT23],
+                    esp32s3 => &[OutputSignal::I2S0O_SD, OutputSignal::I2S0O_SD1],
+                    esp32p4 => &[OutputSignal::I2S0_O_SD, OutputSignal::I2S0_O_SD1],
+                    _ => &[OutputSignal::I2SO_SD],
+                },
+                din_lines: cfg_select! {
+                    esp32 => &[InputSignal::I2S0I_DATA_15],
+                    esp32s2 => &[InputSignal::I2S0I_DATA_IN15],
+                    esp32s3 => &[
+                        InputSignal::I2S0I_SD,
+                        InputSignal::I2S0I_SD1,
+                        InputSignal::I2S0I_SD2,
+                        InputSignal::I2S0I_SD3,
+                    ],
+                    esp32p4 => &[
+                        InputSignal::I2S0_I_SD,
+                        InputSignal::I2S0_I_SD1,
+                        InputSignal::I2S0_I_SD2,
+                        InputSignal::I2S0_I_SD3,
+                    ],
+                    _ => &[InputSignal::I2SI_SD],
+                },
+            };
+            &INFO
         }
     }
 
@@ -2850,79 +2775,43 @@ pub(crate) mod private {
     impl Sealed for I2S1<'_> {}
 
     #[cfg(soc_has_i2s1)]
-    impl RegisterAccessPrivate for I2S1<'_> {}
-
-    #[cfg(soc_has_i2s1)]
-    impl Signals for crate::peripherals::I2S1<'_> {
-        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
-        fn mclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1_MCLK
-        }
-
-        fn bclk_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_BCK
-        }
-
-        fn ws_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1O_WS
-        }
-
-        fn dout_signal(&self) -> OutputSignal {
-            cfg_select! {
-                esp32 => {
-                    OutputSignal::I2S1O_DATA_23
-                }
-                _ => {
-                    OutputSignal::I2S1O_SD
-                }
-            }
-        }
-
-        fn bclk_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_BCK
-        }
-
-        fn ws_rx_signal(&self) -> OutputSignal {
-            OutputSignal::I2S1I_WS
-        }
-
-        fn din_signal(&self) -> InputSignal {
-            cfg_select! {
-                esp32 => {
-                    InputSignal::I2S1I_DATA_15
-                }
-                _ => {
-                    InputSignal::I2S1I_SD
-                }
-            }
-        }
-    }
-
-    impl RegBlock for super::AnyI2s<'_> {
-        fn regs(&self) -> &RegisterBlock {
-            match &self.0 {
-                #[cfg(soc_has_i2s0)]
-                AnyI2sInner::I2s0(i2s) => RegBlock::regs(i2s),
-                #[cfg(soc_has_i2s1)]
-                AnyI2sInner::I2s1(i2s) => RegBlock::regs(i2s),
-            }
-        }
-
-        delegate::delegate! {
-            to match &self.0 {
-                #[cfg(soc_has_i2s0)]
-                AnyI2sInner::I2s0(i2s) => i2s,
-                #[cfg(soc_has_i2s1)]
-                AnyI2sInner::I2s1(i2s) => i2s,
-            } {
-                fn peripheral(&self) -> crate::system::Peripheral;
-            }
+    impl super::Instance for I2S1<'_> {
+        fn info(&self) -> &'static Info {
+            static INFO: Info = Info {
+                register_block: I2S1::PTR.cast::<RegisterBlock>(),
+                peripheral: crate::system::Peripheral::I2s1,
+                #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
+                mclk: OutputSignal::I2S1_MCLK,
+                bclk: OutputSignal::I2S1O_BCK,
+                ws: OutputSignal::I2S1O_WS,
+                bclk_rx: OutputSignal::I2S1I_BCK,
+                ws_rx: OutputSignal::I2S1I_WS,
+                // Note: PDM is only supported on I2S0.
+                dout_lines: cfg_select! {
+                    esp32 => &[OutputSignal::I2S1O_DATA_23],
+                    _ => &[OutputSignal::I2S1O_SD],
+                },
+                din_lines: cfg_select! {
+                    esp32 => &[InputSignal::I2S1I_DATA_15],
+                    _ => &[InputSignal::I2S1I_SD],
+                },
+            };
+            &INFO
         }
     }
 
     impl Sealed for super::AnyI2s<'_> {}
 
-    impl RegisterAccessPrivate for super::AnyI2s<'_> {}
+    impl super::Instance for super::AnyI2s<'_> {
+        fn info(&self) -> &'static Info {
+            match &self.0 {
+                #[cfg(soc_has_i2s0)]
+                AnyI2sInner::I2s0(i2s) => i2s.info(),
+                #[cfg(soc_has_i2s1)]
+                AnyI2sInner::I2s1(i2s) => i2s.info(),
+            }
+        }
+    }
 
     impl super::AnyI2s<'_> {
         delegate::delegate! {
@@ -2940,30 +2829,6 @@ pub(crate) mod private {
         pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
             self.disable_peri_interrupt_on_all_cores();
             self.bind_peri_interrupt(handler);
-        }
-    }
-
-    impl Signals for super::AnyI2s<'_> {
-        delegate::delegate! {
-            to match &self.0 {
-                #[cfg(soc_has_i2s0)]
-                AnyI2sInner::I2s0(i2s) => i2s,
-                #[cfg(soc_has_i2s1)]
-                AnyI2sInner::I2s1(i2s) => i2s,
-            } {
-                #[cfg(not(esp32))]
-                fn mclk_signal(&self) -> OutputSignal;
-                fn bclk_signal(&self) -> OutputSignal;
-                fn ws_signal(&self) -> OutputSignal;
-                fn dout_signal(&self) -> OutputSignal;
-                fn bclk_rx_signal(&self) -> OutputSignal;
-                fn ws_rx_signal(&self) -> OutputSignal;
-                fn din_signal(&self) -> InputSignal;
-                #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
-                fn dout_line_signal(&self, line: u8) -> Option<OutputSignal>;
-                #[cfg(i2s_supports_pdm_rx)]
-                fn din_line_signal(&self, line: u8) -> Option<InputSignal>;
-            }
         }
     }
 
