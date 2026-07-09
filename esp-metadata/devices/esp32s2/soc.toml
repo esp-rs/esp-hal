@@ -603,8 +603,6 @@ instances = [
         ws_rx = "I2S0I_WS",
         dout = ["I2S0O_DATA_OUT23"],
         din = ["I2S0I_DATA_IN15"],
-        pdm_tx = true,
-        pdm_rx = true,
     },
 ]
 

@@ -189,11 +189,14 @@ use crate::{
 pub enum I2sInterrupt {
     /// Receive buffer hung, indicating a stall in data reception.
     RxHung,
+
     /// Transmit buffer hung, indicating a stall in data transmission.
     TxHung,
+
     #[cfg(not(i2s_version = "1"))]
     /// Reception of data is complete.
     RxDone,
+
     #[cfg(not(i2s_version = "1"))]
     /// Transmission of data is complete.
     TxDone,

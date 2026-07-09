@@ -223,12 +223,6 @@ macro_rules! property {
     ("i2s.clock_configured_by_hp_sys_clkrst") => {
         false
     };
-    ("i2s.supports_pdm_tx") => {
-        false
-    };
-    ("i2s.supports_pdm_rx") => {
-        false
-    };
     ("i2s.supports_pcm2pdm") => {
         false
     };
@@ -236,6 +230,12 @@ macro_rules! property {
         false
     };
     ("i2s.supports_pdm_rx_hp_filter") => {
+        false
+    };
+    ("i2s.supports_pdm_tx") => {
+        false
+    };
+    ("i2s.supports_pdm_rx") => {
         false
     };
     ("interrupts.status_registers") => {
@@ -4096,9 +4096,9 @@ macro_rules! for_each_i2s {
         macro_rules! _for_each_inner_i2s { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner_i2s!((I2S0)); _for_each_inner_i2s!((I2S0, I2s0, CLK_I2S,
         I2S0O_BCK, I2S0O_WS, I2S0I_BCK, I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15],
-        true, true)); _for_each_inner_i2s!((names(I2S0)));
+        false, false)); _for_each_inner_i2s!((names(I2S0)));
         _for_each_inner_i2s!((all(I2S0, I2s0, CLK_I2S, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
-        I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15], true, true)));
+        I2S0I_WS, [I2S0O_DATA_OUT23], [I2S0I_DATA_IN15], false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.

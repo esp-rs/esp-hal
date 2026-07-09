@@ -1,7 +1,34 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{cfg::I2sProperties, generate_for_each_macro};
+use crate::{
+    cfg::{I2sProperties, Value},
+    generate_for_each_macro,
+};
+
+impl I2sProperties {
+    /// Derives the chip-level PDM support flags from the per-instance
+    /// configuration. A chip supports a PDM direction if any of its instances
+    /// does.
+    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
+        let supports_pdm_tx = self.instances.iter().any(|i| i.instance_config.pdm_tx);
+        let supports_pdm_rx = self.instances.iter().any(|i| i.instance_config.pdm_rx);
+
+        [
+            (
+                "i2s.supports_pdm_tx",
+                false,
+                Value::Boolean(supports_pdm_tx),
+            ),
+            (
+                "i2s.supports_pdm_rx",
+                false,
+                Value::Boolean(supports_pdm_rx),
+            ),
+        ]
+        .into_iter()
+    }
+}
 
 /// Instance configuration, used in [device.i2s.instances]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
