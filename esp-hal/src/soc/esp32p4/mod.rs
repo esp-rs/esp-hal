@@ -9,6 +9,8 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
+#[inline(always)]
+#[cfg(feature = "rt")]
 pub(crate) fn riscv_preinit() {
     // workaround: this shouldn't be needed - done by the 2nd stage bootloader
     unsafe {

@@ -578,6 +578,7 @@ pub(crate) mod rt {
 
     #[doc(hidden)]
     #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".init")]
     unsafe fn _setup_interrupts() {
         crate::soc::riscv_preinit();
         crate::interrupt::setup_interrupts();

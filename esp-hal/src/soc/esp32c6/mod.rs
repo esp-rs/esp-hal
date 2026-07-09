@@ -24,6 +24,7 @@ pub(crate) fn i2s_sclk_frequency() -> u32 {
     clocks::pll_f160m_frequency()
 }
 
+#[cfg(feature = "rt")]
 pub(crate) fn riscv_preinit() {}
 
 pub(crate) fn pre_init() {
