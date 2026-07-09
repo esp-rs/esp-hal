@@ -11,6 +11,12 @@ use std::{
 use esp_config::{Value, generate_config_from_yaml_definition};
 use esp_metadata_generated::assert_unique_features;
 
+macro_rules! bail {
+    ($($arg:tt)*) => {
+        return Err(format!($($arg)*).into());
+    };
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
     let suppress_panics = std::env::var("RUSTC_WRAPPER")
@@ -30,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // If some library required unstable make sure unstable is actually enabled.
     if !suppress_panics && cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
-        panic!(
+        bail!(
             "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
         );
     }
@@ -44,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
     if !suppress_panics && chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
-        panic!("
+        bail!("
         Seems you are building for an unsupported or wrong target (e.g. the host environment).
         Maybe you are missing the `target` in `.cargo/config.toml` or you have configs overriding it?
 
