@@ -323,6 +323,21 @@ supports_pdm2pcm = true
 supports_pdm_rx_hp_filter = true
 pdm_max_tx_lines = 2
 pdm_max_rx_lines = 4
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S0_MCLK",
+        bclk = "I2S0_O_BCK",
+        ws = "I2S0_O_WS",
+        bclk_rx = "I2S0_I_BCK",
+        ws_rx = "I2S0_I_WS",
+        dout = ["I2S0_O_SD", "I2S0_O_SD1"],
+        din = ["I2S0_I_SD", "I2S0_I_SD1", "I2S0_I_SD2", "I2S0_I_SD3"],
+        pdm_tx = true,
+        pdm_rx = true,
+    },
+]
 [device.ledc]
 version = 2
 channel_count = 8

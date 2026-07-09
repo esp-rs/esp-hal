@@ -739,6 +739,30 @@ supports_pcm2pdm = true
 supports_pdm2pcm = true
 pdm_max_tx_lines = 1
 pdm_max_rx_lines = 1
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        bclk = "I2S0O_BCK",
+        ws = "I2S0O_WS",
+        bclk_rx = "I2S0I_BCK",
+        ws_rx = "I2S0I_WS",
+        dout = ["I2S0O_DATA_23"],
+        din = ["I2S0I_DATA_15"],
+        pdm_tx = true,
+        pdm_rx = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        bclk = "I2S1O_BCK",
+        ws = "I2S1O_WS",
+        bclk_rx = "I2S1I_BCK",
+        ws_rx = "I2S1I_WS",
+        dout = ["I2S1O_DATA_23"],
+        din = ["I2S1I_DATA_15"],
+    },
+]
 
 [device.ledc]
 version = 1

@@ -3,6 +3,7 @@ pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod i2s;
 pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
@@ -19,6 +20,7 @@ pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
 pub(crate) use sdmmc::*;
@@ -465,7 +467,7 @@ driver_configs![
         name: "I2C slave",
         properties: {}
     },
-    I2sProperties {
+    I2sProperties<I2sInstanceConfig> {
         driver: i2s,
         name: "I2S",
         properties: {

@@ -767,21 +767,6 @@ impl Instance for I2S0<'_> {}
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
 
-// Hacky implementation until we have per-instance metadata
-macro_rules! for_each_i2s {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_i2s {
-            $(($pattern) => $code;)*
-        }
-
-        #[cfg(soc_has_i2s0)]
-        _for_each_inner_i2s!((I2S0));
-
-        #[cfg(soc_has_i2s1)]
-        _for_each_inner_i2s!((I2S1));
-    };
-}
-
 /// DMA channel trait for I2S peripherals.
 #[diagnostic::on_unimplemented(
     message = "The DMA channel cannot be used with this I2S peripheral",
