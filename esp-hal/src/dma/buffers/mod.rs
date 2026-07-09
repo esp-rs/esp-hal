@@ -40,18 +40,18 @@ impl core::fmt::Display for DmaBufError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             DmaBufError::BufferTooSmall => {
-                write!(f, "the buffer is smaller than the requested size")
+                write!(f, "The buffer is smaller than the requested size")
             }
             DmaBufError::InsufficientDescriptors => {
-                write!(f, "more descriptors are needed for the buffer size")
+                write!(f, "More descriptors are needed for the buffer size")
             }
             DmaBufError::UnsupportedMemoryRegion => write!(
                 f,
-                "descriptors or buffers are not located in a supported memory region"
+                "Descriptors or buffers are not located in a supported memory region"
             ),
             DmaBufError::InvalidAlignment(x) => write!(f, "{x}"),
             DmaBufError::InvalidChunkSize => {
-                write!(f, "invalid chunk size: must be > 0 and <= 4095")
+                write!(f, "Invalid chunk size: must be > 0 and <= 4095")
             }
         }
     }
@@ -79,8 +79,8 @@ impl From<DmaAlignmentError> for DmaBufError {
 impl core::fmt::Display for DmaAlignmentError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            DmaAlignmentError::Address => write!(f, "buffer address is not properly aligned"),
-            DmaAlignmentError::Size => write!(f, "buffer size is not properly aligned"),
+            DmaAlignmentError::Address => write!(f, "Buffer address is not properly aligned"),
+            DmaAlignmentError::Size => write!(f, "Buffer size is not properly aligned"),
         }
     }
 }
