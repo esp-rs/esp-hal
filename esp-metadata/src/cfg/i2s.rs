@@ -8,11 +8,13 @@ use crate::{
 
 impl I2sProperties {
     /// Derives the chip-level PDM support flags from the per-instance
-    /// configuration. A chip supports a PDM direction if any of its instances
-    /// does.
+    /// configuration. A chip supports a given PDM capability if any of its
+    /// instances does.
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
         let supports_pdm_tx = self.instances.iter().any(|i| i.instance_config.pdm_tx);
         let supports_pdm_rx = self.instances.iter().any(|i| i.instance_config.pdm_rx);
+        let supports_pcm2pdm = self.instances.iter().any(|i| i.instance_config.pcm2pdm);
+        let supports_pdm2pcm = self.instances.iter().any(|i| i.instance_config.pdm2pcm);
 
         [
             (
@@ -24,6 +26,16 @@ impl I2sProperties {
                 "i2s.supports_pdm_rx",
                 false,
                 Value::Boolean(supports_pdm_rx),
+            ),
+            (
+                "i2s.supports_pcm2pdm",
+                false,
+                Value::Boolean(supports_pcm2pdm),
+            ),
+            (
+                "i2s.supports_pdm2pcm",
+                false,
+                Value::Boolean(supports_pdm2pcm),
             ),
         ]
         .into_iter()
@@ -55,6 +67,12 @@ pub(crate) struct I2sInstanceConfig {
     /// Whether this instance supports PDM RX mode.
     #[serde(default)]
     pub pdm_rx: bool,
+    /// Whether this instance supports the hardware PCM-to-PDM filter on TX.
+    #[serde(default)]
+    pub pcm2pdm: bool,
+    /// Whether this instance supports the hardware PDM-to-PCM filter on RX.
+    #[serde(default)]
+    pub pdm2pcm: bool,
 }
 
 /// Generates `for_each_i2s!` which can be used to implement the I2S Instance

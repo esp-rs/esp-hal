@@ -470,7 +470,8 @@ driver_configs![
     I2sProperties<I2sInstanceConfig> {
         driver: i2s,
         name: "I2S",
-        // `supports_pdm_tx`/`supports_pdm_rx` are derived from the per-instance PDM flags.
+        // The `supports_pdm_tx`/`supports_pdm_rx`/`supports_pcm2pdm`/`supports_pdm2pcm`
+        // flags are derived from the per-instance PDM configuration.
         has_computed_properties: true,
         properties: {
             /// Register-layout generation derived from the chip SVD.
@@ -487,12 +488,6 @@ driver_configs![
             #[serde(default)]
             /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
             clock_configured_by_hp_sys_clkrst: bool,
-            #[serde(default)]
-            /// Whether the chip supports the hardware PCM-to-PDM filter on TX.
-            supports_pcm2pdm: bool,
-            #[serde(default)]
-            /// Whether the chip supports the hardware PDM-to-PCM filter on RX.
-            supports_pdm2pcm: bool,
             #[serde(default)]
             /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
             supports_pdm_rx_hp_filter: bool,

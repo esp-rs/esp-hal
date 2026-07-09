@@ -235,12 +235,6 @@ macro_rules! property {
     ("i2s.clock_configured_by_hp_sys_clkrst") => {
         true
     };
-    ("i2s.supports_pcm2pdm") => {
-        true
-    };
-    ("i2s.supports_pdm2pcm") => {
-        true
-    };
     ("i2s.supports_pdm_rx_hp_filter") => {
         true
     };
@@ -260,6 +254,12 @@ macro_rules! property {
         true
     };
     ("i2s.supports_pdm_rx") => {
+        true
+    };
+    ("i2s.supports_pcm2pdm") => {
+        true
+    };
+    ("i2s.supports_pdm2pcm") => {
         true
     };
     ("interrupts.status_registers") => {

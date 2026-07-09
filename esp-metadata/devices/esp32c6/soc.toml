@@ -605,7 +605,6 @@ default_clock_source = 2
 mclk_divider_bit_width = 9
 max_ws_width = 128
 clock_configured_by_pcr = true
-supports_pcm2pdm = true
 pdm_max_tx_lines = 2
 pdm_max_rx_lines = 1
 instances = [
@@ -621,6 +620,7 @@ instances = [
         din = ["I2SI_SD"],
         pdm_tx = true,
         pdm_rx = true,
+        pcm2pdm = true,
     },
 ]
 

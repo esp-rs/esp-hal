@@ -762,8 +762,6 @@ version = 2
 default_clock_source = 2
 mclk_divider_bit_width = 6
 max_ws_width = 128
-supports_pcm2pdm = true
-supports_pdm2pcm = true
 pdm_max_tx_lines = 2
 pdm_max_rx_lines = 4
 instances = [
@@ -779,6 +777,8 @@ instances = [
         din = ["I2S0I_SD", "I2S0I_SD1", "I2S0I_SD2", "I2S0I_SD3"],
         pdm_tx = true,
         pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
     },
     {
         name = "i2s1",

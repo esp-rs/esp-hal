@@ -316,8 +316,6 @@ default_clock_source = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 6
 max_ws_width = 128
-supports_pcm2pdm = true
-supports_pdm2pcm = true
 supports_pdm_rx_hp_filter = true
 pdm_max_tx_lines = 2
 pdm_max_rx_lines = 4
@@ -334,6 +332,8 @@ instances = [
         din = ["I2S0_I_SD", "I2S0_I_SD1", "I2S0_I_SD2", "I2S0_I_SD3"],
         pdm_tx = true,
         pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
     },
 ]
 [device.ledc]
