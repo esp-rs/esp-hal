@@ -52,6 +52,11 @@ options:
       - value: 3740121773
     display_hint: Hex
 
+  - name: init-stack-ptr-range-check
+    description: Check that the stack pointer is in range during initialization.
+    default:
+      - value: true
+
   - name: stack-guard-monitoring
     description: Use a data watchpoint to check if the stack guard was overwritten.
     default:
