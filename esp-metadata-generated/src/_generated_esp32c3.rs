@@ -235,18 +235,6 @@ macro_rules! property {
     ("i2s.supports_pdm_rx_hp_filter") => {
         false
     };
-    ("i2s.pdm_max_tx_lines") => {
-        2
-    };
-    ("i2s.pdm_max_tx_lines", str) => {
-        stringify!(2)
-    };
-    ("i2s.pdm_max_rx_lines") => {
-        1
-    };
-    ("i2s.pdm_max_rx_lines", str) => {
-        stringify!(1)
-    };
     ("i2s.supports_pdm_tx") => {
         true
     };

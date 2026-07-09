@@ -491,10 +491,6 @@ driver_configs![
             #[serde(default)]
             /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
             supports_pdm_rx_hp_filter: bool,
-            /// Maximum number of PDM TX data lines.
-            pdm_max_tx_lines: Option<u32>,
-            /// Maximum number of PDM RX data lines.
-            pdm_max_rx_lines: Option<u32>,
         }
     },
     IeeeProperties {

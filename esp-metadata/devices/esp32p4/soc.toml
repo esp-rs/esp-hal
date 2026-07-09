@@ -309,6 +309,7 @@ support_status = "not_supported"  # Event Task Matrix
 support_status = "not_supported"
 [device.i2c_slave]
 support_status = "not_supported"
+
 [device.i2s]
 support_status = "partial"  # TODO (I2S1/2)
 version = 3
@@ -317,8 +318,6 @@ clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 6
 max_ws_width = 128
 supports_pdm_rx_hp_filter = true
-pdm_max_tx_lines = 2
-pdm_max_rx_lines = 4
 instances = [
     {
         name = "i2s0",
@@ -336,6 +335,7 @@ instances = [
         pdm2pcm = true,
     },
 ]
+
 [device.ledc]
 version = 2
 channel_count = 8

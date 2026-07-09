@@ -733,8 +733,6 @@ version = 1
 default_clock_source = 2
 mclk_divider_bit_width = 6
 max_ws_width = 128
-pdm_max_tx_lines = 1
-pdm_max_rx_lines = 1
 instances = [
     {
         name = "i2s0",

@@ -611,8 +611,6 @@ default_clock_source = 2
 mclk_divider_bit_width = 9
 max_ws_width = 512
 clock_configured_by_pcr = true
-pdm_max_tx_lines = 2
-pdm_max_rx_lines = 1
 instances = [
     {
         name = "i2s0",
