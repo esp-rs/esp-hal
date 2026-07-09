@@ -30,6 +30,7 @@ strum        = { version = "0.27", features = ["derive"] }
 proc-macro2  = "1"
 quote        = "1"
 indexmap     = { version = "2", features = ["serde"] }
+log          = "0.4.22"
 
 [features]
 default = []
