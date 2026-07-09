@@ -651,14 +651,41 @@ fifo_size = 64
 bit_order_is_bool = true
 support_status = "supported"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"], cs = ["HSPICS0", "HSPICS1", "HSPICS2"] },
-    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"], cs = ["VSPICS0", "VSPICS1", "VSPICS2"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "HSPICLK",
+        sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"],
+        cs = ["HSPICS0", "HSPICS1", "HSPICS2"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "VSPICLK",
+        sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"],
+        cs = ["VSPICS0", "VSPICS1", "VSPICS2"]
+    },
 ]
+
 [device.spi_slave]
 support_status = "partial"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
-    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "HSPICLK",
+        mosi = "HSPID",
+        miso = "HSPIQ",
+        cs = "HSPICS0"
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "VSPICLK",
+        mosi = "VSPID",
+        miso = "VSPIQ",
+        cs = "VSPICS0"
+    },
 ]
 
 [device.timergroup]

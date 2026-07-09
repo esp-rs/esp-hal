@@ -169,8 +169,20 @@ version = 3
 fifo_size = 64
 support_status = "partial"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "SPI2_CK", sio = ["SPI2_D", "SPI2_Q", "SPI2_WP", "SPI2_HOLD"], cs = ["SPI2_CS"] },
-    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"], cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "SPI2_CK",
+        sio = ["SPI2_D", "SPI2_Q", "SPI2_WP", "SPI2_HOLD"],
+        cs = ["SPI2_CS"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CK",
+        sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"],
+        cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"]
+    },
 ]
 
 # I2C Master: 2 instances
