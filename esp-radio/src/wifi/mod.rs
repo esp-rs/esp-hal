@@ -881,9 +881,6 @@ static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
-    /// The device disconnected from the network or failed to connect to it.
-    Disconnected(DisconnectReason),
-
     /// Unsupported operation or mode.
     Unsupported,
 
