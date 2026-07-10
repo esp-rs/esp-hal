@@ -1234,6 +1234,8 @@ mod tests {
         );
     }
 
+    // Regression test for esp-rs/esp-hal#4697
+    //
     // This test is timing dependent and tests ESP32-specific behavior
     #[cfg(esp32)]
     #[test]
@@ -1252,6 +1254,15 @@ mod tests {
             .unwrap()
             .with_pin(rx);
 
+        // This suspiciously looking code is to drive the hardware into the state that caused the
+        // originally failed assertion. We want the async part to go into the first receive
+        // phase - then the second future will start "spamming" RMT with pulses.
+        // While not really explainable from any documentation, this turned out to drive the
+        // hardware into an unexpected state.
+        //
+        // With the previous assert in place, interestingly the first two receive calls failed as
+        // expected but then we ran into the issue where the assert failed instead of seeing
+        // the error bit set.
         embassy_futures::join::join(
             async {
                 let mut data = [PulseCode::default(); 10];
