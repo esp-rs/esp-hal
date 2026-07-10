@@ -48,7 +48,6 @@ bench = false
 test  = false
 
 [dependencies]
-bitflags                 = "2.9"
 bytemuck                 = "1.24"
 critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
