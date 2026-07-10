@@ -250,7 +250,7 @@ jobs:
         if: needs.binary-size.result == 'success'
         id: combine
         working-directory: ${{ github.workspace }}
-        run: cargo run -p xtask --features report -- generate-report --input results
+        run: cargo run -p esp-devtool --features report -- generate-report --input results
 
       - name: Find and Update Comment with GH CLI
         env:
