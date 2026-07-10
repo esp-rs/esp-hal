@@ -331,6 +331,20 @@ support_status = { status = "not_supported", issue = 5419 }
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+wakeup_sources = {
+    Ext0 = 0,
+    Ext1 = 1,
+    Gpio = 2,
+    WifiBeacon = 3,
+    Timer = 4,
+    Wifi = 5,
+    Uart0 = 6,
+    Uart1 = 7,
+    Sdio = 8,
+    Bt = 10,
+    LpCore = 11,
+    Usb = 14,
+}
 
 [device.rng]
 support_status = "partial"

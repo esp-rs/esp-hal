@@ -9,7 +9,7 @@ use super::{
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Rtc, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, WakeupSource, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -80,8 +80,12 @@ impl WakeSource for UlpWakeupSource {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_ulp(self.wake_on_interrupt);
-        triggers.set_ulp_riscv_trap(self.wake_on_trap);
+        if self.wake_on_interrupt {
+            triggers.insert(WakeupSource::UlpRiscv);
+        }
+        if self.wake_on_trap {
+            triggers.insert(WakeupSource::UlpRiscvTrap);
+        }
 
         if self.clear_interrupts_on_sleep {
             self.clear_interrupts();
@@ -101,7 +105,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
         sleep_config: &mut RtcSleepConfig,
     ) {
         sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_ext0(true);
+        triggers.insert(WakeupSource::Ext0);
 
         // TODO: disable clock when not in use
         SENS::regs()
@@ -147,7 +151,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_ext1(true);
+        triggers.insert(WakeupSource::Ext1);
 
         // TODO: disable clock when not in use
         SENS::regs()
@@ -222,7 +226,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
 
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_gpio(true);
+        triggers.insert(WakeupSource::Gpio);
 
         // Since we only use RTCIO pins, we can keep deep sleep enabled.
         let sens = crate::peripherals::SENS::regs();
@@ -770,9 +774,10 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
 
             // set bits for what can wake us up
-            LPWR::regs()
-                .wakeup_state()
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
+            LPWR::regs().wakeup_state().modify(|_, w| {
+                w.wakeup_ena()
+                    .bits((wakeup_triggers.as_u32() as u16).into())
+            });
 
             LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
         }

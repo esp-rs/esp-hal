@@ -148,74 +148,72 @@ cfg_select! {
     }
 }
 
-bitflags::bitflags! {
-    /// The source(s) that caused the most recent wakeup from sleep.
-    ///
-    /// Returned by [`wakeup_cause`].
-    ///
-    /// Note that the available flags depend on the target chip.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct WakeupReason: u32 {
-        /// The chip was not woken from sleep.
-        const NoSleep     = 0;
-        #[cfg(pm_support_ext0_wakeup)]
-        /// EXT0 wakeup, via an RTC GPIO (`RTC_IO`).
-        const Ext0        = 1 << 0;
-        #[cfg(all(pm_support_ext1_wakeup, not(esp32p4)))]
-        /// EXT1 wakeup, via one or more RTC GPIOs (`RTC_CNTL`).
-        const Ext1        = 1 << 1;
-        #[cfg(esp32p4)]
-        /// EXT1 wakeup (ESP32-P4 PMU bitmap).
-        const Ext1        = 1 << 12;
-        /// GPIO wakeup.
-        const Gpio        = 1 << 2;
-        // The wakeup-cause bit layout follows `WakeTriggers`: the timer bit is 3 on the
-        // RTC_CNTL-based chips, 4 on the PMU-based chips, and 13 on the ESP32-P4 PMU bitmap.
-        #[cfg(not(soc_has_pmu))]
-        /// Timer wakeup.
-        const Timer       = 1 << 3;
-        #[cfg(all(soc_has_pmu, not(esp32p4)))]
-        /// Timer wakeup.
-        const Timer       = 1 << 4;
-        #[cfg(esp32p4)]
-        /// Timer wakeup (ESP32-P4 PMU bitmap: PMU_RTC_TIMER_WAKEUP_EN).
-        const Timer       = 1 << 13;
-        #[cfg(pm_support_wifi_wakeup)]
-        /// Wi-Fi (MAC) wakeup.
-        const Wifi        = 1 << 5;
-        #[cfg(not(esp32p4))]
-        /// UART0 wakeup.
-        const Uart0       = 1 << 6;
-        #[cfg(esp32p4)]
-        /// UART0 wakeup (ESP32-P4 PMU bitmap).
-        const Uart0       = 1 << 8;
-        /// UART1 wakeup.
-        const Uart1       = 1 << 7;
-        #[cfg(all(pm_support_touch_sensor_wakeup, not(esp32p4)))]
-        /// Touch sensor wakeup.
-        const Touch       = 1 << 8;
-        #[cfg(all(pm_support_touch_sensor_wakeup, esp32p4))]
-        /// Touch sensor wakeup (ESP32-P4 PMU bitmap).
-        const Touch       = 1 << 11;
-        #[cfg(ulp_supported)]
-        /// ULP wakeup.
-        const Ulp         = 1 << 9;
-        #[cfg(pm_support_bt_wakeup)]
-        /// Bluetooth wakeup.
-        const Bluetooth   = 1 << 10;
-        #[cfg(riscv_coproc_supported)]
-        /// ULP RISC-V coprocessor wakeup.
-        const Cocpu       = 1 << 11;
-        #[cfg(riscv_coproc_supported)]
-        /// ULP RISC-V coprocessor trap (crash) wakeup.
-        const CocpuTrap   = 1 << 13;
-    }
+#[rustfmt::skip]
+macro_rules! wakeup_docstring {
+    (Ext0)          => { "EXT0 wakeup" };
+    (Ext1)          => { "EXT1 wakeup, via one or more RTC GPIOs (`RTC_CNTL`)." };
+    (Gpio)          => { "GPIO wakeup." };
+    (Timer)         => { "Timer wakeup." };
+    (Sdio)          => { "SDIO wakeup." };
+    (Wifi)          => { "Wi-Fi (MAC) wakeup." };
+    (WifiBeacon)    => { "Wi-Fi beacon wakeup." };
+    (Uart0)         => { "UART0 wakeup." };
+    (Uart1)         => { "UART1 wakeup." };
+    (Touch)         => { "Touch sensor wakeup." };
+    (Ulp)           => { "ULP wakeup." };
+    (UlpRiscv)      => { "ULP RISC-V coprocessor wakeup." };
+    (UlpRiscvTrap)  => { "ULP RISC-V coprocessor trap (crash) wakeup." };
+    (Bt)            => { "Bluetooth wakeup." };
+    (LpCore)        => { "LP core wakeup." };
+    (Usb)           => { "USB wakeup." };
+    ($($other:tt)*) => { compile_error!(concat!("Unknown wakeup source: ", stringify!($($other)*))) };
 }
 
-#[cfg(feature = "defmt")]
-impl defmt::Format for WakeupReason {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "WakeupReason({=u32:#x})", self.bits());
+for_each_wakeup_source! {
+    (all $( ($variant:ident, $bit:literal) ),*) => {
+        /// A source that can wake the chip from sleep.
+        ///
+        /// Each variant models a single bit in the wakeup registers. This enum is the internal
+        /// representation shared by [`WakeTriggers`][crate::rtc_cntl::sleep::WakeTriggers] (the
+        /// sources configured to end a sleep) and [`WakeupReason`] (the source(s) that caused the
+        /// most recent wakeup, see [`wakeup_cause`]).
+        ///
+        /// Note that the available variants depend on the target chip.
+        #[derive(Debug, enumset::EnumSetType)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum WakeupSource {
+            $(
+                #[doc = wakeup_docstring!($variant)]
+                $variant = $bit,
+            )*
+        }
+    };
+}
+
+/// The source(s) that caused the most recent wakeup from sleep.
+///
+/// Returned by [`wakeup_cause`]. This is a thin wrapper around the set of [`WakeupSource`]s that
+/// were reported by the hardware. The set is empty if the chip was not woken from sleep.
+///
+/// Note that the available sources depend on the target chip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct WakeupReason(enumset::EnumSet<WakeupSource>);
+
+impl WakeupReason {
+    /// Returns `true` if the chip was not woken from sleep by any source.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns `true` if the given source caused the most recent wakeup.
+    pub fn contains(&self, source: WakeupSource) -> bool {
+        self.0.contains(source)
+    }
+
+    /// Returns an iterator over the sources that caused the most recent wakeup.
+    pub fn iter(&self) -> impl Iterator<Item = WakeupSource> {
+        self.0.iter()
     }
 }
 
@@ -718,14 +716,14 @@ static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::Atomic
 
 /// Return the cause(s) of the most recent wakeup.
 ///
-/// A sleep can be ended by more than one source simultaneously, so all matching flags are returned.
-/// The result is [`WakeupReason::NoSleep`] (an empty set) if the chip was not woken from sleep (for
-/// example on a cold boot, or after a reset unrelated to deep sleep).
+/// A sleep can be ended by more than one source simultaneously, so all matching sources are
+/// returned. The result is empty if the chip was not woken from sleep (for example on a cold boot,
+/// or after a reset unrelated to deep sleep).
 pub fn wakeup_cause() -> WakeupReason {
     if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep)
         && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed)
     {
-        return WakeupReason::NoSleep;
+        return WakeupReason::default();
     }
 
     let reg = cfg_select! {
@@ -737,7 +735,7 @@ pub fn wakeup_cause() -> WakeupReason {
     #[allow(clippy::unnecessary_cast)]
     let wakeup_cause_bits = reg.read().wakeup_cause().bits() as u32;
 
-    WakeupReason::from_bits_truncate(wakeup_cause_bits)
+    WakeupReason(enumset::EnumSet::from_u32_truncated(wakeup_cause_bits))
 }
 
 #[cfg(sleep_light_sleep)]

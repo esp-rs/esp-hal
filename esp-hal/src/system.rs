@@ -419,8 +419,8 @@ pub fn reset_reason() -> Option<SocResetReason> {
 
 /// Retrieves the cause(s) of the last wakeup event.
 ///
-/// Returns the set of [`WakeupReason`][crate::rtc_cntl::WakeupReason] flags that ended the most
-/// recent sleep. The result is empty if the chip was not woken from sleep.
+/// Returns the [`WakeupReason`][crate::rtc_cntl::WakeupReason] describing the source(s) that ended
+/// the most recent sleep. The result is empty if the chip was not woken from sleep.
 #[instability::unstable]
 #[inline]
 pub fn wakeup_cause() -> crate::rtc_cntl::WakeupReason {

@@ -1156,6 +1156,22 @@ macro_rules! for_each_sha_algorithm {
     };
 }
 #[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_wakeup_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_wakeup_source!((Sdio, 0));
+        _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Usb,
+        3)); _for_each_inner_wakeup_source!((Uart1, 7));
+        _for_each_inner_wakeup_source!((Uart0, 8));
+        _for_each_inner_wakeup_source!((Touch, 11));
+        _for_each_inner_wakeup_source!((Ext1, 12));
+        _for_each_inner_wakeup_source!((Timer, 13));
+        _for_each_inner_wakeup_source!((all(Sdio, 0), (Gpio, 2), (Usb, 3), (Uart1, 7),
+        (Uart0, 8), (Touch, 11), (Ext1, 12), (Timer, 13)));
+    };
+}
+#[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
 /// ```rust, no_run
 /// // XTAL_CLK

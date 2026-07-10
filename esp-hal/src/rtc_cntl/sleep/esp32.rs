@@ -2,7 +2,7 @@ use super::{Ext0WakeupSource, Ext1WakeupSource, WakeSource, WakeTriggers};
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{BB, DPORT, I2S0, LPWR, NRX, RTC_IO},
-    rtc_cntl::{Rtc, sleep::WakeupLevel},
+    rtc_cntl::{Rtc, WakeupSource, sleep::WakeupLevel},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -78,7 +78,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     ) {
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_ext0(true);
+        triggers.insert(WakeupSource::Ext0);
 
         // set pin to RTC function
         self.pin
@@ -116,7 +116,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_ext1(true);
+        triggers.insert(WakeupSource::Ext1);
 
         // set pins to RTC function
         let mut pins = self.pins.borrow_mut();
@@ -538,7 +538,7 @@ impl RtcSleepConfig {
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0) });
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.as_u32() as u16) });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

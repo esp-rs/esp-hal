@@ -2,7 +2,7 @@ use super::{WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, GPIO, IO_MUX, LPWR, NRX, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Rtc, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, WakeupSource, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -163,7 +163,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
             return;
         }
 
-        triggers.set_gpio(true);
+        triggers.insert(WakeupSource::Gpio);
 
         // If deep sleep is enabled, esp_start_sleep calls
         // gpio_deep_sleep_wakeup_prepare which sets these pullup and
@@ -803,9 +803,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         // set bits for what can wake us up
-        LPWR::regs()
-            .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0.into()) });
+        LPWR::regs().wakeup_state().modify(|_, w| unsafe {
+            w.wakeup_ena()
+                .bits((wakeup_triggers.as_u32() as u16).into())
+        });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

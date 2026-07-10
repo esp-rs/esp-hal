@@ -18,11 +18,16 @@
 #[cfg(not(any(esp32c5, esp32c61, esp32p4)))]
 use core::cell::RefCell;
 
+use enumset::EnumSet;
+
 #[cfg(any(esp32, esp32s2, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
 #[cfg(any(esp32c3, esp32c6, esp32c2, esp32h2))]
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
-use crate::{peripherals::LPWR, rtc_cntl::Rtc};
+use crate::{
+    peripherals::LPWR,
+    rtc_cntl::{Rtc, WakeupSource},
+};
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -411,7 +416,7 @@ impl WakeSource for GpioWakeupSource {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_gpio(true);
+        triggers.insert(WakeupSource::Gpio);
     }
 }
 
@@ -457,7 +462,7 @@ macro_rules! uart_wakeup_impl {
 
             impl WakeSource for [< Uart $num WakeupSource >] {
                 fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
-                    triggers.[< set_uart $num >](true);
+                    triggers.insert(WakeupSource::[< Uart $num >]);
                     let uart = crate::peripherals::[< UART $num >]::regs();
 
                     #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
@@ -478,164 +483,29 @@ macro_rules! uart_wakeup_impl {
 uart_wakeup_impl!(0);
 uart_wakeup_impl!(1);
 
-#[cfg(esp32s2)]
-bitfield::bitfield! {
-    /// Represents the wakeup triggers.
-    #[derive(Default, Clone, Copy)]
-    pub struct WakeTriggers(u16);
-    impl Debug;
-    /// EXT0 GPIO wakeup
-    pub ext0, set_ext0: 0;
-    /// EXT1 GPIO wakeup
-    pub ext1, set_ext1: 1;
-    /// GPIO wakeup (l5ght sleep only)
-    pub gpio, set_gpio: 2;
-    /// Timer wakeup
-    pub timer, set_timer: 3;
-    /// WiFi SoC wakeup
-    pub wifi_soc, set_wifi_soc: 5;
-    /// UART0 wakeup (light sleep only)
-    pub uart0, set_uart0: 6;
-    /// UART1 wakeup (light sleep only)
-    pub uart1, set_uart1: 7;
-    /// Touch wakeup
-    pub touch, set_touch: 8;
-    /// ULP-FSM or ULP-RISCV wakeup
-    pub ulp, set_ulp: 11;
-    /// ULP-RISCV trap wakeup
-    pub ulp_riscv_trap, set_ulp_riscv_trap: 13;
-    /// USB wakeup
-    pub usb, set_usb: 15;
-}
+/// The set of wakeup sources configured to end a sleep.
+///
+/// This is a thin wrapper around a set of [`WakeupSource`]s. Wakeup source implementations enable
+/// the sources they need via [`WakeTriggers::insert`] from within [`WakeSource::apply`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct WakeTriggers(EnumSet<WakeupSource>);
 
-#[cfg(esp32s3)]
-bitfield::bitfield! {
-    /// Represents the wakeup triggers.
-    #[derive(Default, Clone, Copy)]
-    pub struct WakeTriggers(u16);
-    impl Debug;
-    /// EXT0 GPIO wakeup
-    pub ext0, set_ext0: 0;
-    /// EXT1 GPIO wakeup
-    pub ext1, set_ext1: 1;
-    /// GPIO wakeup (light sleep only)
-    pub gpio, set_gpio: 2;
-    /// Timer wakeup
-    pub timer, set_timer: 3;
-    /// SDIO wakeup (light sleep only)
-    pub sdio, set_sdio: 4;
-    /// MAC wakeup (light sleep only)
-    pub mac, set_mac: 5;
-    /// UART0 wakeup (light sleep only)
-    pub uart0, set_uart0: 6;
-    /// UART1 wakeup (light sleep only)
-    pub uart1, set_uart1: 7;
-    /// Touch wakeup
-    pub touch, set_touch: 8;
-    /// ULP-FSM wakeup
-    pub ulp_fsm, set_ulp_fsm: 9;
-    /// BT wakeup (light sleep only)
-    pub bt, set_bt: 10;
-    /// ULP-RISCV wakeup
-    pub ulp_riscv, set_ulp_riscv: 11;
-    /// ULP-RISCV trap wakeup
-    pub ulp_riscv_trap, set_ulp_riscv_trap: 13;
-}
+impl WakeTriggers {
+    /// Enables the given source as a wakeup trigger.
+    pub fn insert(&mut self, source: WakeupSource) {
+        self.0.insert(source);
+    }
 
-#[cfg(any(esp32, esp32c2, esp32c3))]
-bitfield::bitfield! {
-    /// Represents the wakeup triggers.
-    #[derive(Default, Clone, Copy)]
-    pub struct WakeTriggers(u16);
-    impl Debug;
-    /// EXT0 GPIO wakeup
-    pub ext0, set_ext0: 0;
-    /// EXT1 GPIO wakeup
-    pub ext1, set_ext1: 1;
-    /// GPIO wakeup (light sleep only)
-    pub gpio, set_gpio: 2;
-    /// Timer wakeup
-    pub timer, set_timer: 3;
-    /// SDIO wakeup (light sleep only)
-    pub sdio, set_sdio: 4;
-    /// MAC wakeup (light sleep only)
-    pub mac, set_mac: 5;
-    /// UART0 wakeup (light sleep only)
-    pub uart0, set_uart0: 6;
-    /// UART1 wakeup (light sleep only)
-    pub uart1, set_uart1: 7;
-    /// Touch wakeup
-    pub touch, set_touch: 8;
-    /// ULP-FSM wakeup
-    pub ulp, set_ulp: 9;
-    /// BT wakeup (light sleep only)
-    pub bt, set_bt: 10;
-}
+    /// Returns `true` if the given source is enabled as a wakeup trigger.
+    pub fn contains(&self, source: WakeupSource) -> bool {
+        self.0.contains(source)
+    }
 
-#[cfg(all(soc_has_pmu, not(esp32p4)))]
-bitfield::bitfield! {
-    /// Represents the wakeup triggers.
-    #[derive(Default, Clone, Copy)]
-    pub struct WakeTriggers(u16);
-    impl Debug;
-
-    /// EXT0 GPIO wakeup
-    pub ext0, set_ext0: 0;
-    /// EXT1 GPIO wakeup
-    pub ext1, set_ext1: 1;
-    /// GPIO wakeup
-    pub gpio, set_gpio: 2;
-    /// WiFi beacon wakeup
-    pub wifi_beacon, set_wifi_beacon: 3;
-    /// Timer wakeup
-    pub timer, set_timer: 4;
-    /// WiFi SoC wakeup
-    pub wifi_soc, set_wifi_soc: 5;
-    /// UART0 wakeup
-    pub uart0, set_uart0: 6;
-    /// UART1 wakeup
-    pub uart1, set_uart1: 7;
-    /// SDIO wakeup
-    pub sdio, set_sdio: 8;
-    /// BT wakeup
-    pub bt, set_bt: 10;
-    /// LP core wakeup
-    pub lp_core, set_lp_core: 11;
-    /// USB wakeup
-    pub usb, set_usb: 14;
-}
-
-// ESP32-P4 has a different PMU wakeup-source bitmap than the other PMU chips.
-// In particular the LP/RTC timer wakeup is bit 13 (PMU_RTC_TIMER_WAKEUP_EN),
-// not bit 4. See esp-idf `pmu_bit_defs.h` for the ESP32-P4.
-#[cfg(esp32p4)]
-bitfield::bitfield! {
-    /// Represents the wakeup triggers.
-    #[derive(Default, Clone, Copy)]
-    pub struct WakeTriggers(u16);
-    impl Debug;
-
-    /// SDIO wakeup
-    pub sdio, set_sdio: 0;
-    /// GPIO wakeup
-    pub gpio, set_gpio: 2;
-    /// USB wakeup
-    pub usb, set_usb: 3;
-    /// UART1 wakeup
-    pub uart1, set_uart1: 7;
-    /// UART0 wakeup
-    pub uart0, set_uart0: 8;
-    /// EXT1 GPIO wakeup
-    pub ext1, set_ext1: 12;
-    /// Timer (LP/RTC timer) wakeup
-    pub timer, set_timer: 13;
-    // The following sources do not exist on ESP32-P4. They are declared so the
-    // shared wake-source code keeps compiling; they are never set on this
-    // target, so their (overlapping, unused bit 1) position is irrelevant.
-    /// EXT0 GPIO wakeup (unused on ESP32-P4)
-    pub ext0, set_ext0: 1;
-    /// LP core wakeup (unused on ESP32-P4)
-    pub lp_core, set_lp_core: 1;
+    /// Returns the raw wakeup-enable register bitmask.
+    pub(crate) fn as_u32(&self) -> u32 {
+        self.0.as_u32()
+    }
 }
 
 /// Trait representing a wakeup source.

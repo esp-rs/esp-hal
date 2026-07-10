@@ -7,6 +7,7 @@ use crate::{
     private::DropGuard,
     rtc_cntl::{
         Rtc,
+        WakeupSource,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::{
             Ext1WakeupSource,
@@ -59,7 +60,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         // We don't have to keep the LP domain powered if we hold the wakeup pin states.
-        triggers.set_ext1(true);
+        triggers.insert(WakeupSource::Ext1);
 
         // set pins to RTC function
         let mut pins = self.pins.borrow_mut();
@@ -110,7 +111,7 @@ impl WakeSource for WakeFromLpCoreWakeupSource {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_lp_core(true);
+        triggers.insert(WakeupSource::LpCore);
     }
 }
 
@@ -932,7 +933,7 @@ impl RtcSleepConfig {
             | PMU_LP_CORE_WAKEUP_EN
             | PMU_USB_WAKEUP_EN;
 
-        let wakeup_mask = wakeup_triggers.0 as u32;
+        let wakeup_mask = wakeup_triggers.as_u32();
         let reject_mask = if self.deep {
             0
         } else {
