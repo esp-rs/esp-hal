@@ -918,10 +918,7 @@ impl WifiError {
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            _ => {
-                error!("Unknown error code: {}", code);
-                WifiError::Failed
-            }
+            _ => panic!("Unknown error code: {}", code),
         }
     }
 }
