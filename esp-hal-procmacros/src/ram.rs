@@ -10,6 +10,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut rtc_fast = false;
     let mut rtc_slow = false;
     let mut dram2_uninit = false;
+    let mut dcache_reclaimed = false;
     let mut persistent = false;
     let mut zeroed = false;
 
@@ -38,6 +39,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                 i if i == "rtc_fast" => &mut rtc_fast,
                                 i if i == "rtc_slow" => &mut rtc_slow,
                                 i if i == "persistent" => &mut persistent,
+                                i if i == "dcache_reclaimed" => &mut dcache_reclaimed,
                                 i if i == "zeroed" => &mut zeroed,
                                 i => {
                                     return syn::Error::new(
@@ -132,22 +134,40 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         .into_compile_error();
     }
 
+    #[cfg(not(feature = "dcache-reclaimed"))]
+    if dcache_reclaimed {
+        return syn::Error::new(
+            Span::call_site(),
+            "dcache_reclaimed is not available for this target",
+        )
+        .into_compile_error();
+    }
+
     let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (is_fn, rtc_fast, rtc_slow, dram2_uninit, persistent, zeroed) {
-        (true, false, false, false, false, false) => Ok(".rwtext"),
-        (true, true, false, false, false, false) => Ok(".rtc_fast.text"),
-        (true, false, true, false, false, false) => Ok(".rtc_slow.text"),
+    let section_name = match (
+        is_fn,
+        rtc_fast,
+        rtc_slow,
+        dram2_uninit,
+        dcache_reclaimed,
+        persistent,
+        zeroed,
+    ) {
+        (true, false, false, false, false, false, false) => Ok(".rwtext"),
+        (true, true, false, false, false, false, false) => Ok(".rtc_fast.text"),
+        (true, false, true, false, false, false, false) => Ok(".rtc_slow.text"),
 
-        (false, false, false, false, false, false) => Ok(".data"),
-        (false, false, false, true, false, false) => Ok(".dram2_uninit"),
+        (false, false, false, false, false, false, false) => Ok(".data"),
+        (false, false, false, true, false, false, false) => Ok(".dram2_uninit"),
+        (false, false, false, false, true, false, false) => Ok(".dcache_reclaimed_uninit"),
 
-        (false, true, false, false, false, false) => Ok(".rtc_fast.data"),
-        (false, true, false, false, true, false) => Ok(".rtc_fast.persistent"),
-        (false, true, false, false, false, true) => Ok(".rtc_fast.bss"),
+        (false, true, false, false, false, false, false) => Ok(".rtc_fast.data"),
+        (false, true, false, false, false, true, false) => Ok(".rtc_fast.persistent"),
+        (false, true, false, false, false, false, true) => Ok(".rtc_fast.bss"),
 
-        (false, false, true, false, false, false) => Ok(".rtc_slow.data"),
-        (false, false, true, false, true, false) => Ok(".rtc_slow.persistent"),
-        (false, false, true, false, false, true) => Ok(".rtc_slow.bss"),
+        (false, false, true, false, false, false, false) => Ok(".rtc_slow.data"),
+        (false, false, true, false, false, true, false) => Ok(".rtc_slow.persistent"),
+        (false, false, true, false, false, false, true) => Ok(".rtc_slow.bss"),
 
         _ => Err(()),
     };
@@ -170,7 +190,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         Some("zeroable")
     } else if persistent {
         Some("persistable")
-    } else if dram2_uninit {
+    } else if dram2_uninit || dcache_reclaimed {
         Some("uninit")
     } else {
         None

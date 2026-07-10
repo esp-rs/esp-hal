@@ -43,6 +43,10 @@ rtc-slow = []
 ## Indicates the target device has RTC fast memory available.
 rtc-fast = []
 
+## Indicates the target device has a data cache that when not used, is available
+## in a memory section *separate* from DRAM.
+dcache-reclaimed = []
+
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.
 has-lp-core = ["dep:object"]

@@ -6,6 +6,14 @@ RESERVE_ICACHE = 0x8000;
 RESERVE_ICACHE = 0x4000;
 #ENDIF
 
+#IF ESP_HAL_CONFIG_DATA_CACHE_SIZE_64KB
+RESERVE_DCACHE = 0x10000;
+#ENDIF
+
+#IF ESP_HAL_CONFIG_DATA_CACHE_SIZE_32KB
+RESERVE_DCACHE = 0x8000;
+#ENDIF
+
 VECTORS_SIZE = 0x400;
 
 /* Specify main memory areas
@@ -17,7 +25,7 @@ VECTORS_SIZE = 0x400;
  memory, but can only be used after app starts.
 
  D cache use the memory from high address, so when it's configured to 16K/32K, the region
- 0x3FCF0000 ~ (3FD00000 - DATA_CACHE_SIZE) should be available. This region is not used as
+ 0x3FCF0000 ~ (3FD00000 - RESERVE_DCACHE) should be available. This region is not used as
  static memory, leaving to the heap.
 */
 MEMORY
@@ -28,6 +36,8 @@ MEMORY
   /* memory available after the 2nd stage bootloader is finished */
   dram2_seg ( RW )       : ORIGIN = 0x3FCDB700, len = 0x3FCED710 - 0x3FCDB700
   dram_seg ( RW )        : ORIGIN = 0x3FC88000 , len = ORIGIN(dram2_seg) - 0x3FC88000
+
+  dcache_reclaimed_seg ( RW ) : ORIGIN = 0x3FCF0000, len = 0x3FD00000 - 0x3FCF0000 - RESERVE_DCACHE
 
   /* external flash
      The 0x20 offset is a convenience for the app binary image generation.

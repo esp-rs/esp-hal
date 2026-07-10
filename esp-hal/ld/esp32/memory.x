@@ -5,7 +5,12 @@
    for details
    */
 
-INCLUDE "memory_extras.x"
+/* reserved at the start of DRAM for the BT stack */
+#IF CARGO_FEATURE("__bluetooth")
+RESERVE_DRAM = 0x10000;
+#ELSE
+RESERVE_DRAM = 0;
+#ENDIF
 
 /* Specify main memory areas */
 MEMORY

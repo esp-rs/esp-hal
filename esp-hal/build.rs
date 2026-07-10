@@ -95,9 +95,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-search={}", out.display());
 
         if chip.is_xtensa() {
-            #[cfg(feature = "esp32")]
-            File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
-
             let (irtc, drtc) = if cfg!(feature = "esp32s3") {
                 ("rtc_fast_seg", "rtc_fast_seg")
             } else {
@@ -191,13 +188,17 @@ fn preprocess_file(
     let mut take = Vec::new();
     take.push(true);
 
+    let vars = std::env::var("CARGO_CFG_FEATURE").unwrap_or_default();
+    let enabled_features = vars.split(',').collect::<Vec<_>>();
+
     for line in std::io::BufReader::new(file).lines() {
         let line = substitute_config(cfg, &line?);
         let trimmed = line.trim();
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.iter().any(|c| c == condition);
+            let condition_matches = eval_condition(condition, config, &enabled_features);
+            let should_take = should_take && condition_matches;
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {
@@ -217,6 +218,17 @@ fn preprocess_file(
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "rt")]
+fn eval_condition(condition: &str, config: &[String], features: &[&str]) -> bool {
+    if let Some(feature) = condition.strip_prefix("CARGO_FEATURE(\"")
+        && let Some(feature) = feature.strip_suffix("\")")
+    {
+        return features.contains(&feature);
+    }
+
+    config.iter().any(|c| c == condition)
 }
 
 #[cfg(feature = "rt")]
@@ -255,22 +267,4 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
     }
 
     result
-}
-
-#[cfg(all(feature = "esp32", feature = "rt"))]
-fn generate_memory_extras() -> Vec<u8> {
-    let reserve_dram = if cfg!(feature = "__bluetooth") {
-        "0x10000"
-    } else {
-        "0x0"
-    };
-
-    format!(
-        "
-    /* reserved at the start of DRAM for e.g. the BT stack */
-    RESERVE_DRAM = {reserve_dram};
-        "
-    )
-    .as_bytes()
-    .to_vec()
 }
