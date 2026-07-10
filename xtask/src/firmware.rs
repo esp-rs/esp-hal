@@ -123,7 +123,7 @@ impl Metadata {
 /// A single configuration of an example, as parsed from metadata lines.
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
-    chips: Vec<Chip>,
+    chips: Option<Vec<Chip>>,
     name: String,
     cargo_config: Vec<String>,
     features: Vec<String>,
@@ -240,7 +240,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
         //
         // If there are no named configurations, an unnamed default is created.
         let mut all_configuration = Configuration {
-            chips: Chip::iter().collect::<Vec<_>>(),
+            chips: Some(Chip::iter().collect::<Vec<_>>()),
             ..Configuration::default()
         };
 
@@ -264,7 +264,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             match meta_line.key.as_str() {
                 "CHIP_FILTER" => {
                     let chips = parse_chips(meta_line.value.as_str())?;
-                    relevant_metadata.apply(|meta| meta.chips = chips.clone());
+                    relevant_metadata.apply(|meta| meta.chips = Some(chips.clone()));
                 }
                 // A list of cargo `--config` configurations.
                 "CARGO-CONFIG" => {
@@ -321,8 +321,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
 
         // Merge "all" into configurations
         for meta in configurations.values_mut() {
-            // Chips is a filter, inherit if empty
-            if meta.chips.is_empty() {
+            // Chips is a filter, inherit if unset
+            if meta.chips.is_none() {
                 meta.chips = all_configuration.chips.clone();
             }
 
@@ -360,7 +360,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Sort the features so they are in a deterministic order:
             configuration.features.sort();
 
-            for chip in &configuration.chips {
+            for chip in configuration.chips.as_deref().unwrap_or(&[]) {
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),
