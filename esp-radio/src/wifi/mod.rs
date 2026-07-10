@@ -83,7 +83,6 @@ use self::{
 };
 use crate::{
     RadioRefGuard,
-    WifiError,
     asynch::AtomicWaker,
     hal::ram,
     sys::{
@@ -883,7 +882,7 @@ static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
 #[non_exhaustive]
 pub enum WifiError {
     /// The device disconnected from the network or failed to connect to it.
-    Disconnected(sta::DisconnectedInfo),
+    Disconnected(DisconnectReason),
 
     /// Unsupported operation or mode.
     Unsupported,
@@ -928,6 +927,26 @@ impl WifiError {
 }
 
 impl core::error::Error for WifiError {}
+
+/// Errors that can occur during a Wi-Fi connection.
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConnectionError {
+    /// The connection failed.
+    Failed(sta::DisconnectedInfo),
+
+    /// A Wi-Fi error occurred.
+    WifiError(WifiError),
+}
+
+impl From<WifiError> for ConnectionError {
+    fn from(error: WifiError) -> Self {
+        ConnectionError::WifiError(error)
+    }
+}
+
+impl core::error::Error for ConnectionError {}
 
 #[cfg(esp32)]
 fn set_mac_time_update_cb(_wifi: crate::hal::peripherals::WIFI<'_>) {
@@ -2958,11 +2977,11 @@ ignored."
     ///         println!("Wifi connected!");
     ///     }
     ///     Err(e) => {
-    ///       println!("Failed to connect to wifi: {e:?}");
+    ///         println!("Failed to connect to wifi: {e:?}");
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn connect_async(&mut self) -> Result<sta::ConnectedInfo, WifiError> {
+    pub async fn connect_async(&mut self) -> Result<sta::ConnectedInfo, ConnectionError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
             .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
@@ -3003,7 +3022,7 @@ ignored."
                 bssid,
                 reason,
                 rssi,
-            } => Err(WifiError::Disconnected(sta::DisconnectedInfo {
+            } => Err(ConnectionError::Failed(sta::DisconnectedInfo {
                 ssid,
                 bssid,
                 reason: DisconnectReason::from_raw(reason),
