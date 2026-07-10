@@ -39,6 +39,11 @@ impl RmtReader {
     //
     // If `final_` is set, read a full buffer length, potentially wrapping around. Otherwise, fetch
     // half the buffer's length.
+    //
+    // The return value is only valuable if `final_` is set.
+    // In that case `true` indicates that the read completed successfully, while `false` indicates that
+    // the read was incomplete and an error occurred.
+    // This was only observed on ESP32 (and probably ESP32-S2) - other chips indicated an error in that case.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn read(
         &mut self,
