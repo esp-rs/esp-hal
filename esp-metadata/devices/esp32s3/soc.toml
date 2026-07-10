@@ -750,6 +750,21 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+wakeup_sources = {
+    Ext0 = 0,
+    Ext1 = 1,
+    Gpio = 2,
+    Timer = 3,
+    Sdio = 4,
+    Wifi = 5,
+    Uart0 = 6,
+    Uart1 = 7,
+    Touch = 8,
+    Ulp = 9,
+    Bt = 10,
+    UlpRiscv = 11,
+    UlpRiscvTrap = 13
+}
 
 # Other drivers which are partially supported but have no other configuration:
 

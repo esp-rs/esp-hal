@@ -858,7 +858,7 @@ impl RtcSleepConfig {
             | PMU_LP_CORE_WAKEUP_EN
             | PMU_USB_WAKEUP_EN;
 
-        let wakeup_mask = wakeup_triggers.0 as u32;
+        let wakeup_mask = wakeup_triggers.as_u32();
         let reject_mask = if self.deep {
             0
         } else {

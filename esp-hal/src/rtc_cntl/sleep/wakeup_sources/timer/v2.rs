@@ -1,7 +1,7 @@
 use super::TimerWakeupSource;
 use crate::{
     peripherals::RTC_TIMER,
-    rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers},
+    rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -11,7 +11,7 @@ impl WakeSource for TimerWakeupSource {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_timer(true);
+        triggers.insert(WakeupSource::Timer);
 
         let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros());
         let now = rtc.time_since_boot_raw();

@@ -9,8 +9,8 @@
 //! guard is alive, the idle hook falls back to `WFI` and the chip never sleeps.
 //!
 //! Both the `periodic` and `gpio` tasks print `wakeup_cause()`, so you can
-//! observe the chip waking from light sleep via the timer (`WakeupReason::Timer`)
-//! or via the BOOT button (`WakeupReason::Gpio`).
+//! observe the chip waking from light sleep via the timer (`WakeupSource::Timer`)
+//! or via the BOOT button (`WakeupSource::Gpio`).
 //!
 //! Use the UART port for this example - USB Serial/JTAG will break when the device enters sleep.
 

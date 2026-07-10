@@ -9,6 +9,7 @@ pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sdmmc;
 pub(crate) mod sha;
+pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
@@ -25,6 +26,7 @@ pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
 pub(crate) use sdmmc::*;
 pub(crate) use sha::*;
+pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
@@ -681,6 +683,8 @@ driver_configs![
             light_sleep: bool,
             #[serde(default)]
             deep_sleep: bool,
+            #[serde(default)]
+            wakeup_sources: WakeupSources,
         }
     },
     SocProperties {

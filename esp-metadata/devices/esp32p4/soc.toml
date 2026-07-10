@@ -135,7 +135,6 @@ peripherals = [
 [device.soc.clocks]
 # {include clocks.toml}
 
-# UART: 5 instances (UART0-4), 128-byte FIFO
 [device.uart]
 support_status = "partial"
 instances = [
@@ -405,6 +404,17 @@ support_status = { status = "not_supported", issue = 2370 }
 support_status = "partial"  # PMU eco5 sleep: timer wakeup (light + deep)
 light_sleep = true
 deep_sleep = true
+wakeup_sources = {
+    # TODO: other sources
+    Sdio = 0,
+    Gpio = 2,
+    Usb = 3,
+    Uart1 = 7,
+    Uart0 = 8,
+    Touch = 11,
+    Ext1 = 12,
+    Timer = 13,
+}
 
 [device.spi_slave]
 support_status = "not_supported"
