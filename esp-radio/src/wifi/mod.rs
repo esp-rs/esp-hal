@@ -83,6 +83,7 @@ use self::{
 };
 use crate::{
     RadioRefGuard,
+    WifiError,
     asynch::AtomicWaker,
     hal::ram,
     sys::{
@@ -918,7 +919,10 @@ impl WifiError {
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            _ => panic!("Unknown error code: {}", code),
+            _ => {
+                error!("Unknown error code: {}", code);
+                WifiError::Failed
+            }
         }
     }
 }
@@ -997,7 +1001,7 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     }
 }
 
-fn wifi_deinit() -> Result<(), crate::WifiError> {
+fn wifi_deinit() -> Result<(), WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
 
     // Drain RX queues before deinit so that any stale PacketBuffers are freed
