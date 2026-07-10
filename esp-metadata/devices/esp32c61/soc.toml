@@ -391,12 +391,25 @@ has_app_interrupts = true
 has_dma_segmented_transfer = true
 has_clk_pre_div = true
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
 ]
 
 [device.spi_slave]
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        mosi = "FSPID",
+        miso = "FSPIQ",
+        cs = "FSPICS0"
+    },
 ]
 
 [device.assist_debug]
@@ -415,11 +428,22 @@ default_clock_source = 2
 mclk_divider_bit_width = 9
 max_ws_width = 512
 clock_configured_by_pcr = true
-supports_pdm_tx = true
-supports_pdm_rx = true
-supports_pcm2pdm = true
-pdm_max_tx_lines = 2
-pdm_max_rx_lines = 1
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S_MCLK",
+        bclk = "I2SO_BCK",
+        ws = "I2SO_WS",
+        bclk_rx = "I2SI_BCK",
+        ws_rx = "I2SI_WS",
+        dout = ["I2SO_SD"],
+        din = ["I2SI_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+    },
+]
 
 [device.sd_slave]
 support_status = { status = "not_supported", issue = 5417 }

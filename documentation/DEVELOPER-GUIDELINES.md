@@ -110,6 +110,16 @@ The metadata provides different kinds of symbols:
 
 You can find the complete list of available symbols in `esp-metadata-generated/src/_build_script_utils.rs`, in the `emit_check_cfg_directives` function.
 
+### Per-instance metadata
+
+Peripherals with multiple instances (e.g. I2C, SPI master, I2S) should describe each instance in metadata instead of hardcoding instance details in the driver or gating them with per-chip `#[cfg]`s. See `spi_master` and `i2s` for reference implementations.
+
+- Add an `instances = [...]` array to the driver's `[device.<driver>]` table in each `esp-metadata/devices/*/soc.toml`. Each entry holds that instance's data (the `esp_hal::system::Peripheral` variant, GPIO signal names, per-instance capabilities, ...).
+- Define a `<Driver>InstanceConfig` struct in `esp-metadata/src/cfg/<driver>.rs` to deserialize those entries. Use `#[serde(default)]` for optional fields.
+- Provide a `generate_<driver>_peripherals` function that emits a `for_each_<driver>!` macro, and call it from `generate_peripherals` in `esp-metadata/src/lib.rs`. Drivers then invoke `for_each_<driver>!` to populate their `static INFO: Info` for every instance, instead of writing one `impl Instance` block per peripheral.
+
+Prefer deriving chip-level properties from the instance data over maintaining a separate chip-level flag. Set `has_computed_properties` on the driver and implement `computed_properties()` to fold over the instances (for example, "the chip supports PDM RX if any instance does"). This keeps a single source of truth and prevents chip-level flags from drifting out of sync with the instances.
+
 ## Amendments to the Rust API Guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
@@ -207,6 +217,7 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 - All named `Future` types (structs or enums that implement `Future`, public or private) must be marked with ``#[must_use = "futures do nothing unless you `.await` or poll them"]``.
   - Functions that return `impl Future` do **not** need `#[must_use]` — put the attribute on the concrete future type they construct instead.
 - Prefer `core::cfg_select!` (or, if the branches just pick between separate values of the same variable, `cfg!()`) over multiple exclusive `#[cfg]` attributes. `cfg_select!`/`cfg!()` visually divide the options, often results in simpler conditions and simplifies adding new branches in the future.
+  - Conditional compilation is only appropriate for properties that are uniform across all instances of a chip. Capabilities that vary between instances of the same chip belong in the driver's `Info` struct and must be checked at runtime (see [Driver implementation](#driver-implementation)).
 - When marking an API as `unstable`, prefer `#[instability::unstable]` (see [API Surface](#api-surface)).
 - The documentation should contain no more than three primary impl blocks (excluding trait implementations):
   - Blocking: Should be listed first, as it serves as the entry point for creating most drivers.
@@ -221,8 +232,10 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 - The internal implementation of the driver should be non-generic over the peripheral instance. This helps the compiler produce smaller code.
 - The author is encouraged to return a static shared reference to an `Info` and a `State` structure from the `Instance` trait.
   - The `Info` struct should describe the peripheral. Do not use any interior mutability.
+    - Capabilities that differ between instances of the same chip (for example, only one instance supporting a hardware feature) belong here as runtime fields, populated from per-instance metadata. Do not gate such per-instance capabilities with chip-level `#[cfg]` symbols.
   - The `State` struct should contain counters, wakers and other, mutable state. As this is accessed via a shared reference, interior mutability and atomic variables are preferred.
 - When applying configuration, consider using a drop guard to reset a consistent default state on error.
+- Configuration validation that depends on the peripheral instance should take the instance's `&Info` and check the request against its capability fields. Prefer a single `validate` method over separate instance-independent and instance-dependent checks. Validation is a driver-internal concern, performed where the `Info` is available (e.g. when applying the configuration), rather than something callers are expected to do.
 
 ## Modules Documentation
 

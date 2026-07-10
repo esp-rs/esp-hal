@@ -677,15 +677,41 @@ has_octal = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
-    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CLK",
+        sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"],
+        cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"]
+    },
 ]
 
 [device.spi_slave]
 support_status = "partial"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
-    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        mosi = "FSPID",
+        miso = "FSPIQ",
+        cs = "FSPICS0"
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CLK",
+        mosi = "SPI3_D",
+        miso = "SPI3_Q",
+        cs = "SPI3_CS0"
+    },
 ]
 
 [device.timergroup]
@@ -736,12 +762,34 @@ version = 2
 default_clock_source = 2
 mclk_divider_bit_width = 6
 max_ws_width = 128
-supports_pdm_tx = true
-supports_pdm_rx = true
-supports_pcm2pdm = true
-supports_pdm2pcm = true
-pdm_max_tx_lines = 2
-pdm_max_rx_lines = 4
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S0_MCLK",
+        bclk = "I2S0O_BCK",
+        ws = "I2S0O_WS",
+        bclk_rx = "I2S0I_BCK",
+        ws_rx = "I2S0I_WS",
+        dout = ["I2S0O_SD", "I2S0O_SD1"],
+        din = ["I2S0I_SD", "I2S0I_SD1", "I2S0I_SD2", "I2S0I_SD3"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        mclk = "I2S1_MCLK",
+        bclk = "I2S1O_BCK",
+        ws = "I2S1O_WS",
+        bclk_rx = "I2S1I_BCK",
+        ws_rx = "I2S1I_WS",
+        dout = ["I2S1O_SD"],
+        din = ["I2S1I_SD"],
+    },
+]
 
 [device.camera]
 [device.rgb_display]

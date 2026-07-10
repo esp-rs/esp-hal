@@ -11,24 +11,9 @@ use super::{
     clock,
     hp_filter::cut_off_coefficients,
 };
-use crate::i2s::master::private::RegisterAccessPrivate;
-#[cfg(soc_has_i2s0)]
-use crate::pac::i2s0::RegisterBlock as I2s0RegisterBlock;
+use crate::i2s::master::Info;
 
-#[cfg(soc_has_i2s0)]
-fn i2s0_regs() -> &'static I2s0RegisterBlock {
-    use crate::peripherals::I2S0;
-    unsafe { &*I2S0::PTR.cast::<I2s0RegisterBlock>() }
-}
-
-pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &PdmConfig,
-) -> Result<(), PdmError> {
-    if i2s.peripheral() != crate::system::Peripheral::I2s0 {
-        return Err(PdmError::UnsupportedInstance);
-    }
-
+pub(crate) fn configure_pdm(i2s: &Info, config: &PdmConfig) -> Result<(), PdmError> {
     if let Some(tx) = &config.tx {
         configure_tx(i2s, tx)?;
     }
@@ -38,21 +23,19 @@ pub(crate) fn configure_pdm<I: RegisterAccessPrivate + ?Sized>(
     Ok(())
 }
 
-fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &super::PdmTxConfig,
-) -> Result<(), PdmError> {
-    config.validate()?;
+fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError> {
+    if !i2s.pdm_tx {
+        return Err(PdmError::UnsupportedInstance);
+    }
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
     let clock = clock::calculate_tx_clock(&config.clock, pcm)?;
 
-    let regs = i2s0_regs();
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
 
     // Slot/filter setup before clock enable.
-    regs.tx_conf().modify(|_, w| w.tx_reset().set_bit());
-    regs.tx_conf().modify(|_, w| {
+    i2s.regs().tx_conf().modify(|_, w| w.tx_reset().set_bit());
+    i2s.regs().tx_conf().modify(|_, w| {
         w.tx_slave_mod().clear_bit();
         w.tx_tdm_en().clear_bit();
         w.tx_pcm_bypass().clear_bit();
@@ -62,14 +45,17 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
         w.tx_msb_shift().clear_bit();
         w.tx_ws_idle_pol().clear_bit()
     });
-    regs.tx_conf()
+    i2s.regs()
+        .tx_conf()
         .modify(|_, w| unsafe { w.tx_chan_mod().bits(if is_mono { 3 } else { 0 }) });
 
     #[cfg(i2s_version = "2")]
-    regs.tx_conf1().modify(|_, w| w.tx_msb_shift().clear_bit());
+    i2s.regs()
+        .tx_conf1()
+        .modify(|_, w| w.tx_msb_shift().clear_bit());
 
     let slot_bits = if is_mono { 16 } else { 32 };
-    regs.tx_conf1().modify(|_, w| unsafe {
+    i2s.regs().tx_conf1().modify(|_, w| unsafe {
         w.tx_bits_mod().bits(15);
         w.tx_tdm_chan_bits().bits(slot_bits - 1);
         w.tx_half_sample_bits().bits(15);
@@ -81,14 +67,14 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
         let (param0, param5) = cut_off_coefficients(freq_x10);
 
         // Set fp/fs before clock enable.
-        regs.tx_pcm2pdm_conf1().modify(|_, w| unsafe {
+        i2s.regs().tx_pcm2pdm_conf1().modify(|_, w| unsafe {
             w.tx_pdm_fp().bits(config.clock.up_sample_fp as u16);
             w.tx_pdm_fs().bits(config.clock.up_sample_fs as u16);
             w.tx_iir_hp_mult12_0().bits(param0 as u8);
             w.tx_iir_hp_mult12_5().bits(param5 as u8)
         });
 
-        regs.tx_pcm2pdm_conf().modify(|_, w| unsafe {
+        i2s.regs().tx_pcm2pdm_conf().modify(|_, w| unsafe {
             w.tx_pdm_sinc_osr2().bits(clock.over_sample_ratio as u8);
             w.tx_pdm_prescale().bits(config.slot.sd_prescale);
             w.tx_pdm_sigmadelta_in_shift()
@@ -110,36 +96,32 @@ fn configure_tx<I: RegisterAccessPrivate + ?Sized>(
         });
     }
 
-    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-    regs.rx_clkm_conf().modify(|_, w| w.mclk_sel().clear_bit());
-    #[cfg(i2s_clock_configured_by_pcr)]
-    {
-        use crate::peripherals::PCR;
-        PCR::regs()
-            .i2s_rx_clkm_conf()
-            .modify(|_, w| w.i2s_mclk_sel().clear_bit());
-    }
-    #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
-    {
-        use crate::peripherals::HP_SYS_CLKRST;
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl14()
-            .modify(|_, w| w.i2s0_mst_clk_sel().set_bit());
+    cfg_select! {
+        i2s_clock_configured_by_pcr => {
+            crate::peripherals::PCR::regs()
+                .i2s_rx_clkm_conf()
+                .modify(|_, w| w.i2s_mclk_sel().clear_bit());
+        }
+        i2s_clock_configured_by_hp_sys_clkrst => {
+            // TODO: I2S0 hard-coded here
+            crate::peripherals::HP_SYS_CLKRST::regs()
+                .peri_clk_ctrl14()
+                .modify(|_, w| w.i2s0_mst_clk_sel().set_bit());
+        }
+        _ => {
+            i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().clear_bit());
+        }
     }
 
     set_pdm_tx_clock(i2s, &clock);
 
-    regs.tx_conf().modify(|_, w| {
+    i2s.regs().tx_conf().modify(|_, w| {
         w.tx_pdm_en().set_bit();
         w.tx_tdm_en().clear_bit()
     });
-    if pcm {
-        regs.tx_pcm2pdm_conf()
-            .modify(|_, w| w.pcm2pdm_conv_en().set_bit());
-    } else {
-        regs.tx_pcm2pdm_conf()
-            .modify(|_, w| w.pcm2pdm_conv_en().clear_bit());
-    }
+    i2s.regs()
+        .tx_pcm2pdm_conf()
+        .modify(|_, w| w.pcm2pdm_conv_en().bit(pcm));
 
     Ok(())
 }
@@ -156,11 +138,10 @@ fn stereo_pdm_rx_slot_mask(slot_mask: u16) -> u16 {
     stereo_mask
 }
 
-fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    config: &super::PdmRxConfig,
-) -> Result<(), PdmError> {
-    config.validate()?;
+fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError> {
+    if !i2s.pdm_rx {
+        return Err(PdmError::UnsupportedInstance);
+    }
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
     let mut slot_mask = config.slot.slot_mask.bits();
@@ -170,13 +151,11 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
 
     let clock = clock::calculate_rx_clock(&config.clock, pcm, slot_mask)?;
 
-    let regs = i2s0_regs();
-
-    regs.rx_conf().modify(|_, w| {
+    i2s.regs().rx_conf().modify(|_, w| {
         w.rx_reset().set_bit();
         w.rx_fifo_reset().set_bit()
     });
-    regs.rx_conf().modify(|_, w| {
+    i2s.regs().rx_conf().modify(|_, w| {
         w.rx_slave_mod().clear_bit();
         w.rx_pcm_bypass().set_bit();
         // Mono mode stays disabled for PDM RX on HW v2+.
@@ -184,42 +163,50 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
         w
     });
     #[cfg(i2s_version = "3")]
-    regs.rx_conf().modify(|_, w| w.rx_msb_shift().clear_bit());
+    i2s.regs()
+        .rx_conf()
+        .modify(|_, w| w.rx_msb_shift().clear_bit());
     #[cfg(i2s_version = "2")]
-    regs.rx_conf()
+    i2s.regs()
+        .rx_conf()
         .modify(|_, w| unsafe { w.rx_stop_mode().bits(2) });
 
     #[cfg(i2s_version = "2")]
-    regs.rx_conf1().modify(|_, w| w.rx_msb_shift().clear_bit());
+    i2s.regs()
+        .rx_conf1()
+        .modify(|_, w| w.rx_msb_shift().clear_bit());
 
-    regs.rx_conf1().modify(|_, w| unsafe {
+    i2s.regs().rx_conf1().modify(|_, w| unsafe {
         w.rx_bits_mod().bits(15);
         w.rx_tdm_chan_bits().bits(15);
         w.rx_half_sample_bits().bits(15)
     });
 
     // PDM always uses a 2-slot frame; mono DMA expects one active slot only.
-    regs.rx_tdm_ctrl()
+    i2s.regs()
+        .rx_tdm_ctrl()
         .modify(|_, w| unsafe { w.rx_tdm_tot_chan_num().bits(1) });
-    regs.rx_tdm_ctrl()
+    i2s.regs()
+        .rx_tdm_ctrl()
         .modify(|r, w| unsafe { w.bits((r.bits() & 0xFFFF0000) | u32::from(slot_mask)) });
 
-    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-    regs.rx_clkm_conf().modify(|_, w| w.mclk_sel().set_bit());
-    #[cfg(i2s_clock_configured_by_pcr)]
-    {
-        use crate::peripherals::PCR;
-        PCR::regs()
-            .i2s_rx_clkm_conf()
-            .modify(|_, w| w.i2s_mclk_sel().set_bit());
+    cfg_select! {
+        i2s_clock_configured_by_pcr => {
+            crate::peripherals::PCR::regs()
+                .i2s_rx_clkm_conf()
+                .modify(|_, w| w.i2s_mclk_sel().set_bit());
+        }
+        i2s_clock_configured_by_hp_sys_clkrst => {
+            // TODO: I2S0 hard-coded here
+            crate::peripherals::HP_SYS_CLKRST::regs()
+                .peri_clk_ctrl14()
+                .modify(|_, w| w.i2s0_mst_clk_sel().clear_bit());
+        }
+        _ => {
+            i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().set_bit());
+        }
     }
-    #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
-    {
-        use crate::peripherals::HP_SYS_CLKRST;
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl14()
-            .modify(|_, w| w.i2s0_mst_clk_sel().clear_bit());
-    }
+
     i2s.set_rx_clock(clock.dividers);
 
     #[cfg(all(i2s_supports_pdm2pcm, esp32p4))]
@@ -227,7 +214,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
         let dsr16 = config.clock.downsample_rate == super::PdmDownsampleRate::Dsr16s;
         let freq_x10 = (config.slot.hp_cut_off_freq_hz * 10.0) as u32;
         let (param0, param5) = cut_off_coefficients(freq_x10);
-        regs.rx_pdm2pcm_conf().modify(|_, w| {
+        i2s.regs().rx_pdm2pcm_conf().modify(|_, w| {
             w.rx_pdm2pcm_en().bit(pcm);
             w.rx_pdm_sinc_dsr_16_en().bit(dsr16);
             w.rx_pdm_hp_bypass().bit(!config.slot.hp_en);
@@ -240,7 +227,7 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
         });
     }
 
-    regs.rx_conf().modify(|_, w| {
+    i2s.regs().rx_conf().modify(|_, w| {
         w.rx_pdm_en().set_bit();
         w.rx_tdm_en().clear_bit();
         #[cfg(all(i2s_supports_pdm2pcm, not(esp32p4)))]
@@ -255,21 +242,13 @@ fn configure_rx<I: RegisterAccessPrivate + ?Sized>(
     Ok(())
 }
 
-#[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-fn set_pdm_tx_clock<I: RegisterAccessPrivate + ?Sized>(i2s: &I, clock: &clock::PdmTxClockResult) {
+fn set_pdm_tx_clock(i2s: &Info, clock: &clock::PdmTxClockResult) {
     set_pdm_tx_clock_common(i2s, clock);
-    apply_tx_pdm_clock_workaround(clock.dividers.mclk_divider);
+    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
+    apply_tx_pdm_clock_workaround(i2s, clock.dividers.mclk_divider);
 }
 
-#[cfg(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst))]
-fn set_pdm_tx_clock<I: RegisterAccessPrivate + ?Sized>(i2s: &I, clock: &clock::PdmTxClockResult) {
-    set_pdm_tx_clock_common(i2s, clock);
-}
-
-fn set_pdm_tx_clock_common<I: RegisterAccessPrivate + ?Sized>(
-    i2s: &I,
-    clock: &clock::PdmTxClockResult,
-) {
+fn set_pdm_tx_clock_common(i2s: &Info, clock: &clock::PdmTxClockResult) {
     use crate::i2s::master::private::I2sClockDividers;
     let dividers = I2sClockDividers {
         mclk_divider: clock.dividers.mclk_divider,
@@ -281,22 +260,23 @@ fn set_pdm_tx_clock_common<I: RegisterAccessPrivate + ?Sized>(
 }
 
 #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-fn apply_tx_pdm_clock_workaround(mclk_div: u32) {
-    let regs = i2s0_regs();
-    regs.tx_clkm_conf()
+fn apply_tx_pdm_clock_workaround(i2s: &Info, mclk_div: u32) {
+    i2s.regs()
+        .tx_clkm_conf()
         .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(2) });
-    regs.tx_clkm_div_conf().modify(|_, w| unsafe {
+    i2s.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
         w.tx_clkm_div_yn1().clear_bit();
         w.tx_clkm_div_y().bits(1);
         w.tx_clkm_div_z().bits(0);
         w.tx_clkm_div_x().bits(0)
     });
-    regs.tx_clkm_div_conf().modify(|_, w| unsafe {
+    i2s.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
         w.tx_clkm_div_yn1().clear_bit();
         w.tx_clkm_div_y().bits(1);
         w.tx_clkm_div_z().bits(0);
         w.tx_clkm_div_x().bits(1)
     });
-    regs.tx_clkm_conf()
+    i2s.regs()
+        .tx_clkm_conf()
         .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(mclk_div as u8) });
 }

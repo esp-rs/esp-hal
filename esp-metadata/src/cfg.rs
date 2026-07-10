@@ -3,6 +3,7 @@ pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod i2s;
 pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
@@ -19,6 +20,7 @@ pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
 pub(crate) use sdmmc::*;
@@ -465,9 +467,12 @@ driver_configs![
         name: "I2C slave",
         properties: {}
     },
-    I2sProperties {
+    I2sProperties<I2sInstanceConfig> {
         driver: i2s,
         name: "I2S",
+        // The `supports_pdm_tx`/`supports_pdm_rx`/`supports_pcm2pdm`/`supports_pdm2pcm`
+        // flags are derived from the per-instance PDM configuration.
+        has_computed_properties: true,
         properties: {
             /// Register-layout generation derived from the chip SVD.
             version: Option<u32>,
@@ -484,24 +489,8 @@ driver_configs![
             /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
             clock_configured_by_hp_sys_clkrst: bool,
             #[serde(default)]
-            /// Whether the chip supports PDM TX mode.
-            supports_pdm_tx: bool,
-            #[serde(default)]
-            /// Whether the chip supports PDM RX mode.
-            supports_pdm_rx: bool,
-            #[serde(default)]
-            /// Whether the chip supports the hardware PCM-to-PDM filter on TX.
-            supports_pcm2pdm: bool,
-            #[serde(default)]
-            /// Whether the chip supports the hardware PDM-to-PCM filter on RX.
-            supports_pdm2pcm: bool,
-            #[serde(default)]
             /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
             supports_pdm_rx_hp_filter: bool,
-            /// Maximum number of PDM TX data lines.
-            pdm_max_tx_lines: Option<u32>,
-            /// Maximum number of PDM RX data lines.
-            pdm_max_rx_lines: Option<u32>,
         }
     },
     IeeeProperties {

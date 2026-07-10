@@ -651,14 +651,41 @@ fifo_size = 64
 bit_order_is_bool = true
 support_status = "supported"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"], cs = ["HSPICS0", "HSPICS1", "HSPICS2"] },
-    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"], cs = ["VSPICS0", "VSPICS1", "VSPICS2"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "HSPICLK",
+        sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"],
+        cs = ["HSPICS0", "HSPICS1", "HSPICS2"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "VSPICLK",
+        sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"],
+        cs = ["VSPICS0", "VSPICS1", "VSPICS2"]
+    },
 ]
+
 [device.spi_slave]
 support_status = "partial"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
-    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "HSPICLK",
+        mosi = "HSPID",
+        miso = "HSPIQ",
+        cs = "HSPICS0"
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "VSPICLK",
+        mosi = "VSPID",
+        miso = "VSPIQ",
+        cs = "VSPICS0"
+    },
 ]
 
 [device.timergroup]
@@ -706,12 +733,32 @@ version = 1
 default_clock_source = 2
 mclk_divider_bit_width = 6
 max_ws_width = 128
-supports_pdm_tx = true
-supports_pdm_rx = true
-supports_pcm2pdm = true
-supports_pdm2pcm = true
-pdm_max_tx_lines = 1
-pdm_max_rx_lines = 1
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        bclk = "I2S0O_BCK",
+        ws = "I2S0O_WS",
+        bclk_rx = "I2S0I_BCK",
+        ws_rx = "I2S0I_WS",
+        dout = ["I2S0O_DATA_23"],
+        din = ["I2S0I_DATA_15"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        bclk = "I2S1O_BCK",
+        ws = "I2S1O_WS",
+        bclk_rx = "I2S1I_BCK",
+        ws_rx = "I2S1I_WS",
+        dout = ["I2S1O_DATA_23"],
+        din = ["I2S1I_DATA_15"],
+    },
+]
 
 [device.ledc]
 version = 1

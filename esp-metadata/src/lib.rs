@@ -655,6 +655,9 @@ impl Config {
         if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
             tokens.extend(cfg::generate_i2c_master_peripherals(peri));
         };
+        if let Some(peri) = self.device.peri_config.i2s.as_ref() {
+            tokens.extend(cfg::generate_i2s_peripherals(peri));
+        };
         if let Some(peri) = self.device.peri_config.uart.as_ref() {
             tokens.extend(cfg::generate_uart_peripherals(peri));
         }

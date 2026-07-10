@@ -217,6 +217,9 @@ macro_rules! property {
     ("i2s.clock_configured_by_hp_sys_clkrst") => {
         false
     };
+    ("i2s.supports_pdm_rx_hp_filter") => {
+        false
+    };
     ("i2s.supports_pdm_tx") => {
         true
     };
@@ -228,21 +231,6 @@ macro_rules! property {
     };
     ("i2s.supports_pdm2pcm") => {
         true
-    };
-    ("i2s.supports_pdm_rx_hp_filter") => {
-        false
-    };
-    ("i2s.pdm_max_tx_lines") => {
-        1
-    };
-    ("i2s.pdm_max_tx_lines", str) => {
-        stringify!(1)
-    };
-    ("i2s.pdm_max_rx_lines") => {
-        1
-    };
-    ("i2s.pdm_max_rx_lines", str) => {
-        stringify!(1)
     };
     ("interrupts.status_registers") => {
         3
@@ -3968,6 +3956,49 @@ macro_rules! for_each_i2c_master {
         I2CEXT0_SDA)); _for_each_inner_i2c_master!((1, I2C1, I2cExt1, I2CEXT1_SCL,
         I2CEXT1_SDA)); _for_each_inner_i2c_master!((all(0, I2C0, I2cExt0, I2CEXT0_SCL,
         I2CEXT0_SDA), (1, I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the I2S driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $mclk:ident, $bclk:ident, $ws:ident, $bclk_rx:ident,
+/// $ws_rx:ident, [$($dout:ident),*], [$($din:ident),*], $pdm_tx:literal, $pdm_rx:literal,
+/// $pcm2pdm:literal, $pdm2pcm:literal)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the I2S instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$mclk`: the MCLK output signal (a placeholder on chips without a GPIO-matrix MCLK).
+/// - `$bclk`, `$ws`: TX bit clock and word select output signals.
+/// - `$bclk_rx`, `$ws_rx`: RX bit clock and word select output signals.
+/// - `$dout`, `$din`: data-out and data-in signal names.
+/// - `$pdm_tx`, `$pdm_rx`: whether the instance supports PDM TX/RX.
+/// - `$pcm2pdm`, `$pdm2pcm`: whether the instance supports the hardware PCM<->PDM format conversion
+///   filter on TX/RX.
+///
+/// Example data:
+/// - `(I2S0, I2s0, I2S_MCLK, I2SO_BCK, I2SO_WS, I2SI_BCK, I2SI_WS, [I2SO_SD], [I2SI_SD], true,
+///   true, true, true)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_i2s {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2s { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner_i2s!((I2S0)); _for_each_inner_i2s!((I2S1));
+        _for_each_inner_i2s!((I2S0, I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
+        I2S0I_WS, [I2S0O_DATA_23], [I2S0I_DATA_15], true, true, true, true));
+        _for_each_inner_i2s!((I2S1, I2s1, __NO_MCLK, I2S1O_BCK, I2S1O_WS, I2S1I_BCK,
+        I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false, false, false));
+        _for_each_inner_i2s!((names(I2S0), (I2S1))); _for_each_inner_i2s!((all(I2S0,
+        I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK, I2S0I_WS, [I2S0O_DATA_23],
+        [I2S0I_DATA_15], true, true, true, true), (I2S1, I2s1, __NO_MCLK, I2S1O_BCK,
+        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false,
+        false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.

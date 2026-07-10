@@ -169,8 +169,20 @@ version = 3
 fifo_size = 64
 support_status = "partial"
 instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "SPI2_CK", sio = ["SPI2_D", "SPI2_Q", "SPI2_WP", "SPI2_HOLD"], cs = ["SPI2_CS"] },
-    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"], cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"] },
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "SPI2_CK",
+        sio = ["SPI2_D", "SPI2_Q", "SPI2_WP", "SPI2_HOLD"],
+        cs = ["SPI2_CS"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CK",
+        sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"],
+        cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"]
+    },
 ]
 
 # I2C Master: 2 instances
@@ -297,6 +309,7 @@ support_status = "not_supported"  # Event Task Matrix
 support_status = "not_supported"
 [device.i2c_slave]
 support_status = "not_supported"
+
 [device.i2s]
 support_status = "partial"  # TODO (I2S1/2)
 version = 3
@@ -304,13 +317,25 @@ default_clock_source = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 6
 max_ws_width = 128
-supports_pdm_tx = true
-supports_pdm_rx = true
-supports_pcm2pdm = true
-supports_pdm2pcm = true
 supports_pdm_rx_hp_filter = true
-pdm_max_tx_lines = 2
-pdm_max_rx_lines = 4
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S0_MCLK",
+        bclk = "I2S0_O_BCK",
+        ws = "I2S0_O_WS",
+        bclk_rx = "I2S0_I_BCK",
+        ws_rx = "I2S0_I_WS",
+        dout = ["I2S0_O_SD", "I2S0_O_SD1"],
+        din = ["I2S0_I_SD", "I2S0_I_SD1", "I2S0_I_SD2", "I2S0_I_SD3"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
+    },
+]
+
 [device.ledc]
 version = 2
 channel_count = 8
