@@ -506,7 +506,6 @@ impl Context {
 
 #[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::gpio::Output;
     #[allow(unused_imports)]
     use hil_test::{assert, assert_eq};
 
@@ -1236,14 +1235,14 @@ mod tests {
 
     // Regression test for esp-rs/esp-hal#4697
     //
-    // This test is timing dependent and tests ESP32-specific behavior
+    // This tests ESP32-specific (mis-)behavior
     #[cfg(esp32)]
     #[test]
     async fn rmt_check_regession_4697(mut ctx: Context) {
         let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
 
         let (rx, tx) = (ctx.pin, ctx.pin2);
-        let mut tx = Output::new(tx, Level::Low, Default::default());
+        // let mut tx = Output::new(tx, Level::Low, Default::default());
 
         let mut rx_channel = rx_channel_creator!(rmt)
             .configure_rx(
@@ -1254,9 +1253,21 @@ mod tests {
             .unwrap()
             .with_pin(rx);
 
-        // This suspiciously looking code is to drive the hardware into the state that caused the
-        // originally failed assertion. We want the async part to go into the first receive
-        // phase - then the second future will start "spamming" RMT with pulses.
+        let mut spi = esp_hal::spi::master::Spi::new(
+            unsafe { esp_hal::peripherals::SPI2::steal() },
+            Default::default(),
+        )
+        .unwrap()
+        .with_sck(tx)
+        .into_async();
+
+        let mut buf = [0u8; 1000];
+
+        // This code is to drive the hardware into the state that caused the
+        // originally failed assertion.
+        //
+        // We are "spamming" RMT with pulses by feeding it the SPI SCK.
+        //
         // While not really explainable from any documentation, this turned out to drive the
         // hardware into an unexpected state.
         //
@@ -1271,9 +1282,7 @@ mod tests {
                 }
             },
             async {
-                for _ in 0..1000 {
-                    tx.toggle();
-                }
+                spi.transfer_in_place_async(&mut buf).await.unwrap();
             },
         )
         .await;
