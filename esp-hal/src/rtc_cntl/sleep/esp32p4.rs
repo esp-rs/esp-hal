@@ -4,21 +4,22 @@
 //! driver and adapted to the P4 PMU (DCDC, no wireless modem, no regdma
 //! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references.
 
-use core::ops::Not;
+use core::{
+    ops::Not,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{
     clock::RtcClock,
+    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU, USB_DEVICE},
+    private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
+        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::WakeTriggers,
     },
     soc::clocks::{self, ClockTree, CpuRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
 };
-
-unsafe fn pmu<'a>() -> &'a esp32p4::pmu::RegisterBlock {
-    unsafe { &*esp32p4::PMU::ptr() }
-}
 
 // ----------------------------------------------------------------------------
 // USB-Serial-JTAG pad handling across light sleep.
@@ -32,14 +33,12 @@ unsafe fn pmu<'a>() -> &'a esp32p4::pmu::RegisterBlock {
 // support keeping USJ alive across light sleep, so this is unconditional.
 // ----------------------------------------------------------------------------
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
 static USJ_CLOCK_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 static USJ_PAD_WAS_ENABLED: AtomicBool = AtomicBool::new(false);
 
 fn usj_module_is_enabled() -> bool {
-    let clkrst = crate::peripherals::HP_SYS_CLKRST::regs();
-    let aon = crate::peripherals::LP_AON_CLKRST::regs();
+    let clkrst = HP_SYS_CLKRST::regs();
+    let aon = LP_AON_CLKRST::regs();
     clkrst
         .soc_clk_ctrl2()
         .read()
@@ -53,17 +52,17 @@ fn usj_module_is_enabled() -> bool {
 }
 
 fn usj_enable_bus_clock(enable: bool) {
-    crate::peripherals::HP_SYS_CLKRST::regs()
+    HP_SYS_CLKRST::regs()
         .soc_clk_ctrl2()
         .modify(|_, w| w.usb_device_apb_clk_en().bit(enable));
     // PHY 48 MHz clock for USB FSLS PHY 0.
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_usb_clkrst_ctrl0()
         .modify(|_, w| w.lp_aonclkrst_usb_device_48m_clk_en().bit(enable));
 }
 
 fn usj_reset_register() {
-    let aon = crate::peripherals::LP_AON_CLKRST::regs();
+    let aon = LP_AON_CLKRST::regs();
     aon.lp_aonclkrst_hp_usb_clkrst_ctrl1()
         .modify(|_, w| w.lp_aonclkrst_rst_en_usb_device().set_bit());
     aon.lp_aonclkrst_hp_usb_clkrst_ctrl1()
@@ -71,13 +70,13 @@ fn usj_reset_register() {
 }
 
 fn usj_set_pad_enable(enable: bool) {
-    crate::peripherals::USB_DEVICE::regs()
+    USB_DEVICE::regs()
         .conf0()
         .modify(|_, w| w.usb_pad_enable().bit(enable));
 }
 
 fn usj_pad_is_enabled() -> bool {
-    crate::peripherals::USB_DEVICE::regs()
+    USB_DEVICE::regs()
         .conf0()
         .read()
         .usb_pad_enable()
@@ -239,7 +238,7 @@ fn install_mspi_workaround_stub() {
 /// `lp_clkrst_ll_boot_from_lp_ram`: `hpcore0_stat_vector_sel = !boot_from_lp_ram`
 /// (0 -> boot from LP SPM RAM 0x50108000, 1 -> boot from HP ROM 0x4FC00000).
 fn set_boot_from_lp_ram(boot_from_lp_ram: bool) {
-    crate::peripherals::LP_AON_CLKRST::regs()
+    LP_AON_CLKRST::regs()
         .lp_aonclkrst_hpcpu_reset_ctrl0()
         .modify(|_, w| {
             w.lp_aonclkrst_hpcore0_stat_vector_sel()
@@ -267,15 +266,16 @@ fn pmu_sleep_dcdc_to_ldo_handover() {
     const LDO_TAKEOVER_DBIAS: u8 = 30;
     const LDO_TAKEOVER_DCM_VSET: u8 = 24;
 
-    let pmu = unsafe { pmu() };
-
     // pmu_sleep_increase_ldo_volt(): raise the HP LDO and pre-lower the DCDC
     // voltage so the LDO can take over without overshoot.
-    pmu.hp_active_hp_regulator0()
+    PMU::regs()
+        .hp_active_hp_regulator0()
         .modify(|_, w| unsafe { w.hp_active_hp_regulator_dbias().bits(LDO_TAKEOVER_DBIAS) });
-    pmu.hp_active_hp_regulator0()
+    PMU::regs()
+        .hp_active_hp_regulator0()
         .modify(|_, w| w.hp_active_hp_regulator_xpd().set_bit());
-    pmu.hp_active_bias()
+    PMU::regs()
+        .hp_active_bias()
         .modify(|_, w| unsafe { w.hp_active_dcm_vset().bits(LDO_TAKEOVER_DCM_VSET) });
 
     crate::rom::ets_delay_us(LDO_TAKEOVER_PREPARATION_TIME_US);
@@ -283,11 +283,12 @@ fn pmu_sleep_dcdc_to_ldo_handover() {
     // pmu_sleep_shutdown_dcdc(): request the DCDC off (done_force latches it off,
     // the dcdc_switch stays on and is disabled by the PMU when sleep is entered)
     // and drop the HP LDO back to the active default voltage.
-    pmu.dcm_ctrl().modify(|_, w| {
+    PMU::regs().dcm_ctrl().modify(|_, w| {
         w.dcdc_off_req().set_bit();
         w.dcdc_done_force().set_bit()
     });
-    pmu.hp_active_hp_regulator0()
+    PMU::regs()
+        .hp_active_hp_regulator0()
         .modify(|_, w| unsafe { w.hp_active_hp_regulator_dbias().bits(HP_CALI_ACTIVE_DBIAS) });
 }
 
@@ -376,58 +377,57 @@ impl AnalogSleepConfig {
 
     fn apply(&self, dslp: bool) {
         // pmu_sleep_analog_init
-        unsafe {
-            // HP_ACTIVE dcm_mode (deep sleep forces 0, otherwise 1).
-            pmu()
-                .hp_active_bias()
-                .modify(|_, w| w.hp_active_dcm_mode().bits(if dslp { 0 } else { 1 }));
 
-            pmu().hp_sleep_bias().modify(|_, w| {
-                w.hp_sleep_dcm_mode().bits(self.hp_sys.bias.dcm_mode());
-                w.hp_sleep_dcm_vset().bits(self.hp_sys.bias.dcm_vset());
-                w.hp_sleep_dbg_atten().bits(self.hp_sys.bias.dbg_atten());
-                w.hp_sleep_pd_cur().bit(self.hp_sys.bias.pd_cur());
-                w.sleep().bit(self.hp_sys.bias.bias_sleep())
-            });
-            pmu().hp_sleep_hp_regulator0().modify(|_, w| {
-                w.hp_sleep_hp_regulator_slp_mem_xpd()
-                    .bit(self.hp_sys.regulator0.slp_mem_xpd());
-                w.hp_sleep_hp_regulator_slp_logic_xpd()
-                    .bit(self.hp_sys.regulator0.slp_logic_xpd());
-                w.hp_sleep_hp_regulator_xpd()
-                    .bit(self.hp_sys.regulator0.xpd());
-                w.hp_sleep_hp_regulator_slp_logic_dbias()
-                    .bits(self.hp_sys.regulator0.slp_logic_dbias());
-                w.hp_sleep_hp_regulator_dbias()
-                    .bits(self.hp_sys.regulator0.dbias())
-            });
-            pmu().hp_sleep_hp_regulator1().modify(|_, w| {
-                w.hp_sleep_hp_regulator_drv_b()
-                    .bits(self.hp_sys.regulator1.drv_b())
-            });
+        // HP_ACTIVE dcm_mode (deep sleep forces 0, otherwise 1).
+        PMU::regs()
+            .hp_active_bias()
+            .modify(|_, w| unsafe { w.hp_active_dcm_mode().bits(if dslp { 0 } else { 1 }) });
 
-            // LP_SLEEP
-            pmu().lp_sleep_bias().modify(|_, w| {
-                w.lp_sleep_dbg_atten()
-                    .bits(self.lp_sys_sleep.bias.dbg_atten());
-                w.lp_sleep_pd_cur().bit(self.lp_sys_sleep.bias.pd_cur());
-                w.sleep().bit(self.lp_sys_sleep.bias.bias_sleep())
-            });
-            pmu().lp_sleep_lp_regulator0().modify(|_, w| {
-                w.lp_sleep_lp_regulator_slp_xpd()
-                    .bit(self.lp_sys_sleep.regulator0.slp_xpd());
-                w.lp_sleep_lp_regulator_xpd()
-                    .bit(self.lp_sys_sleep.regulator0.xpd());
-                w.lp_sleep_lp_regulator_slp_dbias()
-                    .bits(self.lp_sys_sleep.regulator0.slp_dbias());
-                w.lp_sleep_lp_regulator_dbias()
-                    .bits(self.lp_sys_sleep.regulator0.dbias())
-            });
-            pmu().lp_sleep_lp_regulator1().modify(|_, w| {
-                w.lp_sleep_lp_regulator_drv_b()
-                    .bits(self.lp_sys_sleep.regulator1.drv_b())
-            });
-        }
+        PMU::regs().hp_sleep_bias().modify(|_, w| unsafe {
+            w.hp_sleep_dcm_mode().bits(self.hp_sys.bias.dcm_mode());
+            w.hp_sleep_dcm_vset().bits(self.hp_sys.bias.dcm_vset());
+            w.hp_sleep_dbg_atten().bits(self.hp_sys.bias.dbg_atten());
+            w.hp_sleep_pd_cur().bit(self.hp_sys.bias.pd_cur());
+            w.sleep().bit(self.hp_sys.bias.bias_sleep())
+        });
+        PMU::regs().hp_sleep_hp_regulator0().modify(|_, w| unsafe {
+            w.hp_sleep_hp_regulator_slp_mem_xpd()
+                .bit(self.hp_sys.regulator0.slp_mem_xpd());
+            w.hp_sleep_hp_regulator_slp_logic_xpd()
+                .bit(self.hp_sys.regulator0.slp_logic_xpd());
+            w.hp_sleep_hp_regulator_xpd()
+                .bit(self.hp_sys.regulator0.xpd());
+            w.hp_sleep_hp_regulator_slp_logic_dbias()
+                .bits(self.hp_sys.regulator0.slp_logic_dbias());
+            w.hp_sleep_hp_regulator_dbias()
+                .bits(self.hp_sys.regulator0.dbias())
+        });
+        PMU::regs().hp_sleep_hp_regulator1().modify(|_, w| unsafe {
+            w.hp_sleep_hp_regulator_drv_b()
+                .bits(self.hp_sys.regulator1.drv_b())
+        });
+
+        // LP_SLEEP
+        PMU::regs().lp_sleep_bias().modify(|_, w| unsafe {
+            w.lp_sleep_dbg_atten()
+                .bits(self.lp_sys_sleep.bias.dbg_atten());
+            w.lp_sleep_pd_cur().bit(self.lp_sys_sleep.bias.pd_cur());
+            w.sleep().bit(self.lp_sys_sleep.bias.bias_sleep())
+        });
+        PMU::regs().lp_sleep_lp_regulator0().modify(|_, w| unsafe {
+            w.lp_sleep_lp_regulator_slp_xpd()
+                .bit(self.lp_sys_sleep.regulator0.slp_xpd());
+            w.lp_sleep_lp_regulator_xpd()
+                .bit(self.lp_sys_sleep.regulator0.xpd());
+            w.lp_sleep_lp_regulator_slp_dbias()
+                .bits(self.lp_sys_sleep.regulator0.slp_dbias());
+            w.lp_sleep_lp_regulator_dbias()
+                .bits(self.lp_sys_sleep.regulator0.dbias())
+        });
+        PMU::regs().lp_sleep_lp_regulator1().modify(|_, w| unsafe {
+            w.lp_sleep_lp_regulator_drv_b()
+                .bits(self.lp_sys_sleep.regulator1.drv_b())
+        });
     }
 }
 
@@ -456,15 +456,14 @@ impl DigitalSleepConfig {
 
     fn apply(&self) {
         // pmu_sleep_digital_init
-        unsafe {
-            pmu().hp_sleep_hp_sys_cntl().modify(|_, w| {
-                w.hp_sleep_dig_pad_slp_sel()
-                    .bit(self.syscntl.dig_pad_slp_sel());
-                w.hp_sleep_lp_pad_hold_all()
-                    .bit(self.syscntl.lp_pad_hold_all());
-                w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt())
-            });
-        }
+
+        PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+            w.hp_sleep_dig_pad_slp_sel()
+                .bit(self.syscntl.dig_pad_slp_sel());
+            w.hp_sleep_lp_pad_hold_all()
+                .bit(self.syscntl.lp_pad_hold_all());
+            w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt())
+        });
     }
 }
 
@@ -538,37 +537,36 @@ impl PowerSleepConfig {
 
     fn apply(&self) {
         // pmu_sleep_power_init
-        unsafe {
-            // HP_SLEEP
-            pmu()
-                .hp_sleep_dig_power()
-                .modify(|_, w| w.bits(self.hp_sys.dig_power.0));
-            pmu()
-                .hp_sleep_hp_ck_power()
-                .modify(|_, w| w.bits(self.hp_sys.clk.0));
-            pmu()
-                .hp_sleep_xtal()
-                .modify(|_, w| w.hp_sleep_xpd_xtal().bit(self.hp_sys.xtal.xpd_xtal()));
 
-            // LP_ACTIVE (hp_sleep_lp_*)
-            pmu()
-                .hp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(self.lp_sys_active.dig_power.0));
-            pmu()
-                .hp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(self.lp_sys_active.clk_power.0));
+        // HP_SLEEP
+        PMU::regs()
+            .hp_sleep_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.hp_sys.dig_power.0) });
+        PMU::regs()
+            .hp_sleep_hp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.hp_sys.clk.0) });
+        PMU::regs()
+            .hp_sleep_xtal()
+            .modify(|_, w| w.hp_sleep_xpd_xtal().bit(self.hp_sys.xtal.xpd_xtal()));
 
-            // LP_SLEEP
-            pmu()
-                .lp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(self.lp_sys_sleep.dig_power.0));
-            pmu()
-                .lp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(self.lp_sys_sleep.clk_power.0));
-            pmu()
-                .lp_sleep_xtal()
-                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(self.lp_sys_sleep.xtal.xpd_xtal()));
-        }
+        // LP_ACTIVE (hp_sleep_lp_*)
+        PMU::regs()
+            .hp_sleep_lp_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_active.dig_power.0) });
+        PMU::regs()
+            .hp_sleep_lp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_active.clk_power.0) });
+
+        // LP_SLEEP
+        PMU::regs()
+            .lp_sleep_lp_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_sleep.dig_power.0) });
+        PMU::regs()
+            .lp_sleep_lp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_sleep.clk_power.0) });
+        PMU::regs()
+            .lp_sleep_xtal()
+            .modify(|_, w| w.lp_sleep_xpd_xtal().bit(self.lp_sys_sleep.xtal.xpd_xtal()));
     }
 }
 
@@ -608,45 +606,41 @@ pub struct ParamSleepConfig {
 impl ParamSleepConfig {
     fn apply(&self) {
         // pmu_sleep_param_init
-        unsafe {
-            pmu().slp_wakeup_cntl3().modify(|_, w| {
-                w.hp_min_slp_val()
-                    .bits(self.hp_sys.min_slp_slow_clk_cycle)
-                    .lp_min_slp_val()
-                    .bits(self.lp_sys.min_slp_slow_clk_cycle)
-            });
+        PMU::regs().slp_wakeup_cntl3().modify(|_, w| unsafe {
+            w.hp_min_slp_val().bits(self.hp_sys.min_slp_slow_clk_cycle);
+            w.lp_min_slp_val().bits(self.lp_sys.min_slp_slow_clk_cycle)
+        });
 
-            pmu().slp_wakeup_cntl7().modify(|_, w| {
-                w.ana_wait_target()
-                    .bits(self.hp_sys.analog_wait_target_cycle)
-            });
+        PMU::regs().slp_wakeup_cntl7().modify(|_, w| unsafe {
+            w.ana_wait_target()
+                .bits(self.hp_sys.analog_wait_target_cycle)
+        });
 
-            pmu().power_wait_timer0().modify(|_, w| {
-                w.dg_hp_wait_timer()
-                    .bits(self.hp_sys.digital_power_supply_wait_cycle)
-                    .dg_hp_powerup_timer()
-                    .bits(self.hp_sys.digital_power_up_wait_cycle)
-            });
+        PMU::regs().power_wait_timer0().modify(|_, w| unsafe {
+            w.dg_hp_wait_timer()
+                .bits(self.hp_sys.digital_power_supply_wait_cycle);
+            w.dg_hp_powerup_timer()
+                .bits(self.hp_sys.digital_power_up_wait_cycle)
+        });
 
-            pmu().power_wait_timer1().modify(|_, w| {
-                w.dg_lp_wait_timer()
-                    .bits(self.lp_sys.digital_power_supply_wait_cycle)
-                    .dg_lp_powerup_timer()
-                    .bits(self.lp_sys.digital_power_up_wait_cycle)
-            });
+        PMU::regs().power_wait_timer1().modify(|_, w| unsafe {
+            w.dg_lp_wait_timer()
+                .bits(self.lp_sys.digital_power_supply_wait_cycle);
+            w.dg_lp_powerup_timer()
+                .bits(self.lp_sys.digital_power_up_wait_cycle)
+        });
 
-            pmu().slp_wakeup_cntl5().modify(|_, w| {
-                w.lp_ana_wait_target()
-                    .bits(self.lp_sys.analog_wait_target_cycle)
-            });
+        PMU::regs().slp_wakeup_cntl5().modify(|_, w| unsafe {
+            w.lp_ana_wait_target()
+                .bits(self.lp_sys.analog_wait_target_cycle)
+        });
 
-            pmu().power_ck_wait_cntl().modify(|_, w| {
-                w.pmu_wait_xtl_stable()
-                    .bits(self.hp_lp.xtal_stable_wait_cycle)
-                    .pmu_wait_pll_stable()
-                    .bits(self.hp_sys.pll_stable_wait_cycle)
-            });
-        }
+        PMU::regs().power_ck_wait_cntl().modify(|_, w| unsafe {
+            w.pmu_wait_xtl_stable()
+                .bits(self.hp_lp.xtal_stable_wait_cycle);
+            w.pmu_wait_pll_stable()
+                .bits(self.hp_sys.pll_stable_wait_cycle)
+        });
     }
 
     fn defaults(config: SleepTimeConfig, pd_flags: PowerDownFlags, pd_xtal: bool) -> Self {
@@ -990,10 +984,19 @@ impl RtcSleepConfig {
         };
 
         // Switch the CPU root clock to XTAL for the duration of sleep.
-        let cpu_freq_config = ClockTree::with(|clocks| {
-            let cpu_freq_config = SavedClockConfig::save(clocks);
+        let _restore_clock_config = ClockTree::with(|clocks| {
+            let old_cpu_root_clk = clocks.cpu_root_clk();
+
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
-            cpu_freq_config
+
+            // Restore the old clock settings when we return
+            DropGuard::new((), move |_| {
+                ClockTree::with(|clocks| {
+                    if let Some(old) = old_cpu_root_clk {
+                        clocks::configure_cpu_root_clk(clocks, old);
+                    }
+                });
+            })
         });
 
         let power = PowerSleepConfig::defaults(self.pd_flags);
@@ -1034,68 +1037,73 @@ impl RtcSleepConfig {
         }
 
         // like esp-idf pmu_sleep_start()
-        unsafe {
-            // lp_aon_hal_inform_wakeup_type: on P4 RTC_SLEEP_MODE_REG is
-            // LP_SYSTEM_REG_LP_STORE8 (bit0 = run deep-sleep wake stub). The ROM
-            // reads this on wake to pick the deep vs light wake path.
-            crate::peripherals::LP_AON::regs()
-                .lp_store8()
-                .modify(|r, w| w.bits(r.bits() & !0x01 | self.deep as u32));
 
-            pmu().slp_wakeup_cntl2().write(|w| w.bits(wakeup_mask));
+        // lp_aon_hal_inform_wakeup_type: on P4 RTC_SLEEP_MODE_REG is
+        // LP_SYSTEM_REG_LP_STORE8 (bit0 = run deep-sleep wake stub). The ROM
+        // reads this on wake to pick the deep vs light wake path.
+        crate::peripherals::LP_AON::regs()
+            .lp_store8()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
-            pmu().slp_wakeup_cntl1().modify(|_, w| {
-                w.slp_reject_en().bit(true);
-                w.sleep_reject_ena().bits(reject_mask)
-            });
+        PMU::regs()
+            .slp_wakeup_cntl2()
+            .write(|w| unsafe { w.bits(wakeup_mask) });
 
-            pmu()
-                .slp_wakeup_cntl4()
-                .write(|w| w.slp_reject_cause_clr().bit(true));
+        PMU::regs().slp_wakeup_cntl1().modify(|_, w| unsafe {
+            w.slp_reject_en().bit(true);
+            w.sleep_reject_ena().bits(reject_mask)
+        });
 
-            pmu().int_clr().write(|w| {
-                w.sw().clear_bit_by_one();
-                w.soc_sleep_reject().clear_bit_by_one();
-                w.soc_wakeup().clear_bit_by_one()
-            });
+        PMU::regs()
+            .slp_wakeup_cntl4()
+            .write(|w| w.slp_reject_cause_clr().bit(true));
 
-            // ESP32-P4 deep-sleep DCDC -> LDO supply handover. The HP digital rail
-            // is normally fed by the on-chip DCDC; if it is left running while the
-            // PMU powers down the DCDC switch on deep-sleep entry, the rail glitches
-            // when the LDO takes over on wake-up and the chip fails to reboot (it
-            // looks like it "never wakes"). esp-idf raises the HP LDO so it can take
-            // over, waits for it to settle, then disables the DCDC before entering
-            // deep sleep (pmu_sleep_increase_ldo_volt + pmu_sleep_shutdown_dcdc).
-            // C-series parts have no DCDC and skip this.
-            if self.deep {
-                pmu_sleep_dcdc_to_ldo_handover();
-            }
+        PMU::regs().int_clr().write(|w| {
+            w.sw().clear_bit_by_one();
+            w.soc_sleep_reject().clear_bit_by_one();
+            w.soc_wakeup().clear_bit_by_one()
+        });
 
-            // Light sleep keeps the HP domain (and thus the USJ PHY) powered, so
-            // de-enumerate USB-Serial-JTAG cleanly before sleeping and restore it
-            // in `finish_sleep`. Deep sleep powers the PHY off on its own.
-            if !self.deep {
-                usj_pad_backup_and_disable();
-            }
+        // ESP32-P4 deep-sleep DCDC -> LDO supply handover. The HP digital rail
+        // is normally fed by the on-chip DCDC; if it is left running while the
+        // PMU powers down the DCDC switch on deep-sleep entry, the rail glitches
+        // when the LDO takes over on wake-up and the chip fails to reboot (it
+        // looks like it "never wakes"). esp-idf raises the HP LDO so it can take
+        // over, waits for it to settle, then disables the DCDC before entering
+        // deep sleep (pmu_sleep_increase_ldo_volt + pmu_sleep_shutdown_dcdc).
+        // C-series parts have no DCDC and skip this.
+        if self.deep {
+            pmu_sleep_dcdc_to_ldo_handover();
+        }
 
-            // The PMU FSM switches the pads to their sleep setting and holds IOs
-            // at the same stage; trigger the pad sleep selection first so the IOs
-            // do not get held in an indeterminate state.
-            pmu()
-                .imm_pad_hold_all()
-                .write(|w| w.tie_high_pad_slp_sel().set_bit());
+        // Light sleep keeps the HP domain (and thus the USJ PHY) powered, so
+        // de-enumerate USB-Serial-JTAG cleanly before sleeping and restore it
+        // in `finish_sleep`. Deep sleep powers the PHY off on its own.
+        if !self.deep {
+            usj_pad_backup_and_disable();
+        }
 
-            // FIXME HERE
+        // The PMU FSM switches the pads to their sleep setting and holds IOs
+        // at the same stage; trigger the pad sleep selection first so the IOs
+        // do not get held in an indeterminate state.
 
-            // Start entry into sleep mode.
-            pmu().slp_wakeup_cntl0().write(|w| w.sleep_req().bit(true));
+        PMU::regs()
+            .imm_pad_hold_all()
+            .write(|w| w.tie_high_pad_slp_sel().set_bit());
 
-            // In deep sleep we never get here.
-            loop {
-                let int_raw = pmu().int_raw().read();
-                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                    break;
-                }
+        // FIXME HERE
+
+        // Start entry into sleep mode.
+
+        PMU::regs()
+            .slp_wakeup_cntl0()
+            .write(|w| w.sleep_req().bit(true));
+
+        // In deep sleep we never get here.
+        loop {
+            let int_raw = PMU::regs().int_raw().read();
+            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
+                break;
             }
         }
 
@@ -1105,10 +1113,6 @@ impl RtcSleepConfig {
         if mspi_workaround {
             set_boot_from_lp_ram(false);
         }
-
-        ClockTree::with(|clocks| {
-            cpu_freq_config.restore(clocks);
-        });
     }
 
     /// Cleans up after sleep.
@@ -1116,11 +1120,10 @@ impl RtcSleepConfig {
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish(): switch the pad configuration back from
         // the sleep state to the active state. In deep sleep we never get here.
-        unsafe {
-            pmu()
-                .imm_pad_hold_all()
-                .write(|w| w.tie_low_pad_slp_sel().set_bit());
-        }
+
+        PMU::regs()
+            .imm_pad_hold_all()
+            .write(|w| w.tie_low_pad_slp_sel().set_bit());
 
         // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
         // sleep we never reach here).

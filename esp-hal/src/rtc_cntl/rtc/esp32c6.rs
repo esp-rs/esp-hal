@@ -1,11 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
+    clock::ClockConfig,
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    soc::{
-        clocks::{ClockTree, SocRootClkConfig},
-        regi2c,
-    },
+    soc::{clocks::LpSlowClkConfig, regi2c},
 };
 
 fn pmu_power_domain_force_default() {
@@ -99,36 +97,6 @@ fn modem_clock_domain_power_state_icg_map_init() {
         });
 }
 
-enum RtcSlowClockSource {
-    /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
-    RcSlow  = 0,
-
-    /// Select XTAL32K_CLK as RTC_SLOW_CLK source
-    XTAL32K = 1,
-
-    /// Select RC32K_CLK as RTC_SLOW_CLK source
-    RC32K   = 2,
-
-    /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
-    OscSlow = 3,
-
-    /// Invalid RTC_SLOW_CLK source
-    Invalid,
-}
-
-impl RtcSlowClockSource {
-    fn current() -> Self {
-        // clk_ll_rtc_slow_get_src()
-        match LP_CLKRST::regs().lp_clk_conf().read().slow_clk_sel().bits() {
-            0 => Self::RcSlow,
-            1 => Self::XTAL32K,
-            2 => Self::RC32K,
-            3 => Self::OscSlow,
-            _ => Self::Invalid,
-        }
-    }
-}
-
 #[allow(unused)]
 enum ModemClockLpclkSource {
     RcSlow = 0,
@@ -139,14 +107,12 @@ enum ModemClockLpclkSource {
     EXT32K,
 }
 
-impl From<RtcSlowClockSource> for ModemClockLpclkSource {
-    fn from(src: RtcSlowClockSource) -> Self {
+impl From<LpSlowClkConfig> for ModemClockLpclkSource {
+    fn from(src: LpSlowClkConfig) -> Self {
         match src {
-            RtcSlowClockSource::RcSlow => Self::RcSlow,
-            RtcSlowClockSource::XTAL32K => Self::XTAL32K,
-            RtcSlowClockSource::RC32K => Self::RC32K,
-            RtcSlowClockSource::OscSlow => Self::EXT32K,
-            _ => Self::RcSlow,
+            LpSlowClkConfig::RcSlow => Self::RcSlow,
+            LpSlowClkConfig::Xtal32k => Self::XTAL32K,
+            LpSlowClkConfig::OscSlow => Self::EXT32K,
         }
     }
 }
@@ -1010,11 +976,12 @@ impl LpSystemInit {
     }
 }
 
-pub(crate) fn init() {
+pub(crate) fn init(config: &ClockConfig) {
     // pmu_init()
-    PMU::regs()
-        .rf_pwc()
-        .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
+    PMU::regs().rf_pwc().modify(|_, w| {
+        w.perif_i2c_rstb().set_bit();
+        w.xpd_perif_i2c().set_bit()
+    });
 
     regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
     regi2c::I2C_DIG_REG_ENIF_DIG_DREG.write_field(1);
@@ -1036,10 +1003,9 @@ pub(crate) fn init() {
     //  oscillator (40 MHz) to provide the clock during the sleep process in some
     //  scenarios), the module needs to switch to the required clock source by
     //  itself.
-    // TODO - WIFI-5233
-    let modem_lpclk_src = ModemClockLpclkSource::from(RtcSlowClockSource::current());
+    let lpclk_src = config.lp_slow_clk.unwrap_or(LpSlowClkConfig::RcSlow);
 
-    modem_clock_select_lp_clock_source_wifi(modem_lpclk_src, 0);
+    modem_clock_select_lp_clock_source_wifi(ModemClockLpclkSource::from(lpclk_src), 0);
     modem_clk_domain_active_state_icg_map_preinit();
 }
 
@@ -1056,10 +1022,8 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
             .clk_conf_power_st()
             .modify(|_, w| w.clk_modem_apb_st_map().bits(1 << ICG_MODEM_CODE_ACTIVE));
         MODEM_LPCON::regs().clk_conf_power_st().modify(|_, w| {
-            w.clk_i2c_mst_st_map()
-                .bits(1 << ICG_MODEM_CODE_ACTIVE)
-                .clk_lp_apb_st_map()
-                .bits(1 << ICG_MODEM_CODE_ACTIVE)
+            w.clk_i2c_mst_st_map().bits(1 << ICG_MODEM_CODE_ACTIVE);
+            w.clk_lp_apb_st_map().bits(1 << ICG_MODEM_CODE_ACTIVE)
         });
 
         // Software trigger force update modem ICG code and ICG switch
@@ -1150,25 +1114,4 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
     Cpu0JtagCpu   = 0x18,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SavedClockConfig {
-    /// The clock from which CPU clock is derived
-    old_soc_root_clk: Option<SocRootClkConfig>,
-}
-
-impl SavedClockConfig {
-    pub(crate) fn save(clocks: &ClockTree) -> Self {
-        let old_soc_root_clk = clocks.soc_root_clk();
-
-        SavedClockConfig { old_soc_root_clk }
-    }
-
-    // rtc_clk_cpu_freq_set_config
-    pub(crate) fn restore(self, clocks: &mut ClockTree) {
-        if let Some(old_soc_root_clk) = self.old_soc_root_clk {
-            crate::soc::clocks::configure_soc_root_clk(clocks, old_soc_root_clk);
-        }
-    }
 }
