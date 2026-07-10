@@ -461,6 +461,7 @@ cfg_select! {
 struct Context {
     rmt: RMT<'static>,
     pin: AnyPin<'static>,
+    pin2: AnyPin<'static>,
 }
 
 impl Context {
@@ -505,6 +506,7 @@ impl Context {
 
 #[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
+    use esp_hal::gpio::Output;
     #[allow(unused_imports)]
     use hil_test::{assert, assert_eq};
 
@@ -523,11 +525,13 @@ mod tests {
 
         esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 
-        let pin = AnyPin::from(hil_test::common_test_pins!(peripherals).1);
+        let pins = hil_test::common_test_pins!(peripherals);
+        let (pin, pin2) = (AnyPin::from(pins.1), AnyPin::from(pins.0));
 
         Context {
             rmt: peripherals.RMT,
             pin,
+            pin2,
         }
     }
 
@@ -1228,5 +1232,39 @@ mod tests {
             start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
+    }
+
+    // This test is timing dependent and tests ESP32-specific behavior
+    #[cfg(esp32)]
+    #[test]
+    async fn rmt_check_regession_4697(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
+
+        let (rx, tx) = (ctx.pin, ctx.pin2);
+        let mut tx = Output::new(tx, Level::Low, Default::default());
+
+        let mut rx_channel = rx_channel_creator!(rmt)
+            .configure_rx(
+                &RxChannelConfig::default()
+                    .with_clk_divider(255)
+                    .with_idle_threshold(10000),
+            )
+            .unwrap()
+            .with_pin(rx);
+
+        embassy_futures::join::join(
+            async {
+                let mut data = [PulseCode::default(); 10];
+                for _ in 0..3 {
+                    assert!(rx_channel.receive(&mut data).await.is_err());
+                }
+            },
+            async {
+                for _ in 0..1000 {
+                    tx.toggle();
+                }
+            },
+        )
+        .await;
     }
 }
