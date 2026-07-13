@@ -620,20 +620,26 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
             // advances the index in isr_handle_rx_done via next_rx_buffer().
             receive_done(state);
 
+            // Deliver the frame to the upper layer immediately, for all frames. It is
+            // already copied into the rx queue by receive_done() above, so there is no
+            // buffer-reuse hazard. Delivery was previously deferred for ACK-required
+            // frames until AckTxDone fired (isr_handle_ack_tx_done), but AckTxDone is not
+            // observed to fire on ESP32-H2, so those frames — e.g. a unicast MLE Parent
+            // Response — were copied but never delivered and the radio stayed in TxAck.
+            // The hardware still transmits the auto-ACK independently of this notification.
+            super::rx_available();
+
             if will_auto_send_ack(frm) {
-                // auto tx ack for frame version 0b00 and 0b01
-                // Frame data already copied above. Defer rx_available()
-                // notification until ACK completes (isr_handle_ack_tx_done).
+                // Frame version 0b00/0b01: the hardware sends an immediate ACK
+                // autonomously. Park in TxAck until AckTxDone re-arms RX.
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
                 // Enhanced ACK for frame version 0b10 - TODO: full enh-ack support
-                // Frame data already copied above.
                 state.state = Ieee802154State::TxEnhAck;
                 *needs_next_op = false;
             } else {
-                // No ACK needed, notify immediately (data already copied above)
-                super::rx_available();
+                // No ACK needed
                 *needs_next_op = true;
             }
         });
@@ -642,9 +648,9 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
 
 /// Handle ACK TX done in ISR - matches C driver's isr_handle_ack_tx_done
 fn isr_handle_ack_tx_done(needs_next_op: &mut bool) {
-    // Frame was already copied to queue in isr_handle_rx_done (we must copy
-    // immediately because we only have one RX buffer). Now notify upper layer.
-    super::rx_available();
+    // The frame was already delivered to the upper layer in isr_handle_rx_done — delivery
+    // is no longer deferred to here (see the comment there). Re-notifying would signal the
+    // same already-queued frame a second time. Just advance to the next radio operation.
     *needs_next_op = true;
 }
 

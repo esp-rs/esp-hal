@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - IEEE 802.15.4: unmask all RX-abort events while receiving, so the receiver re-arms after an aborted reception instead of going dead until the next transmit. On ESP32-H2 this was the difference between `RxDone` almost never firing and firing steadily.
 - IEEE 802.15.4: `ensure_receive_enabled()` no longer re-issues `RxStart` on every receive poll, which was aborting frames that were mid-reception (endless `RxSfdDone`/`SfdTimeout` with no `RxDone` on ESP32-H2).
+- IEEE 802.15.4: deliver received frames to the upper layer on `RxDone` for all frames, instead of deferring ACK-required frames to `AckTxDone`. On ESP32-H2 `AckTxDone` does not fire, so ACK-required frames (e.g. a unicast MLE Parent Response) were received but never delivered.
 
 
 ### Removed
