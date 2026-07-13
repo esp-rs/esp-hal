@@ -280,6 +280,15 @@ fn enable_rx() {
     set_next_rx_buffer();
     ieee802154_set_txrx_pti(Ieee802154TxRxScene::Rx);
 
+    // Unmask all RX-abort events while receiving. At init only
+    // TxAckTimeout|TxAckCoexBreak are enabled, so an RX error while waiting for or
+    // receiving a frame (SfdTimeout/CrcError/InvalidLen/FilterFail/NoRss) aborts without
+    // raising the MAC interrupt: the ISR never runs and RX is never re-armed, leaving the
+    // receiver dead until the next TX happens to call enable_rx() again. With these
+    // enabled, each abort fires the interrupt and isr_handle_rx_phase_rx_abort re-arms RX
+    // via next_operation(). On ESP32-H2 this is what takes RxDone from ~never to steady.
+    enable_rx_abort_events(RxAbortReason::all());
+
     set_cmd(Command::RxStart);
 
     // ieee802154_state = IEEE802154_STATE_RX;
@@ -484,15 +493,15 @@ fn next_operation() {
     STATE.with(next_operation_inner);
 }
 
-// FIXME: we shouldn't need this - we need to re-align the original driver with our port
 pub(crate) fn ensure_receive_enabled() {
-    // shouldn't be necessary but avoids a problem with rx stopping
-    // unexpectedly when used together with BLE
-    STATE.with(|state| {
-        if state.state == Ieee802154State::Receive {
-            set_cmd(Command::RxStart);
-        }
-    });
+    // Intentionally a no-op. This is polled from `raw_received()`/`received()` on every
+    // receive poll; re-issuing `RxStart` here while a frame is mid-reception (after
+    // RxSfdDone, before RxDone) restarts the receiver and aborts the in-flight frame. On
+    // ESP32-H2 that manifested as continuous RxSfdDone with rx_abort=SfdTimeout and RxDone
+    // that never fired. The receiver is armed by `enable_rx()` and re-armed on abort (the
+    // RX-abort events unmasked there), so no poll-driven restart is needed. The original
+    // hack was a workaround for "rx stops unexpectedly when used with BLE"; if that recurs
+    // under BLE coexistence it should be fixed at the source rather than by this poll.
 }
 
 #[handler(priority = Priority::Priority1)]
