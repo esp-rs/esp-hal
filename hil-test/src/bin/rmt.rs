@@ -1238,11 +1238,10 @@ mod tests {
     // This tests ESP32-specific (mis-)behavior
     #[cfg(esp32)]
     #[test]
-    async fn rmt_check_regession_4697(mut ctx: Context) {
+    async fn rmt_check_regression_4697(mut ctx: Context) {
         let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
 
         let (rx, tx) = (ctx.pin, ctx.pin2);
-        // let mut tx = Output::new(tx, Level::Low, Default::default());
 
         let mut rx_channel = rx_channel_creator!(rmt)
             .configure_rx(
