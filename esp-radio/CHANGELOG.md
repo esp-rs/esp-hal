@@ -15,8 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- IEEE 802.15.4: program the extended-address acceptance filter in on-air octet order, so unicast frames addressed to the node's extended address are accepted. #5314 changed this to little-endian, which byte-reverses the filter relative to the `openthread` `u64::from_be_bytes` convention: only broadcast frames were then received and an OpenThread node could never attach. Reverts #5314.
-
 
 ### Removed
 
