@@ -107,6 +107,16 @@ esp32c6 = [
     "esp-metadata-generated/esp32c6",
     "esp-rtos?/esp32c6",
 ]
+esp32s3 = [
+    "embedded-test/xtensa-semihosting",
+    "esp-hal/esp32s3",
+    "esp-alloc?/esp32s3",
+    "esp-radio?/esp32s3",
+    "esp-storage?/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-metadata-generated/esp32s3",
+    "esp-rtos?/esp32s3",
+]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
