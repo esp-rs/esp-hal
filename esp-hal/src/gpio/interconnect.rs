@@ -101,6 +101,8 @@
     doc = "[`Spi::with_mosi`]: crate::spi::master::Spi::with_mosi"
 )]
 
+use enumset::{EnumSet, EnumSetType};
+
 #[cfg(feature = "unstable")]
 use crate::gpio::{Input, Output};
 use crate::{
@@ -507,13 +509,19 @@ impl Signal<'_> {
     }
 }
 
-bitflags::bitflags! {
-    #[derive(Clone, Copy)]
-    struct InputFlags: u8 {
-        const ForceGpioMatrix = 1 << 0;
-        const Frozen          = 1 << 1;
-        const InvertInput     = 1 << 2;
+fn set_flag<T: EnumSetType>(flags: &mut EnumSet<T>, flag: T, value: bool) {
+    if value {
+        flags.insert(flag);
+    } else {
+        flags.remove(flag);
     }
+}
+
+#[derive(Debug, EnumSetType)]
+enum InputFlags {
+    ForceGpioMatrix,
+    Frozen,
+    InvertInput,
 }
 
 /// An input signal between a peripheral and a GPIO pin.
@@ -527,7 +535,7 @@ bitflags::bitflags! {
 #[instability::unstable]
 pub struct InputSignal<'d> {
     pin: Signal<'d>,
-    flags: InputFlags,
+    flags: EnumSet<InputFlags>,
 }
 
 impl From<Level> for InputSignal<'_> {
@@ -579,7 +587,7 @@ impl<'d> InputSignal<'d> {
     fn new_inner(inner: Signal<'d>) -> Self {
         Self {
             pin: inner,
-            flags: InputFlags::empty(),
+            flags: EnumSet::empty(),
         }
     }
 
@@ -648,14 +656,14 @@ impl<'d> InputSignal<'d> {
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     pub fn with_input_inverter(mut self, invert: bool) -> Self {
-        self.flags.set(InputFlags::InvertInput, invert);
+        set_flag(&mut self.flags, InputFlags::InvertInput, invert);
         self
     }
 
     /// Consumes the signal and returns a new one that forces the GPIO matrix
     /// to be used.
     pub fn with_gpio_matrix_forced(mut self, force: bool) -> Self {
-        self.flags.set(InputFlags::ForceGpioMatrix, force);
+        set_flag(&mut self.flags, InputFlags::ForceGpioMatrix, force);
         self
     }
 
@@ -690,14 +698,12 @@ impl<'d> InputSignal<'d> {
     }
 }
 
-bitflags::bitflags! {
-    #[derive(Clone, Copy)]
-    struct OutputFlags: u8 {
-        const ForceGpioMatrix = 1 << 0;
-        const Frozen          = 1 << 1;
-        const InvertInput     = 1 << 2;
-        const InvertOutput    = 1 << 3;
-    }
+#[derive(Debug, EnumSetType)]
+enum OutputFlags {
+    ForceGpioMatrix,
+    Frozen,
+    InvertInput,
+    InvertOutput,
 }
 
 /// An (input and) output signal between a peripheral and a GPIO pin.
@@ -714,7 +720,7 @@ bitflags::bitflags! {
 #[instability::unstable]
 pub struct OutputSignal<'d> {
     pin: Signal<'d>,
-    flags: OutputFlags,
+    flags: EnumSet<OutputFlags>,
 }
 
 impl Sealed for OutputSignal<'_> {}
@@ -757,7 +763,7 @@ impl<'d> OutputSignal<'d> {
     fn new_inner(inner: Signal<'d>) -> Self {
         Self {
             pin: inner,
-            flags: OutputFlags::empty(),
+            flags: EnumSet::empty(),
         }
     }
 
@@ -820,21 +826,21 @@ impl<'d> OutputSignal<'d> {
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// output signal.
     pub fn with_output_inverter(mut self, invert: bool) -> Self {
-        self.flags.set(OutputFlags::InvertOutput, invert);
+        set_flag(&mut self.flags, OutputFlags::InvertOutput, invert);
         self
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     pub fn with_input_inverter(mut self, invert: bool) -> Self {
-        self.flags.set(OutputFlags::InvertInput, invert);
+        set_flag(&mut self.flags, OutputFlags::InvertInput, invert);
         self
     }
 
     /// Consumes the signal and returns a new one that forces the GPIO matrix
     /// to be used.
     pub fn with_gpio_matrix_forced(mut self, force: bool) -> Self {
-        self.flags.set(OutputFlags::ForceGpioMatrix, force);
+        set_flag(&mut self.flags, OutputFlags::ForceGpioMatrix, force);
         self
     }
 
