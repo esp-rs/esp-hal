@@ -156,7 +156,16 @@ impl<'a> Ieee802154<'a> {
 
         if let Some(ext_addr) = cfg.ext_addr {
             let mut address = [0u8; IEEE802154_FRAME_EXT_ADDR_SIZE];
-            address.copy_from_slice(&ext_addr.to_le_bytes());
+            // The hardware extended-address acceptance filter expects the octets in
+            // on-air order (IEEE 802.15.4 transmits addresses least-significant-octet
+            // first, and the first on-air octet goes in the low byte of `extend_addr0`).
+            // `Config::ext_addr` follows the convention established by the `openthread`
+            // consumer, which builds the `u64` from the on-air octets via
+            // `u64::from_be_bytes` (so the first on-air octet is the `u64`'s MSB).
+            // `to_be_bytes` therefore reproduces on-air order; `to_le_bytes` reversed it,
+            // so the filter never matched a unicast frame addressed to this node and only
+            // broadcast frames (which bypass the ext-address filter) were received.
+            address.copy_from_slice(&ext_addr.to_be_bytes());
 
             set_extended_address(0, address);
         }
