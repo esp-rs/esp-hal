@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- IEEE 802.15.4: generate and transmit an enhanced ACK for 802.15.4-2015 (frame version 0b10) ack-required frames. The hardware does not auto-ACK these; without a software-generated enhanced ACK a Thread 1.3 parent marks the link failed and evicts the child. Requires `Config::enhance_ack_tx`.
+
 
 ### Changed
 

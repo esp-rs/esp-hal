@@ -256,6 +256,17 @@ pub(crate) fn set_tx_addr(addr: *const u8) {
         .modify(|_, w| unsafe { w.txdma_addr().bits(addr as u32) });
 }
 
+/// Notify the hardware that the software-generated enhanced-ACK frame is ready
+/// in the TX DMA buffer, so it can be transmitted in the ACK window.
+///
+/// Mirrors the C driver's `ieee802154_ll_enhack_generate_done_notify()`.
+#[inline(always)]
+pub(crate) fn enhack_generate_done_notify() {
+    IEEE802154::regs()
+        .enhance_ack_cfg()
+        .write(|w| unsafe { w.tx_enh_ack_generate_done_notify().bits(1) });
+}
+
 #[inline(always)]
 pub(crate) fn set_cmd(cmd: Command) {
     IEEE802154::regs()

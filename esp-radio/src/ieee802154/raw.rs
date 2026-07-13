@@ -33,6 +33,11 @@ const ACK_TIMEOUT_US: u32 = 200_000;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
 
+/// Buffer holding the software-generated enhanced-ACK frame. Length-prefixed
+/// like the TX buffer ([0] = PSDU length); the hardware transmits it from the
+/// TX DMA address after `enhack_generate_done_notify()`.
+static mut ENH_ACK_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
+
 struct PendingTx {
     frame: *const u8,
     cca: bool,
@@ -635,7 +640,20 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
-                // Enhanced ACK for frame version 0b10 - TODO: full enh-ack support
+                // Frame version 0b10 (802.15.4-2015): the hardware does NOT auto-ACK
+                // these; software must generate the enhanced ACK and hand it to the MAC.
+                // Thread 1.3 links use version-2 data frames that require an enhanced ACK;
+                // without one the parent marks the link failed, retransmits and evicts the
+                // child, so operational traffic over Thread never completes.
+                //
+                // Build a minimal enhanced ACK (matched by sequence number; no addressing,
+                // no IEs, unsecured), point the TX DMA at it and strobe
+                // enhack_generate_done_notify so the MAC transmits it in the ACK window.
+                // Completion raises AckTxDone (→ re-arm RX), the same path the immediate
+                // ACK above relies on.
+                build_enh_ack(frm);
+                set_tx_addr(core::ptr::addr_of!(ENH_ACK_BUFFER).cast());
+                enhack_generate_done_notify();
                 state.state = Ieee802154State::TxEnhAck;
                 *needs_next_op = false;
             } else {
@@ -823,7 +841,37 @@ fn will_auto_send_ack(frame: &[u8]) -> bool {
 }
 
 fn should_send_enhanced_ack(frame: &[u8]) -> bool {
-    frame_is_ack_required(frame) && frame_get_version(frame) <= FRAME_VERSION_2 && tx_enhance_ack()
+    // Exactly frame version 0b10 (2015): an enhanced ACK is a v2 concept, and we now
+    // actually generate a v2-format ACK frame — a v0/v1 frame must get the immediate ACK
+    // path, not this one. (Was `<= FRAME_VERSION_2`, which also matched v0/v1 when
+    // auto-ack was disabled.)
+    frame_is_ack_required(frame) && frame_get_version(frame) == FRAME_VERSION_2 && tx_enhance_ack()
+}
+
+/// Build a minimal 802.15.4-2015 enhanced ACK into `ENH_ACK_BUFFER`.
+///
+/// `frame` is the length-stripped PSDU of the acknowledged frame: `[0..2]` = FCF,
+/// `[2]` = sequence number. Frame layout written (length-prefixed for the TX DMA):
+///   `[0]` = 5   PSDU length: 2 (FCF) + 1 (seq) + 2 (FCS)
+///   `[1]` = 0x02, `[2]` = 0x20   FCF = 0x2002: frame type = Acknowledgement (0b010),
+///                                frame version = 0b10 (2015); no addressing, no
+///                                security, no IEs.
+///   `[3]` = seq  sequence number copied from the acknowledged frame (DSN match).
+///   `[4]`,`[5]`  FCS placeholders — the hardware computes and writes the CRC.
+///
+/// The recipient matches the ACK by sequence number, exactly like the immediate ACK
+/// (which also carries no addressing). No IEs are needed for an rx-on child with
+/// CSL/link-metrics disabled, and the ACK need not be secured in that case.
+fn build_enh_ack(frame: &[u8]) {
+    let seq = frame.get(2).copied().unwrap_or(0);
+    unsafe {
+        ENH_ACK_BUFFER[0] = 5;
+        ENH_ACK_BUFFER[1] = 0x02;
+        ENH_ACK_BUFFER[2] = 0x20;
+        ENH_ACK_BUFFER[3] = seq;
+        ENH_ACK_BUFFER[4] = 0;
+        ENH_ACK_BUFFER[5] = 0;
+    }
 }
 
 /// Start the ACK receive timeout timer.
