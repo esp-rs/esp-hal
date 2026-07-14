@@ -56,13 +56,15 @@ use strum::EnumCount;
 
 use crate::{
     gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
-    interrupt::{self, Priority},
-    peripherals::Interrupt,
     ram,
-    system::Cpu,
 };
 #[cfg(feature = "rt")]
-use crate::{handler, interrupt::DEFAULT_INTERRUPT_HANDLER};
+use crate::{
+    handler,
+    interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
+    peripherals::Interrupt,
+    system::Cpu,
+};
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
@@ -113,17 +115,6 @@ pub(crate) fn bind_default_interrupt_handler() {
     }
 
     super::low_level::enable_interrupt(default_gpio_interrupt_handler);
-}
-
-/// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
-pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    for cpu in Cpu::all() {
-        // Only change priority if the interrupt is mapped to the core, otherwise we would enable
-        // the interrupt unconditionally, which we don't want to do.
-        if interrupt::mapped_to(cpu, interrupt).is_some() {
-            interrupt::enable_on_cpu(cpu, interrupt, priority);
-        }
-    }
 }
 
 /// The default GPIO interrupt handler, when the user has not set one.

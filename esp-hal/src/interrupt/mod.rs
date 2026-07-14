@@ -411,10 +411,12 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
+#[cfg(feature = "rt")]
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
 }
 
+#[cfg(feature = "rt")]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
         Cpu::ProCpu => INTERRUPT_CORE0::regs()
