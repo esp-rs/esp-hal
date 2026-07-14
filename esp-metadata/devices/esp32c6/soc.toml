@@ -639,7 +639,16 @@ instances = [
 [device.ledc]
 version = 3
 channel_count = 6
+
 [device.mcpwm]
+support_status = "partial"
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_sleep_retention = true
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+]
 
 [device.pcnt]
 [device.sd_slave]

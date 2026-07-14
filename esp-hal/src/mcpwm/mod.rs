@@ -8,7 +8,7 @@
         cfg(esp32s3) => "CRYPTO_PWM_CLK (160 MHz)",
         cfg(esp32c6) => "PLL_F160M (160 MHz)",
         cfg(esp32h2) => "PLL_F96M_CLK (96 MHz)",
-    }
+    },
 ))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
 //!
@@ -25,13 +25,18 @@
 //! - Generate Space Vector PWM (SVPWM) signals for Field Oriented Control (FOC)
 //!
 //! ## Configuration
-//!
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
 //!     * The 16-bit counter in the PWM timer can work in count-up mode, count-down mode or
 //!       count-up-down mode.
 //!     * A hardware sync or software sync can trigger a reload on the PWM timer with a phase
-//!       register (Not yet implemented)
+//!       register.
+//!     * Timers run until a preconfigured [`timer::StopCondition`], this enum also specifies
+//!       running continuously.
+//!     * Timers can generate [`timer::TimerEvent`] interrupts based on hardware events.
+//!     * Each timer can produce hardware sync events based on [`timer::SyncOutSelect`].
+//!     * Timers can be configured to receive hardware sync events from other timers, or external
+//!       GPIO pins.
 //! * PWM Operators 0, 1 and 2
 //!     * Every PWM operator has two PWM outputs: PWMxA and PWMxB. They can work independently, in
 //!       symmetric and asymmetric configuration.
@@ -39,14 +44,36 @@
 //!     * Configurable dead-time on rising and falling edges; each set up independently. (Not yet
 //!       implemented)
 //!     * All events can trigger CPU interrupts. (Not yet implemented)
-//!     * Modulating of PWM output by high-frequency carrier signals, useful when gate drivers are
-//!       insulated with a transformer. (Not yet implemented)
 //!     * Period, time stamps and important control registers have shadow registers with flexible
 //!       updating methods.
+//! * Capture Channels 0, 1 and 2
+//!     * Every capture channel has one signal input. With an optional invert filter
+//!     * Each capture module can be configured to detect rising and (or), falling edges on an
+//!       external signal.
+//!     * Capture channels can produce hardware capture events based on [`capture::CaptureEvent`].
+//!     * To record the current value of the capture counter. A software trigger can be used to
+//!       trigger a capture event. Note: The edge that is captured is UNSPECIFIED for software
+//!       captures.
+//!     * Each capture channel can be configured with a 8-bit pre-scaler. Which only triggers
+//!       capture events every Nth edge captured. ( Useful for high frequencies )
+//! * Capture Timer:
+//!     * Capture timer can be configured with a sync in source.
+//!     * A hardware sync or software sync can trigger a reload of the capture timer's counter with
+//!       the set value called sync phase.
+#![cfg_attr(
+    mcpwm_capture_clk_from_group,
+    doc = "     * Capture timer's clock source is the same as the PWM timers clock source"
+)]
+#![cfg_attr(
+    not(mcpwm_capture_clk_from_group),
+    doc = "     * Capture timer has its own independent clock source from the MCPWM peripheral."
+)]
 //! * Fault Detection Module (Not yet implemented)
-//! * Capture Module (Not yet implemented)
-//!
-//! Clock source is __clock_src__ by default.
+#![cfg_attr(
+    not(mcpwm_capture_clk_from_group),
+    doc = "\nCapture clock source is `ADB-CLK (80 MHz)` by default.\n"
+)]
+//! Clock source is `__clock_src__` by default.
 //!
 //! ## Examples
 //!
@@ -77,18 +104,28 @@
 //! // of 20 kHz
 //! let timer_clock_cfg = clock_cfg
 //!     .timer_clock_with_frequency(99, PwmWorkingMode::Increase,
-//! Rate::from_khz(20))?; mcpwm.timer0.start(timer_clock_cfg);
+//! Rate::from_khz(20))?;
+//! mcpwm.timer0.apply_config(timer_clock_cfg)?;
+//! mcpwm.timer0.start();
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
 //! # {after_snippet}
 //! ```
 
-use operator::Operator;
-use timer::Timer;
+use enumset::{EnumSet, EnumSetType};
 
+#[cfg(soc_has_mcpwm0)]
+use crate::mcpwm::{
+    capture::{CaptureChannel, CaptureTimer},
+    operator::Operator,
+    sync::SyncLine,
+    timer::Timer,
+};
 use crate::{
-    gpio::OutputSignal,
+    gpio::{InputSignal, OutputSignal},
+    interrupt::{self, InterruptHandler},
+    mcpwm::capture::CaptureChannelConfig,
     pac,
     private::DropGuard,
     soc::clocks::{self, ClockTree},
@@ -96,77 +133,113 @@ use crate::{
     time::Rate,
 };
 
+/// MCPWM capture channels
+pub mod capture;
 /// MCPWM operators
 pub mod operator;
+/// Sync
+pub mod sync;
 /// MCPWM timers
 pub mod timer;
 
-type RegisterBlock = pac::mcpwm0::RegisterBlock;
-
-#[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
-struct PwmClockGuard(DropGuard<(), fn(())>);
-
-impl PwmClockGuard {
-    fn instance<PWM: PwmPeripheral>() -> clocks::McpwmInstance {
-        match PWM::peripheral() {
-            Peripheral::Mcpwm0 => clocks::McpwmInstance::Mcpwm0,
-            #[cfg(soc_has_mcpwm1)]
-            Peripheral::Mcpwm1 => clocks::McpwmInstance::Mcpwm1,
-            _ => unreachable!(),
-        }
+crate::any_peripheral! {
+    /// Any MCPWM peripheral.
+    pub peripheral AnyMcPwm<'d> {
+        #[cfg(soc_has_mcpwm0)]
+        Mcpwm0(crate::peripherals::MCPWM0<'d>),
+        #[cfg(soc_has_mcpwm1)]
+        Mcpwm1(crate::peripherals::MCPWM1<'d>),
     }
+}
 
-    pub fn new<PWM: PwmPeripheral>() -> Self {
-        ClockTree::with(move |clocks| Self::instance::<PWM>().request_function_clock(clocks));
-
-        Self(DropGuard::new((), |_| {
-            ClockTree::with(move |clocks| Self::instance::<PWM>().release_function_clock(clocks));
-        }))
+impl Instance for AnyMcPwm<'_> {
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, mcpwm => { mcpwm.info() })
     }
 }
 
 /// The MCPWM peripheral
 #[non_exhaustive]
-pub struct McPwm<'d, PWM> {
-    _inner: PWM,
+pub struct McPwm<'d> {
+    mcpwm: AnyMcPwm<'d>,
+
     /// Timer0
-    pub timer0: Timer<0, PWM>,
+    pub timer0: Timer<'d>,
     /// Timer1
-    pub timer1: Timer<1, PWM>,
+    pub timer1: Timer<'d>,
     /// Timer2
-    pub timer2: Timer<2, PWM>,
+    pub timer2: Timer<'d>,
+    /// Capture Timer
+    pub capture_timer: CaptureTimer<'d>,
+
     /// Operator0
-    pub operator0: Operator<'d, 0, PWM>,
+    pub operator0: Operator<'d>,
     /// Operator1
-    pub operator1: Operator<'d, 1, PWM>,
+    pub operator1: Operator<'d>,
     /// Operator2
-    pub operator2: Operator<'d, 2, PWM>,
+    pub operator2: Operator<'d>,
+
+    /// Capture0
+    pub capture0: CaptureChannel<'d>,
+    /// Capture1
+    pub capture1: CaptureChannel<'d>,
+    /// Capture2
+    pub capture2: CaptureChannel<'d>,
+
+    /// Sync line 0
+    pub sync0: SyncLine,
+    /// Sync line 1
+    pub sync1: SyncLine,
+    /// Sync line 2
+    pub sync2: SyncLine,
 }
 
-impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
-    /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
-    pub fn new(peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
-        let guard = PeripheralGuard::new(PWM::peripheral());
+impl<'d> McPwm<'d> {
+    /// Create a new instance generics
+    pub fn new(mcpwm: AnyMcPwm<'d>, peripheral_clock: PeripheralClockConfig) -> Self {
+        let info = mcpwm.info();
+        let guard = PeripheralGuard::new(info.peripheral());
 
-        let register_block = unsafe { &*PWM::block() };
-
-        // set prescaler
-        register_block
+        // set prescaler for timer (0-2)
+        info.regs()
             .clk_cfg()
             .write(|w| unsafe { w.clk_prescale().bits(peripheral_clock.prescaler) });
 
         // enable clock
-        register_block.clk().write(|w| w.en().set_bit());
+        info.regs().clk().write(|w| w.en().set_bit());
 
+        let info = mcpwm.info();
         Self {
-            _inner: peripheral,
-            timer0: Timer::new(guard.clone()),
-            timer1: Timer::new(guard.clone()),
-            timer2: Timer::new(guard.clone()),
-            operator0: Operator::new(guard.clone()),
-            operator1: Operator::new(guard.clone()),
-            operator2: Operator::new(guard),
+            mcpwm,
+            timer0: Timer::new(guard.clone(), info, 0, &peripheral_clock),
+            timer1: Timer::new(guard.clone(), info, 1, &peripheral_clock),
+            timer2: Timer::new(guard.clone(), info, 2, &peripheral_clock),
+            operator0: Operator::new(guard.clone(), 0, info),
+            operator1: Operator::new(guard.clone(), 1, info),
+            operator2: Operator::new(guard.clone(), 2, info),
+            capture_timer: CaptureTimer::new(guard.clone(), info),
+            capture0: CaptureChannel::new(guard.clone(), info, 0, CaptureChannelConfig::default()),
+            capture1: CaptureChannel::new(guard.clone(), info, 1, CaptureChannelConfig::default()),
+            capture2: CaptureChannel::new(guard, info, 2, CaptureChannelConfig::default()),
+            sync0: SyncLine::new(0, info),
+            sync1: SyncLine::new(1, info),
+            sync2: SyncLine::new(2, info),
         }
+    }
+
+    /// Set the interrupt handler for the MCPWM peripheral.
+    ///
+    /// Note that this will replace any previously registered interrupt
+    /// handlers.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        let info = self.mcpwm.info();
+        let interrupt = info.interrupt();
+
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, interrupt);
+        }
+        interrupt::bind_handler(interrupt, handler);
     }
 }
 
@@ -272,66 +345,267 @@ impl PeripheralClockConfig {
     ) -> Result<timer::TimerClockConfig, FrequencyError> {
         timer::TimerClockConfig::with_frequency(self, period, mode, target_freq)
     }
+
+    /// Get a timer clock configuration with the default values.
+    ///
+    /// ### Note:
+    /// - Prescaler defaults to the minimum value of `0`.
+    /// - Period defaults to the maximum value of `u16::MAX`.
+    /// - PWM working mode defaults to `PwmWorkingMode::Increase`.
+    ///
+    /// The frequency is calculated with the formula described in
+    ///   [`PeripheralClockConfig::timer_clock_with_prescaler`] with the default prescaler value.
+    pub fn timer_clock_default(&self) -> timer::TimerClockConfig {
+        timer::TimerClockConfig::default(self)
+    }
 }
 
 /// Target frequency could not be set.
 /// Check how the frequency is calculated in the corresponding method docs.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrequencyError;
 
-/// A MCPWM peripheral
-pub trait PwmPeripheral: crate::private::Sealed {
-    /// Get a pointer to the peripheral RegisterBlock
-    fn block() -> *const RegisterBlock;
-    /// Get operator GPIO mux output signal
-    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
-    /// Peripheral
-    fn peripheral() -> Peripheral;
+impl core::fmt::Display for FrequencyError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Target frequency could not be set")
+    }
 }
 
-#[cfg(soc_has_mcpwm0)]
-impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
-    fn block() -> *const RegisterBlock {
-        Self::regs()
+impl core::error::Error for FrequencyError {}
+
+type RegisterBlock = pac::mcpwm0::RegisterBlock;
+
+/// Peripheral info for an MCPWM instance.
+#[doc(hidden)]
+#[derive(Debug)]
+#[non_exhaustive]
+#[allow(private_interfaces, reason = "Unstable details")]
+pub struct Info {
+    /// Register block
+    register_block: *const RegisterBlock,
+    /// System peripheral marker.
+    _peripheral: crate::system::Peripheral,
+    /// Interrupt marker
+    _interrupt: crate::peripherals::Interrupt,
+    /// Sync inputs
+    sync_input: [InputSignal; 3],
+    /// Capture inputs
+    capture_input: [InputSignal; 3],
+    /// Operator A outputs
+    operator_a_output: [OutputSignal; 3],
+    /// Operator B outputs
+    operator_b_output: [OutputSignal; 3],
+}
+
+/// Dispatches event to register bit getter for interrupt status checks
+macro_rules! dispatch_event_bit {
+    ($int_register:expr, $event:expr, $unit:expr) => {
+        match $event {
+            Event::TimerStop => $int_register.timer_stop($unit).bit(),
+            Event::TimerEqualZero => $int_register.timer_tez($unit).bit(),
+            Event::TimerEqualPeriod => $int_register.timer_tep($unit).bit(),
+            Event::Capture => $int_register.cap($unit).bit(),
+            Event::CompareA => $int_register.cmpr_tea($unit).bit(),
+            Event::CompareB => $int_register.cmpr_teb($unit).bit(),
+            Event::Fault => $int_register.fault($unit).bit(),
+            Event::FaultClear => $int_register.fault_clr($unit).bit(),
+            Event::FaultCycleByCycle => $int_register.tz_cbc($unit).bit(),
+            Event::FaultOneShotMode => $int_register.tz_ost($unit).bit(),
+        }
+    };
+}
+
+/// Dispatches event to register bit setter for interrupt control
+macro_rules! dispatch_event_write {
+    ($int_register:expr, $event:expr, $unit:expr, $value:expr) => {
+        match $event {
+            Event::TimerStop => $int_register.timer_stop($unit).bit($value),
+            Event::TimerEqualZero => $int_register.timer_tez($unit).bit($value),
+            Event::TimerEqualPeriod => $int_register.timer_tep($unit).bit($value),
+            Event::Capture => $int_register.cap($unit).bit($value),
+            Event::CompareA => $int_register.cmpr_tea($unit).bit($value),
+            Event::CompareB => $int_register.cmpr_teb($unit).bit($value),
+            Event::Fault => $int_register.fault($unit).bit($value),
+            Event::FaultClear => $int_register.fault_clr($unit).bit($value),
+            Event::FaultCycleByCycle => $int_register.tz_cbc($unit).bit($value),
+            Event::FaultOneShotMode => $int_register.tz_ost($unit).bit($value),
+        }
+    };
+}
+
+/// Event types for MCPWM
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[doc(hidden)]
+pub enum Event {
+    /// Event for when a timer stops
+    TimerStop,
+    /// Event for when a timer equals zero
+    TimerEqualZero,
+    /// Event for when a timer equals period
+    TimerEqualPeriod,
+    /// Event for a fault
+    Fault,
+    /// Event for a fault clear
+    FaultClear,
+    /// Event for a compare A
+    CompareA,
+    /// Event for a compare B
+    CompareB,
+    /// Event for a fault cycle by cycle
+    FaultCycleByCycle,
+    /// Event for a fault one shot mode
+    FaultOneShotMode,
+    /// Event for a capture
+    Capture,
+}
+
+/// A peripheral singleton compatible with the MCPWM driver.
+pub trait Instance: crate::private::Sealed + any::Degrade {
+    /// Returns the peripheral data describing this instance.
+    #[doc(hidden)]
+    fn info(&self) -> &'static Info;
+}
+
+impl Info {
+    /// Returns the register block for this PWM instance.
+    pub fn regs(&self) -> &RegisterBlock {
+        unsafe { &*self.register_block }
     }
 
-    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
-        match (OP, IS_A) {
-            (0, true) => OutputSignal::PWM0_0A,
-            (1, true) => OutputSignal::PWM0_1A,
-            (2, true) => OutputSignal::PWM0_2A,
-            (0, false) => OutputSignal::PWM0_0B,
-            (1, false) => OutputSignal::PWM0_1B,
-            (2, false) => OutputSignal::PWM0_2B,
+    /// Returns the peripheral
+    pub fn peripheral(&self) -> crate::system::Peripheral {
+        self._peripheral
+    }
+
+    /// Returns the interrupt marker
+    pub fn interrupt(&self) -> crate::peripherals::Interrupt {
+        self._interrupt
+    }
+
+    /// Returns the output signal for operators
+    pub fn operator_output_signal(&self, operator: u8, is_a: bool) -> OutputSignal {
+        match is_a {
+            true => self.operator_a_output[operator as usize],
+            false => self.operator_b_output[operator as usize],
+        }
+    }
+
+    /// Returns the sync input signal
+    pub fn sync_input_signal(&self, sync: u8) -> InputSignal {
+        self.sync_input[sync as usize]
+    }
+
+    /// Returns the capture input signal
+    pub fn capture_input_signal(&self, chan: u8) -> InputSignal {
+        self.capture_input[chan as usize]
+    }
+
+    /// Return if the interrupt for an event is set
+    pub fn interrupt_set(&self, unit: u8, event: Event) -> bool {
+        let regs = self.regs();
+        let int_st = regs.int_st().read();
+        dispatch_event_bit!(int_st, event, unit)
+    }
+
+    /// Clear the interrupt for an event on a specific UNIT #
+    pub fn clear_interrupt(&self, unit: u8, event: Event) {
+        let regs = self.regs();
+        regs.int_clr().write(|w| {
+            dispatch_event_write!(w, event, unit, true);
+            w
+        });
+    }
+
+    /// Enables listening for an event on a specific UNIT #
+    pub fn enable_listen(&self, unit: u8, events: EnumSet<Event>, value: bool) {
+        let regs = self.regs();
+        critical_section::with(|_| {
+            regs.int_ena().modify(|_, w| {
+                for event in events {
+                    dispatch_event_write!(w, event, unit, value);
+                }
+                w
+            });
+        });
+    }
+}
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        core::ptr::eq(self.register_block, other.register_block)
+    }
+}
+
+unsafe impl Sync for Info {}
+
+// Create an `Instance` impl for each MCPWM peripheral
+for_each_mcpwm!(
+    ($id:literal, $inst:ident, $sys:ident) => {
+        paste::paste! {
+            impl Instance for crate::peripherals::$inst<'_> {
+                /// Returns peripheral data for MCPWM $id
+                fn info(&self) -> &'static Info {
+                    static INFO: Info = Info {
+                        register_block: crate::peripherals::$inst::regs(),
+                        _peripheral: crate::system::Peripheral::$sys,
+                        _interrupt: crate::peripherals::Interrupt::$inst,
+                        sync_input: [
+                            InputSignal::[<PWM $id _SYNC0>],
+                            InputSignal::[<PWM $id _SYNC1>],
+                            InputSignal::[<PWM $id _SYNC2>],
+                        ],
+                        capture_input: [
+                            InputSignal::[<PWM $id _CAP0>],
+                            InputSignal::[<PWM $id _CAP1>],
+                            InputSignal::[<PWM $id _CAP2>],
+                        ],
+                        operator_a_output: [
+                            OutputSignal::[<PWM $id _0A>],
+                            OutputSignal::[<PWM $id _1A>],
+                            OutputSignal::[<PWM $id _2A>],
+                        ],
+                        operator_b_output: [
+                            OutputSignal::[<PWM $id _0B>],
+                            OutputSignal::[<PWM $id _1B>],
+                            OutputSignal::[<PWM $id _2B>],
+                        ],
+                    };
+
+                    &INFO
+                }
+            }
+    }
+    };
+);
+
+#[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
+struct PwmClockGuard(DropGuard<clocks::McpwmInstance, fn(clocks::McpwmInstance)>);
+
+impl PwmClockGuard {
+    fn instance(mcpwm_info: &'static Info) -> clocks::McpwmInstance {
+        match mcpwm_info.peripheral() {
+            Peripheral::Mcpwm0 => clocks::McpwmInstance::Mcpwm0,
+            #[cfg(soc_has_mcpwm1)]
+            Peripheral::Mcpwm1 => clocks::McpwmInstance::Mcpwm1,
             _ => unreachable!(),
         }
     }
 
-    fn peripheral() -> Peripheral {
-        Peripheral::Mcpwm0
+    pub fn new(mcpwm_info: &'static Info) -> Self {
+        ClockTree::with(move |clocks| Self::instance(mcpwm_info).request_function_clock(clocks));
+
+        Self(DropGuard::new(Self::instance(mcpwm_info), move |mcpwm| {
+            ClockTree::with(move |clocks| mcpwm.release_function_clock(clocks));
+        }))
     }
 }
 
-#[cfg(soc_has_mcpwm1)]
-impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
-    fn block() -> *const RegisterBlock {
-        Self::regs()
-    }
-
-    fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal {
-        match (OP, IS_A) {
-            (0, true) => OutputSignal::PWM1_0A,
-            (1, true) => OutputSignal::PWM1_1A,
-            (2, true) => OutputSignal::PWM1_2A,
-            (0, false) => OutputSignal::PWM1_0B,
-            (1, false) => OutputSignal::PWM1_1B,
-            (2, false) => OutputSignal::PWM1_2B,
-            _ => unreachable!(),
-        }
-    }
-
-    fn peripheral() -> Peripheral {
-        Peripheral::Mcpwm1
+impl<'d> crate::private::Sealed for McPwm<'d> {}
+#[instability::unstable]
+impl<'d> crate::interrupt::InterruptConfigurable for McPwm<'d> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.set_interrupt_handler(handler);
     }
 }

@@ -590,6 +590,12 @@ support_status = { status = "not_supported", issue = 5161 }
 
 [device.mcpwm]
 support_status = { status = "not_supported", issue = 5154 }
+# Although mcpwm is not supported these features are worth noting for future implementation
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_event_comparator = true
+support_sleep_retention = true
 
 [device.sleep]
 support_status = "partial"

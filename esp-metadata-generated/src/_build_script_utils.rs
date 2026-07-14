@@ -309,6 +309,8 @@ impl Chip {
                     "i2c_master_i2c1",
                     "i2s_i2s0",
                     "i2s_i2s1",
+                    "mcpwm_mcpwm0",
+                    "mcpwm_mcpwm1",
                     "spi_master_spi2",
                     "spi_master_spi3",
                     "spi_slave_spi2",
@@ -534,6 +536,8 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_i2c1",
                     "cargo:rustc-cfg=i2s_i2s0",
                     "cargo:rustc-cfg=i2s_i2s1",
+                    "cargo:rustc-cfg=mcpwm_mcpwm0",
+                    "cargo:rustc-cfg=mcpwm_mcpwm1",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_master_spi3",
                     "cargo:rustc-cfg=spi_slave_spi2",
@@ -2039,6 +2043,11 @@ impl Chip {
                     "ledc_channel_count=\"6\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "mcpwm_swsync_can_propagate",
+                    "mcpwm_capture_clk_from_group",
+                    "mcpwm_support_etm",
+                    "mcpwm_support_sleep_retention",
+                    "mcpwm_support_event_comparator",
                     "parl_io_version=\"2\"",
                     "phy_combo_module",
                     "psram_extmem_origin=\"1107296256\"",
@@ -2319,6 +2328,11 @@ impl Chip {
                     "cargo:rustc-cfg=ledc_channel_count=\"6\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=mcpwm_support_etm",
+                    "cargo:rustc-cfg=mcpwm_support_sleep_retention",
+                    "cargo:rustc-cfg=mcpwm_support_event_comparator",
                     "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=psram_extmem_origin=\"1107296256\"",
@@ -2665,6 +2679,7 @@ impl Chip {
                     "i2c_master_i2c0",
                     "i2c_slave_i2c0",
                     "i2s_i2s0",
+                    "mcpwm_mcpwm0",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -2749,6 +2764,10 @@ impl Chip {
                     "ledc_channel_count=\"6\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "mcpwm_swsync_can_propagate",
+                    "mcpwm_capture_clk_from_group",
+                    "mcpwm_support_etm",
+                    "mcpwm_support_sleep_retention",
                     "parl_io_version=\"1\"",
                     "phy_combo_module",
                     "rmt_ram_start=\"1610638336\"",
@@ -2958,6 +2977,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=i2c_slave_i2c0",
                     "cargo:rustc-cfg=i2s_i2s0",
+                    "cargo:rustc-cfg=mcpwm_mcpwm0",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -3042,6 +3062,10 @@ impl Chip {
                     "cargo:rustc-cfg=ledc_channel_count=\"6\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=mcpwm_support_etm",
+                    "cargo:rustc-cfg=mcpwm_support_sleep_retention",
                     "cargo:rustc-cfg=parl_io_version=\"1\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
@@ -3955,6 +3979,7 @@ impl Chip {
                     "i2c_master_i2c0",
                     "i2c_master_i2c1",
                     "i2s_i2s0",
+                    "mcpwm_mcpwm0",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -4041,6 +4066,10 @@ impl Chip {
                     "interrupt_controller=\"plic\"",
                     "ledc_version=\"3\"",
                     "ledc_channel_count=\"6\"",
+                    "mcpwm_swsync_can_propagate",
+                    "mcpwm_capture_clk_from_group",
+                    "mcpwm_support_etm",
+                    "mcpwm_support_sleep_retention",
                     "parl_io_version=\"2\"",
                     "rmt_ram_start=\"1610642432\"",
                     "rmt_channel_ram_size=\"48\"",
@@ -4216,6 +4245,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=i2c_master_i2c1",
                     "cargo:rustc-cfg=i2s_i2s0",
+                    "cargo:rustc-cfg=mcpwm_mcpwm0",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -4302,6 +4332,10 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
                     "cargo:rustc-cfg=ledc_version=\"3\"",
                     "cargo:rustc-cfg=ledc_channel_count=\"6\"",
+                    "cargo:rustc-cfg=mcpwm_swsync_can_propagate",
+                    "cargo:rustc-cfg=mcpwm_capture_clk_from_group",
+                    "cargo:rustc-cfg=mcpwm_support_etm",
+                    "cargo:rustc-cfg=mcpwm_support_sleep_retention",
                     "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610642432\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
@@ -6014,6 +6048,8 @@ impl Chip {
                     "i2c_master_i2c1",
                     "i2s_i2s0",
                     "i2s_i2s1",
+                    "mcpwm_mcpwm0",
+                    "mcpwm_mcpwm1",
                     "spi_master_spi2",
                     "spi_master_spi3",
                     "spi_slave_spi2",
@@ -6101,6 +6137,7 @@ impl Chip {
                     "interrupt_controller=\"xtensa\"",
                     "ledc_version=\"2\"",
                     "ledc_channel_count=\"8\"",
+                    "mcpwm_swsync_can_propagate",
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
@@ -6299,6 +6336,8 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_i2c1",
                     "cargo:rustc-cfg=i2s_i2s0",
                     "cargo:rustc-cfg=i2s_i2s1",
+                    "cargo:rustc-cfg=mcpwm_mcpwm0",
+                    "cargo:rustc-cfg=mcpwm_mcpwm1",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_master_spi3",
                     "cargo:rustc-cfg=spi_slave_spi2",
@@ -6386,6 +6425,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"xtensa\"",
                     "cargo:rustc-cfg=ledc_version=\"2\"",
                     "cargo:rustc-cfg=ledc_channel_count=\"8\"",
+                    "cargo:rustc-cfg=mcpwm_swsync_can_propagate",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
@@ -6828,6 +6868,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_i2c1)");
     println!("cargo:rustc-check-cfg=cfg(i2s_i2s0)");
     println!("cargo:rustc-check-cfg=cfg(i2s_i2s1)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_mcpwm0)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_mcpwm1)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_spi2)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_spi3)");
     println!("cargo:rustc-check-cfg=cfg(spi_slave_spi2)");
@@ -7044,6 +7086,11 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(i2s_clock_configured_by_pcr)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_swsync_can_propagate)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_capture_clk_from_group)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_support_etm)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_support_sleep_retention)");
+    println!("cargo:rustc-check-cfg=cfg(mcpwm_support_event_comparator)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rng_is_lp_sys)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_branch_predictor)");
