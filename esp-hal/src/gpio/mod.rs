@@ -544,7 +544,7 @@ impl<'d> Io<'d> {
     )]
     #[cfg_attr(
         multi_core,
-        doc = "Registers an interrupt handler for all GPIO pins. Enables the interrupt on the current core."
+        doc = "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores."
     )]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
@@ -564,15 +564,11 @@ impl<'d> Io<'d> {
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::GPIO);
-        }
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
-
-        crate::interrupt::bind_handler(
-            Interrupt::GPIO,
-            InterruptHandler::new(user_gpio_interrupt_handler, handler.priority()),
-        );
+        low_level::enable_interrupt(InterruptHandler::new(
+            user_gpio_interrupt_handler,
+            handler.priority(),
+        ));
     }
 }
 
