@@ -87,7 +87,7 @@ pub use placeholder::NoPin;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt},
+    peripherals::{GPIO, IO_MUX},
     private::{self, Sealed},
 };
 
@@ -529,22 +529,18 @@ impl<'d> Io<'d> {
         Io { _io_mux }
     }
 
-    /// Set the interrupt priority for GPIO interrupts.
+    #[doc = cfg_select!(
+        multi_core => "Sets the the interrupt priority and enables GPIO interrupts on all cores.",
+        _ => "Sets the interrupt priority and enables GPIO interrupts.",
+    )]
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        // FIXME: this sets priority on all cores where the handler may be running. Should we only
-        // change it on the current core? Should that enable the interrupt if it's not already
-        // enabled?
-        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
+        low_level::set_interrupt_priority(prio);
     }
 
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for all GPIO pins."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for all GPIO pins. Enables the interrupt on the current core."
+    #[doc = cfg_select!(
+        multi_core => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
+        _ => "Registers an interrupt handler for all GPIO pins.",
     )]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
@@ -564,15 +560,11 @@ impl<'d> Io<'d> {
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::GPIO);
-        }
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
-
-        crate::interrupt::bind_handler(
-            Interrupt::GPIO,
-            InterruptHandler::new(user_gpio_interrupt_handler, handler.priority()),
-        );
+        low_level::enable_interrupt(InterruptHandler::new(
+            user_gpio_interrupt_handler,
+            handler.priority(),
+        ));
     }
 }
 

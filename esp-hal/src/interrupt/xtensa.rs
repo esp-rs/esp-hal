@@ -69,6 +69,7 @@ pub enum CpuInterrupt {
 }
 
 impl CpuInterrupt {
+    #[cfg(feature = "rt")]
     pub(super) fn from_u32(n: u32) -> Option<Self> {
         match n {
             0 => Some(Self::Interrupt0LevelPriority1),

@@ -5,9 +5,12 @@ mod version;
 
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
-#[cfg(feature = "rt")]
-pub(crate) use version::enable_interrupt;
-pub(crate) use version::{gpio_intr_enable, prepare_pin_pull};
+pub(crate) use version::{
+    enable_interrupt,
+    gpio_intr_enable,
+    prepare_pin_pull,
+    set_interrupt_priority,
+};
 
 use crate::peripherals::GPIO;
 
