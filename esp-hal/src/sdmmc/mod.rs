@@ -53,7 +53,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::{
         DmaBufError,
-        aligned::{DmaAlignedMut, InternalMemory},
+        aligned::{DmaAlignedMut, DmaAlignedRef, InternalMemory},
     },
     gpio::{
         InputSignal,
@@ -833,14 +833,23 @@ impl EngineSession {
                 .await?);
         }
 
-        let ptr = dma_ptr_from_raw(buf.as_ptr())?;
+        let dma = DmaAlignedRef::new(buf)?;
+
+        // Flush the caller's buffer before the IDMAC reads it, else stale
+        // memory is written to the card. Reached only when `Bounce::split`
+        // returned `None`, so `buf` is region-aligned in address and length.
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        dma.writeback();
+
+        let total = dma.len();
+        let ptr = dma_ptr_ref(dma)?;
         Ok(self
             .transfer_async(
                 slot,
                 index,
                 arg,
                 true,
-                Transfer::single(ptr, buf.len()),
+                Transfer::single(ptr, total),
                 block_size,
                 auto_stop,
             )
@@ -2141,6 +2150,13 @@ fn wait_busy_cleared() -> Result<(), Error> {
 ///
 /// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
 fn dma_ptr(buf: DmaAlignedMut<'_, [u8]>) -> Result<u32, Error> {
+    dma_ptr_from_raw(buf.as_ptr())
+}
+
+/// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
+///
+/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
+fn dma_ptr_ref(buf: DmaAlignedRef<'_, [u8]>) -> Result<u32, Error> {
     dma_ptr_from_raw(buf.as_ptr())
 }
 
