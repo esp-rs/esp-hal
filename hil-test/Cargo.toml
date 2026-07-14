@@ -50,6 +50,10 @@ name              = "lcd_cam"
 harness           = false
 
 [[bin]]
+name              = "mcpwm"
+harness           = false
+
+[[bin]]
 name              = "misc_drivers"
 harness           = false
 
