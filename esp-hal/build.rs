@@ -4,12 +4,18 @@ use std::{
     collections::HashMap,
     env,
     fs::{self, File},
-    io::{BufRead, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
-use esp_config::{Value, generate_config_from_yaml_definition};
+#[cfg(feature = "rt")]
+use esp_config::Value;
+use esp_config::generate_config_from_yaml_definition;
+#[cfg(feature = "rt")]
+use esp_metadata_generated::Chip;
 use esp_metadata_generated::assert_unique_features;
+#[cfg(feature = "rt")]
+use somni_template::{BlockStyle, Env, Syntax, Template};
 
 macro_rules! bail {
     ($($arg:tt)*) => {
@@ -17,7 +23,14 @@ macro_rules! bail {
     };
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
+    if let Err(e) = try_main() {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
+}
+
+fn try_main() -> Result<(), Box<dyn Error>> {
     // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
     let suppress_panics = std::env::var("RUSTC_WRAPPER")
         .unwrap_or_default()
@@ -67,23 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Failed to read esp_config.yml for esp-hal");
     let cfg = generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
-    // RISC-V and Xtensa devices each require some special handling and processing
-    // of linker scripts:
-
-    let mut config_symbols: Vec<String> =
-        chip.all_symbols().iter().map(|c| c.to_string()).collect();
-
-    for (key, value) in &cfg {
-        match value {
-            Value::Bool(true) => {
-                config_symbols.push(key.clone());
-            }
-            Value::String(v) => {
-                config_symbols.push(format!("{key}_{v}"));
-            }
-            _ => {}
-        }
-    }
+    #[cfg(not(feature = "rt"))]
+    let _ = cfg;
 
     // Only emit linker directives if the `rt` feature is enabled
     #[cfg(feature = "rt")]
@@ -117,14 +115,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         } else {
             // RISC-V devices:
 
+            preprocess_file(chip, &cfg, "ld/riscv/asserts.x", out.join("asserts.x"))?;
             preprocess_file(
-                &config_symbols,
-                &cfg,
-                "ld/riscv/asserts.x",
-                out.join("asserts.x"),
-            )?;
-            preprocess_file(
-                &config_symbols,
+                chip,
                 &cfg,
                 "ld/riscv/hal-defaults.x",
                 out.join("hal-defaults.x"),
@@ -133,8 +126,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // With the architecture-specific linker scripts taken care of, we can copy all
         // remaining linker scripts which are common to all devices:
-        copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-        copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.name()), &out)?;
+        copy_dir_all(chip, &cfg, "ld/sections", &out)?;
+        copy_dir_all(chip, &cfg, format!("ld/{}", chip.name()), &out)?;
     }
 
     Ok(())
@@ -144,25 +137,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 #[cfg(feature = "rt")]
 fn copy_dir_all(
-    config_symbols: &[String],
+    chip: Chip,
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
-) -> std::io::Result<()> {
+) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let ty = entry.file_type()?;
         if ty.is_dir() {
             copy_dir_all(
-                config_symbols,
+                chip,
                 cfg,
                 entry.path(),
                 dst.as_ref().join(entry.file_name()),
             )?;
         } else {
             preprocess_file(
-                config_symbols,
+                chip,
                 cfg,
                 entry.path(),
                 dst.as_ref().join(entry.file_name()),
@@ -175,96 +168,71 @@ fn copy_dir_all(
 /// A naive pre-processor for linker scripts
 #[cfg(feature = "rt")]
 fn preprocess_file(
-    config: &[String],
+    chip: Chip,
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
-) -> std::io::Result<()> {
+) -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={}", src.as_ref().display());
 
-    let file = File::open(src)?;
     let mut out_file = File::create(dst)?;
 
-    let mut take = Vec::new();
-    take.push(true);
+    let syntax = Syntax {
+        expr: ("${".to_string(), "}".to_string()),
+        block: BlockStyle::Line {
+            prefix: "#".to_string(),
+        },
+    };
 
-    let vars = std::env::var("CARGO_CFG_FEATURE").unwrap_or_default();
-    let enabled_features = vars.split(',').collect::<Vec<_>>();
+    let template_src = std::fs::read_to_string(src)?;
+    let template = Template::compile(&template_src, &syntax)
+        .map_err(|e| e.display_with(&template_src).to_string())?;
 
-    for line in std::io::BufReader::new(file).lines() {
-        let line = substitute_config(cfg, &line?);
-        let trimmed = line.trim();
+    let rendered = template
+        .render(somni_env(chip, cfg))
+        .map_err(|e| e.display_with(&template_src).to_string())?;
+    out_file.write_all(rendered.as_bytes())?;
 
-        if let Some(condition) = trimmed.strip_prefix("#IF ") {
-            let should_take = take.iter().all(|v| *v);
-            let condition_matches = eval_condition(condition, config, &enabled_features);
-            let should_take = should_take && condition_matches;
-            take.push(should_take);
-            continue;
-        } else if trimmed == "#ELSE" {
-            let taken = take.pop().unwrap();
-            let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && !taken;
-            take.push(should_take);
-            continue;
-        } else if trimmed == "#ENDIF" {
-            take.pop();
-            continue;
-        }
-
-        if *take.last().unwrap() {
-            out_file.write_all(line.as_bytes())?;
-            let _ = out_file.write(b"\n")?;
-        }
-    }
     Ok(())
 }
 
 #[cfg(feature = "rt")]
-fn eval_condition(condition: &str, config: &[String], features: &[&str]) -> bool {
-    if let Some(feature) = condition.strip_prefix("CARGO_FEATURE(\"")
-        && let Some(feature) = feature.strip_suffix("\")")
-    {
-        return features.contains(&feature);
+fn somni_env(chip: Chip, cfg: &HashMap<String, Value>) -> Env {
+    let mut env = Env::new();
+
+    // cargo features
+    env.function("CARGO_FEATURE", |feature: &str| {
+        let vars = std::env::var("CARGO_CFG_FEATURE").unwrap_or_default();
+        let enabled_features = vars.split(',').collect::<Vec<_>>();
+        enabled_features.contains(&feature)
+    });
+
+    // esp-metadata
+    for c in Chip::all_possible_symbols() {
+        if let Some((name, _)) = c.split_once(',') {
+            // empty string is never a valid value, but we need the variables to exist
+            env.value(name, "");
+        } else {
+            env.value(c, false);
+        }
+    }
+    for c in chip.all_symbols() {
+        if let Some((name, value)) = c.split_once('=') {
+            env.value(name, value.trim().trim_matches('"'));
+        } else {
+            env.value(c, true);
+        }
     }
 
-    config.iter().any(|c| c == condition)
-}
-
-#[cfg(feature = "rt")]
-fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
-    let mut result = String::new();
-    let mut chars = line.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c != '$' {
-            result.push(c);
-            continue;
-        }
-
-        let Some('{') = chars.peek() else {
-            result.push(c);
-            continue;
+    // esp-config values
+    for (name, value) in cfg.iter() {
+        match value {
+            // bools are usually used in conditions
+            Value::Bool(value) => env.value(name, *value),
+            // the rest are usually substituted, so convert them to strings
+            Value::Integer(value) => env.value(name, value.to_string()),
+            Value::String(value) => env.value(name, value.clone()),
         };
-        chars.next();
-
-        let mut key = String::new();
-        for c in chars.by_ref() {
-            if c == '}' {
-                break;
-            }
-            key.push(c);
-        }
-        match cfg
-            .get(&key)
-            .unwrap_or_else(|| panic!("missing config key: {key}"))
-        {
-            Value::Bool(true) => result.push('1'),
-            Value::Bool(false) => result.push('0'),
-            Value::Integer(value) => result.push_str(&value.to_string()),
-            Value::String(value) => result.push_str(value),
-        }
     }
-
-    result
+    env
 }

@@ -273,32 +273,6 @@ impl Chip {
             cfgs
         })
     }
-
-    pub fn list_of_check_cfgs() -> Vec<String> {
-        let mut cfgs = vec![];
-
-        // Used by our documentation builds to prevent the huge red warning banner.
-        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
-        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(semver_checks)"));
-
-        let possible_symbols = Self::list_of_possible_symbols();
-        for (sym, values) in possible_symbols.iter() {
-            if values.is_none() {
-                cfgs.push(format!("cargo:rustc-check-cfg=cfg({})", sym));
-            }
-        }
-
-        for (sym, values) in possible_symbols.iter() {
-            if let Some(values) = values {
-                cfgs.push(format!(
-                    "cargo:rustc-check-cfg=cfg({sym}, values({}))",
-                    values.join(",")
-                ));
-            }
-        }
-
-        cfgs
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -915,7 +889,24 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
 }
 
 pub fn generate_build_script_utils() -> TokenStream {
-    let check_cfgs = Chip::list_of_check_cfgs();
+    // The union of every chip's symbols, deduplicated while preserving first-seen order.
+    // This is the list of all symbols that any supported chip can possibly define.
+    let all_possible_symbols = {
+        let possible_symbols = Chip::list_of_possible_symbols();
+        let mut cfgs = Vec::with_capacity(possible_symbols.len());
+        for (sym, values) in possible_symbols.iter() {
+            if values.is_none() {
+                cfgs.push(sym.to_string());
+            }
+        }
+
+        for (sym, values) in possible_symbols.iter() {
+            if let Some(values) = values {
+                cfgs.push(format!("{sym}, values({})", values.join(",")));
+            }
+        }
+        cfgs
+    };
 
     let chip = Chip::iter()
         .map(|c| format_ident!("{}", c.name()))
@@ -1185,6 +1176,19 @@ pub fn generate_build_script_utils() -> TokenStream {
                     #( Self::#chip => #config ),*
                 }
             }
+
+            /// Returns the list of all symbols that any supported chip can define.
+            ///
+            /// Unlike [`Chip::all_symbols`], which returns the symbols defined for the
+            /// selected chip, this returns the union of the symbols across every chip.
+            ///
+            /// Key-value configurations are returned with the syntax `cfg(<symbol>, values(<values>))`,
+            /// as used by `cargo:rustc-check-cfg` directives.
+            pub fn all_possible_symbols() -> &'static [&'static str] {
+                &[
+                    #(#all_possible_symbols,)*
+                ]
+            }
         }
 
         /// Information about a memory region.
@@ -1250,7 +1254,12 @@ pub fn generate_build_script_utils() -> TokenStream {
 
         /// Prints `cargo:rustc-check-cfg` lines.
         pub fn emit_check_cfg_directives() {
-            #( println!(#check_cfgs); )*
+            println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
+            println!("cargo:rustc-check-cfg=cfg(semver_checks)");
+
+            for cfg in Chip::all_possible_symbols() {
+                println!("cargo:rustc-check-cfg=cfg({cfg})");
+            }
         }
     }
 }
