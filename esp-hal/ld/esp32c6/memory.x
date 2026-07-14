@@ -15,7 +15,7 @@ MEMORY
     ] */
 
     /* 512K of on soc RAM, 32K reserved for cache */
-    /* Instruction and Data RAM 
+    /* Instruction and Data RAM
     0x4086E610 = 2nd stage bootloader iram_loader_seg start address
     see https://github.com/espressif/esp-idf/blob/03414a15508036c8fc0f51642aed7a264e9527df/components/esp_system/ld/esp32c6/memory.ld.in#L26
     */
