@@ -167,7 +167,7 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
     let ok = {
         let root = fs.root_dir();
 
-        // Single-block create: write, then read back and verify.
+        println!("Single-block create");
         let mut f = root.create_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_CREATE).await?;
@@ -177,8 +177,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             MSG_CREATE[i]
         })
         .await?;
+        println!("Single-block create: OK");
 
-        // Single-block update: overwrite with a different payload, verify.
+        println!("Single-block update");
         let mut f = root.open_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_UPDATE).await?;
@@ -188,10 +189,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             MSG_UPDATE[i]
         })
         .await?;
+        println!("Single-block update: OK");
 
-        // Multi-block update: a single large write forces the block layer down
-        // the CMD25 (write) / CMD18 (read) path. The buffer lives on the stack
-        // (DMA-reachable RAM), not in flash.
+        println!("Multi-block update");
         let mut payload = [0u8; MULTIBLOCK_LEN];
         for (i, b) in payload.iter_mut().enumerate() {
             *b = pattern_byte(i);
@@ -207,8 +207,9 @@ async fn fat_crud_inner<IO: ReadWriteSeek>(
             pattern_byte,
         )
         .await?;
+        println!("Multi-block update: OK");
 
-        // Delete, leaving the card as we found it.
+        println!("Delete file");
         root.remove(TEST_FILE).await?;
         created_ok && updated_ok && multiblock_ok
     };
