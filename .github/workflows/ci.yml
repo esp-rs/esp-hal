@@ -149,7 +149,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.6
         if: matrix.group.toolchain == 'esp'
         with:
-          version: 1.96.0.0
+          version: 1.97.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -316,7 +316,7 @@ jobs:
       # same compiler as the rest of CI.
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.96.0.0
+          version: 1.97.0.0
 
       - name: Build hello_world with LLD
         working-directory: examples/hello_world
@@ -487,7 +487,7 @@ jobs:
         with:
           buildtargets: esp32,esp32s2,esp32s3
           default: true
-          version: 1.96.0.0
+          version: 1.97.0.0
 
       - uses: dtolnay/rust-toolchain@v1
         with:
