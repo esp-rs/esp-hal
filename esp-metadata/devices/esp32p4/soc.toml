@@ -94,7 +94,8 @@ peripherals = [
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C" },
     { name = "I2S0", interrupts = { peri = "I2S0" } },
-    # + I2S1, I2S2
+    { name = "I2S1", interrupts = { peri = "I2S1" } },
+    { name = "I2S2", interrupts = { peri = "I2S2" } },
     { name = "TWAI0", interrupts = { peri = "TWAI0" } },
     { name = "TWAI1", interrupts = { peri = "TWAI1" } },
     { name = "TWAI2", interrupts = { peri = "TWAI2" } },
@@ -223,7 +224,8 @@ engines = [
         drivers = ["i2s"],
         peripheral_instances = [
             { name = "I2S0", dma_id = 3 },
-            # I3C, UHCI, I2S1, I2S2, ADC, RMT
+            { name = "I2S1", dma_id = 4 },
+            { name = "I2S2", dma_id = 5 },
         ],
         channels = [
             { name = "DMA_CH0", interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
@@ -310,7 +312,7 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.i2s]
-support_status = "partial"  # TODO (I2S1/2)
+support_status = "partial"
 version = 3
 default_clock_source = 3
 clock_configured_by_hp_sys_clkrst = true
@@ -332,6 +334,28 @@ instances = [
         pdm_rx = true,
         pcm2pdm = true,
         pdm2pcm = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        mclk = "I2S1_MCLK",
+        bclk = "I2S1_O_BCK",
+        ws = "I2S1_O_WS",
+        bclk_rx = "I2S1_I_BCK",
+        ws_rx = "I2S1_I_WS",
+        dout = ["I2S1_O_SD"],
+        din = ["I2S1_I_SD"],
+    },
+    {
+        name = "i2s2",
+        sys_instance = "I2s2",
+        mclk = "I2S2_MCLK",
+        bclk = "I2S2_O_BCK",
+        ws = "I2S2_O_WS",
+        bclk_rx = "I2S2_I_BCK",
+        ws_rx = "I2S2_I_WS",
+        dout = ["I2S2_O_SD"],
+        din = ["I2S2_I_SD"],
     },
 ]
 
