@@ -25,6 +25,8 @@ use esp32p4 as pac;
 use esp32s2 as pac;
 #[cfg(esp32s3)]
 use esp32s3 as pac;
+#[cfg(esp32s31)]
+use esp32s31 as pac;
 #[cfg(not(soc_has_mmu_table))]
 use indexed::*;
 #[cfg(soc_has_mmu_table)]
@@ -192,7 +194,7 @@ fn invalidate_cache(_vaddr: u32, _size: u32) {
 #[cfg(not(esp32s2))]
 const FLASH_VADDR_BASE: u32 = cfg_select! {
     any(esp32c5, esp32c6, esp32c61, esp32h2) => 0x4200_0000,
-    esp32p4 => 0x4000_0000,
+    any(esp32p4, esp32s31) => 0x4000_0000,
     any(esp32c3, esp32c2, esp32s3) => 0x3C00_0000,
     _ => 0x3F40_0000,
 };

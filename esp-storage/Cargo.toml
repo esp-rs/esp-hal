@@ -93,6 +93,8 @@ esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync
 esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2", "dep:esp32s2"]
 ##
 esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "dep:esp32s3"]
+##
+esp32s31  = ["esp-hal/esp32s31", "esp-hal/unstable", "esp-rom-sys/esp32s31", "esp-sync/esp32s31", "dep:esp32s31"]
 ## Used for testing on a host.
 emulation = []
 

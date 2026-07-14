@@ -154,6 +154,8 @@ pub enum Chip {
     Esp32s2,
     /// ESP32-S3
     Esp32s3,
+    /// ESP32-S31
+    Esp32s31,
 }
 
 impl Chip {
@@ -213,6 +215,7 @@ impl Chip {
             Chip::Esp32p4 => "Esp32p4",
             Chip::Esp32s2 => "Esp32s2",
             Chip::Esp32s3 => "Esp32s3",
+            Chip::Esp32s31 => "Esp32s31",
         }
     }
 
@@ -228,6 +231,7 @@ impl Chip {
             Chip::Esp32p4 => "ESP32-P4",
             Chip::Esp32s2 => "ESP32-S2",
             Chip::Esp32s3 => "ESP32-S3",
+            Chip::Esp32s31 => "ESP32-S31",
         }
     }
 
@@ -363,6 +367,7 @@ impl Config {
             Chip::Esp32p4 => cached_device_config!("devices/esp32p4/soc.toml"),
             Chip::Esp32s2 => cached_device_config!("devices/esp32s2/soc.toml"),
             Chip::Esp32s3 => cached_device_config!("devices/esp32s3/soc.toml"),
+            Chip::Esp32s31 => cached_device_config!("devices/esp32s31/soc.toml"),
         }
     }
 

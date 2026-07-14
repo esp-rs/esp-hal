@@ -134,6 +134,7 @@ pub mod sleep;
 #[cfg_attr(esp32p4, path = "rtc/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
+#[cfg_attr(esp32s31, path = "rtc/esp32s31.rs")]
 pub(crate) mod rtc;
 
 cfg_select! {

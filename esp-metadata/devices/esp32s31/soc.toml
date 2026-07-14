@@ -1,0 +1,331 @@
+# ESP32-S31 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32s31"
+arch   = "riscv"
+target = "riscv32imafc-unknown-none-elf"
+cores  = 2
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
+
+symbols = [
+    "swd",
+    # ROM capabilities (TODO: verify against esp-idf when implementing)
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+
+    # Wakeup sources based on ESP-IDF
+    "pm_support_wifi_wakeup",
+    "pm_support_bt_wakeup",
+    "pm_support_ext1_wakeup",
+]
+
+[device.soc]
+cpu_has_branch_predictor = true
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
+
+# SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
+# dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
+# SOC_ROM_STACK_START = 0x2F07CFB0 (from soc.h)
+memory_map = { ranges = [
+    { name = "dram", start = 0x2F00_0000, end = 0x2F07_AFC0 },
+    { name = "dram2_uninit", start = 0x2F07_AFC0, end = 0x2F07_CFB0 },
+] }
+
+peripherals = [
+    { name = "ASSIST_DEBUG" },
+    { name = "CACHE" },
+    { name = "CLIC" },
+    { name = "EFUSE" },
+    { name = "GPIO" },
+    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "HP_APM" },
+    { name = "HP_MEM_APM" },
+    { name = "HP_SYS" },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTERRUPT_CORE1" },
+    { name = "IO_MUX" },
+    { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
+    { name = "LP_APM" },
+    { name = "LP_PERI", pac = "LP_PERICLKRST" },
+    { name = "LP_TEE" },
+    { name = "LP_WDT" },
+    { name = "LPWR", pac = "PMU" },
+    { name = "MEM_MONITOR", pac = "MEM_MONITOR0" },
+    { name = "PAU" },
+    { name = "PMU" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
+    { name = "RNG", pac = "TRNG" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI" },
+    { name = "SYSTEM", pac = "HP_SYS_CLKRST" },
+    { name = "SYSTIMER" },
+    { name = "TEE" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
+    { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART" },
+    { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART" },
+    { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART" },
+    { name = "USB_DEVICE" },
+
+    { name = "FLASH", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+]
+
+[device.soc.clocks]
+# {include clocks.toml}
+
+[device.interrupts]
+support_status = "not_supported"
+# 161 interrupt sources => ceil(161/32) = 6 status words
+status_registers = 6
+software_interrupt_count = 4
+controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 } }
+
+[device.timergroup]
+support_status = "not_supported"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
+rc_fast_calibration = { divider = 32, min_rev = 0 }
+
+[device.gpio]
+version = 2
+has_input_sync = true
+support_status = "not_supported"
+# PIN_FUNC_GPIO = 1 (from io_mux_reg.h)
+gpio_function = 1
+# From gpio_reg.h: 0x80 = constantly high, 0xC0 = constantly low
+constant_0_input = 0xc0
+constant_1_input = 0x80
+# 62 pins total (0..61); GPIO29 and GPIO41 are not bonded/dummy
+pins = [
+    # LP GPIO (0-7): analog domain; GPIO function is function 1
+    { pin =  0, analog = { 0 = "XTAL_32K_N" } },
+    { pin =  1, analog = { 0 = "XTAL_32K_P" } },
+    { pin =  2 },
+    { pin =  3 },
+    { pin =  4 },
+    { pin =  5 },
+    { pin =  6 },
+    { pin =  7 },
+    # HP GPIO (8+): SPI2 direct IOMUX connections (function 0)
+    # Function names use GPIO matrix signal names (FSPIHD = SPI2_HOLD, etc.)
+    { pin =  8,  functions = { 0 = "FSPIHD" } },
+    { pin =  9,  functions = { 0 = "FSPICS0" } },
+    { pin = 10,  functions = { 0 = "FSPID" } },
+    { pin = 11 },
+    { pin = 12,  functions = { 0 = "FSPICLK" } },
+    { pin = 13,  functions = { 0 = "FSPIQ" } },
+    { pin = 14,  functions = { 0 = "FSPIWP" } },
+    { pin = 15 },
+    { pin = 16 },
+    { pin = 17 },
+    { pin = 18 },
+    { pin = 19 },
+    # SDIO/SPI flash pins (function 0)
+    { pin = 20,  limitations = ["spi_flash"] },
+    { pin = 21,  limitations = ["spi_flash"] },
+    { pin = 22,  limitations = ["spi_flash"] },
+    { pin = 23,  limitations = ["spi_flash"] },
+    { pin = 24,  limitations = ["spi_flash"] },
+    { pin = 25,  limitations = ["spi_flash"] },
+    # SPI0/SPI1 flash pins - not for general use
+    { pin = 26,  limitations = ["spi_flash"] },
+    { pin = 27,  limitations = ["spi_flash"] },
+    { pin = 28,  limitations = ["spi_flash"] },
+    # GPIO29: VDD_SPI / not bonded - excluded from valid GPIO mask
+    { pin = 30,  limitations = ["spi_flash"] },
+    { pin = 31,  limitations = ["spi_flash"] },
+    { pin = 32,  limitations = ["spi_flash"] },
+    { pin = 33 },
+    { pin = 34 },
+    { pin = 35 },
+    { pin = 36 },
+    { pin = 37 },
+    { pin = 38 },
+    { pin = 39 },
+    { pin = 40 },
+    # GPIO41: not bonded - excluded from valid GPIO mask
+    { pin = 42 },
+    { pin = 43 },
+    { pin = 44 },
+    { pin = 45 },
+    { pin = 46 },
+    { pin = 47 },
+    { pin = 48 },
+    { pin = 49 },
+    { pin = 50 },
+    { pin = 51 },
+    { pin = 52 },
+    { pin = 53 },
+    # JTAG pins (function 0 = JTAG; function 1 = GPIO)
+    { pin = 54,  functions = { 0 = "MTDO" } },
+    { pin = 55,  functions = { 0 = "MTCK" } },
+    { pin = 56,  functions = { 0 = "MTDI" } },
+    { pin = 57,  functions = { 0 = "MTMS" } },
+    # UART0 default pins (function 0)
+    { pin = 58,  functions = { 0 = "U0TXD" } },
+    { pin = 59,  functions = { 0 = "U0RXD" } },
+    { pin = 60 },
+    { pin = 61 },
+]
+input_signals = [
+    # UART
+    { name = "U0RXD",               id = 10 },
+    { name = "U0CTS",               id = 11 },
+    { name = "U0DSR",               id = 12 },
+    { name = "U1RXD",               id = 13 },
+    { name = "U1CTS",               id = 14 },
+    { name = "U1DSR",               id = 15 },
+    { name = "U2RXD",               id = 16 },
+    { name = "U2CTS",               id = 17 },
+    { name = "U2DSR",               id = 18 },
+    { name = "U3RXD",               id = 137 },
+    { name = "U3CTS",               id = 138 },
+    { name = "U3DSR",               id = 139 },
+    # I2S0
+    { name = "I2SO_BCK",            id = 25 },
+    { name = "I2S_MCLK",            id = 26 },
+    { name = "I2SO_WS",             id = 27 },
+    { name = "I2SI_SD",             id = 28 },
+    { name = "I2SI_BCK",            id = 29 },
+    { name = "I2SI_WS",             id = 30 },
+    # SPI2 (FSPI naming convention)
+    { name = "FSPICLK",             id = 53 },
+    { name = "FSPIQ",               id = 54 },
+    { name = "FSPID",               id = 55 },
+    { name = "FSPIHD",              id = 56 },
+    { name = "FSPIWP",              id = 57 },
+    { name = "FSPICS0",             id = 62 },
+    # I2C
+    { name = "I2CEXT0_SCL",         id = 68 },
+    { name = "I2CEXT0_SDA",         id = 69 },
+    { name = "I2CEXT1_SCL",         id = 70 },
+    { name = "I2CEXT1_SDA",         id = 71 },
+    # USB JTAG
+    { name = "USB_JTAG_TDO_BRIDGE", id = 140 },
+    # CPU GPIO (dedicated GPIO, core 0: IDs 214-221)
+    { name = "CPU_GPIO_0",          id = 214 },
+    { name = "CPU_GPIO_1",          id = 215 },
+    { name = "CPU_GPIO_2",          id = 216 },
+    { name = "CPU_GPIO_3",          id = 217 },
+    { name = "CPU_GPIO_4",          id = 218 },
+    { name = "CPU_GPIO_5",          id = 219 },
+    { name = "CPU_GPIO_6",          id = 220 },
+    { name = "CPU_GPIO_7",          id = 221 },
+    # Spare functions
+    { name = "SIG_IN_FUNC251",      id = 251 },
+    { name = "SIG_IN_FUNC252",      id = 252 },
+    { name = "SIG_IN_FUNC253",      id = 253 },
+    { name = "SIG_IN_FUNC254",      id = 254 },
+    { name = "SIG_IN_FUNC255",      id = 255 },
+
+    # JTAG signals (IOMUX-only, no GPIO matrix ID)
+    { name = "MTDO" },
+    { name = "MTCK" },
+    { name = "MTDI" },
+    { name = "MTMS" },
+]
+output_signals = [
+    # UART
+    { name = "U0TXD",               id = 10 },
+    { name = "U0RTS",               id = 11 },
+    { name = "U0DTR",               id = 12 },
+    { name = "U1TXD",               id = 13 },
+    { name = "U1RTS",               id = 14 },
+    { name = "U1DTR",               id = 15 },
+    { name = "U2TXD",               id = 16 },
+    { name = "U2RTS",               id = 17 },
+    { name = "U2DTR",               id = 18 },
+    { name = "U3TXD",               id = 137 },
+    { name = "U3RTS",               id = 138 },
+    { name = "U3DTR",               id = 116 },
+    # I2S0
+    { name = "I2SO_BCK",            id = 25 },
+    { name = "I2S_MCLK",            id = 26 },
+    { name = "I2SO_WS",             id = 27 },
+    { name = "I2SO_SD",             id = 28 },
+    { name = "I2SI_BCK",            id = 29 },
+    { name = "I2SI_WS",             id = 30 },
+    # SPI2
+    { name = "FSPICLK",             id = 53 },
+    { name = "FSPIQ",               id = 54 },
+    { name = "FSPID",               id = 55 },
+    { name = "FSPIHD",              id = 56 },
+    { name = "FSPIWP",              id = 57 },
+    { name = "FSPICS0",             id = 62 },
+    { name = "FSPICS1",             id = 63 },
+    { name = "FSPICS2",             id = 64 },
+    { name = "FSPICS3",             id = 65 },
+    { name = "FSPICS4",             id = 66 },
+    { name = "FSPICS5",             id = 67 },
+    # I2C
+    { name = "I2CEXT0_SCL",         id = 68 },
+    { name = "I2CEXT0_SDA",         id = 69 },
+    { name = "I2CEXT1_SCL",         id = 70 },
+    { name = "I2CEXT1_SDA",         id = 71 },
+    # CPU GPIO (dedicated GPIO, core 0)
+    { name = "CPU_GPIO_0",          id = 214 },
+    { name = "CPU_GPIO_1",          id = 215 },
+    { name = "CPU_GPIO_2",          id = 216 },
+    { name = "CPU_GPIO_3",          id = 217 },
+    { name = "CPU_GPIO_4",          id = 218 },
+    { name = "CPU_GPIO_5",          id = 219 },
+    { name = "CPU_GPIO_6",          id = 220 },
+    { name = "CPU_GPIO_7",          id = 221 },
+    # GPIO passthrough
+    { name = "GPIO",                id = 256 },
+
+    # JTAG signals (IOMUX-only, no GPIO matrix ID)
+    { name = "MTDO" },
+    { name = "MTCK" },
+    { name = "MTDI" },
+    { name = "MTMS" },
+]
+
+[device.io_mux]
+
+[device.uart]
+support_status = "not_supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+    { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
+    { name = "uart3", sys_instance = "Uart3", tx = "U3TXD", rx = "U3RXD", cts = "U3CTS", rts = "U3RTS" },
+]
+ram_size = 128
+version = 2
+peripheral_controls_mem_clk = true
+has_sclk_enable = true
+
+[device.systimer]
+
+[device.lp_timer]
+
+[device.assist_debug]
+support_status = "not_supported"
+has_sp_monitor = false
+has_region_monitor = true
+
+[device.rng]
+support_status = "not_supported"
+trng_supported = false  # TODO
+apb_cycle_wait_num = 16 # TODO
+is_lp_sys = false
+
+[device.sleep]
+support_status = { status = "not_supported", issue = 0 }
+light_sleep = true
+deep_sleep = true
+wakeup_sources = {
+    Timer = 4,
+}
+

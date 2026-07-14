@@ -299,7 +299,15 @@ esp32s3 = [
     "esp-sync/esp32s3",
     "esp-metadata-generated/esp32s3",
 ]
-
+##
+esp32s31 = [
+    "dep:esp32s31",
+    "esp-riscv-rt/rtc-ram",
+    "procmacros/rtc-fast",
+    "esp-rom-sys/esp32s31",
+    "esp-sync/esp32s31",
+    "esp-metadata-generated/esp32s31",
+]
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
 log-04 = ["dep:log-04"]

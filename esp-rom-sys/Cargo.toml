@@ -68,3 +68,5 @@ esp32p4 = [ "dep:esp32p4" ]
 esp32s2 = [ "dep:esp32s2" ]
 ##
 esp32s3 = [ "dep:esp32s3" ]
+##
+esp32s31 = [ "dep:esp32s31" ]

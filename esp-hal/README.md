@@ -131,6 +131,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
+[0]: https://github.com/esp-rs/esp-hal/issues/0
 [884]: https://github.com/esp-rs/esp-hal/issues/884
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
 [1909]: https://github.com/esp-rs/esp-hal/issues/1909

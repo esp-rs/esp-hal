@@ -17,6 +17,7 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31/mod.rs")]
 mod implementation;
 
 cfg_select! {

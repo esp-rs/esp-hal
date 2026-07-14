@@ -137,6 +137,15 @@ esp32s3 = [
     "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
 ]
+esp32s31 = [
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    # "esp-rtos/esp32s31",
+    "esp-println/esp32s31",
+    # "esp-radio?/esp32s31",
+    "esp-storage?/esp32s31",
+]
 
 rtos-trace = ["esp-rtos/rtos-trace", "dep:rtos-trace"]
 

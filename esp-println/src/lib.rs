@@ -152,7 +152,8 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c61",
         feature = "esp32h2",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     )
 ))]
 mod auto_printer {
@@ -184,6 +185,8 @@ mod auto_printer {
             const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
             #[cfg(feature = "esp32p4")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x500D2008 as *const u32;
+            #[cfg(feature = "esp32s31")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x20391008 as *const u32;
 
             const SOF_INT_MASK: u32 = 0b10;
 
@@ -217,7 +220,8 @@ mod auto_printer {
         feature = "esp32c61",
         feature = "esp32h2",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     ))
 ))]
 mod auto_printer {
@@ -234,7 +238,8 @@ mod auto_printer {
         feature = "esp32c61",
         feature = "esp32h2",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     )
 ))]
 mod serial_jtag_printer {
@@ -273,6 +278,12 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x500D_2000;
     #[cfg(feature = "esp32p4")]
     const SERIAL_JTAG_CONF_REG: usize = 0x500D_2004;
+
+    // ESP32-S31: USB_DEVICE peripheral at 0x2039_1000 per PAC.
+    #[cfg(feature = "esp32s31")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x2039_1000;
+    #[cfg(feature = "esp32s31")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x2039_1004;
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
@@ -425,7 +436,7 @@ mod uart_printer {
     // (`esp_rom_uart_tx_one_char` -> `uart_tx_one_char2 = 0x4fc0_0058`,
     // see esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.api.ld) instead of
     // hardcoding the address. Matches the c5/c6/c61/h2 channel-aware path.
-    #[cfg(feature = "esp32p4")]
+    #[cfg(any(feature = "esp32p4", feature = "esp32s31"))]
     impl Functions for Device {
         // Unused -- tx_byte() below resolves through the linker.
         const TX_ONE_CHAR: usize = 0;

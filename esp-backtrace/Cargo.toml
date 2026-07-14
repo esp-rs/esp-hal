@@ -65,6 +65,7 @@ esp32h2 = ["esp-println?/esp32h2", "esp-metadata-generated/esp32h2"]
 esp32p4 = ["esp-println?/esp32p4", "esp-metadata-generated/esp32p4"]
 esp32s2 = ["esp-println?/esp32s2", "esp-metadata-generated/esp32s2", "semihosting?/openocd-semihosting"]
 esp32s3 = ["esp-println?/esp32s3", "esp-metadata-generated/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
+esp32s31 = ["esp-println?/esp32s31", "esp-metadata-generated/esp32s31"]
 
 ## Use `esp-println`
 println = ["dep:esp-println"]
