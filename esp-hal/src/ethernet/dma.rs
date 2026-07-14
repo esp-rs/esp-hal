@@ -266,6 +266,10 @@ impl<'a> TDesRing<'a> {
         ring
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.descriptors.len()
+    }
+
     /// Rebuilds ring links and returns all descriptors to CPU ownership.
     ///
     /// Call once after `EMAC_DMA` soft-reset completes and before starting TX.

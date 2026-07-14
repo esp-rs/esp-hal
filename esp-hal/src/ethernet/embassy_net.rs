@@ -144,6 +144,7 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
     fn capabilities(&self) -> Capabilities {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
+        caps.max_burst_size = Some(self.tx.len());
         caps
     }
 
