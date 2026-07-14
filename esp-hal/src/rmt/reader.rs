@@ -39,15 +39,21 @@ impl RmtReader {
     //
     // If `final_` is set, read a full buffer length, potentially wrapping around. Otherwise, fetch
     // half the buffer's length.
+    //
+    // The return value is only valuable if `final_` is set.
+    // In that case `true` indicates that the read completed successfully, while `false` indicates
+    // that the read was incomplete and an error occurred.
+    // This was only observed on ESP32 (and probably ESP32-S2) - other chips indicated an error in
+    // that case.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn read(
         &mut self,
         data: &mut &mut [PulseCode],
         raw: DynChannelAccess<Rx>,
         final_: bool,
-    ) {
+    ) -> bool {
         if self.state != ReaderState::Active {
-            return;
+            return true;
         }
 
         let ram_start = raw.channel_ram_start();
@@ -62,8 +68,7 @@ impl RmtReader {
             // => If both are the same, we're done, max_count = 0
             let max_count = (if offset <= hw_offset { 0 } else { memsize }) + hw_offset - offset;
 
-            debug_assert!(
-                max_count == 0 && self.total == 0
+            if !(max_count == 0 && self.total == 0
                     // We always enable wrapping if it is available. If it's unavailable, rx might
                     // stop when the buffer is full, without an end marker present!
                     // (Checking for two value of hw_offset here, because it's not documented what
@@ -74,8 +79,10 @@ impl RmtReader {
                             .add(hw_offset.checked_sub(1).unwrap_or(memsize - 1))
                             .read_volatile()
                     }
-                    .is_end_marker()
-            );
+                    .is_end_marker())
+            {
+                return false;
+            }
 
             max_count
         } else {
@@ -139,5 +146,7 @@ impl RmtReader {
         }
 
         debug_assert!(self.offset == 0 || self.offset as usize == memsize / 2);
+
+        true
     }
 }

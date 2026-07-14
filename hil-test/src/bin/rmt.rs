@@ -461,6 +461,7 @@ cfg_select! {
 struct Context {
     rmt: RMT<'static>,
     pin: AnyPin<'static>,
+    pin2: AnyPin<'static>,
 }
 
 impl Context {
@@ -523,11 +524,13 @@ mod tests {
 
         esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 
-        let pin = AnyPin::from(hil_test::common_test_pins!(peripherals).1);
+        let pins = hil_test::common_test_pins!(peripherals);
+        let (pin, pin2) = (AnyPin::from(pins.1), AnyPin::from(pins.0));
 
         Context {
             rmt: peripherals.RMT,
             pin,
+            pin2,
         }
     }
 
@@ -1228,5 +1231,59 @@ mod tests {
             start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
+    }
+
+    // Regression test for esp-rs/esp-hal#4697
+    //
+    // This tests ESP32-specific (mis-)behavior
+    #[cfg(esp32)]
+    #[test]
+    async fn rmt_check_regression_4697(mut ctx: Context) {
+        let rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
+
+        let (rx, tx) = (ctx.pin, ctx.pin2);
+
+        let mut rx_channel = rx_channel_creator!(rmt)
+            .configure_rx(
+                &RxChannelConfig::default()
+                    .with_clk_divider(255)
+                    .with_idle_threshold(10000),
+            )
+            .unwrap()
+            .with_pin(rx);
+
+        let mut spi = esp_hal::spi::master::Spi::new(
+            unsafe { esp_hal::peripherals::SPI2::steal() },
+            Default::default(),
+        )
+        .unwrap()
+        .with_sck(tx)
+        .into_async();
+
+        let mut buf = [0u8; 1000];
+
+        // This code is to drive the hardware into the state that caused the
+        // originally failed assertion.
+        //
+        // We are "spamming" RMT with pulses by feeding it the SPI SCK.
+        //
+        // While not really explainable from any documentation, this turned out to drive the
+        // hardware into an unexpected state.
+        //
+        // With the previous assert in place, interestingly the first two receive calls failed as
+        // expected but then we ran into the issue where the assert failed instead of seeing
+        // the error bit set.
+        embassy_futures::join::join(
+            async {
+                let mut data = [PulseCode::default(); 10];
+                for _ in 0..3 {
+                    assert!(rx_channel.receive(&mut data).await.is_err());
+                }
+            },
+            async {
+                spi.transfer_in_place_async(&mut buf).await.unwrap();
+            },
+        )
+        .await;
     }
 }

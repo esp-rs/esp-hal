@@ -80,7 +80,11 @@ async fn main(spawner: Spawner) {
 
     loop {
         println!("receive");
-        channel.receive(&mut data).await.unwrap();
+        if channel.receive(&mut data).await.is_err() {
+            println!("receive error");
+            continue;
+        }
+
         let mut total = 0usize;
         for entry in &data[..data.len()] {
             if entry.length1() == 0 {
