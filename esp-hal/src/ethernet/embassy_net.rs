@@ -153,11 +153,13 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
         caps.max_burst_size = Some(self.tx.len());
-        // The hardware is configured for (or rather, not prevented from) checksum offloading, we
-        // don't need smoltcp to spend cycles on computing them.
-        caps.checksum.ipv4 = Checksum::Tx;
-        caps.checksum.tcp = Checksum::Tx;
-        caps.checksum.udp = Checksum::Tx;
+        // Checksums are offloaded to hardware in both directions (RX COE + TX
+        // insertion via the descriptor CIC bits), so smoltcp does neither.
+        caps.checksum.ipv4 = Checksum::None;
+        caps.checksum.tcp = Checksum::None;
+        caps.checksum.udp = Checksum::None;
+        caps.checksum.icmpv4 = Checksum::None;
+        caps.checksum.icmpv6 = Checksum::None;
         caps
     }
 
