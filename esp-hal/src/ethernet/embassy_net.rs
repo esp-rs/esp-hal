@@ -12,7 +12,15 @@
 
 use core::task::Context;
 
-use embassy_net_driver_02::{Capabilities, Driver, HardwareAddress, LinkState, RxToken, TxToken};
+use embassy_net_driver_02::{
+    Capabilities,
+    Checksum,
+    Driver,
+    HardwareAddress,
+    LinkState,
+    RxToken,
+    TxToken,
+};
 
 use super::{Ethernet, RX_WAKER, TX_WAKER, mac::EmacRegs};
 use crate::{
@@ -145,6 +153,11 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
         caps.max_burst_size = Some(self.tx.len());
+        // The hardware is configured for (or rather, not prevented from) checksum offloading, we
+        // don't need smoltcp to spend cycles on computing them.
+        caps.checksum.ipv4 = Checksum::Tx;
+        caps.checksum.tcp = Checksum::Tx;
+        caps.checksum.udp = Checksum::Tx;
         caps
     }
 
