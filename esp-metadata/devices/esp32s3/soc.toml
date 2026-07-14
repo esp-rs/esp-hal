@@ -811,7 +811,15 @@ instances = [
 [device.ledc]
 version = 2
 channel_count = 8
+
 [device.mcpwm]
+support_status = "partial"
+swsync_can_propagate = true
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+    { name = "mcpwm1", sys_instance = "Mcpwm1" },
+]
+
 [device.pcnt]
 
 [device.sdmmc]

@@ -738,6 +738,13 @@ wakeup_sources = {
     Bt = 10,
 }
 
+[device.mcpwm]
+support_status = "partial"
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+    { name = "mcpwm1", sys_instance = "Mcpwm1" },
+]
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Interfaces
@@ -776,7 +783,6 @@ instances = [
 [device.ledc]
 version = 1
 channel_count = 8
-[device.mcpwm]
 [device.pcnt]
 
 [device.sdmmc]
