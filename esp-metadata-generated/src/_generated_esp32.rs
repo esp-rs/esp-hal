@@ -256,6 +256,21 @@ macro_rules! property {
     ("lp_io.has_gpio_matrix") => {
         false
     };
+    ("mcpwm.swsync_can_propagate") => {
+        false
+    };
+    ("mcpwm.capture_clk_from_group") => {
+        false
+    };
+    ("mcpwm.support_etm") => {
+        false
+    };
+    ("mcpwm.support_sleep_retention") => {
+        false
+    };
+    ("mcpwm.support_event_comparator") => {
+        false
+    };
     ("mmu.page_size") => {
         65536
     };
@@ -4155,6 +4170,31 @@ macro_rules! for_each_uart {
         wakeup_source = true), (1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS,
         wakeup_source = true), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS,
         wakeup_source = false)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the MCPWM driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident)`
+///
+/// Macro fragments:
+///
+/// - `$id`: the index of the MCPWM instance
+/// - `$instance`: the name of the MCPWM instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+///
+/// Example data: `(0, MCPWM0, Mcpwm0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mcpwm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mcpwm { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_mcpwm!((0, MCPWM0, Mcpwm0)); _for_each_inner_mcpwm!((1, MCPWM1,
+        Mcpwm1)); _for_each_inner_mcpwm!((all(0, MCPWM0, Mcpwm0), (1, MCPWM1, Mcpwm1)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
