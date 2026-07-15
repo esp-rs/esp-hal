@@ -1698,7 +1698,7 @@ mod read {
 
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin(mut ctx: Context) {
-        const BUFFER_SIZE: usize = 4;
+        const BUFFER_SIZE: usize = 145;
 
         ctx.miso_mirror.set_low();
 
@@ -1901,6 +1901,8 @@ mod write {
         spi: Spi<'static, Blocking>,
         pcnt_unit: Unit<'static, 0>,
         pcnt_source: InputSignal<'static>,
+        cs_unit: Unit<'static, 1>,
+        cs_source: InputSignal<'static>,
 
         #[cfg(spi_master_supports_dma)]
         dma_channel: DmaChannel<'static>,
@@ -1910,8 +1912,8 @@ mod write {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let sclk = peripherals.GPIO0;
         let (mosi, _) = hil_test::common_test_pins!(peripherals);
+        let (sclk, cs) = hil_test::i2c_pins!(peripherals);
 
         let pcnt = Pcnt::new(peripherals.PCNT);
 
@@ -1933,6 +1935,11 @@ mod write {
         mosi.set_output_enable(true);
         let mosi_loopback = mosi.peripheral_input();
 
+        let mut cs = Flex::new(cs);
+        cs.set_input_enable(true);
+        cs.set_output_enable(true);
+        let cs_loopback = cs.peripheral_input();
+
         let spi = Spi::new(
             peripherals.SPI2,
             Config::default()
@@ -1941,26 +1948,34 @@ mod write {
         )
         .unwrap()
         .with_sck(sclk)
-        .with_sio0(mosi);
+        .with_sio0(mosi)
+        .with_cs(cs);
 
         Context {
             spi,
             pcnt_unit: pcnt.unit0,
             pcnt_source: mosi_loopback,
+            cs_unit: pcnt.unit1,
+            cs_source: cs_loopback,
             #[cfg(spi_master_supports_dma)]
             dma_channel,
         }
     }
 
     fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
-        const BUFFER_SIZE: usize = 4;
+        const BUFFER_SIZE: usize = 145;
 
         let tx_buf = &mut [0; BUFFER_SIZE];
         let unit = ctx.pcnt_unit;
+        let cs_unit = ctx.cs_unit;
         let mut spi = ctx.spi;
 
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        cs_unit.channel0.set_edge_signal(ctx.cs_source);
+        cs_unit
+            .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
         tx_buf.fill(0b0110_1010);
@@ -1969,11 +1984,13 @@ mod write {
             .unwrap();
 
         assert_eq!(unit.value(), (3 * BUFFER_SIZE) as _);
+        assert_eq!(cs_unit.value(), 1);
 
         spi.half_duplex_write(mode, Command::None, Address::None, 0, tx_buf)
             .unwrap();
 
         assert_eq!(unit.value(), (6 * BUFFER_SIZE) as _);
+        assert_eq!(cs_unit.value(), 2);
     }
 
     #[cfg(spi_master_supports_dma)]
@@ -2552,7 +2569,7 @@ mod qspi_dma {
         write: u8,
         data_on_multiple_pins: bool,
     ) {
-        const BUFFER_SIZE: usize = 4;
+        const BUFFER_SIZE: usize = 145;
 
         let tx_buf = [write; BUFFER_SIZE];
 
@@ -2560,15 +2577,15 @@ mod qspi_dma {
             unit0.clear();
             unit1.clear();
             spi = transfer_write_cpu(spi, &tx_buf, write, command_data_mode);
-            assert_eq!(unit0.value() + unit1.value(), 8);
+            assert_eq!(unit0.value() + unit1.value(), (BUFFER_SIZE + 4) as _);
 
             if data_on_multiple_pins {
                 if command_data_mode == DataMode::SingleTwoDataLines {
                     assert_eq!(unit0.value(), 1);
-                    assert_eq!(unit1.value(), 7);
+                    assert_eq!(unit1.value(), (BUFFER_SIZE + 3) as _);
                 } else {
                     assert_eq!(unit0.value(), 0);
-                    assert_eq!(unit1.value(), 8);
+                    assert_eq!(unit1.value(), (BUFFER_SIZE + 4) as _);
                 }
             }
 
@@ -2639,6 +2656,21 @@ mod qspi_dma {
     }
 
     #[test]
+    fn test_spi_reads_correctly_from_gpio_pin_0_with_cpu(ctx: Context) {
+        const BUFFER_SIZE: usize = 145;
+
+        let [pin, pin_mirror, _] = ctx.gpios;
+        let _pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
+        let mut spi = ctx.spi.with_sio0(pin);
+        let mut buffer = [0; BUFFER_SIZE];
+
+        spi.half_duplex_read(DataMode::Quad, Command::None, Address::None, 0, &mut buffer)
+            .unwrap();
+
+        assert_eq!(buffer, [0b0001_0001; BUFFER_SIZE]);
+    }
+
+    #[test]
     async fn test_spi_reads_correctly_from_gpio_pin_0_async(ctx: Context) {
         const BUFFER_SIZE: usize = 4;
 
@@ -2664,6 +2696,31 @@ mod qspi_dma {
         spi.half_duplex_read_async(DataMode::Quad, Command::None, Address::None, 0, &mut buffer)
             .await
             .unwrap();
+        assert_eq!(buffer, [0b0001_0001; BUFFER_SIZE]);
+    }
+
+    #[test]
+    async fn test_spi_reads_correctly_from_gpio_pin_0_async_with_cpu_fallback(mut ctx: Context) {
+        const BUFFER_SIZE: usize = 145;
+
+        let [pin, pin_mirror, _] = ctx.gpios;
+        let _pin_mirror = Output::new(pin_mirror, Level::High, OutputConfig::default());
+        ctx.spi
+            .apply_config(
+                &Config::default().with_min_async_transfer_size(BUFFER_SIZE.saturating_add(1)),
+            )
+            .unwrap();
+        let mut spi = ctx
+            .spi
+            .with_sio0(pin)
+            .with_dma(ctx.dma_channel)
+            .into_async();
+        let mut buffer = [0; BUFFER_SIZE];
+
+        spi.half_duplex_read_async(DataMode::Quad, Command::None, Address::None, 0, &mut buffer)
+            .await
+            .unwrap();
+
         assert_eq!(buffer, [0b0001_0001; BUFFER_SIZE]);
     }
 

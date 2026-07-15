@@ -510,11 +510,24 @@ impl Driver {
         Ok(())
     }
 
+    fn prepare_half_duplex_chunk(&self, first: bool, last: bool) {
+        self.regs().user().modify(|_, w| {
+            if !first {
+                w.usr_command().clear_bit();
+                w.usr_addr().clear_bit();
+                w.usr_dummy().clear_bit();
+                w.cs_setup().clear_bit();
+            }
+            w.cs_hold().bit(last)
+        });
+        version::set_cs_keep_active(self, !last);
+    }
+
     /// Blocking, FIFO-based half-duplex read.
     ///
-    /// Performs the command, address, dummy, and data phases as a single SPI
-    /// transaction without involving the DMA engine. Because the FIFO is used,
-    /// `buffer` must not exceed [`FIFO_SIZE`].
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn half_duplex_read(
         &self,
@@ -524,10 +537,6 @@ impl Driver {
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
         if buffer.is_empty() {
             error!("Half-duplex mode does not support empty buffer");
             return Err(Error::Unsupported);
@@ -543,17 +552,26 @@ impl Driver {
             data_mode,
         )?;
 
-        self.configure_datalen(buffer.len(), 0);
-        self.start_operation();
-        self.flush()?;
-        self.read_from_fifo(buffer)
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        let mut first = true;
+        let mut chunks = buffer.chunks_mut(FIFO_SIZE).peekable();
+        while let Some(chunk) = chunks.next() {
+            let last = chunks.peek().is_none();
+            self.prepare_half_duplex_chunk(first, last);
+            self.configure_datalen(chunk.len(), 0);
+            self.start_operation();
+            self.flush()?;
+            self.read_from_fifo(chunk)?;
+            first = false;
+        }
+        Ok(())
     }
 
     /// Blocking, FIFO-based half-duplex write.
     ///
-    /// Performs the command, address, dummy, and data phases as a single SPI
-    /// transaction without involving the DMA engine. Because the FIFO is used,
-    /// `buffer` must not exceed [`FIFO_SIZE`].
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn half_duplex_write(
         &self,
@@ -563,10 +581,6 @@ impl Driver {
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
         cfg_select! {
             all(spi_master_version = "1", spi_address_workaround) => {
                 let mut buffer = buffer;
@@ -604,14 +618,25 @@ impl Driver {
             data_mode,
         )?;
 
-        if !buffer.is_empty() {
-            self.configure_datalen(0, buffer.len());
-            self.fill_fifo(buffer);
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        if buffer.is_empty() {
+            self.prepare_half_duplex_chunk(true, true);
+            self.start_operation();
+            self.flush()?;
+        } else {
+            let mut first = true;
+            let mut chunks = buffer.chunks(FIFO_SIZE).peekable();
+            while let Some(chunk) = chunks.next() {
+                let last = chunks.peek().is_none();
+                self.prepare_half_duplex_chunk(first, last);
+                self.configure_datalen(0, chunk.len());
+                self.fill_fifo(chunk);
+                self.start_operation();
+                self.flush()?;
+                first = false;
+            }
         }
-
-        self.start_operation();
-
-        self.flush()
+        Ok(())
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]

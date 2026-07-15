@@ -462,8 +462,7 @@ pub struct Config {
     /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
     /// both blocking and async DMA modes: when met, DMA is disabled and the
     /// transfer is performed by the CPU. This applies to both full-duplex and
-    /// half-duplex transfers; for half-duplex transfers the CPU-driven path is
-    /// only taken when the data also fits in the hardware FIFO.
+    /// half-duplex transfers.
     ///
     /// A value of `0` (the default) disables the threshold — all transfers use
     /// the driver's default method.
@@ -1192,12 +1191,14 @@ where
 
     /// Half-duplex read.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] or [`Error::Unsupported`] will be returned if
-    /// passed buffer is bigger than FIFO size or if buffer is empty (currently
-    /// unsupported). `DataMode::Single` cannot be combined with any other
-    /// [`DataMode`], otherwise [`Error::Unsupported`] will be returned.
+    /// [`Error::Unsupported`] will be returned if the buffer is empty (currently unsupported).
+    /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
+    /// [`Error::Unsupported`] will be returned.
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1214,10 +1215,13 @@ where
 
     /// Half-duplex write.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] will be returned if
-    /// passed buffer is bigger than FIFO size.
+    /// [`Error::Unsupported`] will be returned for unsupported combinations of command, address,
+    /// dummy, and data modes.
     #[cfg_attr(
         esp32,
         doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."

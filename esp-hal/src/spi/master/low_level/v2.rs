@@ -69,6 +69,13 @@ pub(super) fn setup_half_duplex(driver: &Driver) {
     driver.regs().misc().write(|w| unsafe { w.bits(0) });
 }
 
+pub(super) fn set_cs_keep_active(driver: &Driver, keep_active: bool) {
+    driver
+        .regs()
+        .misc()
+        .modify(|_, w| w.cs_keep_active().bit(keep_active));
+}
+
 pub(super) fn write_address(driver: &Driver, addr: u32) {
     driver
         .regs()
