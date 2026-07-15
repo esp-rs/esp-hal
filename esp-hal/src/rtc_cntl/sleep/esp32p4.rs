@@ -461,7 +461,8 @@ impl DigitalSleepConfig {
                 .bit(self.syscntl.dig_pad_slp_sel());
             w.hp_sleep_lp_pad_hold_all()
                 .bit(self.syscntl.lp_pad_hold_all());
-            w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt())
+            w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt());
+            w.hp_sleep_dig_cpu_stall().bit(true)
         });
     }
 }
