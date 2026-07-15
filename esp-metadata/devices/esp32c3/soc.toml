@@ -12,21 +12,15 @@ target = "riscv32imc-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
-]
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
 
 [device.soc]
 cpu_has_csr_pc = true
+
+has_swd_watchdog = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 },

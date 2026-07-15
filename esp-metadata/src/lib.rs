@@ -326,8 +326,6 @@ struct Device {
     cores: usize,
     trm: String,
 
-    symbols: Vec<String>,
-
     // Peripheral driver configuration:
     #[serde(flatten)]
     peri_config: PeriConfig,
@@ -376,7 +374,6 @@ impl Config {
                 target: String::new(),
                 cores: 1,
                 trm: String::new(),
-                symbols: Vec::new(),
                 peri_config: PeriConfig::default(),
             },
             all_symbols: OnceLock::new(),
@@ -432,11 +429,6 @@ impl Config {
             .unwrap_or(&[])
     }
 
-    /// User-defined symbols for the device.
-    pub fn symbols(&self) -> &[String] {
-        &self.device.symbols
-    }
-
     /// All configuration values for the device.
     pub fn all(&self) -> &[String] {
         self.all_symbols.get_or_init(|| {
@@ -449,7 +441,6 @@ impl Config {
                 },
             ];
             all.extend(self.peripherals().iter().map(|p| p.symbol_name()));
-            all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device
                     .peri_config

@@ -12,18 +12,10 @@ target = "xtensa-esp32-none-elf"
 cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
-symbols = [
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_ext0_wakeup",
-    "pm_support_ext1_wakeup",
-    "pm_support_touch_sensor_wakeup",
-    "ulp_supported",
-]
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true

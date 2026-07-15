@@ -768,7 +768,7 @@ pub fn init(config: Config) -> Peripherals {
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers
-    #[cfg(swd)]
+    #[cfg(soc_has_swd_watchdog)]
     rtc.swd.disable();
 
     rtc.rwdt.disable();

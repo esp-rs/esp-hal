@@ -352,6 +352,18 @@ macro_rules! property {
     ("rng.is_lp_sys") => {
         true
     };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        true
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
+        false
+    };
     ("rsa.version") => {
         3
     };
@@ -393,6 +405,9 @@ macro_rules! property {
     };
     ("soc.internal_memory_cached") => {
         false
+    };
+    ("soc.has_swd_watchdog") => {
+        true
     };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
