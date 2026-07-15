@@ -627,6 +627,21 @@ driver_configs![
             is_lp_sys: bool,
         }
     },
+    RomProperties {
+        driver: rom,
+        name: "ROM",
+        hide_from_peri_table: true,
+        properties: {
+            #[serde(default)]
+            has_crc_le: bool,
+            #[serde(default)]
+            has_crc_be: bool,
+            #[serde(default)]
+            has_md5_bsd: bool,
+            #[serde(default)]
+            has_md5_mbedtls: bool,
+        }
+    },
     RsaProperties {
         driver: rsa,
         name: "RSA",

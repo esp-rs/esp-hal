@@ -12,12 +12,10 @@ target = "xtensa-esp32-none-elf"
 cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
-symbols = [
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-]
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true

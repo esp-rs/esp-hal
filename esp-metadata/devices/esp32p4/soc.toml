@@ -14,12 +14,12 @@ trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_te
 
 symbols = [
     "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
 ]
+
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
 
 [device.interrupts]
 support_status = "partial"

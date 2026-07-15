@@ -4,9 +4,9 @@
 //!
 //! For some selected ROM functions safe wrappers are provided for convenience.
 
-#[cfg(any(rom_crc_be, rom_crc_le))]
+#[cfg(any(rom_has_crc_be, rom_has_crc_le))]
 pub mod crc;
-#[cfg(any(rom_md5_bsd, rom_md5_mbedtls))]
+#[cfg(any(rom_has_md5_bsd, rom_has_md5_mbedtls))]
 pub mod md5;
 pub mod spiflash;
 

@@ -97,7 +97,7 @@
 // and alignment of `usize` and `u32` are identical on all ESP32 chips.
 
 /// Left-shifting CRC-32 with polynomial 0x04c11db7
-#[cfg(rom_crc_be)]
+#[cfg(rom_has_crc_be)]
 #[inline(always)]
 pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
     unsafe extern "C" {
@@ -107,7 +107,7 @@ pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
 }
 
 /// Left-shifting CRC-16 with polynomial 0x1021
-#[cfg(rom_crc_be)]
+#[cfg(rom_has_crc_be)]
 #[inline(always)]
 pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
     unsafe extern "C" {
@@ -117,7 +117,7 @@ pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
 }
 
 /// Left-shifting CRC-8 with polynomial 0x07
-#[cfg(rom_crc_be)]
+#[cfg(rom_has_crc_be)]
 #[inline(always)]
 pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
     unsafe extern "C" {
@@ -127,7 +127,7 @@ pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
 }
 
 /// Right-shifting CRC-32 with polynomial 0x04c11db7
-#[cfg(rom_crc_le)]
+#[cfg(rom_has_crc_le)]
 #[inline(always)]
 pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
     unsafe extern "C" {
@@ -137,7 +137,7 @@ pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
 }
 
 /// Right-shifting CRC-16 with polynomial 0x1021
-#[cfg(rom_crc_le)]
+#[cfg(rom_has_crc_le)]
 #[inline(always)]
 pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
     unsafe extern "C" {
@@ -148,7 +148,7 @@ pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
 
 /// Right-shifting CRC-8 with polynomial 0x07
 #[inline(always)]
-#[cfg(rom_crc_le)]
+#[cfg(rom_has_crc_le)]
 pub fn crc8_le(crc: u8, buf: &[u8]) -> u8 {
     unsafe extern "C" {
         fn esp_rom_crc8_le(crc: u8, buf: *const u8, len: u32) -> u8;
@@ -160,7 +160,7 @@ pub fn crc8_le(crc: u8, buf: &[u8]) -> u8 {
 // bounds checking, so the following code may not benefit from unsafe array
 // indexing.
 
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 static CRC32_BE_TABLE: [u32; 256] = [
     0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
     0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
@@ -196,7 +196,7 @@ static CRC32_BE_TABLE: [u32; 256] = [
     0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668, 0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4,
 ];
 
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 #[rustfmt::skip]
 static CRC16_BE_TABLE: [u16; 256] = [
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
@@ -217,7 +217,7 @@ static CRC16_BE_TABLE: [u16; 256] = [
     0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8, 0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0
 ];
 
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 static CRC8_BE_TABLE: [u8; 256] = [
     0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15, 0x38, 0x3f, 0x36, 0x31, 0x24, 0x23, 0x2a, 0x2d,
     0x70, 0x77, 0x7e, 0x79, 0x6c, 0x6b, 0x62, 0x65, 0x48, 0x4f, 0x46, 0x41, 0x54, 0x53, 0x5a, 0x5d,
@@ -238,7 +238,7 @@ static CRC8_BE_TABLE: [u8; 256] = [
 ];
 
 /// Left-shifting CRC-32 with polynomial 0x04c11db7
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
     let mut crc = !crc;
     for &byte in buf {
@@ -248,7 +248,7 @@ pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
 }
 
 /// Left-shifting CRC-16 with polynomial 0x1021
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
     let mut crc = !crc;
     for &byte in buf {
@@ -258,7 +258,7 @@ pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
 }
 
 /// Left-shifting CRC-8 with polynomial 0x07
-#[cfg(not(rom_crc_be))]
+#[cfg(not(rom_has_crc_be))]
 pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
     let mut crc = !crc;
     for &byte in buf {
@@ -267,7 +267,7 @@ pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
     !crc
 }
 
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 static CRC32_LE_TABLE: [u32; 256] = [
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
     0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988, 0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91,
@@ -303,7 +303,7 @@ static CRC32_LE_TABLE: [u32; 256] = [
     0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 ];
 
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 #[rustfmt::skip]
 static CRC16_LE_TABLE: [u16; 256] = [
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf, 0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
@@ -325,7 +325,7 @@ static CRC16_LE_TABLE: [u16; 256] = [
     0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330, 0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 ];
 
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 static CRC8_LE_TABLE: [u8; 256] = [
     0x00, 0x91, 0xe3, 0x72, 0x07, 0x96, 0xe4, 0x75, 0x0e, 0x9f, 0xed, 0x7c, 0x09, 0x98, 0xea, 0x7b,
     0x1c, 0x8d, 0xff, 0x6e, 0x1b, 0x8a, 0xf8, 0x69, 0x12, 0x83, 0xf1, 0x60, 0x15, 0x84, 0xf6, 0x67,
@@ -346,7 +346,7 @@ static CRC8_LE_TABLE: [u8; 256] = [
 ];
 
 /// Right-shifting CRC-32 with polynomial 0x04c11db7
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
     let mut crc = !crc;
     for &byte in buf {
@@ -356,7 +356,7 @@ pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
 }
 
 /// Right-shifting CRC-16 with polynomial 0x1021
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
     let mut crc = !crc;
     for &byte in buf {
@@ -366,7 +366,7 @@ pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
 }
 
 /// Right-shifting CRC-8 with polynomial 0x07
-#[cfg(not(rom_crc_le))]
+#[cfg(not(rom_has_crc_le))]
 pub fn crc8_le(crc: u8, buf: &[u8]) -> u8 {
     let mut crc = !crc;
     for &byte in buf {

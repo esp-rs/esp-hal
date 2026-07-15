@@ -326,6 +326,7 @@ struct Device {
     cores: usize,
     trm: String,
 
+    #[serde(default)]
     symbols: Vec<String>,
 
     // Peripheral driver configuration:

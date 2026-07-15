@@ -316,6 +316,18 @@ macro_rules! property {
     ("rng.is_lp_sys") => {
         false
     };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        false
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
+        false
+    };
     ("rsa.version") => {
         2
     };

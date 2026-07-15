@@ -14,12 +14,12 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_te
 
 symbols = [
     "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_mbedtls",
 ]
+
+[device.rom]
+has_crc_le      = true
+has_crc_be      = true
+has_md5_mbedtls = true
 
 [device.soc]
 cpu_has_csr_pc = true
