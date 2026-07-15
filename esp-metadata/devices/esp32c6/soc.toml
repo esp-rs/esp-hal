@@ -19,11 +19,6 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
-    "pm_support_ext1_wakeup", # FIXME https://github.com/esp-rs/esp-hal/issues/5798
 ]
 
 [device.soc]

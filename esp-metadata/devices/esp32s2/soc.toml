@@ -18,14 +18,6 @@ symbols = [
     # ROM capabilities
     "rom_crc_le",
     "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_ext0_wakeup",
-    "pm_support_ext1_wakeup",
-    "pm_support_touch_sensor_wakeup",
-    "pm_support_wifi_wakeup",
-    "ulp_supported",
-    "riscv_coproc_supported",
 ]
 
 [device.soc]
