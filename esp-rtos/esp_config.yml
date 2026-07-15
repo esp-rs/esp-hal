@@ -31,3 +31,14 @@ options:
     description: "Enable hardware-based stack overflow detection. The stack watermark is based on the esp-hal stack-guard-offset configuration."
     default:
       - value: true
+
+  - name: radio-timer-thread-priority
+    description: "Priority of the timer thread serving esp-radio."
+    default:
+      - value: 2
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 2
+            end: 28

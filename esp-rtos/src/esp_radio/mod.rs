@@ -169,6 +169,10 @@ impl WaitQueueImplementation for WaitQueue {
 }
 
 register_semaphore_implementation!(CompatSemaphore);
-register_timer_implementation!(CompatTimer);
+register_timer_implementation!(
+    CompatTimer<
+        { esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_RADIO_TIMER_THREAD_PRIORITY") },
+    >
+);
 register_queue_implementation!(CompatQueue);
 register_wait_queue_implementation!(WaitQueue);
