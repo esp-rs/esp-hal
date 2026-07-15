@@ -1,13 +1,121 @@
 //! I2S Loopback and I2S parallel interface tests
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
-//! with loopback mode enabled).
+//! with loopback mode enabled) besides other tests for I2S.
+//!
+//! Built as named xtask configurations (`i2s_i2s0`, `i2s_i2s1`, …) so each I2S
+//! instance is exercised on chips where metadata declares it.
 
-//% CHIP_FILTER: i2s_driver_supported
 //% FEATURES: unstable
+//% CHIP_FILTER(i2s0): i2s_driver_supported && i2s_i2s0
+//% CHIP_FILTER(i2s1): i2s_driver_supported && i2s_i2s1
+//% CHIP_FILTER(i2s2): i2s_driver_supported && i2s_i2s2
+//% ENV(i2s0): HIL_I2S_INSTANCE=0
+//% ENV(i2s1): HIL_I2S_INSTANCE=1
+//% ENV(i2s2): HIL_I2S_INSTANCE=2
 
 #![no_std]
 #![no_main]
+
+macro_rules! i2s_dma_channel_for {
+    ($peripherals:expr, I2S0) => {
+        cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                $peripherals.DMA_I2S0
+            },
+            _ => {
+                $peripherals.DMA_CH0
+            },
+        }
+    };
+    ($peripherals:expr, I2S1) => {
+        cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                $peripherals.DMA_I2S1
+            },
+            _ => {
+                $peripherals.DMA_CH1
+            },
+        }
+    };
+    ($peripherals:expr, I2S2) => {
+        $peripherals.DMA_CH2
+    };
+}
+
+macro_rules! i2s_test_types {
+    () => {
+        #[cfg(i2s_hil_instance = "0")]
+        type TestI2s<'d> = esp_hal::peripherals::I2S0<'d>;
+
+        #[cfg(all(i2s_hil_instance = "1", soc_has_i2s1))]
+        type TestI2s<'d> = esp_hal::peripherals::I2S1<'d>;
+
+        #[cfg(all(i2s_hil_instance = "2", soc_has_i2s2))]
+        type TestI2s<'d> = esp_hal::peripherals::I2S2<'d>;
+
+        #[cfg(i2s_hil_instance = "0")]
+        type TestDma<'d> = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                esp_hal::peripherals::DMA_I2S0<'d>
+            },
+            _ => {
+                esp_hal::peripherals::DMA_CH0<'d>
+            },
+        };
+
+        #[cfg(all(i2s_hil_instance = "1", soc_has_i2s1))]
+        type TestDma<'d> = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                esp_hal::peripherals::DMA_I2S1<'d>
+            },
+            _ => {
+                esp_hal::peripherals::DMA_CH1<'d>
+            },
+        };
+
+        #[cfg(all(i2s_hil_instance = "2", soc_has_i2s2))]
+        type TestDma<'d> = esp_hal::peripherals::DMA_CH2<'d>;
+    };
+}
+
+macro_rules! i2s_take_configured {
+    ($peripherals:expr) => {{
+        #[cfg(i2s_hil_instance = "0")]
+        {
+            ($peripherals.I2S0, i2s_dma_channel_for!($peripherals, I2S0))
+        }
+        #[cfg(all(i2s_hil_instance = "1", soc_has_i2s1))]
+        {
+            ($peripherals.I2S1, i2s_dma_channel_for!($peripherals, I2S1))
+        }
+        #[cfg(all(i2s_hil_instance = "2", soc_has_i2s2))]
+        {
+            ($peripherals.I2S2, i2s_dma_channel_for!($peripherals, I2S2))
+        }
+    }};
+}
+
+#[allow(
+    unused_macros,
+    reason = "only used by PDM validate tests and the half-sample-bits regression test, which are not built for every chip/instance configuration"
+)]
+macro_rules! i2s_steal_configured {
+    () => {{
+        #[cfg(i2s_hil_instance = "0")]
+        {
+            unsafe { esp_hal::peripherals::I2S0::steal() }
+        }
+        #[cfg(all(i2s_hil_instance = "1", soc_has_i2s1))]
+        {
+            unsafe { esp_hal::peripherals::I2S1::steal() }
+        }
+        #[cfg(all(i2s_hil_instance = "2", soc_has_i2s2))]
+        {
+            unsafe { esp_hal::peripherals::I2S2::steal() }
+        }
+    }};
+}
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
@@ -19,18 +127,10 @@ mod tests {
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
         i2s::master::{Channels, DataFormat, I2s, I2sTx, TdmConfig},
-        peripherals::I2S0,
         time::Rate,
     };
 
-    cfg_select! {
-        any(esp32, esp32s2) => {
-            type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-        }
-        _ => {
-            type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
-        }
-    }
+    i2s_test_types!();
 
     const BUFFER_SIZE: usize = 2000;
 
@@ -93,8 +193,8 @@ mod tests {
 
     struct Context {
         dout: AnyPin<'static>,
-        dma_channel: DmaChannel0<'static>,
-        i2s: I2S0<'static>,
+        dma_channel: TestDma<'static>,
+        i2s: TestI2s<'static>,
     }
 
     #[init]
@@ -103,10 +203,7 @@ mod tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
-            _ => peripherals.DMA_CH0,
-        };
+        let (i2s, dma_channel) = i2s_take_configured!(peripherals);
 
         #[cfg(not(esp32c5))]
         let (_, dout) = hil_test::common_test_pins!(peripherals);
@@ -120,7 +217,7 @@ mod tests {
         Context {
             dout: dout.degrade(),
             dma_channel,
-            i2s: peripherals.I2S0,
+            i2s,
         }
     }
 
@@ -336,8 +433,11 @@ mod tests {
         )
         .unwrap();
 
-        // Access registers directly to read back the configured values
-        let regs = esp_hal::peripherals::I2S0::regs();
+        use esp_hal::i2s::master::Instance;
+
+        // Access registers directly to read back the configured values.
+        let i2s = i2s_steal_configured!();
+        let regs = unsafe { &*i2s.info().register_block };
         let tx_conf1 = regs.tx_conf1().read();
         let rx_conf1 = regs.rx_conf1().read();
 
@@ -673,12 +773,14 @@ mod parallel_tests {
     use esp_hal::{
         gpio::NoPin,
         i2s::parallel::{I2sParallel, TxSixteenBits},
-        peripherals::{DMA_I2S0, I2S0},
         time::Rate,
     };
+
+    i2s_test_types!();
+
     struct Context {
-        dma_channel: DMA_I2S0<'static>,
-        i2s: I2S0<'static>,
+        dma_channel: TestDma<'static>,
+        i2s: TestI2s<'static>,
     }
 
     #[init]
@@ -687,12 +789,9 @@ mod parallel_tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        let dma_channel = peripherals.DMA_I2S0;
+        let (i2s, dma_channel) = i2s_take_configured!(peripherals);
 
-        Context {
-            dma_channel,
-            i2s: peripherals.I2S0,
-        }
+        Context { dma_channel, i2s }
     }
 
     #[test]
@@ -725,7 +824,7 @@ mod parallel_tests {
     }
 }
 
-#[cfg(i2s_supports_pdm_tx)]
+#[cfg(i2s_hil_current_instance_supports_pdm_tx)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod pdm_tx_tests {
     use esp_hal::{
@@ -737,7 +836,7 @@ mod pdm_tx_tests {
     #[test]
     fn pdm_tx_config_validate() {
         let tx = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
-        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        let i2s = i2s_steal_configured!();
         assert!(tx.validate(i2s.info()).is_ok());
     }
 
@@ -745,15 +844,12 @@ mod pdm_tx_tests {
     fn pdm_tx_init_and_write() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
-            _ => peripherals.DMA_CH0,
-        };
+        let (i2s, dma_channel) = i2s_take_configured!(peripherals);
 
         let tx_cfg = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
         let pdm_cfg = esp_hal::i2s::master::PdmConfig::tx_only(tx_cfg);
 
-        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+        let i2s = I2s::new_pdm(i2s, dma_channel, pdm_cfg)
             .unwrap()
             .i2s_tx
             .with_clk(peripherals.GPIO1)
@@ -769,7 +865,7 @@ mod pdm_tx_tests {
     }
 }
 
-#[cfg(i2s_supports_pdm_rx)]
+#[cfg(i2s_hil_current_instance_supports_pdm_rx)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod pdm_rx_tests {
     use esp_hal::{
@@ -792,7 +888,7 @@ mod pdm_rx_tests {
     #[test]
     fn pdm_rx_config_validate() {
         let rx = default_rx_config();
-        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        let i2s = i2s_steal_configured!();
         assert!(rx.validate(i2s.info()).is_ok());
     }
 
@@ -800,18 +896,11 @@ mod pdm_rx_tests {
     fn pdm_rx_init_and_read() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                peripherals.DMA_I2S0
-            },
-            _ => {
-                peripherals.DMA_CH0
-            },
-        };
+        let (i2s, dma_channel) = i2s_take_configured!(peripherals);
 
         let pdm_cfg = PdmConfig::rx_only(default_rx_config());
 
-        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+        let i2s = I2s::new_pdm(i2s, dma_channel, pdm_cfg)
             .unwrap()
             .i2s_rx
             .with_clk(peripherals.GPIO1)
