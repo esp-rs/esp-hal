@@ -517,9 +517,6 @@ unsafe extern "C" {
     /// Writes USR / USER1 / USER2 / ADDR / MOSI_DLEN / MISO_DLEN / W0..
     /// Linked from `esp32p4.rom.ld`: `esp_rom_spi_cmd_config = 0x4fc00108`.
     fn esp_rom_spi_cmd_config(spi_num: i32, pcmd: *mut EspRomSpiCmd);
-
-    /// `Cache_Invalidate_All = 0x4fc00404`. Invalidates all cache levels.
-    fn Cache_Invalidate_All();
 }
 
 /// Kick the controller (set `SPI_USR` bit 18 in CMD_REG) and poll
@@ -693,8 +690,10 @@ fn mmu_map_psram(config: &PsramConfig) {
     for page in 0..page_count {
         write_psram_mmu_entry(page as u32, page as u16);
     }
+
+    // Invalidate the newly mapped PSRAM window.
     unsafe {
-        Cache_Invalidate_All();
+        crate::soc::cache_invalidate_addr(EXTMEM_ORIGIN as u32, config.size.get() as u32);
     }
 }
 
