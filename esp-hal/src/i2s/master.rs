@@ -1606,6 +1606,8 @@ impl Instance for AnyI2s<'_> {
             AnyI2sInner::I2s0(i2s) => i2s.info(),
             #[cfg(soc_has_i2s1)]
             AnyI2sInner::I2s1(i2s) => i2s.info(),
+            #[cfg(soc_has_i2s2)]
+            AnyI2sInner::I2s2(i2s) => i2s.info(),
         }
     }
 }
@@ -1617,6 +1619,8 @@ impl AnyI2s<'_> {
             AnyI2sInner::I2s0(i2s) => i2s,
             #[cfg(soc_has_i2s1)]
             AnyI2sInner::I2s1(i2s) => i2s,
+            #[cfg(soc_has_i2s2)]
+            AnyI2sInner::I2s2(i2s) => i2s,
         } {
             fn bind_peri_interrupt(&self, handler: InterruptHandler);
             fn disable_peri_interrupt_on_all_cores(&self);
@@ -2476,46 +2480,10 @@ impl Info {
         });
     }
 
-    // TODO support I2S1/I2S2 (ESP32-P4)
     #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
     pub(crate) fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-        // I2S clocks are configured via HP_SYS_CLKRST (ESP32-P4).
-        use crate::peripherals::HP_SYS_CLKRST;
+        super::hp_sys_clkrst::set_tx_clock(self.peripheral, &clock_settings);
 
-        let clkm_div = clock_settings.mclk_dividers();
-        let clkrst = HP_SYS_CLKRST::regs();
-
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl14()
-            .modify(|_, w| w.i2s0_mst_clk_sel().set_bit());
-
-        // Workaround for the double-division issue documented in esp-idf i2s_ll.h.
-        clkrst
-            .peri_clk_ctrl13()
-            .modify(|_, w| unsafe { w.i2s0_tx_div_n().bits(2) });
-        clkrst.peri_clk_ctrl14().modify(|_, w| unsafe {
-            w.i2s0_tx_div_yn1().clear_bit();
-            w.i2s0_tx_div_y().bits(1);
-            w.i2s0_tx_div_z().bits(0)
-        });
-        clkrst
-            .peri_clk_ctrl13()
-            .modify(|_, w| unsafe { w.i2s0_tx_div_x().bits(0) });
-
-        clkrst.peri_clk_ctrl14().modify(|_, w| unsafe {
-            w.i2s0_tx_div_yn1().bit(clkm_div.yn1);
-            w.i2s0_tx_div_z().bits(clkm_div.z as u16);
-            w.i2s0_tx_div_y().bits(clkm_div.y as u16)
-        });
-        clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
-            w.i2s0_tx_div_x().bits(clkm_div.x as u16);
-            w.i2s0_tx_div_n().bits(clock_settings.mclk_divider as u8);
-            w.i2s0_tx_clk_en().set_bit();
-            w.i2s0_tx_clk_src_sel()
-                .bits(property!("i2s.default_clock_source"))
-        });
-
-        // FIXME: why does P4-specific code have version cfgs?
         #[cfg(i2s_version = "2")]
         self.regs().tx_conf1().modify(|_, w| unsafe {
             w.tx_bck_div_num()
@@ -2529,48 +2497,10 @@ impl Info {
         });
     }
 
-    // TODO support I2S1/I2S2 (ESP32-P4)
     #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
     pub(crate) fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-        // I2S clocks are configured via HP_SYS_CLKRST (ESP32-P4).
-        use crate::peripherals::HP_SYS_CLKRST;
+        super::hp_sys_clkrst::set_rx_clock(self.peripheral, &clock_settings);
 
-        let clkm_div = clock_settings.mclk_dividers();
-        let clkrst = HP_SYS_CLKRST::regs();
-
-        HP_SYS_CLKRST::regs()
-            .peri_clk_ctrl14()
-            .modify(|_, w| w.i2s0_mst_clk_sel().clear_bit());
-
-        // Workaround for the double-division issue documented in esp-idf i2s_ll.h.
-        clkrst
-            .peri_clk_ctrl12()
-            .modify(|_, w| unsafe { w.i2s0_rx_div_n().bits(2) });
-        clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
-            w.i2s0_rx_div_yn1().clear_bit();
-            w.i2s0_rx_div_z().bits(0)
-        });
-        clkrst.peri_clk_ctrl12().modify(|_, w| unsafe {
-            w.i2s0_rx_div_y().bits(1);
-            w.i2s0_rx_div_x().bits(0)
-        });
-
-        clkrst.peri_clk_ctrl13().modify(|_, w| unsafe {
-            w.i2s0_rx_div_yn1().bit(clkm_div.yn1);
-            w.i2s0_rx_div_z().bits(clkm_div.z as u16)
-        });
-        clkrst.peri_clk_ctrl12().modify(|_, w| unsafe {
-            w.i2s0_rx_div_x().bits(clkm_div.x as u16);
-            w.i2s0_rx_div_y().bits(clkm_div.y as u16);
-            w.i2s0_rx_div_n().bits(clock_settings.mclk_divider as u8)
-        });
-        clkrst.peri_clk_ctrl11().modify(|_, w| unsafe {
-            w.i2s0_rx_clk_en().set_bit();
-            w.i2s0_rx_clk_src_sel()
-                .bits(property!("i2s.default_clock_source"))
-        });
-
-        // FIXME: why does P4-specific code have version cfgs?
         #[cfg(i2s_version = "2")]
         self.regs().rx_conf1().modify(|_, w| unsafe {
             w.rx_bck_div_num()
