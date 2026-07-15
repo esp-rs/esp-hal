@@ -77,6 +77,17 @@ pub fn configure(lpwr: LPWR<'static>) -> Sleep {
 
 extern "C" fn auto_light_sleep_hook() -> ! {
     loop {
+        // ESP32-P4 HP wakeup handling is coordinated by the primary core. If
+        // AppCpu enters sleep after parking ProCpu, an HP peripheral wakeup
+        // such as GPIO cannot resume the parked primary core.
+        #[cfg(all(multi_core, esp32p4))]
+        if Cpu::current() == Cpu::AppCpu {
+            // Kick the other core so that it can put the system to sleep.
+            task::trigger_scheduler(RunSchedulerOn::RunOnCore(Cpu::ProCpu));
+            esp_hal::interrupt::wait_for_interrupt();
+            continue;
+        }
+
         SCHEDULER.with(|scheduler| {
             if WakeLock::is_active() {
                 return;
