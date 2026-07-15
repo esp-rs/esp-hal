@@ -223,7 +223,7 @@ pub struct Rtc<'d> {
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     /// Super Watchdog
-    #[cfg(swd)]
+    #[cfg(soc_has_swd_watchdog)]
     pub swd: Swd,
 }
 
@@ -235,7 +235,7 @@ impl<'d> Rtc<'d> {
         Self {
             rtc_timer,
             rwdt: Rwdt,
-            #[cfg(swd)]
+            #[cfg(soc_has_swd_watchdog)]
             swd: Swd,
         }
     }
@@ -659,12 +659,12 @@ impl Rwdt {
 }
 
 /// Super Watchdog
-#[cfg(swd)]
+#[cfg(soc_has_swd_watchdog)]
 #[non_exhaustive]
 pub struct Swd;
 
 /// Super Watchdog driver
-#[cfg(swd)]
+#[cfg(soc_has_swd_watchdog)]
 impl Swd {
     /// Enable the watchdog timer instance
     pub fn enable(&mut self) {

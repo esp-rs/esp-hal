@@ -12,10 +12,6 @@ target = "xtensa-esp32s2-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-]
-
 [device.rom]
 has_crc_le  = true
 has_md5_bsd = true
@@ -25,6 +21,7 @@ memory_map = { ranges = [
     { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
 ] }
+has_swd_watchdog = true
 
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" } },

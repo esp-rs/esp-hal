@@ -12,10 +12,6 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-]
-
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -41,6 +37,8 @@ cpu_has_branch_predictor = true
 multi_core_enabled = true
 cpu_has_csr_pc = false
 internal_memory_cached = true
+
+has_swd_watchdog = true
 
 # HP L2MEM: 0x4FF0_0000 - 0x4FFC_0000 (768 KB)
 # ROM bootloader reserves 0x4FF0_0000 - 0x4FF4_0000 (256 KB)

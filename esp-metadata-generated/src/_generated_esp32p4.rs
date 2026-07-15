@@ -370,6 +370,9 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         true
     };
+    ("soc.has_swd_watchdog") => {
+        true
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };

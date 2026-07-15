@@ -12,10 +12,6 @@ target = "xtensa-esp32s3-none-elf"
 cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-]
-
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -23,6 +19,7 @@ has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
+has_swd_watchdog = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 },

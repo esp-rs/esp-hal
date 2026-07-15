@@ -12,10 +12,6 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-]
-
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -25,6 +21,8 @@ has_md5_bsd = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
+
+has_swd_watchdog = true
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },

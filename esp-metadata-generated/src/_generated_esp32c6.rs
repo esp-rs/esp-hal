@@ -406,6 +406,9 @@ macro_rules! property {
     ("soc.internal_memory_cached") => {
         false
     };
+    ("soc.has_swd_watchdog") => {
+        true
+    };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
     };
