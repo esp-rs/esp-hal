@@ -460,7 +460,7 @@ jobs:
   hil-build:
     needs: calculate
     if: needs.calculate.outputs.run-hil == 'true'
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
     outputs:
       matrix: ${{ steps.chips.outputs.matrix }}
     steps:
@@ -495,46 +495,8 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      # Cache the cross-compiled binaries, they rarely change so this
-      # avoids the expensive cross build.
-      - name: Cache xtask binaries
-        id: xtask-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            target/armv7-unknown-linux-gnueabihf/release/xtask
-            target/aarch64-unknown-linux-gnu/release/xtask
-          key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'esp-metadata/**', 'xtask-mcp-macros/**') }}
-
-      - name: Install cross-compilation targets
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: |
-          rustup target add aarch64-unknown-linux-gnu
-          rustup target add armv7-unknown-linux-gnueabihf
-
-      - uses: taiki-e/install-action@v2
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        with:
-          tool: cross
-
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v2
-
-      - name: Build xtask for HIL runners
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: |
-          cross build --release --target armv7-unknown-linux-gnueabihf -p esp-devtool
-          cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: xtask-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/esp-devtool
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: xtask-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
 
       - name: Build hil-test tests
         run: |
@@ -576,9 +538,58 @@ jobs:
           path: target/tests/
           if-no-files-found: ignore
 
+  hil-devtool:
+    needs: calculate
+    if: needs.calculate.outputs.run-hil == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # xtask runs on the HIL runners as a host tool.
+      # Cache the cross-compiled binaries, they rarely change so this
+      # avoids the expensive cross build.
+      - name: Cache xtask binaries
+        id: xtask-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/armv7-unknown-linux-gnueabihf/release/esp-devtool
+            target/aarch64-unknown-linux-gnu/release/esp-devtool
+          key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'esp-metadata/**', 'xtask-mcp-macros/**') }}
+
+      - name: Install cross-compilation targets
+        if: steps.xtask-cache.outputs.cache-hit != 'true'
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
+
+      - uses: taiki-e/install-action@v2
+        if: steps.xtask-cache.outputs.cache-hit != 'true'
+        with:
+          tool: cross
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build xtask for HIL runners
+        if: steps.xtask-cache.outputs.cache-hit != 'true'
+        run: |
+          cross build --release --target armv7-unknown-linux-gnueabihf -p esp-devtool
+          cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/esp-devtool
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xtask-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
+
   # Device runs — aggregated by hil-gate (see below).
   hil-run:
-    needs: hil-build
+    needs: [hil-build, hil-devtool]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -621,7 +632,7 @@ jobs:
   # Radio HIL device runs — wifi/BT capable chips on dedicated radio runners.
   # Not gated by hil-gate or ci-result.
   hil-run-radio:
-    needs: hil-build
+    needs: [hil-build, hil-devtool]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:

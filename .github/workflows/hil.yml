@@ -72,7 +72,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
     outputs:
       matrix: ${{ steps.chips.outputs.matrix }}
       radio_matrix: ${{ steps.chips.outputs.radio_matrix }}
@@ -219,8 +219,19 @@ jobs:
           path: target/tests/
           if-no-files-found: ignore
 
+  devtool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name != 'workflow_dispatch'
+      - uses: actions/checkout@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+
       # xtask runs on the HIL runners as a host tool.
-      # We build the actual tests using the correct toolchain before.
+      # We build the actual tests separately using the correct toolchain.
       # Cache the cross-compiled binaries, they rarely change so this
       # avoids the expensive cross build.
       - name: Cache xtask binaries
@@ -228,8 +239,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            target/armv7-unknown-linux-gnueabihf/release/xtask
-            target/aarch64-unknown-linux-gnu/release/xtask
+            target/armv7-unknown-linux-gnueabihf/release/esp-devtool
+            target/aarch64-unknown-linux-gnu/release/esp-devtool
           key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'esp-metadata/**', 'xtask-mcp-macros/**') }}
 
       - name: Install host toolchain for cross-compiling xtask
@@ -263,7 +274,7 @@ jobs:
           path: target/aarch64-unknown-linux-gnu/release/esp-devtool
 
   hil:
-    needs: build
+    needs: [build, devtool]
     if: ${{ inputs.package != 'hil-test-radio' }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -320,7 +331,7 @@ jobs:
   # radio runners.  The matrix is empty when no requested chip has a radio
   # runner, which causes this job to be skipped entirely.
   hil-radio:
-    needs: build
+    needs: [build, devtool]
     if: >
       inputs.package != 'hil-test' &&
       needs.build.outputs.radio_matrix != '{"target":[]}'
