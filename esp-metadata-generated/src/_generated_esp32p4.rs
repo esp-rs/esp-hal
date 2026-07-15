@@ -277,6 +277,9 @@ macro_rules! property {
     ("lp_i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("lp_io.version") => {
+        "esp32p4"
+    };
     ("lp_uart.ram_size") => {
         32
     };

@@ -14,21 +14,15 @@
 #![no_main]
 
 use esp_backtrace as _;
+use esp_hal::{gpio::lp_io::LowPowerOutput, load_lp_code, main};
 cfg_select! {
     any(feature = "esp32s2", feature = "esp32s3") => {
-        use esp_hal::{
-            gpio::rtc_io::LowPowerOutput,
-            lp_core::{UlpCore, UlpCoreWakeupSource},
-        };
+        use esp_hal::lp_core::{UlpCore, UlpCoreWakeupSource};
     }
     _ => {
-        use esp_hal::{
-            gpio::lp_io::LowPowerOutput,
-            lp_core::{LpCore, LpCoreWakeupSource},
-        };
+        use esp_hal::lp_core::{LpCore, LpCoreWakeupSource};
     }
 }
-use esp_hal::{load_lp_code, main};
 use esp_println::{print, println};
 
 esp_bootloader_esp_idf::esp_app_desc!();

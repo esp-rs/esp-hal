@@ -536,6 +536,14 @@ driver_configs![
             fifo_size: u32,
         }
     },
+    LpIoProperties {
+        driver: lp_io,
+        name: "LP IO",
+        properties: {
+            /// Low-level implementation selected for the chip's RTC/LP IO block.
+            version: String,
+        }
+    },
     LpUartProperties {
         driver: lp_uart,
         name: "LP UART",

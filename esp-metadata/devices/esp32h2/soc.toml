@@ -172,6 +172,10 @@ separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true # only after revision 1.2
 
+[device.lp_io]
+support_status = "partial"
+version = "esp32h2"
+
 [device.gpio]
 version = 2
 has_input_sync = true

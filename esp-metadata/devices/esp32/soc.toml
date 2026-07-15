@@ -148,6 +148,10 @@ engines = [
     }
 ]
 
+[device.lp_io]
+support_status = "partial"
+version = "esp32"
+
 [device.gpio]
 version = 1
 support_status = "supported"

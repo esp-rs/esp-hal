@@ -256,6 +256,9 @@ macro_rules! property {
     ("ledc.channel_count", str) => {
         stringify!(8)
     };
+    ("lp_io.version") => {
+        "v2"
+    };
     ("phy.combo_module") => {
         false
     };

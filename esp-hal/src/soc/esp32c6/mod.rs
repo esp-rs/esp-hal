@@ -13,7 +13,6 @@ crate::unstable_module! {
     pub mod lp_core;
     pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32c6 as pac;

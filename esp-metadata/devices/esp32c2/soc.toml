@@ -115,6 +115,10 @@ curves = [
 ]
 zero_extend_writes = true
 
+[device.lp_io]
+support_status = "partial"
+version = "v3"
+
 [device.gpio]
 version = 2
 has_input_sync = true

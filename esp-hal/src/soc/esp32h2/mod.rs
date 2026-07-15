@@ -12,7 +12,6 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32h2 as pac;

@@ -283,6 +283,9 @@ macro_rules! property {
     ("ledc.channel_count", str) => {
         stringify!(6)
     };
+    ("lp_io.version") => {
+        "esp32h2"
+    };
     ("parl_io.version") => {
         2
     };

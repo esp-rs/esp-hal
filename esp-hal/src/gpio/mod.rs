@@ -58,11 +58,8 @@ crate::unstable_module! {
     #[cfg(etm_driver_supported)]
     pub mod etm;
 
-    #[cfg(soc_has_lp_io)]
+    #[cfg(lp_io_driver_supported)]
     pub mod lp_io;
-
-    #[cfg(all(soc_has_rtc_io, not(esp32)))]
-    pub mod rtc_io;
 
     #[cfg(dedicated_gpio_driver_supported)]
     pub mod dedicated;

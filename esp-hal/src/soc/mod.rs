@@ -5,7 +5,6 @@ use core::{ops::Range, sync::atomic::Ordering};
 use portable_atomic::AtomicU32;
 use procmacros::ram;
 
-pub use self::implementation::*;
 use crate::efuse::ChipRevision;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
@@ -19,6 +18,15 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
 mod implementation;
+
+cfg_select! {
+    all(feature = "unstable", ulp_riscv_driver_supported) => {
+        pub use self::implementation::*;
+    }
+    _ => {
+        pub(crate) use self::implementation::*;
+    }
+}
 
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
