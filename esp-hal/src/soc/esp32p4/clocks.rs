@@ -591,7 +591,7 @@ fn configure_timg_calibration_clock_impl(
                 TimgCalibrationClockConfig::MpllClk => 0,
                 TimgCalibrationClockConfig::SpllClk => 1,
                 TimgCalibrationClockConfig::CpllClk => 2,
-                TimgCalibrationClockConfig::RcFastClk => 7,
+                TimgCalibrationClockConfig::RcFastDivClk => 7,
                 TimgCalibrationClockConfig::RcSlowClk => 8,
                 TimgCalibrationClockConfig::Xtal32kClk => 10,
             })

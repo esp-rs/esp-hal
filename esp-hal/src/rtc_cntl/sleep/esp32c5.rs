@@ -1,15 +1,14 @@
 use core::ops::Not;
 
 use crate::{
-    clock::RtcClock,
     peripherals::{LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::WakeTriggers,
+        sleep::{WakeTriggers, pmu_common::SleepTimeConfig},
     },
-    soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig, TimgCalibrationClockConfig},
+    soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig},
 };
 
 /// Configuration for controlling the behavior during sleep modes.
@@ -506,75 +505,11 @@ impl ParamSleepConfig {
     }
 }
 
-#[derive(Clone, Copy)]
-struct SleepTimeConfig {
-    sleep_time_adjustment: u32,
-    // TODO: esp-idf does some calibration here to determine slowclk_period
-    slowclk_period: u32,
-    fastclk_period: u32,
-}
-
-const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
-
 impl SleepTimeConfig {
-    const RTC_CLK_CAL_FRACT: u32 = 19;
+    pub(crate) const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
+    pub(crate) const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 56;
 
-    fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(TimgCalibrationClockConfig::RcFastDivClk, slowclk_cycles)
-    }
-
-    fn new(_deep: bool) -> Self {
-        // https://github.com/espressif/esp-idf/commit/e1d24ebd7f43c7c7ded183bc8800b20af3bf014b
-
-        // Calibrate rtc slow clock
-        // TODO: do an actual calibration instead of a read
-        let slowclk_period = LP_AON::regs().store1().read().data().bits();
-
-        // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
-        const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;
-        let fastclk_period = Self::rtc_clk_cal_fast(FAST_CLK_SRC_CAL_CYCLES);
-
-        Self {
-            sleep_time_adjustment: 0,
-            slowclk_period,
-            fastclk_period,
-        }
-    }
-
-    fn light_sleep(pd_flags: PowerDownFlags) -> Self {
-        const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 56;
-
-        let mut this = Self::new(false);
-
-        let sw = LIGHT_SLEEP_TIME_OVERHEAD_US; // TODO
-        let hw = this.pmu_sleep_calculate_hw_wait_time(pd_flags);
-
-        this.sleep_time_adjustment = sw + hw;
-
-        this
-    }
-
-    fn deep_sleep() -> Self {
-        let mut this = Self::new(true);
-
-        this.sleep_time_adjustment = 250 + 100 * 240 / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-
-        this
-    }
-
-    fn us_to_slowclk(&self, us: u32) -> u32 {
-        (us << Self::RTC_CLK_CAL_FRACT) / self.slowclk_period
-    }
-
-    fn slowclk_to_us(&self, rtc_cycles: u32) -> u32 {
-        (rtc_cycles * self.slowclk_period) >> Self::RTC_CLK_CAL_FRACT
-    }
-
-    fn us_to_fastclk(&self, us: u32) -> u32 {
-        (us << Self::RTC_CLK_CAL_FRACT) / self.fastclk_period
-    }
-
-    fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
+    pub(crate) fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
         // LP core hardware wait time, microsecond
         let lp_wakeup_wait_time_us = self.slowclk_to_us(MachineConstants::LP_WAKEUP_WAIT_CYCLE);
         let lp_clk_switch_time_us = self.slowclk_to_us(MachineConstants::LP_CLK_SWITCH_CYCLE);

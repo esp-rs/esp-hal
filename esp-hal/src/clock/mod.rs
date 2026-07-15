@@ -51,6 +51,7 @@ use clocks::LpSlowClkConfig;
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg_function_clock)]
 use clocks::TimgFunctionClockConfig;
+use portable_atomic::AtomicU32;
 
 /// # Low-level clock control
 ///
@@ -81,6 +82,15 @@ use crate::{
     soc::{clocks, clocks::ClockTree},
     time::Rate,
 };
+
+cfg_select! {
+    soc_has_lp_aon => {
+        use crate::peripherals::LP_AON;
+    }
+    _ => {
+        use crate::peripherals::LPWR as LP_AON;
+    }
+}
 
 impl CpuClock {
     #[procmacros::doc_replace]
@@ -125,20 +135,17 @@ use crate::soc::clocks::TimgCalibrationClockConfig;
 
 /// RTC Watchdog Timer driver.
 impl RtcClock {
-    const CAL_FRACT: u32 = 19;
+    pub(crate) const CAL_FRACT: u32 = 19;
 
     /// Get the nominal value of the RTC_SLOW_CLK source.
     #[instability::unstable]
     #[cfg(any(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
-        cfg_select! {
-            soc_has_clock_node_rtc_slow_clk => {
-                let freq = clocks::rtc_slow_clk_frequency();
-            }
-            _ => {
-                let freq = clocks::lp_slow_clk_frequency();
-            }
-        }
+        let freq = cfg_select! {
+            soc_has_clock_node_rtc_slow_clk => clocks::rtc_slow_clk_frequency(),
+            _ => clocks::lp_slow_clk_frequency(),
+        };
+
         Rate::from_hz(freq)
     }
 
@@ -152,15 +159,15 @@ impl RtcClock {
     /// issue, or lack of 32 XTAL on board).
     #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
-        ClockTree::with(|clocks| {
-            #[cfg(not(esp32c2))]
-            if cal_clk == TimgCalibrationClockConfig::Xtal32kClk {
-                debug!("Assuming Xtal32k has precisely 32.768kHz instead of calibrating");
-                let freq_hz: u64 = 32_768;
-                let period_64 = (1_000_000u64 << RtcClock::CAL_FRACT) / freq_hz;
-                return period_64 as u32;
-            }
+        #[cfg(not(esp32c2))]
+        if cal_clk == TimgCalibrationClockConfig::Xtal32kClk {
+            debug!("Assuming Xtal32k has precisely 32.768kHz instead of calibrating");
+            let freq_hz: u64 = 32_768;
+            let period_64 = (1_000_000u64 << RtcClock::CAL_FRACT) / freq_hz;
+            return period_64 as u32;
+        }
 
+        ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency());
 
             let (xtal_cycles, _) = RtcClock::measure_rtc_clock(
@@ -229,6 +236,7 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
     });
 
     calibrate_rtc_slow_clock();
+    calibrate_rtc_fast_clock();
 }
 
 impl RtcClock {
@@ -443,7 +451,7 @@ fn calibrate_rtc_slow_clock() {
 }
 
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
-fn calibrate_rtc_slow_clock() {
+pub(crate) fn calibrate_rtc_slow_clock() {
     // Unfortunate device specific mapping.
     // TODO: fix it by generating cfgs for each mux input?
     cfg_select! {
@@ -471,27 +479,36 @@ fn calibrate_rtc_slow_clock() {
         _ => {}
     }
 
-    let cal_val = RtcClock::calibrate(slow_clk, 1024);
+    // Clock is in order of 30-150kHz.
+    const SLOW_CLK_SRC_CAL_CYCLES: u32 = 16;
+    let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
-    cfg_select! {
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
-
-    cfg_select! {
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
+    let reg = cfg_select! {
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
     reg.write(|w| unsafe { w.bits(cal_val) });
+}
+
+static RC_FAST_CAL_VAL: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(soc_has_clock_node_timg_calibration_clock)]
+pub(crate) fn calibrate_rtc_fast_clock() {
+    // Clock is in order of 10 MHz
+    const FAST_CLK_SRC_CAL_CYCLES: u32 = 128;
+
+    let cal_val = RtcClock::calibrate(
+        TimgCalibrationClockConfig::RcFastDivClk,
+        FAST_CLK_SRC_CAL_CYCLES,
+    );
+
+    RC_FAST_CAL_VAL.store(cal_val, core::sync::atomic::Ordering::Relaxed);
+}
+
+#[cfg(not(soc_has_clock_node_timg_calibration_clock))]
+fn calibrate_rtc_fast_clock() {
+    // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
 }
 
 /// The CPU clock frequency.
@@ -510,36 +527,25 @@ pub fn xtal_clock() -> Rate {
 /// with `RtcClock::CAL_FRACT` fractional bits.
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
-fn rtc_slow_cal_period() -> u64 {
-    cfg_select! {
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
+pub(crate) fn rtc_slow_cal_period() -> u32 {
+    let reg = cfg_select! {
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
-    // P4: LP_SYS (mapped as LP_AON in esp-hal) names its scratch registers
-    // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
-    // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
-    // Once that lands this cfg branch can disappear.
-    cfg_select! {
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
+    reg.read().bits()
+}
 
-    reg.read().bits() as u64
+/// Read the calibrated RTC fast clock period from memory.
+#[cfg_attr(not(soc_has_pmu), expect(dead_code))]
+pub(crate) fn rtc_fast_cal_period() -> u32 {
+    RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
 
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.
 #[cfg(lp_timer_driver_supported)]
 pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
-    let period = rtc_slow_cal_period();
+    let period = rtc_slow_cal_period() as u64;
 
     // The LP timer is a 48-bit counter running from RTC_SLOW_CLK.
     // `period` is a fixed point number with 19 fractional bits, it may be a 24-bit value if
@@ -557,7 +563,7 @@ pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
 
 /// Convert microseconds to RTC slow clock ticks using the calibrated period.
 pub(crate) fn us_to_rtc_ticks(time_in_us: u64) -> u64 {
-    let period = rtc_slow_cal_period();
+    let period = rtc_slow_cal_period() as u64;
 
     if time_in_us > (u64::MAX >> RtcClock::CAL_FRACT) {
         ((time_in_us / period) << RtcClock::CAL_FRACT)
