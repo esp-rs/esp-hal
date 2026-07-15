@@ -58,6 +58,11 @@ mod tests {
             let (mut descriptors, mut buffer) = buf.split();
             if !initial_data.is_empty() {
                 simulate_dma_rx_fill(&mut descriptors, &mut buffer, 0, initial_data, eof);
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                {
+                    buffer.writeback();
+                    descriptors.writeback();
+                }
             }
             let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
             f(buf.into_view());
@@ -74,6 +79,11 @@ mod tests {
             for (index, (data, eof)) in fills.iter().enumerate() {
                 simulate_dma_rx_fill(&mut descriptors, &mut buffer, index, data, *eof);
             }
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            {
+                buffer.writeback();
+                descriptors.writeback();
+            }
             let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
             f(buf.into_view());
         })
@@ -88,6 +98,8 @@ mod tests {
                     desc.set_owner(Owner::Cpu);
                     desc.set_length(0);
                 }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                descriptors.writeback();
             }
             let mut buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
             buf.push(&[]);
@@ -363,6 +375,8 @@ mod tests {
 
             // DMA processed first descriptor, now it should be owned by CPU
             descriptors[0].set_owner(Owner::Cpu);
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            descriptors.writeback();
 
             let buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
             let mut view = buf.into_view();
