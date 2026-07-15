@@ -836,6 +836,81 @@ impl<'d> Spi<'d, Async> {
         self.driver().transfer_in_place_async(words).await
     }
 
+    /// Half-duplex read.
+    ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
+    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block for a short
+    /// while to ensure the transfer is aborted.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] will be returned if the buffer is empty (currently unsupported).
+    /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
+    /// [`Error::Unsupported`] will be returned.
+    #[instability::unstable]
+    pub async fn half_duplex_read_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
+        if self.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_read(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_read_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
+    /// Half-duplex write.
+    ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
+    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block for a short
+    /// while to ensure the transfer is aborted.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] will be returned for unsupported combinations of command, address,
+    /// dummy, and data modes.
+    #[cfg_attr(
+        esp32,
+        doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
+    )]
+    #[instability::unstable]
+    pub async fn half_duplex_write_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
+        if self.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_write(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_write_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
     // TODO: These inherent methods should be public
 
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
