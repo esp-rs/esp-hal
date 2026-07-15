@@ -120,14 +120,14 @@ impl EmacRegs {
     /// cut-through receive instead.
     pub fn dma_start(&self) {
         EMAC_DMA::regs().dmaoperation_mode().modify(|_, w| {
-            #[cfg(esp32p4)]
-            {
-                w.tx_str_fwd().set_bit();
-                w.fwd_under_gf().set_bit();
-            }
-            #[cfg(not(esp32p4))]
-            {
-                w.rx_store_forward().set_bit();
+            w.tx_str_fwd().set_bit();
+            cfg_select! {
+                esp32p4 => {
+                    w.fwd_under_gf().set_bit();
+                }
+                _ => {
+                    w.rx_store_forward().set_bit();
+                }
             }
             w.start_stop_rx().set_bit();
             w.start_stop_transmission_command().set_bit()
@@ -207,7 +207,13 @@ impl EmacRegs {
             w.mii().set_bit();
             w.fespeed().bit(speed == Speed::_100M);
             w.duplex().bit(duplex == Duplex::Full);
-            w.padcrcstrip().set_bit();
+            w.padcrcstrip().clear_bit();
+            w.rxipcoffload().set_bit();
+            w.retry().set_bit();
+            w.watchdog().set_bit();
+            w.rxown().set_bit();
+            w.loopback().clear_bit();
+            w.deferralcheck().clear_bit();
             w.rx().set_bit();
             w.tx().set_bit()
         });

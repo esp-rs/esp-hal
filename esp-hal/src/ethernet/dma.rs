@@ -23,6 +23,9 @@ pub const TDES0_IC: u32 = 1 << 30;
 pub const TDES0_LS: u32 = 1 << 29;
 /// TX first-segment flag.
 pub const TDES0_FS: u32 = 1 << 28;
+/// TX checksum insertion control: 3 = IP Header checksum and payload checksum calculation
+/// and insertion are enabled, and pseudo-header checksum is calculated in hardware.
+pub const TDES0_CIC_FULL: u32 = 3 << 22;
 /// TX second-address-chained mode (next descriptor pointer in TDES3).
 pub const TDES0_CHAINED: u32 = 1 << 20;
 
@@ -45,6 +48,29 @@ pub const RDES0_LS: u32 = 1 << 8;
 pub const RDES1_BUF1_SIZE_MASK: u32 = 0x1fff;
 /// RX second-address-chained bit.
 pub const RDES1_CHAINED: u32 = 1 << 14;
+
+// ── RDES4 extended-status bits (Type-2 checksum offload) ─────────────────────
+//
+// Only consumed on chips whose RX FIFO runs in cut-through mode and therefore
+// cannot rely on the DMA to auto-drop checksum-error frames (see `dma_start`).
+
+cfg_select! {
+    esp32p4 => {
+        /// RDES0 extended-status-available bit: RDES4 holds valid COE status.
+        pub const RDES0_ESA: u32 = 1 << 0;
+        /// RDES4: IP header checksum error.
+        pub const RDES4_IP_HEADER_ERROR: u32 = 1 << 3;
+        /// RDES4: IP payload (TCP/UDP/ICMP) checksum error.
+        pub const RDES4_IP_PAYLOAD_ERROR: u32 = 1 << 4;
+        /// RDES4: IP checksum offload engine was bypassed (checksum not verified).
+        pub const RDES4_IP_CHECKSUM_BYPASSED: u32 = 1 << 5;
+        /// RDES4: IPv4 packet received.
+        pub const RDES4_IPV4_PACKET: u32 = 1 << 6;
+        /// RDES4: IPv6 packet received.
+        pub const RDES4_IPV6_PACKET: u32 = 1 << 7;
+    }
+    _ => {}
+}
 
 // ── Descriptor types ────────────────────────────────────────────────────────
 
@@ -113,8 +139,9 @@ impl TDes {
 
     fn set_len_and_flags(&mut self, len: usize) {
         self.tdes1.set(len as u32 & RDES1_BUF1_SIZE_MASK);
-        self.tdes0
-            .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC);
+        self.tdes0.set(
+            (self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC | TDES0_CIC_FULL,
+        );
     }
 
     fn set_buffer_addr(&mut self, addr: *const u8) {
@@ -135,7 +162,12 @@ pub struct RDes {
     pub(super) rdes1: VolatileCell<u32>,
     pub(super) buf_addr: VolatileCell<u32>,
     pub(super) next_desc: VolatileCell<u32>,
-    _rdes4: VolatileCell<u32>,
+    // Extended status; the GMAC writes IP checksum-offload results here.
+    #[cfg_attr(
+        not(esp32p4),
+        allow(dead_code, reason = "only read for P4 RX checksum offload")
+    )]
+    rdes4: VolatileCell<u32>,
     _rdes5: VolatileCell<u32>,
     _rdes6: VolatileCell<u32>,
     _rdes7: VolatileCell<u32>,
@@ -149,7 +181,7 @@ impl RDes {
             rdes1: VolatileCell::new(0),
             buf_addr: VolatileCell::new(0),
             next_desc: VolatileCell::new(0),
-            _rdes4: VolatileCell::new(0),
+            rdes4: VolatileCell::new(0),
             _rdes5: VolatileCell::new(0),
             _rdes6: VolatileCell::new(0),
             _rdes7: VolatileCell::new(0),
@@ -184,6 +216,30 @@ impl RDes {
 
     fn frame_len(&self) -> usize {
         ((self.rdes0.get() & RDES0_FL_MASK) >> RDES0_FL_SHIFT) as usize
+    }
+
+    /// Returns `true` if the hardware IP checksum-offload engine flagged a
+    /// header or payload checksum error for this frame.
+    ///
+    /// These results live in the extended-status word (RDES4) rather than in
+    /// `RDES0_ES`, so they must be inspected explicitly. Only meaningful on the
+    /// last descriptor of a frame. Non-IP frames (e.g. ARP) and frames whose
+    /// checksum the engine bypassed never report an error.
+    #[cfg(esp32p4)]
+    fn checksum_error(&self) -> bool {
+        // The extended status is only valid when RDES0[0] (ESA) is set.
+        if self.rdes0.get() & RDES0_ESA == 0 {
+            return false;
+        }
+
+        let ext = self.rdes4.get();
+
+        // The COE status bits only apply to IPv4/IPv6 frames.
+        let is_ip = ext & (RDES4_IPV4_PACKET | RDES4_IPV6_PACKET) != 0;
+        // If the engine bypassed the checksum, there is nothing to reject.
+        let bypassed = ext & RDES4_IP_CHECKSUM_BYPASSED != 0;
+
+        is_ip && !bypassed && ext & (RDES4_IP_HEADER_ERROR | RDES4_IP_PAYLOAD_ERROR) != 0
     }
 
     fn configure_buffer(&mut self, size: usize) {
@@ -264,6 +320,10 @@ impl<'a> TDesRing<'a> {
         };
         ring.reset();
         ring
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.descriptors.len()
     }
 
     /// Rebuilds ring links and returns all descriptors to CPU ownership.
@@ -450,7 +510,15 @@ impl<'a> RDesRing<'a> {
                 let is_complete = desc.is_complete_frame();
                 let frame_len = desc.frame_len();
 
-                if status & RDES0_ES != 0 || !is_complete {
+                // On chips with cut-through RX the DMA can't auto-drop
+                // checksum-error frames, so reject them here based on the
+                // extended-status COE bits.
+                let checksum_bad = cfg_select! {
+                    esp32p4 => desc.checksum_error(),
+                    _ => false,
+                };
+
+                if status & RDES0_ES != 0 || !is_complete || checksum_bad {
                     None
                 } else {
                     // Strip the 4-byte FCS the GMAC appends to the frame length.

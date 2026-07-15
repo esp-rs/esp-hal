@@ -12,7 +12,15 @@
 
 use core::task::Context;
 
-use embassy_net_driver_02::{Capabilities, Driver, HardwareAddress, LinkState, RxToken, TxToken};
+use embassy_net_driver_02::{
+    Capabilities,
+    Checksum,
+    Driver,
+    HardwareAddress,
+    LinkState,
+    RxToken,
+    TxToken,
+};
 
 use super::{Ethernet, RX_WAKER, TX_WAKER, mac::EmacRegs};
 use crate::{
@@ -144,6 +152,14 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
     fn capabilities(&self) -> Capabilities {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
+        caps.max_burst_size = Some(self.tx.len());
+        // Checksums are offloaded to hardware in both directions (RX COE + TX
+        // insertion via the descriptor CIC bits), so smoltcp does neither.
+        caps.checksum.ipv4 = Checksum::None;
+        caps.checksum.tcp = Checksum::None;
+        caps.checksum.udp = Checksum::None;
+        caps.checksum.icmpv4 = Checksum::None;
+        caps.checksum.icmpv6 = Checksum::None;
         caps
     }
 
