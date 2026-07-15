@@ -22,33 +22,30 @@
 //! rising and falling edges from a GPIO pin.
 //!
 //! ```rust, no_run
-//! use core::cell::RefCell;
+//! # {before_snippet}
+//! # use critical_section::Mutex;
+//! # use esp_hal::mcpwm::{AnyMcPwm, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::capture::{CaptureChannel, CaptureChannelConfig, CaptureMode, CaptureTimerConfig};
+//! # use esp_hal::time::Rate;
+//! # use core::cell::RefCell;
+//! #
+//! # let pin = peripherals.GPIO0;
 //!
-//! use critical_section::Mutex;
-//! use esp_hal::{
-//!     mcpwm::{
-//!         McPwm,
-//!         PeripheralClockConfig,
-//!         capture::{CaptureChannelConfig, CaptureMode, CaptureTimerConfig},
-//!         mcpwm0,
-//!     },
-//!     time::Rate,
-//! };
-//!
-//! static CAP0: Mutex<RefCell<Option<mcpwm0::CaptureChannel<'static, 0>>>> =
+//! static CAP0: Mutex<RefCell<Option<CaptureChannel<'static>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(AnyMcPwm::from(peripherals.MCPWM0), clock_cfg);
 //!
 //! // initialize capture timer
 //! let cap_timer_cfg = CaptureTimerConfig::default();
-//! mcpwm.capture_timer.set_config(cap_timer_cfg);
+//! mcpwm.capture_timer.apply_config(cap_timer_cfg);
 //! mcpwm.capture_timer.start();
 //!
 //! // create capture channel with a `pin` and rising edge capture mode
 //! let mut capture = mcpwm.capture0.with_signal_input(pin);
+//! capture.apply_config(CaptureChannelConfig::default());
 //! capture.set_enable(true);
 //! capture.listen(CaptureMode::RisingEdge);
 //!
@@ -69,6 +66,8 @@
 //!         }
 //!     });
 //! }
+//! # Ok(())
+//! # }
 //! ```
 
 use core::marker::PhantomData;
@@ -99,7 +98,6 @@ impl CaptureTimerConfig {
         Self { sync_phase }
     }
 }
-
 /// The MCPWM Capture Timer
 ///
 /// ## Overview
@@ -283,7 +281,7 @@ impl<'d> CaptureChannel<'d> {
     }
 
     /// Set the config
-    pub fn set_config(&mut self, config: CaptureChannelConfig) {
+    pub fn apply_config(&mut self, config: CaptureChannelConfig) {
         self.configure(config);
     }
 

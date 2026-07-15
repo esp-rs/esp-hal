@@ -85,12 +85,12 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, AnyMcPwm, PeripheralClockConfig};
 //! # let pin = peripherals.GPIO0;
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(AnyMcPwm::from(peripherals.MCPWM0), clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);
@@ -521,13 +521,11 @@ impl Info {
     /// Enables listening for an event on a specific UNIT #
     pub fn enable_listen(&self, unit: u8, events: EnumSet<Event>, value: bool) {
         let regs = self.regs();
-        critical_section::with(|_| {
-            regs.int_ena().modify(|_, w| {
-                for event in events {
-                    dispatch_event_write!(w, event, unit, value);
-                }
-                w
-            });
+        regs.int_ena().modify(|_, w| {
+            for event in events {
+                dispatch_event_write!(w, event, unit, value);
+            }
+            w
         });
     }
 }
