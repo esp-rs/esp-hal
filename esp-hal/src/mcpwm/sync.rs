@@ -24,20 +24,23 @@
 //! for 3-phase PWM.
 //!
 //! ```rust, no_run
-//! use esp_hal::{
-//!     mcpwm::{McPwm, PeripheralClockConfig},
-//!     time::Rate,
-//! };
+//! # {before_snippet}
+//! # use esp_hal::{
+//! #     mcpwm::{McPwm, AnyMcPwm, PeripheralClockConfig},
+//! #     time::Rate,
+//! # };
+//! # let pin = peripherals.GPIO0;
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(AnyMcPwm::from(peripherals.MCPWM0), clock_cfg);
 //!
 //! // connect sync line 0 to take input from `pin`
 //! mcpwm.sync0.set_signal(pin);
 //!
 //! // connecting sync line 0 for a timer0's sync in
 //! mcpwm.timer0.set_sync_in(mcpwm.sync0.get_sync_out());
+//! # {after_snippet}
 //! ```
 //!
 //! ### Chaining 2 or more timers sync events
@@ -45,16 +48,21 @@
 //! to be phase aligned for proper timing.
 //!
 //! ```rust, no_run
-//! use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
+//! # {before_snippet}
+//! # use esp_hal::{
+//! #     mcpwm::{McPwm, AnyMcPwm, PeripheralClockConfig},
+//! #     time::Rate,
+//! # };
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(AnyMcPwm::from(peripherals.MCPWM0), clock_cfg);
 //!
 //! // set timer1's sync in
 //! mcpwm.timer1.set_sync_in(mcpwm.timer0.get_sync_out());
 //! // set timer2's sync in
 //! mcpwm.timer2.set_sync_in(mcpwm.timer1.get_sync_out());
+//! # {after_snippet}
 //! ```
 
 use crate::{gpio::interconnect::PeripheralInput, mcpwm::Info};

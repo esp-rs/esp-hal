@@ -38,11 +38,11 @@ use crate::{
 #[instability::unstable]
 pub enum TimerEvent {
     /// Event for when a timer stops
-    TimerStop,
+    Stop,
     /// Event for when a timer equals zero
-    TimerEqualZero,
+    EqualZero,
     /// Event for when a timer equals period
-    TimerEqualPeriod,
+    EqualPeriod,
 }
 
 /// A MCPWM timer
@@ -124,9 +124,9 @@ impl<'d> Timer<'d> {
     /// The valid range for phase depends on the timer configuration:
     /// - When the timer is in [`PwmWorkingMode::UpDown`] mode:
     ///     - The valid range for phase is `[0, period]` when the sync direction is
-    ///   [`CounterDirection::Increasing`].
+    ///       [`CounterDirection::Increasing`].
     ///     - The valid range for phase is `[1, period+1]` when the sync direction is
-    ///   [`CounterDirection::Decreasing`].
+    ///       [`CounterDirection::Decreasing`].
     /// - The valid range for phase is `[0, period+1]` when the timer is in another
     ///   [`PwmWorkingMode`].
     pub fn apply_config(&mut self, config: TimerClockConfig) -> Result<(), ConfigError> {
@@ -230,13 +230,13 @@ impl<'d> Timer<'d> {
 
         let ints = info.regs().int_st().read();
         if ints.timer_stop(self.number).bit() {
-            res.insert(TimerEvent::TimerStop);
+            res.insert(TimerEvent::Stop);
         }
         if ints.timer_tep(self.number).bit() {
-            res.insert(TimerEvent::TimerEqualPeriod);
+            res.insert(TimerEvent::EqualPeriod);
         }
         if ints.timer_tez(self.number).bit() {
-            res.insert(TimerEvent::TimerEqualZero);
+            res.insert(TimerEvent::EqualZero);
         }
 
         res
@@ -248,9 +248,9 @@ impl<'d> Timer<'d> {
         info.regs().int_clr().write(|w| {
             for event in events {
                 match event {
-                    TimerEvent::TimerStop => w.timer_stop(self.number).bit(true),
-                    TimerEvent::TimerEqualPeriod => w.timer_tep(self.number).bit(true),
-                    TimerEvent::TimerEqualZero => w.timer_tez(self.number).bit(true),
+                    TimerEvent::Stop => w.timer_stop(self.number).bit(true),
+                    TimerEvent::EqualPeriod => w.timer_tep(self.number).bit(true),
+                    TimerEvent::EqualZero => w.timer_tez(self.number).bit(true),
                 };
             }
             w
@@ -281,7 +281,7 @@ impl<'d> Timer<'d> {
         self.cfg0().write(|w| unsafe {
             w.prescale().bits(prescaler);
             w.period().bits(period);
-            w.period_upmethod().bits(period_updating_method as u8)
+            w.period_upmethod().bits(period_updating_method)
         });
 
         // write sync configure
@@ -347,9 +347,9 @@ pub enum SyncOutSelect {
     /// Sync out is triggered when a timer receives a sync in
     SyncIn              = 0,
     /// Sync out is triggered when the timer equals zero
-    SyncWhenEqualZero   = 1,
+    WhenEqualZero   = 1,
     /// Sync out is triggered when the timer equals the period
-    SyncWhenEqualPeriod = 2,
+    WhenEqualPeriod = 2,
 }
 
 /// Sync error for an invalid sync configuration
@@ -586,9 +586,9 @@ pub enum CounterDirection {
 impl From<TimerEvent> for Event {
     fn from(value: TimerEvent) -> Self {
         match value {
-            TimerEvent::TimerStop => Event::TimerStop,
-            TimerEvent::TimerEqualZero => Event::TimerEqualZero,
-            TimerEvent::TimerEqualPeriod => Event::TimerEqualPeriod,
+            TimerEvent::Stop => Event::TimerStop,
+            TimerEvent::EqualZero => Event::TimerEqualZero,
+            TimerEvent::EqualPeriod => Event::TimerEqualPeriod,
         }
     }
 }

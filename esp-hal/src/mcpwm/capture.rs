@@ -22,33 +22,30 @@
 //! rising and falling edges from a GPIO pin.
 //!
 //! ```rust, no_run
-//! use core::cell::RefCell;
+//! # {before_snippet}
+//! # use critical_section::Mutex;
+//! # use esp_hal::mcpwm::{AnyMcPwm, McPwm, PeripheralClockConfig};
+//! # use esp_hal::mcpwm::capture::{CaptureChannel, CaptureChannelConfig, CaptureMode, CaptureTimerConfig};
+//! # use esp_hal::time::Rate;
+//! # use core::cell::RefCell;
+//! #
+//! # let pin = peripherals.GPIO0;
 //!
-//! use critical_section::Mutex;
-//! use esp_hal::{
-//!     mcpwm::{
-//!         McPwm,
-//!         PeripheralClockConfig,
-//!         capture::{CaptureChannelConfig, CaptureMode, CaptureTimerConfig},
-//!         mcpwm0,
-//!     },
-//!     time::Rate,
-//! };
-//!
-//! static CAP0: Mutex<RefCell<Option<mcpwm0::CaptureChannel<'static, 0>>>> =
+//! static CAP0: Mutex<RefCell<Option<CaptureChannel<'static>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
 //! // initialize peripheral
 //! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
-//! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+//! let mut mcpwm = McPwm::new(AnyMcPwm::from(peripherals.MCPWM0), clock_cfg);
 //!
 //! // initialize capture timer
 //! let cap_timer_cfg = CaptureTimerConfig::default();
-//! mcpwm.capture_timer.set_config(cap_timer_cfg);
+//! mcpwm.capture_timer.apply_config(cap_timer_cfg);
 //! mcpwm.capture_timer.start();
 //!
 //! // create capture channel with a `pin` and rising edge capture mode
 //! let mut capture = mcpwm.capture0.with_signal_input(pin);
+//! capture.apply_config(CaptureChannelConfig::default());
 //! capture.set_enable(true);
 //! capture.listen(CaptureMode::RisingEdge);
 //!
@@ -69,6 +66,8 @@
 //!         }
 //!     });
 //! }
+//! # Ok(())
+//! # }
 //! ```
 
 use core::marker::PhantomData;
@@ -87,7 +86,7 @@ use crate::{
 };
 
 /// Configuration for capture timer
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CaptureTimerConfig {
     sync_phase: u32,
@@ -96,16 +95,9 @@ pub struct CaptureTimerConfig {
 impl CaptureTimerConfig {
     /// Sets the sync phase for the capture timer
     pub fn with_sync_phase(self, sync_phase: u32) -> Self {
-        Self { sync_phase, ..self }
+        Self { sync_phase }
     }
 }
-
-impl Default for CaptureTimerConfig {
-    fn default() -> Self {
-        Self { sync_phase: 0 }
-    }
-}
-
 /// The MCPWM Capture Timer
 ///
 /// ## Overview
@@ -207,7 +199,7 @@ impl CaptureEvent {
 }
 
 /// Configuration for capture channel
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 // Hash cannot be implemented for CaptureMode
 pub struct CaptureChannelConfig {
@@ -224,15 +216,6 @@ impl CaptureChannelConfig {
     /// Sets the prescaler for the config
     pub fn with_prescaler(self, prescaler: u8) -> Self {
         Self { prescaler, ..self }
-    }
-}
-
-impl Default for CaptureChannelConfig {
-    fn default() -> Self {
-        Self {
-            invert: false,
-            prescaler: 0,
-        }
     }
 }
 
@@ -298,7 +281,7 @@ impl<'d> CaptureChannel<'d> {
     }
 
     /// Set the config
-    pub fn set_config(&mut self, config: CaptureChannelConfig) {
+    pub fn apply_config(&mut self, config: CaptureChannelConfig) {
         self.configure(config);
     }
 

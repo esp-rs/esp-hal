@@ -477,8 +477,11 @@ impl<const IS_A: bool> embedded_hal::pwm::SetDutyCycle for PwmPin<'_, IS_A> {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
+/// # use esp_hal::mcpwm::{McPwm, AnyMcPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
+/// # use esp_hal::time::Rate;
+/// # use core::convert::From;
+///
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 ///
@@ -486,7 +489,7 @@ impl<const IS_A: bool> embedded_hal::pwm::SetDutyCycle for PwmPin<'_, IS_A> {
 /// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
 ///
 /// let mut mcpwm = McPwm::new(
-///     peripherals.MCPWM0,
+///     AnyMcPwm::from(peripherals.MCPWM0),
 ///     PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_clk__))?,
 /// );
 ///
@@ -527,7 +530,7 @@ impl<'d> LinkedPins<'d> {
     ) -> Self {
         // setup deadtime config before enabling the pins
         #[cfg(esp32s3)]
-        let dt_cfg = unsafe { mcpwm_info.regs().ch(operator as usize) }.db_cfg();
+        let dt_cfg = mcpwm_info.regs().ch(operator as usize).db_cfg();
         #[cfg(not(esp32s3))]
         let dt_cfg = mcpwm_info.regs().ch(operator as usize).dt_cfg();
         dt_cfg.write(|w| unsafe { w.bits(config_dt.cfg_reg) });
