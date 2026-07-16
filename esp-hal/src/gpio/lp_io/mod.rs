@@ -41,6 +41,7 @@ use super::{InputPin, OutputPin, RtcPin};
 #[cfg_attr(lp_io_version = "esp32c6", path = "low_level/esp32c6.rs")]
 #[cfg_attr(lp_io_version = "esp32h2", path = "low_level/esp32h2.rs")]
 #[cfg_attr(lp_io_version = "esp32p4", path = "low_level/esp32p4.rs")]
+#[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 mod low_level;
 
 // FIXME: RtcPin is necessary only as long as the sleep API takes &dyn RtcPin(WithResistors).

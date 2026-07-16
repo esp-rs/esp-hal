@@ -67,7 +67,7 @@ peripherals = [
     # { name = "LP_APM" },
     { name = "LP_APM0" },
     { name = "LP_CLKRST" },
-    # { name = "LP_GPIO" }, # TODO: rename LP_IO?
+    { name = "LP_GPIO", pac = "LP_IO" },
     # { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
     { name = "LP_IO_MUX" },
@@ -198,8 +198,8 @@ has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.lp_io]
-support_status = "not_supported"
-version = "unsupported"
+support_status = "partial"
+version = "v4"
 
 [device.gpio]
 support_status = "supported"

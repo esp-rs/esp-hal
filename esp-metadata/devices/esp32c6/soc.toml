@@ -180,7 +180,7 @@ has_memory_clock_gate = true
 
 [device.lp_io]
 support_status = "partial"
-version = "esp32c6"
+version = "v4"
 
 [device.gpio]
 version = 2
