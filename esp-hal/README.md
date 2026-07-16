@@ -90,7 +90,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Key Manager               |       |          |          | [❌][5171] [^1] |          |           |          |          |          |          |
 | LEDC                      | ⚒️   | ⚒️      | ⚒️      | [❌][5161] [^1] | ⚒️      | [❌][5418] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | LP I2C master             |       |          |          | ⚒️      | ⚒️      |           |          | ❌       |          |          |
-| LP IO                     | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ❌        | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| LP IO                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |           |          | ❌       |          |          |
 | MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      |           | ⚒️      | ❌       |          | ⚒️      |
 | MIPI-DSI                  |       |          |          |          |          |           |          | ⚒️      |          |          |
