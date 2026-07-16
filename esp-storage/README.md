@@ -9,6 +9,13 @@
 This crate provides functionality to access ESP32 flash. Enable the
 `embedded-storage` feature for [`embedded-storage`](https://github.com/rust-embedded-community/embedded-storage) trait implementations.
 
+## `esp-hal/unstable` requirement
+
+`esp-storage` depends on unstable `esp-hal` APIs (for example the `FLASH` peripheral
+and flash encryption helpers). The crate enables `esp-hal/requires-unstable` via its
+chip features; **application crates must enable `esp-hal/unstable`** when building
+for a device.
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
