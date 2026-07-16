@@ -12,7 +12,7 @@ for_each_lp_function! {
             }
 
             fn rtcio_pad_hold(&self, enable: bool) {
-                let mask = 1 << $pin;
+                let mask = 1 << lp_pin_to_gpio($pin);
                 LP_AON::regs()
                     .gpio_hold0()
                     .modify(|r, w| unsafe {
