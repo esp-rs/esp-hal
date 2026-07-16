@@ -360,7 +360,7 @@ impl TryFrom<usize> for AlternateFunction {
 #[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
+#[cfg(not(esp32h2))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -373,14 +373,13 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
-#[cfg(not(any(esp32c5, esp32c61)))]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32p4))]
     #[doc(hidden)]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -392,7 +391,7 @@ pub trait RtcPin: Pin {
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32p4))]
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
     #[doc(hidden)]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
@@ -400,7 +399,6 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which support internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(not(any(esp32c5, esp32c61)))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     #[cfg(not(esp32h2))]
@@ -2180,7 +2178,6 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
     panic!("Pin {} is not an {}", pin, function)
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 macro_rules! for_each_rtcio_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2203,7 +2200,7 @@ macro_rules! for_each_rtcio_pin {
     };
 }
 
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
+#[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2235,7 +2232,6 @@ macro_rules! for_each_rtcio_output_pin {
     };
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8 {
@@ -2244,7 +2240,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
@@ -2257,7 +2253,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32p4))]
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
         for_each_rtcio_pin! {
             (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };
@@ -2265,7 +2261,6 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 impl RtcPinWithResistors for AnyPin<'_> {
     #[cfg(not(esp32h2))]
     fn rtcio_pullup(&self, enable: bool) {

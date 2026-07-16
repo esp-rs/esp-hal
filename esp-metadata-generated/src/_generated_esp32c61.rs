@@ -265,6 +265,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("lp_io.version") => {
+        "v4"
+    };
     ("phy.combo_module") => {
         true
     };
@@ -3431,7 +3434,9 @@ macro_rules! for_each_peripheral {
         "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
         LPWR <= LP_CLKRST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)));
+        = "LP_GPIO peripheral singleton"] LP_GPIO <= LP_GPIO() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LPPERI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)));
@@ -3531,6 +3536,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_APM(unstable)));
         _for_each_inner_peripheral!((LP_CLKRST(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
+        _for_each_inner_peripheral!((LP_GPIO(unstable)));
         _for_each_inner_peripheral!((LP_IO_MUX(unstable)));
         _for_each_inner_peripheral!((LP_PERI(unstable)));
         _for_each_inner_peripheral!((LP_TEE(unstable)));
@@ -3736,14 +3742,15 @@ macro_rules! for_each_peripheral {
         = "LP_APM peripheral singleton"] LP_APM <= LP_APM() (unstable)), (@ peri_type
         #[doc = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)),
         (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <= LP_CLKRST()
-        (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <=
-        LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
-        LP_PERI <= LPPERI() (unstable)), (@ peri_type #[doc =
-        "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@ peri_type #[doc
-        = "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)), (@
-        peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)),
-        (@ peri_type #[doc = "MEM_MONITOR peripheral singleton"] MEM_MONITOR <=
-        MEM_MONITOR() (unstable)), (@ peri_type #[doc =
+        (unstable)), (@ peri_type #[doc = "LP_GPIO peripheral singleton"] LP_GPIO <=
+        LP_GPIO() (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"]
+        LP_IO_MUX <= LP_IO_MUX() (unstable)), (@ peri_type #[doc =
+        "LP_PERI peripheral singleton"] LP_PERI <= LPPERI() (unstable)), (@ peri_type
+        #[doc = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@
+        peri_type #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER()
+        (unstable)), (@ peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <=
+        LP_WDT() (unstable)), (@ peri_type #[doc = "MEM_MONITOR peripheral singleton"]
+        MEM_MONITOR <= MEM_MONITOR() (unstable)), (@ peri_type #[doc =
         "MODEM_LPCON peripheral singleton"] MODEM_LPCON <= MODEM_LPCON() (unstable)), (@
         peri_type #[doc = "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <=
         MODEM_SYSCON() (unstable)), (@ peri_type #[doc = "PAU peripheral singleton"] PAU
@@ -3793,7 +3800,7 @@ macro_rules! for_each_peripheral {
         (GPIO(unstable)), (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
         (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
         (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
-        (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)),
+        (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)), (LP_GPIO(unstable)),
         (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
         (RTC_TIMER(unstable)), (LP_WDT(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),

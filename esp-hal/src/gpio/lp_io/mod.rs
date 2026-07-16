@@ -38,7 +38,6 @@ use super::{InputPin, OutputPin, RtcPin};
 #[cfg_attr(lp_io_version = "esp32", path = "low_level/esp32.rs")]
 #[cfg_attr(lp_io_version = "v2", path = "low_level/v2.rs")]
 #[cfg_attr(lp_io_version = "v3", path = "low_level/v3.rs")]
-#[cfg_attr(lp_io_version = "esp32c6", path = "low_level/esp32c6.rs")]
 #[cfg_attr(lp_io_version = "esp32h2", path = "low_level/esp32h2.rs")]
 #[cfg_attr(lp_io_version = "esp32p4", path = "low_level/esp32p4.rs")]
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]

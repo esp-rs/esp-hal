@@ -61,7 +61,7 @@ peripherals = [
     { name = "LP_APM" },
     { name = "LP_CLKRST" },
     { name = "LPWR", pac = "LP_CLKRST" },
-    # { name = "LP_GPIO" }, # TODO: add PAC manually later
+    { name = "LP_GPIO" },
     # { name = "LP_I2C0" },
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
@@ -120,8 +120,8 @@ timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
 
 [device.lp_io]
-support_status = "not_supported"
-version = "unsupported"
+support_status = "partial"
+version = "v4"
 
 [device.gpio]
 support_status = "supported"
