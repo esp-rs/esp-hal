@@ -1,6 +1,6 @@
 //! Embassy executor benchmark, used to try out optimization ideas.
 
-//% CHIP_FILTER: systimer_driver_supported && sleep_driver_supported
+//% CHIP_FILTER: systimer_driver_supported && gpio_driver_supported
 //% FEATURES: rtos-trace
 
 #![no_std]
