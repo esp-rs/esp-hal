@@ -3,6 +3,7 @@ use crate::{
     gpio::AnyPin,
     interrupt::{self, InterruptHandler, Priority},
     peripherals::{GPIO, Interrupt},
+    system::Cpu,
 };
 
 pub(crate) fn read_bank_interrupt_status(bank: GpioBank) -> u32 {
@@ -28,9 +29,15 @@ pub(crate) fn gpio_intr_enable(int_enable: bool) -> u8 {
 }
 
 pub(crate) fn enable_interrupt(handler: InterruptHandler) {
+    for cpu in Cpu::other() {
+        interrupt::disable(cpu, Interrupt::GPIO);
+    }
     interrupt::bind_handler(Interrupt::GPIO, handler);
 }
 
 pub(crate) fn set_interrupt_priority(priority: Priority) {
+    for cpu in Cpu::other() {
+        interrupt::disable(cpu, Interrupt::GPIO);
+    }
     interrupt::enable(Interrupt::GPIO, priority);
 }

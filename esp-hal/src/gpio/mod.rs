@@ -530,8 +530,8 @@ impl<'d> Io<'d> {
     }
 
     #[doc = cfg_select!(
-        multi_core => "Sets the the interrupt priority and enables GPIO interrupts on all cores.",
-        _ => "Sets the interrupt priority and enables GPIO interrupts.",
+        any(single_core, esp32s3) => "Sets the the interrupt priority and enables GPIO interrupts.",
+        _ => "Sets the interrupt priority and enables GPIO interrupts on all cores.",
     )]
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
@@ -539,8 +539,8 @@ impl<'d> Io<'d> {
     }
 
     #[doc = cfg_select!(
-        multi_core => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
-        _ => "Registers an interrupt handler for all GPIO pins.",
+        any(single_core, esp32s3) => "Registers an interrupt handler for all GPIO pins.",
+        _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
     )]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
