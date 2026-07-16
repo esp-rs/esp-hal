@@ -9,17 +9,6 @@
 This crate provides functionality to access ESP32 flash. Enable the
 `embedded-storage` feature for [`embedded-storage`](https://github.com/rust-embedded-community/embedded-storage) trait implementations.
 
-## Important
-
-For ESP32 it is necessary to build with [optimization level](https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level) 2 or 3.
-
-To make it work also for `debug` builds add this to your `Cargo.toml`
-
-```toml
-[profile.dev.package.esp-storage]
-opt-level = 3
-```
-
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
