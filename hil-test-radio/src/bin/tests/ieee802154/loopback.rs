@@ -116,6 +116,9 @@ mod tests {
             }
         }
 
-        assert!(echoed, "did not receive an echoed frame from the peer board");
+        assert!(
+            echoed,
+            "did not receive an echoed frame from the peer board"
+        );
     }
 }
