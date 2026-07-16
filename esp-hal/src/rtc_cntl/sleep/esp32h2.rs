@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
+    gpio::RtcFunction,
     peripherals::{LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
@@ -31,6 +31,8 @@ impl Ext1WakeupSource<'_, '_> {
 
     /// Resets the pins that had been configured as wakeup trigger to their default state.
     fn wake_io_reset() {
+        use crate::gpio::RtcPin;
+
         fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.rtc_number()) != 0 {
                 pin.rtcio_pad_hold(false);
@@ -67,14 +69,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
                 WakeupLevel::Low => 0,
             };
 
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
             pin.rtcio_pad_hold(true);
-            Input::new(
-                unsafe { AnyPin::steal(pin.number()) },
-                InputConfig::default().with_pull(match level {
-                    WakeupLevel::High => Pull::Down,
-                    WakeupLevel::Low => Pull::Up,
-                }),
-            );
         }
 
         // clear previous wakeup status
@@ -98,7 +94,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
             pin.rtcio_pad_hold(false);
-            unsafe { AnyPin::steal(pin.number()) }.init_gpio();
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
         }
     }
 }

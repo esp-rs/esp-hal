@@ -360,7 +360,7 @@ impl TryFrom<usize> for AlternateFunction {
 #[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
+#[cfg(not(any(esp32c5, esp32c61)))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -380,7 +380,7 @@ pub trait RtcPin: Pin {
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    #[cfg(any(xtensa, esp32c6, esp32h2, esp32p4))]
     #[doc(hidden)]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -403,11 +403,9 @@ pub trait RtcPin: Pin {
 #[cfg(not(any(esp32c5, esp32c61)))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
-    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pullup(&self, enable: bool);
     /// Enable/disable the internal pull-down resistor
-    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pulldown(&self, enable: bool);
 }
@@ -2203,7 +2201,7 @@ macro_rules! for_each_rtcio_pin {
     };
 }
 
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
+#[cfg(not(any(esp32c5, esp32c61)))]
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2244,7 +2242,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    #[cfg(any(xtensa, esp32c6, esp32h2, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
@@ -2267,14 +2265,12 @@ impl RtcPin for AnyPin<'_> {
 
 #[cfg(not(any(esp32c5, esp32c61)))]
 impl RtcPinWithResistors for AnyPin<'_> {
-    #[cfg(not(esp32h2))]
     fn rtcio_pullup(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
         }
     }
 
-    #[cfg(not(esp32h2))]
     fn rtcio_pulldown(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
