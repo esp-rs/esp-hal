@@ -18,7 +18,7 @@
 use esp_hal::{clock::CpuClock, main};
 use esp_radio::ieee802154::{Config, Frame, Ieee802154};
 use hil_test as _;
-use hil_test::ieee802154_params::{CHANNEL, DUT_ADDRESS, PAN_ID, SUPPORT_ADDRESS};
+use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, SUPPORT_ADDRESS};
 use ieee802154::mac::{
     Address,
     FrameContent,

@@ -61,7 +61,7 @@ pub fn signal_harness_ready() {
 /// The device-under-test and the `ieee802154_echo_support` firmware must agree
 /// on these values so the two boards land on the same channel and PAN and can
 /// address frames to each other.
-pub mod ieee802154_params {
+pub mod ieee802154 {
     /// Radio channel used by both boards.
     pub const CHANNEL: u8 = 15;
     /// PAN ID shared by both boards.
