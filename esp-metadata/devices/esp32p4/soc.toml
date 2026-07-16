@@ -131,7 +131,7 @@ peripherals = [
 # {include clocks.toml}
 
 [device.uart]
-support_status = "partial"
+support_status = "supported"
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "UART0_TXD", rx = "UART0_RXD", cts = "UART0_CTS", rts = "UART0_RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "UART1_TXD", rx = "UART1_RXD", cts = "UART1_CTS", rts = "UART1_RTS" },
@@ -157,9 +157,9 @@ instances = [
 timg_has_divcnt_rst = true
 
 [device.spi_master]
+support_status = "supported"
 version = 3
 fifo_size = 64
-support_status = "partial"
 instances = [
     {
         name = "spi2",
@@ -178,7 +178,7 @@ instances = [
 ]
 
 [device.i2c_master]
-support_status = "partial"
+support_status = "supported"
 version = 3
 instances = [
     { name = "i2c0", sys_instance = "I2c0", scl = "I2C0_SCL", sda = "I2C0_SDA" },
@@ -479,8 +479,8 @@ has_memory_clock_gate = true
 supports_enhanced_security = true
 
 [device.gpio]
+support_status = "supported"
 version = 3
-support_status = "partial"
 has_bank_1 = true
 has_input_sync = true
 gpio_function = 1

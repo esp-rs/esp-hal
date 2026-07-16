@@ -119,9 +119,9 @@ timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
 
 [device.gpio]
+support_status = "supported"
 version = 2
 has_input_sync = true
-support_status = "partial"
 gpio_function = 1
 constant_0_input = 0x60
 constant_1_input = 0x40
@@ -391,10 +391,10 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 support_status = { status = "not_supported", issue = 5444 }
 
 [device.spi_master]
+support_status = "supported"
 dma_can_access_flash = true
 version = 3
 fifo_size = 64
-support_status = "supported"
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 has_clk_pre_div = true
