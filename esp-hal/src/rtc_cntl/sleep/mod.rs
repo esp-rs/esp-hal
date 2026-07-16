@@ -14,15 +14,24 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
+<<<<<<< HEAD
 // ESP32-C5/C61 currently only support timer wakeup, which does not use `RefCell`.
 #[cfg(not(any(esp32c5, esp32c61)))]
+=======
+// ESP32-P4 currently only supports timer wakeup, which does not use `RefCell`.
+#[cfg(not(esp32p4))]
+>>>>>>> a4bcf4d059 (Implement Ext1 wakeup source)
 use core::cell::RefCell;
 
 use enumset::EnumSet;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
 use crate::gpio::RtcPin as RtcIoWakeupPinType;
+<<<<<<< HEAD
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32p4))]
+=======
+#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2))]
+>>>>>>> a4bcf4d059 (Implement Ext1 wakeup source)
 use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::{
     peripherals::LPWR,
@@ -171,11 +180,11 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 
 #[procmacros::doc_replace(
     "pin_low" => {
-        cfg(any(esp32c6, esp32p4)) => "GPIO2",
+        cfg(any(esp32c5, esp32c6, esp32c61, esp32p4)) => "GPIO2",
         cfg(esp32h2) => "GPIO9",
     },
     "pin_high" => {
-        cfg(any(esp32c6, esp32p4)) => "GPIO3",
+        cfg(any(esp32c5, esp32c6, esp32c61, esp32p4)) => "GPIO3",
         cfg(esp32h2) => "GPIO10"
     },
 )]
@@ -214,14 +223,22 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// delay.delay_millis(100);
 /// lpwr.sleep_deep(&[&timer, &ext1]);
 ///
-/// # }
+/// # {after_snippet}
 /// ```
+<<<<<<< HEAD
 #[cfg(any(esp32c6, esp32h2, esp32p4))]
+=======
+#[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+>>>>>>> a4bcf4d059 (Implement Ext1 wakeup source)
 pub struct Ext1WakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
 }
 
+<<<<<<< HEAD
 #[cfg(any(esp32c6, esp32h2, esp32p4))]
+=======
+#[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+>>>>>>> a4bcf4d059 (Implement Ext1 wakeup source)
 impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1) with the specified pins and
     /// wake-up level.
