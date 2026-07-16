@@ -166,6 +166,7 @@ rt = [
     "esp32h2?/rt",
     "esp32s2?/rt",
     "esp32s3?/rt",
+    "esp32s31?/rt",
     "critical-section",
 ]
 
@@ -303,6 +304,7 @@ esp32s3 = [
 esp32s31 = [
     "dep:esp32s31",
     "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt/clic-48",
     "procmacros/rtc-fast",
     "esp-rom-sys/esp32s31",
     "esp-sync/esp32s31",

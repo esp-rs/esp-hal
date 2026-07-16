@@ -471,6 +471,8 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         }
         soc_has_clock_node_lp_slow_clk => {
             let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
+                // on S31, clock can not be calibrated to get OSC_SLOW actual frequency
+                #[cfg(not(esp32s31))]
                 LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
                 LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
                 LpSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
@@ -483,10 +485,29 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     const SLOW_CLK_SRC_CAL_CYCLES: u32 = 16;
     let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
-    let reg = cfg_select! {
-        esp32p4 => LP_AON::regs().lp_store1(),
-        _ => LP_AON::regs().store1(),
-    };
+    cfg_select! {
+        esp32s31 => {
+            use crate::peripherals::LP_SYS;
+        }
+        soc_has_lp_aon => {
+            use crate::peripherals::LP_AON;
+        }
+        _ => {
+            use crate::peripherals::LPWR as LP_AON;
+        }
+    }
+
+    cfg_select! {
+        esp32s31 => {
+            let reg = LP_SYS::regs().lp_store(1);
+        }
+        esp32p4 => {
+            let reg = LP_AON::regs().lp_store1();
+        }
+        _ => {
+            let reg = LP_AON::regs().store1();
+        }
+    }
 
     reg.write(|w| unsafe { w.bits(cal_val) });
 }
@@ -527,14 +548,34 @@ pub fn xtal_clock() -> Rate {
 /// with `RtcClock::CAL_FRACT` fractional bits.
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
-pub(crate) fn rtc_slow_cal_period() -> u32 {
-    let reg = cfg_select! {
-        esp32p4 => LP_AON::regs().lp_store1(),
-        _ => LP_AON::regs().store1(),
-    };
+fn rtc_slow_cal_period() -> u64 {
+    cfg_select! {
+        esp32s31 => {
+            use crate::peripherals::LP_SYS;
+        }
+        soc_has_lp_aon => {
+            use crate::peripherals::LP_AON;
+        }
+        _ => {
+            use crate::peripherals::LPWR as LP_AON;
+        }
+    }
 
-    reg.read().bits()
-}
+    // P4: LP_SYS (mapped as LP_AON in esp-hal) names its scratch registers
+    // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
+    // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
+    // Once that lands this cfg branch can disappear.
+    cfg_select! {
+        esp32s31 => {
+            let reg = LP_SYS::regs().lp_store(1);
+        }
+        esp32p4 => {
+            let reg = LP_AON::regs().lp_store1();
+        }
+        _ => {
+            let reg = LP_AON::regs().store1();
+        }
+    }
 
 /// Read the calibrated RTC fast clock period from memory.
 #[cfg_attr(not(soc_has_pmu), expect(dead_code))]

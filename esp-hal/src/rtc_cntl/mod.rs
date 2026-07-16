@@ -138,6 +138,10 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::LP_SYS;
+        use crate::peripherals::LP_WDT;
+    }
     soc_has_lp_wdt => {
         use crate::peripherals::LP_WDT;
         use crate::peripherals::LP_AON;
@@ -306,13 +310,19 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-        let regs = LP_AON::regs();
         cfg_select! {
+            esp32s31 => {
+                let regs = LP_SYS::regs();
+                let low_reg = regs.lp_store(2);
+                let high_reg = regs.lp_store(3);
+            }
             esp32p4 => {
+                let regs = LP_AON::regs();
                 let low_reg = regs.lp_store2();
                 let high_reg = regs.lp_store3();
             }
             _ => {
+                let regs = LP_AON::regs();
                 let low_reg = regs.store2();
                 let high_reg = regs.store3();
             }
@@ -331,13 +341,19 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let regs = LP_AON::regs();
         cfg_select! {
+            esp32s31 => {
+                let regs = LP_SYS::regs();
+                let low_reg = regs.lp_store(2);
+                let high_reg = regs.lp_store(3);
+            }
             esp32p4 => {
+                let regs = LP_AON::regs();
                 let low_reg = regs.lp_store2();
                 let high_reg = regs.lp_store3();
             }
             _ => {
+                let regs = LP_AON::regs();
                 let low_reg = regs.store2();
                 let high_reg = regs.store3();
             }
@@ -425,10 +441,15 @@ impl<'d> Rtc<'d> {
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
         let reg = cfg_select! {
+            esp32s31 => LP_SYS::regs().lp_store(4),
             esp32p4 => LP_AON::regs().lp_store4(),
             _ => LP_AON::regs().store4(),
         };
-        reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+        let disable_mask = cfg_select! {
+            any(esp32p4, esp32s31) => Self::RTC_DISABLE_ROM_LOG | (Self::RTC_DISABLE_ROM_LOG << 16),
+            _ => Self::RTC_DISABLE_ROM_LOG,
+        };
+        reg.modify(|r, w| unsafe { w.bits(r.bits() | disable_mask) });
     }
 
     /// Register an interrupt handler for the RTC.

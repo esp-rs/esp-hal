@@ -339,7 +339,7 @@ use crate::rtc_cntl::SocResetReason;
 #[inline]
 pub fn software_reset() -> ! {
     let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
-    #[cfg(esp32p4)]
+    #[cfg(any(esp32p4, esp32s31))]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
 }

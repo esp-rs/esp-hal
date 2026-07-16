@@ -222,7 +222,6 @@ const REGI2C_RTC_ADDR_SHIFT: u32 = 8;
 const REGI2C_RTC_ADDR_MASK: u32 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_MASK: u32 = 0xFF;
 
-
 fn regi2c_enable_block(block: u8) -> usize {
     unsafe {
         let reg = MODEM_LPCON_CLK_CONF_REG as *mut u32;
@@ -283,8 +282,10 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
 
     wait_i2c_idle(ctrl);
 
-    let cmd = ((block as u32 & REGI2C_RTC_SLAVE_ID_MASK) /* << 0 */)
-        | ((reg_add as u32 & REGI2C_RTC_ADDR_MASK) << REGI2C_RTC_ADDR_SHIFT);
+    let cmd = (
+        (block as u32 & REGI2C_RTC_SLAVE_ID_MASK)
+        // << 0
+    ) | ((reg_add as u32 & REGI2C_RTC_ADDR_MASK) << REGI2C_RTC_ADDR_SHIFT);
 
     unsafe { (ctrl as *mut u32).write_volatile(cmd) };
 
@@ -300,8 +301,10 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
 
     wait_i2c_idle(ctrl);
 
-    let cmd = ((block as u32 & REGI2C_RTC_SLAVE_ID_MASK) /* << 0 */)
-        | ((reg_add as u32 & REGI2C_RTC_ADDR_MASK) << REGI2C_RTC_ADDR_SHIFT)
+    let cmd = (
+        (block as u32 & REGI2C_RTC_SLAVE_ID_MASK)
+        // << 0
+    ) | ((reg_add as u32 & REGI2C_RTC_ADDR_MASK) << REGI2C_RTC_ADDR_SHIFT)
         | REGI2C_RTC_WR_CNTL_BIT
         | ((data as u32 & REGI2C_RTC_DATA_MASK) << REGI2C_RTC_DATA_SHIFT);
 

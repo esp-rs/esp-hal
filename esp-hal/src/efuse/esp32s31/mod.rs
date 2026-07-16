@@ -15,6 +15,12 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
+/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+#[instability::unstable]
+pub fn rwdt_multiplier() -> u8 {
+    super::read_field_le::<u8>(WDT_DELAY_SEL)
+}
+
 /// Get efuse block version.
 ///
 /// Returns (major, minor).
@@ -34,12 +40,14 @@ pub fn rtc_calib_version() -> u8 {
 }
 
 /// Returns the major hardware revision.
-pub(crate) fn major_chip_version() -> u8 {
+#[instability::unstable]
+pub fn major_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MAJOR)
 }
 
 /// Returns the minor hardware revision.
-pub(crate) fn minor_chip_version() -> u8 {
+#[instability::unstable]
+pub fn minor_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MINOR)
 }
 
