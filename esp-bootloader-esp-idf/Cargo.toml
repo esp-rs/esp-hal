@@ -46,7 +46,7 @@ md-5 = { version = "0.10.6", default-features = false, optional = true }
 # Not used by library code. Optional so CI `check-configs` can pass `esp-hal/unstable`
 # (Cargo only forwards dependency features from direct deps; dev-dependencies are not used by `cargo check`).
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dependencies]
-esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true }
+esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true, features = ["requires-unstable"] }
 
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
