@@ -1,15 +1,15 @@
 use core::mem::MaybeUninit;
 
-#[cfg(multi_core)]
-use esp_hal::peripherals::CPU_CTRL;
 #[cfg(not(feature = "emulation"))]
 pub use esp_hal::peripherals::FLASH as Flash;
+
 #[cfg(multi_core)]
-use esp_hal::system::Cpu;
-#[cfg(multi_core)]
-use esp_hal::system::CpuControl;
-#[cfg(multi_core)]
-use esp_hal::system::is_running;
+esp_hal::if_unstable_hal! {
+    use esp_hal::peripherals::CPU_CTRL;
+    use esp_hal::system::Cpu;
+    use esp_hal::system::CpuControl;
+    use esp_hal::system::is_running;
+}
 
 use crate::chip_specific;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -251,9 +251,11 @@ impl MultiCoreStrategy {
         match self {
             #[cfg(multi_core)]
             MultiCoreStrategy::Error => {
-                for other_cpu in Cpu::other() {
-                    if is_running(other_cpu) {
-                        return Err(FlashStorageError::OtherCoreRunning);
+                esp_hal::if_unstable_hal! {
+                    for other_cpu in Cpu::other() {
+                        if is_running(other_cpu) {
+                            return Err(FlashStorageError::OtherCoreRunning);
+                        }
                     }
                 }
                 Ok(false)
@@ -261,11 +263,13 @@ impl MultiCoreStrategy {
 
             #[cfg(multi_core)]
             MultiCoreStrategy::AutoPark => {
-                let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
-                for other_cpu in Cpu::other() {
-                    if is_running(other_cpu) {
-                        unsafe { cpu_ctrl.park_core(other_cpu) };
-                        return Ok(true);
+                esp_hal::if_unstable_hal! {
+                    let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
+                    for other_cpu in Cpu::other() {
+                        if is_running(other_cpu) {
+                            unsafe { cpu_ctrl.park_core(other_cpu) };
+                            return Ok(true);
+                        }
                     }
                 }
                 Ok(false)
@@ -283,12 +287,14 @@ impl MultiCoreStrategy {
     pub(crate) fn post_write(&self, unpark: bool) {
         cfg_select! {
             multi_core => {
-                let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
                 if let MultiCoreStrategy::AutoPark = self
                     && unpark
                 {
-                    for other_cpu in Cpu::other() {
-                        cpu_ctrl.unpark_core(other_cpu);
+                    esp_hal::if_unstable_hal! {
+                        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
+                        for other_cpu in Cpu::other() {
+                            cpu_ctrl.unpark_core(other_cpu);
+                        }
                     }
                 }
             }
