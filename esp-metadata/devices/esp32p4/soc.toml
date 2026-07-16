@@ -156,8 +156,6 @@ instances = [
 ]
 timg_has_divcnt_rst = true
 
-# SPI Master: 2 instances (GPSPI2, GPSPI3)
-# SPI Master: SPI2 only (SPI2 and SPI3 have different PAC RegisterBlock types)
 [device.spi_master]
 version = 3
 fifo_size = 64
@@ -179,8 +177,6 @@ instances = [
     },
 ]
 
-# I2C Master: 2 instances
-# P4 PAC: data register is read-only, TX uses txfifo_start_addr (fixed in i2c/master/mod.rs)
 [device.i2c_master]
 support_status = "partial"
 version = 3
@@ -197,15 +193,6 @@ max_bus_timeout = 0x1F
 has_arbitration_en = true
 has_pd_en = true
 
-# DMA: P4 exposes three DMA controllers. IDF public docs
-# (https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-reference/system/async_memcpy.html)
-# refer to them as GDMA-AHB and GDMA-AXI:
-#   AHB_DMA / GDMA-AHB (0x50085000): GDMA v2 layout -- used by esp-hal as `Dma`
-#   AXI_DMA / GDMA-AXI (0x5008A000): AXI-bus DMA, different layout
-#   DMA (separate block at 0x50081000, SOC_DW_GDMA_SUPPORTED):
-#     another register layout, not used by esp-hal
-# esp-hal's `Dma` singleton must be GDMA v2 compatible, hence PAC alias AHB_DMA above.
-# Ref: IDF linker esp32p4.peripherals.ld (AHB_DMA, AXI_DMA, DW_GDMA symbols).
 [device.dma]
 support_status = "partial"
 gdma_version = 2
@@ -262,20 +249,11 @@ engines = [
     },
 ]
 
-# TODO: Check later with PAC and TRM both
 [device.twai]
 support_status = "not_supported"
-# TODO: Check later with PAC and TRM both
+
 [device.adc]
 support_status = "not_supported"
-# Below: peripherals P4 silicon physically has, but no esp-hal driver
-# is wired up in this PR. All marked `not_supported` so the README's
-# chip-support table accurately shows ❌ rather than empty cells.
-# When the upstream driver lands or our local code path is added,
-# flip the relevant entry to `partial`.
-# Refs:
-#   .investigation/PERIPHERAL_TESTABILITY_w_logicpro.md
-#   .investigation/README_TABLE_AUDIT_P4.md
 
 [device.assist_debug]
 support_status = "not_supported"
@@ -419,7 +397,7 @@ slot_config = [
 support_status = { status = "not_supported", issue = 2370 }
 
 [device.sleep]
-support_status = "partial"  # PMU eco5 sleep: timer wakeup (light + deep)
+support_status = "partial"
 light_sleep = true
 deep_sleep = true
 wakeup_sources = {
@@ -437,9 +415,9 @@ wakeup_sources = {
 [device.spi_slave]
 support_status = "not_supported"
 [device.temp_sensor]
-support_status = "not_supported"  # LP_TSENS
+support_status = "not_supported"
 [device.touch]
-support_status = "not_supported"  # LP_TOUCH 14ch
+support_status = "not_supported"
 [device.uhci]
 support_status = "not_supported"
 [device.ulp_riscv]
@@ -510,7 +488,6 @@ constant_0_input = 0x3E
 constant_1_input = 0x3F
 # P4's GPIO_FUNC_IN_SEL_CFG registers start at signal 1 (no signal-0 register
 # exists), so func_in_sel_cfg[0] in the PAC corresponds to hardware signal 1.
-# The offset corrects the index: PAC index = signal_id - func_in_sel_offset.
 func_in_sel_offset = 1
 input_signals = [
     { name = "SDHOST_CCMD_IN_2", id = 1 },
@@ -752,7 +729,7 @@ output_signals = [
     { name = "SPI3_CS2", id = 45 },
     { name = "SPI3_CS1", id = 46 },
     { name = "SPI3_CK", id = 47 },
-    { name = "SPI3_Q", id = 48 },  # PAC: SPI3_QO_PAD_OUT_IDX, renamed to match input signal
+    { name = "SPI3_Q", id = 48 },
     { name = "SPI3_D", id = 49 },
     { name = "SPI3_HOLD", id = 50 },
     { name = "SPI3_WP", id = 51 },
