@@ -58,11 +58,8 @@ crate::unstable_module! {
     #[cfg(etm_driver_supported)]
     pub mod etm;
 
-    #[cfg(soc_has_lp_io)]
+    #[cfg(lp_io_driver_supported)]
     pub mod lp_io;
-
-    #[cfg(all(soc_has_rtc_io, not(esp32)))]
-    pub mod rtc_io;
 
     #[cfg(dedicated_gpio_driver_supported)]
     pub mod dedicated;
@@ -1682,6 +1679,20 @@ impl<'lt> AnyPin<'lt> {
     pub(crate) fn init_gpio(&self) {
         self.set_output_enable(false);
         self.disable_usb_pads();
+
+        #[cfg(any(xtensa, esp32c6, esp32p4))]
+        for_each_lp_function! {
+            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+                if self.number() == crate::peripherals::$gpio::NUMBER {
+                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                }
+            };
+            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+                if self.number() == crate::peripherals::$gpio::NUMBER {
+                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                }
+            };
+        }
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)

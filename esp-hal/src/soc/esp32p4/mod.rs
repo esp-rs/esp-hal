@@ -1,5 +1,3 @@
-pub mod gpio;
-
 crate::unstable_module! {
     pub mod clocks;
 }

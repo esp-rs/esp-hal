@@ -163,6 +163,10 @@ engines = [
     },
 ]
 
+[device.lp_io]
+support_status = "partial"
+version = "v2"
+
 [device.gpio]
 version = 2
 support_status = "supported"

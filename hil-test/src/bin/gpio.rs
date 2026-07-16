@@ -846,4 +846,33 @@ mod tests {
         );
         output_bundle.set_low(0b10); // should panic, only channel0 is configured
     }
+
+    #[cfg(all(lp_io_driver_supported, feature = "unstable"))]
+    fn no_init() {}
+
+    #[test(init = no_init)]
+    #[cfg(all(lp_io_driver_supported, feature = "unstable"))]
+    fn creating_lpio_does_not_panic() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let jtag_pins = cfg_select!(
+            esp32 => [13, 14, 15, 16],
+            any(esp32c2, esp32c3) => [4, 5],
+            // S2 JTAG pins are not RTC_IO pins, rest use USB Serial/JTAG
+            _ => [],
+        );
+
+        esp_metadata_generated::for_each_lp_function! {
+            (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident) => {
+                if !jtag_pins.contains(&$pin) {
+                    esp_hal::gpio::lp_io::LowPowerInput::<$pin>::new(peripherals.$gpio);
+                }
+            };
+            (($_rtc:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
+                if !jtag_pins.contains(&$pin) {
+                    esp_hal::gpio::lp_io::LowPowerInput::<$pin>::new(peripherals.$gpio);
+                }
+            };
+        }
+    }
 }

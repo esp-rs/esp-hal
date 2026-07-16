@@ -118,6 +118,10 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
 
+[device.lp_io]
+support_status = "not_supported"
+version = "unsupported"
+
 [device.gpio]
 support_status = "supported"
 version = 2

@@ -250,6 +250,9 @@ macro_rules! property {
     ("ledc.channel_count", str) => {
         stringify!(8)
     };
+    ("lp_io.version") => {
+        "esp32"
+    };
     ("phy.combo_module") => {
         true
     };
@@ -4924,10 +4927,10 @@ macro_rules! for_each_gpio {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
-///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm,
+///   2, 3)`.
 ///
 /// Macro fragments:
 ///
@@ -4984,35 +4987,35 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC_H, GPIO39));
         _for_each_inner_analog_function!((ADC1_CH3, GPIO39));
         _for_each_inner_analog_function!(((ADC2_CH1, ADCn_CHm, 2, 1), GPIO0));
-        _for_each_inner_analog_function!(((TOUCH1, TOUCHn, 1), GPIO0));
         _for_each_inner_analog_function!(((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2));
-        _for_each_inner_analog_function!(((TOUCH2, TOUCHn, 2), GPIO2));
         _for_each_inner_analog_function!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO4));
-        _for_each_inner_analog_function!(((TOUCH0, TOUCHn, 0), GPIO4));
         _for_each_inner_analog_function!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12));
-        _for_each_inner_analog_function!(((TOUCH5, TOUCHn, 5), GPIO12));
         _for_each_inner_analog_function!(((ADC2_CH4, ADCn_CHm, 2, 4), GPIO13));
-        _for_each_inner_analog_function!(((TOUCH4, TOUCHn, 4), GPIO13));
         _for_each_inner_analog_function!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14));
-        _for_each_inner_analog_function!(((TOUCH6, TOUCHn, 6), GPIO14));
         _for_each_inner_analog_function!(((ADC2_CH3, ADCn_CHm, 2, 3), GPIO15));
-        _for_each_inner_analog_function!(((TOUCH3, TOUCHn, 3), GPIO15));
-        _for_each_inner_analog_function!(((DAC1, DACn, 1), GPIO25));
         _for_each_inner_analog_function!(((ADC2_CH8, ADCn_CHm, 2, 8), GPIO25));
-        _for_each_inner_analog_function!(((DAC2, DACn, 2), GPIO26));
         _for_each_inner_analog_function!(((ADC2_CH9, ADCn_CHm, 2, 9), GPIO26));
         _for_each_inner_analog_function!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27));
-        _for_each_inner_analog_function!(((TOUCH7, TOUCHn, 7), GPIO27));
         _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32));
-        _for_each_inner_analog_function!(((TOUCH9, TOUCHn, 9), GPIO32));
         _for_each_inner_analog_function!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33));
-        _for_each_inner_analog_function!(((TOUCH8, TOUCHn, 8), GPIO33));
         _for_each_inner_analog_function!(((ADC1_CH6, ADCn_CHm, 1, 6), GPIO34));
         _for_each_inner_analog_function!(((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36));
         _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37));
         _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38));
         _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39));
+        _for_each_inner_analog_function!(((TOUCH1, TOUCHn, 1), GPIO0));
+        _for_each_inner_analog_function!(((TOUCH2, TOUCHn, 2), GPIO2));
+        _for_each_inner_analog_function!(((TOUCH0, TOUCHn, 0), GPIO4));
+        _for_each_inner_analog_function!(((TOUCH5, TOUCHn, 5), GPIO12));
+        _for_each_inner_analog_function!(((TOUCH4, TOUCHn, 4), GPIO13));
+        _for_each_inner_analog_function!(((TOUCH6, TOUCHn, 6), GPIO14));
+        _for_each_inner_analog_function!(((TOUCH3, TOUCHn, 3), GPIO15));
+        _for_each_inner_analog_function!(((TOUCH7, TOUCHn, 7), GPIO27));
+        _for_each_inner_analog_function!(((TOUCH9, TOUCHn, 9), GPIO32));
+        _for_each_inner_analog_function!(((TOUCH8, TOUCHn, 8), GPIO33));
+        _for_each_inner_analog_function!(((DAC1, DACn, 1), GPIO25));
+        _for_each_inner_analog_function!(((DAC2, DACn, 2), GPIO26));
         _for_each_inner_analog_function!((all(ADC2_CH1, GPIO0), (TOUCH1, GPIO0),
         (ADC2_CH2, GPIO2), (TOUCH2, GPIO2), (ADC2_CH0, GPIO4), (TOUCH0, GPIO4),
         (ADC2_CH5, GPIO12), (TOUCH5, GPIO12), (ADC2_CH4, GPIO13), (TOUCH4, GPIO13),
@@ -5023,21 +5026,22 @@ macro_rules! for_each_analog_function {
         (ADC1_CH6, GPIO34), (ADC1_CH7, GPIO35), (ADC_H, GPIO36), (ADC1_CH0, GPIO36),
         (ADC_H, GPIO37), (ADC1_CH1, GPIO37), (ADC_H, GPIO38), (ADC1_CH2, GPIO38), (ADC_H,
         GPIO39), (ADC1_CH3, GPIO39)));
-        _for_each_inner_analog_function!((all_expanded((ADC2_CH1, ADCn_CHm, 2, 1),
-        GPIO0), ((TOUCH1, TOUCHn, 1), GPIO0), ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2),
-        ((TOUCH2, TOUCHn, 2), GPIO2), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO4), ((TOUCH0,
-        TOUCHn, 0), GPIO4), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12), ((TOUCH5, TOUCHn, 5),
-        GPIO12), ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO13), ((TOUCH4, TOUCHn, 4), GPIO13),
-        ((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14), ((TOUCH6, TOUCHn, 6), GPIO14), ((ADC2_CH3,
-        ADCn_CHm, 2, 3), GPIO15), ((TOUCH3, TOUCHn, 3), GPIO15), ((DAC1, DACn, 1),
-        GPIO25), ((ADC2_CH8, ADCn_CHm, 2, 8), GPIO25), ((DAC2, DACn, 2), GPIO26),
-        ((ADC2_CH9, ADCn_CHm, 2, 9), GPIO26), ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27),
-        ((TOUCH7, TOUCHn, 7), GPIO27), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32), ((TOUCH9,
-        TOUCHn, 9), GPIO32), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33), ((TOUCH8, TOUCHn, 8),
-        GPIO33), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO34), ((ADC1_CH7, ADCn_CHm, 1, 7),
-        GPIO35), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36), ((ADC1_CH1, ADCn_CHm, 1, 1),
-        GPIO37), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38), ((ADC1_CH3, ADCn_CHm, 1, 3),
-        GPIO39)));
+        _for_each_inner_analog_function!((ADCn_CHm((ADC2_CH1, ADCn_CHm, 2, 1), GPIO0),
+        ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO4),
+        ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12), ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO13),
+        ((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14), ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO15),
+        ((ADC2_CH8, ADCn_CHm, 2, 8), GPIO25), ((ADC2_CH9, ADCn_CHm, 2, 9), GPIO26),
+        ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32),
+        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO34),
+        ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36),
+        ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38),
+        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39)));
+        _for_each_inner_analog_function!((TOUCHn((TOUCH1, TOUCHn, 1), GPIO0), ((TOUCH2,
+        TOUCHn, 2), GPIO2), ((TOUCH0, TOUCHn, 0), GPIO4), ((TOUCH5, TOUCHn, 5), GPIO12),
+        ((TOUCH4, TOUCHn, 4), GPIO13), ((TOUCH6, TOUCHn, 6), GPIO14), ((TOUCH3, TOUCHn,
+        3), GPIO15), ((TOUCH7, TOUCHn, 7), GPIO27), ((TOUCH9, TOUCHn, 9), GPIO32),
+        ((TOUCH8, TOUCHn, 8), GPIO33))); _for_each_inner_analog_function!((DACn((DAC1,
+        DACn, 1), GPIO25), ((DAC2, DACn, 2), GPIO26)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -5048,10 +5052,10 @@ macro_rules! for_each_analog_function {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
-///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
+///   SAR_I2C_SCL_n, 1)`.
 ///
 /// Macro fragments:
 ///
@@ -5118,7 +5122,7 @@ macro_rules! for_each_lp_function {
         GPIO26), (RTC_GPIO17, GPIO27), (RTC_GPIO9, GPIO32), (RTC_GPIO8, GPIO33),
         (RTC_GPIO4, GPIO34), (RTC_GPIO5, GPIO35), (RTC_GPIO0, GPIO36), (RTC_GPIO1,
         GPIO37), (RTC_GPIO2, GPIO38), (RTC_GPIO3, GPIO39)));
-        _for_each_inner_lp_function!((all_expanded((RTC_GPIO11, RTC_GPIOn, 11), GPIO0),
+        _for_each_inner_lp_function!((RTC_GPIOn((RTC_GPIO11, RTC_GPIOn, 11), GPIO0),
         ((RTC_GPIO12, RTC_GPIOn, 12), GPIO2), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO4),
         ((RTC_GPIO15, RTC_GPIOn, 15), GPIO12), ((RTC_GPIO14, RTC_GPIOn, 14), GPIO13),
         ((RTC_GPIO16, RTC_GPIOn, 16), GPIO14), ((RTC_GPIO13, RTC_GPIOn, 13), GPIO15),
@@ -5143,9 +5147,9 @@ macro_rules! for_each_lp_function {
 ///
 /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
 ///   identifiers, and maybe the alternate function.
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
-///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
-///   group to which the signal belongs.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs.
 ///
 /// Macro fragments:
 ///
@@ -5249,44 +5253,44 @@ macro_rules! for_each_iomux_function {
         _for_each_inner_iomux_function!((EMAC_RXDV, GPIO27, _5));
         _for_each_inner_iomux_function!(((CLK_OUT1, CLK_OUTn, 1), GPIO0, _1));
         _for_each_inner_iomux_function!(((CLK_OUT3, CLK_OUTn, 3), GPIO1, _1));
-        _for_each_inner_iomux_function!(((EMAC_RXD2, EMAC_RXDn, 2), GPIO1, _5));
-        _for_each_inner_iomux_function!(((SD2_DATA0, SDn_DATAm, 2, 0), GPIO2, _3));
-        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO2, _4));
         _for_each_inner_iomux_function!(((CLK_OUT2, CLK_OUTn, 2), GPIO3, _1));
-        _for_each_inner_iomux_function!(((SD2_DATA1, SDn_DATAm, 2, 1), GPIO4, _3));
-        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO4, _4));
-        _for_each_inner_iomux_function!(((VSPICS0, VSPICSn, 0), GPIO5, _1));
-        _for_each_inner_iomux_function!(((SD1_DATA6, SDn_DATAm, 1, 6), GPIO5, _3));
-        _for_each_inner_iomux_function!(((SD1_CLK, SDn_CLK, 1), GPIO6, _3));
-        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO7, _0));
-        _for_each_inner_iomux_function!(((SD1_DATA0, SDn_DATAm, 1, 0), GPIO7, _3));
-        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO8, _0));
-        _for_each_inner_iomux_function!(((SD1_DATA1, SDn_DATAm, 1, 1), GPIO8, _3));
-        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO9, _0));
-        _for_each_inner_iomux_function!(((SD1_DATA2, SDn_DATAm, 1, 2), GPIO9, _3));
-        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO10, _0));
-        _for_each_inner_iomux_function!(((SD1_DATA3, SDn_DATAm, 1, 3), GPIO10, _3));
-        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO11, _1));
-        _for_each_inner_iomux_function!(((SD1_CMD, SDn_CMD, 1), GPIO11, _3));
-        _for_each_inner_iomux_function!(((SD2_DATA2, SDn_DATAm, 2, 2), GPIO12, _3));
-        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO12, _4));
-        _for_each_inner_iomux_function!(((EMAC_TXD3, EMAC_TXDn, 3), GPIO12, _5));
-        _for_each_inner_iomux_function!(((SD2_DATA3, SDn_DATAm, 2, 3), GPIO13, _3));
-        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO13, _4));
-        _for_each_inner_iomux_function!(((SD2_CLK, SDn_CLK, 2), GPIO14, _3));
-        _for_each_inner_iomux_function!(((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5));
-        _for_each_inner_iomux_function!(((HSPICS0, HSPICSn, 0), GPIO15, _1));
-        _for_each_inner_iomux_function!(((SD2_CMD, SDn_CMD, 2), GPIO15, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD2, EMAC_RXDn, 2), GPIO1, _5));
         _for_each_inner_iomux_function!(((EMAC_RXD3, EMAC_RXDn, 3), GPIO15, _5));
-        _for_each_inner_iomux_function!(((SD1_DATA4, SDn_DATAm, 1, 4), GPIO16, _3));
-        _for_each_inner_iomux_function!(((SD1_DATA5, SDn_DATAm, 1, 5), GPIO17, _3));
-        _for_each_inner_iomux_function!(((EMAC_CLK_180, EMAC_CLK_n, 180), GPIO17, _5));
-        _for_each_inner_iomux_function!(((SD1_DATA7, SDn_DATAm, 1, 7), GPIO18, _3));
-        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO19, _5));
-        _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5));
-        _for_each_inner_iomux_function!(((SD1_STROBE, SDn_STROBE, 1), GPIO23, _3));
         _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO25, _5));
         _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO26, _5));
+        _for_each_inner_iomux_function!(((SD2_DATA0, SDn_DATAm, 2, 0), GPIO2, _3));
+        _for_each_inner_iomux_function!(((SD2_DATA1, SDn_DATAm, 2, 1), GPIO4, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA6, SDn_DATAm, 1, 6), GPIO5, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA0, SDn_DATAm, 1, 0), GPIO7, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA1, SDn_DATAm, 1, 1), GPIO8, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA2, SDn_DATAm, 1, 2), GPIO9, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA3, SDn_DATAm, 1, 3), GPIO10, _3));
+        _for_each_inner_iomux_function!(((SD2_DATA2, SDn_DATAm, 2, 2), GPIO12, _3));
+        _for_each_inner_iomux_function!(((SD2_DATA3, SDn_DATAm, 2, 3), GPIO13, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA4, SDn_DATAm, 1, 4), GPIO16, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA5, SDn_DATAm, 1, 5), GPIO17, _3));
+        _for_each_inner_iomux_function!(((SD1_DATA7, SDn_DATAm, 1, 7), GPIO18, _3));
+        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO2, _4));
+        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO4, _4));
+        _for_each_inner_iomux_function!(((SD_DATA0, SD_DATAn, 0), GPIO7, _0));
+        _for_each_inner_iomux_function!(((SD_DATA1, SD_DATAn, 1), GPIO8, _0));
+        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO9, _0));
+        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO10, _0));
+        _for_each_inner_iomux_function!(((SD_DATA2, SD_DATAn, 2), GPIO12, _4));
+        _for_each_inner_iomux_function!(((SD_DATA3, SD_DATAn, 3), GPIO13, _4));
+        _for_each_inner_iomux_function!(((VSPICS0, VSPICSn, 0), GPIO5, _1));
+        _for_each_inner_iomux_function!(((SD1_CLK, SDn_CLK, 1), GPIO6, _3));
+        _for_each_inner_iomux_function!(((SD2_CLK, SDn_CLK, 2), GPIO14, _3));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO11, _1));
+        _for_each_inner_iomux_function!(((SD1_CMD, SDn_CMD, 1), GPIO11, _3));
+        _for_each_inner_iomux_function!(((SD2_CMD, SDn_CMD, 2), GPIO15, _3));
+        _for_each_inner_iomux_function!(((EMAC_TXD3, EMAC_TXDn, 3), GPIO12, _5));
+        _for_each_inner_iomux_function!(((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5));
+        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO19, _5));
+        _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5));
+        _for_each_inner_iomux_function!(((HSPICS0, HSPICSn, 0), GPIO15, _1));
+        _for_each_inner_iomux_function!(((EMAC_CLK_180, EMAC_CLK_n, 180), GPIO17, _5));
+        _for_each_inner_iomux_function!(((SD1_STROBE, SDn_STROBE, 1), GPIO23, _3));
         _for_each_inner_iomux_function!((all(CLK_OUT1, GPIO0, _1), (EMAC_TX_CLK, GPIO0,
         _5), (U0TXD, GPIO1, _0), (CLK_OUT3, GPIO1, _1), (EMAC_RXD2, GPIO1, _5), (HSPIWP,
         GPIO2, _1), (SD2_DATA0, GPIO2, _3), (SD_DATA0, GPIO2, _4), (U0RXD, GPIO3, _0),
@@ -5311,28 +5315,36 @@ macro_rules! for_each_iomux_function {
         GPIO19, _5), (VSPIHD, GPIO21, _1), (EMAC_TXEN, GPIO21, _5), (VSPIWP, GPIO22, _1),
         (U0RTS, GPIO22, _3), (EMAC_TXD1, GPIO22, _5), (VSPID, GPIO23, _1), (SD1_STROBE,
         GPIO23, _3), (EMAC_RXD0, GPIO25, _5), (EMAC_RXD1, GPIO26, _5), (EMAC_RXDV,
-        GPIO27, _5))); _for_each_inner_iomux_function!((all_expanded((CLK_OUT1, CLK_OUTn,
-        1), GPIO0, _1), ((CLK_OUT3, CLK_OUTn, 3), GPIO1, _1), ((EMAC_RXD2, EMAC_RXDn, 2),
-        GPIO1, _5), ((SD2_DATA0, SDn_DATAm, 2, 0), GPIO2, _3), ((SD_DATA0, SD_DATAn, 0),
-        GPIO2, _4), ((CLK_OUT2, CLK_OUTn, 2), GPIO3, _1), ((SD2_DATA1, SDn_DATAm, 2, 1),
-        GPIO4, _3), ((SD_DATA1, SD_DATAn, 1), GPIO4, _4), ((VSPICS0, VSPICSn, 0), GPIO5,
-        _1), ((SD1_DATA6, SDn_DATAm, 1, 6), GPIO5, _3), ((SD1_CLK, SDn_CLK, 1), GPIO6,
-        _3), ((SD_DATA0, SD_DATAn, 0), GPIO7, _0), ((SD1_DATA0, SDn_DATAm, 1, 0), GPIO7,
-        _3), ((SD_DATA1, SD_DATAn, 1), GPIO8, _0), ((SD1_DATA1, SDn_DATAm, 1, 1), GPIO8,
-        _3), ((SD_DATA2, SD_DATAn, 2), GPIO9, _0), ((SD1_DATA2, SDn_DATAm, 1, 2), GPIO9,
-        _3), ((SD_DATA3, SD_DATAn, 3), GPIO10, _0), ((SD1_DATA3, SDn_DATAm, 1, 3),
-        GPIO10, _3), ((SPICS0, SPICSn, 0), GPIO11, _1), ((SD1_CMD, SDn_CMD, 1), GPIO11,
-        _3), ((SD2_DATA2, SDn_DATAm, 2, 2), GPIO12, _3), ((SD_DATA2, SD_DATAn, 2),
-        GPIO12, _4), ((EMAC_TXD3, EMAC_TXDn, 3), GPIO12, _5), ((SD2_DATA3, SDn_DATAm, 2,
-        3), GPIO13, _3), ((SD_DATA3, SD_DATAn, 3), GPIO13, _4), ((SD2_CLK, SDn_CLK, 2),
-        GPIO14, _3), ((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5), ((HSPICS0, HSPICSn, 0),
-        GPIO15, _1), ((SD2_CMD, SDn_CMD, 2), GPIO15, _3), ((EMAC_RXD3, EMAC_RXDn, 3),
-        GPIO15, _5), ((SD1_DATA4, SDn_DATAm, 1, 4), GPIO16, _3), ((SD1_DATA5, SDn_DATAm,
-        1, 5), GPIO17, _3), ((EMAC_CLK_180, EMAC_CLK_n, 180), GPIO17, _5), ((SD1_DATA7,
-        SDn_DATAm, 1, 7), GPIO18, _3), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO19, _5),
-        ((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5), ((SD1_STROBE, SDn_STROBE, 1), GPIO23,
-        _3), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO25, _5), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO26,
-        _5)));
+        GPIO27, _5))); _for_each_inner_iomux_function!((CLK_OUTn((CLK_OUT1, CLK_OUTn, 1),
+        GPIO0, _1), ((CLK_OUT3, CLK_OUTn, 3), GPIO1, _1), ((CLK_OUT2, CLK_OUTn, 2),
+        GPIO3, _1))); _for_each_inner_iomux_function!((EMAC_RXDn((EMAC_RXD2, EMAC_RXDn,
+        2), GPIO1, _5), ((EMAC_RXD3, EMAC_RXDn, 3), GPIO15, _5), ((EMAC_RXD0, EMAC_RXDn,
+        0), GPIO25, _5), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO26, _5)));
+        _for_each_inner_iomux_function!((SDn_DATAm((SD2_DATA0, SDn_DATAm, 2, 0), GPIO2,
+        _3), ((SD2_DATA1, SDn_DATAm, 2, 1), GPIO4, _3), ((SD1_DATA6, SDn_DATAm, 1, 6),
+        GPIO5, _3), ((SD1_DATA0, SDn_DATAm, 1, 0), GPIO7, _3), ((SD1_DATA1, SDn_DATAm, 1,
+        1), GPIO8, _3), ((SD1_DATA2, SDn_DATAm, 1, 2), GPIO9, _3), ((SD1_DATA3,
+        SDn_DATAm, 1, 3), GPIO10, _3), ((SD2_DATA2, SDn_DATAm, 2, 2), GPIO12, _3),
+        ((SD2_DATA3, SDn_DATAm, 2, 3), GPIO13, _3), ((SD1_DATA4, SDn_DATAm, 1, 4),
+        GPIO16, _3), ((SD1_DATA5, SDn_DATAm, 1, 5), GPIO17, _3), ((SD1_DATA7, SDn_DATAm,
+        1, 7), GPIO18, _3))); _for_each_inner_iomux_function!((SD_DATAn((SD_DATA0,
+        SD_DATAn, 0), GPIO2, _4), ((SD_DATA1, SD_DATAn, 1), GPIO4, _4), ((SD_DATA0,
+        SD_DATAn, 0), GPIO7, _0), ((SD_DATA1, SD_DATAn, 1), GPIO8, _0), ((SD_DATA2,
+        SD_DATAn, 2), GPIO9, _0), ((SD_DATA3, SD_DATAn, 3), GPIO10, _0), ((SD_DATA2,
+        SD_DATAn, 2), GPIO12, _4), ((SD_DATA3, SD_DATAn, 3), GPIO13, _4)));
+        _for_each_inner_iomux_function!((VSPICSn((VSPICS0, VSPICSn, 0), GPIO5, _1)));
+        _for_each_inner_iomux_function!((SDn_CLK((SD1_CLK, SDn_CLK, 1), GPIO6, _3),
+        ((SD2_CLK, SDn_CLK, 2), GPIO14, _3)));
+        _for_each_inner_iomux_function!((SPICSn((SPICS0, SPICSn, 0), GPIO11, _1)));
+        _for_each_inner_iomux_function!((SDn_CMD((SD1_CMD, SDn_CMD, 1), GPIO11, _3),
+        ((SD2_CMD, SDn_CMD, 2), GPIO15, _3)));
+        _for_each_inner_iomux_function!((EMAC_TXDn((EMAC_TXD3, EMAC_TXDn, 3), GPIO12,
+        _5), ((EMAC_TXD2, EMAC_TXDn, 2), GPIO14, _5), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO19,
+        _5), ((EMAC_TXD1, EMAC_TXDn, 1), GPIO22, _5)));
+        _for_each_inner_iomux_function!((HSPICSn((HSPICS0, HSPICSn, 0), GPIO15, _1)));
+        _for_each_inner_iomux_function!((EMAC_CLK_n((EMAC_CLK_180, EMAC_CLK_n, 180),
+        GPIO17, _5))); _for_each_inner_iomux_function!((SDn_STROBE((SD1_STROBE,
+        SDn_STROBE, 1), GPIO23, _3)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.

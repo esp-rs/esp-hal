@@ -478,6 +478,10 @@ separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true
 
+[device.lp_io]
+support_status = "partial"
+version = "esp32p4"
+
 [device.gpio]
 support_status = "supported"
 version = 3
