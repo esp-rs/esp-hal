@@ -31,6 +31,18 @@ harness           = false
 required-features = ["esp-alloc"]
 path              = "src/bin/support/ble_peripheral_support.rs"
 
+[[bin]]
+name              = "ieee802154"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/tests/ieee802154.rs"
+
+[[bin]]
+name              = "ieee802154_echo_support"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/support/ieee802154_echo_support.rs"
+
 [dependencies]
 defmt              = "1.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
@@ -40,6 +52,7 @@ embassy-sync       = "0.8"
 embassy-time       = "0.5.0"
 embedded-io        = "0.7.1"
 embedded-io-async  = "0.7.0"
+ieee802154         = "0.6.1"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
