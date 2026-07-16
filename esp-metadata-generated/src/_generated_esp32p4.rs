@@ -5803,10 +5803,10 @@ macro_rules! for_each_gpio {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
-///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm,
+///   2, 3)`.
 ///
 /// Macro fragments:
 ///
@@ -5863,14 +5863,14 @@ macro_rules! for_each_analog_function {
         (ADC1_CH6, GPIO22), (ADC1_CH7, GPIO23), (USJ_DM, GPIO24), (USJ_DP, GPIO25),
         (USB_FS_DM, GPIO26), (USB_FS_DP, GPIO27), (ADC2_CH0, GPIO49), (ADC2_CH1, GPIO50),
         (ADC2_CH2, GPIO51), (ADC2_CH3, GPIO52), (ADC2_CH4, GPIO53), (ADC2_CH5, GPIO54)));
-        _for_each_inner_analog_function!((all_expanded((ADC1_CH0, ADCn_CHm, 1, 0),
-        GPIO16), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO17), ((ADC1_CH2, ADCn_CHm, 1, 2),
-        GPIO18), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO19), ((ADC1_CH4, ADCn_CHm, 1, 4),
-        GPIO20), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO21), ((ADC1_CH6, ADCn_CHm, 1, 6),
-        GPIO22), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO23), ((ADC2_CH0, ADCn_CHm, 2, 0),
-        GPIO49), ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO50), ((ADC2_CH2, ADCn_CHm, 2, 2),
-        GPIO51), ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO52), ((ADC2_CH4, ADCn_CHm, 2, 4),
-        GPIO53), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO54)));
+        _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO16),
+        ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO17), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO18),
+        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO19), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO20),
+        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO21), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO22),
+        ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO23), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO49),
+        ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO50), ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO51),
+        ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO52), ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO53),
+        ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO54)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -5881,10 +5881,10 @@ macro_rules! for_each_analog_function {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
-///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
+///   SAR_I2C_SCL_n, 1)`.
 ///
 /// Macro fragments:
 ///
@@ -5945,7 +5945,7 @@ macro_rules! for_each_lp_function {
         GPIO12), (LP_GPIO13, GPIO13), (LP_GPIO14, GPIO14), (LP_GPIO15, GPIO15),
         (LP_GPIO16, GPIO16), (LP_GPIO17, GPIO17), (LP_GPIO18, GPIO18), (LP_GPIO19,
         GPIO19), (LP_GPIO20, GPIO20), (LP_GPIO21, GPIO21), (LP_GPIO22, GPIO22),
-        (LP_GPIO23, GPIO23))); _for_each_inner_lp_function!((all_expanded((LP_GPIO0,
+        (LP_GPIO23, GPIO23))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
         LP_GPIOn, 0), GPIO0), ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO2, LP_GPIOn, 2),
         GPIO2), ((LP_GPIO3, LP_GPIOn, 3), GPIO3), ((LP_GPIO4, LP_GPIOn, 4), GPIO4),
         ((LP_GPIO5, LP_GPIOn, 5), GPIO5), ((LP_GPIO12, LP_GPIOn, 12), GPIO12),
@@ -5970,9 +5970,9 @@ macro_rules! for_each_lp_function {
 ///
 /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
 ///   identifiers, and maybe the alternate function.
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
-///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
-///   group to which the signal belongs.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs.
 ///
 /// Macro fragments:
 ///
@@ -6094,64 +6094,65 @@ macro_rules! for_each_iomux_function {
         _for_each_inner_iomux_function!((EMAC_RXER, GPIO54, _3));
         _for_each_inner_iomux_function!((DBG_FLASH_D, GPIO54, _4));
         _for_each_inner_iomux_function!(((SPI2_HOLD, SPIn_HOLD, 2), GPIO6, _3));
-        _for_each_inner_iomux_function!(((SPI2_CS, SPIn_CS, 2), GPIO7, _3));
-        _for_each_inner_iomux_function!(((UART0_RTS, UARTn_RTS, 0), GPIO8, _2));
-        _for_each_inner_iomux_function!(((SPI2_D, SPIn_D, 2), GPIO8, _3));
-        _for_each_inner_iomux_function!(((UART0_CTS, UARTn_CTS, 0), GPIO9, _2));
-        _for_each_inner_iomux_function!(((SPI2_CK, SPIn_CK, 2), GPIO9, _3));
-        _for_each_inner_iomux_function!(((UART1_TXD, UARTn_TXD, 1), GPIO10, _2));
-        _for_each_inner_iomux_function!(((SPI2_Q, SPIn_Q, 2), GPIO10, _3));
-        _for_each_inner_iomux_function!(((UART1_RXD, UARTn_RXD, 1), GPIO11, _2));
-        _for_each_inner_iomux_function!(((SPI2_WP, SPIn_WP, 2), GPIO11, _3));
-        _for_each_inner_iomux_function!(((UART1_RTS, UARTn_RTS, 1), GPIO12, _2));
-        _for_each_inner_iomux_function!(((UART1_CTS, UARTn_CTS, 1), GPIO13, _2));
-        _for_each_inner_iomux_function!(((SPI2_CS, SPIn_CS, 2), GPIO28, _2));
-        _for_each_inner_iomux_function!(((SPI2_D, SPIn_D, 2), GPIO29, _2));
-        _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO29, _3));
-        _for_each_inner_iomux_function!(((SPI2_CK, SPIn_CK, 2), GPIO30, _2));
-        _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO30, _3));
-        _for_each_inner_iomux_function!(((SPI2_Q, SPIn_Q, 2), GPIO31, _2));
         _for_each_inner_iomux_function!(((SPI2_HOLD, SPIn_HOLD, 2), GPIO32, _2));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4), GPIO32, _4));
-        _for_each_inner_iomux_function!(((SPI2_WP, SPIn_WP, 2), GPIO33, _2));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO33, _4));
-        _for_each_inner_iomux_function!(((SPI2_IO4, SPIn_IOm, 2, 4), GPIO34, _2));
-        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO34, _3));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ6, DBG_PSRAM_DQn, 6), GPIO34, _4));
-        _for_each_inner_iomux_function!(((SPI2_IO5, SPIn_IOm, 2, 5), GPIO35, _2));
-        _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO35, _3));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7), GPIO35, _4));
-        _for_each_inner_iomux_function!(((SPI2_IO6, SPIn_IOm, 2, 6), GPIO36, _2));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_0, DBG_PSRAM_DQS_n, 0), GPIO36,
-        _4)); _for_each_inner_iomux_function!(((UART0_TXD, UARTn_TXD, 0), GPIO37, _0));
-        _for_each_inner_iomux_function!(((SPI2_IO7, SPIn_IOm, 2, 7), GPIO37, _2));
+        _for_each_inner_iomux_function!(((SPI2_CS, SPIn_CS, 2), GPIO7, _3));
+        _for_each_inner_iomux_function!(((SPI2_CS, SPIn_CS, 2), GPIO28, _2));
+        _for_each_inner_iomux_function!(((UART0_RTS, UARTn_RTS, 0), GPIO8, _2));
+        _for_each_inner_iomux_function!(((UART1_RTS, UARTn_RTS, 1), GPIO12, _2));
+        _for_each_inner_iomux_function!(((SPI2_D, SPIn_D, 2), GPIO8, _3));
+        _for_each_inner_iomux_function!(((SPI2_D, SPIn_D, 2), GPIO29, _2));
+        _for_each_inner_iomux_function!(((UART0_CTS, UARTn_CTS, 0), GPIO9, _2));
+        _for_each_inner_iomux_function!(((UART1_CTS, UARTn_CTS, 1), GPIO13, _2));
+        _for_each_inner_iomux_function!(((SPI2_CK, SPIn_CK, 2), GPIO9, _3));
+        _for_each_inner_iomux_function!(((SPI2_CK, SPIn_CK, 2), GPIO30, _2));
+        _for_each_inner_iomux_function!(((UART1_TXD, UARTn_TXD, 1), GPIO10, _2));
+        _for_each_inner_iomux_function!(((UART0_TXD, UARTn_TXD, 0), GPIO37, _0));
+        _for_each_inner_iomux_function!(((SPI2_Q, SPIn_Q, 2), GPIO10, _3));
+        _for_each_inner_iomux_function!(((SPI2_Q, SPIn_Q, 2), GPIO31, _2));
+        _for_each_inner_iomux_function!(((UART1_RXD, UARTn_RXD, 1), GPIO11, _2));
         _for_each_inner_iomux_function!(((UART0_RXD, UARTn_RXD, 0), GPIO38, _0));
-        _for_each_inner_iomux_function!(((SPI2_DQS, SPIn_DQS, 2), GPIO38, _2));
-        _for_each_inner_iomux_function!(((SD1_DATA0, SDn_DATAm, 1, 0), GPIO39, _0));
+        _for_each_inner_iomux_function!(((SPI2_WP, SPIn_WP, 2), GPIO11, _3));
+        _for_each_inner_iomux_function!(((SPI2_WP, SPIn_WP, 2), GPIO33, _2));
+        _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO29, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO30, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO46, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO47, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO52, _3));
+        _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO53, _3));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4), GPIO32, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO33, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ6, DBG_PSRAM_DQn, 6), GPIO34, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7), GPIO35, _4));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4));
-        _for_each_inner_iomux_function!(((SD1_DATA1, SDn_DATAm, 1, 1), GPIO40, _0));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ9, DBG_PSRAM_DQn, 9), GPIO40, _4));
-        _for_each_inner_iomux_function!(((SD1_DATA2, SDn_DATAm, 1, 2), GPIO41, _0));
-        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO41, _3));
         _for_each_inner_iomux_function!(((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41,
-        _4)); _for_each_inner_iomux_function!(((SD1_DATA3, SDn_DATAm, 1, 3), GPIO42,
-        _0)); _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ11, DBG_PSRAM_DQn, 11), GPIO42,
-        _4)); _for_each_inner_iomux_function!(((SD1_CLK, SDn_CLK, 1), GPIO43, _0));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ12, DBG_PSRAM_DQn, 12), GPIO43,
-        _4)); _for_each_inner_iomux_function!(((SD1_CMD, SDn_CMD, 1), GPIO44, _0));
-        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44,
-        _4)); _for_each_inner_iomux_function!(((SD1_DATA4, SDn_DATAm, 1, 4), GPIO45,
-        _0)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14),
-        GPIO45, _4)); _for_each_inner_iomux_function!(((SD1_DATA5, SDn_DATAm, 1, 5),
-        GPIO46, _0)); _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO46,
-        _3)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15),
-        GPIO46, _4)); _for_each_inner_iomux_function!(((SD1_DATA6, SDn_DATAm, 1, 6),
-        GPIO47, _0)); _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO47,
-        _3)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_1, DBG_PSRAM_DQS_n, 1),
-        GPIO47, _4)); _for_each_inner_iomux_function!(((SD1_DATA7, SDn_DATAm, 1, 7),
-        GPIO48, _0)); _for_each_inner_iomux_function!(((EMAC_RXD0, EMAC_RXDn, 0), GPIO52,
-        _3)); _for_each_inner_iomux_function!(((EMAC_RXD1, EMAC_RXDn, 1), GPIO53, _3));
+        _4)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ11, DBG_PSRAM_DQn, 11),
+        GPIO42, _4)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ12, DBG_PSRAM_DQn,
+        12), GPIO43, _4)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ13,
+        DBG_PSRAM_DQn, 13), GPIO44, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14), GPIO45,
+        _4)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15),
+        GPIO46, _4)); _for_each_inner_iomux_function!(((SPI2_IO4, SPIn_IOm, 2, 4),
+        GPIO34, _2)); _for_each_inner_iomux_function!(((SPI2_IO5, SPIn_IOm, 2, 5),
+        GPIO35, _2)); _for_each_inner_iomux_function!(((SPI2_IO6, SPIn_IOm, 2, 6),
+        GPIO36, _2)); _for_each_inner_iomux_function!(((SPI2_IO7, SPIn_IOm, 2, 7),
+        GPIO37, _2)); _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO34,
+        _3)); _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO35, _3));
+        _for_each_inner_iomux_function!(((EMAC_TXD0, EMAC_TXDn, 0), GPIO41, _3));
+        _for_each_inner_iomux_function!(((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_0, DBG_PSRAM_DQS_n, 0), GPIO36,
+        _4)); _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_1, DBG_PSRAM_DQS_n, 1),
+        GPIO47, _4)); _for_each_inner_iomux_function!(((SPI2_DQS, SPIn_DQS, 2), GPIO38,
+        _2)); _for_each_inner_iomux_function!(((SD1_DATA0, SDn_DATAm, 1, 0), GPIO39,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA1, SDn_DATAm, 1, 1), GPIO40,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA2, SDn_DATAm, 1, 2), GPIO41,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA3, SDn_DATAm, 1, 3), GPIO42,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA4, SDn_DATAm, 1, 4), GPIO45,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA5, SDn_DATAm, 1, 5), GPIO46,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA6, SDn_DATAm, 1, 6), GPIO47,
+        _0)); _for_each_inner_iomux_function!(((SD1_DATA7, SDn_DATAm, 1, 7), GPIO48,
+        _0)); _for_each_inner_iomux_function!(((SD1_CLK, SDn_CLK, 1), GPIO43, _0));
+        _for_each_inner_iomux_function!(((SD1_CMD, SDn_CMD, 1), GPIO44, _0));
         _for_each_inner_iomux_function!((all(MTCK, GPIO2, _0), (MTDI, GPIO3, _0), (MTMS,
         GPIO4, _0), (MTDO, GPIO5, _0), (SPI2_HOLD, GPIO6, _3), (SPI2_CS, GPIO7, _3),
         (UART0_RTS, GPIO8, _2), (SPI2_D, GPIO8, _3), (UART0_CTS, GPIO9, _2), (SPI2_CK,
@@ -6186,40 +6187,56 @@ macro_rules! for_each_iomux_function {
         (DBG_FLASH_WP, GPIO51, _4), (EMAC_RXD0, GPIO52, _3), (DBG_FLASH_HOLD, GPIO52,
         _4), (EMAC_RXD1, GPIO53, _3), (DBG_FLASH_CK, GPIO53, _4), (EMAC_RXER, GPIO54,
         _3), (DBG_FLASH_D, GPIO54, _4)));
-        _for_each_inner_iomux_function!((all_expanded((SPI2_HOLD, SPIn_HOLD, 2), GPIO6,
-        _3), ((SPI2_CS, SPIn_CS, 2), GPIO7, _3), ((UART0_RTS, UARTn_RTS, 0), GPIO8, _2),
-        ((SPI2_D, SPIn_D, 2), GPIO8, _3), ((UART0_CTS, UARTn_CTS, 0), GPIO9, _2),
-        ((SPI2_CK, SPIn_CK, 2), GPIO9, _3), ((UART1_TXD, UARTn_TXD, 1), GPIO10, _2),
-        ((SPI2_Q, SPIn_Q, 2), GPIO10, _3), ((UART1_RXD, UARTn_RXD, 1), GPIO11, _2),
-        ((SPI2_WP, SPIn_WP, 2), GPIO11, _3), ((UART1_RTS, UARTn_RTS, 1), GPIO12, _2),
-        ((UART1_CTS, UARTn_CTS, 1), GPIO13, _2), ((SPI2_CS, SPIn_CS, 2), GPIO28, _2),
-        ((SPI2_D, SPIn_D, 2), GPIO29, _2), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO29, _3),
-        ((SPI2_CK, SPIn_CK, 2), GPIO30, _2), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO30, _3),
-        ((SPI2_Q, SPIn_Q, 2), GPIO31, _2), ((SPI2_HOLD, SPIn_HOLD, 2), GPIO32, _2),
-        ((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4), GPIO32, _4), ((SPI2_WP, SPIn_WP, 2), GPIO33,
-        _2), ((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO33, _4), ((SPI2_IO4, SPIn_IOm, 2,
-        4), GPIO34, _2), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO34, _3), ((DBG_PSRAM_DQ6,
-        DBG_PSRAM_DQn, 6), GPIO34, _4), ((SPI2_IO5, SPIn_IOm, 2, 5), GPIO35, _2),
-        ((EMAC_TXD1, EMAC_TXDn, 1), GPIO35, _3), ((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7),
-        GPIO35, _4), ((SPI2_IO6, SPIn_IOm, 2, 6), GPIO36, _2), ((DBG_PSRAM_DQS_0,
-        DBG_PSRAM_DQS_n, 0), GPIO36, _4), ((UART0_TXD, UARTn_TXD, 0), GPIO37, _0),
-        ((SPI2_IO7, SPIn_IOm, 2, 7), GPIO37, _2), ((UART0_RXD, UARTn_RXD, 0), GPIO38,
-        _0), ((SPI2_DQS, SPIn_DQS, 2), GPIO38, _2), ((SD1_DATA0, SDn_DATAm, 1, 0),
-        GPIO39, _0), ((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4), ((SD1_DATA1,
-        SDn_DATAm, 1, 1), GPIO40, _0), ((DBG_PSRAM_DQ9, DBG_PSRAM_DQn, 9), GPIO40, _4),
-        ((SD1_DATA2, SDn_DATAm, 1, 2), GPIO41, _0), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO41,
-        _3), ((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41, _4), ((SD1_DATA3, SDn_DATAm,
-        1, 3), GPIO42, _0), ((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3), ((DBG_PSRAM_DQ11,
-        DBG_PSRAM_DQn, 11), GPIO42, _4), ((SD1_CLK, SDn_CLK, 1), GPIO43, _0),
-        ((DBG_PSRAM_DQ12, DBG_PSRAM_DQn, 12), GPIO43, _4), ((SD1_CMD, SDn_CMD, 1),
-        GPIO44, _0), ((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44, _4), ((SD1_DATA4,
-        SDn_DATAm, 1, 4), GPIO45, _0), ((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14), GPIO45, _4),
-        ((SD1_DATA5, SDn_DATAm, 1, 5), GPIO46, _0), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO46,
-        _3), ((DBG_PSRAM_DQ15, DBG_PSRAM_DQn, 15), GPIO46, _4), ((SD1_DATA6, SDn_DATAm,
-        1, 6), GPIO47, _0), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO47, _3), ((DBG_PSRAM_DQS_1,
-        DBG_PSRAM_DQS_n, 1), GPIO47, _4), ((SD1_DATA7, SDn_DATAm, 1, 7), GPIO48, _0),
-        ((EMAC_RXD0, EMAC_RXDn, 0), GPIO52, _3), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO53,
-        _3)));
+        _for_each_inner_iomux_function!((SPIn_HOLD((SPI2_HOLD, SPIn_HOLD, 2), GPIO6, _3),
+        ((SPI2_HOLD, SPIn_HOLD, 2), GPIO32, _2)));
+        _for_each_inner_iomux_function!((SPIn_CS((SPI2_CS, SPIn_CS, 2), GPIO7, _3),
+        ((SPI2_CS, SPIn_CS, 2), GPIO28, _2)));
+        _for_each_inner_iomux_function!((UARTn_RTS((UART0_RTS, UARTn_RTS, 0), GPIO8, _2),
+        ((UART1_RTS, UARTn_RTS, 1), GPIO12, _2)));
+        _for_each_inner_iomux_function!((SPIn_D((SPI2_D, SPIn_D, 2), GPIO8, _3),
+        ((SPI2_D, SPIn_D, 2), GPIO29, _2)));
+        _for_each_inner_iomux_function!((UARTn_CTS((UART0_CTS, UARTn_CTS, 0), GPIO9, _2),
+        ((UART1_CTS, UARTn_CTS, 1), GPIO13, _2)));
+        _for_each_inner_iomux_function!((SPIn_CK((SPI2_CK, SPIn_CK, 2), GPIO9, _3),
+        ((SPI2_CK, SPIn_CK, 2), GPIO30, _2)));
+        _for_each_inner_iomux_function!((UARTn_TXD((UART1_TXD, UARTn_TXD, 1), GPIO10,
+        _2), ((UART0_TXD, UARTn_TXD, 0), GPIO37, _0)));
+        _for_each_inner_iomux_function!((SPIn_Q((SPI2_Q, SPIn_Q, 2), GPIO10, _3),
+        ((SPI2_Q, SPIn_Q, 2), GPIO31, _2)));
+        _for_each_inner_iomux_function!((UARTn_RXD((UART1_RXD, UARTn_RXD, 1), GPIO11,
+        _2), ((UART0_RXD, UARTn_RXD, 0), GPIO38, _0)));
+        _for_each_inner_iomux_function!((SPIn_WP((SPI2_WP, SPIn_WP, 2), GPIO11, _3),
+        ((SPI2_WP, SPIn_WP, 2), GPIO33, _2)));
+        _for_each_inner_iomux_function!((EMAC_RXDn((EMAC_RXD0, EMAC_RXDn, 0), GPIO29,
+        _3), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO30, _3), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO46,
+        _3), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO47, _3), ((EMAC_RXD0, EMAC_RXDn, 0), GPIO52,
+        _3), ((EMAC_RXD1, EMAC_RXDn, 1), GPIO53, _3)));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQn((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4),
+        GPIO32, _4), ((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO33, _4), ((DBG_PSRAM_DQ6,
+        DBG_PSRAM_DQn, 6), GPIO34, _4), ((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7), GPIO35, _4),
+        ((DBG_PSRAM_DQ8, DBG_PSRAM_DQn, 8), GPIO39, _4), ((DBG_PSRAM_DQ9, DBG_PSRAM_DQn,
+        9), GPIO40, _4), ((DBG_PSRAM_DQ10, DBG_PSRAM_DQn, 10), GPIO41, _4),
+        ((DBG_PSRAM_DQ11, DBG_PSRAM_DQn, 11), GPIO42, _4), ((DBG_PSRAM_DQ12,
+        DBG_PSRAM_DQn, 12), GPIO43, _4), ((DBG_PSRAM_DQ13, DBG_PSRAM_DQn, 13), GPIO44,
+        _4), ((DBG_PSRAM_DQ14, DBG_PSRAM_DQn, 14), GPIO45, _4), ((DBG_PSRAM_DQ15,
+        DBG_PSRAM_DQn, 15), GPIO46, _4)));
+        _for_each_inner_iomux_function!((SPIn_IOm((SPI2_IO4, SPIn_IOm, 2, 4), GPIO34,
+        _2), ((SPI2_IO5, SPIn_IOm, 2, 5), GPIO35, _2), ((SPI2_IO6, SPIn_IOm, 2, 6),
+        GPIO36, _2), ((SPI2_IO7, SPIn_IOm, 2, 7), GPIO37, _2)));
+        _for_each_inner_iomux_function!((EMAC_TXDn((EMAC_TXD0, EMAC_TXDn, 0), GPIO34,
+        _3), ((EMAC_TXD1, EMAC_TXDn, 1), GPIO35, _3), ((EMAC_TXD0, EMAC_TXDn, 0), GPIO41,
+        _3), ((EMAC_TXD1, EMAC_TXDn, 1), GPIO42, _3)));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQS_n((DBG_PSRAM_DQS_0,
+        DBG_PSRAM_DQS_n, 0), GPIO36, _4), ((DBG_PSRAM_DQS_1, DBG_PSRAM_DQS_n, 1), GPIO47,
+        _4))); _for_each_inner_iomux_function!((SPIn_DQS((SPI2_DQS, SPIn_DQS, 2), GPIO38,
+        _2))); _for_each_inner_iomux_function!((SDn_DATAm((SD1_DATA0, SDn_DATAm, 1, 0),
+        GPIO39, _0), ((SD1_DATA1, SDn_DATAm, 1, 1), GPIO40, _0), ((SD1_DATA2, SDn_DATAm,
+        1, 2), GPIO41, _0), ((SD1_DATA3, SDn_DATAm, 1, 3), GPIO42, _0), ((SD1_DATA4,
+        SDn_DATAm, 1, 4), GPIO45, _0), ((SD1_DATA5, SDn_DATAm, 1, 5), GPIO46, _0),
+        ((SD1_DATA6, SDn_DATAm, 1, 6), GPIO47, _0), ((SD1_DATA7, SDn_DATAm, 1, 7),
+        GPIO48, _0))); _for_each_inner_iomux_function!((SDn_CLK((SD1_CLK, SDn_CLK, 1),
+        GPIO43, _0))); _for_each_inner_iomux_function!((SDn_CMD((SD1_CMD, SDn_CMD, 1),
+        GPIO44, _0)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.

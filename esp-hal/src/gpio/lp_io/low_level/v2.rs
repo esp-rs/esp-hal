@@ -57,7 +57,7 @@ macro_rules! hold_field {
 
 // Generates one big match statement because the pin registers have different types.
 for_each_lp_function!(
-    (all_expanded $(
+    (RTC_GPIOn $(
         (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident)
     ),*) => {
         macro_rules! with_pin_reg {

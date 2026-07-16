@@ -4752,10 +4752,10 @@ macro_rules! for_each_gpio {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
-///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm,
+///   2, 3)`.
 ///
 /// Macro fragments:
 ///
@@ -4796,10 +4796,11 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((all(ADC1_CH0, GPIO1), (ADC1_CH1, GPIO2),
         (ADC1_CH2, GPIO3), (ADC1_CH3, GPIO4), (ADC1_CH4, GPIO5), (ZCD0, GPIO10), (ZCD1,
         GPIO11), (XTAL_32K_P, GPIO13), (XTAL_32K_N, GPIO14), (USJ_DM, GPIO26), (USJ_DP,
-        GPIO27))); _for_each_inner_analog_function!((all_expanded((ADC1_CH0, ADCn_CHm, 1,
-        0), GPIO1), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2),
-        GPIO3), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5),
-        ((ZCD0, ZCDn, 0), GPIO10), ((ZCD1, ZCDn, 1), GPIO11)));
+        GPIO27))); _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0),
+        GPIO1), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3),
+        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5)));
+        _for_each_inner_analog_function!((ZCDn((ZCD0, ZCDn, 0), GPIO10), ((ZCD1, ZCDn,
+        1), GPIO11)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -4810,10 +4811,10 @@ macro_rules! for_each_analog_function {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
-///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal
+///   case, where you need the number(s) of a signal, or the general group to which the signal
+///   belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
+///   SAR_I2C_SCL_n, 1)`.
 ///
 /// Macro fragments:
 ///
@@ -4851,12 +4852,11 @@ macro_rules! for_each_lp_function {
         _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO14));
         _for_each_inner_lp_function!((all(LP_GPIO0, GPIO7), (LP_GPIO1, GPIO8), (LP_GPIO2,
         GPIO9), (LP_GPIO3, GPIO10), (LP_GPIO4, GPIO11), (LP_GPIO5, GPIO12), (LP_GPIO6,
-        GPIO13), (LP_GPIO7, GPIO14)));
-        _for_each_inner_lp_function!((all_expanded((LP_GPIO0, LP_GPIOn, 0), GPIO7),
-        ((LP_GPIO1, LP_GPIOn, 1), GPIO8), ((LP_GPIO2, LP_GPIOn, 2), GPIO9), ((LP_GPIO3,
-        LP_GPIOn, 3), GPIO10), ((LP_GPIO4, LP_GPIOn, 4), GPIO11), ((LP_GPIO5, LP_GPIOn,
-        5), GPIO12), ((LP_GPIO6, LP_GPIOn, 6), GPIO13), ((LP_GPIO7, LP_GPIOn, 7),
-        GPIO14)));
+        GPIO13), (LP_GPIO7, GPIO14))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
+        LP_GPIOn, 0), GPIO7), ((LP_GPIO1, LP_GPIOn, 1), GPIO8), ((LP_GPIO2, LP_GPIOn, 2),
+        GPIO9), ((LP_GPIO3, LP_GPIOn, 3), GPIO10), ((LP_GPIO4, LP_GPIOn, 4), GPIO11),
+        ((LP_GPIO5, LP_GPIOn, 5), GPIO12), ((LP_GPIO6, LP_GPIOn, 6), GPIO13), ((LP_GPIO7,
+        LP_GPIOn, 7), GPIO14)));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
@@ -4872,9 +4872,9 @@ macro_rules! for_each_lp_function {
 ///
 /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
 ///   identifiers, and maybe the alternate function.
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident,
-///   $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general
-///   group to which the signal belongs.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs.
 ///
 /// Macro fragments:
 ///
@@ -4922,9 +4922,9 @@ macro_rules! for_each_iomux_function {
         (MTCK, GPIO4, _0), (FSPICLK, GPIO4, _2), (MTDO, GPIO5, _0), (FSPID, GPIO5, _2),
         (U0RXD, GPIO23, _0), (FSPICS1, GPIO23, _2), (U0TXD, GPIO24, _0), (FSPICS2,
         GPIO24, _2), (FSPICS3, GPIO25, _2), (FSPICS4, GPIO26, _2), (FSPICS5, GPIO27,
-        _2))); _for_each_inner_iomux_function!((all_expanded((FSPICS0, FSPICSn, 0),
-        GPIO1, _2), ((FSPICS1, FSPICSn, 1), GPIO23, _2), ((FSPICS2, FSPICSn, 2), GPIO24,
-        _2), ((FSPICS3, FSPICSn, 3), GPIO25, _2), ((FSPICS4, FSPICSn, 4), GPIO26, _2),
+        _2))); _for_each_inner_iomux_function!((FSPICSn((FSPICS0, FSPICSn, 0), GPIO1,
+        _2), ((FSPICS1, FSPICSn, 1), GPIO23, _2), ((FSPICS2, FSPICSn, 2), GPIO24, _2),
+        ((FSPICS3, FSPICSn, 3), GPIO25, _2), ((FSPICS4, FSPICSn, 4), GPIO26, _2),
         ((FSPICS5, FSPICSn, 5), GPIO27, _2)));
     };
 }
