@@ -663,16 +663,12 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        // Small transfers that fit in the FIFO can skip the DMA setup cost entirely.
+        // Transfers below the configured threshold can skip the DMA setup cost entirely.
         if self.use_blocking_transfer(buffer.len()) {
-            if buffer.len() <= FIFO_SIZE {
-                self.dma_driver().disable_dma();
-                return self
-                    .driver()
-                    .half_duplex_read(data_mode, cmd, address, dummy, buffer);
-            } else {
-                warn!("Buffer size exceeds FIFO size, skipping blocking transfer");
-            }
+            self.dma_driver().disable_dma();
+            return self
+                .driver()
+                .half_duplex_read(data_mode, cmd, address, dummy, buffer);
         }
 
         let operation = DmaOperationKind::for_read(buffer);
@@ -731,16 +727,12 @@ impl<'d> SpiDma<'d, Async> {
             return Ok(());
         }
 
-        // Small transfers that fit in the FIFO can skip the DMA setup cost entirely.
+        // Transfers below the configured threshold can skip the DMA setup cost entirely.
         if self.use_blocking_transfer(buffer.len()) {
-            if buffer.len() <= FIFO_SIZE {
-                self.dma_driver().disable_dma();
-                return self
-                    .driver()
-                    .half_duplex_write(data_mode, cmd, address, dummy, buffer);
-            } else {
-                warn!("Buffer size exceeds FIFO size, skipping blocking transfer");
-            }
+            self.dma_driver().disable_dma();
+            return self
+                .driver()
+                .half_duplex_write(data_mode, cmd, address, dummy, buffer);
         }
 
         let operation = DmaOperationKind::for_write(buffer);
