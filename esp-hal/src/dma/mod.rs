@@ -443,7 +443,7 @@ macro_rules! dma_buffers_impl {
         $crate::dma_buffers_impl!(
             $size,
             $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size()
-        );
+        )
     };
 }
 
