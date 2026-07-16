@@ -246,9 +246,10 @@ overflow-checks  = true
 
 [profile.release]
 codegen-units    = 1
-debug            = 2
 debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+# We rarely debug HIL binaries, so let's shrink the .ELF size
+debug            = 0
