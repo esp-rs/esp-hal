@@ -242,7 +242,7 @@ mod implementation {
 
     struct TimerQueueInner {
         // A linked list of active timers
-        head: Option<NonNull<CompatTimer>>,
+        head: Option<NonNull<Timer>>,
         next_wakeup: u64,
         semaphore: SemaphorePtr,
         processing: bool,
@@ -264,7 +264,7 @@ mod implementation {
         }
 
         /// Returns the Semaphore that should be given.
-        fn enqueue(&mut self, timer: &CompatTimer) -> Option<SemaphorePtr> {
+        fn enqueue(&mut self, timer: &Timer) -> Option<SemaphorePtr> {
             let head = self.head;
             let props = timer.properties(self);
             let due = props.next_due;
@@ -289,9 +289,9 @@ mod implementation {
             }
         }
 
-        fn dequeue(&mut self, timer: &CompatTimer) -> bool {
+        fn dequeue(&mut self, timer: &Timer) -> bool {
             let mut current = self.head;
-            let mut prev: Option<NonNull<CompatTimer>> = None;
+            let mut prev: Option<NonNull<Timer>> = None;
 
             // Scan through the queue until we find the timer
             while let Some(current_timer) = current {
@@ -327,12 +327,12 @@ mod implementation {
 
     impl CompatTimerQueue {
         /// Ensures that the timer queue is initialized, then provides a reference to it.
-        fn ensure_initialized<'a>() -> &'a CompatTimerQueue {
+        fn ensure_initialized<'a>(task_priority: u32) -> &'a CompatTimerQueue {
             static TIMER_QUEUE: AtomicPtr<CompatTimerQueue> = AtomicPtr::new(core::ptr::null_mut());
 
             #[cold]
             #[inline(never)]
-            fn initialize<'a>() -> &'a CompatTimerQueue {
+            fn initialize<'a>(task_priority: u32) -> &'a CompatTimerQueue {
                 trace!("Trying to initialize timer queue");
                 let boxed = Box::new(CompatTimerQueue {
                     inner: NonReentrantMutex::new(TimerQueueInner::new()),
@@ -353,15 +353,14 @@ mod implementation {
                             forget = true;
 
                             // The winner also creates the timer task.
-                            let semaphore = boxed.with(|inner| inner.semaphore);
                             unsafe {
                                 // It's okay to drop the thread pointer, the timer queue cannot be
                                 // stopped.
                                 crate::task_create(
                                     "timer",
                                     timer_task,
-                                    semaphore.as_ptr().cast(),
-                                    2,
+                                    queue_ptr.as_ptr().cast(),
+                                    task_priority,
                                     None,
                                     8192,
                                 );
@@ -391,18 +390,18 @@ mod implementation {
             if let Some(queue) = NonNull::new(TIMER_QUEUE.load(Ordering::Acquire)) {
                 unsafe { queue.as_ref() }
             } else {
-                initialize()
+                initialize(task_priority)
             }
         }
 
         /// Calls a closure with a mutable reference to the global timer queue.
         ///
         /// If the queue is not initialized, it will be initialized first.
-        fn with_global<F, R>(f: F) -> R
+        fn with_global<F, R>(task_priority: u32, f: F) -> R
         where
             F: FnOnce(&mut TimerQueueInner) -> R,
         {
-            let queue = Self::ensure_initialized();
+            let queue = Self::ensure_initialized(task_priority);
             queue.with(f)
         }
 
@@ -482,7 +481,7 @@ mod implementation {
             let next_wakeup = self.with(|q| {
                 while let Some(timer) = q.scheduled_for_drop.pop() {
                     trace!("Dropping timer {:x}", timer.as_ptr() as usize);
-                    let timer = unsafe { Box::from_raw(timer.cast::<CompatTimer>().as_ptr()) };
+                    let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
                     q.dequeue(&timer);
                     core::mem::drop(timer);
                 }
@@ -503,7 +502,7 @@ mod implementation {
         periodic: bool,
 
         enqueued: bool,
-        next: Option<NonNull<CompatTimer>>,
+        next: Option<NonNull<Timer>>,
     }
 
     struct TimerQueueCell<T>(UnsafeCell<T>);
@@ -518,21 +517,15 @@ mod implementation {
         }
     }
 
-    /// A timer implementation that uses a background thread.
-    ///
-    /// This implementation uses thread and Semaphore APIs that the RTOS implementation provides.
-    ///
-    /// To use this implementation, add `register_timer_implementation!(CompatTimer)` to your
-    /// implementation.
-    pub struct CompatTimer {
+    struct Timer {
         callback: RefCell<Box<dyn FnMut() + Send>>,
         // Timer properties, not available in `callback` due to how the timer is constructed.
         timer_properties: TimerQueueCell<TimerProperties>,
     }
 
-    impl CompatTimer {
-        pub fn new(callback: Box<dyn FnMut() + Send>) -> Self {
-            CompatTimer {
+    impl Timer {
+        fn new(callback: Box<dyn FnMut() + Send>) -> Self {
+            Self {
                 callback: RefCell::new(callback),
                 timer_properties: TimerQueueCell::new(TimerProperties {
                     is_active: false,
@@ -583,7 +576,17 @@ mod implementation {
         }
     }
 
-    impl TimerImplementation for CompatTimer {
+    /// A timer implementation that uses a background thread.
+    ///
+    /// This implementation uses thread and Semaphore APIs that the RTOS implementation provides.
+    ///
+    /// To use this implementation, add `register_timer_implementation!(CompatTimer)` to your
+    /// implementation. The background task defaults to priority 2; select another priority with,
+    /// for example, `register_timer_implementation!(CompatTimer<1>)`. Priorities above the
+    /// scheduler's maximum supported priority are clamped to that maximum.
+    pub struct CompatTimer<const TASK_PRIORITY: u32 = 2>;
+
+    impl<const TASK_PRIORITY: u32> TimerImplementation for CompatTimer<TASK_PRIORITY> {
         fn create(func: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> TimerPtr {
             // TODO: get rid of the inner box (or its heap allocation) somehow
             struct CCallback {
@@ -600,15 +603,13 @@ mod implementation {
 
             let mut callback = CCallback { func, data };
 
-            let timer = Box::new(CompatTimer::new(Box::new(move || unsafe {
-                callback.call()
-            })));
+            let timer = Box::new(Timer::new(Box::new(move || unsafe { callback.call() })));
             NonNull::from(Box::leak(timer)).cast()
         }
 
         unsafe fn delete(timer: TimerPtr) {
             let mut semaphore_to_give = None;
-            CompatTimerQueue::with_global(|q| {
+            CompatTimerQueue::with_global(TASK_PRIORITY, |q| {
                 // we don't drop the timer right now, since it might be
                 // processed currently
                 q.scheduled_for_drop.push(timer);
@@ -621,7 +622,7 @@ mod implementation {
                     semaphore_to_give = Some(q.semaphore);
                 }
 
-                let timer = unsafe { CompatTimer::from_ptr(timer) };
+                let timer = unsafe { Timer::from_ptr(timer) };
                 timer.properties(q).is_active = false;
             });
 
@@ -632,9 +633,9 @@ mod implementation {
         }
 
         unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) {
-            let timer = unsafe { CompatTimer::from_ptr(timer) };
+            let timer = unsafe { Timer::from_ptr(timer) };
             if let Some(semaphore_ptr) =
-                CompatTimerQueue::with_global(|q| timer.arm(q, timeout, periodic))
+                CompatTimerQueue::with_global(TASK_PRIORITY, |q| timer.arm(q, timeout, periodic))
             {
                 let semaphore = unsafe { SemaphoreHandle::ref_from_ptr(&semaphore_ptr) };
                 semaphore.give();
@@ -642,13 +643,13 @@ mod implementation {
         }
 
         unsafe fn is_active(timer: TimerPtr) -> bool {
-            let timer = unsafe { CompatTimer::from_ptr(timer) };
-            CompatTimerQueue::with_global(|q| timer.is_active(q))
+            let timer = unsafe { Timer::from_ptr(timer) };
+            CompatTimerQueue::with_global(TASK_PRIORITY, |q| timer.is_active(q))
         }
 
         unsafe fn disarm(timer: TimerPtr) {
-            let timer = unsafe { CompatTimer::from_ptr(timer) };
-            CompatTimerQueue::with_global(|q| timer.disarm(q))
+            let timer = unsafe { Timer::from_ptr(timer) };
+            CompatTimerQueue::with_global(TASK_PRIORITY, |q| timer.disarm(q))
         }
     }
 
@@ -656,14 +657,18 @@ mod implementation {
     /// events.
     ///
     /// The timer task is created when the first timer is armed.
-    pub(crate) extern "C" fn timer_task(semaphore_ptr: *mut c_void) {
-        let semaphore_ptr = NonNull::new(semaphore_ptr).unwrap().cast();
+    pub(crate) extern "C" fn timer_task(queue_ptr: *mut c_void) {
+        let queue = unsafe {
+            NonNull::new(queue_ptr)
+                .unwrap()
+                .cast::<CompatTimerQueue>()
+                .as_ref()
+        };
+        let semaphore_ptr = queue.with(|inner| inner.semaphore);
         let semaphore = unsafe { SemaphoreHandle::ref_from_ptr(&semaphore_ptr) };
 
         // Wait for the semaphore to be signaled, there is nothing to do until then.
         semaphore.take(None);
-
-        let queue = CompatTimerQueue::ensure_initialized();
 
         loop {
             queue.process(semaphore);
