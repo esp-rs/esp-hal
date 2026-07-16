@@ -20,213 +20,295 @@ const fn hp_retention_regdma_config(dir: u32, entry: u32) -> u32 {
 }
 
 #[derive(Clone, Copy)]
-struct HpSystemInit {
+struct HpSystemPower {
     dig_power: u32,
+    clk_power: u32,
+    xtal: u32,
+}
+
+#[derive(Clone, Copy)]
+struct HpSystemClock {
     icg_func: [u32; 2],
     icg_apb: [u32; 2],
     icg_modem: u32,
-    syscntl: u32,
-    clk_power: u32,
-    bias: u32,
-    retention: u32,
-    backup_clk: [u32; 2],
     sysclk: u32,
+}
+
+#[derive(Clone, Copy)]
+struct HpSystemDigital {
+    syscntl: u32,
+}
+
+#[derive(Clone, Copy)]
+struct HpSystemAnalog {
+    bias: u32,
     regulator0: u32,
     regulator1: u32,
-    xtal: u32,
+}
+
+#[derive(Clone, Copy)]
+struct HpSystemRetention {
+    retention: u32,
+    backup_clk: [u32; 2],
+}
+
+#[derive(Clone, Copy)]
+struct HpSystemInit {
+    power: HpSystemPower,
+    clock: HpSystemClock,
+    digital: HpSystemDigital,
+    analog: HpSystemAnalog,
+    retention: HpSystemRetention,
 }
 
 impl HpSystemInit {
     // PMU_HP_ACTIVE_*_CONFIG_DEFAULT
     const fn active() -> Self {
         Self {
-            dig_power: 0,
-            icg_func: [u32::MAX; 2],
-            icg_apb: [u32::MAX; 2],
-            icg_modem: 2 << 30,
-            syscntl: 1 << 23,
-            clk_power: (1 << 22)
-                | (1 << 23)
-                | (1 << 24)
-                | (1 << 26)
-                | (1 << 27)
-                | (1 << 28)
-                | (1 << 30),
-            bias: 1 << 25,
-            retention: (2 << 4)
-                | (2 << 6)
-                | (hp_retention_regdma_config(0, 0) << 18)
-                | (hp_retention_regdma_config(0, 2) << 23),
-            backup_clk: [u32::MAX; 2],
-            sysclk: 1 << 27,
-            regulator0: (1 << 3)
-                | (0xd << 4)
-                | (0x1c << 9)
-                | (1 << 14)
-                | (1 << 18)
-                | (HP_CALI_DBIAS << 27),
-            regulator1: 0,
-            xtal: 1 << 31,
+            power: HpSystemPower {
+                dig_power: 0,
+                clk_power: (1 << 22)
+                    | (1 << 23)
+                    | (1 << 24)
+                    | (1 << 26)
+                    | (1 << 27)
+                    | (1 << 28)
+                    | (1 << 30),
+                xtal: 1 << 31,
+            },
+            clock: HpSystemClock {
+                icg_func: [u32::MAX; 2],
+                icg_apb: [u32::MAX; 2],
+                icg_modem: 2 << 30,
+                sysclk: 1 << 27,
+            },
+            digital: HpSystemDigital { syscntl: 1 << 23 },
+            analog: HpSystemAnalog {
+                bias: 1 << 25,
+                regulator0: (1 << 3)
+                    | (0xd << 4)
+                    | (0x1c << 9)
+                    | (1 << 14)
+                    | (1 << 18)
+                    | (HP_CALI_DBIAS << 27),
+                regulator1: 0,
+            },
+            retention: HpSystemRetention {
+                retention: (2 << 4)
+                    | (2 << 6)
+                    | (hp_retention_regdma_config(0, 0) << 18)
+                    | (hp_retention_regdma_config(0, 2) << 23),
+                backup_clk: [u32::MAX; 2],
+            },
         }
     }
 
     // PMU_HP_MODEM_*_CONFIG_DEFAULT
     const fn modem() -> Self {
         Self {
-            dig_power: 0,
-            // PMU_ICG_FUNC_ENA_ETM=40 and PMU_ICG_FUNC_ENA_BUS=47.
-            icg_func: [0, (1 << (40 - 32)) | (1 << (47 - 32))],
-            icg_apb: [0; 2],
-            icg_modem: 1 << 30,
-            syscntl: (1 << 23) | (1 << 25) | (1 << 26) | (1 << 28) | (1 << 29),
-            clk_power: (1 << 20)
-                | (1 << 21)
-                | (1 << 22)
-                | (1 << 23)
-                | (1 << 24)
-                | (1 << 27)
-                | (1 << 28),
-            bias: 0,
-            retention: (1 << 4) | (hp_retention_regdma_config(0, 1) << 20),
-            backup_clk: [u32::MAX; 2],
-            // The S31 IDF deliberately keeps the modem-state system clock on XTAL.
-            sysclk: (1 << 27) | (1 << 28) | (1 << 29),
-            regulator0: (1 << 18) | (HP_CALI_DBIAS << 27),
-            regulator1: 0,
-            xtal: 1 << 31,
+            power: HpSystemPower {
+                dig_power: 0,
+                clk_power: (1 << 20)
+                    | (1 << 21)
+                    | (1 << 22)
+                    | (1 << 23)
+                    | (1 << 24)
+                    | (1 << 27)
+                    | (1 << 28),
+                xtal: 1 << 31,
+            },
+            clock: HpSystemClock {
+                // PMU_ICG_FUNC_ENA_ETM=40 and PMU_ICG_FUNC_ENA_BUS=47.
+                icg_func: [0, (1 << (40 - 32)) | (1 << (47 - 32))],
+                icg_apb: [0; 2],
+                icg_modem: 1 << 30,
+                // The S31 IDF deliberately keeps the modem-state system clock on XTAL.
+                sysclk: (1 << 27) | (1 << 28) | (1 << 29),
+            },
+            digital: HpSystemDigital {
+                syscntl: (1 << 23) | (1 << 25) | (1 << 26) | (1 << 28) | (1 << 29),
+            },
+            analog: HpSystemAnalog {
+                bias: 0,
+                regulator0: (1 << 18) | (HP_CALI_DBIAS << 27),
+                regulator1: 0,
+            },
+            retention: HpSystemRetention {
+                retention: (1 << 4) | (hp_retention_regdma_config(0, 1) << 20),
+                backup_clk: [u32::MAX; 2],
+            },
         }
     }
 
     // PMU_HP_SLEEP_*_CONFIG_DEFAULT
     const fn sleep() -> Self {
         Self {
-            dig_power: 0,
-            icg_func: [0; 2],
-            icg_apb: [0; 2],
-            icg_modem: 0,
-            syscntl: (1 << 24) | (1 << 25) | (1 << 26) | (1 << 28) | (1 << 29),
-            clk_power: (1 << 20) | (1 << 21),
-            bias: (1 << 30) | (1 << 31),
-            retention: (2 << 8)
-                | (hp_retention_regdma_config(1, 1) << 20)
-                | (hp_retention_regdma_config(1, 0) << 25),
-            backup_clk: [u32::MAX; 2],
-            sysclk: (1 << 28) | (1 << 29),
-            regulator0: 1 << 18,
-            regulator1: 0,
-            xtal: 0,
+            power: HpSystemPower {
+                dig_power: 0,
+                clk_power: (1 << 20) | (1 << 21),
+                xtal: 0,
+            },
+            clock: HpSystemClock {
+                icg_func: [0; 2],
+                icg_apb: [0; 2],
+                icg_modem: 0,
+                sysclk: (1 << 28) | (1 << 29),
+            },
+            digital: HpSystemDigital {
+                syscntl: (1 << 24) | (1 << 25) | (1 << 26) | (1 << 28) | (1 << 29),
+            },
+            analog: HpSystemAnalog {
+                bias: (1 << 30) | (1 << 31),
+                regulator0: 1 << 18,
+                regulator1: 0,
+            },
+            retention: HpSystemRetention {
+                retention: (2 << 8)
+                    | (hp_retention_regdma_config(1, 1) << 20)
+                    | (hp_retention_regdma_config(1, 0) << 25),
+                backup_clk: [u32::MAX; 2],
+            },
         }
     }
 }
 
-macro_rules! init_hp_system {
+macro_rules! hp_system_init {
     ($state:ident, $param:expr) => {{
         let param = $param;
         let pmu = PMU::regs();
         paste::paste! {
             unsafe {
-                pmu.[<$state _dig_power>]().write(|w| w.bits(param.dig_power));
-                pmu.[<$state _icg_hp_func>]().write(|w| w.bits(param.icg_func[0]));
-                pmu.[<$state _icg_hp_apb>]().write(|w| w.bits(param.icg_apb[0]));
-                pmu.[<$state _icg_hp_func1>]().write(|w| w.bits(param.icg_func[1]));
-                pmu.[<$state _icg_hp_apb1>]().write(|w| w.bits(param.icg_apb[1]));
-                pmu.[<$state _icg_modem>]().write(|w| w.bits(param.icg_modem));
-                pmu.[<$state _hp_sys_cntl>]().write(|w| w.bits(param.syscntl));
-                pmu.[<$state _hp_ck_power>]().write(|w| w.bits(param.clk_power));
-                pmu.[<$state _bias>]().write(|w| w.bits(param.bias));
-                pmu.[<$state _backup>]().write(|w| w.bits(param.retention));
-                pmu.[<$state _backup_clk>]().write(|w| w.bits(param.backup_clk[0]));
-                pmu.[<$state _backup1_clk>]().write(|w| w.bits(param.backup_clk[1]));
-                pmu.[<$state _sysclk>]().write(|w| w.bits(param.sysclk));
-                pmu.[<$state _hp_regulator0>]().write(|w| w.bits(param.regulator0));
-                pmu.[<$state _hp_regulator1>]().write(|w| w.bits(param.regulator1));
-                pmu.[<$state _xtal>]().write(|w| w.bits(param.xtal));
+                pmu.[<$state _dig_power>]().write(|w| w.bits(param.power.dig_power));
+                pmu.[<$state _hp_ck_power>]().write(|w| w.bits(param.power.clk_power));
+                pmu.[<$state _xtal>]().write(|w| w.bits(param.power.xtal));
+
+                pmu.[<$state _icg_hp_func>]().write(|w| w.bits(param.clock.icg_func[0]));
+                pmu.[<$state _icg_hp_apb>]().write(|w| w.bits(param.clock.icg_apb[0]));
+                pmu.[<$state _icg_hp_func1>]().write(|w| w.bits(param.clock.icg_func[1]));
+                pmu.[<$state _icg_hp_apb1>]().write(|w| w.bits(param.clock.icg_apb[1]));
+                pmu.[<$state _icg_modem>]().write(|w| w.bits(param.clock.icg_modem));
+                pmu.[<$state _sysclk>]().write(|w| w.bits(param.clock.sysclk));
+
+                pmu.[<$state _hp_sys_cntl>]().write(|w| w.bits(param.digital.syscntl));
+
+                pmu.[<$state _bias>]().write(|w| w.bits(param.analog.bias));
+                pmu.[<$state _hp_regulator0>]().write(|w| w.bits(param.analog.regulator0));
+                pmu.[<$state _hp_regulator1>]().write(|w| w.bits(param.analog.regulator1));
+
+                pmu.[<$state _backup>]().write(|w| w.bits(param.retention.retention));
+                pmu.[<$state _backup_clk>]().write(|w| w.bits(param.retention.backup_clk[0]));
+                pmu.[<$state _backup1_clk>]().write(|w| w.bits(param.retention.backup_clk[1]));
             }
         }
     }};
 }
 
-fn hp_system_init_default() {
-    init_hp_system!(hp_active, HpSystemInit::active());
-    init_hp_system!(hp_modem, HpSystemInit::modem());
-    init_hp_system!(hp_sleep, HpSystemInit::sleep());
-
+fn update_hp_system_config() {
     PMU::regs()
         .imm_modem_icg()
         .write(|w| w.update_dig_icg_modem_en().set_bit());
     PMU::regs()
         .imm_sleep_sysclk()
         .write(|w| w.update_dig_icg_switch().set_bit());
-    PMU::regs()
-        .slp_wakeup_cntl3()
-        .modify(|_, w| unsafe { w.sleep_prt_sel().bits(2) });
+}
+
+impl HpSystemInit {
+    fn init_default() {
+        hp_system_init!(hp_active, Self::active());
+        update_hp_system_config();
+        hp_system_init!(hp_modem, Self::modem());
+        update_hp_system_config();
+        hp_system_init!(hp_sleep, Self::sleep());
+        update_hp_system_config();
+        PMU::regs()
+            .slp_wakeup_cntl3()
+            .modify(|_, w| unsafe { w.sleep_prt_sel().bits(2) });
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LpSystemPower {
+    dig_power: u32,
+    clk_power: u32,
+    xtal: u32,
+}
+
+#[derive(Clone, Copy)]
+struct LpSystemAnalog {
+    bias: u32,
+    regulator0: u32,
+    regulator1: u32,
 }
 
 #[derive(Clone, Copy)]
 struct LpSystemInit {
-    dig_power: u32,
-    clk_power: u32,
-    bias: u32,
-    regulator0: u32,
-    regulator1: u32,
-    xtal: u32,
+    power: LpSystemPower,
+    analog: LpSystemAnalog,
 }
 
 impl LpSystemInit {
     // PMU_LP_ACTIVE_*_CONFIG_DEFAULT
     const fn active() -> Self {
         Self {
-            dig_power: 0,
-            clk_power: 1 << 30,
-            bias: 0,
-            regulator0: (1 << 22) | (LP_CALI_DBIAS << 27),
-            regulator1: 0,
-            xtal: 0,
+            power: LpSystemPower {
+                dig_power: 0,
+                clk_power: 1 << 30,
+                xtal: 0,
+            },
+            analog: LpSystemAnalog {
+                bias: 0,
+                regulator0: (1 << 22) | (LP_CALI_DBIAS << 27),
+                regulator1: 0,
+            },
         }
     }
 
     // PMU_LP_SLEEP_*_CONFIG_DEFAULT
     const fn sleep() -> Self {
         Self {
-            dig_power: 0,
-            clk_power: 0,
-            bias: (1 << 30) | (1 << 31),
-            regulator0: 1 << 22,
-            regulator1: 0,
-            xtal: 0,
+            power: LpSystemPower {
+                dig_power: 0,
+                clk_power: 0,
+                xtal: 0,
+            },
+            analog: LpSystemAnalog {
+                bias: (1 << 30) | (1 << 31),
+                regulator0: 1 << 22,
+                regulator1: 0,
+            },
         }
     }
 }
 
-fn lp_system_init_default() {
-    let active = LpSystemInit::active();
-    let sleep = LpSystemInit::sleep();
-    let pmu = PMU::regs();
+impl LpSystemInit {
+    fn init_default() {
+        let active = Self::active();
+        let sleep = Self::sleep();
+        let pmu = PMU::regs();
 
-    unsafe {
-        // PMU_MODE_LP_ACTIVE is represented by the HP-sleep LP register group.
-        pmu.hp_sleep_lp_dig_power()
-            .write(|w| w.bits(active.dig_power));
-        pmu.hp_sleep_lp_ck_power()
-            .write(|w| w.bits(active.clk_power));
-        pmu.hp_sleep_lp_regulator0()
-            .write(|w| w.bits(active.regulator0));
-        pmu.hp_sleep_lp_regulator1()
-            .write(|w| w.bits(active.regulator1));
+        unsafe {
+            // PMU_MODE_LP_ACTIVE is represented by the HP-sleep LP register group.
+            pmu.hp_sleep_lp_dig_power()
+                .write(|w| w.bits(active.power.dig_power));
+            pmu.hp_sleep_lp_ck_power()
+                .write(|w| w.bits(active.power.clk_power));
+            pmu.hp_sleep_lp_regulator0()
+                .write(|w| w.bits(active.analog.regulator0));
+            pmu.hp_sleep_lp_regulator1()
+                .write(|w| w.bits(active.analog.regulator1));
 
-        pmu.lp_sleep_lp_dig_power()
-            .write(|w| w.bits(sleep.dig_power));
-        pmu.lp_sleep_lp_ck_power()
-            .write(|w| w.bits(sleep.clk_power));
-        pmu.lp_sleep_bias().write(|w| w.bits(sleep.bias));
-        pmu.lp_sleep_lp_regulator0()
-            .write(|w| w.bits(sleep.regulator0));
-        pmu.lp_sleep_lp_regulator1()
-            .write(|w| w.bits(sleep.regulator1));
-        pmu.lp_sleep_xtal().write(|w| w.bits(sleep.xtal));
+            pmu.lp_sleep_lp_dig_power()
+                .write(|w| w.bits(sleep.power.dig_power));
+            pmu.lp_sleep_lp_ck_power()
+                .write(|w| w.bits(sleep.power.clk_power));
+            pmu.lp_sleep_bias().write(|w| w.bits(sleep.analog.bias));
+            pmu.lp_sleep_lp_regulator0()
+                .write(|w| w.bits(sleep.analog.regulator0));
+            pmu.lp_sleep_lp_regulator1()
+                .write(|w| w.bits(sleep.analog.regulator1));
+            pmu.lp_sleep_xtal().write(|w| w.bits(sleep.power.xtal));
+        }
     }
-
-    let _ = (active.bias, active.xtal);
 }
 
 fn power_domain_force_default() {
@@ -254,28 +336,41 @@ fn power_domain_force_default() {
 }
 
 fn modem_clock_domain_power_state_icg_map_init() {
-    // Values from esp32s31/modem_clock_impl.c.
+    // OR in the defaults from esp32s31/modem_clock_impl.c. Other users may
+    // already own additional state-map bits, so do not replace whole fields.
     MODEM_SYSCON::regs()
         .clk_conf_power_st()
-        .modify(|_, w| unsafe {
-            w.clk_modem_apb_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_modem_peri_st_map().bits(ICG_NOGATING_ACTIVE);
-            w.clk_wifi_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_bt_st_map().bits(ICG_NOGATING_ACTIVE);
-            w.clk_fe_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_zb_st_map().bits(ICG_NOGATING_ACTIVE)
+        .modify(|r, w| unsafe {
+            w.clk_modem_apb_st_map()
+                .bits(r.clk_modem_apb_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_modem_peri_st_map()
+                .bits(r.clk_modem_peri_st_map().bits() | ICG_NOGATING_ACTIVE);
+            w.clk_wifi_st_map()
+                .bits(r.clk_wifi_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_bt_st_map()
+                .bits(r.clk_bt_st_map().bits() | ICG_NOGATING_ACTIVE);
+            w.clk_fe_st_map()
+                .bits(r.clk_fe_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_zb_st_map()
+                .bits(r.clk_zb_st_map().bits() | ICG_NOGATING_ACTIVE)
         });
     MODEM_LPCON::regs()
         .clk_conf_power_st()
-        .modify(|_, w| unsafe {
-            w.clk_lp_apb_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_i2c_mst_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_coex_st_map().bits(ICG_NOGATING_ACTIVE_MODEM);
-            w.clk_wifipwr_st_map().bits(ICG_NOGATING_ACTIVE_MODEM)
+        .modify(|r, w| unsafe {
+            w.clk_lp_apb_st_map()
+                .bits(r.clk_lp_apb_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_i2c_mst_st_map()
+                .bits(r.clk_i2c_mst_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_coex_st_map()
+                .bits(r.clk_coex_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM);
+            w.clk_wifipwr_st_map()
+                .bits(r.clk_wifipwr_st_map().bits() | ICG_NOGATING_ACTIVE_MODEM)
         });
 }
 
-fn select_wifi_lp_clock(config: &ClockConfig) {
+/// Select the WiFi LP clock after `ClockConfig::configure` has applied and
+/// acquired the configured LP clock source.
+pub(crate) fn configure_wifi_lp_clock(config: &ClockConfig) {
     let lpcon = MODEM_LPCON::regs();
     let source = config.lp_slow_clk.unwrap_or(LpSlowClkConfig::RcSlow);
 
@@ -289,13 +384,20 @@ fn select_wifi_lp_clock(config: &ClockConfig) {
             LpSlowClkConfig::Xtal32k => w.clk_wifipwr_lp_sel_xtal32k().set_bit(),
         }
     });
+    if source == LpSlowClkConfig::Xtal32k {
+        // The WiFi 32 kHz selector feeds from the shared modem 32 kHz mux.
+        // MODEM_CLOCK_XTAL32K_CODE is 0 on S31.
+        lpcon
+            .modem_32k_clk_conf()
+            .modify(|_, w| unsafe { w.clk_modem_32k_sel().bits(0) });
+    }
     lpcon
         .wifi_lp_clk_conf()
         .modify(|_, w| unsafe { w.clk_wifipwr_lp_div_num().bits(0) });
     lpcon.clk_conf().modify(|_, w| w.clk_wifipwr_en().set_bit());
 }
 
-pub(crate) fn init(config: &ClockConfig) {
+pub(crate) fn init(_config: &ClockConfig) {
     // pmu_init: power up and release reset for the analog peripheral I2C.
     PMU::regs()
         .ana_peri_pwr_ctrl()
@@ -306,12 +408,12 @@ pub(crate) fn init(config: &ClockConfig) {
         w.rstb_perif_i2c().set_bit()
     });
 
-    hp_system_init_default();
-    lp_system_init_default();
+    HpSystemInit::init_default();
+    LpSystemInit::init_default();
     power_domain_force_default();
 
     // rtc_clk_init: S31 only applies RC_SLOW tuning and regulator force bits
-    // here; unlike C5 it has no PCR/FOSC/RC32K tuning sequence.
+    // here, it has no PCR/FOSC/RC32K tuning sequence.
     regi2c::I2C_DIG_REG_SCK_DCAP.write_field(128);
     regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
     regi2c::I2C_DIG_REG_ENIF_DIG_DREG.write_field(1);
@@ -319,7 +421,6 @@ pub(crate) fn init(config: &ClockConfig) {
     regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
 
     modem_clock_domain_power_state_icg_map_init();
-    select_wifi_lp_clock(config);
 }
 
 /// SOC Reset Reason.

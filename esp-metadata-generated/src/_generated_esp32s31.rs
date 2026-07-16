@@ -130,6 +130,18 @@ macro_rules! property {
     ("rng.is_lp_sys") => {
         false
     };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        true
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
+        false
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -153,6 +165,9 @@ macro_rules! property {
     };
     ("soc.internal_memory_cached") => {
         false
+    };
+    ("soc.has_swd_watchdog") => {
+        true
     };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
@@ -182,7 +197,7 @@ macro_rules! property {
         0
     };
     ("timergroup.rc_fast_calibration_divider") => {
-        32
+        50
     };
     ("timergroup.rc_fast_calibration_tick_enable") => {
         false
@@ -384,8 +399,16 @@ macro_rules! for_each_sw_interrupt {
 macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((Timer, 4));
-        _for_each_inner_wakeup_source!((all(Timer, 4)));
+        tt) => {} } _for_each_inner_wakeup_source!((LpCore, 0));
+        _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Usb,
+        3)); _for_each_inner_wakeup_source!((Uart1, 7));
+        _for_each_inner_wakeup_source!((Uart0, 8)); _for_each_inner_wakeup_source!((Ext1,
+        12)); _for_each_inner_wakeup_source!((Timer, 13));
+        _for_each_inner_wakeup_source!((Wifi, 22));
+        _for_each_inner_wakeup_source!((WifiBeacon, 23));
+        _for_each_inner_wakeup_source!((Bt, 25));
+        _for_each_inner_wakeup_source!((all(LpCore, 0), (Gpio, 2), (Usb, 3), (Uart1, 7),
+        (Uart0, 8), (Ext1, 12), (Timer, 13), (Wifi, 22), (WifiBeacon, 23), (Bt, 25)));
     };
 }
 #[macro_export]
@@ -442,12 +465,6 @@ macro_rules! for_each_wakeup_source {
 /// // PLL_F20M
 ///
 /// fn enable_pll_f20m_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// // PLL_F40M
-///
-/// fn enable_pll_f40m_impl(_clocks: &mut ClockTree, _en: bool) {
 ///     todo!()
 /// }
 ///
@@ -966,7 +983,6 @@ macro_rules! define_clock_tree_types {
             xtal32k_clk_refcount: u32,
             rc_slow_clk_refcount: u32,
             pll_f20m_refcount: u32,
-            pll_f40m_refcount: u32,
             pll_f80m_refcount: u32,
             pll_f120m_refcount: u32,
             pll_f160m_refcount: u32,
@@ -1096,7 +1112,6 @@ macro_rules! define_clock_tree_types {
                 xtal32k_clk_refcount: 0,
                 rc_slow_clk_refcount: 0,
                 pll_f20m_refcount: 0,
-                pll_f40m_refcount: 0,
                 pll_f80m_refcount: 0,
                 pll_f120m_refcount: 0,
                 pll_f160m_refcount: 0,
@@ -1279,28 +1294,6 @@ macro_rules! define_clock_tree_types {
             (bbpll_clk_frequency() / 24)
         }
         pub fn pll_f20m_source_frequency() -> u32 {
-            bbpll_clk_frequency()
-        }
-        pub fn request_pll_f40m(clocks: &mut ClockTree) {
-            trace!("Requesting PLL_F40M");
-            if increment_reference_count(&mut clocks.pll_f40m_refcount) {
-                trace!("Enabling PLL_F40M");
-                request_bbpll_clk(clocks);
-                enable_pll_f40m_impl(clocks, true);
-            }
-        }
-        pub fn release_pll_f40m(clocks: &mut ClockTree) {
-            trace!("Releasing PLL_F40M");
-            if decrement_reference_count(&mut clocks.pll_f40m_refcount) {
-                trace!("Disabling PLL_F40M");
-                enable_pll_f40m_impl(clocks, false);
-                release_bbpll_clk(clocks);
-            }
-        }
-        pub fn pll_f40m_frequency() -> u32 {
-            (bbpll_clk_frequency() / 12)
-        }
-        pub fn pll_f40m_source_frequency() -> u32 {
             bbpll_clk_frequency()
         }
         pub fn request_pll_f80m(clocks: &mut ClockTree) {

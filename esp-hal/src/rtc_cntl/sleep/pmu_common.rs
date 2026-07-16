@@ -1,13 +1,18 @@
 use crate::{
-    clock::{
-        RtcClock,
-        calibrate_rtc_fast_clock,
-        calibrate_rtc_slow_clock,
-        rtc_fast_cal_period,
-        rtc_slow_cal_period,
-    },
+    clock::{RtcClock, calibrate_rtc_fast_clock, calibrate_rtc_slow_clock, rtc_fast_cal_period},
     rtc_cntl::sleep::PowerDownFlags,
 };
+
+fn rtc_slow_cal_period() -> u32 {
+    cfg_select! {
+        esp32p4 => {
+            crate::peripherals::LP_AON::regs().lp_store1().read().bits()
+        }
+        _ => {
+            crate::peripherals::LP_AON::regs().store1().read().bits()
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct SleepTimeConfig {

@@ -1,3 +1,10 @@
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -27,11 +34,25 @@ impl Internal {
     }
 }
 
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 pub(crate) struct DropGuard<I, F: FnOnce(I)> {
     inner: ManuallyDrop<I>,
     on_drop: ManuallyDrop<F>,
 }
 
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 impl<I, F: FnOnce(I)> DropGuard<I, F> {
     pub(crate) fn new(inner: I, on_drop: F) -> Self {
         Self {
@@ -45,6 +66,13 @@ impl<I, F: FnOnce(I)> DropGuard<I, F> {
     }
 }
 
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
     fn drop(&mut self) {
         let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
@@ -53,6 +81,13 @@ impl<I, F: FnOnce(I)> Drop for DropGuard<I, F> {
     }
 }
 
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
     type Target = I;
 
@@ -61,6 +96,13 @@ impl<I, F: FnOnce(I)> Deref for DropGuard<I, F> {
     }
 }
 
+#[cfg(any(
+    mcpwm_driver_supported,
+    sdmmc_driver_supported,
+    sleep_driver_supported,
+    spi_master_driver_supported,
+    uart_driver_supported,
+))]
 impl<I, F: FnOnce(I)> DerefMut for DropGuard<I, F> {
     fn deref_mut(&mut self) -> &mut I {
         &mut self.inner

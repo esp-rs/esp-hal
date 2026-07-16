@@ -432,15 +432,10 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
     match core {
         Cpu::ProCpu => {
             cfg_select! {
-                esp32s31 => unsafe {
-                    // IDF routes source N through the register at the interrupt
-                    // core base plus four bytes per source. The S31 PAC exposes
-                    // these contiguous registers individually rather than as an array.
+                esp32s31 => {
                     INTERRUPT_CORE0::regs()
-                        .sys_icm_intr_map()
-                        .as_ptr()
-                        .add(interrupt as usize)
-                        .write_volatile(cpu_interrupt);
+                        .core_0_intr_map(interrupt as usize)
+                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
                 }
                 _ => {
                     INTERRUPT_CORE0::regs()
@@ -452,12 +447,10 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
         #[cfg(multi_core)]
         Cpu::AppCpu => {
             cfg_select! {
-                esp32s31 => unsafe {
+                esp32s31 => {
                     INTERRUPT_CORE1::regs()
-                        .sys_icm_intr_map()
-                        .as_ptr()
-                        .add(interrupt as usize)
-                        .write_volatile(cpu_interrupt);
+                        .core_1_intr_map(interrupt as usize)
+                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
                 }
                 _ => {
                     INTERRUPT_CORE1::regs()
@@ -470,7 +463,7 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", gpio_driver_supported))]
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
 }
@@ -480,12 +473,12 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
         Cpu::ProCpu => {
             cfg_select! {
-                esp32s31 => unsafe {
+                esp32s31 => {
                     INTERRUPT_CORE0::regs()
-                        .sys_icm_intr_map()
-                        .as_ptr()
-                        .add(interrupt as usize)
-                        .read_volatile()
+                        .core_0_intr_map(interrupt as usize)
+                        .read()
+                        .map()
+                        .bits() as u32
                 }
                 _ => {
                     INTERRUPT_CORE0::regs()
@@ -498,12 +491,12 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
         #[cfg(multi_core)]
         Cpu::AppCpu => {
             cfg_select! {
-                esp32s31 => unsafe {
+                esp32s31 => {
                     INTERRUPT_CORE1::regs()
-                        .sys_icm_intr_map()
-                        .as_ptr()
-                        .add(interrupt as usize)
-                        .read_volatile()
+                        .core_1_intr_map(interrupt as usize)
+                        .read()
+                        .map()
+                        .bits() as u32
                 }
                 _ => {
                     INTERRUPT_CORE1::regs()

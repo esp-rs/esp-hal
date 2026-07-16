@@ -12,24 +12,17 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
 
-symbols = [
-    "swd",
-    # ROM capabilities (TODO: verify against esp-idf when implementing)
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-
-    # Wakeup sources based on ESP-IDF
-    "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
-    "pm_support_ext1_wakeup",
-]
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
 
 [device.soc]
 multi_core_enabled = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
+has_swd_watchdog = true
 
 # SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
 # dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
@@ -100,7 +93,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
-rc_fast_calibration = { divider = 32, min_rev = 0 }
+rc_fast_calibration = { divider = 50, min_rev = 0 }
 
 [device.gpio]
 support_status = "not_supported"
@@ -332,6 +325,15 @@ support_status = { status = "not_supported", issue = 0 }
 light_sleep = true
 deep_sleep = true
 wakeup_sources = {
-    Timer = 4,
+    LpCore = 0,
+    Gpio = 2,
+    Usb = 3,
+    Uart1 = 7,
+    Uart0 = 8,
+    Ext1 = 12,
+    Timer = 13,
+    Wifi = 22,
+    WifiBeacon = 23,
+    Bt = 25,
 }
 

@@ -139,7 +139,7 @@ jobs:
         group:
           - chips: [esp32, esp32s2, esp32s3, esp32c2, esp32c3]
             toolchain: esp
-          - chips: [esp32c5, esp32c6, esp32c61, esp32h2, esp32p4]
+          - chips: [esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31]
             toolchain: stable
 
     steps:
@@ -216,7 +216,7 @@ jobs:
       - name: Build RISC-V docs
         if: matrix.group == 'riscv'
         shell: bash
-        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4
+        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4,esp32s31
 
       - name: Run Xtensa doc tests
         if: matrix.group == 'xtensa'
@@ -237,6 +237,7 @@ jobs:
           cargo xtask run doc-tests esp32c61
           cargo xtask run doc-tests esp32h2
           cargo xtask run doc-tests esp32p4
+          cargo xtask run doc-tests esp32s31
 
   # --------------------------------------------------------------------------
   # MSRV
@@ -280,7 +281,7 @@ jobs:
       - name: msrv RISC-V (esp-hal)
         if: matrix.group == 'riscv'
         run: |
-          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4 --toolchain ${{ env.MSRV }}
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4,esp32s31 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
         if: matrix.group == 'xtensa'

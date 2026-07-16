@@ -38,8 +38,12 @@ pub(crate) fn enable_branch_predictor() {
 pub(crate) fn riscv_preinit() {}
 
 pub(crate) fn pre_init() {
-    unsafe { cpu_control::internal_park_core(crate::system::Cpu::AppCpu, true) };
-    cpu_control::disable_core1();
+    if crate::system::Cpu::current() == crate::system::Cpu::ProCpu {
+        // The ROM may enter on either core. Only the designated primary core
+        // should park and gate its sibling during HAL startup.
+        unsafe { cpu_control::internal_park_core(crate::system::Cpu::AppCpu, true) };
+        cpu_control::disable_core1();
+    }
 
     // Unlike the other supported chips, the S31 ROM leaves both SYSTIMER clock
     // gates disabled. `Peripheral::KEEP_ENABLED` only prevents the clock from

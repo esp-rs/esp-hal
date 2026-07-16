@@ -20,7 +20,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
-    let mut cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
+    let cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
 
     // FIXME: this fails clock calibration
     // #[cfg(feature = "esp32")]

@@ -11,7 +11,6 @@ system_clocks = { clock_tree = [
 
     # BBPLL divider taps (480MHz / N)
     { name = "PLL_F20M",  type = "generic", output = "BBPLL_CLK / 24" },
-    { name = "PLL_F40M",  type = "generic", output = "BBPLL_CLK / 12" },
     { name = "PLL_F80M",  type = "generic", output = "BBPLL_CLK / 6"  },
     { name = "PLL_F120M", type = "generic", output = "BBPLL_CLK / 4"  },
     { name = "PLL_F160M", type = "generic", output = "BBPLL_CLK / 3"  },

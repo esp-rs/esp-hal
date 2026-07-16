@@ -32,16 +32,35 @@ pub fn is_running(core: Cpu) -> bool {
         Cpu::ProCpu => stall.hpcore0_sw_stall_code().bits(),
         Cpu::AppCpu => stall.hpcore1_sw_stall_code().bits(),
     };
-    code != 0x86
+    if code == 0x86 {
+        return false;
+    }
+
+    match core {
+        Cpu::ProCpu => true,
+        Cpu::AppCpu => {
+            let control = HP_SYS_CLKRST::regs().hpcore1_ctrl0().read();
+            control.core1_cpu_clk_en().bit_is_set() && control.core1_global_rst_en().bit_is_clear()
+        }
+    }
 }
 
 pub(crate) fn pre_system_reset() {
-    // Reset and stall Core 1 before resetting the whole system, matching
-    // esp_restart_noos() for ESP32-S31.
-    LP_AON_CLK_RST::regs()
-        .hpcore1_reset_ctrl()
-        .modify(|_, w| w.hpcore1_sw_reset().set_bit());
-    unsafe { internal_park_core(Cpu::AppCpu, true) };
+    // Match IDF's esp_restart_noos(): reset and stall only the other core.
+    // The caller must remain alive to request the subsequent system reset.
+    let other_core = match Cpu::current() {
+        Cpu::ProCpu => Cpu::AppCpu,
+        Cpu::AppCpu => Cpu::ProCpu,
+    };
+    match other_core {
+        Cpu::ProCpu => LP_AON_CLK_RST::regs()
+            .hpcore0_reset_ctrl()
+            .modify(|_, w| w.hpcore0_sw_reset().set_bit()),
+        Cpu::AppCpu => LP_AON_CLK_RST::regs()
+            .hpcore1_reset_ctrl()
+            .modify(|_, w| w.hpcore1_sw_reset().set_bit()),
+    };
+    unsafe { internal_park_core(other_core, true) };
 
     // Prevent ROM from jumping to an entry point from the previous image.
     crate::rom::ets_set_appcpu_boot_addr(0);
@@ -91,9 +110,15 @@ where
         ".option norelax",
         "la gp, __global_pointer$",
         ".option pop",
-        "li t0, 0x6000",
-        "csrrs x0, mstatus, t0",
-        "fscsr x0",
+        // Follow IDF's FPU initialization, enable it in Initial state, touch
+        // fcsr (which makes the state Dirty), then clear the dirty bit to
+        // leave mstatus.FS in Clean state (0b10).
+        "li t0, 0x2000",
+        "csrs mstatus, t0",
+        "li t0, 1",
+        "csrw fcsr, t0",
+        "li t0, 0x2000",
+        "csrc mstatus, t0",
         "la t0, {stack_top}",
         "lw sp, 0(t0)",
         "j {init}",

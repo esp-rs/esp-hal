@@ -779,14 +779,14 @@ pub(crate) mod implem {
     }
 
     #[inline]
-    #[cfg(sleep_light_sleep)]
+    #[cfg(all(sleep_light_sleep, sleep_driver_supported))]
     pub(crate) fn us_to_ticks(counter: u64) -> u64 {
         counter * 16
     }
 
     /// Callers must ensure this function is not called concurrently.
     #[inline]
-    #[cfg(sleep_light_sleep)]
+    #[cfg(all(sleep_light_sleep, sleep_driver_supported))]
     pub(crate) unsafe fn update_counter(counter: u64) {
         // On ESP32 the monotonic counter is the LACT timer of TIMG0. To set its
         // value we stage the new 64-bit count in the load registers and then
@@ -840,14 +840,14 @@ pub(crate) mod implem {
     }
 
     #[inline]
-    #[cfg(sleep_light_sleep)]
+    #[cfg(all(sleep_light_sleep, sleep_driver_supported))]
     pub(crate) fn us_to_ticks(counter: u64) -> u64 {
         SystemTimer::us_to_ticks(counter)
     }
 
     /// Callers must ensure this function is not called concurrently.
     #[inline]
-    #[cfg(sleep_light_sleep)]
+    #[cfg(all(sleep_light_sleep, sleep_driver_supported))]
     pub(crate) unsafe fn update_counter(counter: u64) {
         unsafe {
             SystemTimer::set_unit_value(Unit::Unit0, counter);

@@ -84,6 +84,9 @@ use crate::{
 };
 
 cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::LP_SYS as LP_AON;
+    }
     soc_has_lp_aon => {
         use crate::peripherals::LP_AON;
     }
@@ -118,6 +121,9 @@ impl CpuClock {
             }
             esp32p4 => {
                 Self::_400MHz
+            }
+            esp32s31 => {
+                Self::_320MHz
             }
             _ => {
                 Self::_240MHz
@@ -205,6 +211,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         crate::rtc_cntl::rtc::init(&cpu_clock_config);
 
         cpu_clock_config.configure(clocks);
+        #[cfg(esp32s31)]
+        crate::rtc_cntl::rtc::configure_wifi_lp_clock(&cpu_clock_config);
 
         // FIXME: MCPWM clock configuration needs to know about the active clock source
         // frequency. In the future, we should turn the MCPWM config structs into
@@ -548,26 +556,10 @@ pub fn xtal_clock() -> Rate {
 /// with `RtcClock::CAL_FRACT` fractional bits.
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
-fn rtc_slow_cal_period() -> u64 {
+pub(crate) fn rtc_slow_cal_period() -> u32 {
     cfg_select! {
         esp32s31 => {
-            use crate::peripherals::LP_SYS;
-        }
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
-
-    // P4: LP_SYS (mapped as LP_AON in esp-hal) names its scratch registers
-    // `lp_store0..lp_store14`, while every other chip names them `store0..N`.
-    // TODO: file an esp-pacs issue/PR to rename the P4 fields to match.
-    // Once that lands this cfg branch can disappear.
-    cfg_select! {
-        esp32s31 => {
-            let reg = LP_SYS::regs().lp_store(1);
+            let reg = LP_AON::regs().lp_store(1);
         }
         esp32p4 => {
             let reg = LP_AON::regs().lp_store1();
@@ -577,8 +569,12 @@ fn rtc_slow_cal_period() -> u64 {
         }
     }
 
+    reg.read().bits()
+}
+
 /// Read the calibrated RTC fast clock period from memory.
 #[cfg_attr(not(soc_has_pmu), expect(dead_code))]
+#[cfg_attr(esp32s31, expect(dead_code))]
 pub(crate) fn rtc_fast_cal_period() -> u32 {
     RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }

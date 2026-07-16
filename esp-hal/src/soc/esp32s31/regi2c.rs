@@ -1,4 +1,7 @@
-use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
+use crate::{
+    peripherals::{MODEM_LPCON, MODEM_SYSCON},
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
+};
 
 define_regi2c! {
     master: REGI2C_BB(0x67, 0) {}
@@ -202,16 +205,10 @@ const CONF2_SLAVE_SEL_SHIFT: u32 = 4;
 /// 24-bit write mask for I2C_ANA_MST_ANA_CONF1.
 const ANA_CONF1_M: u32 = 0x00FF_FFFF;
 
-/// MODEM_LPCON_CLK_CONF_REG: DR_REG_MODEM_LPCON_BASE (0x2010_F000) + 0x18.
-const MODEM_LPCON_CLK_CONF_REG: u32 = 0x2010_F018;
-const MODEM_LPCON_CLK_I2C_MST_EN: u32 = 1 << 2;
-
 /// I2C ANA MST register block: MODEM_PWR_BASE (0x2010_D000) + 0x2800.
 const I2C_ANA_MST_BASE: u32 = 0x2010_F800;
-const I2C_ANA_MST_I2C0_CTRL_REG: u32 = I2C_ANA_MST_BASE + 0x00;
+const I2C_ANA_MST_I2C0_CTRL_REG: u32 = I2C_ANA_MST_BASE;
 const I2C_ANA_MST_I2C1_CTRL_REG: u32 = I2C_ANA_MST_BASE + 0x04;
-const I2C_ANA_MST_ANA_CONF1_REG: u32 = I2C_ANA_MST_BASE + 0x1C;
-const I2C_ANA_MST_ANA_CONF2_REG: u32 = I2C_ANA_MST_BASE + 0x20;
 
 /// I2C control register bit fields (same layout as C5/C61).
 const REGI2C_RTC_BUSY_BIT: u32 = 1 << 25;
@@ -223,10 +220,18 @@ const REGI2C_RTC_ADDR_MASK: u32 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_MASK: u32 = 0xFF;
 
 fn regi2c_enable_block(block: u8) -> usize {
-    unsafe {
-        let reg = MODEM_LPCON_CLK_CONF_REG as *mut u32;
-        reg.write_volatile(reg.read_volatile() | MODEM_LPCON_CLK_I2C_MST_EN);
-    }
+    // Match the S31 bootloader setup explicitly instead of relying on a
+    // previous-stage bootloader to leave the analog-I2C source and force bit
+    // configured for us.
+    MODEM_SYSCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+    MODEM_LPCON::regs()
+        .clk_conf_force_on()
+        .modify(|_, w| w.clk_i2c_mst_fo().set_bit());
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
 
     let bit_mask: u32 = match block {
         v if v == REGI2C_BB.master => REGI2C_BB_MASK,
@@ -246,16 +251,17 @@ fn regi2c_enable_block(block: u8) -> usize {
         _ => return 0,
     };
 
-    unsafe {
-        let conf2 = (I2C_ANA_MST_ANA_CONF2_REG as *const u32).read_volatile();
-        let i2c_sel_set = conf2 & (bit_mask << CONF2_SLAVE_SEL_SHIFT) != 0;
+    let i2c_ana_mst = unsafe { &*crate::pac::I2C_ANA_MST::PTR };
+    let conf2 = i2c_ana_mst.ana_conf2().read().ana_conf2().bits();
+    let i2c_sel_set = conf2 & (bit_mask << CONF2_SLAVE_SEL_SHIFT) != 0;
 
-        (I2C_ANA_MST_ANA_CONF1_REG as *mut u32)
-            .write_volatile(!(bit_mask << CONF1_SLAVE_SEL_SHIFT) & ANA_CONF1_M);
+    i2c_ana_mst.ana_conf1().write(|w| unsafe {
+        w.ana_conf1()
+            .bits(!(bit_mask << CONF1_SLAVE_SEL_SHIFT) & ANA_CONF1_M)
+    });
 
-        // i2c_sel_set == true → use master 0; false → use master 1
-        if i2c_sel_set { 0 } else { 1 }
-    }
+    // i2c_sel_set == true → use master 0; false → use master 1
+    if i2c_sel_set { 0 } else { 1 }
 }
 
 #[inline]
