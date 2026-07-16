@@ -23,10 +23,20 @@ for_each_lp_function! {
                 mux: bool,
                 func: RtcFunction,
             ) {
+                if mux {
+                    LP_GPIO::regs()
+                        .clk_en()
+                        .modify(|_, w| w.reg_clk_en().set_bit());
+                    while LP_GPIO::regs().clk_en().read().reg_clk_en().bit_is_clear() {}
+                }
+
                 LP_IO_MUX::regs().pad($lp_pin).modify(|_, w| unsafe {
                     w.mux_sel().bit(mux);
-                    w.slp_ie().bit(input_enable);
-                    w.fun_sel().bits(func as u8)
+                    w.fun_ie().bit(input_enable);
+                    w.fun_sel().bits(match func {
+                        RtcFunction::Rtc => 1,
+                        RtcFunction::Digital => 0,
+                    })
                 });
             }
         }

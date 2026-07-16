@@ -3,12 +3,12 @@
 //!
 //! Wiring
 //!
-//! | Function           | ESP32-C6 | ESP32-H2  |
-//! | ------------------ | -------- | --------- |
-//! | Wake on low level  | GPIO2    | GPIO9     |
-//! | Wake on high level | GPIO3    | GPIO10    |
+//! | Function           | ESP32-C6 | ESP32-H2 | ESP32-P4 |
+//! | ------------------ | -------- | -------- | -------- |
+//! | Wake on low level  | GPIO2    | GPIO9    | GPIO2    |
+//! | Wake on high level | GPIO3    | GPIO10   | GPIO3    |
 
-//% CHIP_FILTER: esp32c6 || esp32h2
+//% CHIP_FILTER: esp32c6 || esp32h2 || esp32p4
 
 #![no_std]
 #![no_main]
@@ -38,16 +38,9 @@ fn main() -> ! {
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
     cfg_select! {
-        feature = "esp32c6" => {
-            use esp_hal::gpio::{Input, InputConfig, Pull};
-
+        any(feature = "esp32c6", feature = "esp32p4") => {
             let mut pin_low = peripherals.GPIO2;
             let mut pin_high = peripherals.GPIO3;
-            let input = Input::new(
-                pin_low.reborrow(),
-                InputConfig::default().with_pull(Pull::None),
-            );
-            core::mem::drop(input);
         }
         feature = "esp32h2" => {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
