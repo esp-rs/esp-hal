@@ -157,9 +157,6 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v2
-
       # Build hil-test ELFs for each requested chip (unless the dispatch
       # asked for radio-only via package=hil-test-radio).
       - name: Build hil-test tests
