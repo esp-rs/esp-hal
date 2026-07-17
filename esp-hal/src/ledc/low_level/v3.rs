@@ -1,27 +1,30 @@
 use super::super::{
-    LSGlobalClkSource,
+    LowSpeedGlobalClockSource,
     channel::Number as ChannelNumber,
-    timer::{LSClockSource, Number as TimerNumber},
+    timer::Number as TimerNumber,
 };
-use crate::{gpio::OutputSignal, pac::ledc::RegisterBlock, soc::clocks, time::Rate};
+use crate::{
+    gpio::OutputSignal,
+    ledc::timer::ClockSource,
+    pac::ledc::RegisterBlock,
+    soc::clocks,
+    time::Rate,
+};
 
-pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobalClkSource) {
+pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeedGlobalClockSource) {
     let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
     pcr.ledc_sclk_conf().write(|w| w.ledc_sclk_en().set_bit());
     match clock_source {
-        LSGlobalClkSource::APBClk => {
-            #[cfg(esp32c6)]
+        LowSpeedGlobalClockSource::APBClock => {
+            let sel = if cfg!(esp32c6) { 1 } else { 0 };
             pcr.ledc_sclk_conf()
-                .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
-            #[cfg(esp32h2)]
-            pcr.ledc_sclk_conf()
-                .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
+                .write(|w| unsafe { w.ledc_sclk_sel().bits(sel) });
         }
     }
     ledc.timer(0).conf().modify(|_, w| w.para_up().set_bit());
 }
 
-pub(super) fn ls_freq_hw(_clock_source: LSClockSource) -> Rate {
+pub(super) fn ls_freq_hw(_clock_source: ClockSource) -> Rate {
     Rate::from_hz(clocks::apb_clk_frequency())
 }
 
