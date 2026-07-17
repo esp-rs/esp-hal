@@ -1675,7 +1675,7 @@ impl<'lt> AnyPin<'lt> {
         self.set_output_enable(false);
         self.disable_usb_pads();
 
-        #[cfg(any(xtensa, esp32c6, esp32p4))]
+        #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
         for_each_lp_function! {
             (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
@@ -2236,6 +2236,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
+    // Keep device cfg aligned with init_gpio!
     #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
@@ -2333,13 +2334,13 @@ for_each_gpio! {
 
             fn output_signals(&self, _: crate::private::Internal) -> &'static [(AlternateFunction, OutputSignal)] {
                 &[$(
-                        (AlternateFunction::$af_output_num, OutputSignal::$af_output_signal),
+                    (AlternateFunction::$af_output_num, OutputSignal::$af_output_signal),
                 )*]
             }
 
             fn input_signals(&self, _: crate::private::Internal) -> &'static [(AlternateFunction, InputSignal)] {
                 &[$(
-                        (AlternateFunction::$af_input_num, InputSignal::$af_input_signal),
+                    (AlternateFunction::$af_input_num, InputSignal::$af_input_signal),
                 )*]
             }
         }
