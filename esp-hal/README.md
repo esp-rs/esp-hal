@@ -35,6 +35,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ESP32-P4 | [ESP32-P4][esp32p4-datasheet] | [ESP32-P4][esp32p4-trm] | `riscv32imafc-unknown-none-elf` |
 | ESP32-S2 | [ESP32-S2][esp32s2-datasheet] | [ESP32-S2][esp32s2-trm] | `xtensa-esp32s2-none-elf` |
 | ESP32-S3 | [ESP32-S3][esp32s3-datasheet] | [ESP32-S3][esp32s3-trm] | `xtensa-esp32s3-none-elf` |
+| ESP32-S31 | [ESP32-S31][esp32s31-datasheet] | [ESP32-S31][esp32s31-trm] | `riscv32imafc-unknown-none-elf` |
 
 [esp32-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 [esp32-trm]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
@@ -56,6 +57,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [esp32s2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
 [esp32s3-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 [esp32s3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
+[esp32s31-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf
+[esp32s31-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf
 <!-- end supported devices table -->
 
 ## Peripheral support

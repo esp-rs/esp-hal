@@ -9,7 +9,6 @@ crate::unstable_module! {
     pub mod clocks;
 }
 pub(crate) mod cpu_control;
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32s31 as pac;

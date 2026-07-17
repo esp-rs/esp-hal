@@ -304,7 +304,6 @@ impl RunQueue {
 
     /// Returns `true` if any task is ready to run (queued at any priority level).
     #[cfg(all(multi_core, sleep_light_sleep))]
-    #[cfg(all(sleep_light_sleep, sleep_driver_supported))]
     pub(crate) fn has_ready_tasks(&self) -> bool {
         self.ready_priority.mask != 0
     }

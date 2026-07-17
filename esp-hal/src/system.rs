@@ -1,5 +1,7 @@
 //! # System Control
 
+#![cfg_attr(esp32s31, allow(dead_code))]
+
 use esp_sync::NonReentrantMutex;
 
 cfg_select! {
@@ -57,164 +59,80 @@ pub(crate) fn disable_peripherals() {
     })
 }
 
-#[cfg(any(
-    adc_driver_supported,
-    aes_driver_supported,
-    dma_driver_supported,
-    ecc_driver_supported,
-    etm_driver_supported,
-    ethernet_driver_supported,
-    hmac_driver_supported,
-    i2c_master_driver_supported,
-    i2c_slave_driver_supported,
-    i2s_driver_supported,
-    mcpwm_driver_supported,
-    mipi_dsi_driver_supported,
-    parl_io_driver_supported,
-    pcnt_driver_supported,
-    rmt_driver_supported,
-    rsa_driver_supported,
-    sdmmc_driver_supported,
-    sha_driver_supported,
-    spi_master_driver_supported,
-    spi_slave_driver_supported,
-    twai_driver_supported,
-    uart_driver_supported,
-    usb_otg_driver_supported,
-    usb_otg_hs_driver_supported,
-))]
-mod guards {
-    use super::{Peripheral, PeripheralClockControl};
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct PeripheralGuard {
+    peripheral: Peripheral,
+}
 
-    #[derive(Debug, PartialEq, Eq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub(crate) struct PeripheralGuard {
-        peripheral: Peripheral,
+impl PeripheralGuard {
+    pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
+        PeripheralClockControl::request_peripheral(p, init);
+
+        Self { peripheral: p }
     }
 
-    impl PeripheralGuard {
-        pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
-            PeripheralClockControl::request_peripheral(p, init);
-
-            Self { peripheral: p }
-        }
-
-        pub(crate) fn new(p: Peripheral) -> Self {
-            Self::new_with(p, || {})
-        }
-    }
-
-    impl Clone for PeripheralGuard {
-        fn clone(&self) -> Self {
-            Self::new(self.peripheral)
-        }
-
-        fn clone_from(&mut self, _source: &Self) {
-            // This is a no-op since the ref count for P remains the same.
-        }
-    }
-
-    impl Drop for PeripheralGuard {
-        fn drop(&mut self) {
-            PeripheralClockControl::disable(self.peripheral);
-        }
-    }
-
-    #[derive(Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    pub(crate) struct GenericPeripheralGuard<const P: u8> {}
-
-    impl<const P: u8> GenericPeripheralGuard<P> {
-        pub(crate) fn new_with(init: fn()) -> Self {
-            let p = const { Peripheral::try_from(P).unwrap() };
-            PeripheralClockControl::request_peripheral(p, init);
-
-            Self {}
-        }
-
-        #[cfg_attr(esp32p4, allow(unused))]
-        #[cfg_attr(not(feature = "unstable"), allow(unused))]
-        pub(crate) fn new() -> Self {
-            Self::new_with(|| {})
-        }
-    }
-
-    impl<const P: u8> Clone for GenericPeripheralGuard<P> {
-        fn clone(&self) -> Self {
-            Self::new()
-        }
-
-        fn clone_from(&mut self, _source: &Self) {
-            // This is a no-op since the ref count for P remains the same.
-        }
-    }
-
-    impl<const P: u8> Drop for GenericPeripheralGuard<P> {
-        fn drop(&mut self) {
-            let peripheral = const { Peripheral::try_from(P).unwrap() };
-            PeripheralClockControl::disable(peripheral);
-        }
+    pub(crate) fn new(p: Peripheral) -> Self {
+        Self::new_with(p, || {})
     }
 }
 
-#[cfg(any(
-    adc_driver_supported,
-    aes_driver_supported,
-    dma_driver_supported,
-    ecc_driver_supported,
-    etm_driver_supported,
-    ethernet_driver_supported,
-    hmac_driver_supported,
-    i2c_master_driver_supported,
-    i2c_slave_driver_supported,
-    i2s_driver_supported,
-    mcpwm_driver_supported,
-    mipi_dsi_driver_supported,
-    parl_io_driver_supported,
-    pcnt_driver_supported,
-    rmt_driver_supported,
-    rsa_driver_supported,
-    sdmmc_driver_supported,
-    sha_driver_supported,
-    spi_master_driver_supported,
-    spi_slave_driver_supported,
-    twai_driver_supported,
-    uart_driver_supported,
-    usb_otg_driver_supported,
-    usb_otg_hs_driver_supported,
-))]
-pub(crate) use guards::{GenericPeripheralGuard, PeripheralGuard};
+impl Clone for PeripheralGuard {
+    fn clone(&self) -> Self {
+        Self::new(self.peripheral)
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
+impl Drop for PeripheralGuard {
+    fn drop(&mut self) {
+        PeripheralClockControl::disable(self.peripheral);
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct GenericPeripheralGuard<const P: u8> {}
+
+impl<const P: u8> GenericPeripheralGuard<P> {
+    pub(crate) fn new_with(init: fn()) -> Self {
+        let p = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::request_peripheral(p, init);
+
+        Self {}
+    }
+
+    #[cfg_attr(esp32p4, allow(unused))]
+    #[cfg_attr(not(feature = "unstable"), allow(unused))]
+    pub(crate) fn new() -> Self {
+        Self::new_with(|| {})
+    }
+}
+
+impl<const P: u8> Clone for GenericPeripheralGuard<P> {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
+impl<const P: u8> Drop for GenericPeripheralGuard<P> {
+    fn drop(&mut self) {
+        let peripheral = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::disable(peripheral);
+    }
+}
 
 /// Controls the enablement of peripheral clocks.
 pub(crate) struct PeripheralClockControl;
 
 impl PeripheralClockControl {
-    #[cfg(any(
-        adc_driver_supported,
-        aes_driver_supported,
-        dma_driver_supported,
-        ecc_driver_supported,
-        etm_driver_supported,
-        ethernet_driver_supported,
-        hmac_driver_supported,
-        i2c_master_driver_supported,
-        i2c_slave_driver_supported,
-        i2s_driver_supported,
-        mcpwm_driver_supported,
-        mipi_dsi_driver_supported,
-        parl_io_driver_supported,
-        pcnt_driver_supported,
-        rmt_driver_supported,
-        rsa_driver_supported,
-        sdmmc_driver_supported,
-        sha_driver_supported,
-        spi_master_driver_supported,
-        spi_slave_driver_supported,
-        twai_driver_supported,
-        uart_driver_supported,
-        usb_otg_driver_supported,
-        usb_otg_hs_driver_supported,
-    ))]
     fn request_peripheral(p: Peripheral, init: fn()) {
         PERIPHERAL_REF_COUNT.with(|ref_counts| {
             if Self::enable_with_counts(p, ref_counts) {
@@ -505,6 +423,7 @@ pub fn reset_reason() -> Option<SocResetReason> {
 ///
 /// Returns the [`WakeupReason`][crate::rtc_cntl::WakeupReason] describing the source(s) that ended
 /// the most recent sleep. The result is empty if the chip was not woken from sleep.
+#[cfg(sleep_driver_supported)]
 #[instability::unstable]
 #[inline]
 pub fn wakeup_cause() -> crate::rtc_cntl::WakeupReason {

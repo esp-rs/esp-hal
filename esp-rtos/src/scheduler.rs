@@ -451,7 +451,7 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(all(multi_core, sleep_light_sleep, sleep_driver_supported))]
+    #[cfg(all(multi_core, sleep_light_sleep))]
     pub(crate) fn cpu_idle(&self, cpu: Cpu) -> bool {
         let per_cpu = &self.per_cpu[cpu as usize];
         !per_cpu.initialized || per_cpu.current_task.is_null()

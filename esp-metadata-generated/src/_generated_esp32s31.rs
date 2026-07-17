@@ -52,63 +52,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
     };
-    ("assist_debug.has_sp_monitor") => {
-        false
-    };
-    ("assist_debug.has_region_monitor") => {
-        true
-    };
-    ("gpio.version") => {
-        2
-    };
-    ("gpio.version", str) => {
-        stringify!(2)
-    };
-    ("gpio.has_bank_1") => {
-        false
-    };
-    ("gpio.has_input_sync") => {
-        true
-    };
-    ("gpio.gpio_function") => {
-        1
-    };
-    ("gpio.gpio_function", str) => {
-        stringify!(1)
-    };
-    ("gpio.constant_0_input") => {
-        192
-    };
-    ("gpio.constant_0_input", str) => {
-        stringify!(192)
-    };
-    ("gpio.constant_1_input") => {
-        128
-    };
-    ("gpio.constant_1_input", str) => {
-        stringify!(128)
-    };
-    ("gpio.remap_iomux_pin_registers") => {
-        false
-    };
-    ("gpio.func_in_sel_offset") => {
-        0
-    };
-    ("gpio.func_in_sel_offset", str) => {
-        stringify!(0)
-    };
-    ("gpio.input_signal_max") => {
-        255
-    };
-    ("gpio.input_signal_max", str) => {
-        stringify!(255)
-    };
-    ("gpio.output_signal_max") => {
-        256
-    };
-    ("gpio.output_signal_max", str) => {
-        stringify!(256)
-    };
     ("interrupts.status_registers") => {
         6
     };
@@ -117,18 +60,6 @@ macro_rules! property {
     };
     ("interrupts.disabled_interrupt") => {
         0
-    };
-    ("rng.apb_cycle_wait_num") => {
-        16
-    };
-    ("rng.apb_cycle_wait_num", str) => {
-        stringify!(16)
-    };
-    ("rng.trng_supported") => {
-        false
-    };
-    ("rng.is_lp_sys") => {
-        false
     };
     ("rom.has_crc_le") => {
         true
@@ -141,12 +72,6 @@ macro_rules! property {
     };
     ("rom.has_md5_mbedtls") => {
         false
-    };
-    ("sleep.light_sleep") => {
-        true
-    };
-    ("sleep.deep_sleep") => {
-        true
     };
     ("soc.cpu_has_branch_predictor") => {
         true
@@ -187,6 +112,9 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("clock_tree.i2c.function_clock.div_num") => {
+        (0, 255)
+    };
     ("timergroup.timg_has_timer1") => {
         false
     };
@@ -201,27 +129,6 @@ macro_rules! property {
     };
     ("timergroup.rc_fast_calibration_tick_enable") => {
         false
-    };
-    ("uart.ram_size") => {
-        128
-    };
-    ("uart.ram_size", str) => {
-        stringify!(128)
-    };
-    ("uart.version") => {
-        2
-    };
-    ("uart.version", str) => {
-        stringify!(2)
-    };
-    ("uart.peripheral_controls_mem_clk") => {
-        true
-    };
-    ("uart.has_sclk_divider") => {
-        false
-    };
-    ("uart.has_sclk_enable") => {
-        true
     };
 }
 #[macro_export]
@@ -392,23 +299,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_wakeup_source {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((LpCore, 0));
-        _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Usb,
-        3)); _for_each_inner_wakeup_source!((Uart1, 7));
-        _for_each_inner_wakeup_source!((Uart0, 8)); _for_each_inner_wakeup_source!((Ext1,
-        12)); _for_each_inner_wakeup_source!((Timer, 13));
-        _for_each_inner_wakeup_source!((Wifi, 22));
-        _for_each_inner_wakeup_source!((WifiBeacon, 23));
-        _for_each_inner_wakeup_source!((Bt, 25));
-        _for_each_inner_wakeup_source!((all(LpCore, 0), (Gpio, 2), (Usb, 3), (Uart1, 7),
-        (Uart0, 8), (Ext1, 12), (Timer, 13), (Wifi, 22), (WifiBeacon, 23), (Bt, 25)));
     };
 }
 #[macro_export]
@@ -596,6 +486,22 @@ macro_rules! for_each_wakeup_source {
 ///     todo!()
 /// }
 ///
+/// impl I2cInstance {
+///     // I2C_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<I2cFunctionClockConfig>,
+///         _new_config: I2cFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl SpiInstance {
 ///     // SPI_FUNCTION_CLOCK
 ///
@@ -677,6 +583,11 @@ macro_rules! for_each_wakeup_source {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2cInstance {
+            I2c0 = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SpiInstance {
@@ -844,6 +755,45 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum I2cFunctionClockSclk {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+        }
+        /// Configures the `I2C0_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = sclk / (div_num + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct I2cFunctionClockConfig {
+            sclk: I2cFunctionClockSclk,
+            div_num: u32,
+        }
+        impl I2cFunctionClockConfig {
+            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(sclk: I2cFunctionClockSclk, div_num: u32) -> Self {
+                ::core::assert!(
+                    div_num <= 255,
+                    "`I2C0_FUNCTION_CLOCK` div_num must be between 0 and 255 (inclusive)."
+                );
+                Self { sclk, div_num }
+            }
+            pub(crate) fn sclk(self) -> I2cFunctionClockSclk {
+                self.sclk
+            }
+            pub(crate) fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
+        }
         /// The list of clock signals that the `SPI2_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -973,6 +923,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             spi_function_clock: [Option<SpiFunctionClockConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
@@ -991,6 +942,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            i2c_function_clock_refcount: [u32; 1],
             spi_function_clock_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
@@ -1037,6 +989,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
+            }
+            /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
+            pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
+                self.i2c_function_clock[I2cInstance::I2c0 as usize]
             }
             /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
             pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
@@ -1102,6 +1058,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk: None,
                 lp_slow_clk: None,
                 timg_calibration_clock: None,
+                i2c_function_clock: [None; 1],
                 spi_function_clock: [None; 1],
                 timg_function_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
@@ -1120,6 +1077,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                i2c_function_clock_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
@@ -1144,6 +1102,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
@@ -1765,6 +1725,81 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
         }
+        impl I2cInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                config: I2cFunctionClockConfig,
+            ) {
+                let old_config = clocks.i2c_function_clock[self as usize].replace(config);
+                refresh_i2c_function_clock_downstream(clocks, self);
+                if clocks.i2c_function_clock_refcount[self as usize] > 0 {
+                    match config.sclk {
+                        I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_config, config);
+                    if let Some(old_config) = old_config {
+                        match old_config.sclk {
+                            I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+                            I2cFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_config, config);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<I2cFunctionClockConfig> {
+                clocks.i2c_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
+                        I2cFunctionClockSclk::Xtal => request_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.i2c_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.i2c_function_clock[self as usize]).sclk {
+                        I2cFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+                        I2cFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: I2cFunctionClockConfig,
+            ) -> u32 {
+                (match config.sclk {
+                    I2cFunctionClockSclk::Xtal => xtal_clk_frequency(),
+                    I2cFunctionClockSclk::RcFast => rc_fast_clk_frequency(),
+                } / (config.div_num() + 1))
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                I2C_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn function_clock_source_frequency(sclk: I2cFunctionClockSclk) -> u32 {
+                match sclk {
+                    I2cFunctionClockSclk::Xtal => xtal_clk_frequency(),
+                    I2cFunctionClockSclk::RcFast => rc_fast_clk_frequency(),
+                }
+            }
+        }
         impl SpiInstance {
             pub fn configure_function_clock(
                 self,
@@ -2297,6 +2332,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
+            if let Some(config) = clocks.i2c_function_clock[instance as usize] {
+                I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    I2cInstance::function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
         fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {
             if let Some(config) = clocks.spi_function_clock[instance as usize] {
                 SPI_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
@@ -2355,6 +2398,8 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
+            /// I2C0 peripheral clock signal
+            I2c0,
             /// SPI2 peripheral clock signal
             Spi2,
             /// SYSTIMER peripheral clock signal
@@ -2376,6 +2421,7 @@ macro_rules! implement_peripheral_clocks {
             const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
+                Self::I2c0,
                 Self::Spi2,
                 Self::Systimer,
                 Self::Timg0,
@@ -2388,6 +2434,11 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
+                Peripheral::I2c0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2c0_ctrl0()
+                        .modify(|_, w| w.i2c0_apb_clk_en().bit(enable).i2c0_clk_en().bit(enable));
+                }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .gpspi2_ctrl0()
@@ -2462,6 +2513,11 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
+                Peripheral::I2c0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2c0_ctrl0()
+                        .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .gpspi2_ctrl0()
@@ -2617,48 +2673,15 @@ macro_rules! for_each_peripheral {
         "GPIO18 peripheral singleton"] GPIO18 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO19 peripheral singleton"]
         GPIO19 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO20 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO20 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO21 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO21 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO22 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO22 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO23 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO23 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO24 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO24 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO25 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO20 peripheral singleton"] GPIO20 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO21 peripheral singleton"]
+        GPIO21 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO22 peripheral singleton"] GPIO22 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO23 peripheral singleton"]
+        GPIO23 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO24 peripheral singleton"] GPIO24 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO25 peripheral singleton"]
+        GPIO25 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -2671,14 +2694,16 @@ macro_rules! for_each_peripheral {
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()));
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO28 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()));
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO30 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -2700,18 +2725,55 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
         "</ul>"] #[doc = "</section>"] GPIO32 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO33 peripheral singleton"]
-        GPIO33 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO34 peripheral singleton"] GPIO34 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO35 peripheral singleton"]
-        GPIO35 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO36 peripheral singleton"] GPIO36 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO37 peripheral singleton"]
-        GPIO37 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO38 peripheral singleton"] GPIO38 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO39 peripheral singleton"]
-        GPIO39 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO40 peripheral singleton"] GPIO40 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO33 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO33 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "GPIO34 peripheral singleton (Limitations exist)"] #[doc = ""]
+        #[doc = "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO34 <= virtual())); _for_each_inner_peripheral!((@
+        peri_type #[doc = "GPIO35 peripheral singleton"] GPIO35 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO36 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO36 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO37 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO37 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO38 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO38 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO39 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO39 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO40 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO40 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO42 peripheral singleton"]
         GPIO42 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO43 peripheral singleton"] GPIO43 <= virtual()));
@@ -2772,9 +2834,20 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO59 <= virtual()));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO60 peripheral singleton"]
-        GPIO60 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO61 peripheral singleton"] GPIO61 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO60 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO60 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO61 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO61 <= virtual()));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CACHE peripheral singleton"]
@@ -2792,6 +2865,9 @@ macro_rules! for_each_peripheral {
         HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -2825,7 +2901,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "SPI1 peripheral singleton"]
         SPI1 <= SPI1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
         SYSTEM <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
@@ -2835,16 +2911,15 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
         TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "UART2 peripheral singleton"] UART2 <= UART2(UART2 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART3 peripheral singleton"] UART3 <= UART3(UART3 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART3 peripheral singleton"]
+        UART3 <= UART3(UART3 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -2891,6 +2966,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((HP_MEM_APM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((HP_SYS_CLKRST(unstable)));
+        _for_each_inner_peripheral!((I2C0));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
         _for_each_inner_peripheral!((IO_MUX(unstable)));
@@ -2910,16 +2986,14 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((SPI0(unstable)));
         _for_each_inner_peripheral!((SPI1(unstable)));
-        _for_each_inner_peripheral!((SPI2(unstable)));
+        _for_each_inner_peripheral!((SPI2));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((SYSTIMER(unstable)));
         _for_each_inner_peripheral!((TEE(unstable)));
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
-        _for_each_inner_peripheral!((UART0(unstable)));
-        _for_each_inner_peripheral!((UART1(unstable)));
-        _for_each_inner_peripheral!((UART2(unstable)));
-        _for_each_inner_peripheral!((UART3(unstable)));
+        _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
+        _for_each_inner_peripheral!((UART2)); _for_each_inner_peripheral!((UART3));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
@@ -2945,42 +3019,12 @@ macro_rules! for_each_peripheral {
         "GPIO17 peripheral singleton"] GPIO17 <= virtual()), (@ peri_type #[doc =
         "GPIO18 peripheral singleton"] GPIO18 <= virtual()), (@ peri_type #[doc =
         "GPIO19 peripheral singleton"] GPIO19 <= virtual()), (@ peri_type #[doc =
-        "GPIO20 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO20 <= virtual()), (@ peri_type #[doc =
-        "GPIO21 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO21 <= virtual()), (@ peri_type #[doc =
-        "GPIO22 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO22 <= virtual()), (@ peri_type #[doc =
-        "GPIO23 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO23 <= virtual()), (@ peri_type #[doc =
-        "GPIO24 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO24 <= virtual()), (@ peri_type #[doc =
-        "GPIO25 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
-        "<section class=\"warning\">"] #[doc =
-        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
-        #[doc = "<ul>"] #[doc =
-        "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()), (@ peri_type #[doc =
+        "GPIO20 peripheral singleton"] GPIO20 <= virtual()), (@ peri_type #[doc =
+        "GPIO21 peripheral singleton"] GPIO21 <= virtual()), (@ peri_type #[doc =
+        "GPIO22 peripheral singleton"] GPIO22 <= virtual()), (@ peri_type #[doc =
+        "GPIO23 peripheral singleton"] GPIO23 <= virtual()), (@ peri_type #[doc =
+        "GPIO24 peripheral singleton"] GPIO24 <= virtual()), (@ peri_type #[doc =
+        "GPIO25 peripheral singleton"] GPIO25 <= virtual()), (@ peri_type #[doc =
         "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -2992,13 +3036,15 @@ macro_rules! for_each_peripheral {
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()), (@ peri_type #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()), (@ peri_type #[doc =
         "GPIO28 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
-        "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()), (@ peri_type #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()), (@ peri_type #[doc =
         "GPIO30 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -3017,14 +3063,49 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>This pin may be reserved for interfacing with SPI flash.</li>"] #[doc =
         "</ul>"] #[doc = "</section>"] GPIO32 <= virtual()), (@ peri_type #[doc =
-        "GPIO33 peripheral singleton"] GPIO33 <= virtual()), (@ peri_type #[doc =
-        "GPIO34 peripheral singleton"] GPIO34 <= virtual()), (@ peri_type #[doc =
+        "GPIO33 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO33 <= virtual()), (@ peri_type #[doc =
+        "GPIO34 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using USB.</li>"] #[doc = "</ul>"]
+        #[doc = "</section>"] GPIO34 <= virtual()), (@ peri_type #[doc =
         "GPIO35 peripheral singleton"] GPIO35 <= virtual()), (@ peri_type #[doc =
-        "GPIO36 peripheral singleton"] GPIO36 <= virtual()), (@ peri_type #[doc =
-        "GPIO37 peripheral singleton"] GPIO37 <= virtual()), (@ peri_type #[doc =
-        "GPIO38 peripheral singleton"] GPIO38 <= virtual()), (@ peri_type #[doc =
-        "GPIO39 peripheral singleton"] GPIO39 <= virtual()), (@ peri_type #[doc =
-        "GPIO40 peripheral singleton"] GPIO40 <= virtual()), (@ peri_type #[doc =
+        "GPIO36 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO36 <= virtual()), (@ peri_type #[doc =
+        "GPIO37 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO37 <= virtual()), (@ peri_type #[doc =
+        "GPIO38 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO38 <= virtual()), (@ peri_type #[doc =
+        "GPIO39 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO39 <= virtual()), (@ peri_type #[doc =
+        "GPIO40 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO40 <= virtual()), (@ peri_type #[doc =
         "GPIO42 peripheral singleton"] GPIO42 <= virtual()), (@ peri_type #[doc =
         "GPIO43 peripheral singleton"] GPIO43 <= virtual()), (@ peri_type #[doc =
         "GPIO44 peripheral singleton"] GPIO44 <= virtual()), (@ peri_type #[doc =
@@ -3073,8 +3154,18 @@ macro_rules! for_each_peripheral {
         #[doc = "<ul>"] #[doc =
         "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
         = "</ul>"] #[doc = "</section>"] GPIO59 <= virtual()), (@ peri_type #[doc =
-        "GPIO60 peripheral singleton"] GPIO60 <= virtual()), (@ peri_type #[doc =
-        "GPIO61 peripheral singleton"] GPIO61 <= virtual()), (@ peri_type #[doc =
+        "GPIO60 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO60 <= virtual()), (@ peri_type #[doc =
+        "GPIO61 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO61 <= virtual()), (@ peri_type #[doc =
         "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)),
         (@ peri_type #[doc = "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)),
         (@ peri_type #[doc = "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@
@@ -3086,8 +3177,10 @@ macro_rules! for_each_peripheral {
         HP_MEM_APM <= HP_MEM_APM() (unstable)), (@ peri_type #[doc =
         "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)), (@ peri_type #[doc
         = "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
-        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
-        INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
+        (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C0
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <=
+        INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
         (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX <=
         IO_MUX() (unstable)), (@ peri_type #[doc = "LP_AON_CLK_RST peripheral singleton"]
@@ -3110,26 +3203,25 @@ macro_rules! for_each_peripheral {
         "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)), (@ peri_type #[doc =
         "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)), (@ peri_type #[doc =
         "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)), (@ peri_type
-        #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)), (@
+        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
+        "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)), (@ peri_type #[doc
+        = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)), (@
         peri_type #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)), (@
         peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)), (@
         peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)), (@
         peri_type #[doc = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "UART1 peripheral singleton"] UART1 <=
-        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "UART3 peripheral singleton"] UART3 <= UART3(UART3 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE() (unstable)), (@
-        peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
-        (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <=
-        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
-        CPU_CTRL <= virtual() (unstable))));
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "UART1 peripheral singleton"] UART1 <= UART1(UART1 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "UART2 peripheral singleton"] UART2 <= UART2(UART2 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "UART3 peripheral singleton"] UART3 <= UART3(UART3 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE()
+        (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
+        virtual() (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
+        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
+        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable))));
         _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
@@ -3140,17 +3232,17 @@ macro_rules! for_each_peripheral {
         (GPIO54), (GPIO55), (GPIO56), (GPIO57), (GPIO58), (GPIO59), (GPIO60), (GPIO61),
         (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)), (EFUSE(unstable)),
         (GPIO(unstable)), (GPIO_SD(unstable)), (HP_APM(unstable)),
-        (HP_MEM_APM(unstable)), (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)),
+        (HP_MEM_APM(unstable)), (HP_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0),
         (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
         (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)), (LP_PERI(unstable)),
         (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PAU(unstable)), (PMU(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)),
-        (SPI0(unstable)), (SPI1(unstable)), (SPI2(unstable)), (SYSTEM(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0(unstable)), (UART1(unstable)), (UART2(unstable)), (UART3(unstable)),
-        (USB_DEVICE(unstable)), (FLASH(unstable)), (SW_INTERRUPT(unstable)),
-        (CPU_CTRL(unstable)))); _for_each_inner_peripheral!((dma_eligible));
+        (UART0), (UART1), (UART2), (UART3), (USB_DEVICE(unstable)), (FLASH(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        _for_each_inner_peripheral!((dma_eligible));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -3186,97 +3278,187 @@ macro_rules! for_each_gpio {
         macro_rules! _for_each_inner_gpio { $(($pattern) => $code;)* ($other : tt) => {}
         } _for_each_inner_gpio!((0, GPIO0() () ([Input] [Output])));
         _for_each_inner_gpio!((1, GPIO1() () ([Input] [Output])));
-        _for_each_inner_gpio!((2, GPIO2() () ([Input] [Output])));
-        _for_each_inner_gpio!((3, GPIO3() () ([Input] [Output])));
-        _for_each_inner_gpio!((4, GPIO4() () ([Input] [Output])));
-        _for_each_inner_gpio!((5, GPIO5() () ([Input] [Output])));
-        _for_each_inner_gpio!((6, GPIO6() () ([Input] [Output])));
-        _for_each_inner_gpio!((7, GPIO7() () ([Input] [Output])));
-        _for_each_inner_gpio!((8, GPIO8(_0 => FSPIHD) (_0 => FSPIHD) ([Input]
-        [Output]))); _for_each_inner_gpio!((9, GPIO9(_0 => FSPICS0) (_0 => FSPICS0)
-        ([Input] [Output]))); _for_each_inner_gpio!((10, GPIO10(_0 => FSPID) (_0 =>
-        FSPID) ([Input] [Output]))); _for_each_inner_gpio!((11, GPIO11() () ([Input]
-        [Output]))); _for_each_inner_gpio!((12, GPIO12(_0 => FSPICLK) (_0 => FSPICLK)
-        ([Input] [Output]))); _for_each_inner_gpio!((13, GPIO13(_0 => FSPIQ) (_0 =>
-        FSPIQ) ([Input] [Output]))); _for_each_inner_gpio!((14, GPIO14(_0 => FSPIWP) (_0
-        => FSPIWP) ([Input] [Output]))); _for_each_inner_gpio!((15, GPIO15() () ([Input]
-        [Output]))); _for_each_inner_gpio!((16, GPIO16() () ([Input] [Output])));
-        _for_each_inner_gpio!((17, GPIO17() () ([Input] [Output])));
-        _for_each_inner_gpio!((18, GPIO18() () ([Input] [Output])));
-        _for_each_inner_gpio!((19, GPIO19() () ([Input] [Output])));
-        _for_each_inner_gpio!((20, GPIO20() () ([Input] [Output])));
-        _for_each_inner_gpio!((21, GPIO21() () ([Input] [Output])));
-        _for_each_inner_gpio!((22, GPIO22() () ([Input] [Output])));
-        _for_each_inner_gpio!((23, GPIO23() () ([Input] [Output])));
-        _for_each_inner_gpio!((24, GPIO24() () ([Input] [Output])));
-        _for_each_inner_gpio!((25, GPIO25() () ([Input] [Output])));
-        _for_each_inner_gpio!((26, GPIO26() () ([Input] [Output])));
-        _for_each_inner_gpio!((27, GPIO27() () ([Input] [Output])));
-        _for_each_inner_gpio!((28, GPIO28() () ([Input] [Output])));
-        _for_each_inner_gpio!((30, GPIO30() () ([Input] [Output])));
-        _for_each_inner_gpio!((31, GPIO31() () ([Input] [Output])));
-        _for_each_inner_gpio!((32, GPIO32() () ([Input] [Output])));
-        _for_each_inner_gpio!((33, GPIO33() () ([Input] [Output])));
-        _for_each_inner_gpio!((34, GPIO34() () ([Input] [Output])));
-        _for_each_inner_gpio!((35, GPIO35() () ([Input] [Output])));
-        _for_each_inner_gpio!((36, GPIO36() () ([Input] [Output])));
-        _for_each_inner_gpio!((37, GPIO37() () ([Input] [Output])));
-        _for_each_inner_gpio!((38, GPIO38() () ([Input] [Output])));
-        _for_each_inner_gpio!((39, GPIO39() () ([Input] [Output])));
-        _for_each_inner_gpio!((40, GPIO40() () ([Input] [Output])));
-        _for_each_inner_gpio!((42, GPIO42() () ([Input] [Output])));
-        _for_each_inner_gpio!((43, GPIO43() () ([Input] [Output])));
-        _for_each_inner_gpio!((44, GPIO44() () ([Input] [Output])));
-        _for_each_inner_gpio!((45, GPIO45() () ([Input] [Output])));
-        _for_each_inner_gpio!((46, GPIO46() () ([Input] [Output])));
-        _for_each_inner_gpio!((47, GPIO47() () ([Input] [Output])));
-        _for_each_inner_gpio!((48, GPIO48() () ([Input] [Output])));
-        _for_each_inner_gpio!((49, GPIO49() () ([Input] [Output])));
-        _for_each_inner_gpio!((50, GPIO50() () ([Input] [Output])));
-        _for_each_inner_gpio!((51, GPIO51() () ([Input] [Output])));
-        _for_each_inner_gpio!((52, GPIO52() () ([Input] [Output])));
-        _for_each_inner_gpio!((53, GPIO53() () ([Input] [Output])));
-        _for_each_inner_gpio!((54, GPIO54(_0 => MTDO) (_0 => MTDO) ([Input] [Output])));
-        _for_each_inner_gpio!((55, GPIO55(_0 => MTCK) (_0 => MTCK) ([Input] [Output])));
-        _for_each_inner_gpio!((56, GPIO56(_0 => MTDI) (_0 => MTDI) ([Input] [Output])));
-        _for_each_inner_gpio!((57, GPIO57(_0 => MTMS) (_0 => MTMS) ([Input] [Output])));
+        _for_each_inner_gpio!((2, GPIO2(_3 => LCD_DATA19) (_3 => LCD_DATA19) ([Input]
+        [Output]))); _for_each_inner_gpio!((3, GPIO3(_3 => LCD_DATA20) (_3 => LCD_DATA20)
+        ([Input] [Output]))); _for_each_inner_gpio!((4, GPIO4(_3 => LCD_DATA21) (_3 =>
+        LCD_DATA21) ([Input] [Output]))); _for_each_inner_gpio!((5, GPIO5(_3 =>
+        LCD_DATA22) (_3 => LCD_DATA22) ([Input] [Output]))); _for_each_inner_gpio!((6,
+        GPIO6() () ([Input] [Output]))); _for_each_inner_gpio!((7, GPIO7(_3 =>
+        LCD_DATA23) (_3 => LCD_DATA23) ([Input] [Output]))); _for_each_inner_gpio!((8,
+        GPIO8(_2 => GMAC_PHY_TXD0 _3 => LCD_DATA0) (_2 => GMAC_PHY_TXD0 _3 => LCD_DATA0)
+        ([Input] [Output]))); _for_each_inner_gpio!((9, GPIO9(_0 => FSPIHD _2 =>
+        GMAC_PHY_TXD1 _3 => LCD_DATA1 _4 => DBG_PSRAM_CK) (_0 => FSPIHD _2 =>
+        GMAC_PHY_TXD1 _3 => LCD_DATA1 _4 => DBG_PSRAM_CK) ([Input] [Output])));
+        _for_each_inner_gpio!((10, GPIO10(_0 => FSPICS0 _2 => GMAC_PHY_TXD2 _3 =>
+        LCD_DATA2 _4 => DBG_PSRAM_CS) (_0 => FSPICS0 _2 => GMAC_PHY_TXD2 _3 => LCD_DATA2
+        _4 => DBG_PSRAM_CS) ([Input] [Output]))); _for_each_inner_gpio!((11, GPIO11(_0 =>
+        FSPID _2 => GMAC_PHY_TXD3 _3 => LCD_DATA3 _4 => DBG_PSRAM_D) (_0 => FSPID _2 =>
+        GMAC_PHY_TXD3 _3 => LCD_DATA3 _4 => DBG_PSRAM_D) ([Input] [Output])));
+        _for_each_inner_gpio!((12, GPIO12(_0 => FSPICLK _2 => GMAC_PHY_TXEN _3 =>
+        LCD_DATA4 _4 => DBG_PSRAM_Q) (_0 => FSPICLK _2 => GMAC_PHY_TXEN _3 => LCD_DATA4
+        _4 => DBG_PSRAM_Q) ([Input] [Output]))); _for_each_inner_gpio!((13, GPIO13(_0 =>
+        FSPIQ _2 => GMAC_RMII_CLK _3 => LCD_DATA5 _4 => DBG_PSRAM_WP) (_0 => FSPIQ _2 =>
+        GMAC_RMII_CLK _3 => LCD_DATA5 _4 => DBG_PSRAM_WP) ([Input] [Output])));
+        _for_each_inner_gpio!((14, GPIO14(_0 => FSPIWP _2 => GMAC_RX_CLK _3 => LCD_DATA6
+        _4 => DBG_PSRAM_HOLD) (_0 => FSPIWP _2 => GMAC_RX_CLK _3 => LCD_DATA6 _4 =>
+        DBG_PSRAM_HOLD) ([Input] [Output]))); _for_each_inner_gpio!((15, GPIO15(_0 =>
+        FSPIIO4 _2 => GMAC_PHY_RXDV _3 => LCD_DATA7 _4 => DBG_PSRAM_DQ4) (_0 => FSPIIO4
+        _2 => GMAC_PHY_RXDV _3 => LCD_DATA7 _4 => DBG_PSRAM_DQ4) ([Input] [Output])));
+        _for_each_inner_gpio!((16, GPIO16(_0 => FSPIIO5 _2 => GMAC_PHY_RXD3 _3 =>
+        LCD_DATA8 _4 => DBG_PSRAM_DQ5) (_0 => FSPIIO5 _2 => GMAC_PHY_RXD3 _3 => LCD_DATA8
+        _4 => DBG_PSRAM_DQ5) ([Input] [Output]))); _for_each_inner_gpio!((17, GPIO17(_0
+        => FSPIIO6 _2 => GMAC_PHY_RXD2 _3 => LCD_DATA9 _4 => DBG_PSRAM_DQ6) (_0 =>
+        FSPIIO6 _2 => GMAC_PHY_RXD2 _3 => LCD_DATA9 _4 => DBG_PSRAM_DQ6) ([Input]
+        [Output]))); _for_each_inner_gpio!((18, GPIO18(_0 => FSPIIO7 _2 => GMAC_PHY_RXD1
+        _3 => LCD_DATA10 _4 => DBG_PSRAM_DQ7) (_0 => FSPIIO7 _2 => GMAC_PHY_RXD1 _3 =>
+        LCD_DATA10 _4 => DBG_PSRAM_DQ7) ([Input] [Output]))); _for_each_inner_gpio!((19,
+        GPIO19(_0 => FSPIDQS _2 => GMAC_PHY_RXD0 _3 => LCD_DATA11 _4 => DBG_PSRAM_DQS_0)
+        (_0 => FSPIDQS _2 => GMAC_PHY_RXD0 _3 => LCD_DATA11 _4 => DBG_PSRAM_DQS_0)
+        ([Input] [Output]))); _for_each_inner_gpio!((20, GPIO20(_0 => SDIO_DATA0 _2 =>
+        FSPICLK _4 => DBG_FLASH_CK) (_0 => SDIO_DATA0 _2 => FSPICLK _4 => DBG_FLASH_CK)
+        ([Input] [Output]))); _for_each_inner_gpio!((21, GPIO21(_0 => SDIO_DATA1 _2 =>
+        FSPID _4 => DBG_FLASH_D) (_0 => SDIO_DATA1 _2 => FSPID _4 => DBG_FLASH_D)
+        ([Input] [Output]))); _for_each_inner_gpio!((22, GPIO22(_0 => SDIO_DATA2 _2 =>
+        FSPIQ _4 => DBG_FLASH_CS) (_0 => SDIO_DATA2 _2 => FSPIQ _4 => DBG_FLASH_CS)
+        ([Input] [Output]))); _for_each_inner_gpio!((23, GPIO23(_0 => SDIO_DATA3 _2 =>
+        FSPICS0 _4 => DBG_FLASH_Q) (_0 => SDIO_DATA3 _2 => FSPICS0 _4 => DBG_FLASH_Q)
+        ([Input] [Output]))); _for_each_inner_gpio!((24, GPIO24(_0 => SDIO_CLK _2 =>
+        FSPIHD _4 => DBG_FLASH_WP) (_0 => SDIO_CLK _2 => FSPIHD _4 => DBG_FLASH_WP)
+        ([Input] [Output]))); _for_each_inner_gpio!((25, GPIO25(_0 => SDIO_CMD _2 =>
+        FSPIWP _4 => DBG_FLASH_HOLD) (_0 => SDIO_CMD _2 => FSPIWP _4 => DBG_FLASH_HOLD)
+        ([Input] [Output]))); _for_each_inner_gpio!((26, GPIO26(_0 => SPICS0) (_0 =>
+        SPICS0) ([Input] [Output]))); _for_each_inner_gpio!((27, GPIO27(_0 => SPIQ) (_0
+        => SPIQ) ([Input] [Output]))); _for_each_inner_gpio!((28, GPIO28(_0 => SPIWP) (_0
+        => SPIWP) ([Input] [Output]))); _for_each_inner_gpio!((30, GPIO30(_0 => SPIHD)
+        (_0 => SPIHD) ([Input] [Output]))); _for_each_inner_gpio!((31, GPIO31(_0 =>
+        SPICLK) (_0 => SPICLK) ([Input] [Output]))); _for_each_inner_gpio!((32, GPIO32(_0
+        => SPID) (_0 => SPID) ([Input] [Output]))); _for_each_inner_gpio!((33, GPIO33(_3
+        => LCD_DATA12) (_3 => LCD_DATA12) ([Input] [Output])));
+        _for_each_inner_gpio!((34, GPIO34(_3 => LCD_DATA13) (_3 => LCD_DATA13) ([Input]
+        [Output]))); _for_each_inner_gpio!((35, GPIO35(_2 => REF_GMAC_CLK _3 =>
+        LCD_DATA14 _4 => SD2_CDATA0) (_2 => REF_GMAC_CLK _3 => LCD_DATA14 _4 =>
+        SD2_CDATA0) ([Input] [Output]))); _for_each_inner_gpio!((36, GPIO36(_2 =>
+        GMAC_PHY_RXDV _3 => LCD_DATA15 _4 => SD2_CDATA1) (_2 => GMAC_PHY_RXDV _3 =>
+        LCD_DATA15 _4 => SD2_CDATA1) ([Input] [Output]))); _for_each_inner_gpio!((37,
+        GPIO37(_2 => GMAC_PHY_TXEN _3 => LCD_DATA16 _4 => SD2_CDATA2) (_2 =>
+        GMAC_PHY_TXEN _3 => LCD_DATA16 _4 => SD2_CDATA2) ([Input] [Output])));
+        _for_each_inner_gpio!((38, GPIO38(_2 => GMAC_PHY_RXD3 _3 => LCD_DATA17 _4 =>
+        SD2_CDATA3) (_2 => GMAC_PHY_RXD3 _3 => LCD_DATA17 _4 => SD2_CDATA3) ([Input]
+        [Output]))); _for_each_inner_gpio!((39, GPIO39(_2 => GMAC_PHY_RXD2 _3 =>
+        LCD_DATA18 _4 => SD2_CCLK) (_2 => GMAC_PHY_RXD2 _3 => LCD_DATA18 _4 => SD2_CCLK)
+        ([Input] [Output]))); _for_each_inner_gpio!((40, GPIO40(_2 => GMAC_PHY_RXD1 _3 =>
+        LCD_PCLK _4 => SD2_CCMD) (_2 => GMAC_PHY_RXD1 _3 => LCD_PCLK _4 => SD2_CCMD)
+        ([Input] [Output]))); _for_each_inner_gpio!((42, GPIO42(_2 => GMAC_RX_CLK) (_2 =>
+        GMAC_RX_CLK) ([Input] [Output]))); _for_each_inner_gpio!((43, GPIO43(_2 =>
+        GMAC_RMII_CLK _3 => LCD_H_ENABLE) (_2 => GMAC_RMII_CLK _3 => LCD_H_ENABLE)
+        ([Input] [Output]))); _for_each_inner_gpio!((44, GPIO44(_2 => GMAC_PHY_TXD0 _3 =>
+        LCD_H_SYNC) (_2 => GMAC_PHY_TXD0 _3 => LCD_H_SYNC) ([Input] [Output])));
+        _for_each_inner_gpio!((45, GPIO45(_2 => GMAC_PHY_TXD1 _3 => LCD_V_SYNC) (_2 =>
+        GMAC_PHY_TXD1 _3 => LCD_V_SYNC) ([Input] [Output]))); _for_each_inner_gpio!((46,
+        GPIO46(_2 => GMAC_PHY_TXD2 _3 => CAM_DATA0) (_2 => GMAC_PHY_TXD2 _3 => CAM_DATA0)
+        ([Input] [Output]))); _for_each_inner_gpio!((47, GPIO47(_2 => GMAC_PHY_TXD3 _3 =>
+        CAM_DATA1) (_2 => GMAC_PHY_TXD3 _3 => CAM_DATA1) ([Input] [Output])));
+        _for_each_inner_gpio!((48, GPIO48(_3 => CAM_DATA2) (_3 => CAM_DATA2) ([Input]
+        [Output]))); _for_each_inner_gpio!((49, GPIO49(_3 => CAM_DATA3) (_3 => CAM_DATA3)
+        ([Input] [Output]))); _for_each_inner_gpio!((50, GPIO50(_3 => CAM_DATA4) (_3 =>
+        CAM_DATA4) ([Input] [Output]))); _for_each_inner_gpio!((51, GPIO51(_3 =>
+        CAM_DATA5) (_3 => CAM_DATA5) ([Input] [Output]))); _for_each_inner_gpio!((52,
+        GPIO52(_2 => FSPICS0 _3 => CAM_DATA6) (_2 => FSPICS0 _3 => CAM_DATA6) ([Input]
+        [Output]))); _for_each_inner_gpio!((53, GPIO53(_2 => FSPICLK _3 => CAM_DATA7) (_2
+        => FSPICLK _3 => CAM_DATA7) ([Input] [Output]))); _for_each_inner_gpio!((54,
+        GPIO54(_0 => MTDO _2 => FSPID _3 => CAM_PCLK) (_0 => MTDO _2 => FSPID _3 =>
+        CAM_PCLK) ([Input] [Output]))); _for_each_inner_gpio!((55, GPIO55(_0 => MTCK _2
+        => FSPIQ _3 => CAM_XCLK) (_0 => MTCK _2 => FSPIQ _3 => CAM_XCLK) ([Input]
+        [Output]))); _for_each_inner_gpio!((56, GPIO56(_0 => MTDI _2 => FSPIHD _3 =>
+        CAM_V_SYNC) (_0 => MTDI _2 => FSPIHD _3 => CAM_V_SYNC) ([Input] [Output])));
+        _for_each_inner_gpio!((57, GPIO57(_0 => MTMS _2 => FSPIWP _3 => CAM_H_SYNC) (_0
+        => MTMS _2 => FSPIWP _3 => CAM_H_SYNC) ([Input] [Output])));
         _for_each_inner_gpio!((58, GPIO58() (_0 => U0TXD) ([Input] [Output])));
         _for_each_inner_gpio!((59, GPIO59(_0 => U0RXD) () ([Input] [Output])));
         _for_each_inner_gpio!((60, GPIO60() () ([Input] [Output])));
         _for_each_inner_gpio!((61, GPIO61() () ([Input] [Output])));
         _for_each_inner_gpio!((all(0, GPIO0() () ([Input] [Output])), (1, GPIO1() ()
-        ([Input] [Output])), (2, GPIO2() () ([Input] [Output])), (3, GPIO3() () ([Input]
-        [Output])), (4, GPIO4() () ([Input] [Output])), (5, GPIO5() () ([Input]
-        [Output])), (6, GPIO6() () ([Input] [Output])), (7, GPIO7() () ([Input]
-        [Output])), (8, GPIO8(_0 => FSPIHD) (_0 => FSPIHD) ([Input] [Output])), (9,
-        GPIO9(_0 => FSPICS0) (_0 => FSPICS0) ([Input] [Output])), (10, GPIO10(_0 =>
-        FSPID) (_0 => FSPID) ([Input] [Output])), (11, GPIO11() () ([Input] [Output])),
-        (12, GPIO12(_0 => FSPICLK) (_0 => FSPICLK) ([Input] [Output])), (13, GPIO13(_0 =>
-        FSPIQ) (_0 => FSPIQ) ([Input] [Output])), (14, GPIO14(_0 => FSPIWP) (_0 =>
-        FSPIWP) ([Input] [Output])), (15, GPIO15() () ([Input] [Output])), (16, GPIO16()
-        () ([Input] [Output])), (17, GPIO17() () ([Input] [Output])), (18, GPIO18() ()
-        ([Input] [Output])), (19, GPIO19() () ([Input] [Output])), (20, GPIO20() ()
-        ([Input] [Output])), (21, GPIO21() () ([Input] [Output])), (22, GPIO22() ()
-        ([Input] [Output])), (23, GPIO23() () ([Input] [Output])), (24, GPIO24() ()
-        ([Input] [Output])), (25, GPIO25() () ([Input] [Output])), (26, GPIO26() ()
-        ([Input] [Output])), (27, GPIO27() () ([Input] [Output])), (28, GPIO28() ()
-        ([Input] [Output])), (30, GPIO30() () ([Input] [Output])), (31, GPIO31() ()
-        ([Input] [Output])), (32, GPIO32() () ([Input] [Output])), (33, GPIO33() ()
-        ([Input] [Output])), (34, GPIO34() () ([Input] [Output])), (35, GPIO35() ()
-        ([Input] [Output])), (36, GPIO36() () ([Input] [Output])), (37, GPIO37() ()
-        ([Input] [Output])), (38, GPIO38() () ([Input] [Output])), (39, GPIO39() ()
-        ([Input] [Output])), (40, GPIO40() () ([Input] [Output])), (42, GPIO42() ()
-        ([Input] [Output])), (43, GPIO43() () ([Input] [Output])), (44, GPIO44() ()
-        ([Input] [Output])), (45, GPIO45() () ([Input] [Output])), (46, GPIO46() ()
-        ([Input] [Output])), (47, GPIO47() () ([Input] [Output])), (48, GPIO48() ()
-        ([Input] [Output])), (49, GPIO49() () ([Input] [Output])), (50, GPIO50() ()
-        ([Input] [Output])), (51, GPIO51() () ([Input] [Output])), (52, GPIO52() ()
-        ([Input] [Output])), (53, GPIO53() () ([Input] [Output])), (54, GPIO54(_0 =>
-        MTDO) (_0 => MTDO) ([Input] [Output])), (55, GPIO55(_0 => MTCK) (_0 => MTCK)
-        ([Input] [Output])), (56, GPIO56(_0 => MTDI) (_0 => MTDI) ([Input] [Output])),
-        (57, GPIO57(_0 => MTMS) (_0 => MTMS) ([Input] [Output])), (58, GPIO58() (_0 =>
-        U0TXD) ([Input] [Output])), (59, GPIO59(_0 => U0RXD) () ([Input] [Output])), (60,
-        GPIO60() () ([Input] [Output])), (61, GPIO61() () ([Input] [Output]))));
+        ([Input] [Output])), (2, GPIO2(_3 => LCD_DATA19) (_3 => LCD_DATA19) ([Input]
+        [Output])), (3, GPIO3(_3 => LCD_DATA20) (_3 => LCD_DATA20) ([Input] [Output])),
+        (4, GPIO4(_3 => LCD_DATA21) (_3 => LCD_DATA21) ([Input] [Output])), (5, GPIO5(_3
+        => LCD_DATA22) (_3 => LCD_DATA22) ([Input] [Output])), (6, GPIO6() () ([Input]
+        [Output])), (7, GPIO7(_3 => LCD_DATA23) (_3 => LCD_DATA23) ([Input] [Output])),
+        (8, GPIO8(_2 => GMAC_PHY_TXD0 _3 => LCD_DATA0) (_2 => GMAC_PHY_TXD0 _3 =>
+        LCD_DATA0) ([Input] [Output])), (9, GPIO9(_0 => FSPIHD _2 => GMAC_PHY_TXD1 _3 =>
+        LCD_DATA1 _4 => DBG_PSRAM_CK) (_0 => FSPIHD _2 => GMAC_PHY_TXD1 _3 => LCD_DATA1
+        _4 => DBG_PSRAM_CK) ([Input] [Output])), (10, GPIO10(_0 => FSPICS0 _2 =>
+        GMAC_PHY_TXD2 _3 => LCD_DATA2 _4 => DBG_PSRAM_CS) (_0 => FSPICS0 _2 =>
+        GMAC_PHY_TXD2 _3 => LCD_DATA2 _4 => DBG_PSRAM_CS) ([Input] [Output])), (11,
+        GPIO11(_0 => FSPID _2 => GMAC_PHY_TXD3 _3 => LCD_DATA3 _4 => DBG_PSRAM_D) (_0 =>
+        FSPID _2 => GMAC_PHY_TXD3 _3 => LCD_DATA3 _4 => DBG_PSRAM_D) ([Input] [Output])),
+        (12, GPIO12(_0 => FSPICLK _2 => GMAC_PHY_TXEN _3 => LCD_DATA4 _4 => DBG_PSRAM_Q)
+        (_0 => FSPICLK _2 => GMAC_PHY_TXEN _3 => LCD_DATA4 _4 => DBG_PSRAM_Q) ([Input]
+        [Output])), (13, GPIO13(_0 => FSPIQ _2 => GMAC_RMII_CLK _3 => LCD_DATA5 _4 =>
+        DBG_PSRAM_WP) (_0 => FSPIQ _2 => GMAC_RMII_CLK _3 => LCD_DATA5 _4 =>
+        DBG_PSRAM_WP) ([Input] [Output])), (14, GPIO14(_0 => FSPIWP _2 => GMAC_RX_CLK _3
+        => LCD_DATA6 _4 => DBG_PSRAM_HOLD) (_0 => FSPIWP _2 => GMAC_RX_CLK _3 =>
+        LCD_DATA6 _4 => DBG_PSRAM_HOLD) ([Input] [Output])), (15, GPIO15(_0 => FSPIIO4 _2
+        => GMAC_PHY_RXDV _3 => LCD_DATA7 _4 => DBG_PSRAM_DQ4) (_0 => FSPIIO4 _2 =>
+        GMAC_PHY_RXDV _3 => LCD_DATA7 _4 => DBG_PSRAM_DQ4) ([Input] [Output])), (16,
+        GPIO16(_0 => FSPIIO5 _2 => GMAC_PHY_RXD3 _3 => LCD_DATA8 _4 => DBG_PSRAM_DQ5) (_0
+        => FSPIIO5 _2 => GMAC_PHY_RXD3 _3 => LCD_DATA8 _4 => DBG_PSRAM_DQ5) ([Input]
+        [Output])), (17, GPIO17(_0 => FSPIIO6 _2 => GMAC_PHY_RXD2 _3 => LCD_DATA9 _4 =>
+        DBG_PSRAM_DQ6) (_0 => FSPIIO6 _2 => GMAC_PHY_RXD2 _3 => LCD_DATA9 _4 =>
+        DBG_PSRAM_DQ6) ([Input] [Output])), (18, GPIO18(_0 => FSPIIO7 _2 => GMAC_PHY_RXD1
+        _3 => LCD_DATA10 _4 => DBG_PSRAM_DQ7) (_0 => FSPIIO7 _2 => GMAC_PHY_RXD1 _3 =>
+        LCD_DATA10 _4 => DBG_PSRAM_DQ7) ([Input] [Output])), (19, GPIO19(_0 => FSPIDQS _2
+        => GMAC_PHY_RXD0 _3 => LCD_DATA11 _4 => DBG_PSRAM_DQS_0) (_0 => FSPIDQS _2 =>
+        GMAC_PHY_RXD0 _3 => LCD_DATA11 _4 => DBG_PSRAM_DQS_0) ([Input] [Output])), (20,
+        GPIO20(_0 => SDIO_DATA0 _2 => FSPICLK _4 => DBG_FLASH_CK) (_0 => SDIO_DATA0 _2 =>
+        FSPICLK _4 => DBG_FLASH_CK) ([Input] [Output])), (21, GPIO21(_0 => SDIO_DATA1 _2
+        => FSPID _4 => DBG_FLASH_D) (_0 => SDIO_DATA1 _2 => FSPID _4 => DBG_FLASH_D)
+        ([Input] [Output])), (22, GPIO22(_0 => SDIO_DATA2 _2 => FSPIQ _4 => DBG_FLASH_CS)
+        (_0 => SDIO_DATA2 _2 => FSPIQ _4 => DBG_FLASH_CS) ([Input] [Output])), (23,
+        GPIO23(_0 => SDIO_DATA3 _2 => FSPICS0 _4 => DBG_FLASH_Q) (_0 => SDIO_DATA3 _2 =>
+        FSPICS0 _4 => DBG_FLASH_Q) ([Input] [Output])), (24, GPIO24(_0 => SDIO_CLK _2 =>
+        FSPIHD _4 => DBG_FLASH_WP) (_0 => SDIO_CLK _2 => FSPIHD _4 => DBG_FLASH_WP)
+        ([Input] [Output])), (25, GPIO25(_0 => SDIO_CMD _2 => FSPIWP _4 =>
+        DBG_FLASH_HOLD) (_0 => SDIO_CMD _2 => FSPIWP _4 => DBG_FLASH_HOLD) ([Input]
+        [Output])), (26, GPIO26(_0 => SPICS0) (_0 => SPICS0) ([Input] [Output])), (27,
+        GPIO27(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])), (28, GPIO28(_0 => SPIWP) (_0
+        => SPIWP) ([Input] [Output])), (30, GPIO30(_0 => SPIHD) (_0 => SPIHD) ([Input]
+        [Output])), (31, GPIO31(_0 => SPICLK) (_0 => SPICLK) ([Input] [Output])), (32,
+        GPIO32(_0 => SPID) (_0 => SPID) ([Input] [Output])), (33, GPIO33(_3 =>
+        LCD_DATA12) (_3 => LCD_DATA12) ([Input] [Output])), (34, GPIO34(_3 => LCD_DATA13)
+        (_3 => LCD_DATA13) ([Input] [Output])), (35, GPIO35(_2 => REF_GMAC_CLK _3 =>
+        LCD_DATA14 _4 => SD2_CDATA0) (_2 => REF_GMAC_CLK _3 => LCD_DATA14 _4 =>
+        SD2_CDATA0) ([Input] [Output])), (36, GPIO36(_2 => GMAC_PHY_RXDV _3 => LCD_DATA15
+        _4 => SD2_CDATA1) (_2 => GMAC_PHY_RXDV _3 => LCD_DATA15 _4 => SD2_CDATA1)
+        ([Input] [Output])), (37, GPIO37(_2 => GMAC_PHY_TXEN _3 => LCD_DATA16 _4 =>
+        SD2_CDATA2) (_2 => GMAC_PHY_TXEN _3 => LCD_DATA16 _4 => SD2_CDATA2) ([Input]
+        [Output])), (38, GPIO38(_2 => GMAC_PHY_RXD3 _3 => LCD_DATA17 _4 => SD2_CDATA3)
+        (_2 => GMAC_PHY_RXD3 _3 => LCD_DATA17 _4 => SD2_CDATA3) ([Input] [Output])), (39,
+        GPIO39(_2 => GMAC_PHY_RXD2 _3 => LCD_DATA18 _4 => SD2_CCLK) (_2 => GMAC_PHY_RXD2
+        _3 => LCD_DATA18 _4 => SD2_CCLK) ([Input] [Output])), (40, GPIO40(_2 =>
+        GMAC_PHY_RXD1 _3 => LCD_PCLK _4 => SD2_CCMD) (_2 => GMAC_PHY_RXD1 _3 => LCD_PCLK
+        _4 => SD2_CCMD) ([Input] [Output])), (42, GPIO42(_2 => GMAC_RX_CLK) (_2 =>
+        GMAC_RX_CLK) ([Input] [Output])), (43, GPIO43(_2 => GMAC_RMII_CLK _3 =>
+        LCD_H_ENABLE) (_2 => GMAC_RMII_CLK _3 => LCD_H_ENABLE) ([Input] [Output])), (44,
+        GPIO44(_2 => GMAC_PHY_TXD0 _3 => LCD_H_SYNC) (_2 => GMAC_PHY_TXD0 _3 =>
+        LCD_H_SYNC) ([Input] [Output])), (45, GPIO45(_2 => GMAC_PHY_TXD1 _3 =>
+        LCD_V_SYNC) (_2 => GMAC_PHY_TXD1 _3 => LCD_V_SYNC) ([Input] [Output])), (46,
+        GPIO46(_2 => GMAC_PHY_TXD2 _3 => CAM_DATA0) (_2 => GMAC_PHY_TXD2 _3 => CAM_DATA0)
+        ([Input] [Output])), (47, GPIO47(_2 => GMAC_PHY_TXD3 _3 => CAM_DATA1) (_2 =>
+        GMAC_PHY_TXD3 _3 => CAM_DATA1) ([Input] [Output])), (48, GPIO48(_3 => CAM_DATA2)
+        (_3 => CAM_DATA2) ([Input] [Output])), (49, GPIO49(_3 => CAM_DATA3) (_3 =>
+        CAM_DATA3) ([Input] [Output])), (50, GPIO50(_3 => CAM_DATA4) (_3 => CAM_DATA4)
+        ([Input] [Output])), (51, GPIO51(_3 => CAM_DATA5) (_3 => CAM_DATA5) ([Input]
+        [Output])), (52, GPIO52(_2 => FSPICS0 _3 => CAM_DATA6) (_2 => FSPICS0 _3 =>
+        CAM_DATA6) ([Input] [Output])), (53, GPIO53(_2 => FSPICLK _3 => CAM_DATA7) (_2 =>
+        FSPICLK _3 => CAM_DATA7) ([Input] [Output])), (54, GPIO54(_0 => MTDO _2 => FSPID
+        _3 => CAM_PCLK) (_0 => MTDO _2 => FSPID _3 => CAM_PCLK) ([Input] [Output])), (55,
+        GPIO55(_0 => MTCK _2 => FSPIQ _3 => CAM_XCLK) (_0 => MTCK _2 => FSPIQ _3 =>
+        CAM_XCLK) ([Input] [Output])), (56, GPIO56(_0 => MTDI _2 => FSPIHD _3 =>
+        CAM_V_SYNC) (_0 => MTDI _2 => FSPIHD _3 => CAM_V_SYNC) ([Input] [Output])), (57,
+        GPIO57(_0 => MTMS _2 => FSPIWP _3 => CAM_H_SYNC) (_0 => MTMS _2 => FSPIWP _3 =>
+        CAM_H_SYNC) ([Input] [Output])), (58, GPIO58() (_0 => U0TXD) ([Input] [Output])),
+        (59, GPIO59(_0 => U0RXD) () ([Input] [Output])), (60, GPIO60() () ([Input]
+        [Output])), (61, GPIO61() () ([Input] [Output]))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.
@@ -3312,7 +3494,55 @@ macro_rules! for_each_analog_function {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_analog_function!((XTAL_32K_N, GPIO0));
         _for_each_inner_analog_function!((XTAL_32K_P, GPIO1));
-        _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO0), (XTAL_32K_P, GPIO1)));
+        _for_each_inner_analog_function!((USJ_DM, GPIO33));
+        _for_each_inner_analog_function!((USJ_DP, GPIO34));
+        _for_each_inner_analog_function!((ADC1_CH0, GPIO42));
+        _for_each_inner_analog_function!((ADC1_CH1, GPIO43));
+        _for_each_inner_analog_function!((ADC1_CH2, GPIO44));
+        _for_each_inner_analog_function!((ADC1_CH3, GPIO45));
+        _for_each_inner_analog_function!((ADC1_CH4, GPIO46));
+        _for_each_inner_analog_function!((ADC1_CH5, GPIO47));
+        _for_each_inner_analog_function!((ADC1_CH6, GPIO48));
+        _for_each_inner_analog_function!((ADC1_CH7, GPIO49));
+        _for_each_inner_analog_function!((ADC2_CH0, GPIO50));
+        _for_each_inner_analog_function!((ADC2_CH1, GPIO51));
+        _for_each_inner_analog_function!((ADC2_CH2, GPIO52));
+        _for_each_inner_analog_function!((ADC2_CH3, GPIO53));
+        _for_each_inner_analog_function!((ADC2_CH4, GPIO54));
+        _for_each_inner_analog_function!((ADC2_CH5, GPIO55));
+        _for_each_inner_analog_function!((ADC2_CH6, GPIO56));
+        _for_each_inner_analog_function!((ADC2_CH7, GPIO57));
+        _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42));
+        _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43));
+        _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44));
+        _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45));
+        _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO46));
+        _for_each_inner_analog_function!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO47));
+        _for_each_inner_analog_function!(((ADC1_CH6, ADCn_CHm, 1, 6), GPIO48));
+        _for_each_inner_analog_function!(((ADC1_CH7, ADCn_CHm, 1, 7), GPIO49));
+        _for_each_inner_analog_function!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO50));
+        _for_each_inner_analog_function!(((ADC2_CH1, ADCn_CHm, 2, 1), GPIO51));
+        _for_each_inner_analog_function!(((ADC2_CH2, ADCn_CHm, 2, 2), GPIO52));
+        _for_each_inner_analog_function!(((ADC2_CH3, ADCn_CHm, 2, 3), GPIO53));
+        _for_each_inner_analog_function!(((ADC2_CH4, ADCn_CHm, 2, 4), GPIO54));
+        _for_each_inner_analog_function!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55));
+        _for_each_inner_analog_function!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56));
+        _for_each_inner_analog_function!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57));
+        _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO0), (XTAL_32K_P, GPIO1),
+        (USJ_DM, GPIO33), (USJ_DP, GPIO34), (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43),
+        (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45), (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47),
+        (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49), (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51),
+        (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53), (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55),
+        (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
+        _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42),
+        ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44),
+        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO46),
+        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO47), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO48),
+        ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO49), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO50),
+        ((ADC2_CH1, ADCn_CHm, 2, 1), GPIO51), ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO52),
+        ((ADC2_CH3, ADCn_CHm, 2, 3), GPIO53), ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO54),
+        ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55), ((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56),
+        ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -3346,7 +3576,29 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((all));
+        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5));
+        _for_each_inner_lp_function!((LP_GPIO6, GPIO6));
+        _for_each_inner_lp_function!((LP_GPIO7, GPIO7));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
+        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6));
+        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO7));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0), (LP_GPIO1, GPIO1), (LP_GPIO2,
+        GPIO2), (LP_GPIO3, GPIO3), (LP_GPIO4, GPIO4), (LP_GPIO5, GPIO5), (LP_GPIO6,
+        GPIO6), (LP_GPIO7, GPIO7))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
+        LP_GPIOn, 0), GPIO0), ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO2, LP_GPIOn, 2),
+        GPIO2), ((LP_GPIO3, LP_GPIOn, 3), GPIO3), ((LP_GPIO4, LP_GPIOn, 4), GPIO4),
+        ((LP_GPIO5, LP_GPIOn, 5), GPIO5), ((LP_GPIO6, LP_GPIOn, 6), GPIO6), ((LP_GPIO7,
+        LP_GPIOn, 7), GPIO7)));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
@@ -3384,24 +3636,296 @@ macro_rules! for_each_lp_function {
 macro_rules! for_each_iomux_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_iomux_function { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_iomux_function!((FSPIHD, GPIO8, _0));
-        _for_each_inner_iomux_function!((FSPICS0, GPIO9, _0));
-        _for_each_inner_iomux_function!((FSPID, GPIO10, _0));
+        tt) => {} } _for_each_inner_iomux_function!((LCD_DATA19, GPIO2, _3));
+        _for_each_inner_iomux_function!((LCD_DATA20, GPIO3, _3));
+        _for_each_inner_iomux_function!((LCD_DATA21, GPIO4, _3));
+        _for_each_inner_iomux_function!((LCD_DATA22, GPIO5, _3));
+        _for_each_inner_iomux_function!((LCD_DATA23, GPIO7, _3));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD0, GPIO8, _2));
+        _for_each_inner_iomux_function!((LCD_DATA0, GPIO8, _3));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO9, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD1, GPIO9, _2));
+        _for_each_inner_iomux_function!((LCD_DATA1, GPIO9, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_CK, GPIO9, _4));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO10, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD2, GPIO10, _2));
+        _for_each_inner_iomux_function!((LCD_DATA2, GPIO10, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_CS, GPIO10, _4));
+        _for_each_inner_iomux_function!((FSPID, GPIO11, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD3, GPIO11, _2));
+        _for_each_inner_iomux_function!((LCD_DATA3, GPIO11, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_D, GPIO11, _4));
         _for_each_inner_iomux_function!((FSPICLK, GPIO12, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXEN, GPIO12, _2));
+        _for_each_inner_iomux_function!((LCD_DATA4, GPIO12, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_Q, GPIO12, _4));
         _for_each_inner_iomux_function!((FSPIQ, GPIO13, _0));
+        _for_each_inner_iomux_function!((GMAC_RMII_CLK, GPIO13, _2));
+        _for_each_inner_iomux_function!((LCD_DATA5, GPIO13, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_WP, GPIO13, _4));
         _for_each_inner_iomux_function!((FSPIWP, GPIO14, _0));
+        _for_each_inner_iomux_function!((GMAC_RX_CLK, GPIO14, _2));
+        _for_each_inner_iomux_function!((LCD_DATA6, GPIO14, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_HOLD, GPIO14, _4));
+        _for_each_inner_iomux_function!((FSPIIO4, GPIO15, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXDV, GPIO15, _2));
+        _for_each_inner_iomux_function!((LCD_DATA7, GPIO15, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQ4, GPIO15, _4));
+        _for_each_inner_iomux_function!((FSPIIO5, GPIO16, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD3, GPIO16, _2));
+        _for_each_inner_iomux_function!((LCD_DATA8, GPIO16, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQ5, GPIO16, _4));
+        _for_each_inner_iomux_function!((FSPIIO6, GPIO17, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD2, GPIO17, _2));
+        _for_each_inner_iomux_function!((LCD_DATA9, GPIO17, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQ6, GPIO17, _4));
+        _for_each_inner_iomux_function!((FSPIIO7, GPIO18, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD1, GPIO18, _2));
+        _for_each_inner_iomux_function!((LCD_DATA10, GPIO18, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQ7, GPIO18, _4));
+        _for_each_inner_iomux_function!((FSPIDQS, GPIO19, _0));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD0, GPIO19, _2));
+        _for_each_inner_iomux_function!((LCD_DATA11, GPIO19, _3));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQS_0, GPIO19, _4));
+        _for_each_inner_iomux_function!((SDIO_DATA0, GPIO20, _0));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO20, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_CK, GPIO20, _4));
+        _for_each_inner_iomux_function!((SDIO_DATA1, GPIO21, _0));
+        _for_each_inner_iomux_function!((FSPID, GPIO21, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_D, GPIO21, _4));
+        _for_each_inner_iomux_function!((SDIO_DATA2, GPIO22, _0));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO22, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_CS, GPIO22, _4));
+        _for_each_inner_iomux_function!((SDIO_DATA3, GPIO23, _0));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO23, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_Q, GPIO23, _4));
+        _for_each_inner_iomux_function!((SDIO_CLK, GPIO24, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO24, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_WP, GPIO24, _4));
+        _for_each_inner_iomux_function!((SDIO_CMD, GPIO25, _0));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO25, _2));
+        _for_each_inner_iomux_function!((DBG_FLASH_HOLD, GPIO25, _4));
+        _for_each_inner_iomux_function!((SPICS0, GPIO26, _0));
+        _for_each_inner_iomux_function!((SPIQ, GPIO27, _0));
+        _for_each_inner_iomux_function!((SPIWP, GPIO28, _0));
+        _for_each_inner_iomux_function!((SPIHD, GPIO30, _0));
+        _for_each_inner_iomux_function!((SPICLK, GPIO31, _0));
+        _for_each_inner_iomux_function!((SPID, GPIO32, _0));
+        _for_each_inner_iomux_function!((LCD_DATA12, GPIO33, _3));
+        _for_each_inner_iomux_function!((LCD_DATA13, GPIO34, _3));
+        _for_each_inner_iomux_function!((REF_GMAC_CLK, GPIO35, _2));
+        _for_each_inner_iomux_function!((LCD_DATA14, GPIO35, _3));
+        _for_each_inner_iomux_function!((SD2_CDATA0, GPIO35, _4));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXDV, GPIO36, _2));
+        _for_each_inner_iomux_function!((LCD_DATA15, GPIO36, _3));
+        _for_each_inner_iomux_function!((SD2_CDATA1, GPIO36, _4));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXEN, GPIO37, _2));
+        _for_each_inner_iomux_function!((LCD_DATA16, GPIO37, _3));
+        _for_each_inner_iomux_function!((SD2_CDATA2, GPIO37, _4));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD3, GPIO38, _2));
+        _for_each_inner_iomux_function!((LCD_DATA17, GPIO38, _3));
+        _for_each_inner_iomux_function!((SD2_CDATA3, GPIO38, _4));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD2, GPIO39, _2));
+        _for_each_inner_iomux_function!((LCD_DATA18, GPIO39, _3));
+        _for_each_inner_iomux_function!((SD2_CCLK, GPIO39, _4));
+        _for_each_inner_iomux_function!((GMAC_PHY_RXD1, GPIO40, _2));
+        _for_each_inner_iomux_function!((LCD_PCLK, GPIO40, _3));
+        _for_each_inner_iomux_function!((SD2_CCMD, GPIO40, _4));
+        _for_each_inner_iomux_function!((GMAC_RX_CLK, GPIO42, _2));
+        _for_each_inner_iomux_function!((GMAC_RMII_CLK, GPIO43, _2));
+        _for_each_inner_iomux_function!((LCD_H_ENABLE, GPIO43, _3));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD0, GPIO44, _2));
+        _for_each_inner_iomux_function!((LCD_H_SYNC, GPIO44, _3));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD1, GPIO45, _2));
+        _for_each_inner_iomux_function!((LCD_V_SYNC, GPIO45, _3));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD2, GPIO46, _2));
+        _for_each_inner_iomux_function!((CAM_DATA0, GPIO46, _3));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXD3, GPIO47, _2));
+        _for_each_inner_iomux_function!((CAM_DATA1, GPIO47, _3));
+        _for_each_inner_iomux_function!((CAM_DATA2, GPIO48, _3));
+        _for_each_inner_iomux_function!((CAM_DATA3, GPIO49, _3));
+        _for_each_inner_iomux_function!((CAM_DATA4, GPIO50, _3));
+        _for_each_inner_iomux_function!((CAM_DATA5, GPIO51, _3));
+        _for_each_inner_iomux_function!((FSPICS0, GPIO52, _2));
+        _for_each_inner_iomux_function!((CAM_DATA6, GPIO52, _3));
+        _for_each_inner_iomux_function!((FSPICLK, GPIO53, _2));
+        _for_each_inner_iomux_function!((CAM_DATA7, GPIO53, _3));
         _for_each_inner_iomux_function!((MTDO, GPIO54, _0));
+        _for_each_inner_iomux_function!((FSPID, GPIO54, _2));
+        _for_each_inner_iomux_function!((CAM_PCLK, GPIO54, _3));
         _for_each_inner_iomux_function!((MTCK, GPIO55, _0));
+        _for_each_inner_iomux_function!((FSPIQ, GPIO55, _2));
+        _for_each_inner_iomux_function!((CAM_XCLK, GPIO55, _3));
         _for_each_inner_iomux_function!((MTDI, GPIO56, _0));
+        _for_each_inner_iomux_function!((FSPIHD, GPIO56, _2));
+        _for_each_inner_iomux_function!((CAM_V_SYNC, GPIO56, _3));
         _for_each_inner_iomux_function!((MTMS, GPIO57, _0));
+        _for_each_inner_iomux_function!((FSPIWP, GPIO57, _2));
+        _for_each_inner_iomux_function!((CAM_H_SYNC, GPIO57, _3));
         _for_each_inner_iomux_function!((U0TXD, GPIO58, _0));
         _for_each_inner_iomux_function!((U0RXD, GPIO59, _0));
-        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO9, _0));
-        _for_each_inner_iomux_function!((all(FSPIHD, GPIO8, _0), (FSPICS0, GPIO9, _0),
-        (FSPID, GPIO10, _0), (FSPICLK, GPIO12, _0), (FSPIQ, GPIO13, _0), (FSPIWP, GPIO14,
-        _0), (MTDO, GPIO54, _0), (MTCK, GPIO55, _0), (MTDI, GPIO56, _0), (MTMS, GPIO57,
-        _0), (U0TXD, GPIO58, _0), (U0RXD, GPIO59, _0)));
-        _for_each_inner_iomux_function!((FSPICSn((FSPICS0, FSPICSn, 0), GPIO9, _0)));
+        _for_each_inner_iomux_function!(((LCD_DATA19, LCD_DATAn, 19), GPIO2, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA20, LCD_DATAn, 20), GPIO3, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA21, LCD_DATAn, 21), GPIO4, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA22, LCD_DATAn, 22), GPIO5, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA23, LCD_DATAn, 23), GPIO7, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA0, LCD_DATAn, 0), GPIO8, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA1, LCD_DATAn, 1), GPIO9, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA2, LCD_DATAn, 2), GPIO10, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA3, LCD_DATAn, 3), GPIO11, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA4, LCD_DATAn, 4), GPIO12, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA5, LCD_DATAn, 5), GPIO13, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA6, LCD_DATAn, 6), GPIO14, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA7, LCD_DATAn, 7), GPIO15, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA8, LCD_DATAn, 8), GPIO16, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA9, LCD_DATAn, 9), GPIO17, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA10, LCD_DATAn, 10), GPIO18, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA11, LCD_DATAn, 11), GPIO19, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA12, LCD_DATAn, 12), GPIO33, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA13, LCD_DATAn, 13), GPIO34, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA14, LCD_DATAn, 14), GPIO35, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA15, LCD_DATAn, 15), GPIO36, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA16, LCD_DATAn, 16), GPIO37, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA17, LCD_DATAn, 17), GPIO38, _3));
+        _for_each_inner_iomux_function!(((LCD_DATA18, LCD_DATAn, 18), GPIO39, _3));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD0, GMAC_PHY_TXDn, 0), GPIO8, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD1, GMAC_PHY_TXDn, 1), GPIO9, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD2, GMAC_PHY_TXDn, 2), GPIO10, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD3, GMAC_PHY_TXDn, 3), GPIO11, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD0, GMAC_PHY_TXDn, 0), GPIO44, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD1, GMAC_PHY_TXDn, 1), GPIO45, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD2, GMAC_PHY_TXDn, 2), GPIO46, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_TXD3, GMAC_PHY_TXDn, 3), GPIO47, _2));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO10, _0));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO23, _2));
+        _for_each_inner_iomux_function!(((FSPICS0, FSPICSn, 0), GPIO52, _2));
+        _for_each_inner_iomux_function!(((FSPIIO4, FSPIIOn, 4), GPIO15, _0));
+        _for_each_inner_iomux_function!(((FSPIIO5, FSPIIOn, 5), GPIO16, _0));
+        _for_each_inner_iomux_function!(((FSPIIO6, FSPIIOn, 6), GPIO17, _0));
+        _for_each_inner_iomux_function!(((FSPIIO7, FSPIIOn, 7), GPIO18, _0));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4), GPIO15, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO16, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ6, DBG_PSRAM_DQn, 6), GPIO17, _4));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7), GPIO18, _4));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD3, GMAC_PHY_RXDn, 3), GPIO16, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD2, GMAC_PHY_RXDn, 2), GPIO17, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD1, GMAC_PHY_RXDn, 1), GPIO18, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD0, GMAC_PHY_RXDn, 0), GPIO19, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD3, GMAC_PHY_RXDn, 3), GPIO38, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD2, GMAC_PHY_RXDn, 2), GPIO39, _2));
+        _for_each_inner_iomux_function!(((GMAC_PHY_RXD1, GMAC_PHY_RXDn, 1), GPIO40, _2));
+        _for_each_inner_iomux_function!(((DBG_PSRAM_DQS_0, DBG_PSRAM_DQS_n, 0), GPIO19,
+        _4)); _for_each_inner_iomux_function!(((SDIO_DATA0, SDIO_DATAn, 0), GPIO20, _0));
+        _for_each_inner_iomux_function!(((SDIO_DATA1, SDIO_DATAn, 1), GPIO21, _0));
+        _for_each_inner_iomux_function!(((SDIO_DATA2, SDIO_DATAn, 2), GPIO22, _0));
+        _for_each_inner_iomux_function!(((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0));
+        _for_each_inner_iomux_function!(((SPICS0, SPICSn, 0), GPIO26, _0));
+        _for_each_inner_iomux_function!(((SD2_CDATA0, SDn_CDATAm, 2, 0), GPIO35, _4));
+        _for_each_inner_iomux_function!(((SD2_CDATA1, SDn_CDATAm, 2, 1), GPIO36, _4));
+        _for_each_inner_iomux_function!(((SD2_CDATA2, SDn_CDATAm, 2, 2), GPIO37, _4));
+        _for_each_inner_iomux_function!(((SD2_CDATA3, SDn_CDATAm, 2, 3), GPIO38, _4));
+        _for_each_inner_iomux_function!(((SD2_CCLK, SDn_CCLK, 2), GPIO39, _4));
+        _for_each_inner_iomux_function!(((SD2_CCMD, SDn_CCMD, 2), GPIO40, _4));
+        _for_each_inner_iomux_function!(((CAM_DATA0, CAM_DATAn, 0), GPIO46, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA1, CAM_DATAn, 1), GPIO47, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA2, CAM_DATAn, 2), GPIO48, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA3, CAM_DATAn, 3), GPIO49, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA4, CAM_DATAn, 4), GPIO50, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA5, CAM_DATAn, 5), GPIO51, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA6, CAM_DATAn, 6), GPIO52, _3));
+        _for_each_inner_iomux_function!(((CAM_DATA7, CAM_DATAn, 7), GPIO53, _3));
+        _for_each_inner_iomux_function!((all(LCD_DATA19, GPIO2, _3), (LCD_DATA20, GPIO3,
+        _3), (LCD_DATA21, GPIO4, _3), (LCD_DATA22, GPIO5, _3), (LCD_DATA23, GPIO7, _3),
+        (GMAC_PHY_TXD0, GPIO8, _2), (LCD_DATA0, GPIO8, _3), (FSPIHD, GPIO9, _0),
+        (GMAC_PHY_TXD1, GPIO9, _2), (LCD_DATA1, GPIO9, _3), (DBG_PSRAM_CK, GPIO9, _4),
+        (FSPICS0, GPIO10, _0), (GMAC_PHY_TXD2, GPIO10, _2), (LCD_DATA2, GPIO10, _3),
+        (DBG_PSRAM_CS, GPIO10, _4), (FSPID, GPIO11, _0), (GMAC_PHY_TXD3, GPIO11, _2),
+        (LCD_DATA3, GPIO11, _3), (DBG_PSRAM_D, GPIO11, _4), (FSPICLK, GPIO12, _0),
+        (GMAC_PHY_TXEN, GPIO12, _2), (LCD_DATA4, GPIO12, _3), (DBG_PSRAM_Q, GPIO12, _4),
+        (FSPIQ, GPIO13, _0), (GMAC_RMII_CLK, GPIO13, _2), (LCD_DATA5, GPIO13, _3),
+        (DBG_PSRAM_WP, GPIO13, _4), (FSPIWP, GPIO14, _0), (GMAC_RX_CLK, GPIO14, _2),
+        (LCD_DATA6, GPIO14, _3), (DBG_PSRAM_HOLD, GPIO14, _4), (FSPIIO4, GPIO15, _0),
+        (GMAC_PHY_RXDV, GPIO15, _2), (LCD_DATA7, GPIO15, _3), (DBG_PSRAM_DQ4, GPIO15,
+        _4), (FSPIIO5, GPIO16, _0), (GMAC_PHY_RXD3, GPIO16, _2), (LCD_DATA8, GPIO16, _3),
+        (DBG_PSRAM_DQ5, GPIO16, _4), (FSPIIO6, GPIO17, _0), (GMAC_PHY_RXD2, GPIO17, _2),
+        (LCD_DATA9, GPIO17, _3), (DBG_PSRAM_DQ6, GPIO17, _4), (FSPIIO7, GPIO18, _0),
+        (GMAC_PHY_RXD1, GPIO18, _2), (LCD_DATA10, GPIO18, _3), (DBG_PSRAM_DQ7, GPIO18,
+        _4), (FSPIDQS, GPIO19, _0), (GMAC_PHY_RXD0, GPIO19, _2), (LCD_DATA11, GPIO19,
+        _3), (DBG_PSRAM_DQS_0, GPIO19, _4), (SDIO_DATA0, GPIO20, _0), (FSPICLK, GPIO20,
+        _2), (DBG_FLASH_CK, GPIO20, _4), (SDIO_DATA1, GPIO21, _0), (FSPID, GPIO21, _2),
+        (DBG_FLASH_D, GPIO21, _4), (SDIO_DATA2, GPIO22, _0), (FSPIQ, GPIO22, _2),
+        (DBG_FLASH_CS, GPIO22, _4), (SDIO_DATA3, GPIO23, _0), (FSPICS0, GPIO23, _2),
+        (DBG_FLASH_Q, GPIO23, _4), (SDIO_CLK, GPIO24, _0), (FSPIHD, GPIO24, _2),
+        (DBG_FLASH_WP, GPIO24, _4), (SDIO_CMD, GPIO25, _0), (FSPIWP, GPIO25, _2),
+        (DBG_FLASH_HOLD, GPIO25, _4), (SPICS0, GPIO26, _0), (SPIQ, GPIO27, _0), (SPIWP,
+        GPIO28, _0), (SPIHD, GPIO30, _0), (SPICLK, GPIO31, _0), (SPID, GPIO32, _0),
+        (LCD_DATA12, GPIO33, _3), (LCD_DATA13, GPIO34, _3), (REF_GMAC_CLK, GPIO35, _2),
+        (LCD_DATA14, GPIO35, _3), (SD2_CDATA0, GPIO35, _4), (GMAC_PHY_RXDV, GPIO36, _2),
+        (LCD_DATA15, GPIO36, _3), (SD2_CDATA1, GPIO36, _4), (GMAC_PHY_TXEN, GPIO37, _2),
+        (LCD_DATA16, GPIO37, _3), (SD2_CDATA2, GPIO37, _4), (GMAC_PHY_RXD3, GPIO38, _2),
+        (LCD_DATA17, GPIO38, _3), (SD2_CDATA3, GPIO38, _4), (GMAC_PHY_RXD2, GPIO39, _2),
+        (LCD_DATA18, GPIO39, _3), (SD2_CCLK, GPIO39, _4), (GMAC_PHY_RXD1, GPIO40, _2),
+        (LCD_PCLK, GPIO40, _3), (SD2_CCMD, GPIO40, _4), (GMAC_RX_CLK, GPIO42, _2),
+        (GMAC_RMII_CLK, GPIO43, _2), (LCD_H_ENABLE, GPIO43, _3), (GMAC_PHY_TXD0, GPIO44,
+        _2), (LCD_H_SYNC, GPIO44, _3), (GMAC_PHY_TXD1, GPIO45, _2), (LCD_V_SYNC, GPIO45,
+        _3), (GMAC_PHY_TXD2, GPIO46, _2), (CAM_DATA0, GPIO46, _3), (GMAC_PHY_TXD3,
+        GPIO47, _2), (CAM_DATA1, GPIO47, _3), (CAM_DATA2, GPIO48, _3), (CAM_DATA3,
+        GPIO49, _3), (CAM_DATA4, GPIO50, _3), (CAM_DATA5, GPIO51, _3), (FSPICS0, GPIO52,
+        _2), (CAM_DATA6, GPIO52, _3), (FSPICLK, GPIO53, _2), (CAM_DATA7, GPIO53, _3),
+        (MTDO, GPIO54, _0), (FSPID, GPIO54, _2), (CAM_PCLK, GPIO54, _3), (MTCK, GPIO55,
+        _0), (FSPIQ, GPIO55, _2), (CAM_XCLK, GPIO55, _3), (MTDI, GPIO56, _0), (FSPIHD,
+        GPIO56, _2), (CAM_V_SYNC, GPIO56, _3), (MTMS, GPIO57, _0), (FSPIWP, GPIO57, _2),
+        (CAM_H_SYNC, GPIO57, _3), (U0TXD, GPIO58, _0), (U0RXD, GPIO59, _0)));
+        _for_each_inner_iomux_function!((LCD_DATAn((LCD_DATA19, LCD_DATAn, 19), GPIO2,
+        _3), ((LCD_DATA20, LCD_DATAn, 20), GPIO3, _3), ((LCD_DATA21, LCD_DATAn, 21),
+        GPIO4, _3), ((LCD_DATA22, LCD_DATAn, 22), GPIO5, _3), ((LCD_DATA23, LCD_DATAn,
+        23), GPIO7, _3), ((LCD_DATA0, LCD_DATAn, 0), GPIO8, _3), ((LCD_DATA1, LCD_DATAn,
+        1), GPIO9, _3), ((LCD_DATA2, LCD_DATAn, 2), GPIO10, _3), ((LCD_DATA3, LCD_DATAn,
+        3), GPIO11, _3), ((LCD_DATA4, LCD_DATAn, 4), GPIO12, _3), ((LCD_DATA5, LCD_DATAn,
+        5), GPIO13, _3), ((LCD_DATA6, LCD_DATAn, 6), GPIO14, _3), ((LCD_DATA7, LCD_DATAn,
+        7), GPIO15, _3), ((LCD_DATA8, LCD_DATAn, 8), GPIO16, _3), ((LCD_DATA9, LCD_DATAn,
+        9), GPIO17, _3), ((LCD_DATA10, LCD_DATAn, 10), GPIO18, _3), ((LCD_DATA11,
+        LCD_DATAn, 11), GPIO19, _3), ((LCD_DATA12, LCD_DATAn, 12), GPIO33, _3),
+        ((LCD_DATA13, LCD_DATAn, 13), GPIO34, _3), ((LCD_DATA14, LCD_DATAn, 14), GPIO35,
+        _3), ((LCD_DATA15, LCD_DATAn, 15), GPIO36, _3), ((LCD_DATA16, LCD_DATAn, 16),
+        GPIO37, _3), ((LCD_DATA17, LCD_DATAn, 17), GPIO38, _3), ((LCD_DATA18, LCD_DATAn,
+        18), GPIO39, _3)));
+        _for_each_inner_iomux_function!((GMAC_PHY_TXDn((GMAC_PHY_TXD0, GMAC_PHY_TXDn, 0),
+        GPIO8, _2), ((GMAC_PHY_TXD1, GMAC_PHY_TXDn, 1), GPIO9, _2), ((GMAC_PHY_TXD2,
+        GMAC_PHY_TXDn, 2), GPIO10, _2), ((GMAC_PHY_TXD3, GMAC_PHY_TXDn, 3), GPIO11, _2),
+        ((GMAC_PHY_TXD0, GMAC_PHY_TXDn, 0), GPIO44, _2), ((GMAC_PHY_TXD1, GMAC_PHY_TXDn,
+        1), GPIO45, _2), ((GMAC_PHY_TXD2, GMAC_PHY_TXDn, 2), GPIO46, _2),
+        ((GMAC_PHY_TXD3, GMAC_PHY_TXDn, 3), GPIO47, _2)));
+        _for_each_inner_iomux_function!((FSPICSn((FSPICS0, FSPICSn, 0), GPIO10, _0),
+        ((FSPICS0, FSPICSn, 0), GPIO23, _2), ((FSPICS0, FSPICSn, 0), GPIO52, _2)));
+        _for_each_inner_iomux_function!((FSPIIOn((FSPIIO4, FSPIIOn, 4), GPIO15, _0),
+        ((FSPIIO5, FSPIIOn, 5), GPIO16, _0), ((FSPIIO6, FSPIIOn, 6), GPIO17, _0),
+        ((FSPIIO7, FSPIIOn, 7), GPIO18, _0)));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQn((DBG_PSRAM_DQ4, DBG_PSRAM_DQn, 4),
+        GPIO15, _4), ((DBG_PSRAM_DQ5, DBG_PSRAM_DQn, 5), GPIO16, _4), ((DBG_PSRAM_DQ6,
+        DBG_PSRAM_DQn, 6), GPIO17, _4), ((DBG_PSRAM_DQ7, DBG_PSRAM_DQn, 7), GPIO18,
+        _4))); _for_each_inner_iomux_function!((GMAC_PHY_RXDn((GMAC_PHY_RXD3,
+        GMAC_PHY_RXDn, 3), GPIO16, _2), ((GMAC_PHY_RXD2, GMAC_PHY_RXDn, 2), GPIO17, _2),
+        ((GMAC_PHY_RXD1, GMAC_PHY_RXDn, 1), GPIO18, _2), ((GMAC_PHY_RXD0, GMAC_PHY_RXDn,
+        0), GPIO19, _2), ((GMAC_PHY_RXD3, GMAC_PHY_RXDn, 3), GPIO38, _2),
+        ((GMAC_PHY_RXD2, GMAC_PHY_RXDn, 2), GPIO39, _2), ((GMAC_PHY_RXD1, GMAC_PHY_RXDn,
+        1), GPIO40, _2)));
+        _for_each_inner_iomux_function!((DBG_PSRAM_DQS_n((DBG_PSRAM_DQS_0,
+        DBG_PSRAM_DQS_n, 0), GPIO19, _4)));
+        _for_each_inner_iomux_function!((SDIO_DATAn((SDIO_DATA0, SDIO_DATAn, 0), GPIO20,
+        _0), ((SDIO_DATA1, SDIO_DATAn, 1), GPIO21, _0), ((SDIO_DATA2, SDIO_DATAn, 2),
+        GPIO22, _0), ((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0)));
+        _for_each_inner_iomux_function!((SPICSn((SPICS0, SPICSn, 0), GPIO26, _0)));
+        _for_each_inner_iomux_function!((SDn_CDATAm((SD2_CDATA0, SDn_CDATAm, 2, 0),
+        GPIO35, _4), ((SD2_CDATA1, SDn_CDATAm, 2, 1), GPIO36, _4), ((SD2_CDATA2,
+        SDn_CDATAm, 2, 2), GPIO37, _4), ((SD2_CDATA3, SDn_CDATAm, 2, 3), GPIO38, _4)));
+        _for_each_inner_iomux_function!((SDn_CCLK((SD2_CCLK, SDn_CCLK, 2), GPIO39, _4)));
+        _for_each_inner_iomux_function!((SDn_CCMD((SD2_CCMD, SDn_CCMD, 2), GPIO40, _4)));
+        _for_each_inner_iomux_function!((CAM_DATAn((CAM_DATA0, CAM_DATAn, 0), GPIO46,
+        _3), ((CAM_DATA1, CAM_DATAn, 1), GPIO47, _3), ((CAM_DATA2, CAM_DATAn, 2), GPIO48,
+        _3), ((CAM_DATA3, CAM_DATAn, 3), GPIO49, _3), ((CAM_DATA4, CAM_DATAn, 4), GPIO50,
+        _3), ((CAM_DATA5, CAM_DATAn, 5), GPIO51, _3), ((CAM_DATA6, CAM_DATAn, 6), GPIO52,
+        _3), ((CAM_DATA7, CAM_DATAn, 7), GPIO53, _3)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
@@ -3462,6 +3986,99 @@ macro_rules! define_io_mux_signals {
             MTCK,
             MTDI,
             MTMS,
+            SDIO_DATA0,
+            SDIO_DATA1,
+            SDIO_DATA2,
+            SDIO_DATA3,
+            SDIO_CLK,
+            SDIO_CMD,
+            FSPIIO4,
+            FSPIIO5,
+            FSPIIO6,
+            FSPIIO7,
+            FSPIDQS,
+            SPICS0,
+            SPIQ,
+            SPIWP,
+            SPIHD,
+            SPICLK,
+            SPID,
+            GMAC_PHY_TXD0,
+            GMAC_PHY_TXD1,
+            GMAC_PHY_TXD2,
+            GMAC_PHY_TXD3,
+            GMAC_PHY_TXEN,
+            GMAC_RMII_CLK,
+            GMAC_RX_CLK,
+            GMAC_PHY_RXDV,
+            GMAC_PHY_RXD0,
+            GMAC_PHY_RXD1,
+            GMAC_PHY_RXD2,
+            GMAC_PHY_RXD3,
+            REF_GMAC_CLK,
+            LCD_DATA0,
+            LCD_DATA1,
+            LCD_DATA2,
+            LCD_DATA3,
+            LCD_DATA4,
+            LCD_DATA5,
+            LCD_DATA6,
+            LCD_DATA7,
+            LCD_DATA8,
+            LCD_DATA9,
+            LCD_DATA10,
+            LCD_DATA11,
+            LCD_DATA12,
+            LCD_DATA13,
+            LCD_DATA14,
+            LCD_DATA15,
+            LCD_DATA16,
+            LCD_DATA17,
+            LCD_DATA18,
+            LCD_DATA19,
+            LCD_DATA20,
+            LCD_DATA21,
+            LCD_DATA22,
+            LCD_DATA23,
+            LCD_PCLK,
+            LCD_H_ENABLE,
+            LCD_H_SYNC,
+            LCD_V_SYNC,
+            CAM_DATA0,
+            CAM_DATA1,
+            CAM_DATA2,
+            CAM_DATA3,
+            CAM_DATA4,
+            CAM_DATA5,
+            CAM_DATA6,
+            CAM_DATA7,
+            CAM_PCLK,
+            CAM_XCLK,
+            CAM_V_SYNC,
+            CAM_H_SYNC,
+            SD2_CDATA0,
+            SD2_CDATA1,
+            SD2_CDATA2,
+            SD2_CDATA3,
+            SD2_CCLK,
+            SD2_CCMD,
+            DBG_PSRAM_CK,
+            DBG_PSRAM_CS,
+            DBG_PSRAM_D,
+            DBG_PSRAM_Q,
+            DBG_PSRAM_WP,
+            DBG_PSRAM_HOLD,
+            DBG_PSRAM_DQ4,
+            DBG_PSRAM_DQ5,
+            DBG_PSRAM_DQ6,
+            DBG_PSRAM_DQ7,
+            DBG_PSRAM_DQS_0,
+            DBG_FLASH_CK,
+            DBG_FLASH_D,
+            DBG_FLASH_CS,
+            DBG_FLASH_Q,
+            DBG_FLASH_WP,
+            DBG_FLASH_HOLD,
         }
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[derive(Debug, PartialEq, Copy, Clone)]
@@ -3514,6 +4131,99 @@ macro_rules! define_io_mux_signals {
             MTCK,
             MTDI,
             MTMS,
+            SDIO_DATA0,
+            SDIO_DATA1,
+            SDIO_DATA2,
+            SDIO_DATA3,
+            SDIO_CLK,
+            SDIO_CMD,
+            FSPIIO4,
+            FSPIIO5,
+            FSPIIO6,
+            FSPIIO7,
+            FSPIDQS,
+            SPICS0,
+            SPIQ,
+            SPIWP,
+            SPIHD,
+            SPICLK,
+            SPID,
+            GMAC_PHY_TXD0,
+            GMAC_PHY_TXD1,
+            GMAC_PHY_TXD2,
+            GMAC_PHY_TXD3,
+            GMAC_PHY_TXEN,
+            GMAC_RMII_CLK,
+            GMAC_RX_CLK,
+            GMAC_PHY_RXDV,
+            GMAC_PHY_RXD0,
+            GMAC_PHY_RXD1,
+            GMAC_PHY_RXD2,
+            GMAC_PHY_RXD3,
+            REF_GMAC_CLK,
+            LCD_DATA0,
+            LCD_DATA1,
+            LCD_DATA2,
+            LCD_DATA3,
+            LCD_DATA4,
+            LCD_DATA5,
+            LCD_DATA6,
+            LCD_DATA7,
+            LCD_DATA8,
+            LCD_DATA9,
+            LCD_DATA10,
+            LCD_DATA11,
+            LCD_DATA12,
+            LCD_DATA13,
+            LCD_DATA14,
+            LCD_DATA15,
+            LCD_DATA16,
+            LCD_DATA17,
+            LCD_DATA18,
+            LCD_DATA19,
+            LCD_DATA20,
+            LCD_DATA21,
+            LCD_DATA22,
+            LCD_DATA23,
+            LCD_PCLK,
+            LCD_H_ENABLE,
+            LCD_H_SYNC,
+            LCD_V_SYNC,
+            CAM_DATA0,
+            CAM_DATA1,
+            CAM_DATA2,
+            CAM_DATA3,
+            CAM_DATA4,
+            CAM_DATA5,
+            CAM_DATA6,
+            CAM_DATA7,
+            CAM_PCLK,
+            CAM_XCLK,
+            CAM_V_SYNC,
+            CAM_H_SYNC,
+            SD2_CDATA0,
+            SD2_CDATA1,
+            SD2_CDATA2,
+            SD2_CDATA3,
+            SD2_CCLK,
+            SD2_CCMD,
+            DBG_PSRAM_CK,
+            DBG_PSRAM_CS,
+            DBG_PSRAM_D,
+            DBG_PSRAM_Q,
+            DBG_PSRAM_WP,
+            DBG_PSRAM_HOLD,
+            DBG_PSRAM_DQ4,
+            DBG_PSRAM_DQ5,
+            DBG_PSRAM_DQ6,
+            DBG_PSRAM_DQ7,
+            DBG_PSRAM_DQS_0,
+            DBG_FLASH_CK,
+            DBG_FLASH_D,
+            DBG_FLASH_CS,
+            DBG_FLASH_Q,
+            DBG_FLASH_WP,
+            DBG_FLASH_HOLD,
         }
     };
 }

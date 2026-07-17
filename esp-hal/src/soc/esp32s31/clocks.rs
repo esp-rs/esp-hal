@@ -261,7 +261,9 @@ pll_gate!(enable_pll_f120m_impl, ref_120m_ctrl0, ref_120m_clk_en);
 pll_gate!(enable_pll_f160m_impl, ref_160m_ctrl0, ref_160m_clk_en);
 pll_gate!(enable_pll_f240m_impl, ref_240m_ctrl0, ref_240m_clk_en);
 
-fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn enable_cpu_root_clk_impl(_clocks: &mut ClockTree, en: bool) {
     hp_alive_sys()
@@ -285,7 +287,9 @@ fn configure_cpu_root_clk_impl(
     update_bus_clocks();
 }
 
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, new: CpuClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -304,7 +308,9 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
     ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
 }
 
-fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn configure_ahb_clk_impl(_clocks: &mut ClockTree, _old: Option<AhbClkConfig>, new: AhbClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -317,7 +323,9 @@ fn configure_ahb_clk_impl(_clocks: &mut ClockTree, _old: Option<AhbClkConfig>, n
     update_bus_clocks();
 }
 
-fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, new: ApbClkConfig) {
     HP_SYS_CLKRST::regs()
@@ -330,7 +338,9 @@ fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, n
     update_bus_clocks();
 }
 
-fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn configure_lp_fast_clk_impl(
     _clocks: &mut ClockTree,
@@ -347,7 +357,9 @@ fn configure_lp_fast_clk_impl(
         });
 }
 
-fn enable_lp_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_lp_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
 
 fn configure_lp_slow_clk_impl(
     _clocks: &mut ClockTree,
@@ -388,53 +400,91 @@ fn configure_timg_calibration_clock_impl(
         });
 }
 
+impl I2cInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do here
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old: Option<I2cFunctionClockConfig>,
+        new: I2cFunctionClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs().i2c0_ctrl0().modify(|_, w| unsafe {
+            w.i2c0_clk_src_sel().bit(matches!(
+                new.sclk(),
+                I2cFunctionClockSclk::RcFast
+            ));
+            w.i2c0_clk_div_num().bits(new.div_num() as u8);
+            w.i2c0_clk_div_numerator().bits(0);
+            w.i2c0_clk_div_denominator().bits(0)
+        });
+    }
+}
+
 impl SpiInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do here
+    }
     fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<SpiFunctionClockConfig>,
         _new: SpiFunctionClockConfig,
     ) {
+        // TODO: Configure the GPSPI source and divider when SPI support is enabled.
     }
 }
 
 impl TimgInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // TODO: Control the selected timer's function-clock gate.
+    }
     fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<TimgFunctionClockConfig>,
         _new: TimgFunctionClockConfig,
     ) {
+        // TODO: Configure the selected timer's function-clock source.
     }
 
-    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // TODO: Control the selected timer group's watchdog-clock gate.
+    }
     fn configure_wdt_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<TimgWdtClockConfig>,
         _new: TimgWdtClockConfig,
     ) {
+        // TODO: Configure the selected timer group's watchdog-clock source.
     }
 }
 
 impl UartInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do here
+    }
     fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<UartFunctionClockConfig>,
         _new: UartFunctionClockConfig,
     ) {
+        // TODO: Configure the UART source and divider when UART support is enabled.
     }
 
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {}
+    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do here
+    }
     fn configure_baud_rate_generator_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<UartBaudRateGeneratorConfig>,
         _new: UartBaudRateGeneratorConfig,
     ) {
+        // Nothing to do here
     }
 }

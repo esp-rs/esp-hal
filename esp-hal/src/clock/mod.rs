@@ -493,29 +493,11 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     const SLOW_CLK_SRC_CAL_CYCLES: u32 = 16;
     let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
-    cfg_select! {
-        esp32s31 => {
-            use crate::peripherals::LP_SYS;
-        }
-        soc_has_lp_aon => {
-            use crate::peripherals::LP_AON;
-        }
-        _ => {
-            use crate::peripherals::LPWR as LP_AON;
-        }
-    }
-
-    cfg_select! {
-        esp32s31 => {
-            let reg = LP_SYS::regs().lp_store(1);
-        }
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
+    let reg = cfg_select! {
+        esp32s31 => LP_AON::regs().lp_store(1),
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
     reg.write(|w| unsafe { w.bits(cal_val) });
 }
@@ -557,17 +539,11 @@ pub fn xtal_clock() -> Rate {
 ///
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
 pub(crate) fn rtc_slow_cal_period() -> u32 {
-    cfg_select! {
-        esp32s31 => {
-            let reg = LP_AON::regs().lp_store(1);
-        }
-        esp32p4 => {
-            let reg = LP_AON::regs().lp_store1();
-        }
-        _ => {
-            let reg = LP_AON::regs().store1();
-        }
-    }
+    let reg = cfg_select! {
+        esp32s31 => LP_AON::regs().lp_store(1),
+        esp32p4 => LP_AON::regs().lp_store1(),
+        _ => LP_AON::regs().store1(),
+    };
 
     reg.read().bits()
 }
