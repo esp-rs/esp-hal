@@ -63,13 +63,11 @@ peripherals = [
     { name = "LP_I2C_ANA_MST" },
     { name = "CLIC" },
     { name = "IO_MUX" },
-    # LP_AON / LPWR: compatibility aliases -- other chips expose an `LP_AON`
-    # (and the `LPWR` alias) register block; on P4 the same registers live in
-    # `LP_SYS` in the PAC, so we point the esp-hal `LP_AON` / `LPWR` singletons
-    # at the `LP_SYS` PAC type.
     { name = "LP_AON", pac = "LP_SYS" },
     { name = "LP_AON_CLKRST" },
     { name = "LP_SYS" },
+    { name = "LP_GPIO" },
+    { name = "LP_IO_MUX" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
@@ -914,14 +912,14 @@ pins = [
     { pin = 13, functions = { 2 = "UART1_CTS" },                       lp = { 0 = "LP_GPIO13" } },
     { pin = 14,                                                        lp = { 0 = "LP_GPIO14" } },
     { pin = 15,                                                        lp = { 0 = "LP_GPIO15" } },
-    { pin = 16,                                                        lp = { 0 = "LP_GPIO16" }, analog = { 1 = "ADC1_CH0" } },
-    { pin = 17,                                                        lp = { 0 = "LP_GPIO17" }, analog = { 1 = "ADC1_CH1" } },
-    { pin = 18,                                                        lp = { 0 = "LP_GPIO18" }, analog = { 1 = "ADC1_CH2" } },
-    { pin = 19,                                                        lp = { 0 = "LP_GPIO19" }, analog = { 1 = "ADC1_CH3" } },
-    { pin = 20,                                                        lp = { 0 = "LP_GPIO20" }, analog = { 1 = "ADC1_CH4" } },
-    { pin = 21,                                                        lp = { 0 = "LP_GPIO21" }, analog = { 1 = "ADC1_CH5" } },
-    { pin = 22, functions = {                    4 = "DBG_PSRAM_CK" }, lp = { 0 = "LP_GPIO22" }, analog = { 1 = "ADC1_CH6" } },
-    { pin = 23, functions = { 3 = "REF_50M_CLK", 4 = "DBG_PSRAM_CS" }, lp = { 0 = "LP_GPIO23" }, analog = { 1 = "ADC1_CH7" } },
+    { pin = 16,                                                        analog = { 1 = "ADC1_CH0" } },
+    { pin = 17,                                                        analog = { 1 = "ADC1_CH1" } },
+    { pin = 18,                                                        analog = { 1 = "ADC1_CH2" } },
+    { pin = 19,                                                        analog = { 1 = "ADC1_CH3" } },
+    { pin = 20,                                                        analog = { 1 = "ADC1_CH4" } },
+    { pin = 21,                                                        analog = { 1 = "ADC1_CH5" } },
+    { pin = 22, functions = {                    4 = "DBG_PSRAM_CK" }, analog = { 1 = "ADC1_CH6" } },
+    { pin = 23, functions = { 3 = "REF_50M_CLK", 4 = "DBG_PSRAM_CS" }, analog = { 1 = "ADC1_CH7" } },
     # Default PHY assignment: 24/25 are USB-Serial/JTAG, 26/27 are USB OTG FS. USB HS uses dedicated (non-GPIO) pins.
     # FIXME: provide a mechanism to swap them
     { pin = 24,                                 analog = { 0 = "USJ_DM" } },

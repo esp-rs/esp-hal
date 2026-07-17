@@ -10,15 +10,96 @@ use core::{
 };
 
 use crate::{
+    gpio::RtcFunction,
     peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU, USB_DEVICE},
     private::DropGuard,
     rtc_cntl::{
         Rtc,
+        WakeupSource,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{WakeTriggers, pmu_common::SleepTimeConfig},
+        sleep::{
+            Ext1WakeupSource,
+            WakeSource,
+            WakeTriggers,
+            WakeupLevel,
+            pmu_common::SleepTimeConfig,
+        },
     },
     soc::clocks::{self, ClockTree, CpuRootClkConfig, LpSlowClkConfig},
 };
+
+impl Ext1WakeupSource<'_, '_> {
+    fn wakeup_pins() -> u32 {
+        PMU::regs().ext_wakeup_sel().read().ext_wakeup_sel().bits()
+    }
+
+    fn wake_io_reset() {
+        use crate::gpio::RtcPin;
+
+        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u32) {
+            if wakeup_pins & (1 << pin.number()) != 0 {
+                pin.rtcio_pad_hold(false);
+                pin.rtc_set_config(false, false, RtcFunction::Rtc);
+            }
+        }
+
+        let wakeup_pins = Self::wakeup_pins();
+        for_each_lp_function! {
+            (($_lp:ident, LP_GPIOn, $_pin:literal), $gpio:ident) => {
+                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
+            };
+        }
+        PMU::regs().ext_wakeup_sel().reset();
+    }
+}
+
+impl WakeSource for Ext1WakeupSource<'_, '_> {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        _sleep_config: &mut RtcSleepConfig,
+    ) {
+        triggers.insert(WakeupSource::Ext1);
+
+        let mut pins = self.pins.borrow_mut();
+        let mut pin_mask = 0u32;
+        let mut level_mask = 0u32;
+        for (pin, level) in pins.iter_mut() {
+            pin_mask |= 1 << pin.number();
+            level_mask |= match level {
+                WakeupLevel::High => 1 << pin.number(),
+                WakeupLevel::Low => 0,
+            };
+
+            pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtcio_pad_hold(true);
+        }
+
+        PMU::regs()
+            .ext_wakeup_cntl()
+            .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
+        PMU::regs()
+            .ext_wakeup_cntl()
+            .modify(|_, w| w.ext_wakeup_status_clr().clear_bit());
+
+        PMU::regs()
+            .ext_wakeup_sel()
+            .write(|w| unsafe { w.ext_wakeup_sel().bits(pin_mask) });
+        PMU::regs()
+            .ext_wakeup_lv()
+            .write(|w| unsafe { w.ext_wakeup_lv().bits(level_mask) });
+    }
+}
+
+impl Drop for Ext1WakeupSource<'_, '_> {
+    fn drop(&mut self) {
+        let mut pins = self.pins.borrow_mut();
+        for (pin, _level) in pins.iter_mut() {
+            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+        }
+    }
+}
 
 // ----------------------------------------------------------------------------
 // USB-Serial-JTAG pad handling across light sleep.
@@ -439,6 +520,14 @@ pub struct DigitalSleepConfig {
 }
 
 impl DigitalSleepConfig {
+    fn defaults_deep_sleep(pd_flags: PowerDownFlags) -> Self {
+        let mut syscntl = HpSysCntlReg::default();
+        syscntl.set_dig_pad_slp_sel(false);
+        syscntl.set_lp_pad_hold_all(pd_flags.pd_lp_periph());
+
+        Self { syscntl }
+    }
+
     fn defaults_light_sleep(pd_flags: PowerDownFlags) -> Self {
         // PMU_SLEEP_DIGITAL_LSLP_CONFIG_DEFAULT
         Self {
@@ -862,7 +951,9 @@ impl RtcSleepConfig {
         self.deep_slp()
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
+        Ext1WakeupSource::wake_io_reset();
+    }
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
@@ -961,6 +1052,7 @@ impl RtcSleepConfig {
             param.lp_sys.analog_wait_target_cycle =
                 config.us_to_slowclk(PMU_LP_ANALOG_WAIT_TARGET_TIME_DSLP_US) as u8;
 
+            DigitalSleepConfig::defaults_deep_sleep(self.pd_flags).apply();
             AnalogSleepConfig::defaults_deep_sleep().apply(true);
         } else {
             AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply(false);
@@ -1066,6 +1158,8 @@ impl RtcSleepConfig {
         PMU::regs()
             .imm_pad_hold_all()
             .write(|w| w.tie_low_pad_slp_sel().set_bit());
+
+        Ext1WakeupSource::wake_io_reset();
 
         // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
         // sleep we never reach here).
