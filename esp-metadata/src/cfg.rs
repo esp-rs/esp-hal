@@ -225,9 +225,10 @@ macro_rules! driver_configs {
             pub fn driver_names(&self) -> impl Iterator<Item = &str> {
                 [$(
                     self.$driver.as_ref().and_then(|d| {
-                        match d.support_status.status {
-                            SupportStatusLevel::NotAvailable | SupportStatusLevel::NotSupported => None,
-                            _ => Some(stringify!($driver)),
+                        if d.support_status.is_supported() {
+                            Some(stringify!($driver))
+                        } else {
+                            None
                         }
                     }),
                 )*].into_iter().flatten()
@@ -237,7 +238,8 @@ macro_rules! driver_configs {
                 // Collect into a vector. This compiles faster than chaining iterators.
                 let mut instances = vec![];
                 $(
-                    if let Some(driver) = &self.$driver {
+                    if let Some(driver) = &self.$driver
+                        && driver.support_status.is_supported() {
                         instances.extend(driver.instances.iter().map(|i| {
                             format!("{}.{}", stringify!($driver), i.name)
                         }));
@@ -254,11 +256,13 @@ macro_rules! driver_configs {
                 let mut properties = vec![];
                 $(
                     if let Some(driver) = &self.$driver {
-                        properties.extend(driver.properties());
-                        $(
-                            driver_configs!(@ignore $computed);
-                            properties.extend(driver.computed_properties());
-                        )?
+                        if driver.support_status.is_supported() {
+                            properties.extend(driver.properties());
+                            $(
+                                driver_configs!(@ignore $computed);
+                                properties.extend(driver.computed_properties());
+                            )?
+                        }
                     }
                 )*
                 properties.into_iter()

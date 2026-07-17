@@ -58,12 +58,6 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         false
     };
-    ("assist_debug.has_sp_monitor") => {
-        false
-    };
-    ("assist_debug.has_region_monitor") => {
-        false
-    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -259,32 +253,8 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
-    ("ledc.version") => {
-        2
-    };
-    ("ledc.version", str) => {
-        stringify!(2)
-    };
-    ("ledc.channel_count") => {
-        8
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(8)
-    };
-    ("lp_i2c_master.fifo_size") => {
-        32
-    };
-    ("lp_i2c_master.fifo_size", str) => {
-        stringify!(32)
-    };
     ("lp_io.version") => {
         "esp32p4"
-    };
-    ("lp_uart.ram_size") => {
-        32
-    };
-    ("lp_uart.ram_size", str) => {
-        stringify!(32)
     };
     ("psram.octal_spi") => {
         false
@@ -461,9 +431,6 @@ macro_rules! property {
         false
     };
     ("uart.has_sclk_enable") => {
-        false
-    };
-    ("uhci.combined_uart_selector_field") => {
         false
     };
     ("usb_otg.fifo_depth_words") => {
