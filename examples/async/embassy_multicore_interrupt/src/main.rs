@@ -9,7 +9,7 @@
 //! The following wiring is assumed:
 //! - LED => GPIO0
 
-//% CHIP_FILTER: multi_core
+//% CHIP_FILTER: multi_core && gpio_driver_supported
 
 #![no_std]
 #![no_main]

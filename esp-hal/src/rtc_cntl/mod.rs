@@ -134,9 +134,14 @@ pub mod sleep;
 #[cfg_attr(esp32p4, path = "rtc/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
+#[cfg_attr(esp32s31, path = "rtc/esp32s31.rs")]
 pub(crate) mod rtc;
 
 cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::LP_SYS as LP_AON;
+        use crate::peripherals::LP_WDT;
+    }
     soc_has_lp_wdt => {
         use crate::peripherals::LP_WDT;
         use crate::peripherals::LP_AON;
@@ -149,6 +154,7 @@ cfg_select! {
 }
 
 #[rustfmt::skip]
+#[cfg(sleep_driver_supported)]
 macro_rules! wakeup_docstring {
     (Ext0)          => { "EXT0 wakeup" };
     (Ext1)          => { "EXT1 wakeup, via one or more RTC GPIOs (`RTC_CNTL`)." };
@@ -172,6 +178,7 @@ macro_rules! wakeup_docstring {
     ($($other:tt)*) => { compile_error!(concat!("Unknown wakeup source: ", stringify!($($other)*))) };
 }
 
+#[cfg(sleep_driver_supported)]
 for_each_wakeup_source! {
     (all $( ($variant:ident, $bit:literal) ),*) => {
         /// A source that can wake the chip from sleep.
@@ -201,8 +208,10 @@ for_each_wakeup_source! {
 /// Note that the available sources depend on the target chip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(sleep_driver_supported)]
 pub struct WakeupReason(enumset::EnumSet<WakeupSource>);
 
+#[cfg(sleep_driver_supported)]
 impl WakeupReason {
     /// Returns `true` if the chip was not woken from sleep by any source.
     pub fn is_empty(&self) -> bool {
@@ -305,17 +314,11 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-        let regs = LP_AON::regs();
-        cfg_select! {
-            esp32p4 => {
-                let low_reg = regs.lp_store2();
-                let high_reg = regs.lp_store3();
-            }
-            _ => {
-                let low_reg = regs.store2();
-                let high_reg = regs.store3();
-            }
-        }
+        let (low_reg, high_reg) = cfg_select! {
+            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+        };
 
         let l = low_reg.read().bits() as u64;
         let h = high_reg.read().bits() as u64;
@@ -330,17 +333,11 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let regs = LP_AON::regs();
-        cfg_select! {
-            esp32p4 => {
-                let low_reg = regs.lp_store2();
-                let high_reg = regs.lp_store3();
-            }
-            _ => {
-                let low_reg = regs.store2();
-                let high_reg = regs.store3();
-            }
-        }
+        let (low_reg, high_reg) = cfg_select! {
+            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+        };
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
 
@@ -424,10 +421,15 @@ impl<'d> Rtc<'d> {
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
         let reg = cfg_select! {
+            esp32s31 => LP_AON::regs().lp_store(4),
             esp32p4 => LP_AON::regs().lp_store4(),
             _ => LP_AON::regs().store4(),
         };
-        reg.modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+        let disable_mask = cfg_select! {
+            any(esp32p4, esp32s31) => Self::RTC_DISABLE_ROM_LOG | (Self::RTC_DISABLE_ROM_LOG << 16),
+            _ => Self::RTC_DISABLE_ROM_LOG,
+        };
+        reg.modify(|r, w| unsafe { w.bits(r.bits() | disable_mask) });
     }
 
     /// Register an interrupt handler for the RTC.
@@ -715,6 +717,7 @@ pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 }
 
 /// Tracks whether the chip has just returned from a light sleep.
+#[cfg(sleep_driver_supported)]
 static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
 
 /// Return the cause(s) of the most recent wakeup.
@@ -722,6 +725,7 @@ static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::Atomic
 /// A sleep can be ended by more than one source simultaneously, so all matching sources are
 /// returned. The result is empty if the chip was not woken from sleep (for example on a cold boot,
 /// or after a reset unrelated to deep sleep).
+#[cfg(sleep_driver_supported)]
 pub fn wakeup_cause() -> WakeupReason {
     if reset_reason(Cpu::ProCpu) != Some(SocResetReason::CoreDeepSleep)
         && !LIGHT_SLEEP_WAKEUP.load(portable_atomic::Ordering::Relaxed)

@@ -557,6 +557,7 @@ macro_rules! assign_resources {
 /// ```
 #[doc(hidden)]
 #[rustfmt::skip]
+#[cfg(dma_driver_supported)]
 macro_rules! impl_dma_channel_trait {
     // Single peripheral instance case
     (
@@ -612,6 +613,7 @@ macro_rules! impl_dma_channel_trait {
         }
     };
 }
+#[cfg(dma_driver_supported)]
 pub(crate) use impl_dma_channel_trait;
 #[cfg(feature = "unstable")]
 use procmacros::doc_replace;

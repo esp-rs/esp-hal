@@ -378,6 +378,14 @@ impl<'a> PartitionTable<'a> {
                     (((0x5008C000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
                 };
             }
+            feature = "esp32s31" => {
+                // Read MMU entry 0, which maps the beginning of the flash
+                // virtual-address range.
+                let paddr = unsafe {
+                    ((0x20500000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
+                    (((0x20500000 + 0x37c) as *const u32).read_volatile() & 0x7ff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
+                };
+            }
             any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32h2") => {
                 let paddr = unsafe {
                     ((0x60002000 + 0x380) as *mut u32).write_volatile(0);

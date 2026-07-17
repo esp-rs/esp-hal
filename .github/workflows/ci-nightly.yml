@@ -35,6 +35,7 @@ jobs:
             "esp32c61",
             "esp32h2",
             "esp32p4",
+            "esp32s31",
           ]
     steps:
       - uses: actions/checkout@v6
