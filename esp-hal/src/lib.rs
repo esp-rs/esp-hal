@@ -197,11 +197,7 @@ fn main() -> ! {
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-// TODO(esp32p4): fill `[device.clock_tree]` doc strings in esp32p4.toml,
-// then promote back to `deny`. Until then, downgrade to warn for P4 only.
-#![cfg_attr(not(esp32p4), deny(missing_docs))]
-#![cfg_attr(esp32p4, warn(missing_docs))]
-#![deny(rust_2018_idioms, rustdoc::all)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 // Don't trip up on broken/private links when running semver-checks
@@ -263,7 +259,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
-#[cfg_attr(esp32c61, allow(unused))]
+#[cfg_attr(esp32s31, allow(unused))]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
@@ -274,17 +270,21 @@ metadata!(
     esp_config::esp_config_str!("ESP_HAL_CONFIG_MIN_CHIP_REVISION")
 );
 
-#[cfg(all(riscv, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use esp_riscv_rt::{self, riscv};
-pub(crate) use peripherals::pac;
-#[cfg(xtensa)]
-#[cfg(all(xtensa, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use xtensa_lx_rt::{self, xtensa_lx};
+#[cfg(feature = "rt")]
+cfg_select! {
+    riscv => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use esp_riscv_rt::{self, riscv};
+    }
+    xtensa => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use xtensa_lx_rt::{self, xtensa_lx};
+    }
+}
 
+pub(crate) use peripherals::pac;
 pub(crate) mod private;
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
@@ -308,7 +308,6 @@ mod reg_access;
 pub mod rng;
 #[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
-#[cfg_attr(any(esp32c5, esp32c61), allow(dead_code))]
 pub mod system;
 pub mod time;
 #[cfg(uart_driver_supported)]
@@ -319,18 +318,15 @@ mod macros;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
-#[cfg(any(lp_core, ulp_riscv_core))]
+#[cfg(ulp_riscv_driver_supported)]
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]
-#[cfg(lp_core)]
+#[cfg(ulp_riscv_driver_supported)]
 pub use self::soc::lp_core;
-#[instability::unstable]
-#[cfg(ulp_riscv_core)]
-pub use self::soc::ulp_core;
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
@@ -393,11 +389,13 @@ unstable_driver! {
     pub mod rmt;
     #[cfg(rsa_driver_supported)]
     pub mod rsa;
+    #[cfg(sdmmc_driver_supported)]
+    pub mod sdmmc;
     #[cfg(sha_driver_supported)]
     pub mod sha;
     #[cfg(sdm_driver_supported)]
     pub mod sdm;
-    #[cfg(touch)]
+    #[cfg(touch_driver_supported)]
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
@@ -737,12 +735,27 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
+    let min_rev = esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
+    assert!(
+        crate::efuse::chip_revision() >= crate::efuse::ChipRevision::from_combined(min_rev),
+        "This chip's hardware revision is older than the minimum required \
+         v{}.{} (ESP_HAL_CONFIG_MIN_CHIP_REVISION).",
+        min_rev / 100,
+        min_rev % 100,
+    );
+
     #[cfg(soc_cpu_has_branch_predictor)]
     crate::soc::enable_branch_predictor();
 
+    // Have we already overflown the stack?
+    #[cfg(init_stack_ptr_range_check)]
     crate::soc::ensure_stack_pointer_in_range();
+
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
+
+    #[cfg(all(feature = "rt", enable_pmp, riscv))]
+    crate::soc::enable_pmp();
 
     system::disable_peripherals();
 
@@ -751,13 +764,13 @@ pub fn init(config: Config) -> Peripherals {
     crate::clock::init(config.clock_config());
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
+    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());
 
     #[cfg(sleep_driver_supported)]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers
-    #[cfg(swd)]
+    #[cfg(soc_has_swd_watchdog)]
     rtc.swd.disable();
 
     rtc.rwdt.disable();

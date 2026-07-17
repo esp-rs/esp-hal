@@ -32,8 +32,8 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaRxBuf, DmaTxBuf},
-    dma_buffers,
+    dma_rx_buffer,
+    dma_tx_buffer,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     main,
     spi::{Mode, slave::Spi},
@@ -65,9 +65,8 @@ fn main() -> ! {
         _ => peripherals.DMA_CH0,
     };
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let mut slave_receive = dma_rx_buffer!(32000).unwrap();
+    let mut slave_send = dma_tx_buffer!(32000).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
         .with_sck(slave_sclk)

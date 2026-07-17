@@ -2,10 +2,10 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    soc::regi2c,
+    soc::{clocks::ClockConfig, regi2c},
 };
 
-pub(crate) fn init() {
+pub(crate) fn init(_config: &ClockConfig) {
     let rtc_cntl = LPWR::regs();
 
     regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);

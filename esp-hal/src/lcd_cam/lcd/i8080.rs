@@ -582,6 +582,7 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
             task::{Context, Poll},
         };
 
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
         struct LcdDoneFuture {}
 
         impl Future for LcdDoneFuture {

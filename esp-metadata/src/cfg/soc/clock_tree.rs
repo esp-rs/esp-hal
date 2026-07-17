@@ -30,7 +30,6 @@
 
 // TODO: some clock sources don't _really_ need refcount. This needs analysis to see which nodes can
 //       be simplified. (Probably the ones that only have one user, or those that are always on).
-// TODO: optimize out 1-variant clock multiplexers?
 // TODO: ClockConfig doc comment should be tailored to the specific chip
 // TODO: finalize public API
 // TODO: define clock IDs and maintain active clocks as a bitmap
@@ -261,6 +260,9 @@ pub(crate) struct ManagementProperties {
     /// This clock node is considered always running.
     pub always_on: bool,
 
+    /// This clock node holds a wake lock while it is enabled.
+    pub wake_locking: bool,
+
     pub receiver: Option<TokenStream>,
     pub accessor: Option<TokenStream>,
 }
@@ -295,6 +297,10 @@ impl ManagementProperties {
 
     pub fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    pub fn wake_locking(&self) -> bool {
+        self.wake_locking
     }
 
     /// For peripheral clocks, returns a receiver expression (`self`).
@@ -342,6 +348,9 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn always_on(&self) -> bool {
         false
     }
+    fn wake_locking(&self) -> bool {
+        false
+    }
     fn validate_source_data(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -364,6 +373,16 @@ pub(crate) trait ClockTreeNodeType: Any {
     /// Returns true when `config_frequency` must take an `instance` parameter because its
     /// frequency formula reads a per-instance upstream node's cached frequency.
     fn config_frequency_needs_instance(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> bool {
+        false
+    }
+
+    /// Returns true when a configurable node's output frequency is a direct alias of a single
+    /// upstream node, so a dedicated frequency cache would only duplicate that upstream value.
+    fn skips_frequency_cache(
         &self,
         _instance: &ClockTreeNodeInstance,
         _tree: &ProcessedClockData,

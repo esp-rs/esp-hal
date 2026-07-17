@@ -12,7 +12,6 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32h2 as pac;
@@ -22,6 +21,9 @@ pub(crate) use esp32h2 as pac;
 pub(crate) fn i2s_sclk_frequency() -> u32 {
     clocks::pll_f96m_clk_frequency()
 }
+
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {}
 
 pub(crate) fn pre_init() {
     // By default, these access path filters are enable and allow the access to

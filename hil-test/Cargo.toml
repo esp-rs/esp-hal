@@ -72,19 +72,11 @@ harness           = false
 required-features = ["unstable"]
 
 [[bin]]
-name              = "spi_full_duplex"
+name              = "spi"
 harness           = false
 
 [[bin]]
-name              = "spi_half_duplex_slave_qspi"
-harness           = false
-
-[[bin]]
-name              = "spi_half_duplex_write_psram"
-harness           = false
-
-[[bin]]
-name              = "storage_read_app_desc"
+name              = "storage"
 harness           = false
 
 [[bin]]
@@ -94,12 +86,11 @@ harness           = false
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 critical-section   = "1"
-defmt              = "1.0.1"
+defmt              = "1.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
-embedded-storage   = "0.3.1"
-embassy-sync       = "0.7.0" # TODO: update after trouble-host has been released
+embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
@@ -119,7 +110,7 @@ portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.7.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -222,7 +213,8 @@ esp32p4 = [
     "esp-alloc?/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-metadata-generated/esp32p4",
-    "esp-rtos?/esp32p4"
+    "esp-rtos?/esp32p4",
+    "esp-storage?/esp32p4",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
@@ -259,9 +251,10 @@ overflow-checks  = true
 
 [profile.release]
 codegen-units    = 1
-debug            = 2
 debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+# We rarely debug HIL binaries, so let's shrink the .ELF size
+debug            = 0

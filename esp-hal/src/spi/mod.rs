@@ -20,6 +20,18 @@ crate::unstable_module! {
     pub mod slave;
 }
 
+#[cfg_attr(
+    any(spi_master_version = "1", spi_master_version = "2"),
+    path = "clocks/v1v2.rs"
+)]
+#[cfg_attr(
+    all(spi_master_version = "3", not(any(esp32p4, soc_has_pcr))),
+    path = "clocks/v3.rs"
+)]
+#[cfg_attr(esp32p4, path = "clocks/esp32p4.rs")]
+#[cfg_attr(soc_has_pcr, path = "clocks/v3_pcr.rs")]
+mod clocks;
+
 /// SPI errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

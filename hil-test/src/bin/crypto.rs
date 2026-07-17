@@ -1,9 +1,8 @@
 //! Crypto hardware tests
 
 // ESP32 has no AES-DMA, no point in setting up PSRAM
-// TODO: validate and enable PSRAM on ESP32-C5 and ESP32-P4, then drop the exclusions below.
-//% CHIP_FILTER(quad):     dma_can_access_psram && !esp32c5 && !esp32p4
-//% CHIP_FILTER(no_psram): !dma_can_access_psram || esp32c5 || esp32p4
+//% CHIP_FILTER(psram):    dma_can_access_psram
+//% CHIP_FILTER(no_psram): !dma_can_access_psram
 
 //% FEATURES: unstable esp-alloc/nightly
 

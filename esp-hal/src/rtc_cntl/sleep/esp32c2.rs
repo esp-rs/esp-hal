@@ -1,8 +1,8 @@
-use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
+use super::{WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, GPIO, IO_MUX, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Rtc, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, WakeupSource, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -88,37 +88,6 @@ pub const SIG_GPIO_OUT_IDX: u32 = 128;
 /// Maximum number of GPIO pins supported.
 pub const GPIO_NUM_MAX: usize = 22;
 
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-        let rtc_cntl = LPWR::regs();
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            rtc_cntl
-                .slp_timer0()
-                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-
-            rtc_cntl
-                .int_clr()
-                .write(|w| w.main_timer().clear_bit_by_one());
-
-            rtc_cntl.slp_timer1().write(|w| {
-                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
-                w.main_timer_alarm_en().set_bit()
-            });
-        }
-    }
-}
-
 impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
@@ -194,7 +163,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
             return;
         }
 
-        triggers.set_gpio(true);
+        triggers.insert(WakeupSource::Gpio);
 
         // If deep sleep is enabled, esp_start_sleep calls
         // gpio_deep_sleep_wakeup_prepare which sets these pullup and
@@ -397,6 +366,14 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
+
+        // This is the light-sleep config. The main XTAL is powered down in sleep
+        // (`xtal_fpu` stays false), so the analog regulator/bias must use the
+        // same XTAL-down settings that `deep()` applies "because of xtal_fpu".
+        cfg.set_rtc_regulator_fpu(true);
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
         cfg
     }
 }
@@ -439,12 +416,9 @@ fn rtc_sleep_pu(val: bool) {
         .modify(|_, w| w.lslp_mem_force_pu().bit(val));
 
     APB_CTRL::regs().front_end_mem_pd().modify(|_r, w| {
-        w.dc_mem_force_pu()
-            .bit(val)
-            .pbus_mem_force_pu()
-            .bit(val)
-            .agc_mem_force_pu()
-            .bit(val)
+        w.dc_mem_force_pu().bit(val);
+        w.pbus_mem_force_pu().bit(val);
+        w.agc_mem_force_pu().bit(val)
     });
 
     BB::regs()
@@ -506,6 +480,10 @@ impl RtcSleepConfig {
         cfg.set_pd_cur_slp(true);
 
         cfg
+    }
+
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -720,13 +698,12 @@ impl RtcSleepConfig {
 
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         // set bits for what can wake us up
-        LPWR::regs()
-            .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0.into()) });
+        LPWR::regs().wakeup_state().modify(|_, w| unsafe {
+            w.wakeup_ena()
+                .bits((wakeup_triggers.as_u32() as u16).into())
+        });
 
-        LPWR::regs()
-            .state0()
-            .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }
 
     pub(crate) fn finish_sleep(&self) {

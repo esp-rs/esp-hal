@@ -5,10 +5,11 @@ use crate::RegisterToggle;
 // `axi_dma` (GDMA-AXI, different register layout). The PAC's `dma` module maps to
 // a separate block that is not GDMA-AHB, so alias `ahb_dma` as `gdma_pac` on P4.
 // Other chips: PAC `dma` module is the GDMA v2 module directly.
-cfg_if::cfg_if! {
-    if #[cfg(esp32p4)] {
+cfg_select! {
+    esp32p4 => {
         use pac::ahb_dma as gdma_pac;
-    } else {
+    }
+    _ => {
         use pac::dma as gdma_pac;
     }
 }

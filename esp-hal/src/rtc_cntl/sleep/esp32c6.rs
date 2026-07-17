@@ -1,61 +1,33 @@
 use core::ops::Not;
 
 use crate::{
-    clock::RtcClock,
     gpio::RtcFunction,
+    peripherals::{LP_AON, PMU},
+    private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
+        WakeupSource,
+        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::{
             Ext1WakeupSource,
-            TimerWakeupSource,
             WakeFromLpCoreWakeupSource,
             WakeSource,
             WakeTriggers,
             WakeupLevel,
+            pmu_common::SleepTimeConfig,
         },
     },
-    soc::clocks::{self, ClockTree, LpSlowClkConfig, TimgCalibrationClockConfig},
+    soc::clocks::{self, ClockTree, LpSlowClkConfig, SocRootClkConfig},
 };
-
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-
-        let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            lp_timer.tar0_high().write(|w| {
-                w.main_timer_tar_high0()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-            });
-            lp_timer.tar0_low().write(|w| {
-                w.main_timer_tar_low0()
-                    .bits((time_in_ticks & 0xffffffff) as u32)
-            });
-            lp_timer
-                .int_clr()
-                .write(|w| w.soc_wakeup().clear_bit_by_one());
-            lp_timer
-                .tar0_high()
-                .modify(|_, w| w.main_timer_tar_en0().set_bit());
-        }
-    }
-}
 
 impl Ext1WakeupSource<'_, '_> {
     /// Returns the currently configured wakeup pins.
     fn wakeup_pins() -> u8 {
-        unsafe { lp_aon().ext_wakeup_cntl().read().ext_wakeup_sel().bits() }
+        LP_AON::regs()
+            .ext_wakeup_cntl()
+            .read()
+            .ext_wakeup_sel()
+            .bits()
     }
 
     fn wake_io_reset() {
@@ -69,14 +41,11 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(unsafe { crate::peripherals::GPIO0::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO1::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO2::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO3::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO4::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO5::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO6::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO7::steal() }, wakeup_pins);
+        for_each_lp_function! {
+            (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
+            };
+        }
     }
 }
 
@@ -88,7 +57,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         // We don't have to keep the LP domain powered if we hold the wakeup pin states.
-        triggers.set_ext1(true);
+        triggers.insert(WakeupSource::Ext1);
 
         // set pins to RTC function
         let mut pins = self.pins.borrow_mut();
@@ -105,20 +74,18 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
             pin.rtcio_pad_hold(true);
         }
 
-        unsafe {
-            // clear previous wakeup status
-            lp_aon()
-                .ext_wakeup_cntl()
-                .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
+        // clear previous wakeup status
+        LP_AON::regs()
+            .ext_wakeup_cntl()
+            .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
 
-            // set pin + level register fields
-            lp_aon().ext_wakeup_cntl().modify(|r, w| {
-                w.ext_wakeup_sel()
-                    .bits(r.ext_wakeup_sel().bits() | pin_mask)
-                    .ext_wakeup_lv()
-                    .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
-            });
-        }
+        // set pin + level register fields
+        LP_AON::regs().ext_wakeup_cntl().modify(|r, w| unsafe {
+            w.ext_wakeup_sel()
+                .bits(r.ext_wakeup_sel().bits() | pin_mask);
+            w.ext_wakeup_lv()
+                .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
+        });
     }
 }
 
@@ -141,7 +108,7 @@ impl WakeSource for WakeFromLpCoreWakeupSource {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_lp_core(true);
+        triggers.insert(WakeupSource::LpCore);
     }
 }
 
@@ -238,48 +205,57 @@ impl AnalogSleepConfig {
 
         unsafe {
             // HP SLEEP (hp_sleep_*)
-            pmu().hp_sleep_bias().modify(|_, w| {
-                w.hp_sleep_dbg_atten() // pmu_ll_hp_set_dbg_atten
-                    .bits(self.hp_sys.bias.dbg_atten())
-                    .hp_sleep_pd_cur() // pmu_ll_hp_set_current_power_off
-                    .bit(self.hp_sys.bias.pd_cur())
-                    .sleep() // pmu_ll_hp_set_bias_sleep_enable
-                    .bit(self.hp_sys.bias.bias_sleep())
+            PMU::regs().hp_sleep_bias().modify(|_, w| {
+                // pmu_ll_hp_set_dbg_atten
+                w.hp_sleep_dbg_atten().bits(self.hp_sys.bias.dbg_atten());
+                // pmu_ll_hp_set_current_power_off
+                w.hp_sleep_pd_cur().bit(self.hp_sys.bias.pd_cur());
+                // pmu_ll_hp_set_bias_sleep_enable
+                w.sleep().bit(self.hp_sys.bias.bias_sleep())
             });
-            pmu().hp_sleep_hp_regulator0().modify(|_, w| {
-                w.hp_sleep_hp_regulator_xpd() // pmu_ll_hp_set_regulator_xpd
-                    .bit(self.hp_sys.regulator0.xpd())
-                    .hp_sleep_hp_regulator_dbias() // pmu_ll_hp_set_regulator_dbias
+            PMU::regs().hp_sleep_hp_regulator0().modify(|_, w| {
+                // pmu_ll_hp_set_regulator_xpd
+                w.hp_sleep_hp_regulator_xpd()
+                    .bit(self.hp_sys.regulator0.xpd());
+                // pmu_ll_hp_set_regulator_dbias
+                w.hp_sleep_hp_regulator_dbias()
                     .bits(self.hp_sys.regulator0.dbias())
             });
-            pmu().hp_sleep_hp_regulator1().modify(|_, w| {
-                w.hp_sleep_hp_regulator_drv_b() // pmu_ll_hp_set_regulator_driver_bar
+            PMU::regs().hp_sleep_hp_regulator1().modify(|_, w| {
+                // pmu_ll_hp_set_regulator_driver_bar
+                w.hp_sleep_hp_regulator_drv_b()
                     .bits(self.hp_sys.regulator1.drv_b())
             });
 
             // LP SLEEP (lp_sleep_*)
-            pmu().lp_sleep_bias().modify(|_, w| {
-                w.lp_sleep_dbg_atten() // pmu_ll_lp_set_dbg_atten
-                    .bits(self.lp_sys_sleep.bias.dbg_atten())
-                    .lp_sleep_pd_cur() // pmu_ll_lp_set_current_power_off
-                    .bit(self.lp_sys_sleep.bias.pd_cur())
-                    .sleep() // pmu_ll_lp_set_bias_sleep_enable
-                    .bit(self.lp_sys_sleep.bias.bias_sleep())
+            PMU::regs().lp_sleep_bias().modify(|_, w| {
+                // pmu_ll_lp_set_dbg_atten
+                w.lp_sleep_dbg_atten()
+                    .bits(self.lp_sys_sleep.bias.dbg_atten());
+                // pmu_ll_lp_set_current_power_off
+                w.lp_sleep_pd_cur().bit(self.lp_sys_sleep.bias.pd_cur());
+                // pmu_ll_lp_set_bias_sleep_enable
+                w.sleep().bit(self.lp_sys_sleep.bias.bias_sleep())
             });
 
-            pmu().lp_sleep_lp_regulator0().modify(|_, w| {
-                w.lp_sleep_lp_regulator_slp_xpd() // pmu_ll_lp_set_regulator_slp_xpd
-                    .bit(self.lp_sys_sleep.regulator0.slp_xpd())
-                    .lp_sleep_lp_regulator_xpd() // pmu_ll_lp_set_regulator_xpd
-                    .bit(self.lp_sys_sleep.regulator0.xpd())
-                    .lp_sleep_lp_regulator_slp_dbias() // pmu_ll_lp_set_regulator_sleep_dbias
-                    .bits(self.lp_sys_sleep.regulator0.slp_dbias())
-                    .lp_sleep_lp_regulator_dbias() // pmu_ll_lp_set_regulator_dbias
+            PMU::regs().lp_sleep_lp_regulator0().modify(|_, w| {
+                // pmu_ll_lp_set_regulator_slp_xpd
+                w.lp_sleep_lp_regulator_slp_xpd()
+                    .bit(self.lp_sys_sleep.regulator0.slp_xpd());
+                // pmu_ll_lp_set_regulator_xpd
+                w.lp_sleep_lp_regulator_xpd()
+                    .bit(self.lp_sys_sleep.regulator0.xpd());
+                // pmu_ll_lp_set_regulator_sleep_dbias
+                w.lp_sleep_lp_regulator_slp_dbias()
+                    .bits(self.lp_sys_sleep.regulator0.slp_dbias());
+                // pmu_ll_lp_set_regulator_dbias
+                w.lp_sleep_lp_regulator_dbias()
                     .bits(self.lp_sys_sleep.regulator0.dbias())
             });
 
-            pmu().lp_sleep_lp_regulator1().modify(|_, w| {
-                w.lp_sleep_lp_regulator_drv_b() // pmu_ll_lp_set_regulator_driver_bar
+            PMU::regs().lp_sleep_lp_regulator1().modify(|_, w| {
+                // pmu_ll_lp_set_regulator_driver_bar
+                w.lp_sleep_lp_regulator_drv_b()
                     .bits(self.lp_sys_sleep.regulator1.drv_b())
             });
         }
@@ -311,12 +287,10 @@ impl DigitalSleepConfig {
 
     fn apply(&self) {
         // pmu_sleep_digital_init
-        unsafe {
-            pmu().hp_sleep_hp_sys_cntl().modify(|_, w| {
-                w.hp_sleep_dig_pad_slp_sel()
-                    .bit(self.syscntl.dig_pad_slp_sel())
-            })
-        };
+        PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+            w.hp_sleep_dig_pad_slp_sel()
+                .bit(self.syscntl.dig_pad_slp_sel())
+        });
     }
 }
 
@@ -354,8 +328,24 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_aon_pd_en(pd_flags.pd_hp_aon());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        self.hp_sys.clk.set_i2c_iso_en(true);
-        self.hp_sys.clk.set_i2c_retention(true);
+        if pd_flags.pd_modem() {
+            // The modem (Wi-Fi/BLE) power domain is powered down during sleep, so
+            // isolate and retain its analog I2C buses as before.
+            self.hp_sys.clk.set_i2c_iso_en(true);
+            self.hp_sys.clk.set_i2c_retention(true);
+        } else {
+            // The modem power domain is kept on across (light-)sleep
+            // (`pd_modem == false`, the default). In that case its analog blocks -
+            // the BBPLL and the analog I2C buses used to (re)configure it - must be
+            // kept powered too, matching the `HP_MODEM` power state. Otherwise the
+            // radio comes back without a usable PLL and can no longer transmit
+            // (e.g. BLE advertising silently stops working) after wakeup.
+            self.hp_sys.clk.set_i2c_iso_en(false);
+            self.hp_sys.clk.set_i2c_retention(false);
+            self.hp_sys.clk.set_xpd_bb_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll_i2c(true);
+            self.hp_sys.clk.set_xpd_bbpll(true);
+        }
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -386,37 +376,35 @@ impl PowerSleepConfig {
     fn apply(&self) {
         // pmu_sleep_power_init
 
-        unsafe {
-            // HP SLEEP (hp_sleep_*)
-            pmu()
-                .hp_sleep_dig_power()
-                .modify(|_, w| w.bits(self.hp_sys.dig_power.0));
-            pmu()
-                .hp_sleep_hp_ck_power()
-                .modify(|_, w| w.bits(self.hp_sys.clk.0));
-            pmu()
-                .hp_sleep_xtal()
-                .modify(|_, w| w.hp_sleep_xpd_xtal().bit(self.hp_sys.xtal.xpd_xtal()));
+        // HP SLEEP (hp_sleep_*)
+        PMU::regs()
+            .hp_sleep_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.hp_sys.dig_power.0) });
+        PMU::regs()
+            .hp_sleep_hp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.hp_sys.clk.0) });
+        PMU::regs()
+            .hp_sleep_xtal()
+            .modify(|_, w| w.hp_sleep_xpd_xtal().bit(self.hp_sys.xtal.xpd_xtal()));
 
-            // LP ACTIVE (hp_sleep_lp_*)
-            pmu()
-                .hp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(self.lp_sys_active.dig_power.0));
-            pmu()
-                .hp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(self.lp_sys_active.clk_power.0));
+        // LP ACTIVE (hp_sleep_lp_*)
+        PMU::regs()
+            .hp_sleep_lp_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_active.dig_power.0) });
+        PMU::regs()
+            .hp_sleep_lp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_active.clk_power.0) });
 
-            // LP SLEEP (lp_sleep_*)
-            pmu()
-                .lp_sleep_lp_dig_power()
-                .modify(|_, w| w.bits(self.lp_sys_sleep.dig_power.0));
-            pmu()
-                .lp_sleep_lp_ck_power()
-                .modify(|_, w| w.bits(self.lp_sys_sleep.clk_power.0));
-            pmu()
-                .lp_sleep_xtal()
-                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(self.lp_sys_sleep.xtal.xpd_xtal()));
-        }
+        // LP SLEEP (lp_sleep_*)
+        PMU::regs()
+            .lp_sleep_lp_dig_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_sleep.dig_power.0) });
+        PMU::regs()
+            .lp_sleep_lp_ck_power()
+            .modify(|_, w| unsafe { w.bits(self.lp_sys_sleep.clk_power.0) });
+        PMU::regs()
+            .lp_sleep_xtal()
+            .modify(|_, w| w.lp_sleep_xpd_xtal().bit(self.lp_sys_sleep.xtal.xpd_xtal()));
     }
 }
 
@@ -438,7 +426,7 @@ pub struct HpParam {
     pub pll_stable_wait_cycle: u16,
     /// Number of cycles to wait for modifying the ICG control.
     pub modify_icg_cntl_wait_cycle: u8,
-    /// Number of cycles to wait for switching the ICG coйntrol.
+    /// Number of cycles to wait for switching the ICG control.
     pub switch_icg_cntl_wait_cycle: u8,
     /// Minimum sleep time measured in slow clock cycles.
     pub min_slp_slow_clk_cycle: u8,
@@ -511,43 +499,49 @@ impl ParamSleepConfig {
         // pmu_sleep_param_init
 
         unsafe {
-            pmu().slp_wakeup_cntl3().modify(|_, w| {
-                w.hp_min_slp_val() // pmu_ll_hp_set_min_sleep_cycle
-                    .bits(self.hp_sys.min_slp_slow_clk_cycle)
-                    .lp_min_slp_val() // pmu_ll_lp_set_min_sleep_cycle
-                    .bits(self.lp_sys.min_slp_slow_clk_cycle)
+            PMU::regs().slp_wakeup_cntl3().modify(|_, w| {
+                // pmu_ll_hp_set_min_sleep_cycle
+                w.hp_min_slp_val().bits(self.hp_sys.min_slp_slow_clk_cycle);
+                // pmu_ll_lp_set_min_sleep_cycle
+                w.lp_min_slp_val().bits(self.lp_sys.min_slp_slow_clk_cycle)
             });
 
-            pmu().slp_wakeup_cntl7().modify(|_, w| {
+            PMU::regs().slp_wakeup_cntl7().modify(|_, w| {
                 w.ana_wait_target() // pmu_ll_hp_set_analog_wait_target_cycle
                     .bits(self.hp_sys.analog_wait_target_cycle)
             });
 
-            pmu().power_wait_timer0().modify(|_, w| {
-                w.dg_hp_wait_timer() // pmu_ll_hp_set_digital_power_supply_wait_cycle
-                    .bits(self.hp_sys.digital_power_supply_wait_cycle)
-                    .dg_hp_powerup_timer() // pmu_ll_hp_set_digital_power_up_wait_cycle
+            PMU::regs().power_wait_timer0().modify(|_, w| {
+                // pmu_ll_hp_set_digital_power_supply_wait_cycle
+                w.dg_hp_wait_timer()
+                    .bits(self.hp_sys.digital_power_supply_wait_cycle);
+                // pmu_ll_hp_set_digital_power_up_wait_cycle
+                w.dg_hp_powerup_timer()
                     .bits(self.hp_sys.digital_power_up_wait_cycle)
             });
 
-            pmu().power_wait_timer1().modify(|_, w| {
-                w.dg_lp_wait_timer() // pmu_ll_lp_set_digital_power_supply_wait_cycle
-                    .bits(self.lp_sys.digital_power_supply_wait_cycle)
-                    .dg_lp_powerup_timer() // pmu_ll_lp_set_digital_power_up_wait_cycle
+            PMU::regs().power_wait_timer1().modify(|_, w| {
+                // pmu_ll_lp_set_digital_power_supply_wait_cycle
+                w.dg_lp_wait_timer()
+                    .bits(self.lp_sys.digital_power_supply_wait_cycle);
+                // pmu_ll_lp_set_digital_power_up_wait_cycle
+                w.dg_lp_powerup_timer()
                     .bits(self.lp_sys.digital_power_up_wait_cycle)
             });
 
-            pmu().slp_wakeup_cntl5().modify(|_, w| {
-                w.lp_ana_wait_target() // pmu_ll_lp_set_analog_wait_target_cycle
-                    .bits(self.lp_sys.analog_wait_target_cycle)
-                    .modem_wait_target() // pmu_ll_hp_set_modem_wakeup_wait_cycle
+            PMU::regs().slp_wakeup_cntl5().modify(|_, w| {
+                // pmu_ll_lp_set_analog_wait_target_cycle
+                w.lp_ana_wait_target()
+                    .bits(self.lp_sys.analog_wait_target_cycle);
+                // pmu_ll_hp_set_modem_wakeup_wait_cycle
+                w.modem_wait_target()
                     .bits(self.hp_sys.modem_wakeup_wait_cycle)
             });
-            pmu().power_ck_wait_cntl().modify(|_, w| {
-                w.wait_xtl_stable() // pmu_ll_hp_set_xtal_stable_wait_cycle
-                    .bits(self.hp_lp.xtal_stable_wait_cycle)
-                    .wait_pll_stable() // pmu_ll_hp_set_pll_stable_wait_cycle
-                    .bits(self.hp_sys.pll_stable_wait_cycle)
+            PMU::regs().power_ck_wait_cntl().modify(|_, w| {
+                // pmu_ll_hp_set_xtal_stable_wait_cycle
+                w.wait_xtl_stable().bits(self.hp_lp.xtal_stable_wait_cycle);
+                // pmu_ll_hp_set_pll_stable_wait_cycle
+                w.wait_pll_stable().bits(self.hp_sys.pll_stable_wait_cycle)
             });
         }
     }
@@ -597,75 +591,11 @@ impl ParamSleepConfig {
     }
 }
 
-#[derive(Clone, Copy)]
-struct SleepTimeConfig {
-    sleep_time_adjustment: u32,
-    // TODO: esp-idf does some calibration here to determine slowclk_period
-    slowclk_period: u32,
-    fastclk_period: u32,
-}
-
-const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
-
 impl SleepTimeConfig {
-    const RTC_CLK_CAL_FRACT: u32 = 19;
+    pub(crate) const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
+    pub(crate) const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 56;
 
-    fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(TimgCalibrationClockConfig::RcFastDivClk, slowclk_cycles)
-    }
-
-    fn new(_deep: bool) -> Self {
-        // https://github.com/espressif/esp-idf/commit/e1d24ebd7f43c7c7ded183bc8800b20af3bf014b
-
-        // Calibrate rtc slow clock
-        // TODO: do an actual calibration instead of a read
-        let slowclk_period = unsafe { lp_aon().store1().read().data().bits() };
-
-        // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
-        const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;
-        let fastclk_period = Self::rtc_clk_cal_fast(FAST_CLK_SRC_CAL_CYCLES);
-
-        Self {
-            sleep_time_adjustment: 0,
-            slowclk_period,
-            fastclk_period,
-        }
-    }
-
-    fn light_sleep(pd_flags: PowerDownFlags) -> Self {
-        const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 56;
-
-        let mut this = Self::new(false);
-
-        let sw = LIGHT_SLEEP_TIME_OVERHEAD_US; // TODO
-        let hw = this.pmu_sleep_calculate_hw_wait_time(pd_flags);
-
-        this.sleep_time_adjustment = sw + hw;
-
-        this
-    }
-
-    fn deep_sleep() -> Self {
-        let mut this = Self::new(true);
-
-        this.sleep_time_adjustment = 250 + 100 * 240 / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-
-        this
-    }
-
-    fn us_to_slowclk(&self, us: u32) -> u32 {
-        (us << Self::RTC_CLK_CAL_FRACT) / self.slowclk_period
-    }
-
-    fn slowclk_to_us(&self, rtc_cycles: u32) -> u32 {
-        (rtc_cycles * self.slowclk_period) >> Self::RTC_CLK_CAL_FRACT
-    }
-
-    fn us_to_fastclk(&self, us: u32) -> u32 {
-        (us << Self::RTC_CLK_CAL_FRACT) / self.fastclk_period
-    }
-
-    fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
+    pub(crate) fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
         // LP core hardware wait time, microsecond
         let lp_wakeup_wait_time_us = self.slowclk_to_us(MachineConstants::LP_WAKEUP_WAIT_CYCLE);
         let lp_clk_switch_time_us = self.slowclk_to_us(MachineConstants::LP_CLK_SWITCH_CYCLE);
@@ -753,14 +683,6 @@ impl Default for RtcSleepConfig {
             pd_flags: PowerDownFlags(0),
         }
     }
-}
-
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    unsafe { &*esp32c6::PMU::ptr() }
-}
-
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    unsafe { &*esp32c6::LP_AON::ptr() }
 }
 
 bitfield::bitfield! {
@@ -865,6 +787,10 @@ impl RtcSleepConfig {
         }
     }
 
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep
+    }
+
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         Self::wake_io_reset();
     }
@@ -876,6 +802,13 @@ impl RtcSleepConfig {
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
+        let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
+            matches!(
+                clocks::lp_slow_clk_config(clocks),
+                Some(LpSlowClkConfig::Xtal32k)
+            )
+        });
+
         if self.deep {
             // force-disable certain power domains
             self.pd_flags.set_pd_top(true);
@@ -887,15 +820,20 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_hp_aon(true);
             self.pd_flags.set_pd_lp_periph(true);
-            let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
-                matches!(
-                    clocks::lp_slow_clk_config(clocks),
-                    Some(LpSlowClkConfig::Xtal32k)
-                )
-            });
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
             self.pd_flags.set_pd_rc32k(true);
             self.pd_flags.set_pd_rc_fast(true);
+        } else {
+            // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered
+            // and only clock-gated, so execution resumes in place. To cut power we
+            // turn off the analog clock sources that nothing needs while the core is
+            // gated. Powering down XTAL also makes the analog config drop the HP
+            // regulator to the 0.6 V light-sleep voltage instead of holding it at the
+            // active calibration voltage (see `AnalogSleepConfig::defaults_light_sleep`),
+            // which is the dominant saving.
+            self.pd_flags.set_pd_xtal(true);
+            self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
     }
 
@@ -928,7 +866,7 @@ impl RtcSleepConfig {
             | PMU_LP_CORE_WAKEUP_EN
             | PMU_USB_WAKEUP_EN;
 
-        let wakeup_mask = wakeup_triggers.0 as u32;
+        let wakeup_mask = wakeup_triggers.as_u32();
         let reject_mask = if self.deep {
             0
         } else {
@@ -937,13 +875,19 @@ impl RtcSleepConfig {
             wakeup_mask & reject_mask
         };
 
-        let cpu_freq_config = ClockTree::with(|clocks| {
-            let cpu_freq_config = SavedClockConfig::save(clocks);
-            crate::soc::clocks::configure_soc_root_clk(
-                clocks,
-                crate::soc::clocks::SocRootClkConfig::Xtal,
-            );
-            cpu_freq_config
+        let _restore_clock_config = ClockTree::with(|clocks| {
+            let old_root = clocks.soc_root_clk();
+
+            clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
+
+            // Restore the old clock settings when we return
+            DropGuard::new((), move |_| {
+                ClockTree::with(|clocks| {
+                    if let Some(old_root) = old_root {
+                        clocks::configure_soc_root_clk(clocks, old_root);
+                    }
+                });
+            })
         });
 
         // pmu_sleep_config_default + pmu_sleep_init.
@@ -976,66 +920,52 @@ impl RtcSleepConfig {
 
         // like esp-idf pmu_sleep_start()
 
-        unsafe {
-            // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
-            lp_aon()
-                .store9()
-                .modify(|r, w| w.bits(r.bits() & !0x01 | self.deep as u32));
+        // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
+        LP_AON::regs()
+            .store9()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
-            // pmu_ll_hp_set_wakeup_enable
-            pmu().slp_wakeup_cntl2().write(|w| w.bits(wakeup_mask));
+        // pmu_ll_hp_set_wakeup_enable
+        PMU::regs()
+            .slp_wakeup_cntl2()
+            .write(|w| unsafe { w.bits(wakeup_mask) });
 
-            // pmu_ll_hp_set_reject_enable
-            pmu().slp_wakeup_cntl1().modify(|_, w| {
-                w.slp_reject_en()
-                    .bit(true)
-                    .sleep_reject_ena()
-                    .bits(reject_mask)
-            });
+        // pmu_ll_hp_set_reject_enable
+        PMU::regs().slp_wakeup_cntl1().modify(|_, w| unsafe {
+            w.slp_reject_en().bit(true);
+            w.sleep_reject_ena().bits(reject_mask)
+        });
 
-            // pmu_ll_hp_clear_reject_cause
-            pmu()
-                .slp_wakeup_cntl4()
-                .write(|w| w.slp_reject_cause_clr().bit(true));
+        // pmu_ll_hp_clear_reject_cause
+        PMU::regs()
+            .slp_wakeup_cntl4()
+            .write(|w| w.slp_reject_cause_clr().bit(true));
 
-            pmu().int_clr().write(|w| {
-                w.sw() // pmu_ll_hp_clear_sw_intr_status
-                    .clear_bit_by_one()
-                    .soc_sleep_reject() // pmu_ll_hp_clear_reject_intr_status
-                    .clear_bit_by_one()
-                    .soc_wakeup() // pmu_ll_hp_clear_wakeup_intr_status
-                    .clear_bit_by_one()
-            });
+        PMU::regs().int_clr().write(|w| {
+            // pmu_ll_hp_clear_sw_intr_status
+            w.sw().clear_bit_by_one();
+            // pmu_ll_hp_clear_reject_intr_status
+            w.soc_sleep_reject().clear_bit_by_one();
+            // pmu_ll_hp_clear_wakeup_intr_status
+            w.soc_wakeup().clear_bit_by_one()
+        });
 
-            // misc_modules_sleep_prepare
+        // misc_modules_sleep_prepare
 
-            // TODO: IDF-7370
-            #[cfg(not(soc_has_pmu))]
-            if !(self.deep && wakeup_triggers.touch) {
-                APB_SARADC::regs()
-                    .ctrl()
-                    .modify(|_, w| w.saradc2_pwdet_drv().bit(false));
-            }
+        // Start entry into sleep mode
 
-            // Start entry into sleep mode
+        // pmu_ll_hp_set_sleep_enable
+        PMU::regs()
+            .slp_wakeup_cntl0()
+            .write(|w| w.sleep_req().bit(true));
 
-            // pmu_ll_hp_set_sleep_enable
-            pmu().slp_wakeup_cntl0().write(|w| w.sleep_req().bit(true));
-
-            // In pd_cpu lightsleep and deepsleep mode, we never get here
-            loop {
-                let int_raw = pmu().int_raw().read();
-                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                    break;
-                }
+        // In pd_cpu lightsleep and deepsleep mode, we never get here
+        loop {
+            let int_raw = PMU::regs().int_raw().read();
+            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
+                break;
             }
         }
-
-        // esp-idf returns if the sleep was rejected, we don't return anything
-
-        ClockTree::with(|clocks| {
-            cpu_freq_config.restore(clocks);
-        });
     }
 
     /// Cleans up after sleep

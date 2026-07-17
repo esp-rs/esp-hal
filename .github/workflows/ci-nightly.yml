@@ -26,15 +26,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [
-          "esp32c2",
-          "esp32c3",
-          "esp32c5",
-          "esp32c6",
-          "esp32c61",
-          "esp32h2",
-          "esp32p4",
-        ]
+        device:
+          [
+            "esp32c2",
+            "esp32c3",
+            "esp32c5",
+            "esp32c6",
+            "esp32c61",
+            "esp32h2",
+            "esp32p4",
+            "esp32s31",
+          ]
     steps:
       - uses: actions/checkout@v6
 
@@ -44,15 +46,6 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           toolchain: nightly
           components: rust-src, clippy, rustfmt
-
-      - name: Setup cargo-batch
-        run: |
-          # Note this is linux-only, but the macOS runner has cargo batch installed
-          if ! command -v cargo-batch &> /dev/null; then
-              mkdir -p $HOME/.cargo/bin
-              curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
-              chmod +x $HOME/.cargo/bin/cargo-batch
-          fi
 
       - name: Build and Check
         shell: bash
@@ -78,7 +71,7 @@ jobs:
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.96.0.0
+          version: 1.97.0.0
 
       - name: Lint esp-hal on Xtensa chip
         run: cargo xtask lint-packages --chips ${{ matrix.device }} --toolchain esp
@@ -92,7 +85,7 @@ jobs:
         # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.96.0.0
+          version: 1.97.0.0
 
       # Check all chips at once only for esp-hal
       - name: Run check-global-symbols

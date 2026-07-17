@@ -49,6 +49,31 @@ macro_rules! assert_eq {
     ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
 }
 
+/// Signal to the radio HIL runner that harness firmware is ready.
+///
+/// The runner waits for this semihosting line before starting the DUT test.
+pub fn signal_harness_ready() {
+    semihosting::println!("[HARNESS-READY]");
+}
+
+/// Shared parameters for the IEEE 802.15.4 radio HIL tests.
+///
+/// The device-under-test and the `ieee802154_echo_support` firmware must agree
+/// on these values so the two boards land on the same channel and PAN and can
+/// address frames to each other.
+pub mod ieee802154 {
+    /// Radio channel used by both boards.
+    pub const CHANNEL: u8 = 15;
+    /// PAN ID shared by both boards.
+    pub const PAN_ID: u16 = 0x4242;
+    /// Short address of the device-under-test.
+    pub const DUT_ADDRESS: u16 = 0x2222;
+    /// Short address of the support (echo) firmware.
+    pub const SUPPORT_ADDRESS: u16 = 0x2323;
+    /// Payload the DUT transmits and the support firmware echoes back.
+    pub const PAYLOAD: &[u8] = b"esp-radio 802.15.4 HIL";
+}
+
 #[macro_export]
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{

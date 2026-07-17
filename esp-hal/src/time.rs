@@ -264,7 +264,7 @@ impl Instant {
     /// ```
     #[inline]
     pub fn now() -> Self {
-        implem::now()
+        now()
     }
 
     #[inline]
@@ -379,6 +379,13 @@ impl core::hash::Hash for Duration {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_micros().hash(state);
+    }
+}
+
+impl Default for Duration {
+    #[inline]
+    fn default() -> Self {
+        Self::ZERO
     }
 }
 
@@ -710,9 +717,16 @@ impl core::ops::Div<Duration> for Duration {
     }
 }
 
+#[inline]
+pub(crate) fn now() -> Instant {
+    let ticks = implem::raw_counter();
+    let micros = implem::ticks_to_us(ticks);
+
+    Instant::from_ticks(micros)
+}
+
 #[cfg(esp32)]
 pub(crate) mod implem {
-    use super::Instant;
     use crate::peripherals::TIMG0;
 
     #[cfg(feature = "rt")]
@@ -737,7 +751,7 @@ pub(crate) mod implem {
     }
 
     #[inline]
-    pub(super) fn now() -> Instant {
+    pub(crate) fn raw_counter() -> u64 {
         // on ESP32 use LACT
         let tg0 = TIMG0::regs();
         tg0.lactupdate().write(|w| unsafe { w.update().bits(1) });
@@ -756,15 +770,58 @@ pub(crate) mod implem {
         };
         let hi = tg0.lacthi().read().bits();
 
-        let ticks = ((hi as u64) << 32u64) | lo as u64;
+        ((hi as u64) << 32u64) | lo as u64
+    }
 
-        Instant::from_ticks(ticks / 16)
+    #[inline]
+    pub(crate) fn ticks_to_us(ticks: u64) -> u64 {
+        ticks / 16
+    }
+
+    #[inline]
+    #[cfg(sleep_light_sleep)]
+    pub(crate) fn us_to_ticks(counter: u64) -> u64 {
+        counter * 16
+    }
+
+    /// Callers must ensure this function is not called concurrently.
+    #[inline]
+    #[cfg(sleep_light_sleep)]
+    pub(crate) unsafe fn update_counter(counter: u64) {
+        // On ESP32 the monotonic counter is the LACT timer of TIMG0. To set its
+        // value we stage the new 64-bit count in the load registers and then
+        // trigger a software reload, which copies the staged value into the
+        // counter immediately.
+        //
+        // A manual `LACTLOAD` while the timer is running (`en = 1`) is silently
+        // dropped when executed from the AppCpu, leaving the monotonic clock stuck
+        // (this is why the post-light-sleep time correction is lost on AppCpu). We
+        // therefore disable the timer around the load (preserving the divider) and
+        // re-enable it afterwards, mirroring `time_init`. Callers run this with
+        // interrupts disabled and the other core parked, so the brief disable is
+        // safe from concurrent reads.
+        let tg0 = TIMG0::regs();
+
+        let divider = tg0.lactconfig().read().divider().bits();
+        tg0.lactconfig().write(|w| unsafe { w.bits(0) });
+
+        tg0.lactloadhi()
+            .write(|w| unsafe { w.load_hi().bits((counter >> 32) as u32) });
+        tg0.lactloadlo()
+            .write(|w| unsafe { w.load_lo().bits(counter as u32) });
+        tg0.lactload().write(|w| unsafe { w.load().bits(1) });
+
+        tg0.lactconfig().write(|w| {
+            unsafe { w.divider().bits(divider) };
+            w.increase().bit(true);
+            w.autoreload().bit(true);
+            w.en().bit(true)
+        });
     }
 }
 
 #[cfg(systimer_driver_supported)]
 pub(crate) mod implem {
-    use super::Instant;
     use crate::timer::systimer::{SystemTimer, Unit};
 
     #[cfg(feature = "rt")]
@@ -773,11 +830,27 @@ pub(crate) mod implem {
     }
 
     #[inline]
-    pub(super) fn now() -> Instant {
-        let ticks = SystemTimer::unit_value(Unit::Unit0);
+    pub(crate) fn raw_counter() -> u64 {
+        SystemTimer::unit_value(Unit::Unit0)
+    }
 
-        let micros = SystemTimer::ticks_to_us(ticks);
+    #[inline]
+    pub(crate) fn ticks_to_us(ticks: u64) -> u64 {
+        SystemTimer::ticks_to_us(ticks)
+    }
 
-        Instant::from_ticks(micros)
+    #[inline]
+    #[cfg(sleep_light_sleep)]
+    pub(crate) fn us_to_ticks(counter: u64) -> u64 {
+        SystemTimer::us_to_ticks(counter)
+    }
+
+    /// Callers must ensure this function is not called concurrently.
+    #[inline]
+    #[cfg(sleep_light_sleep)]
+    pub(crate) unsafe fn update_counter(counter: u64) {
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit0, counter);
+        }
     }
 }

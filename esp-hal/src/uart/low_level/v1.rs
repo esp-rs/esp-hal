@@ -1,12 +1,12 @@
-use super::{
+use crate::uart::{
     ConfigError,
     CtsConfig,
     HwFlowControl,
-    Info,
     RegisterBlock,
     RtsConfig,
     StopBits,
     SwFlowControl,
+    low_level::Info,
 };
 
 #[inline(always)]
@@ -28,31 +28,29 @@ pub(super) fn set_rx_timeout(
     timeout: Option<u8>,
     _symbol_len: u8,
 ) -> Result<(), ConfigError> {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             const MAX_THRHD: u8 = 0x7F; // 7 bits
-        } else {
+        }
+        _ => {
             const MAX_THRHD: u16 = 0x3FF; // 10 bits
         }
     }
 
     if let Some(timeout) = timeout {
-        #[cfg(esp32)]
-        let timeout_reg = timeout;
-        #[cfg(not(esp32))]
-        let timeout_reg = timeout as u16 * _symbol_len as u16;
+        let timeout_reg = cfg_select! {
+            esp32 => timeout,
+            _ => timeout as u16 * _symbol_len as u16,
+        };
 
         if timeout_reg > MAX_THRHD {
             return Err(ConfigError::TimeoutTooLong);
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let reg_thrhd = info.regs().conf1();
-            } else {
-                let reg_thrhd = info.regs().mem_conf();
-            }
-        }
+        let reg_thrhd = cfg_select! {
+            esp32 => info.regs().conf1(),
+            _ => info.regs().mem_conf(),
+        };
         reg_thrhd.modify(|_, w| unsafe { w.rx_tout_thrhd().bits(timeout_reg) });
     }
 
@@ -70,13 +68,10 @@ pub(super) fn rx_timeout_enabled(info: &Info) -> bool {
 }
 
 pub(super) fn is_tx_idle(info: &Info) -> bool {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
-            let status = info.regs().status();
-        } else {
-            let status = info.regs().fsm_status();
-        }
-    }
+    let status = cfg_select! {
+        esp32 => info.regs().status(),
+        _ => info.regs().fsm_status(),
+    };
 
     status.read().st_utx_out().bits() == 0x0
 }
@@ -114,19 +109,21 @@ pub(super) fn change_flow_control(
             xon_threshold,
             xoff_threshold,
         } => {
-            info.regs()
-                .flow_conf()
-                .modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+            info.regs().flow_conf().modify(|_, w| {
+                w.xonoff_del().set_bit();
+                w.sw_flow_con_en().set_bit()
+            });
 
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
+            cfg_select! {
+                esp32 => {
                     info.regs().swfc_conf().modify(|_, w| unsafe {
                         w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)
                     });
                     info.regs().swfc_conf().modify(|_, w| unsafe {
                         w.xon_char().bits(xon_char).xoff_char().bits(xoff_char)
                     });
-                } else {
+                }
+                _ => {
                     info.regs()
                         .swfc_conf1()
                         .modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
@@ -162,14 +159,33 @@ pub(super) fn change_flow_control(
     sync_regs(info.regs());
 }
 
+#[cfg(sleep_driver_supported)]
+pub(super) fn suspend(_info: &Info, _en: bool) {
+    // We drain the entire FIFO, so we have nothing to disable.
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn wait_for_suspended(info: &Info) {
+    // Wait for FIFO to drain completely.
+    while info.regs().status().read().txfifo_cnt().bits() > 0 {}
+
+    let fsm_status = cfg_select! {
+        esp32 => info.regs().status(),
+        _ => info.regs().fsm_status(),
+    };
+
+    while fsm_status.read().st_utx_out().bits() != 0 {}
+}
+
 fn configure_rts_flow_ctrl(info: &Info, enable: bool, threshold: Option<u8>) {
     if let Some(threshold) = threshold {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 info.regs()
                     .conf1()
                     .modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
-            } else {
+            }
+            _ => {
                 info.regs()
                     .mem_conf()
                     .modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
@@ -206,23 +222,25 @@ pub(super) fn current_symbol_length(info: &Info) -> u8 {
 pub(super) fn read_next_from_fifo(info: &Info) -> u8 {
     fn access_fifo_register<R>(f: impl Fn() -> R) -> R {
         // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/cpu-subsequent-access-halted-when-get-interrupted.html
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 crate::interrupt::free(f)
-            } else {
+            }
+            _ => {
                 f()
             }
         }
     }
 
     let fifo_reg = info.regs().fifo();
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
+    cfg_select! {
+        esp32s2 => {
             // On the ESP32-S2 we need to use PeriBus2 to read the FIFO:
             let fifo_reg = unsafe {
                 &*fifo_reg.as_ptr().cast::<u8>().add(0x20C00000).cast::<crate::pac::uart0::FIFO>()
             };
         }
+        _ => {}
     }
 
     access_fifo_register(|| fifo_reg.read().rxfifo_rd_byte().bits())
@@ -230,8 +248,8 @@ pub(super) fn read_next_from_fifo(info: &Info) -> u8 {
 
 #[allow(clippy::unnecessary_cast)]
 pub(super) fn rx_fifo_count(info: &Info) -> u16 {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             let fifo_cnt = info.regs().status().read().rxfifo_cnt().bits();
 
             // Calculate the real count based on the FIFO read and write offset address:
@@ -249,7 +267,8 @@ pub(super) fn rx_fifo_count(info: &Info) -> u16 {
             } else {
                 0
             }
-        } else {
+        }
+        _ => {
             info.regs().status().read().rxfifo_cnt().bits() as u16
         }
     }

@@ -96,19 +96,21 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 
 ## Changelog & migration
 
-- Add entries to `CHANGELOG.md` under `## [Unreleased]` > `### Added/Changed/Fixed/Removed`
-- Format: `- Description. (#PR_NUMBER)` — amend existing entries when modifying same feature: `(#789, #1234)`
-- Breaking changes: add migration steps to `MIGRATING-*.md` in the affected crate root
-- Breaking changes to stable API require a `breaking-change-<crate-name>` PR label
+- Changelog entries go in the **PR description**, not in `CHANGELOG.md` (those files are generated at release time — never edit them directly).
+- Use a `# Changelog` section with H2 crate headings (e.g. `## esp-hal`). Each entry starts with a kind prefix: `Added`, `Changed`, `Fixed`, or `Removed` — e.g. `- Added: Support for the Foo peripheral.` Do not include a PR number.
+- If a touched crate needs no user-visible entry, add `- No changelog necessary.` as the sole item in its section.
+- Breaking changes: add a `# Migration guide` section with an H2 `## crate/area` heading (e.g. `## esp-hal/SPI driver`) and an H3 `### Title` per change, followed by migration steps.
+- Breaking changes to stable API require a `breaking-change-<crate-name>` PR label.
+- Validate with `cargo xtask check-pr-changelog` (pipe the body in, or pass `--pr <number>`).
 
 ## PR checklist
 
 1. `cargo xtask fmt-packages`
 2. `cargo xtask lint-packages --chips <affected>` — fix all warnings
 3. `cargo xtask update-metadata --check` — if metadata changed
-4. `cargo xtask check-changelog` — add changelog entry if API changed
+4. `cargo xtask check-pr-changelog` — add changelog entries to the PR description if API changed
 5. Build affected examples/tests for relevant chips
-6. `cargo xtask host-tests` — if host-side code changed
+6. `cargo xtask host-tests` — if host-side code changed; when adding `#[test]` to a package for the first time, register it in `run_host_tests` (`xtask/src/lib.rs`)
 
 ## Key references
 

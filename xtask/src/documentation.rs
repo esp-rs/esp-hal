@@ -11,7 +11,12 @@ use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{Chip, Package, cargo::CargoArgsBuilder, windows_safe_path};
+use crate::{
+    Chip,
+    Package,
+    cargo::{CargoArgsBuilder, CargoCommandBatcher},
+    windows_safe_path,
+};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -279,14 +284,14 @@ fn cargo_doc_without_pre_processing(
     };
 
     let mut features = vec![];
-    let doc_features = if let Some(chip) = &chip {
+    let doc_config = if let Some(chip) = &chip {
         features.push(chip.to_string());
-        package.doc_feature_rules(Config::for_chip(chip))
+        package.doc_config_rules(Config::for_chip(chip))
     } else {
-        package.doc_feature_rules(&Config::empty())
+        package.doc_config_rules(&Config::empty())
     };
-    if let Some(doc_features) = doc_features {
-        features.extend(doc_features);
+    if let Some(doc_config) = &doc_config {
+        features.extend(doc_config.features.clone());
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -308,10 +313,7 @@ fn cargo_doc_without_pre_processing(
         builder.add_arg("-Zbuild-std=alloc,core");
     }
 
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    let rustdocflags = vec![
+    let rustdocflags = [
         "--cfg docsrs",
         "--cfg not_really_docsrs",
         // Activating this would redirect *all* rand_core version to 0.10.0, which is wrong.
@@ -320,17 +322,24 @@ fn cargo_doc_without_pre_processing(
         // support multiple versions of the same crate. We could redirect everything to 0.10.0,
         // which isn't ideal.
         // "--extern-html-root-url rand_core-09=https://docs.rs/rand_core/0.9.5/",
-    ];
+    ]
+    .join(" ");
 
-    let rustdocflags = rustdocflags.join(" ");
-    let mut envs = vec![("RUSTDOCFLAGS", rustdocflags.as_str())];
+    if let Some(doc_config) = &doc_config {
+        for (key, value) in &doc_config.env {
+            builder.add_env_var(key, value);
+        }
+    }
+    builder.add_env_var("RUSTDOCFLAGS", &rustdocflags);
     // Special case: `esp-storage` requires the optimization level to be 2 or 3:
     if package == Package::EspStorage {
-        envs.push(("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3"));
+        builder.add_env_var("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3");
     }
 
-    // Execute `cargo doc` from the package root:
-    crate::cargo::run_with_env(&args, &package_path, envs, false)?;
+    let command = CargoCommandBatcher::build_one_for_cargo(&builder);
+    log::debug!("{command:#?}");
+    crate::cargo::run_with_env(&command.command, &package_path, command.env_vars, false)
+        .with_context(|| format!("Failed to run `cargo doc` for {}", package_name))?;
 
     // Build up the path at which the built documentation can be found:
     let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {

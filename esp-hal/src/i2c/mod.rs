@@ -11,6 +11,11 @@
 #[cfg(i2c_master_driver_supported)]
 pub mod master;
 
+#[cfg(i2c_slave_driver_supported)]
+crate::unstable_module! {
+    pub mod slave;
+}
+
 #[cfg(soc_has_lp_i2c0)]
 crate::unstable_module! {
     pub mod lp_i2c;
@@ -21,3 +26,13 @@ crate::unstable_module! {
 crate::unstable_module! {
     pub mod rtc;
 }
+
+#[cfg_attr(i2c_master_version = "1", path = "clocks/v1.rs")]
+#[cfg_attr(i2c_master_version = "2", path = "clocks/v2.rs")]
+#[cfg_attr(
+    all(i2c_master_version = "3", not(any(esp32p4, soc_has_pcr))),
+    path = "clocks/v3.rs"
+)]
+#[cfg_attr(esp32p4, path = "clocks/esp32p4.rs")]
+#[cfg_attr(soc_has_pcr, path = "clocks/v3_pcr.rs")]
+mod clocks;

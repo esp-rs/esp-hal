@@ -221,6 +221,7 @@ fn parse_changelog_subsection(text: &str, sections: &mut Vec<PrSection>) -> Resu
     let mut current: Option<(String, Option<String>)> = None;
 
     for line in non_comment_lines(after) {
+        let line = line.trim();
         if line.starts_with("# ") {
             break;
         } else if let Some(h2) = line.strip_prefix("## ") {
@@ -259,7 +260,7 @@ fn parse_changelog_subsection(text: &str, sections: &mut Vec<PrSection>) -> Resu
 
 /// Parse a single list item `Kind: text` into a `ChangelogEntry`.
 fn parse_changelog_item(item: &str) -> Result<ChangelogEntry> {
-    let Some((kind_str, text)) = item.split_once(": ") else {
+    let Some((kind_str, text)) = item.split_once(":") else {
         bail!(
             r#"Changelog list item must start with a category followed by a colon, or '- No changelog necessary.'; got: `- {item}`.
 
@@ -565,6 +566,7 @@ fn validate_changelog_subsection(after: &str, errors: &mut Vec<String>) {
     let mut section_has_entries = false;
 
     for line in non_comment_lines(after) {
+        let line = line.trim();
         if line.starts_with("# ") {
             break;
         } else if let Some(h2) = line.strip_prefix("## ") {
@@ -1114,5 +1116,26 @@ Do something else.
             .unwrap();
         assert!(meta.exempted);
         assert!(meta.changelog.is_empty());
+    }
+
+    /// Two crates in one PR: one exempted, one with a real entry.
+    #[test]
+    fn spaces_are_trimmed() {
+        let body = r"
+ # Changelog
+
+  ## esp-hal
+
+ - Added: The new thing.
+";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        assert_eq!(cl.sections.len(), 1);
+        let hal = cl
+            .sections
+            .iter()
+            .find(|s| s.crate_name == "esp-hal")
+            .unwrap();
+        assert!(!hal.exempted);
+        assert_eq!(hal.changelog.len(), 1);
     }
 }

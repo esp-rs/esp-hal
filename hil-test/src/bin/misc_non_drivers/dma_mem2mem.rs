@@ -35,12 +35,12 @@ mod tests {
             .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
             .unwrap();
 
-        for i in 0..core::mem::size_of_val(tx_buffer) {
+        for i in 0..tx_buffer.len() {
             tx_buffer[i] = (i % 256) as u8;
         }
         let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
         dma_wait.wait().unwrap();
-        for i in 0..core::mem::size_of_val(tx_buffer) {
+        for i in 0..tx_buffer.len() {
             assert_eq!(rx_buffer[i], tx_buffer[i]);
         }
     }

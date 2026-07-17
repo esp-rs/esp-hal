@@ -9,26 +9,82 @@
 #![no_std]
 #![no_main]
 
+macro_rules! i2s_test_dma_channel {
+    ($peripherals:ident, I2S0) => {
+        cfg_select! {
+            esp32s2 => {
+                $peripherals.DMA_I2S0
+            }
+            i2s_dma_engine = "I2S_DMA" => {
+                $peripherals.DMA_I2S0.into()
+            }
+            _ => {
+                $peripherals.DMA_CH0.into()
+            }
+        }
+    };
+    ($peripherals:ident, I2S1) => {
+        cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                $peripherals.DMA_I2S1.into()
+            }
+            _ => {
+                $peripherals.DMA_CH0.into()
+            }
+        }
+    };
+    ($peripherals:ident, I2S2) => {
+        $peripherals.DMA_CH0.into()
+    };
+}
+
+macro_rules! i2s_instance_resources {
+    ($i2s:ident) => {{
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s: esp_hal::i2s::AnyI2s<'static> = peripherals.$i2s.into();
+        let dma_channel = i2s_test_dma_channel!(peripherals, $i2s);
+
+        #[cfg(not(esp32c5))]
+        let (_, dout) = hil_test::common_test_pins!(peripherals);
+
+        // there are some random pulses counted on ESP32-C5 in our HIL setup
+        // with the common test pin, so just use a fixed GPIO pin which is not used for anything
+        // else in this test on that chip in the hope it will fix it
+        #[cfg(esp32c5)]
+        let dout = peripherals.GPIO6;
+
+        let dout = dout.degrade();
+        (i2s, dma_channel, dout)
+    }};
+}
+
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::{
         Async,
         delay::Delay,
-        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf},
+        dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, DmaTxStreamBuf, aligned::InternalMemory},
         dma_rx_stream_buffer,
         dma_tx_stream_buffer,
         gpio::{AnyPin, NoPin, Pin},
-        i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
-        peripherals::I2S0,
+        i2s::{
+            AnyI2s,
+            master::{Channels, DataFormat, I2s, I2sTx, TdmConfig},
+        },
         time::Rate,
     };
 
     cfg_select! {
-        any(esp32, esp32s2) => {
-            type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
+        esp32s2 => {
+            type AnyI2sDmaChannel<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
+        }
+        i2s_dma_engine = "I2S_DMA" => {
+            type AnyI2sDmaChannel<'d> = esp_hal::dma::I2sDmaChannel<'d>;
         }
         _ => {
-            type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
+            type AnyI2sDmaChannel<'d> = esp_hal::dma::AhbGdmaChannel<'d>;
         }
     }
 
@@ -91,54 +147,20 @@ mod tests {
         }
     }
 
-    struct Context {
+    async fn run_test_i2s_loopback_async(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
         dout: AnyPin<'static>,
-        dma_channel: DmaChannel0<'static>,
-        i2s: I2S0<'static>,
-    }
-
-    #[init]
-    fn init() -> Context {
-        let peripherals = esp_hal::init(
-            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-        );
-
-        let dma_channel = cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                peripherals.DMA_I2S0
-            },
-            _ => {
-                peripherals.DMA_CH0
-            },
-        };
-
-        #[cfg(not(esp32c5))]
-        let (_, dout) = hil_test::common_test_pins!(peripherals);
-
-        // there are some random pulses counted on ESP32-C5 in our HIL setup
-        // with the common test pin, so just use a fixed GPIO pin which is not used for anything
-        // else in this test on that chip in the hope it will fix it
-        #[cfg(esp32c5)]
-        let dout = peripherals.GPIO6;
-
-        Context {
-            dout: dout.degrade(),
-            dma_channel,
-            i2s: peripherals.I2S0,
-        }
-    }
-
-    #[test]
-    async fn test_i2s_loopback_async(ctx: Context) {
+    ) {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE, 128);
         let tx_buffer = dma_tx_stream_buffer!(BUFFER_SIZE, 128);
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
@@ -147,7 +169,7 @@ mod tests {
         .unwrap()
         .into_async();
 
-        let (din, dout) = unsafe { ctx.dout.split() };
+        let (din, dout) = unsafe { dout.split() };
 
         let i2s_tx = i2s
             .i2s_tx
@@ -197,15 +219,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_i2s_loopback(ctx: Context) {
+    fn run_test_i2s_loopback(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
         let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE * 4, 1000);
         let mut tx_buffer = dma_tx_stream_buffer!(BUFFER_SIZE * 4, 1000);
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_signal_loopback(true)
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
@@ -213,7 +238,7 @@ mod tests {
         )
         .unwrap();
 
-        let (din, dout) = unsafe { ctx.dout.split() };
+        let (din, dout) = unsafe { dout.split() };
         let mut counter = super::EdgeCounter::new(din.clone());
 
         let i2s_tx = i2s
@@ -325,15 +350,17 @@ mod tests {
         counter.check(0);
     }
 
-    #[test]
     #[cfg(not(any(esp32, esp32s2)))]
-    fn test_i2s_rx_half_sample_bits_regression(ctx: Context) {
+    fn run_test_i2s_rx_half_sample_bits_regression(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+    ) {
         // Regression test for rx_half_sample_bits configuration bug.
         // Validates that TX and RX half_sample_bits registers are configured identically.
         let _i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -369,16 +396,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_i2s_read_one_shot_multiple(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+    fn run_test_i2s_read_one_shot_multiple(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([0; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -387,7 +422,7 @@ mod tests {
 
         // reading WS as input will generate a certain bit pattern on the data line which we can
         // check was received correctly
-        let (din, ws) = unsafe { ctx.dout.split() };
+        let (din, ws) = unsafe { dout.split() };
 
         let mut i2s_rx = i2s
             .i2s_rx
@@ -421,16 +456,24 @@ mod tests {
         }
     }
 
-    #[test]
-    async fn test_i2s_read_one_shot_multiple_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [0u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut rx_buffer = DmaRxBuf::new(descr, buffer).unwrap();
+    async fn run_test_i2s_read_one_shot_multiple_async(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([0; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut rx_buffer =
+            DmaRxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -440,7 +483,7 @@ mod tests {
 
         // reading WS as input will generate a certain bit pattern on the data line which we can
         // check was received correctly
-        let (din, ws) = unsafe { ctx.dout.split() };
+        let (din, ws) = unsafe { dout.split() };
 
         let mut i2s_rx = i2s
             .i2s_rx
@@ -476,25 +519,30 @@ mod tests {
         }
     }
 
-    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
-    // write completes.
-    #[test]
-    fn test_i2s_write_one_shot(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+    fn run_test_i2s_write_one_shot(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([1u8; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
         )
         .unwrap();
 
-        let (other, dout) = unsafe { ctx.dout.split() };
+        let (other, dout) = unsafe { dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
@@ -514,18 +562,23 @@ mod tests {
         counter.check(8000);
     }
 
-    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
-    // write completes.
-    #[test]
-    async fn test_i2s_write_one_shot_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 8000], [1u8; 8000]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+    async fn run_test_i2s_write_one_shot_async(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer =
+            hil_test::mk_static!(InternalMemory<[u8; 8000]>, InternalMemory::new([1u8; 8000]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let tx_buffer = DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -533,7 +586,7 @@ mod tests {
         .unwrap()
         .into_async();
 
-        let (other, dout) = unsafe { ctx.dout.split() };
+        let (other, dout) = unsafe { dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
         let i2s_tx = i2s
@@ -554,25 +607,30 @@ mod tests {
         counter.check(8000);
     }
 
-    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
-    // write completes.
-    #[test]
-    async fn test_i2s_write_one_shot_multiple(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+    async fn run_test_i2s_write_one_shot_multiple(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer = hil_test::mk_static!(InternalMemory<[u8; 4]>, InternalMemory::new([1u8; 4]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
         )
         .unwrap();
 
-        let (other, dout) = unsafe { ctx.dout.split() };
+        let (other, dout) = unsafe { dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
         let mut i2s_tx = i2s
@@ -598,18 +656,23 @@ mod tests {
         }
     }
 
-    // On chips supporting PCNT we check the number of written bytes, otherwise just make sure the
-    // write completes.
-    #[test]
-    async fn test_i2s_write_one_shot_multiple_async(ctx: Context) {
-        let buffer = hil_test::mk_static!([u8; 4], [1u8; 4]);
-        let descr = hil_test::mk_static!([DmaDescriptor; 4], [DmaDescriptor::EMPTY; 4]);
-        let mut tx_buffer = DmaTxBuf::new(descr, buffer).unwrap();
+    async fn run_test_i2s_write_one_shot_multiple_async(
+        i2s: AnyI2s<'static>,
+        dma_channel: AnyI2sDmaChannel<'static>,
+        dout: AnyPin<'static>,
+    ) {
+        let buffer = hil_test::mk_static!(InternalMemory<[u8; 4]>, InternalMemory::new([1u8; 4]));
+        let descr = hil_test::mk_static!(
+            InternalMemory<[DmaDescriptor; 4]>,
+            InternalMemory::new([DmaDescriptor::EMPTY; 4])
+        );
+        let mut tx_buffer =
+            DmaTxBuf::new(descr.get_mut().unsize(), buffer.get_mut().unsize()).unwrap();
 
         let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
+            i2s,
+            dma_channel,
+            TdmConfig::new_tdm_philips()
                 .with_sample_rate(Rate::from_hz(16000))
                 .with_data_format(DataFormat::Data16Channel16)
                 .with_channels(Channels::STEREO),
@@ -617,7 +680,7 @@ mod tests {
         .unwrap()
         .into_async();
 
-        let (other, dout) = unsafe { ctx.dout.split() };
+        let (other, dout) = unsafe { dout.split() };
         let mut counter = super::EdgeCounter::new(other);
 
         let mut i2s_tx = i2s
@@ -643,44 +706,205 @@ mod tests {
             i2s_tx = i2s_tx_back;
         }
     }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn test_i2s_loopback_async_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_loopback_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn test_i2s_loopback_async_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_loopback_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    async fn test_i2s_loopback_async_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_loopback_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    fn test_i2s_loopback_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_loopback(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    fn test_i2s_loopback_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_loopback(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    fn test_i2s_loopback_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_loopback(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    fn test_i2s_read_one_shot_multiple_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_read_one_shot_multiple(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    fn test_i2s_read_one_shot_multiple_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_read_one_shot_multiple(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    fn test_i2s_read_one_shot_multiple_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_read_one_shot_multiple(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn test_i2s_read_one_shot_multiple_async_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_read_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn test_i2s_read_one_shot_multiple_async_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_read_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    async fn test_i2s_read_one_shot_multiple_async_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_read_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    fn test_i2s_write_one_shot_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_write_one_shot(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    fn test_i2s_write_one_shot_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_write_one_shot(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    fn test_i2s_write_one_shot_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_write_one_shot(i2s, dma_channel, dout);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn test_i2s_write_one_shot_async_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_write_one_shot_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn test_i2s_write_one_shot_async_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_write_one_shot_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    async fn test_i2s_write_one_shot_async_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_write_one_shot_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn test_i2s_write_one_shot_multiple_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_write_one_shot_multiple(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn test_i2s_write_one_shot_multiple_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_write_one_shot_multiple(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    async fn test_i2s_write_one_shot_multiple_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_write_one_shot_multiple(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn test_i2s_write_one_shot_multiple_async_i2s0() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S0);
+        run_test_i2s_write_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn test_i2s_write_one_shot_multiple_async_i2s1() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S1);
+        run_test_i2s_write_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s2)]
+    async fn test_i2s_write_one_shot_multiple_async_i2s2() {
+        let (i2s, dma_channel, dout) = i2s_instance_resources!(I2S2);
+        run_test_i2s_write_one_shot_multiple_async(i2s, dma_channel, dout).await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(any(esp32, esp32s2))))]
+    fn test_i2s_rx_half_sample_bits_regression_i2s0() {
+        let (i2s, dma_channel, _) = i2s_instance_resources!(I2S0);
+        run_test_i2s_rx_half_sample_bits_regression(i2s, dma_channel);
+    }
 }
 
 #[cfg(esp32)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
-mod parallel_tests {
+mod i2s_parallel_tests {
     use esp_hal::{
+        dma::I2sDmaChannel,
         gpio::NoPin,
-        i2s::parallel::{I2sParallel, TxSixteenBits},
-        peripherals::{DMA_I2S0, I2S0},
+        i2s::{
+            AnyI2s,
+            parallel::{I2sParallel, TxSixteenBits},
+        },
         time::Rate,
     };
-    struct Context {
-        dma_channel: DMA_I2S0<'static>,
-        i2s: I2S0<'static>,
-    }
 
-    #[init]
-    fn init() -> Context {
-        let peripherals = esp_hal::init(
-            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-        );
-
-        let dma_channel = peripherals.DMA_I2S0;
-
-        Context {
-            dma_channel,
-            i2s: peripherals.I2S0,
-        }
-    }
-
-    #[test]
-    async fn driver_does_not_hang_when_async(ctx: Context) {
+    async fn run_driver_does_not_hang_when_async(
+        i2s: AnyI2s<'static>,
+        dma_channel: I2sDmaChannel<'static>,
+    ) {
         let pins = TxSixteenBits::new(
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
             NoPin, NoPin, NoPin, NoPin,
         );
-        let i2s = I2sParallel::new(ctx.i2s, ctx.dma_channel, Rate::from_mhz(20), pins, NoPin)
-            .into_async();
+        let i2s = I2sParallel::new(i2s, dma_channel, Rate::from_mhz(20), pins, NoPin).into_async();
 
         // Try sending an empty buffer, as an edge case
         let tx_buf = esp_hal::dma_tx_buffer!(4096).unwrap();
@@ -700,6 +924,130 @@ mod parallel_tests {
             .map_err(|_| "failed to send buffer")
             .unwrap();
         xfer.wait_for_done().await.unwrap();
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    async fn driver_does_not_hang_when_async_i2s0() {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s = peripherals.I2S0.into();
+        let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
+        run_driver_does_not_hang_when_async(i2s, dma_channel).await;
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    async fn driver_does_not_hang_when_async_i2s1() {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s = peripherals.I2S1.into();
+        let dma_channel: esp_hal::dma::I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
+        run_driver_does_not_hang_when_async(i2s, dma_channel).await;
+    }
+}
+
+#[cfg(i2s_supports_pdm_tx)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod pdm_tx_tests {
+    use esp_hal::{
+        dma_tx_buffer,
+        i2s::master::{I2s, Instance, PdmSlotMode, PdmTxConfig},
+        time::Rate,
+    };
+
+    #[test]
+    fn pdm_tx_config_validate() {
+        let tx = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
+        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        assert!(tx.validate(i2s.info()).is_ok());
+    }
+
+    #[test]
+    fn pdm_tx_init_and_write() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
+            _ => peripherals.DMA_CH0,
+        };
+
+        let tx_cfg = PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono);
+        let pdm_cfg = esp_hal::i2s::master::PdmConfig::tx_only(tx_cfg);
+
+        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+            .unwrap()
+            .i2s_tx
+            .with_clk(peripherals.GPIO1)
+            .with_dout(peripherals.GPIO2)
+            .build();
+
+        let mut buffer = dma_tx_buffer!(512).unwrap();
+        buffer.set_length(512);
+
+        let transfer = i2s.write(buffer).unwrap();
+        let (_, i2s, _) = transfer.wait();
+        let _ = i2s;
+    }
+}
+
+#[cfg(i2s_supports_pdm_rx)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod pdm_rx_tests {
+    use esp_hal::{
+        dma_rx_buffer,
+        i2s::master::{I2s, Instance, PdmConfig, PdmRxConfig, PdmSlotMode},
+        time::Rate,
+    };
+
+    fn default_rx_config() -> PdmRxConfig {
+        cfg_select! {
+            any(esp32, esp32s3, esp32p4) => {
+                PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
+            }
+            _ => {
+                PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            }
+        }
+    }
+
+    #[test]
+    fn pdm_rx_config_validate() {
+        let rx = default_rx_config();
+        let i2s = unsafe { esp_hal::peripherals::I2S0::steal() };
+        assert!(rx.validate(i2s.info()).is_ok());
+    }
+
+    #[test]
+    fn pdm_rx_init_and_read() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let dma_channel = cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => {
+                peripherals.DMA_I2S0
+            },
+            _ => {
+                peripherals.DMA_CH0
+            },
+        };
+
+        let pdm_cfg = PdmConfig::rx_only(default_rx_config());
+
+        let i2s = I2s::new_pdm(peripherals.I2S0, dma_channel, pdm_cfg)
+            .unwrap()
+            .i2s_rx
+            .with_clk(peripherals.GPIO1)
+            .with_din(peripherals.GPIO2)
+            .build();
+
+        let mut buffer = dma_rx_buffer!(512).unwrap();
+        buffer.set_length(512);
+
+        let transfer = i2s.read(buffer).unwrap();
+        let (_, i2s, _) = transfer.wait();
+        let _ = i2s;
     }
 }
 

@@ -3,11 +3,14 @@ pub(crate) mod dma;
 pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod i2s;
 pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sdm;
+pub(crate) mod sdmmc;
 pub(crate) mod sha;
+pub(crate) mod sleep;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
@@ -19,10 +22,13 @@ pub(crate) use dma::*;
 pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
 pub(crate) use sdm::*;
+pub(crate) use sdmmc::*;
 pub(crate) use sha::*;
+pub(crate) use sleep::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
@@ -221,9 +227,10 @@ macro_rules! driver_configs {
             pub fn driver_names(&self) -> impl Iterator<Item = &str> {
                 [$(
                     self.$driver.as_ref().and_then(|d| {
-                        match d.support_status.status {
-                            SupportStatusLevel::NotAvailable | SupportStatusLevel::NotSupported => None,
-                            _ => Some(stringify!($driver)),
+                        if d.support_status.is_supported() {
+                            Some(stringify!($driver))
+                        } else {
+                            None
                         }
                     }),
                 )*].into_iter().flatten()
@@ -233,7 +240,8 @@ macro_rules! driver_configs {
                 // Collect into a vector. This compiles faster than chaining iterators.
                 let mut instances = vec![];
                 $(
-                    if let Some(driver) = &self.$driver {
+                    if let Some(driver) = &self.$driver
+                        && driver.support_status.is_supported() {
                         instances.extend(driver.instances.iter().map(|i| {
                             format!("{}.{}", stringify!($driver), i.name)
                         }));
@@ -250,11 +258,13 @@ macro_rules! driver_configs {
                 let mut properties = vec![];
                 $(
                     if let Some(driver) = &self.$driver {
-                        properties.extend(driver.properties());
-                        $(
-                            driver_configs!(@ignore $computed);
-                            properties.extend(driver.computed_properties());
-                        )?
+                        if driver.support_status.is_supported() {
+                            properties.extend(driver.properties());
+                            $(
+                                driver_configs!(@ignore $computed);
+                                properties.extend(driver.computed_properties());
+                            )?
+                        }
                     }
                 )*
                 properties.into_iter()
@@ -347,13 +357,9 @@ driver_configs![
             #[serde(default)]
             mem2mem_requires_peripheral: bool,
             #[serde(default)]
-            can_access_psram: bool,
-            #[serde(default)]
             ext_mem_configurable_block_size: bool,
             #[serde(default)]
             separate_in_out_interrupts: bool,
-            #[serde(default)]
-            max_priority: Option<u32>,
             #[serde(default)]
             gdma_version: Option<u32>,
             #[serde(default)]
@@ -453,6 +459,10 @@ driver_configs![
             has_tx_fifo_watermark: bool,
             #[serde(default)]
             bus_timeout_is_exponential: bool,
+            /// Whether `I2C_SCL_SP_CONF_REG` has `scl_pd_en`/`sda_pd_en` bits for
+            /// actively holding a line low. All chips except ESP32 have these.
+            #[serde(default)]
+            has_pd_en: bool,
             #[serde(default)]
             i2c0_data_register_ahb_address: Option<u32>,
             max_bus_timeout: u32,
@@ -465,9 +475,12 @@ driver_configs![
         name: "I2C slave",
         properties: {}
     },
-    I2sProperties {
+    I2sProperties<I2sInstanceConfig> {
         driver: i2s,
         name: "I2S",
+        // The `supports_pdm_tx`/`supports_pdm_rx`/`supports_pcm2pdm`/`supports_pdm2pcm`
+        // flags are derived from the per-instance PDM configuration.
+        has_computed_properties: true,
         properties: {
             /// Register-layout generation derived from the chip SVD.
             version: Option<u32>,
@@ -480,6 +493,12 @@ driver_configs![
             #[serde(default)]
             /// Whether I2S clock/reset control is performed via PCR.
             clock_configured_by_pcr: bool,
+            #[serde(default)]
+            /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
+            clock_configured_by_hp_sys_clkrst: bool,
+            #[serde(default)]
+            /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
+            supports_pdm_rx_hp_filter: bool,
         }
     },
     IeeeProperties {
@@ -521,6 +540,14 @@ driver_configs![
         name: "LP I2C master",
         properties: {
             fifo_size: u32,
+        }
+    },
+    LpIoProperties {
+        driver: lp_io,
+        name: "LP IO",
+        properties: {
+            /// Low-level implementation selected for the chip's RTC/LP IO block.
+            version: String,
         }
     },
     LpUartProperties {
@@ -614,6 +641,21 @@ driver_configs![
             is_lp_sys: bool,
         }
     },
+    RomProperties {
+        driver: rom,
+        name: "ROM",
+        hide_from_peri_table: true,
+        properties: {
+            #[serde(default)]
+            has_crc_le: bool,
+            #[serde(default)]
+            has_crc_be: bool,
+            #[serde(default)]
+            has_md5_bsd: bool,
+            #[serde(default)]
+            has_md5_mbedtls: bool,
+        }
+    },
     RsaProperties {
         driver: rsa,
         name: "RSA",
@@ -630,10 +672,19 @@ driver_configs![
         name: "RTC Timekeeping",
         properties: {}
     },
-    SdHostProperties {
-        driver: sd_host,
-        name: "SDIO host",
-        properties: {}
+    Sdmmc {
+        driver: sdmmc,
+        name: "SDMMC/SDIO host",
+        properties: {
+            delay_phase_num: Option<u32>,
+            has_iomux: bool,
+            has_gpio_matrix: bool,
+            psram_dma: bool,
+            uhs: bool,
+            /// Per-slot signal routing; generates `for_each_sdmmc!`.
+            #[serde(default)]
+            slot_config: SdmmcSlots,
+        }
     },
     SdSlaveProperties {
         driver: sd_slave,
@@ -669,6 +720,8 @@ driver_configs![
             light_sleep: bool,
             #[serde(default)]
             deep_sleep: bool,
+            #[serde(default)]
+            wakeup_sources: WakeupSources,
         }
     },
     SocProperties {
@@ -685,9 +738,9 @@ driver_configs![
             #[serde(default)]
             cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
-            rc_fast_clk_default: Option<u32>,
-            #[serde(default)]
             internal_memory_cached: bool,
+            #[serde(default)]
+            has_swd_watchdog: bool,
             #[serde(flatten)]
             config: SocConfig,
         }

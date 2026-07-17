@@ -88,14 +88,15 @@ use crate::{
 
 const NUM_TIMG: usize = 1 + cfg!(timergroup_timg1) as usize;
 
-cfg_if::cfg_if! {
+cfg_select! {
     // We need no locks when a TIMG has a single timer, and we don't need locks for ESP32
     // and S2 where the effective interrupt enable register (config) is not shared between
     // the timers.
-    if #[cfg(all(timergroup_timg_has_timer1, not(any(esp32, esp32s2))))] {
+    all(timergroup_timg_has_timer1, not(any(esp32, esp32s2))) => {
         use esp_sync::RawMutex;
         static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
     }
+    _ => {}
 }
 
 #[procmacros::doc_replace(
@@ -422,8 +423,8 @@ impl Timer<'_> {
     }
 
     fn source_frequency(&self) -> Rate {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg_function_clock)] {
+        cfg_select! {
+            soc_has_clock_node_timg_function_clock => {
                 let timg = match self.timer_group() {
                     0 => crate::soc::clocks::TimgInstance::Timg0,
                     #[cfg(soc_has_timg1)]
@@ -431,7 +432,8 @@ impl Timer<'_> {
                     _ => unreachable!()
                 };
                 let hz = timg.function_clock_frequency();
-            } else {
+            }
+            _ => {
                 let hz = crate::soc::clocks::apb_clk_frequency();
             }
         }
@@ -512,21 +514,23 @@ impl Timer<'_> {
     }
 
     fn set_interrupt_enabled(&self, state: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2))] {
+        cfg_select! {
+            any(esp32, esp32s2) => {
                 // On ESP32 and S2, the `int_ena` register is ineffective - interrupts fire even
                 // without int_ena enabling them. We use level interrupts so that we have a status
                 // bit available.
                 self.t()
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
-            } else if #[cfg(timergroup_timg_has_timer1)] {
+            }
+            timergroup_timg_has_timer1 => {
                 INT_ENA_LOCK[self.timer_group() as usize].lock(|| {
                     self.register_block()
                         .int_ena()
                         .modify(|_, w| w.t(self.timer_number()).bit(state));
                 });
-            } else {
+            }
+            _ => {
                 self.register_block()
                     .int_ena()
                     .modify(|_, w| w.t(0).bit(state));
@@ -687,10 +691,11 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg_wdt_clock)] {
+        cfg_select! {
+            soc_has_clock_node_timg_wdt_clock => {
                 let clk_src = Rate::from_hz(TG::clock_instance().wdt_clock_frequency());
-            } else {
+            }
+            _ => {
                 let clk_src = Rate::from_hz(clocks::apb_clk_frequency());
             }
         }

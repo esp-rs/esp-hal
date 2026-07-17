@@ -4,15 +4,21 @@
   _trap_section_origin = .;
   KEEP(*(.trap));
   *(.trap.*);
+
+  *(.rwtext.interrupt .rwtext.interrupt.*)
 } > RWTEXT
 #ENDIF
 
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
+
+  _rwtext_start = .;
+
+  /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
   /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
-  *:esp_rom_spiflash.*(.literal .literal.* .text .text.*)
+  *:esp_rom_spiflash.*(.literal .text .literal.* .text.*)
 
   #IF ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK
     INCLUDE "rwtext_hook.x"
@@ -40,5 +46,6 @@
   *( .sleep_iram* )
   . = ALIGN(4);
 
+  _rwtext_end = .;
   _rwtext_len = . - ORIGIN(RWTEXT);
 } > RWTEXT

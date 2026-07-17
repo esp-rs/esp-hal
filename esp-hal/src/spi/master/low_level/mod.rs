@@ -26,6 +26,7 @@ use super::{
 };
 use crate::{
     asynch::AtomicWaker,
+    clock::ll::SpiInstance,
     gpio::{InputSignal, OutputSignal},
     handler,
     interrupt::InterruptHandler,
@@ -96,13 +97,25 @@ impl Drop for SpiWrapper<'_> {
         unsafe {
             // SAFETY: we "own" the state, we are allowed to deinit it
             self.spi.state().deinit();
-            crate::clock::ll::ClockTree::with(|clocks| {
-                self.spi
-                    .info()
-                    .clock_instance
-                    .release_function_clock(clocks);
-            });
         }
+    }
+}
+
+pub(super) struct SpiClockGuard {
+    clock: SpiInstance,
+}
+
+impl SpiClockGuard {
+    pub(super) fn new(spi: &Info) -> Self {
+        let clock = spi.clock_instance;
+        crate::clock::ll::ClockTree::with(|clocks| clock.request_function_clock(clocks));
+        Self { clock }
+    }
+}
+
+impl Drop for SpiClockGuard {
+    fn drop(&mut self) {
+        crate::clock::ll::ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
     }
 }
 
@@ -202,26 +215,29 @@ impl Driver {
     /// Initialize for full-duplex 1 bit mode
     pub(super) fn init(&self) {
         version::enable_peripheral_clock(self);
+
         crate::soc::clocks::ClockTree::with(|clocks| {
             self.info.clock_instance.configure_function_clock(
                 clocks,
                 crate::soc::clocks::SpiFunctionClockConfig::default(),
             );
             self.info.clock_instance.request_function_clock(clocks);
-        });
-        self.regs().user().modify(|_, w| {
-            w.usr_miso_highpart().clear_bit();
-            w.usr_mosi_highpart().clear_bit();
-            w.doutdin().set_bit();
-            w.usr_miso().set_bit();
-            w.usr_mosi().set_bit();
-            w.cs_hold().set_bit();
-            w.usr_dummy_idle().set_bit();
-            w.usr_addr().clear_bit();
-            w.usr_command().clear_bit()
-        });
 
-        version::init(self);
+            self.regs().user().modify(|_, w| {
+                w.usr_miso_highpart().clear_bit();
+                w.usr_mosi_highpart().clear_bit();
+                w.doutdin().set_bit();
+                w.usr_miso().set_bit();
+                w.usr_mosi().set_bit();
+                w.cs_hold().set_bit();
+                w.usr_dummy_idle().set_bit();
+                w.usr_addr().clear_bit();
+                w.usr_command().clear_bit()
+            });
+
+            version::init(self);
+            self.info.clock_instance.release_function_clock(clocks);
+        });
 
         self.regs().slave().write(|w| unsafe { w.bits(0) });
     }
@@ -260,17 +276,20 @@ impl Driver {
             self.info
                 .clock_instance
                 .configure_function_clock(clocks, config.clock_source);
+            self.info.clock_instance.request_function_clock(clocks);
 
             self.regs().clock().write(|w| unsafe { w.bits(raw) });
+
+            self.set_bit_order(config.read_bit_order, config.write_bit_order);
+            self.set_data_mode(config.mode);
+
+            version::apply_config(self);
+            self.info.clock_instance.release_function_clock(clocks);
         });
 
-        self.set_bit_order(config.read_bit_order, config.write_bit_order);
-        self.set_data_mode(config.mode);
         self.state
             .min_async_transfer_size
             .store(config.min_async_transfer_size, Ordering::Relaxed);
-
-        version::apply_config(self);
 
         Ok(())
     }
@@ -315,19 +334,14 @@ impl Driver {
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn fill_fifo(&self, chunk: &[u8]) {
-        // TODO: replace with `array_chunks` and `from_le_bytes`
-        let mut c_iter = chunk.chunks_exact(4);
+        let (chunks, rem) = chunk.as_chunks::<4>();
         let mut w_iter = self.regs().w_iter();
-        for c in c_iter.by_ref() {
+        for c in chunks {
             if let Some(w_reg) = w_iter.next() {
-                let word = (c[0] as u32)
-                    | ((c[1] as u32) << 8)
-                    | ((c[2] as u32) << 16)
-                    | ((c[3] as u32) << 24);
+                let word = u32::from_le_bytes(*c);
                 w_reg.write(|w| w.buf().set(word));
             }
         }
-        let rem = c_iter.remainder();
         if !rem.is_empty()
             && let Some(w_reg) = w_iter.next()
         {
@@ -354,15 +368,11 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
-    ///
-    /// This function will return before all bytes of the last chunk to transmit
-    /// have been sent to the wire. If you must ensure that the whole
-    /// messages was written correctly, use [`Self::flush`].
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
-            self.flush()?;
             self.write_one(chunk)?;
+            self.flush()?;
         }
         Ok(())
     }
@@ -479,8 +489,6 @@ impl Driver {
                 break;
             }
 
-            self.flush()?;
-
             if write_inc < read_inc {
                 // Read more than we write, must pad writing part with zeros
                 let mut empty = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -490,13 +498,143 @@ impl Driver {
                 self.write_one(&write[write_from..][..write_inc])?;
             }
 
+            self.flush()?;
+
             if read_inc > 0 {
-                self.flush()?;
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
 
             write_from += write_inc;
             read_from += read_inc;
+        }
+        Ok(())
+    }
+
+    fn prepare_half_duplex_chunk(&self, first: bool, last: bool) {
+        self.regs().user().modify(|_, w| {
+            if !first {
+                w.usr_command().clear_bit();
+                w.usr_addr().clear_bit();
+                w.usr_dummy().clear_bit();
+                w.cs_setup().clear_bit();
+            }
+            w.cs_hold().bit(!last)
+        });
+        version::set_cs_keep_active(self, !last);
+    }
+
+    /// Blocking, FIFO-based half-duplex read.
+    ///
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    pub(super) fn half_duplex_read(
+        &self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        if buffer.is_empty() {
+            error!("Half-duplex mode does not support empty buffer");
+            return Err(Error::Unsupported);
+        }
+
+        self.setup_half_duplex(
+            false,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        )?;
+
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        let mut first = true;
+        let mut chunks = buffer.chunks_mut(FIFO_SIZE).peekable();
+        while let Some(chunk) = chunks.next() {
+            let last = chunks.peek().is_none();
+            self.prepare_half_duplex_chunk(first, last);
+            self.configure_datalen(chunk.len(), 0);
+            self.start_operation();
+            self.flush()?;
+            self.read_from_fifo(chunk)?;
+            first = false;
+        }
+        Ok(())
+    }
+
+    /// Blocking, FIFO-based half-duplex write.
+    ///
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    pub(super) fn half_duplex_write(
+        &self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => {
+                let mut buffer = buffer;
+                let mut data_mode = data_mode;
+                let mut address = address;
+                let addr_bytes;
+                if buffer.is_empty() && !address.is_none() {
+                    // If the buffer is empty, we need to send a dummy byte
+                    // to trigger the address phase.
+                    let bytes_to_write = address.width().div_ceil(8);
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    addr_bytes = address.value().to_be_bytes();
+                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+                    data_mode = address.mode();
+                    address = Address::None;
+                }
+
+                if dummy > 0 {
+                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    error!("Dummy bits are not supported without data");
+                    return Err(Error::Unsupported);
+                }
+            }
+            _ => {}
+        }
+
+        self.setup_half_duplex(
+            true,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        )?;
+
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        if buffer.is_empty() {
+            self.prepare_half_duplex_chunk(true, true);
+            self.start_operation();
+            self.flush()?;
+        } else {
+            let mut first = true;
+            let mut chunks = buffer.chunks(FIFO_SIZE).peekable();
+            while let Some(chunk) = chunks.next() {
+                let last = chunks.peek().is_none();
+                self.prepare_half_duplex_chunk(first, last);
+                self.configure_datalen(0, chunk.len());
+                self.fill_fifo(chunk);
+                self.start_operation();
+                self.flush()?;
+                first = false;
+            }
         }
         Ok(())
     }
@@ -508,7 +646,7 @@ impl Driver {
             // while to ensure the peripheral is idle.
             let cancel_on_drop = DropGuard::new((), |_| {
                 self.abort_transfer();
-                while self.busy() {}
+                let _ = self.flush();
             });
             let res = self.write_one(chunk);
             self.flush_async().await;
@@ -547,8 +685,8 @@ impl Driver {
                 self.write_one(&write[write_from..][..write_inc])?;
             }
 
-            // Preserve previous semantics - see https://github.com/esp-rs/esp-hal/issues/5257
             self.flush_async().await;
+
             if read_inc > 0 {
                 self.read_from_fifo(&mut read[read_from..][..read_inc])?;
             }
@@ -654,8 +792,8 @@ impl Driver {
     }
 
     pub(super) fn update(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(spi_master_version = "3")] {
+        cfg_select! {
+            spi_master_version = "3" => {
                 let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
@@ -663,7 +801,8 @@ impl Driver {
                 while reg_block.cmd().read().update().bit_is_set() {
                     // wait
                 }
-            } else {
+            }
+            _ => {
                 // Doesn't seem to be needed for ESP32 and ESP32-S2
             }
         }
@@ -782,6 +921,7 @@ pub(super) fn handle_async(info: &'static Info, state: &'static State) {
     }
 }
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 struct SpiFuture<'a> {
     driver: &'a Driver,
 }

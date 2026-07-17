@@ -1,18 +1,22 @@
-//! Demonstrates deep sleep with timer wakeup
+//! Demonstrates waking from deep sleep with timer
 
 //% CHIP_FILTER: sleep_driver_supported
 
 #![no_std]
 #![no_main]
 
-use core::time::Duration;
-
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     main,
-    rtc_cntl::{Rtc, SocResetReason, reset_reason, sleep::TimerWakeupSource, wakeup_cause},
+    rtc_cntl::{
+        SocResetReason,
+        reset_reason,
+        sleep::{LowPower, TimerWakeupSource},
+        wakeup_cause,
+    },
     system::Cpu,
+    time::Duration,
 };
 use esp_println::println;
 
@@ -23,9 +27,9 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let delay = Delay::new();
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    println!("up and runnning!");
+    println!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
@@ -34,5 +38,5 @@ fn main() -> ! {
     let timer = TimerWakeupSource::new(Duration::from_secs(5));
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer]);
+    lpwr.sleep_deep(&[&timer]);
 }

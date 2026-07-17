@@ -243,10 +243,11 @@ pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
     // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
     // will not need to have a scheduler in their firmware.
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "wifi", feature = "ble"))] {
+    cfg_select! {
+        any(feature = "wifi", feature = "ble") => {
             crate::preempt::now() as i64
-        } else {
+        }
+        _ => {
             // In this case we don't have a scheduler, we can return esp-hal's timestamp.
             esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
         }
@@ -300,20 +301,15 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-// Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
-// causing an eventual overflow. Currently we are holding onto a guard ourselves while Wi-Fi/BT is
-// active, so the blobs should not be able to disable the clock anyway.
-//
-// This might have some low-power issues, but we're not there yet anyway.
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_enable_clock() {
-    // Stealing the peripheral is safe here, as they must have been passed into the relevant
-    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    let guard = esp_phy::enable_phy();
+    core::mem::forget(guard);
 }
 
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_disable_clock() {
-    // No-op, see `phy_enable_clock`.
+    esp_phy::disable_phy();
 }
 
 pub(crate) fn enable_wifi_power_domain() {
@@ -328,10 +324,11 @@ pub(crate) fn enable_wifi_power_domain() {
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
         #[cfg(not(esp32))]
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_apb_ctrl)] {
+        cfg_select! {
+            soc_has_apb_ctrl => {
                 let syscon = regs!(APB_CTRL);
-            } else { // S2
+            }
+            _ => { // S2
                 let syscon = regs!(SYSCON);
             }
         }
@@ -367,6 +364,63 @@ pub(crate) fn enable_wifi_power_domain() {
         rtc_cntl
             .dig_iso()
             .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
+
+    // Pulse a reset over the shared modem subsystems (RF frontend, BT/Wi-Fi
+    // baseband and MAC). On PMU-based chips a system reset restarts the digital core
+    // but leaves the modem power domain untouched, so without this the radio
+    // would inherit whatever state the previously-used radio left.
+    cfg_select! {
+        not(wifi_mac_version = "1") => {
+            regs!(MODEM_SYSCON).modem_rst_conf().modify(|_, w| {
+                w.rst_fe().set_bit();
+                w.rst_btbb().set_bit();
+                w.rst_btbb_apb().set_bit();
+                w.rst_btmac().set_bit();
+                w.rst_btmac_apb().set_bit();
+                #[cfg(soc_has_ieee802154)]
+                w.rst_zbmac().set_bit();
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().set_bit();
+                    w.rst_wifimac().set_bit();
+                }
+                w
+            });
+            regs!(MODEM_SYSCON).modem_rst_conf().modify(|_, w| {
+                w.rst_fe().clear_bit();
+                w.rst_btbb().clear_bit();
+                w.rst_btbb_apb().clear_bit();
+                w.rst_btmac().clear_bit();
+                w.rst_btmac_apb().clear_bit();
+                #[cfg(soc_has_ieee802154)]
+                w.rst_zbmac().clear_bit();
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().clear_bit();
+                    w.rst_wifimac().clear_bit();
+                }
+                w
+            });
+        }
+        // ESP32-C2 has no separate modem power domain (RTC_CNTL lacks
+        // wifi_force_pd/iso), but a system reset still leaves the shared modem
+        // subsystems in their previous state.
+        esp32c2 => {
+            regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
+                w.wifibb_rst().set_bit();
+                w.fe_rst().set_bit();
+                w.mac_rst().set_bit();
+                w.ble_rpa_rst().set_bit()
+            });
+            regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
+                w.wifibb_rst().clear_bit();
+                w.fe_rst().clear_bit();
+                w.mac_rst().clear_bit();
+                w.ble_rpa_rst().clear_bit()
+            });
+        }
+        _ => {}
     }
 }
 

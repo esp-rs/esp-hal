@@ -177,14 +177,15 @@ impl RunQueue {
         }
         self.ready_tasks[priority_n].push(ready_task);
 
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 let run_on = if _state[1].initialized {
                     self.select_scheduler_trigger_multi_core(_state, ready_task)
                 } else {
                     self.select_scheduler_trigger_single_core(priority_n)
                 };
-            } else {
+            }
+            _ => {
                 let run_on = self.select_scheduler_trigger_single_core(priority_n);
             }
         }
@@ -254,8 +255,8 @@ impl RunQueue {
         let current_prio = self.ready_priority.ready();
         trace!("pop - from level: {}", current_prio);
 
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
+        cfg_select! {
+            multi_core => {
                 use esp_hal::system::Cpu;
 
                 let other = match Cpu::current() {
@@ -283,7 +284,8 @@ impl RunQueue {
                     break;
                 }
 
-            } else {
+            }
+            _ => {
                 let popped = self.ready_tasks[current_prio].pop();
             }
         }
@@ -298,6 +300,12 @@ impl RunQueue {
 
     pub(crate) fn is_level_empty(&self, level: Priority) -> bool {
         self.ready_tasks[level.get()].is_empty()
+    }
+
+    /// Returns `true` if any task is ready to run (queued at any priority level).
+    #[cfg(all(multi_core, sleep_light_sleep))]
+    pub(crate) fn has_ready_tasks(&self) -> bool {
+        self.ready_priority.mask != 0
     }
 
     pub(crate) fn remove(&mut self, to_delete: TaskPtr) {

@@ -1863,7 +1863,9 @@ impl<'ch> RxTransaction<'ch, '_> {
 
                 // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
                 // after the receiver finished since it returns immediately if already done.
-                self.reader.read(&mut self.data, raw, true);
+                if !self.reader.read(&mut self.data, raw, true) {
+                    return Some(Event::Error);
+                }
             }
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
@@ -2077,11 +2079,13 @@ impl core::future::Future for RxFuture<'_> {
                 // might not be desired.
                 raw.stop_rx(false);
 
-                this.reader.read(&mut this.data, raw, true);
-
-                match ev {
-                    Event::Error => Err(Error::ReceiverError),
-                    _ => Ok(this.reader.total),
+                if !this.reader.read(&mut this.data, raw, true) {
+                    Err(Error::ReceiverError)
+                } else {
+                    match ev {
+                        Event::Error => Err(Error::ReceiverError),
+                        _ => Ok(this.reader.total),
+                    }
                 }
             }
             #[cfg(rmt_has_rx_wrap)]

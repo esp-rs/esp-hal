@@ -9,6 +9,14 @@ options:
       - type:
           validator: positive_integer
 
+  - name: light_sleep_min_us
+    description: "Minimum predicted sleep duration, in microseconds, required for the auto light-sleep idle hook to enter light sleep instead of WFI."
+    default:
+      - value: 1000
+    constraints:
+      - type:
+          validator: positive_integer
+
   - name: sw-task-overflow-detection
     description: "Enable software-based stack overflow detection. The stack guard value and offset is based on esp-hal configuration."
     default:
@@ -23,3 +31,14 @@ options:
     description: "Enable hardware-based stack overflow detection. The stack watermark is based on the esp-hal stack-guard-offset configuration."
     default:
       - value: true
+
+  - name: radio-timer-thread-priority
+    description: "Priority of the timer thread serving esp-radio."
+    default:
+      - value: 2
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 2
+            end: 28

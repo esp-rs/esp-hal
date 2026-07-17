@@ -58,11 +58,8 @@ crate::unstable_module! {
     #[cfg(etm_driver_supported)]
     pub mod etm;
 
-    #[cfg(soc_has_lp_io)]
+    #[cfg(lp_io_driver_supported)]
     pub mod lp_io;
-
-    #[cfg(all(soc_has_rtc_io, not(esp32)))]
-    pub mod rtc_io;
 
     #[cfg(dedicated_gpio_driver_supported)]
     pub mod dedicated;
@@ -87,7 +84,7 @@ pub use placeholder::NoPin;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt},
+    peripherals::{GPIO, IO_MUX},
     private::{self, Sealed},
 };
 
@@ -363,7 +360,6 @@ impl TryFrom<usize> for AlternateFunction {
 #[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -376,14 +372,13 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
-#[cfg(not(any(esp32c5, esp32c61)))]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     #[doc(hidden)]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
 
@@ -395,7 +390,7 @@ pub trait RtcPin: Pin {
     ///
     /// The `level` argument needs to be a valid setting for the
     /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32p4))]
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
     #[doc(hidden)]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
@@ -403,14 +398,11 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which support internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(not(any(esp32c5, esp32c61)))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
-    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pullup(&self, enable: bool);
     /// Enable/disable the internal pull-down resistor
-    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pulldown(&self, enable: bool);
 }
@@ -486,7 +478,7 @@ pub trait AnalogPin: Pin {
 }
 
 /// Trait implemented by pins which can be used as Touchpad pins
-#[cfg(touch)]
+#[cfg(touch_driver_supported)]
 #[instability::unstable]
 pub trait TouchPin: Pin {
     /// Configure the pin for analog operation
@@ -529,22 +521,18 @@ impl<'d> Io<'d> {
         Io { _io_mux }
     }
 
-    /// Set the interrupt priority for GPIO interrupts.
+    #[doc = cfg_select!(
+        any(single_core, esp32s3) => "Sets the the interrupt priority and enables GPIO interrupts.",
+        _ => "Sets the interrupt priority and enables GPIO interrupts on all cores.",
+    )]
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        // FIXME: this sets priority on all cores where the handler may be running. Should we only
-        // change it on the current core? Should that enable the interrupt if it's not already
-        // enabled?
-        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
+        low_level::set_interrupt_priority(prio);
     }
 
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for all GPIO pins."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for all GPIO pins. Enables the interrupt on the current core."
+    #[doc = cfg_select!(
+        any(single_core, esp32s3) => "Registers an interrupt handler for all GPIO pins.",
+        _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
     )]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
@@ -564,15 +552,11 @@ impl<'d> Io<'d> {
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::GPIO);
-        }
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
-
-        crate::interrupt::bind_handler(
-            Interrupt::GPIO,
-            InterruptHandler::new(user_gpio_interrupt_handler, handler.priority()),
-        );
+        low_level::enable_interrupt(InterruptHandler::new(
+            user_gpio_interrupt_handler,
+            handler.priority(),
+        ));
     }
 }
 
@@ -1360,7 +1344,7 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
-        unwrap!(self.pin.listen_with_options(event, true, false, false));
+        unwrap!(self.pin.listen_with_options(event, true, false));
     }
 
     /// Stop listening for interrupts.
@@ -1413,8 +1397,7 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.pin
-            .listen_with_options(event.into(), false, false, enable)
+        self.pin.listen_with_options(event.into(), false, enable)
     }
 
     // Output functions
@@ -1692,6 +1675,20 @@ impl<'lt> AnyPin<'lt> {
         self.set_output_enable(false);
         self.disable_usb_pads();
 
+        #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+        for_each_lp_function! {
+            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+                if self.number() == crate::peripherals::$gpio::NUMBER {
+                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                }
+            };
+            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+                if self.number() == crate::peripherals::$gpio::NUMBER {
+                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                }
+            };
+        }
+
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
             .write(|w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
@@ -1888,7 +1885,6 @@ impl<'lt> AnyPin<'lt> {
         &self,
         event: Event,
         int_enable: bool,
-        nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) -> Result<(), WakeConfigError> {
         if wake_up_from_light_sleep {
@@ -1908,7 +1904,7 @@ impl<'lt> AnyPin<'lt> {
 
             set_int_enable(
                 self.number(),
-                Some(gpio_intr_enable(int_enable, nmi_enable)),
+                Some(gpio_intr_enable(int_enable)),
                 event as u8,
                 wake_up_from_light_sleep,
             );
@@ -2179,7 +2175,6 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
     panic!("Pin {} is not an {}", pin, function)
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 macro_rules! for_each_rtcio_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2202,7 +2197,6 @@ macro_rules! for_each_rtcio_pin {
     };
 }
 
-#[cfg(not(any(esp32h2, esp32c5, esp32c61)))]
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2234,7 +2228,6 @@ macro_rules! for_each_rtcio_output_pin {
     };
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8 {
@@ -2243,7 +2236,8 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(xtensa, esp32c6, esp32p4))]
+    // Keep device cfg aligned with init_gpio!
+    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
@@ -2256,7 +2250,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32p4))]
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
         for_each_rtcio_pin! {
             (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };
@@ -2264,16 +2258,13 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(not(any(esp32c5, esp32c61)))]
 impl RtcPinWithResistors for AnyPin<'_> {
-    #[cfg(not(esp32h2))]
     fn rtcio_pullup(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
         }
     }
 
-    #[cfg(not(esp32h2))]
     fn rtcio_pulldown(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
@@ -2343,13 +2334,13 @@ for_each_gpio! {
 
             fn output_signals(&self, _: crate::private::Internal) -> &'static [(AlternateFunction, OutputSignal)] {
                 &[$(
-                        (AlternateFunction::$af_output_num, OutputSignal::$af_output_signal),
+                    (AlternateFunction::$af_output_num, OutputSignal::$af_output_signal),
                 )*]
             }
 
             fn input_signals(&self, _: crate::private::Internal) -> &'static [(AlternateFunction, InputSignal)] {
                 &[$(
-                        (AlternateFunction::$af_input_num, InputSignal::$af_input_signal),
+                    (AlternateFunction::$af_input_num, InputSignal::$af_input_signal),
                 )*]
             }
         }

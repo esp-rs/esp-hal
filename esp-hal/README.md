@@ -21,104 +21,111 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 ## Supported Devices
 
-|   Chip   |         Datasheet          | Technical Reference Manual |             Target             |
-| :------: | :------------------------: | :------------------------: | :----------------------------: |
-|  ESP32   |    [ESP32][32-datasheet]   |      [ESP32][32-trm]       |    `xtensa-esp32-none-elf`     |
-| ESP32-C2 |  [ESP32-C2][c2-datasheet]  |     [ESP32-C2][c2-trm]     | `riscv32imc-unknown-none-elf`  |
-| ESP32-C3 |  [ESP32-C3][c3-datasheet]  |     [ESP32-C3][c3-trm]     | `riscv32imc-unknown-none-elf`  |
-| ESP32-C5 |  [ESP32-C5][c5-datasheet]  |     [ESP32-C5][c5-trm]     | `riscv32imac-unknown-none-elf` |
-| ESP32-C6 |  [ESP32-C6][c6-datasheet]  |     [ESP32-C6][c6-trm]     | `riscv32imac-unknown-none-elf` |
-| ESP32-C61| [ESP32-C61][c61-datasheet] |     [ESP32-C61][c61-trm]   | `riscv32imac-unknown-none-elf` |
-| ESP32-H2 |  [ESP32-H2][h2-datasheet]  |     [ESP32-H2][h2-trm]     | `riscv32imac-unknown-none-elf` |
-| ESP32-P4 |  [ESP32-P4][p4-datasheet]  |     [ESP32-P4][p4-trm]     | `riscv32imafc-unknown-none-elf`|
-| ESP32-S2 |  [ESP32-S2][s2-datasheet]  |     [ESP32-S2][s2-trm]     |   `xtensa-esp32s2-none-elf`    |
-| ESP32-S3 |  [ESP32-S3][s3-datasheet]  |     [ESP32-S3][s3-trm]     |   `xtensa-esp32s3-none-elf`    |
+<!-- The following table is machine generated. Do not edit the comments and the table by hand! -->
+<!-- start supported devices table -->
+| Chip | Datasheet | Technical Reference Manual | Target |
+| :---: | :-------: | :------------------------: | :----: |
+| ESP32 | [ESP32][esp32-datasheet] | [ESP32][esp32-trm] | `xtensa-esp32-none-elf` |
+| ESP32-C2 | [ESP32-C2][esp32c2-datasheet] | [ESP32-C2][esp32c2-trm] | `riscv32imc-unknown-none-elf` |
+| ESP32-C3 | [ESP32-C3][esp32c3-datasheet] | [ESP32-C3][esp32c3-trm] | `riscv32imc-unknown-none-elf` |
+| ESP32-C5 | [ESP32-C5][esp32c5-datasheet] | [ESP32-C5][esp32c5-trm] | `riscv32imac-unknown-none-elf` |
+| ESP32-C6 | [ESP32-C6][esp32c6-datasheet] | [ESP32-C6][esp32c6-trm] | `riscv32imac-unknown-none-elf` |
+| ESP32-C61 | [ESP32-C61][esp32c61-datasheet] | [ESP32-C61][esp32c61-trm] | `riscv32imac-unknown-none-elf` |
+| ESP32-H2 | [ESP32-H2][esp32h2-datasheet] | [ESP32-H2][esp32h2-trm] | `riscv32imac-unknown-none-elf` |
+| ESP32-P4 | [ESP32-P4][esp32p4-datasheet] | [ESP32-P4][esp32p4-trm] | `riscv32imafc-unknown-none-elf` |
+| ESP32-S2 | [ESP32-S2][esp32s2-datasheet] | [ESP32-S2][esp32s2-trm] | `xtensa-esp32s2-none-elf` |
+| ESP32-S3 | [ESP32-S3][esp32s3-datasheet] | [ESP32-S3][esp32s3-trm] | `xtensa-esp32s3-none-elf` |
+| ESP32-S31 | [ESP32-S31][esp32s31-datasheet] | [ESP32-S31][esp32s31-trm] | `riscv32imafc-unknown-none-elf` |
 
-[32-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
-[c2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp8684_datasheet_en.pdf
-[c3-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
-[c5-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c5_datasheet_en.pdf
-[c6-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_datasheet_en.pdf
-[c61-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c61_datasheet_en.pdf
-[h2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_datasheet_en.pdf
-[p4-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_datasheet_en.pdf
-[s2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
-[s3-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
-[32-trm]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
-[c2-trm]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
-[c3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
-[c5-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf
-[c6-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
-[c61-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf
-[h2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
-[p4-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf
-[s2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
-[s3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
+[esp32-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
+[esp32-trm]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
+[esp32c2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp8684_datasheet_en.pdf
+[esp32c2-trm]: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf
+[esp32c3-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
+[esp32c3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf
+[esp32c5-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c5_datasheet_en.pdf
+[esp32c5-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf
+[esp32c6-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_datasheet_en.pdf
+[esp32c6-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
+[esp32c61-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-c61_datasheet_en.pdf
+[esp32c61-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf
+[esp32h2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_datasheet_en.pdf
+[esp32h2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf
+[esp32p4-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_datasheet_en.pdf
+[esp32p4-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf
+[esp32s2-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
+[esp32s2-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf
+[esp32s3-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+[esp32s3-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
+[esp32s31-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf
+[esp32s31-trm]: https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf
+<!-- end supported devices table -->
 
 ## Peripheral support
 
 <!-- The following table is machine generated. Do not edit the comments and the table by hand! -->
 <!-- start chip support table -->
-| Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 |
-| ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|
-| ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [❌][5422] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       |          | ⚒️      |
-| Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          | [❌][5423] [^1] |          | ❌       |          |          |
-| Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |           |          |          |          |          |
-| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          | ⚒️      |
-| Camera interface          | ❌    |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |
-| DAC                       | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          |
-| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
-| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | ❌       | [❌][884] [^1] | [❌][884] [^1] |
-| ECDSA                     |       |          |          | [❌][5444] [^1] |          | [❌][5444] [^1] | [❌][5444] [^1] | ❌       |          |          |
-| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          |
-| Ethernet                  | ⚒️   |          |          |          |          |           |          | ⚒️      |          |          |
-| ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      | [❌][5419] [^1] | ⚒️      | ❌       |          |          |
-| GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ⚒️       | ✔️      | ⚒️      | ✔️      | ✔️      |
-| HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
-| I2C slave                 | [❌][1909] [^1] |          | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | [❌][1909] [^1] | ❌       | [❌][1909] [^1] | [❌][1909] [^1] |
-| I2S                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |
-| Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
-| Key Manager               |       |          |          | [❌][5171] [^1] |          |           |          |          |          |          |
-| LEDC                      | ⚒️   | ⚒️      | ⚒️      | [❌][5161] [^1] | ⚒️      | [❌][5418] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| LP I2C master             |       |          |          | ⚒️      | ⚒️      |           |          | ❌       |          |          |
-| LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |           |          | ❌       |          |          |
-| MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      |           | ⚒️      | ❌       |          | ⚒️      |
-| MIPI-DSI                  |       |          |          |          |          |           |          | ⚒️      |          |          |
-| PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |
-| PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      | ⚒️      |
-| RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |
-| RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |
-| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SDIO host                 | ❌    |          |          |          |          |           |          | ❌       |          | ❌       |
-| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          | ❌       |          |          |
-| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SDM                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
-| SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | [❌][5421] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |           |          | ❌       | [❌][1905] [^1] | [❌][1905] [^1] |
-| TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
-| UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ❌       | ⚒️      |
-| ULP (FSM)                 | ❌    |          |          |          |          |           |          |          | ❌       | ❌       |
-| ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ❌       | ⚒️      | ⚒️      |
-| USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |
-| USB OTG HS                |       |          |          |          |          |           |          | ⚒️      |          |          |
-| USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |
-| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      |
+| Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 | ESP32-S31 |
+| ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|:---------:|
+| ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [❌][5422] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       |          | ⚒️      | ❌        |
+| Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          | [❌][5423] [^1] |          | ❌       |          |          |           |
+| Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |           |          |          |          |          |           |
+| Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          | ⚒️      |           |
+| Camera interface          | ❌    |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |           |
+| DAC                       | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          |           |
+| Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |           |
+| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | ❌       | [❌][884] [^1] | [❌][884] [^1] |           |
+| ECDSA                     |       |          |          | [❌][5444] [^1] |          | [❌][5444] [^1] | [❌][5444] [^1] | ❌       |          |          |           |
+| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          |           |
+| Ethernet                  | ⚒️   |          |          |          |          |           |          | ⚒️      |          |          |           |
+| ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      | [❌][5419] [^1] | ⚒️      | ❌       |          |          |           |
+| GPIO                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ❌        |
+| HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      |           |
+| I2C slave                 | [❌][1909] [^1] |          | ✔️      | [❌][1909] [^1] | ✔️      | [❌][1909] [^1] | [❌][1909] [^1] | ❌       | [❌][1909] [^1] | [❌][1909] [^1] |           |
+| I2S                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |           |
+| Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       |
+| Key Manager               |       |          |          | [❌][5171] [^1] |          |           |          |          |          |          |           |
+| LEDC                      | ⚒️   | ⚒️      | ⚒️      | [❌][5161] [^1] | ⚒️      | [❌][5418] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| LP I2C master             |       |          |          | ⚒️      | ⚒️      |           |          | ❌       |          |          |           |
+| LP IO                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |           |          | ❌       |          |          |           |
+| MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      |           | ⚒️      | ❌       |          | ⚒️      |           |
+| MIPI-DSI                  |       |          |          |          |          |           |          | ⚒️      |          |          |           |
+| PARL_IO                   |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          |           |
+| PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |           |
+| PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      | ⚒️      |           |
+| RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |           |
+| RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |           |
+| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| SDMMC/SDIO host           | ⚒️   |          |          |          |          |           |          | ⚒️      |          | ⚒️      |           |
+| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |           |
+| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| SDM                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
+| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      |           |
+| SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | [❌][5421] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |           |          | ❌       | [❌][1905] [^1] | [❌][1905] [^1] |           |
+| TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
+| UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ❌        |
+| UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ❌       | ⚒️      |           |
+| ULP (FSM)                 | ❌    |          |          |          |          |           |          |          | ❌       | ❌       |           |
+| ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ❌       | ⚒️      | ⚒️      |           |
+| USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |           |
+| USB OTG HS                |       |          |          |          |          |           |          | ⚒️      |          |          |           |
+| USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |           |
+| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      |           |
 
  * Empty cell: Not available
  * ❌: Not supported
@@ -137,7 +144,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5161]: https://github.com/esp-rs/esp-hal/issues/5161
 [5163]: https://github.com/esp-rs/esp-hal/issues/5163
 [5164]: https://github.com/esp-rs/esp-hal/issues/5164
-[5165]: https://github.com/esp-rs/esp-hal/issues/5165
 [5166]: https://github.com/esp-rs/esp-hal/issues/5166
 [5167]: https://github.com/esp-rs/esp-hal/issues/5167
 [5168]: https://github.com/esp-rs/esp-hal/issues/5168
@@ -150,7 +156,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5421]: https://github.com/esp-rs/esp-hal/issues/5421
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
-[5424]: https://github.com/esp-rs/esp-hal/issues/5424
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 <!-- end chip support table -->
 

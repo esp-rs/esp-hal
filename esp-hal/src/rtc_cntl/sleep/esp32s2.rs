@@ -1,7 +1,6 @@
 use super::{
     Ext0WakeupSource,
     Ext1WakeupSource,
-    TimerWakeupSource,
     UlpWakeupSource,
     WakeSource,
     WakeTriggers,
@@ -10,7 +9,7 @@ use super::{
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Rtc, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, WakeupSource, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -81,8 +80,12 @@ impl WakeSource for UlpWakeupSource {
         triggers: &mut WakeTriggers,
         sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_ulp(self.wake_on_interrupt);
-        triggers.set_ulp_riscv_trap(self.wake_on_trap);
+        if self.wake_on_interrupt {
+            triggers.insert(WakeupSource::UlpRiscv);
+        }
+        if self.wake_on_trap {
+            triggers.insert(WakeupSource::UlpRiscvTrap);
+        }
 
         if self.clear_interrupts_on_sleep {
             self.clear_interrupts();
@@ -94,37 +97,6 @@ impl WakeSource for UlpWakeupSource {
     }
 }
 
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-        let rtc_cntl = LPWR::regs();
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            rtc_cntl
-                .slp_timer0()
-                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-
-            rtc_cntl
-                .int_clr()
-                .write(|w| w.main_timer().clear_bit_by_one());
-
-            rtc_cntl.slp_timer1().write(|w| {
-                w.slp_val_hi().bits(((time_in_ticks >> 32) & 0xffff) as u16);
-                w.main_timer_alarm_en().set_bit()
-            });
-        }
-    }
-}
-
 impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     fn apply(
         &self,
@@ -133,7 +105,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
         sleep_config: &mut RtcSleepConfig,
     ) {
         sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_ext0(true);
+        triggers.insert(WakeupSource::Ext0);
 
         // TODO: disable clock when not in use
         SENS::regs()
@@ -179,7 +151,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         triggers: &mut WakeTriggers,
         _sleep_config: &mut RtcSleepConfig,
     ) {
-        triggers.set_ext1(true);
+        triggers.insert(WakeupSource::Ext1);
 
         // TODO: disable clock when not in use
         SENS::regs()
@@ -254,7 +226,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
 
         // don't power down RTC peripherals
         sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_gpio(true);
+        triggers.insert(WakeupSource::Gpio);
 
         // Since we only use RTCIO pins, we can keep deep sleep enabled.
         let sens = crate::peripherals::SENS::regs();
@@ -337,8 +309,15 @@ impl Default for RtcSleepConfig {
         cfg.set_light_slp_reject(true);
         cfg.set_rtc_dbias_slp(RTC_CNTL_DBIAS_1V10);
         cfg.set_dig_dbias_slp(RTC_CNTL_DBIAS_1V10);
-        cfg.set_rtc_slowmem_pd_en(true);
-        cfg.set_rtc_fastmem_pd_en(true);
+
+        // This is the light-sleep config. The main XTAL is powered down in sleep
+        // (`xtal_fpu` stays false), so the analog regulator/bias must use the
+        // same XTAL-down settings that `deep()` applies "because of xtal_fpu".
+        cfg.set_rtc_regulator_fpu(true);
+        cfg.set_bias_sleep_monitor(true);
+        cfg.set_pd_cur_monitor(true);
+        cfg.set_bias_sleep_slp(true);
+        cfg.set_pd_cur_slp(true);
         cfg
     }
 }
@@ -434,6 +413,10 @@ impl RtcSleepConfig {
         cfg.set_pd_cur_slp(true);
 
         cfg
+    }
+
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -791,15 +774,12 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
 
             // set bits for what can wake us up
-            LPWR::regs()
-                .wakeup_state()
-                .modify(|_, w| w.wakeup_ena().bits(wakeup_triggers.0.into()));
-
-            // WARN: slp_wakeup is not set in esp-idf
-            LPWR::regs().state0().write(|w| {
-                w.sleep_en().set_bit();
-                w.slp_wakeup().set_bit()
+            LPWR::regs().wakeup_state().modify(|_, w| {
+                w.wakeup_ena()
+                    .bits((wakeup_triggers.as_u32() as u16).into())
             });
+
+            LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
         }
     }
 

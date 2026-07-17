@@ -1497,20 +1497,22 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     }
 
     fn input_signal(&self) -> InputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
+        cfg_select! {
+            any(esp32, esp32c3, esp32s2, esp32s3) => {
                 InputSignal::TWAI_RX
-            } else {
+            }
+            _ => {
                 InputSignal::TWAI0_RX
             }
         }
     }
 
     fn output_signal(&self) -> OutputSignal {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
+        cfg_select! {
+            any(esp32, esp32c3, esp32s2, esp32s3) => {
                 OutputSignal::TWAI_TX
-            } else {
+            }
+            _ => {
                 OutputSignal::TWAI0_TX
             }
         }
@@ -1625,6 +1627,7 @@ mod asynch {
     use esp_sync::RawMutex;
 
     use super::*;
+    use crate::rtc_cntl::WakeLock;
 
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
@@ -1670,6 +1673,7 @@ mod asynch {
         twai: AnyTwai<'d>,
         frame: &'f EspTwaiFrame,
         in_flight: bool,
+        _wake_lock: WakeLock,
     }
 
     impl<'d, 'f> TransmitFuture<'d, 'f> {
@@ -1678,6 +1682,7 @@ mod asynch {
                 twai,
                 frame,
                 in_flight: false,
+                _wake_lock: WakeLock::new(),
             }
         }
     }

@@ -3,6 +3,7 @@
 SECTIONS {
   .rtc_slow.text : {
    . = ALIGN(4);
+   /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
    *(.rtc_slow.literal .rtc_slow.text .rtc_slow.literal.* .rtc_slow.text.*)
    . = ALIGN(4);
   } > rtc_slow_seg AT > RODATA

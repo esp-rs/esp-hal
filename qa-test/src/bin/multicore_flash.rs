@@ -16,7 +16,6 @@
 
 use core::ptr::addr_of_mut;
 
-use embedded_storage::nor_flash::NorFlash;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
@@ -36,6 +35,9 @@ const CACHE_PRESSURE_BASE: u32 = 0x4200_0000;
 const CACHE_PRESSURE_SIZE: usize = 65536; // 64KB
 
 unsafe extern "C" {
+    #[cfg(feature = "esp32s31")]
+    fn Cache_Invalidate_All(cache_map: u32);
+    #[cfg(not(feature = "esp32s31"))]
     fn Cache_Invalidate_ICache_All();
 }
 
@@ -89,6 +91,10 @@ fn read() {
         // Read through the entire region to stress cache
         for offset in (0..CACHE_PRESSURE_SIZE).step_by(32) {
             let ptr = base_ptr.add(offset / 4);
+            #[cfg(feature = "esp32s31")]
+            // CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | CACHE_MAP_L1_DCACHE
+            Cache_Invalidate_All(0x13);
+            #[cfg(not(feature = "esp32s31"))]
             Cache_Invalidate_ICache_All();
             core::ptr::read_volatile(ptr);
         }
@@ -114,9 +120,9 @@ fn flash_access(flash: esp_hal::peripherals::FLASH) {
         println!("write flash");
         other2();
 
-        let mut foo = [0u8; 0x4000];
+        let foo = [0u8; 0x4000];
 
-        let res = flash.write(0x9000, &mut foo);
+        let res = flash.write_nor(0x9000, &foo);
         println!("Writing to flash result: {:?}", res);
     }
 }

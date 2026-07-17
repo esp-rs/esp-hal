@@ -1,17 +1,17 @@
 //! Demonstrates deep sleep with timer, using low and high level pins as wakeup
 //! sources.
 //!
-//! The following wiring is assumed for ESP32-C6:
-//! - ext1 wakeup pin => GPIO2 (low level) / GPIO3 (high level)
-//! The following wiring is assumed for ESP32-H2:
-//! - ext1 wakeup pin => GPIO9 (low level) / GPIO10 (high level)
+//! Wiring
+//!
+//! | Function           | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2  | ESP32-P4 |
+//! | ------------------ | -------- | -------- | --------- | --------- | -------- |
+//! | Wake on low level  | GPIO2    | GPIO2    | GPIO2     | GPIO9     | GPIO2    |
+//! | Wake on high level | GPIO3    | GPIO3    | GPIO3     | GPIO10    | GPIO3    |
 
-//% CHIP_FILTER: esp32c6 || esp32h2
+//% CHIP_FILTER: esp32c5 || esp32c6 || esp32c61 || esp32h2 || esp32p4
 
 #![no_std]
 #![no_main]
-
-use core::time::Duration;
 
 use esp_backtrace as _;
 use esp_hal::{
@@ -19,13 +19,13 @@ use esp_hal::{
     gpio::RtcPinWithResistors,
     main,
     rtc_cntl::{
-        Rtc,
         SocResetReason,
         reset_reason,
-        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
+        sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
     },
     system::Cpu,
+    time::Duration,
 };
 use esp_println::println;
 
@@ -35,27 +35,21 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
     cfg_select! {
-        feature = "esp32c6" => {
-            use esp_hal::gpio::{Input, InputConfig, Pull};
-
+        any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32p4") => {
             let mut pin_low = peripherals.GPIO2;
             let mut pin_high = peripherals.GPIO3;
-            let input = Input::new(
-                pin_low.reborrow(),
-                InputConfig::default().with_pull(Pull::None),
-            );
-            core::mem::drop(input);
         }
         feature = "esp32h2" => {
             let mut pin_low = peripherals.GPIO9; // typically a boot mode button, low when pressed
             let mut pin_high = peripherals.GPIO10;
         }
+        _ => {}
     }
 
-    println!("up and runnning!");
+    println!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
@@ -72,5 +66,5 @@ fn main() -> ! {
     let rtcio = Ext1WakeupSource::new(wakeup_pins);
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer, &rtcio]);
+    lpwr.sleep_deep(&[&timer, &rtcio]);
 }

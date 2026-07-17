@@ -2,7 +2,7 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{fmt::Write, sync::OnceLock};
+use std::{fmt::Write, path::Path, sync::OnceLock};
 
 use anyhow::{Context, Result, bail, ensure};
 use cfg::PeriConfig;
@@ -11,6 +11,7 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
+mod include;
 mod support_status;
 
 use crate::{
@@ -18,21 +19,45 @@ use crate::{
     support_status::SupportStatusLevel,
 };
 
-macro_rules! include_toml {
-    (Config, $file:expr) => {{
-        static LOADED_TOML: OnceLock<Config> = OnceLock::new();
-        LOADED_TOML.get_or_init(|| {
-            let config: Config = basic_toml::from_str(include_str!($file))
-                .with_context(|| format!("Failed to load device configuration: {}", $file))
-                .unwrap();
+fn load_device_config(relative_path: &str) -> Config {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = manifest_dir.join(relative_path);
+    log::debug!("Loading device config from {}", path.display());
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read device configuration: {}", path.display()))
+        .unwrap();
 
-            config
-                .validate()
-                .with_context(|| format!("Failed to validate device configuration: {}", $file))
-                .unwrap();
-
-            config
+    let devices_dir = manifest_dir.join("devices");
+    let content = include::expand_includes(&content, &path, &devices_dir)
+        .with_context(|| {
+            format!(
+                "Failed to expand includes in device configuration: {}",
+                path.display()
+            )
         })
+        .unwrap();
+
+    let config: Config = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse device configuration: {}", path.display()))
+        .unwrap();
+
+    config
+        .validate()
+        .with_context(|| {
+            format!(
+                "Failed to validate device configuration: {}",
+                path.display()
+            )
+        })
+        .unwrap();
+
+    config
+}
+
+macro_rules! cached_device_config {
+    ($file:literal) => {{
+        static LOADED_TOML: OnceLock<Config> = OnceLock::new();
+        LOADED_TOML.get_or_init(|| load_device_config($file))
     }};
 }
 
@@ -129,6 +154,8 @@ pub enum Chip {
     Esp32s2,
     /// ESP32-S3
     Esp32s3,
+    /// ESP32-S31
+    Esp32s31,
 }
 
 impl Chip {
@@ -188,6 +215,7 @@ impl Chip {
             Chip::Esp32p4 => "Esp32p4",
             Chip::Esp32s2 => "Esp32s2",
             Chip::Esp32s3 => "Esp32s3",
+            Chip::Esp32s31 => "Esp32s31",
         }
     }
 
@@ -203,6 +231,7 @@ impl Chip {
             Chip::Esp32p4 => "ESP32-P4",
             Chip::Esp32s2 => "ESP32-S2",
             Chip::Esp32s3 => "ESP32-S3",
+            Chip::Esp32s31 => "ESP32-S31",
         }
     }
 
@@ -247,32 +276,6 @@ impl Chip {
 
             cfgs
         })
-    }
-
-    pub fn list_of_check_cfgs() -> Vec<String> {
-        let mut cfgs = vec![];
-
-        // Used by our documentation builds to prevent the huge red warning banner.
-        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
-        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(semver_checks)"));
-
-        let possible_symbols = Self::list_of_possible_symbols();
-        for (sym, values) in possible_symbols.iter() {
-            if values.is_none() {
-                cfgs.push(format!("cargo:rustc-check-cfg=cfg({})", sym));
-            }
-        }
-
-        for (sym, values) in possible_symbols.iter() {
-            if let Some(values) = values {
-                cfgs.push(format!(
-                    "cargo:rustc-check-cfg=cfg({sym}, values({}))",
-                    values.join(",")
-                ));
-            }
-        }
-
-        cfgs
     }
 }
 
@@ -319,14 +322,14 @@ impl PeripheralDef {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Device {
     name: String,
     arch: Arch,
     target: String,
     cores: usize,
+    datasheet: String,
     trm: String,
-
-    symbols: Vec<String>,
 
     // Peripheral driver configuration:
     #[serde(flatten)]
@@ -354,16 +357,17 @@ impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
         match chip {
-            Chip::Esp32 => include_toml!(Config, "../devices/esp32.toml"),
-            Chip::Esp32c2 => include_toml!(Config, "../devices/esp32c2.toml"),
-            Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
-            Chip::Esp32c5 => include_toml!(Config, "../devices/esp32c5.toml"),
-            Chip::Esp32c6 => include_toml!(Config, "../devices/esp32c6.toml"),
-            Chip::Esp32c61 => include_toml!(Config, "../devices/esp32c61.toml"),
-            Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
-            Chip::Esp32p4 => include_toml!(Config, "../devices/esp32p4.toml"),
-            Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
-            Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
+            Chip::Esp32 => cached_device_config!("devices/esp32/soc.toml"),
+            Chip::Esp32c2 => cached_device_config!("devices/esp32c2/soc.toml"),
+            Chip::Esp32c3 => cached_device_config!("devices/esp32c3/soc.toml"),
+            Chip::Esp32c5 => cached_device_config!("devices/esp32c5/soc.toml"),
+            Chip::Esp32c6 => cached_device_config!("devices/esp32c6/soc.toml"),
+            Chip::Esp32c61 => cached_device_config!("devices/esp32c61/soc.toml"),
+            Chip::Esp32h2 => cached_device_config!("devices/esp32h2/soc.toml"),
+            Chip::Esp32p4 => cached_device_config!("devices/esp32p4/soc.toml"),
+            Chip::Esp32s2 => cached_device_config!("devices/esp32s2/soc.toml"),
+            Chip::Esp32s3 => cached_device_config!("devices/esp32s3/soc.toml"),
+            Chip::Esp32s31 => cached_device_config!("devices/esp32s31/soc.toml"),
         }
     }
 
@@ -375,8 +379,8 @@ impl Config {
                 arch: Arch::RiscV,
                 target: String::new(),
                 cores: 1,
+                datasheet: String::new(),
                 trm: String::new(),
-                symbols: Vec::new(),
                 peri_config: PeriConfig::default(),
             },
             all_symbols: OnceLock::new(),
@@ -432,11 +436,6 @@ impl Config {
             .unwrap_or(&[])
     }
 
-    /// User-defined symbols for the device.
-    pub fn symbols(&self) -> &[String] {
-        &self.device.symbols
-    }
-
     /// All configuration values for the device.
     pub fn all(&self) -> &[String] {
         self.all_symbols.get_or_init(|| {
@@ -449,7 +448,6 @@ impl Config {
                 },
             ];
             all.extend(self.peripherals().iter().map(|p| p.symbol_name()));
-            all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device
                     .peri_config
@@ -628,6 +626,9 @@ impl Config {
         // TODO: repeat for all drivers that have Instance traits
         if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
             tokens.extend(cfg::generate_i2c_master_peripherals(peri));
+        };
+        if let Some(peri) = self.device.peri_config.i2s.as_ref() {
+            tokens.extend(cfg::generate_i2s_peripherals(peri));
         };
         if let Some(peri) = self.device.peri_config.uart.as_ref() {
             tokens.extend(cfg::generate_uart_peripherals(peri));
@@ -879,14 +880,31 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
                 //     }
                 // }
                 // ```
-                #(  #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
+                #( #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }
 }
 
 pub fn generate_build_script_utils() -> TokenStream {
-    let check_cfgs = Chip::list_of_check_cfgs();
+    // The union of every chip's symbols, deduplicated while preserving first-seen order.
+    // This is the list of all symbols that any supported chip can possibly define.
+    let all_possible_symbols = {
+        let possible_symbols = Chip::list_of_possible_symbols();
+        let mut cfgs = Vec::with_capacity(possible_symbols.len());
+        for (sym, values) in possible_symbols.iter() {
+            if values.is_none() {
+                cfgs.push(sym.to_string());
+            }
+        }
+
+        for (sym, values) in possible_symbols.iter() {
+            if let Some(values) = values {
+                cfgs.push(format!("{sym}, values({})", values.join(",")));
+            }
+        }
+        cfgs
+    };
 
     let chip = Chip::iter()
         .map(|c| format_ident!("{}", c.name()))
@@ -925,11 +943,15 @@ pub fn generate_build_script_utils() -> TokenStream {
                     .map(|pin| {
                         let num = number(pin.pin);
                         let limitations = pin.limitations().into_iter().map(|limitation| {
-                            TokenStream::from_str(
-                                &basic_toml::to_string(&limitation)
-                                    .expect("Serializing limitations should be infallible"),
+                            let mut value = String::new();
+                            serde::Serialize::serialize(
+                                &limitation,
+                                toml::ser::ValueSerializer::new(&mut value),
                             )
-                            .expect("Valid TOML string can be re-parsed as Rust strings")
+                            .expect("Serializing limitations should be infallible");
+
+                            TokenStream::from_str(&value)
+                                .expect("Valid TOML string can be re-parsed as Rust strings")
                         });
                         quote! {
                             PinInfo {
@@ -1152,6 +1174,19 @@ pub fn generate_build_script_utils() -> TokenStream {
                     #( Self::#chip => #config ),*
                 }
             }
+
+            /// Returns the list of all symbols that any supported chip can define.
+            ///
+            /// Unlike [`Chip::all_symbols`], which returns the symbols defined for the
+            /// selected chip, this returns the union of the symbols across every chip.
+            ///
+            /// Key-value configurations are returned with the syntax `cfg(<symbol>, values(<values>))`,
+            /// as used by `cargo:rustc-check-cfg` directives.
+            pub fn all_possible_symbols() -> &'static [&'static str] {
+                &[
+                    #(#all_possible_symbols,)*
+                ]
+            }
         }
 
         /// Information about a memory region.
@@ -1217,7 +1252,12 @@ pub fn generate_build_script_utils() -> TokenStream {
 
         /// Prints `cargo:rustc-check-cfg` lines.
         pub fn emit_check_cfg_directives() {
-            #( println!(#check_cfgs); )*
+            println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
+            println!("cargo:rustc-check-cfg=cfg(semver_checks)");
+
+            for cfg in Chip::all_possible_symbols() {
+                println!("cargo:rustc-check-cfg=cfg({cfg})");
+            }
         }
     }
 }
@@ -1424,4 +1464,53 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     }
 
     Ok(())
+}
+
+pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Result {
+    writeln!(
+        output,
+        "| Chip | Datasheet | Technical Reference Manual | Target |"
+    )?;
+    writeln!(
+        output,
+        "| :---: | :-------: | :------------------------: | :----: |"
+    )?;
+
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        writeln!(
+            output,
+            "| {pretty} | [{pretty}][{chip}-datasheet] | [{pretty}][{chip}-trm] | `{target}` |",
+            pretty = chip.pretty_name(),
+            target = config.device.target,
+        )?;
+    }
+
+    writeln!(output)?;
+
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        writeln!(output, "[{chip}-datasheet]: {}", config.device.datasheet,)?;
+        writeln!(output, "[{chip}-trm]: {}", config.device.trm,)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn supported_devices_table_uses_metadata() {
+        let mut table = String::new();
+        generate_supported_devices_table(&mut table).unwrap();
+
+        for chip in Chip::iter() {
+            let config = Config::for_chip(&chip);
+            assert!(table.contains(&config.device.datasheet));
+            assert!(table.contains(&config.device.trm));
+            assert!(table.contains(&config.device.target));
+        }
+    }
 }

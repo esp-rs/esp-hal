@@ -29,6 +29,24 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
     maybe_with_critical_section(|| unsafe { esp_rom_spiflash_write(dest_addr, data, len) })
 }
 
+#[ram]
+pub(crate) fn spiflash_write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> i32 {
+    let rc = maybe_with_critical_section(|| unsafe {
+        esp_rom_spiflash_write_encrypted(dest_addr, data, len)
+    });
+    if rc == 0 {
+        crate::mmu::invalidate_flash_cache(dest_addr, len);
+    }
+    rc
+}
+
+pub(crate) fn read_flash_encrypted(
+    offset: u32,
+    bytes: &mut [u8],
+) -> Result<(), crate::FlashStorageError> {
+    crate::mmu::read_flash_encrypted(offset, bytes)
+}
+
 /// Detect flash size by reading via the dedicated hardware RDID command.
 pub(crate) fn get_flash_size() -> u32 {
     // On ESP32 the hardware RDID mechanism does not work reliably, so we

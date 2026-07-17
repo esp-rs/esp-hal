@@ -65,6 +65,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     private::Sealed,
+    spi::master::low_level::SpiClockGuard,
     time::Rate,
 };
 
@@ -460,7 +461,8 @@ pub struct Config {
     /// async context-switch cost exceeds the benefit. For
     /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
     /// both blocking and async DMA modes: when met, DMA is disabled and the
-    /// transfer is performed by the CPU.
+    /// transfer is performed by the CPU. This applies to both full-duplex and
+    /// half-duplex transfers.
     ///
     /// A value of `0` (the default) disables the threshold — all transfers use
     /// the driver's default method.
@@ -515,15 +517,13 @@ impl Config {
         // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
         let source_freq = self.clock_source_freq_hz();
 
-        let reg_val: u32;
-        let duty_cycle = 128;
-
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
         if self.frequency > ((source_freq / 4) * 3) {
-            // Using APB frequency directly will give us the best result here.
-            reg_val = 1 << 31;
+            // Using source frequency directly will give us the best result here.
+            // Set the SPI_CLK_EQU_SYSCLK bit.
+            Ok(1 << 31)
         } else {
             // For best duty cycle resolution, we want n to be as close to 32 as
             // possible, but we also need a pre/n combo that gets us as close as
@@ -532,59 +532,46 @@ impl Config {
             // between pre/n combos that give the same result, use the one with the
             // higher n.
 
-            let mut pre: i32;
-            let mut bestn: i32 = -1;
-            let mut bestpre: i32 = -1;
-            let mut besterr: i32 = 0;
-            let mut errval: i32;
+            let mut best_n: u32 = 2;
+            let mut best_pre: u32 = 0;
+            let mut best_err: u32 = u32::MAX;
 
-            let target_freq_hz = self.frequency.as_hz() as i32;
-            let source_freq_hz = source_freq.as_hz() as i32;
+            let target_freq_hz = self.frequency.as_hz();
+            let source_freq_hz = source_freq.as_hz();
 
             // Start at n = 2. We need to be able to set h/l so we have at least
             // one high and one low pulse.
 
             for n in 2..=64 {
-                // Effectively, this does:
-                // pre = round((APB_CLK_FREQ / n) / frequency)
+                let pre = (source_freq_hz / n).div_ceil(target_freq_hz).clamp(1, 16);
 
-                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
+                let errval = (source_freq_hz / (pre * n)).abs_diff(target_freq_hz);
+                if errval <= best_err {
+                    best_err = errval;
+                    best_n = n;
+                    best_pre = pre;
 
-                if pre <= 0 {
-                    pre = 1;
-                }
-
-                if pre > 16 {
-                    pre = 16;
-                }
-
-                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
-                if bestn == -1 || errval <= besterr {
-                    besterr = errval;
-                    bestn = n;
-                    bestpre = pre;
+                    if errval == 0 {
+                        break;
+                    }
                 }
             }
 
-            let n: i32 = bestn;
-            pre = bestpre;
-            let l: i32 = n;
+            // n = SPI_CLKCNT_N + 1
+            let n = best_n;
+            // pre = SPI_CLKDIV_PRE + 1
+            let pre = best_pre;
+            // In master mode, L == N
+            let l = n;
 
-            // Effectively, this does:
-            // h = round((duty_cycle * n) / 256)
+            // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
+            let h = (n / 2).max(1);
 
-            let mut h: i32 = (duty_cycle * n + 127) / 256;
-            if h <= 0 {
-                h = 1;
-            }
-
-            reg_val = (l as u32 - 1)
-                | ((h as u32 - 1) << 6)
-                | ((n as u32 - 1) << 12)
-                | ((pre as u32 - 1) << 18);
+            Ok((l - 1) // SPI_CLKCNT_L
+                | ((h - 1) << 6) // SPI_CLKCNT_H
+                | ((n - 1) << 12) // SPI_CLKCNT_N
+                | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
         }
-
-        Ok(reg_val)
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
@@ -807,7 +794,6 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.driver().flush_async().await;
         Ok(())
     }
 
@@ -839,9 +825,8 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -854,9 +839,8 @@ impl<'d> Spi<'d, Async> {
     // TODO: These inherent methods should be public
 
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -867,14 +851,12 @@ impl<'d> Spi<'d, Async> {
     }
 
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
-            self.driver().write(words)?;
-            return self.driver().flush();
+            return self.driver().write(words);
         }
 
         self.driver().write_async(words).await
@@ -1143,18 +1125,10 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
-
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().write_one(chunk)?;
-            // NOTE: While we don't need to flush after the last chunk, changing
-            // that would change the behavior of the function.
-            // https://github.com/esp-rs/esp-hal/issues/5257
-            self.driver().flush()?;
-        }
-
-        Ok(())
+        self.driver().write(words)
     }
 
     #[procmacros::doc_replace]
@@ -1181,7 +1155,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
@@ -1210,19 +1184,21 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
     /// Half-duplex read.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] or [`Error::Unsupported`] will be returned if
-    /// passed buffer is bigger than FIFO size or if buffer is empty (currently
-    /// unsupported). `DataMode::Single` cannot be combined with any other
-    /// [`DataMode`], otherwise [`Error::Unsupported`] will be returned.
+    /// [`Error::Unsupported`] will be returned if the buffer is empty (currently unsupported).
+    /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
+    /// [`Error::Unsupported`] will be returned.
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1232,38 +1208,20 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        if buffer.is_empty() {
-            error!("Half-duplex mode does not support empty buffer");
-            return Err(Error::Unsupported);
-        }
-
-        self.flush()?;
-        self.driver().setup_half_duplex(
-            false,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        self.driver().configure_datalen(buffer.len(), 0);
-        self.driver().start_operation();
-        self.driver().flush()?;
-        self.driver().read_from_fifo(buffer)
+        let _clock = SpiClockGuard::new(self.spi.info());
+        self.driver()
+            .half_duplex_read(data_mode, cmd, address, dummy, buffer)
     }
 
     /// Half-duplex write.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] will be returned if
-    /// passed buffer is bigger than FIFO size.
+    /// [`Error::Unsupported`] will be returned for unsupported combinations of command, address,
+    /// dummy, and data modes.
     #[cfg_attr(
         esp32,
         doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
@@ -1277,56 +1235,9 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        self.flush()?;
-
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
-                let mut buffer = buffer;
-                let mut data_mode = data_mode;
-                let mut address = address;
-                let addr_bytes;
-                if buffer.is_empty() && !address.is_none() {
-                    // If the buffer is empty, we need to send a dummy byte
-                    // to trigger the address phase.
-                    let bytes_to_write = address.width().div_ceil(8);
-                    // The address register is read in big-endian order,
-                    // we have to prepare the emulated write in the same way.
-                    addr_bytes = address.value().to_be_bytes();
-                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-                    data_mode = address.mode();
-                    address = Address::None;
-                }
-
-                if dummy > 0 {
-                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
-                    error!("Dummy bits are not supported without data");
-                    return Err(Error::Unsupported);
-                }
-            }
-        }
-
-        self.driver().setup_half_duplex(
-            true,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        if !buffer.is_empty() {
-            self.driver().configure_datalen(0, buffer.len());
-            self.driver().fill_fifo(buffer);
-        }
-
-        self.driver().start_operation();
-
-        self.driver().flush()
+        let _clock = SpiClockGuard::new(self.spi.info());
+        self.driver()
+            .half_duplex_write(data_mode, cmd, address, dummy, buffer)
     }
 
     fn use_blocking_transfer(&self, transfer_size: usize) -> bool {
@@ -1375,19 +1286,11 @@ where
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        // Do not call the inherent `write` method. The trait impl does not flush after.
-        // Flush before starting to ensure the bus is clear before we reconfigure to full duplex.
-        self.driver().flush()?;
-        self.driver().setup_full_duplex()?;
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().flush()?;
-            self.driver().write_one(chunk)?;
-        }
-        Ok(())
+        self.write(words)
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
 
         if read.is_empty() {
@@ -1400,13 +1303,13 @@ where
     }
 
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.driver().flush()
+        Ok(())
     }
 }
 
@@ -1420,18 +1323,18 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(read.len().max(write.len())) {
-            if read.is_empty() {
-                self.driver().write(write)?;
-                return self.driver().flush();
+            return if read.is_empty() {
+                self.driver().write(write)
             } else if write.is_empty() {
-                return self.driver().read(read);
+                self.driver().read(read)
             } else {
-                return self.driver().transfer(read, write);
-            }
+                self.driver().transfer(read, write)
+            };
         }
 
         if read.is_empty() {
@@ -1448,7 +1351,7 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_async().await
+        Ok(())
     }
 }
 

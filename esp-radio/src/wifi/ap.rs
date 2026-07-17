@@ -206,7 +206,6 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         signal_strength: record.rssi,
         auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
         #[cfg(feature = "unstable")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         country: CountryInfo::try_from_c(&record.country),
     }
 }

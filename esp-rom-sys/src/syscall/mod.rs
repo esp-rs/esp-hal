@@ -3,12 +3,7 @@
 use core::ffi::{c_char, c_int, c_long, c_void};
 
 // future chips or ECOs _might_ be different - at least ESP-IDF defines the struct per chip
-#[cfg_attr(
-    any(
-        esp32, esp32s2, esp32s3, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4
-    ),
-    path = "v1.rs"
-)]
+#[path = "v1.rs"]
 pub(crate) mod chip_specific;
 
 pub type clock_t = c_long;
@@ -176,8 +171,8 @@ unsafe extern "C" fn abort_wrapper() {
 /// Should only get called once.
 #[allow(clippy::missing_transmute_annotations)]
 pub unsafe fn init_syscall_table() {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
                 static mut syscall_table_ptr_app: *const chip_specific::syscall_stub_table;
@@ -186,12 +181,14 @@ pub unsafe fn init_syscall_table() {
                 syscall_table_ptr_pro = &raw const SYSCALL_TABLE;
                 syscall_table_ptr_app = &raw const SYSCALL_TABLE;
             }
-        } else if #[cfg(esp32s2)] {
+        }
+        esp32s2 => {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
             }
             unsafe { syscall_table_ptr_pro = &raw const SYSCALL_TABLE; }
-        } else {
+        }
+        _ => {
             unsafe extern "C" {
                 static mut syscall_table_ptr: *const chip_specific::syscall_stub_table;
             }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
+use crate::{rtc_cntl::WakeLock, soc::clocks::ClockTree};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
@@ -13,6 +13,7 @@ pub(super) struct I2cFuture<'a> {
     deadline: Option<Instant>,
     /// True if the Future has been polled to completion.
     finished: bool,
+    _wake_lock: WakeLock,
 }
 
 impl<'a> I2cFuture<'a> {
@@ -52,6 +53,7 @@ impl<'a> I2cFuture<'a> {
             driver,
             deadline,
             finished: false,
+            _wake_lock: WakeLock::new(),
         }
     }
 
@@ -142,8 +144,8 @@ fn set_filter(
     sda_threshold: Option<u8>,
     scl_threshold: Option<u8>,
 ) {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_separate_filter_config_registers)] {
+    cfg_select! {
+        i2c_master_separate_filter_config_registers => {
             register_block.sda_filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -156,7 +158,8 @@ fn set_filter(
                 }
                 w.scl_filter_en().bit(scl_threshold.is_some())
             });
-        } else {
+        }
+        _ => {
             register_block.filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -230,13 +233,14 @@ fn configure_clock(
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_bus_timeout_enable)] {
+        cfg_select! {
+            i2c_master_has_bus_timeout_enable => {
                 info.regs().to().write(|w| {
                     w.time_out_en().bit(timeout.is_some());
                     w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
-            } else {
+            }
+            _ => {
                 info.regs()
                     .to()
                     .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
@@ -351,35 +355,21 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-#[derive(Debug)]
-pub(super) struct I2cClockGuard<'t> {
-    i2c: AnyI2c<'t>,
+pub(super) struct I2cClockGuard {
+    clock: crate::clock::ll::I2cInstance,
 }
 
-impl<'t> I2cClockGuard<'t> {
-    pub(super) fn new(i2c: AnyI2c<'t>) -> Self {
-        ClockTree::with(|clocks| {
-            let clock = i2c.info().clock_instance;
-            let config = I2cFunctionClockConfig::new(
-                Default::default(),
-                #[cfg(i2c_master_version = "3")]
-                0,
-            );
-            clock.configure_function_clock(clocks, config);
-            clock.request_function_clock(clocks);
-        });
-        Self { i2c }
+impl I2cClockGuard {
+    pub(super) fn new(i2c: AnyI2c<'_>) -> Self {
+        let clock = i2c.info().clock_instance;
+        ClockTree::with(|clocks| clock.request_function_clock(clocks));
+        Self { clock }
     }
 }
 
-impl Drop for I2cClockGuard<'_> {
+impl Drop for I2cClockGuard {
     fn drop(&mut self) {
-        ClockTree::with(|clocks| {
-            self.i2c
-                .info()
-                .clock_instance
-                .release_function_clock(clocks);
-        });
+        ClockTree::with(|clocks| self.clock.release_function_clock(clocks));
     }
 }
 
@@ -439,9 +429,8 @@ impl Driver<'_> {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
-            // Use open drain output for SDA and SCL
-            w.sda_force_out().set_bit();
-            w.scl_force_out().set_bit();
+            w.sda_force_out().open_drain();
+            w.scl_force_out().open_drain();
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
@@ -489,11 +478,12 @@ impl Driver<'_> {
     }
 
     fn do_fsm_reset(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(i2c_master_has_reliable_fsm_reset)] {
+        cfg_select! {
+            i2c_master_has_reliable_fsm_reset => {
                 // Device has a working FSM reset mechanism
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-            } else {
+            }
+            _ => {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
                 // define I2C_LL_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
@@ -575,6 +565,94 @@ impl Driver<'_> {
             }
         })
         .await;
+    }
+
+    pub(super) fn force_scl_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_scl_pd(low),
+            _ => self.force_pin_low(low, self.config.scl_pin.pin_number(), &self.info.scl_output),
+        }
+    }
+
+    pub(super) fn force_sda_low(&self, low: bool) {
+        cfg_select! {
+            i2c_master_has_pd_en => self.set_sda_pd(low),
+            _ => self.force_pin_low(low, self.config.sda_pin.pin_number(), &self.info.sda_output),
+        }
+    }
+
+    /// Restores force_out to open-drain mode for both lines.
+    #[cfg(i2c_master_has_pd_en)]
+    fn restore_force_out(&self) {
+        self.regs().ctr().modify(|_, w| {
+            w.scl_force_out().open_drain();
+            w.sda_force_out().open_drain()
+        });
+        self.update_registers();
+    }
+
+    #[cfg(not(i2c_master_has_pd_en))]
+    fn force_pin_low(
+        &self,
+        low: bool,
+        pin_number: Option<u8>,
+        output_signal: &crate::gpio::OutputSignal,
+    ) {
+        use crate::gpio::AnyPin;
+        let Some(n) = pin_number else { return };
+        let pin = unsafe { AnyPin::steal(n) };
+        if low {
+            pin.set_output_high(false);
+            output_signal.disconnect_from(&pin);
+        } else {
+            output_signal.connect_to(&pin);
+        }
+    }
+
+    /// Sets or clears `scl_pd_en`. Switches `scl_force_out` to direct-output while
+    /// pd_en is active (required on all chips), restoring OD mode when both pd_en
+    /// bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    fn set_scl_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.scl_force_out().direct_output());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.scl_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+                return;
+            }
+        }
+        self.update_registers();
+    }
+
+    /// Sets or clears `sda_pd_en`. Switches `sda_force_out` to direct-output while
+    /// pd_en is active (required on all chips), restoring OD mode when both pd_en
+    /// bits clear.
+    #[cfg(i2c_master_has_pd_en)]
+    fn set_sda_pd(&self, low: bool) {
+        if low {
+            self.regs()
+                .ctr()
+                .modify(|_, w| w.sda_force_out().direct_output());
+        }
+        self.regs()
+            .scl_sp_conf()
+            .modify(|_, w| w.sda_pd_en().bit(low));
+        if !low {
+            let sp = self.regs().scl_sp_conf().read();
+            if sp.scl_pd_en().bit_is_clear() && sp.sda_pd_en().bit_is_clear() {
+                self.restore_force_out();
+                return;
+            }
+        }
+        self.update_registers();
     }
 
     /// Resets the I2C peripheral's command registers.
@@ -1468,6 +1546,7 @@ mod bus_clear {
 
     use super::*;
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ClearBusFuture<'a> {
         driver: Driver<'a>,
     }
@@ -1595,6 +1674,7 @@ mod bus_clear {
         SendClock(u8, bool),
     }
 
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ClearBusFuture<'a> {
         driver: Driver<'a>,
         wait: Instant,
@@ -1824,15 +1904,16 @@ where
 // Estimate the reason for an acknowledge check failure on a best effort basis.
 // When in doubt it's better to return `Unknown` than to return a wrong reason.
 fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
-    cfg_if::cfg_if! {
-        if #[cfg(i2c_master_can_estimate_nack_reason)] {
+    cfg_select! {
+        i2c_master_can_estimate_nack_reason => {
             // this is based on observations rather than documented behavior
             if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
                 AcknowledgeCheckFailedReason::Address
             } else {
                 AcknowledgeCheckFailedReason::Data
             }
-        } else {
+        }
+        _ => {
             AcknowledgeCheckFailedReason::Unknown
         }
     }

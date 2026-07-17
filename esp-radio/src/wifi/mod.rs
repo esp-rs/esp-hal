@@ -37,6 +37,16 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all
 //! configuration keys apply.
+//!
+//! ## Troubleshooting
+//!
+//! ### Connection failures on boards with a weak antenna or in a poor RF environment
+//!
+//! The default maximum TX power is 20 (5dBm) on the 0.25dBm scale. The optimal value is
+//! board-dependent: if connections are unreliable, try adjusting it via
+//! `WifiController::set_max_tx_power` (requires the `unstable` feature) using a value in the
+//! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
+//! authentication failures on some hardware, so setting it to the maximum is not always better.
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
@@ -871,9 +881,6 @@ static DATA_QUEUE_RX_STA: NonReentrantMutex<PacketQueue> =
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
-    /// The device disconnected from the network or failed to connect to it.
-    Disconnected(sta::DisconnectedInfo),
-
     /// Unsupported operation or mode.
     Unsupported,
 
@@ -914,6 +921,26 @@ impl WifiError {
 }
 
 impl core::error::Error for WifiError {}
+
+/// Errors that can occur during a Wi-Fi connection.
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConnectionError {
+    /// The connection failed.
+    Failed(sta::DisconnectedInfo),
+
+    /// A Wi-Fi error occurred.
+    WifiError(WifiError),
+}
+
+impl From<WifiError> for ConnectionError {
+    fn from(error: WifiError) -> Self {
+        ConnectionError::WifiError(error)
+    }
+}
+
+impl core::error::Error for ConnectionError {}
 
 #[cfg(esp32)]
 fn set_mac_time_update_cb(_wifi: crate::hal::peripherals::WIFI<'_>) {
@@ -977,16 +1004,17 @@ pub(crate) fn coex_initialize() -> i32 {
 pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     debug!("coex-init");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             unsafe { crate::sys::include::coex_init() }
-        } else {
+        }
+        _ => {
             0
         }
     }
 }
 
-fn wifi_deinit() -> Result<(), crate::WifiError> {
+fn wifi_deinit() -> Result<(), WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
 
     // Drain RX queues before deinit so that any stale PacketBuffers are freed
@@ -2081,7 +2109,10 @@ impl CountryInfo {
             // TODO: these may be valid defaults, but they should be configurable.
             schan: 1,
             nchan: 13,
-            max_tx_power: 20,
+            // This field is output-only: esp_wifi_set_country ignores it. The actual TX power
+            // is controlled exclusively via esp_wifi_set_max_tx_power after WiFi start.
+            // See: https://github.com/espressif/esp-idf/blob/20f5e18/components/esp_wifi/include/esp_wifi_types.h#L46
+            max_tx_power: 0,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
 
             #[cfg(wifi_has_5g)]
@@ -2262,10 +2293,12 @@ impl Drop for WifiController<'_> {
                 warn!("Failed to cleanly deinit wifi: {:?}", e);
             }
 
-            #[cfg(all(rng_trng_supported, feature = "unstable"))]
-            esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-                esp_hal::Internal::conjure()
-            });
+            #[cfg(rng_trng_supported)]
+            esp_hal::if_unstable_hal! {
+                esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                    esp_hal::Internal::conjure()
+                });
+            }
         })
     }
 }
@@ -2365,10 +2398,12 @@ impl<'d> WifiController<'d> {
         crate::wifi::wifi_init(device)?;
 
         // At some point the "High-speed ADC" entropy source became available.
-        #[cfg(all(rng_trng_supported, feature = "unstable"))]
-        unsafe {
-            esp_hal::rng::TrngSource::increase_entropy_source_counter()
-        };
+        #[cfg(rng_trng_supported)]
+        esp_hal::if_unstable_hal! {
+            unsafe {
+                esp_hal::rng::TrngSource::increase_entropy_source_counter()
+            };
+        }
 
         // Only create WifiController after we've enabled TRNG - otherwise returning an
         // error from this function will cause panic because WifiController::drop tries
@@ -2383,6 +2418,9 @@ impl<'d> WifiController<'d> {
         controller.set_power_saving(PowerSaveMode::default())?;
 
         controller.set_config(&config.initial_config)?;
+
+        // Set a default TX power
+        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(20) })?;
 
         Ok(controller)
     }
@@ -2801,7 +2839,10 @@ ignored."
 
     /// Set maximum transmitting power after WiFi start.
     ///
-    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm. The default is
+    /// 20 (5dBm). Values above roughly 65 (~16dBm) have been reported to cause authentication
+    /// failures on some hardware. See the
+    /// [module-level troubleshooting section](self#troubleshooting) for details.
     #[instability::unstable]
     pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
@@ -2930,11 +2971,11 @@ ignored."
     ///         println!("Wifi connected!");
     ///     }
     ///     Err(e) => {
-    ///       println!("Failed to connect to wifi: {e:?}");
+    ///         println!("Failed to connect to wifi: {e:?}");
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn connect_async(&mut self) -> Result<sta::ConnectedInfo, WifiError> {
+    pub async fn connect_async(&mut self) -> Result<sta::ConnectedInfo, ConnectionError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
             .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
@@ -2975,7 +3016,7 @@ ignored."
                 bssid,
                 reason,
                 rssi,
-            } => Err(WifiError::Disconnected(sta::DisconnectedInfo {
+            } => Err(ConnectionError::Failed(sta::DisconnectedInfo {
                 ssid,
                 bssid,
                 reason: DisconnectReason::from_raw(reason),

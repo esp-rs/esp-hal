@@ -96,12 +96,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Ok(level) = std::env::var("OPT_LEVEL")
-        && level != "2"
-        && level != "3"
-        && level != "s"
+        && !["2", "3", "s", "z"].contains(&level.as_str())
     {
         let message = format!(
-            "esp-radio should be built with optimization level 2, 3 or s - yours is {level}.
+            "esp-radio should be built with optimization level 2, 3, s or z - yours is {level}.
                 See https://github.com/esp-rs/esp-hal/tree/main/esp-radio",
         );
         print_warning(message);

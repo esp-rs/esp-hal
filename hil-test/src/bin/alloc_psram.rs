@@ -1,9 +1,7 @@
 //! Allocator and PSRAM-related tests
 
-// TODO: clean configurations up once esp-storage is enabled for the P4 (https://github.com/esp-rs/esp-hal/issues/5648)
-
-//% CHIP_FILTER(llff, tlsf): psram_driver_supported && esp32p4
-//% CHIP_FILTER(llff_with_storage, tlsf_with_storage): psram_driver_supported && !esp32p4
+//% CHIP_FILTER(llff, tlsf): psram_driver_supported && !soc_has_flash
+//% CHIP_FILTER(llff_with_storage, tlsf_with_storage): psram_driver_supported && soc_has_flash
 //% ENV(llff, llff_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
 //% ENV(tlsf, tlsf_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable esp-alloc/nightly
@@ -145,7 +143,6 @@ mod tests {
 #[cfg(feature = "esp-storage")]
 #[embedded_test::tests]
 mod storage_tests {
-    use embedded_storage::*;
     use esp_bootloader_esp_idf::partitions;
     use esp_hal::peripherals::FLASH;
     use esp_storage::FlashStorage;
@@ -178,7 +175,7 @@ mod storage_tests {
         ))
         .unwrap()
         .unwrap()
-        .as_embedded_storage(&mut flash)
+        .as_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
 

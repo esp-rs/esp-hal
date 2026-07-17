@@ -5,7 +5,6 @@
 #![no_std]
 #![no_main]
 
-use embedded_storage::{ReadStorage, Storage};
 use esp_backtrace as _;
 use esp_bootloader_esp_idf::partitions;
 use esp_hal::main;
@@ -40,7 +39,7 @@ fn main() -> ! {
     ))
     .unwrap()
     .unwrap()
-    .as_embedded_storage(&mut flash)
+    .as_flash_region(&mut flash)
     .read(32, &mut app_desc)
     .unwrap();
     println!("App descriptor dump {:02x?}", app_desc);
@@ -52,7 +51,7 @@ fn main() -> ! {
         ))
         .unwrap()
         .unwrap();
-    let mut nvs_partition = nvs.as_embedded_storage(&mut flash);
+    let mut nvs_partition = nvs.as_flash_region(&mut flash);
 
     let mut bytes = [0u8; 32];
     println!("NVS partition size = {}", nvs_partition.capacity());

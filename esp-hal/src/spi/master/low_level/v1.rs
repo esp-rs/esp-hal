@@ -200,6 +200,13 @@ pub(super) fn prepare_half_duplex(driver: &Driver, is_write: bool, dummy: u8) ->
 
 pub(super) fn setup_half_duplex(_driver: &Driver) {}
 
+pub(super) fn set_cs_keep_active(driver: &Driver, keep_active: bool) {
+    driver
+        .regs()
+        .pin()
+        .modify(|_, w| w.cs_keep_active().bit(keep_active));
+}
+
 pub(super) fn write_address(driver: &Driver, addr: u32) {
     driver.regs().addr().write(|w| unsafe { w.bits(addr) });
 }

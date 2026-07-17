@@ -14,18 +14,20 @@ use quad::CommandMode;
 const FUNC_SPICS1_SPICS1: u8 = 0;
 const PIN_FUNC_GPIO: u8 = 1;
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32c61)] {
+cfg_select! {
+    esp32c61 => {
         const PSRAM_CS_IO: u8 = 14;
         const SPI_CS1_GPIO_NUM: u8 = 14;
         const SPICS1_OUT_IDX: u8 = 102;
         const PSRAM_SPIWP_SD3_IO: u8 = 17;
-    } else if #[cfg(esp32c5)] {
+    }
+    esp32c5 => {
         const PSRAM_CS_IO: u8 = 15;
         const SPI_CS1_GPIO_NUM: u8 = 15;
         const SPICS1_OUT_IDX: u8 = 101;
         const PSRAM_SPIWP_SD3_IO: u8 = 18;
     }
+    _ => {}
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -137,30 +139,27 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 
 #[procmacros::ram]
 pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
-    const MMU_ACCESS_SPIRAM: u32 = 1 << 9;
-
     const MMU_PAGE_SIZE: u32 = 0x10000;
     const FLASH_MMU_TABLE_SIZE: u32 = 512;
-    const MMU_VALID: u32 = 1 << 10;
 
-    fn read_mmu_entry(i: u32) -> u32 {
+    fn select_mmu_entry(entry_id: u32) {
         SPI0::regs()
             .mmu_item_index()
-            .write(|w| unsafe { w.mmu_item_index().bits(i) });
-        SPI0::regs()
-            .mmu_item_content()
-            .read()
-            .mmu_item_content()
-            .bits()
+            .write(|w| unsafe { w.mmu_item_index().bits(entry_id) });
     }
 
-    fn write_mmu_entry(i: u32, entry: u32) {
-        SPI0::regs()
-            .mmu_item_index()
-            .write(|w| unsafe { w.mmu_item_index().bits(i) });
-        SPI0::regs()
-            .mmu_item_content()
-            .write(|w| unsafe { w.mmu_item_content().bits(entry) });
+    fn mmu_entry_is_valid(entry_id: u32) -> bool {
+        select_mmu_entry(entry_id);
+        SPI0::regs().mmu_item_content().read().valid().bit()
+    }
+
+    fn write_psram_mmu_entry(entry_id: u32, page: u16) {
+        select_mmu_entry(entry_id);
+        SPI0::regs().mmu_item_content().write(|w| {
+            unsafe { w.paddr().bits(page) };
+            w.access_spiram().set_bit();
+            w.valid().set_bit()
+        });
     }
 
     // calculate the PSRAM start address to map
@@ -172,7 +171,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     // the bootloader is using the last page to access flash internally
     // (e.g. to read the app descriptor) so we just skip that
     for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
-        if (read_mmu_entry(i) & MMU_VALID) != 0 {
+        if mmu_entry_is_valid(i) {
             mapped_pages = i + 1;
             break;
         }
@@ -181,7 +180,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     debug!("PSRAM start address = {:x}", start);
 
     for i in 0..config.size.get() as u32 / MMU_PAGE_SIZE {
-        write_mmu_entry(i + mapped_pages, MMU_VALID + MMU_ACCESS_SPIRAM + i)
+        write_psram_mmu_entry(i + mapped_pages, i as u16);
     }
 
     // enable busses

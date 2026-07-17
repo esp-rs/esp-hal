@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
+use esp_devtool as xtask;
 use esp_metadata::{Chip, Config};
 use object::{Object, ObjectSymbol, SymbolKind, read::archive::ArchiveFile};
 use rustc_demangle::try_demangle;
@@ -51,7 +52,7 @@ enum Cli {
     ///
     /// Reads the body from stdin by default. Pass `--pr` to fetch from GitHub.
     CheckPrChangelog(CheckPrChangelogArgs),
-    /// Re-generate metadata and the chip support table in the esp-hal README.
+    /// Re-generate metadata and tables in the esp-hal README.
     UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),
@@ -260,9 +261,9 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
                 continue;
             }
 
-            for mut features in package.check_feature_rules(device) {
+            for mut check_config in package.check_config_rules(device) {
                 if package.has_chip_features() {
-                    features.push(device.name())
+                    check_config.features.push(device.name());
                 }
 
                 commands.push(build_check_package_command(
@@ -270,7 +271,7 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
                     *package,
                     chip,
                     &["--no-default-features"],
-                    &features,
+                    &check_config,
                     args.toolchain.as_deref(),
                 )?);
             }
@@ -293,17 +294,19 @@ fn build_check_package_command(
     package: Package,
     chip: &Chip,
     args: &[&str],
-    features: &[String],
+    check_config: &xtask::CheckConfig,
     mut toolchain: Option<&str>,
 ) -> Result<CargoArgsBuilder> {
     log::info!(
-        "Linting package: {} ({}, features: {:?})",
+        "Checking package: {} ({}, features: {:?}, env: {:?})",
         package,
         chip,
-        features
+        check_config.features,
+        check_config.env
     );
 
     let path = workspace.join(package.to_string());
+    let features = &check_config.features;
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand("check")
@@ -330,6 +333,9 @@ fn build_check_package_command(
         builder = builder.arg(format!("--features={}", features.join(",")));
     }
 
+    for (key, value) in &check_config.env {
+        builder.add_env_var(key, value);
+    }
     // TODO: these should come from the outside
     builder.add_env_var("CI", "1");
     builder.add_env_var("DEFMT_LOG", "trace");
@@ -356,9 +362,9 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 continue;
             }
 
-            for mut features in package.lint_feature_rules(device) {
+            for mut check_config in package.lint_config_rules(device) {
                 if package.has_chip_features() {
-                    features.push(device.name())
+                    check_config.features.push(device.name());
                 }
 
                 lint_package(
@@ -366,7 +372,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     *package,
                     chip,
                     &["--no-default-features"],
-                    &features,
+                    &check_config,
                     args.fix,
                     args.toolchain.as_deref(),
                 )?;
@@ -382,20 +388,24 @@ fn lint_package(
     package: Package,
     chip: &Chip,
     args: &[&str],
-    features: &[String],
+    check_config: &xtask::CheckConfig,
     fix: bool,
     mut toolchain: Option<&str>,
 ) -> Result<()> {
     log::info!(
-        "Linting package: {} ({}, features: {:?})",
+        "Linting package: {} ({}, features: {:?}, env: {:?})",
         package,
         chip,
-        features
+        check_config.features,
+        check_config.env
     );
 
     let path = workspace.join(package.to_string());
+    let features = &check_config.features;
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("clippy")
+        .manifest_path(path.join("Cargo.toml"));
 
     if !package.build_on_host(features) {
         if chip.is_xtensa() {
@@ -420,26 +430,21 @@ fn lint_package(
         builder = builder.arg(format!("--features={}", features.join(",")));
     }
 
-    let builder = if fix {
+    let mut builder = if fix {
         builder.arg("--fix").arg("--lib").arg("--allow-dirty")
     } else {
         builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
     };
 
-    let cargo_args = builder.build();
+    for (key, value) in &check_config.env {
+        builder.add_env_var(key, value);
+    }
+    builder.add_env_var("CI", "1");
+    builder.add_env_var("DEFMT_LOG", "trace");
 
-    xtask::cargo::run_with_env(
-        &cargo_args,
-        &path,
-        [("CI", "1"), ("DEFMT_LOG", "trace")],
-        false,
-    )
-    .with_context(|| {
-        format!(
-            "Failed to run `cargo run` with {args:?} `CI, `1`, `DEFMT_LOG`, and `trace` envs in {}",
-            path.display()
-        )
-    })?;
+    let command = CargoCommandBatcher::build_one_for_cargo(&builder);
+    xtask::cargo::run_with_env(&command.command, &path, command.env_vars, false)
+        .with_context(|| format!("Failed to run `cargo clippy` in {}", path.display()))?;
 
     Ok(())
 }

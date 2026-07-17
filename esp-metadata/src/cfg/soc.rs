@@ -32,6 +32,7 @@ use crate::{
 pub mod clock_tree;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SocConfig {
     #[serde(default)]
     pub peripherals: Vec<PeripheralDef>,
@@ -66,6 +67,7 @@ impl super::GenericProperty for SocConfig {
 
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct MemoryRange {
     pub name: String,
     #[serde(flatten)]
@@ -74,6 +76,7 @@ pub struct MemoryRange {
 
 /// Memory regions.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct MemoryMap {
     pub ranges: Vec<MemoryRange>,
 }
@@ -124,6 +127,7 @@ impl MemoryMap {
 
 /// Represents the clock sources and clock distribution tree in the SoC.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SystemClocks {
     clock_tree: Vec<ClockTreeItem>,
 
@@ -133,6 +137,7 @@ pub struct SystemClocks {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ClockGroup {
     group: String,
     clocks: Vec<ClockTreeItem>,
@@ -212,6 +217,10 @@ impl ClockTreeNodeInstance {
         self.node.config_frequency_needs_instance(self, tree)
     }
 
+    fn skips_frequency_cache(&self, tree: &ProcessedClockData) -> bool {
+        self.node.skips_frequency_cache(self, tree)
+    }
+
     fn emits_config_type(&self, tree: &ProcessedClockData) -> bool {
         self.is_configurable()
             || matches!(
@@ -255,6 +264,10 @@ impl ClockTreeNodeInstance {
 
     fn always_on(&self) -> bool {
         self.node.always_on()
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.node.wake_locking()
     }
 
     fn input_clocks(&self, tree: &ProcessedClockData) -> Vec<String> {
@@ -462,6 +475,15 @@ impl ClockTreeNodeInstance {
         let request_trace = log_msg("Requesting");
         let release_trace = log_msg("Releasing");
 
+        let (acquire_wake_lock, release_wake_lock) = if self.properties.wake_locking() {
+            (
+                quote! { crate::rtc_cntl::WakeLock::acquire(); },
+                quote! { crate::rtc_cntl::WakeLock::release(); },
+            )
+        } else {
+            (quote! {}, quote! {})
+        };
+
         let refcount_accessor = self.properties.refcount_accessor();
         ClockNodeFunctions {
             impl_type: if self.properties.receiver.is_some() {
@@ -486,6 +508,7 @@ impl ClockTreeNodeInstance {
                             trace!(#request_trace);
                             if increment_reference_count(&mut #refcount_accessor) {
                                 trace!(#enable_trace);
+                                #acquire_wake_lock
                                 #request_direct_dependencies
                                 #(#receiver.)* #enable_fn_impl_name(clocks, true);
                             }
@@ -521,6 +544,7 @@ impl ClockTreeNodeInstance {
                             trace!(#release_trace);
                             if decrement_reference_count(&mut #refcount_accessor) {
                                 trace!(#disable_trace);
+                                #release_wake_lock
                                 #(#receiver.)* #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
                             }
@@ -562,7 +586,26 @@ impl ClockTreeNodeInstance {
 
             frequency: Function {
                 _name: frequency_function_name.to_string(),
-                implementation: if self.is_configurable() {
+                implementation: if self.is_configurable() && self.skips_frequency_cache(tree) {
+                    let live_frequency_impl =
+                        self.node_frequency_impl(tree, config_frequency_receiver.as_slice());
+                    let config_fn_self = needs_instance.then_some(quote! { self }).into_iter();
+
+                    quote! {
+                        #[allow(unused_variables)]
+                        pub fn #config_frequency_function_name(
+                            #(#config_fn_self,)*
+                            clocks: &mut ClockTree,
+                            config: #ty_name,
+                        ) -> u32 {
+                            #frequency_function_impl
+                        }
+
+                        pub fn #frequency_function_name(#(#receiver)*) -> u32 {
+                            #live_frequency_impl
+                        }
+                    }
+                } else if self.is_configurable() {
                     let cache_name = self.freq_cache_static_name();
                     let cache_load = if self.properties.receiver.is_some() {
                         quote! { #cache_name[self as usize].load(::core::sync::atomic::Ordering::Acquire) }
@@ -880,7 +923,7 @@ impl SystemClocks {
             let Some(node) = tree.try_get_node(&node_name) else {
                 continue;
             };
-            if !node.is_configurable() {
+            if !node.is_configurable() || node.skips_frequency_cache(tree) {
                 continue;
             }
 
@@ -1171,6 +1214,7 @@ impl SystemClocks {
 /// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
 /// actual values.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Template {
     /// The name of the template. Other templates can substitute this template's value by using the
     /// `{{name}}` placeholder.
@@ -1189,6 +1233,7 @@ pub struct Template {
 /// `PeripheralClocks`. This way each peripheral clock signal can either simply use the defaults,
 /// or override them with custom values in case they don't fit the scheme for some reason.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PeripheralClock {
     /// The name of the peripheral clock signal. Usually specified as CamelCase. Also determines
     /// the value of the `peripheral` template parameter, by converting the name to snake_case.
@@ -1207,6 +1252,7 @@ pub struct PeripheralClock {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PeripheralClocks {
     pub(crate) templates: Vec<Template>,
     pub(crate) peripheral_clocks: Vec<PeripheralClock>,
@@ -1422,6 +1468,7 @@ impl DeviceClocks {
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        wake_locking: false,
                         receiver: None,
                         accessor: None, // System clocks are never collected in an array
                     },
@@ -1480,6 +1527,7 @@ impl DeviceClocks {
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        wake_locking: false,
                         receiver: Some(quote! { self }),
                         accessor: Some(quote! { #instance_ty::#instance_variant as usize }),
                     },
@@ -1572,6 +1620,22 @@ impl DeviceClocks {
                 None
             };
             node.properties.always_on = node.always_on();
+            node.properties.wake_locking = node.wake_locking();
+
+            if node.wake_locking() && !node.properties.refcounted {
+                anyhow::bail!(
+                    "Clock node `{}` is `wake_locking` but not reference-counted; \
+                     it has no enable/disable edges to acquire and release the wake lock.",
+                    node.name_str()
+                );
+            }
+            if node.wake_locking() && node.always_on() {
+                anyhow::bail!(
+                    "Clock node `{}` is both `always_on` and `wake_locking`; \
+                     an always-on clock would pin the wake lock forever.",
+                    node.name_str()
+                );
+            }
 
             if !node.group_template.is_empty() {
                 tree.group_instances

@@ -201,10 +201,34 @@ pub fn evaluate_yaml_config(
     let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
     let mut eval_ctx = somni_expr::Context::new();
-    if let Some(chip) = chip {
-        eval_ctx.add_variable("chip", chip.name());
+
+    for c in esp_metadata_generated::Chip::iter() {
+        if chip != Some(c) {
+            eval_ctx.add_variable(c.name(), false);
+            for symbol in c.all_symbols() {
+                if let Some((key, _value)) = symbol.split_once('=') {
+                    eval_ctx.add_variable(key.trim(), "");
+                } else {
+                    eval_ctx.add_variable(symbol, false);
+                }
+            }
+        }
+    }
+
+    if let Some(c) = chip {
+        eval_ctx.add_variable(c.name(), true);
+        for symbol in c.all_symbols() {
+            if let Some((key, value)) = symbol.split_once('=') {
+                let value = value.trim().trim_matches('"');
+                eval_ctx.add_variable(key.trim(), value);
+            } else {
+                eval_ctx.add_variable(symbol, true);
+            }
+        }
+    }
+
+    if chip.is_some() {
         eval_ctx.add_variable("ignore_feature_gates", ignore_feature_gates);
-        eval_ctx.add_function("feature", move |feature: &str| chip.contains(feature));
         eval_ctx.add_function("cargo_feature", |feature: &str| {
             features.contains(&feature.to_uppercase().replace("-", "_"))
         });
@@ -968,9 +992,9 @@ options:
 - name: esp_idf_version
   description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
   default:
-    - if: 'chip == "esp32c6"'
+    - if: 'esp32c6'
       value: '"esp32c6"'
-    - if: 'chip == "esp32"'
+    - if: 'esp32'
       value: '"other"'
   active: true
 
@@ -983,7 +1007,7 @@ options:
     - if: true
       value: 32768
   stability: Unstable
-  active: 'chip == "esp32c6"'
+  active: 'esp32c6'
 "#;
 
         let (cfg, options) = evaluate_yaml_config(
@@ -1048,9 +1072,9 @@ options:
 - name: esp_idf_version
   description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
   default:
-    - if: 'chip == "esp32c6"'
+    - if: 'esp32c6'
       value: '"esp32c6"'
-    - if: 'chip == "esp32"'
+    - if: 'esp32'
       value: '"other"'
     - value: '"default"'
   active: true
@@ -1093,7 +1117,7 @@ options:
   default:
     - value: 100
   constraints:
-    - if: 'chip == "esp32c6"'
+    - if: 'esp32c6'
       type:
         validator: integer_in_range
         value:

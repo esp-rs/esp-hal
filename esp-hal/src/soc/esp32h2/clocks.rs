@@ -15,7 +15,7 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0},
     soc::regi2c,
 };
 
@@ -548,129 +548,5 @@ impl TimgInstance {
                     TimgWdtClockConfig::PllF48m => 2,
                 })
             });
-    }
-}
-
-impl UartInstance {
-    // UART_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let uart = match self {
-            UartInstance::Uart0 => {
-                // At least on revision 0.1 switching SCLK off causes the chip to no longer boot.
-                // TODO: https://github.com/esp-rs/esp-hal/issues/4952
-                return;
-            }
-            UartInstance::Uart1 => 1,
-        };
-        PCR::regs()
-            .uart(uart)
-            .clk_conf()
-            .modify(|_, w| w.sclk_en().bit(en));
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        new_config: UartFunctionClockConfig,
-    ) {
-        let uart = match self {
-            UartInstance::Uart0 => 0,
-            UartInstance::Uart1 => 1,
-        };
-        PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
-            w.sclk_sel().bits(match new_config.sclk {
-                UartFunctionClockSclk::PllF48m => 1,
-                UartFunctionClockSclk::RcFast => 2,
-                UartFunctionClockSclk::Xtal => 3,
-            });
-            w.sclk_div_a().bits(0);
-            w.sclk_div_b().bits(0);
-            w.sclk_div_num().bits(new_config.div_num as _);
-            w
-        });
-    }
-
-    // UART_BAUD_RATE_GENERATOR
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        new_config: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new_config.integral as _);
-            w.frag().bits(new_config.fractional as _)
-        });
-    }
-}
-
-impl I2cInstance {
-    // I2C_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let i2c = match self {
-            I2cInstance::I2c0 => 0,
-            I2cInstance::I2c1 => 1,
-        };
-        PCR::regs()
-            .i2c_sclk_conf(i2c)
-            .modify(|_, w| w.i2c_sclk_en().bit(en));
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<I2cFunctionClockConfig>,
-        new_config: I2cFunctionClockConfig,
-    ) {
-        let i2c = match self {
-            I2cInstance::I2c0 => 0,
-            I2cInstance::I2c1 => 1,
-        };
-        PCR::regs().i2c_sclk_conf(i2c).modify(|_, w| unsafe {
-            w.i2c_sclk_sel()
-                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
-            w.i2c_sclk_div_num().bits(new_config.div_num as _)
-        });
-    }
-}
-
-impl SpiInstance {
-    // SPI_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs()
-                .spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_en().bit(en)),
-        };
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SpiFunctionClockConfig>,
-        new_config: SpiFunctionClockConfig,
-    ) {
-        match self {
-            SpiInstance::Spi2 => PCR::regs().spi2_clkm_conf().modify(|_, w| unsafe {
-                w.spi2_clkm_sel().bits(match new_config {
-                    SpiFunctionClockConfig::Xtal => 0,
-                    SpiFunctionClockConfig::PllF48m => 1,
-                    SpiFunctionClockConfig::RcFast => 2,
-                })
-            }),
-        };
     }
 }

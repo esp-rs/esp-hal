@@ -2,6 +2,12 @@
 
 pub mod master;
 
+#[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
+mod hp_sys_clkrst;
+
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+pub mod pdm;
+
 #[cfg(esp32)]
 pub mod parallel;
 
@@ -12,6 +18,8 @@ crate::any_peripheral! {
         I2s0(crate::peripherals::I2S0<'d>),
         #[cfg(soc_has_i2s1)]
         I2s1(crate::peripherals::I2S1<'d>),
+        #[cfg(soc_has_i2s2)]
+        I2s2(crate::peripherals::I2S2<'d>),
     }
 }
 

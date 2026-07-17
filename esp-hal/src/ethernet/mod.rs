@@ -172,8 +172,8 @@ macro_rules! implement_trait {
 }
 
 // MII traits
-cfg_if::cfg_if! {
-    if #[cfg(ethernet_mii_via_gpio_matrix)] {
+cfg_select! {
+    ethernet_mii_via_gpio_matrix => {
         macro_rules! mii_pin {
             ($name:ident, $doc:literal $(, in=$input:ident)? $(, out=$output:ident)?) => {
                 #[doc = $doc]
@@ -229,7 +229,8 @@ cfg_if::cfg_if! {
                 impl MiiRxd3 for crate::peripherals::$gpio<'_> {}
             };
         }
-    } else {
+    }
+    _ => {
         emac_pin!(MiiTxClk, "MII TX clock pin");
         emac_pin!(MiiTxEn,  "MII TX enable pin");
         emac_pin!(MiiTxd0,  "MII TXD0 pin");

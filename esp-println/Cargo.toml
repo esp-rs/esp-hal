@@ -12,6 +12,8 @@ license       = "MIT OR Apache-2.0"
 links         = "esp-println"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["auto", "defmt-espflash", "critical-section"] }
 check-configs = [
     { features = ["auto"] },
@@ -45,7 +47,7 @@ esp-sync = { version = "0.2.1", path = "../esp-sync", optional = true }
 portable-atomic  = { version = "1.11", optional = true, default-features = false }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt  = { version = "1.0.1", optional = true }
+defmt  = { version = "1.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
@@ -65,6 +67,7 @@ esp32h2 = ["esp-metadata-generated/esp32h2", "esp-sync?/esp32h2"]
 esp32p4 = ["esp-metadata-generated/esp32p4", "esp-sync?/esp32p4"]
 esp32s2 = ["esp-metadata-generated/esp32s2", "esp-sync?/esp32s2"]
 esp32s3 = ["esp-metadata-generated/esp32s3", "esp-sync?/esp32s3"]
+esp32s31 = ["esp-metadata-generated/esp32s31", "esp-sync?/esp32s31"]
 
 ## Use a critical section around print calls. This ensures that the output is consistent.
 critical-section = ["dep:esp-sync"]

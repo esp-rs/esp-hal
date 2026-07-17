@@ -408,12 +408,78 @@ mod tests {
         }
     }
 
+    // Verify that `force_scl_low(true)` drives SCL low, blocking all I2C
+    // clocking, and that `force_scl_low(false)` releases the line and
+    // restores normal operation.
+    #[test]
+    fn test_force_scl_low(mut ctx: Context) {
+        ctx.i2c
+            .apply_config(
+                &Config::default().with_software_timeout(SoftwareTimeout::PerByte(
+                    time::Duration::from_millis(10),
+                )),
+            )
+            .unwrap();
+
+        ctx.i2c.force_scl_low(true);
+        assert_eq!(
+            ctx.i2c.write(DUT_ADDRESS, &[]),
+            Err(Error::Timeout),
+            "expected Timeout with SCL held low by pd_en"
+        );
+
+        ctx.i2c.force_scl_low(false);
+        ctx.i2c.apply_config(&Config::default()).unwrap();
+
+        let mut read_data = [0u8; 22];
+        ctx.i2c
+            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .expect("bus should work normally after releasing SCL");
+        assert_ne!(read_data, [0u8; 22]);
+    }
+
+    // Verify that `force_sda_low(true)` drives SDA low and that
+    // `force_sda_low(false)` releases the line and restores normal operation.
+    #[test]
+    fn test_force_sda_low(mut ctx: Context) {
+        ctx.i2c
+            .apply_config(
+                &Config::default().with_software_timeout(SoftwareTimeout::PerByte(
+                    time::Duration::from_millis(10),
+                )),
+            )
+            .unwrap();
+
+        ctx.i2c.force_sda_low(true);
+        let mut data = [0xFFu8; 22];
+        let result = ctx
+            .i2c
+            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut data);
+        // force_sda_low must have observable effect: either the
+        // transaction failed, or it "succeeded" but with all-zero data.
+        assert!(
+            result.is_err() || data == [0u8; 22],
+            "force_sda_low had no observable effect: got Ok with non-zero data {:?}",
+            data
+        );
+
+        ctx.i2c.force_sda_low(false);
+        ctx.i2c.apply_config(&Config::default()).unwrap();
+
+        let mut read_data = [0u8; 22];
+        ctx.i2c
+            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .expect("bus should work normally after releasing SDA");
+        assert_ne!(read_data, [0u8; 22]);
+    }
+
     #[test]
     #[cfg(esp32s3)]
     fn test_read_cali_with_rtc_i2c() {
-        use core::time::Duration;
-
-        use esp_hal::i2c::rtc::{Config, I2c, Timing};
+        use esp_hal::{
+            i2c::rtc::{Config, I2c, Timing},
+            time::Duration,
+        };
 
         let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
 

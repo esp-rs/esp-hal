@@ -7,6 +7,8 @@
 //!
 //! Make sure the LP RAM is cleared before loading the code.
 
+//% CHIP_FILTER: ulp_riscv_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -14,12 +16,14 @@ use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
 use panic_halt as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "esp32c6")] {
+cfg_select! {
+    feature = "esp32c6" => {
         const ADDRESS: u32 = 0x5000_2000;
-    } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
+    }
+    any(feature = "esp32s2", feature = "esp32s3") => {
         const ADDRESS: u32 = 0x400;
     }
+    _ => {}
 }
 
 #[entry]

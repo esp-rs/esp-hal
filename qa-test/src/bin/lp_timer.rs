@@ -20,7 +20,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
-    let mut cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
+    let cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
 
     // FIXME: this fails clock calibration
     // #[cfg(feature = "esp32")]
@@ -30,7 +30,7 @@ fn main() -> ! {
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock_config));
 
-    let rtc = Rtc::new(peripherals.LPWR);
+    let rtc = Rtc::new(peripherals.RTC_TIMER);
 
     let start = Instant::now();
     rtc.set_current_time_us(start.duration_since_epoch().as_micros());

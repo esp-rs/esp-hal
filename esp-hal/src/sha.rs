@@ -14,10 +14,6 @@
 //! * SHA-384
 //! * SHA-512
 //!
-//! The driver supports two working modes:
-//! * Typical SHA (CPU-driven)
-//! * DMA-SHA (not supported yet)
-//!
 //! It provides functions to update the hash calculation with input data, finish
 //! the hash calculation and retrieve the resulting hash value. The SHA
 //! peripheral on ESP chips can handle large data streams efficiently, making it
@@ -633,15 +629,16 @@ for_each_sha_algorithm! {
 impl ShaAlgorithmKind {
     fn start(self, sha: &crate::peripherals::SHA<'_>) {
         let regs = sha.register_block();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_start().write(|w| w.sha1_start().set_bit()),
                     ShaAlgorithmKind::Sha256 => regs.sha256_start().write(|w| w.sha256_start().set_bit()),
                     ShaAlgorithmKind::Sha384 => regs.sha384_start().write(|w| w.sha384_start().set_bit()),
                     ShaAlgorithmKind::Sha512 => regs.sha512_start().write(|w| w.sha512_start().set_bit()),
                 };
-            } else {
+            }
+            _ => {
                 regs.start().write(|w| w.start().set_bit());
             }
         }
@@ -649,15 +646,16 @@ impl ShaAlgorithmKind {
 
     fn r#continue(self, sha: &crate::peripherals::SHA<'_>) {
         let regs = sha.register_block();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_continue().write(|w| w.sha1_continue().set_bit()),
                     ShaAlgorithmKind::Sha256 => regs.sha256_continue().write(|w| w.sha256_continue().set_bit()),
                     ShaAlgorithmKind::Sha384 => regs.sha384_continue().write(|w| w.sha384_continue().set_bit()),
                     ShaAlgorithmKind::Sha512 => regs.sha512_continue().write(|w| w.sha512_continue().set_bit()),
                 };
-            } else {
+            }
+            _ => {
                 regs.continue_().write(|w| w.continue_().set_bit());
             }
         }
@@ -667,8 +665,8 @@ impl ShaAlgorithmKind {
     ///
     /// Returns whether the caller needs to wait for the hash to be loaded.
     fn load(self, _sha: &crate::peripherals::SHA<'_>) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let regs = _sha.register_block();
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_load().write(|w| w.sha1_load().set_bit()),
@@ -678,7 +676,8 @@ impl ShaAlgorithmKind {
                 };
 
                 true
-            } else {
+            }
+            _ => {
                 // Return that no waiting is necessary
                 false
             }
@@ -687,15 +686,16 @@ impl ShaAlgorithmKind {
 
     fn is_busy(self, sha: &crate::peripherals::SHA<'_>) -> bool {
         let regs = sha.register_block();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let bit = match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_busy().read().sha1_busy(),
                     ShaAlgorithmKind::Sha256 => regs.sha256_busy().read().sha256_busy(),
                     ShaAlgorithmKind::Sha384 => regs.sha384_busy().read().sha384_busy(),
                     ShaAlgorithmKind::Sha512 => regs.sha512_busy().read().sha512_busy(),
                 };
-            } else {
+            }
+            _ => {
                 let bit = regs.busy().read().state();
             }
         }
@@ -738,10 +738,11 @@ for_each_sha_algorithm! {
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             sha.text(index).as_ptr()
-        } else {
+        }
+        _ => {
             sha.h_mem(index).as_ptr()
         }
     }
@@ -749,10 +750,11 @@ fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
 
 fn m_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
+    cfg_select! {
+        esp32 => {
             sha.text(index).as_ptr()
-        } else {
+        }
+        _ => {
             sha.m_mem(index).as_ptr()
         }
     }

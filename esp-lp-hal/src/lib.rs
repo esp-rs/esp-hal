@@ -43,16 +43,19 @@ pub mod prelude {
     pub use procmacros::entry;
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32c6)] {
+cfg_select! {
+    esp32c6 => {
         // LP_FAST_CLK is not very accurate, for now use a rough estimate
         const LP_FAST_CLK_HZ: u32 = 16_000_000;
         const XTAL_D2_CLK_HZ: u32 = 20_000_000;
-    } else if #[cfg(esp32s2)] {
+    }
+    esp32s2 => {
         const LP_FAST_CLK_HZ: u32 = 8_000_000;
-    } else if #[cfg(esp32s3)] {
+    }
+    esp32s3 => {
         const LP_FAST_CLK_HZ: u32 = 17_500_000;
     }
+    _ => {}
 }
 
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;

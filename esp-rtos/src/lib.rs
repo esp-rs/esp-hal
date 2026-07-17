@@ -14,6 +14,17 @@
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
+//! # struct FakeHeap;
+//! # unsafe impl core::alloc::GlobalAlloc for FakeHeap {
+//! #     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+//! #         unimplemented!()
+//! #     }
+//! #     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+//! #         unimplemented!()
+//! #     }
+//! # }
+//! # #[global_allocator]
+//! # static ALLOCATOR: FakeHeap = FakeHeap;
 //! use esp_hal::timer::timg::TimerGroup;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //!
@@ -24,8 +35,14 @@
     multi_core,
     doc = "
 // Optionally, start the scheduler on the second core
+use static_cell::ConstStaticCell;
+use esp_hal::system::Stack;
+
+static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
 esp_rtos::start_second_core(
+    peripherals.CPU_CTRL,
     software_interrupt.software_interrupt1,
+    STACK.take(),
     || {}, // Second core's main function.
 );
 "
@@ -33,13 +50,84 @@ esp_rtos::start_second_core(
 #![doc = ""]
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
-//! # }
+#![doc = esp_hal::after_snippet!()]
 //! ```
 //! 
 //! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
-//!
+#![cfg_attr(
+    sleep_light_sleep,
+    doc = r"
+## Automatic Light Sleep (experimental)
+
+When enabled, the CPU will automatically enter light sleep mode when there are no tasks to run,
+and wake up when a task is ready to run. This can help reduce power consumption.
+
+Because waking up from automatic light sleep can increase latency, the minimum expected idle time
+can be configured using `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US`.
+
+To enable automatic light sleep, call the [`sleep::configure`] function and pass the
+idle hook from the returned [`Sleep`](sleep::Sleep) object to [`start_with_idle_hook`].
+
+To prevent the CPU from entering light sleep, take a [`WakeLock`]. Drop the lock when you are done
+with the critical code.
+"
+)]
+#![cfg_attr(
+    all(sleep_light_sleep, multi_core),
+    doc = r"
+
+⚠️ If you are using bare-metal code on the second core (i.e. the second core is
+not managed by the RTOS), make sure to take a [`WakeLock`], otherwise the automatic
+light sleep may cause unexpected behavior.
+"
+)]
+#![cfg_attr(
+    sleep_light_sleep,
+    doc = r"
+### Example
+
+```rust,no_run
+#![no_std]
+# #[panic_handler]
+# fn panic(_: &core::panic::PanicInfo) -> ! {
+#     loop {}
+# }
+# struct FakeHeap;
+# unsafe impl core::alloc::GlobalAlloc for FakeHeap {
+#     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+#         unimplemented!()
+#     }
+#     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+#         unimplemented!()
+#     }
+# }
+# #[global_allocator]
+# static ALLOCATOR: FakeHeap = FakeHeap;
+
+use esp_hal::interrupt::software::SoftwareInterruptControl;
+use esp_hal::timer::timg::TimerGroup;
+
+# fn main() {
+let p = esp_hal::init(esp_hal::Config::default());
+
+let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+let timg0 = TimerGroup::new(p.TIMG0);
+
+let sleep = esp_rtos::sleep::configure(p.LPWR);
+
+esp_rtos::start_with_idle_hook(
+    timg0.timer0,
+    sw_int.software_interrupt0,
+    sleep.light_sleep_hook,
+);
+# }
+```
+
+[`WakeLock`]: esp_hal::rtc_cntl::WakeLock
+"
+)]
 //! ## Additional configuration
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_rtos_config_table.md"))]
@@ -62,6 +150,8 @@ mod fmt;
 mod esp_radio;
 mod run_queue;
 mod scheduler;
+#[cfg(sleep_light_sleep)]
+pub mod sleep;
 mod syscall;
 mod task;
 mod timer;
@@ -459,6 +549,17 @@ const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_TICK_RA
 
 pub(crate) fn now() -> u64 {
     Instant::now().duration_since_epoch().as_micros()
+}
+
+/// Rearms the alarm timer.
+///
+/// This function may be necessary to call after waking up from light sleep.
+pub fn rearm_alarm() {
+    SCHEDULER.with(|s| {
+        if let Some(time_driver) = s.time_driver.as_mut() {
+            time_driver.rearm(now());
+        }
+    });
 }
 
 #[cfg(feature = "embassy")]

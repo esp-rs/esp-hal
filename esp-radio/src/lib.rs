@@ -183,8 +183,6 @@ use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(all(esp32, feature = "unstable"))]
-use hal::analog::adc::{release_adc2, try_claim_adc2};
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
@@ -265,17 +263,16 @@ pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new()
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
-    cfg_if::cfg_if! {
-        if #[cfg(wifi_driver_supported)] {
-            core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-            core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
-            core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
-        }
+    #[cfg(wifi_driver_supported)]
+    {
+        core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+        core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+        core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
+        core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
     };
 };
 
@@ -302,11 +299,14 @@ const _: () = {
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
 pub(crate) fn init() {
-    #[cfg(all(esp32, feature = "unstable"))]
-    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
-        panic!(
-            "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
-        );
+    esp_hal::if_unstable_hal! {
+        #[cfg(esp32)]
+        if hal::analog::adc::try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+            panic!(
+                "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
+            );
+        }
+        esp_hal::rtc_cntl::WakeLock::acquire();
     }
 
     if !preempt::initialized() {
@@ -350,9 +350,13 @@ pub(crate) fn deinit() {
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
 
-    #[cfg(all(esp32, feature = "unstable"))]
-    // Allow using `ADC2` again
-    release_adc2(unsafe { esp_hal::Internal::conjure() });
+    esp_hal::if_unstable_hal! {
+        // Allow using `ADC2` again
+        #[cfg(esp32)]
+        hal::analog::adc::release_adc2(unsafe { esp_hal::Internal::conjure() });
+
+        esp_hal::rtc_cntl::WakeLock::release();
+    }
 
     debug!("Radio deinitialized");
 }

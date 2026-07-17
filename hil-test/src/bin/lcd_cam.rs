@@ -9,7 +9,8 @@ use esp_hal::{
     Async,
     Blocking,
     dma::{DmaChannel, DmaRxBuf, DmaTxBuf},
-    dma_buffers,
+    dma_rx_buffer,
+    dma_tx_buffer,
     gpio::Level,
     lcd_cam::{
         BitOrder,
@@ -75,8 +76,7 @@ mod async_tests {
         async fn init() -> AsyncContext<'static> {
             let peripherals = esp_hal::init(esp_hal::Config::default());
             let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
-            let (_, _, tx_buffer, tx_desc) = dma_buffers!(0, DATA_SIZE);
-            let dma_buf = DmaTxBuf::new(tx_desc, tx_buffer).unwrap();
+            let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
 
             AsyncContext {
                 lcd_cam,
@@ -117,8 +117,7 @@ mod blocking_tests {
             let peripherals = esp_hal::init(esp_hal::Config::default());
             let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
             let pcnt = Pcnt::new(peripherals.PCNT);
-            let (_, _, tx_buffer, tx_desc) = dma_buffers!(0, DATA_SIZE);
-            let dma_buf = DmaTxBuf::new(tx_desc, tx_buffer).unwrap();
+            let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
 
             BlockingContext {
                 lcd_cam,
@@ -351,9 +350,8 @@ mod camera_tests {
         #[init]
         fn init() -> CameraContext {
             let peripherals = esp_hal::init(esp_hal::Config::default());
-            let (rx_buf, rx_desc, tx_buf, tx_desc) = dma_buffers!(50 * 50);
-            let dma_rx_buf = DmaRxBuf::new(rx_desc, rx_buf).unwrap();
-            let dma_tx_buf = DmaTxBuf::new(tx_desc, tx_buf).unwrap();
+            let dma_rx_buf = dma_rx_buffer!(2500).unwrap();
+            let dma_tx_buf = dma_tx_buffer!(2500).unwrap();
 
             CameraContext {
                 peripherals,

@@ -11,6 +11,8 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = ["println", "esp-println/auto"] },
@@ -32,8 +34,7 @@ bench = false
 test  = false
 
 [dependencies]
-cfg-if      = "1"
-defmt       = { version = "1", optional = true }
+defmt       = { version = "1.1", optional = true }
 esp-config  = { version = "0.7.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
 esp-println = { version = "0.17.0", optional = true, default-features = false, path = "../esp-println" }
@@ -64,6 +65,7 @@ esp32h2 = ["esp-println?/esp32h2", "esp-metadata-generated/esp32h2"]
 esp32p4 = ["esp-println?/esp32p4", "esp-metadata-generated/esp32p4"]
 esp32s2 = ["esp-println?/esp32s2", "esp-metadata-generated/esp32s2", "semihosting?/openocd-semihosting"]
 esp32s3 = ["esp-println?/esp32s3", "esp-metadata-generated/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
+esp32s31 = ["esp-println?/esp32s31", "esp-metadata-generated/esp32s31"]
 
 ## Use `esp-println`
 println = ["dep:esp-println"]

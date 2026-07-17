@@ -37,9 +37,7 @@ pub(crate) fn reset_wifi_mac() {
 }
 
 pub(crate) fn init_clocks() {
-    regs!(MODEM_LPCON)
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit().clk_wifipwr_en().set_bit());
+    // done in esp-hal
 }
 
 pub(crate) fn ble_rtc_clk_init() {

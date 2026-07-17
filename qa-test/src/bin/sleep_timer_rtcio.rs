@@ -13,8 +13,6 @@
 #![no_std]
 #![no_main]
 
-use core::time::Duration;
-
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
@@ -22,13 +20,13 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
     rtc_cntl::{
-        Rtc,
         SocResetReason,
         reset_reason,
-        sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
+        sleep::{LowPower, RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
     },
     system::Cpu,
+    time::Duration,
 };
 use esp_println::println;
 
@@ -38,9 +36,9 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    println!("up and runnning!");
+    println!("up and running!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
     println!("reset reason: {:?}", reason);
     let wake_reason = wakeup_cause();
@@ -71,10 +69,11 @@ fn main() -> ! {
                 (&mut pin18, WakeupLevel::High),
             ];
         }
+        _ => {}
     }
 
     let rtcio = RtcioWakeupSource::new(wakeup_pins);
     println!("sleeping!");
     delay.delay_millis(100);
-    rtc.sleep_deep(&[&timer, &rtcio]);
+    lpwr.sleep_deep(&[&timer, &rtcio]);
 }

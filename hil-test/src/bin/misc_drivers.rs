@@ -371,7 +371,7 @@ mod systimer {
         timer::{
             OneShotTimer,
             PeriodicTimer,
-            systimer::{Alarm, SystemTimer},
+            systimer::{Alarm, SystemTimer, Unit},
         },
     };
     use portable_atomic::{AtomicUsize, Ordering};
@@ -505,6 +505,19 @@ mod systimer {
 
         // We'll end the test in the interrupt handler.
         loop {}
+    }
+
+    #[test]
+    fn set_unit_count_does_not_mask_high_bits(_ctx: Context) {
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit0, 1 << 32);
+            assert!(SystemTimer::unit_value(Unit::Unit0) >= 1 << 32);
+        }
+        #[cfg(not(esp32s2))]
+        unsafe {
+            SystemTimer::set_unit_value(Unit::Unit1, 1 << 32);
+            assert!(SystemTimer::unit_value(Unit::Unit1) >= 1 << 32);
+        }
     }
 }
 
@@ -685,5 +698,35 @@ mod twai {
 
             twai.transmit_async(&frame).await.unwrap();
         }
+    }
+}
+
+#[cfg(lp_timer_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod lp_timekeeping {
+    use esp_hal::{
+        rtc_cntl::Rtc,
+        time::{Duration, Instant},
+    };
+
+    #[init]
+    fn init() -> Rtc<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        Rtc::new(peripherals.RTC_TIMER)
+    }
+
+    #[test]
+    fn returns_correct_timestamp(rtc: Rtc<'static>) {
+        let start_rtc = rtc.time_since_power_up();
+        let start_instant = Instant::now();
+        while start_instant.elapsed() < Duration::from_millis(10) {}
+
+        let rtc_duration = rtc.time_since_power_up() - start_rtc;
+        assert!(
+            rtc_duration > Duration::from_millis(5),
+            "RTC only advanced by {:?}",
+            rtc_duration
+        );
     }
 }

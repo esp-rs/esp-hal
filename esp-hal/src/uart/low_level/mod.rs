@@ -1,7 +1,39 @@
+use core::task::Poll;
+
+use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
-use super::*;
-use crate::asynch::AtomicWaker;
+#[cfg(feature = "unstable")]
+use super::BaudrateTolerance;
+use super::{
+    AnyUart,
+    Config,
+    ConfigError,
+    DataBits,
+    HwFlowControl,
+    Parity,
+    RxError,
+    RxErrorKind,
+    StopBits,
+    SwFlowControl,
+    TxError,
+    UartInterrupt,
+    any,
+};
+use crate::{
+    asynch::AtomicWaker,
+    gpio::{InputSignal, OutputSignal},
+    handler,
+    interrupt::InterruptHandler,
+    pac::uart0::RegisterBlock,
+    ram,
+    soc::clocks::{
+        self,
+        ClockTree,
+        UartBaudRateGeneratorConfig as BaudRateConfig,
+        UartFunctionClockConfig as ClockConfig,
+    },
+};
 
 #[cfg_attr(uart_version = "1", path = "v1.rs")]
 #[cfg_attr(uart_version = "2", path = "v2.rs")]
@@ -30,21 +62,32 @@ pub(super) enum RxEvent {
     BreakDetected,
 }
 
-pub(super) fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
+pub(super) fn rx_event_check_for_error(
+    events: EnumSet<RxEvent>,
+    reported_errors: EnumSet<RxErrorKind>,
+) -> Result<(), RxError> {
     for event in events {
-        match event {
-            RxEvent::FifoOvf => return Err(RxError::FifoOverflowed),
-            RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
-            RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
-            RxEvent::ParityError => return Err(RxError::ParityMismatch),
-            RxEvent::FifoFull
-            | RxEvent::CmdCharDetected
-            | RxEvent::FifoTout
-            | RxEvent::BreakDetected => continue,
+        if let Some(error) = rx_error_kind(event)
+            && reported_errors.contains(error)
+        {
+            return Err(error.into());
         }
     }
 
     Ok(())
+}
+
+fn rx_error_kind(event: RxEvent) -> Option<RxErrorKind> {
+    match event {
+        RxEvent::FifoOvf => Some(RxErrorKind::FifoOverflowed),
+        RxEvent::GlitchDetected => Some(RxErrorKind::GlitchOccurred),
+        RxEvent::FrameError => Some(RxErrorKind::FrameFormatViolated),
+        RxEvent::ParityError => Some(RxErrorKind::ParityMismatch),
+        RxEvent::FifoFull
+        | RxEvent::CmdCharDetected
+        | RxEvent::FifoTout
+        | RxEvent::BreakDetected => None,
+    }
 }
 
 /// A future that resolves when the passed interrupt is triggered,
@@ -527,6 +570,15 @@ impl Info {
         version::rx_timeout_enabled(self)
     }
 
+    pub(super) fn set_discard_erroneous_bytes(&self, discard: bool) {
+        // ERR_WR_MASK causes the hardware to discard bytes with UART errors
+        // instead of storing them in the RX FIFO.
+        self.regs()
+            .conf0()
+            .modify(|_, w| w.err_wr_mask().bit(discard));
+        self.sync_regs();
+    }
+
     pub(super) fn is_tx_idle(&self) -> bool {
         version::is_tx_idle(self)
     }
@@ -553,15 +605,16 @@ impl Info {
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
-            cfg_if::cfg_if! {
-                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))] {
+            cfg_select! {
+                any(uart_has_sclk_divider, soc_has_pcr, esp32p4) => {
                     const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 
                     let conf = ClockConfig::new(config.clock_source, clk_div - 1);
                     let divider = (clk << FRAC_BITS) / (config.baudrate * clk_div);
-                } else {
+                }
+                _ => {
                     debug!("SCLK: {}", clk);
                     let conf = ClockConfig::new(config.clock_source);
                     let divider = (clk << FRAC_BITS) / config.baudrate;
@@ -675,21 +728,30 @@ impl Info {
             .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
     }
 
-    pub(super) fn check_for_errors(&self) -> Result<(), RxError> {
-        let errors = RxEvent::FifoOvf
-            | RxEvent::FifoTout
-            | RxEvent::GlitchDetected
-            | RxEvent::FrameError
-            | RxEvent::ParityError;
+    fn check_for_errors_and_reset_fifo(
+        &self,
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<bool, RxError> {
+        let errors =
+            RxEvent::FifoOvf | RxEvent::GlitchDetected | RxEvent::FrameError | RxEvent::ParityError;
         let events = self.rx_events().intersection(errors);
-        let result = rx_event_check_for_error(events);
-        if result.is_err() {
-            self.clear_rx_events(errors);
-            if events.contains(RxEvent::FifoOvf) {
+        let result = rx_event_check_for_error(events, reported_errors);
+        let fifo_overflowed = events.contains(RxEvent::FifoOvf);
+        if !events.is_empty() {
+            self.clear_rx_events(events);
+            if fifo_overflowed {
                 self.rxfifo_reset();
             }
         }
-        result
+        result.map(|()| fifo_overflowed)
+    }
+
+    pub(super) fn check_for_errors(
+        &self,
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<(), RxError> {
+        self.check_for_errors_and_reset_fifo(reported_errors)
+            .map(|_| ())
     }
 
     pub(super) fn check_rx_break_detected(&self) -> bool {
@@ -720,24 +782,39 @@ impl Info {
         Ok(to_write)
     }
 
-    pub(super) fn read(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+    pub(super) fn read(
+        &self,
+        buf: &mut [u8],
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
 
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-            self.check_for_errors()?;
-        }
+        loop {
+            while self.rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+                self.check_for_errors(reported_errors)?;
+            }
 
-        self.read_buffered(buf)
+            let read = self.read_buffered(buf, reported_errors)?;
+            if read > 0 {
+                break Ok(read);
+            }
+        }
     }
 
-    pub(super) fn read_buffered(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+    pub(super) fn read_buffered(
+        &self,
+        buf: &mut [u8],
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<usize, RxError> {
         // Get the count first, to avoid accidentally reading a corrupted byte received
         // after the error check.
         let to_read = (self.rx_fifo_count() as usize).min(buf.len());
-        self.check_for_errors()?;
+        if self.check_for_errors_and_reset_fifo(reported_errors)? {
+            return Ok(0);
+        }
 
         for byte_into in buf[..to_read].iter_mut() {
             *byte_into = self.read_next_from_fifo();
@@ -747,6 +824,17 @@ impl Info {
         self.clear_rx_events(RxEvent::FifoFull);
 
         Ok(to_read)
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn suspend_for_sleep(&self) {
+        version::suspend(self, true);
+        version::wait_for_suspended(self);
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn resume_from_sleep(&self) {
+        version::suspend(self, false);
     }
 }
 
@@ -759,7 +847,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 for_each_uart! {
-    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[handler]

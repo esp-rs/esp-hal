@@ -3,6 +3,7 @@ use quote::quote;
 use crate::{cfg::GenericProperty, number};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RcFastCalibrationProperties {
     divider: u32,
     #[serde(default)]

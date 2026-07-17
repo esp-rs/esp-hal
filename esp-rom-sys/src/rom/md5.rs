@@ -68,7 +68,7 @@ use core::{
 // toml file then `InternalContext` will be either undefined or multiple
 // defined and this module will fail to compile letting you know to fix it
 
-#[cfg(rom_md5_bsd)]
+#[cfg(rom_has_md5_bsd)]
 #[derive(Clone)]
 #[repr(C)]
 struct InternalContext {
@@ -77,14 +77,14 @@ struct InternalContext {
     _in: [u8; 64],
 }
 
-#[cfg(rom_md5_bsd)]
+#[cfg(rom_has_md5_bsd)]
 unsafe extern "C" {
     fn esp_rom_md5_init(context: *mut InternalContext);
     fn esp_rom_md5_update(context: *mut InternalContext, buf: *const c_void, len: u32);
     fn esp_rom_md5_final(digest: *mut u8, context: *mut InternalContext);
 }
 
-#[cfg(rom_md5_mbedtls)]
+#[cfg(rom_has_md5_mbedtls)]
 #[derive(Clone)]
 #[repr(C)]
 struct InternalContext {
@@ -93,7 +93,7 @@ struct InternalContext {
     buffer: [c_uchar; 64],
 }
 
-#[cfg(rom_md5_mbedtls)]
+#[cfg(rom_has_md5_mbedtls)]
 unsafe extern "C" {
     fn esp_rom_mbedtls_md5_starts_ret(context: *mut InternalContext) -> c_int;
     fn esp_rom_mbedtls_md5_update_ret(
@@ -114,10 +114,10 @@ impl Context {
     pub fn new() -> Self {
         let mut ctx = MaybeUninit::<InternalContext>::uninit();
         unsafe {
-            #[cfg(rom_md5_bsd)]
+            #[cfg(rom_has_md5_bsd)]
             esp_rom_md5_init(ctx.as_mut_ptr());
 
-            #[cfg(rom_md5_mbedtls)]
+            #[cfg(rom_has_md5_mbedtls)]
             let _ = esp_rom_mbedtls_md5_starts_ret(ctx.as_mut_ptr());
 
             Self(ctx.assume_init())
@@ -129,14 +129,14 @@ impl Context {
     pub fn consume<T: AsRef<[u8]>>(&mut self, data: T) {
         let data = data.as_ref();
         unsafe {
-            #[cfg(rom_md5_bsd)]
+            #[cfg(rom_has_md5_bsd)]
             esp_rom_md5_update(
                 &mut self.0 as *mut _,
                 data.as_ptr() as *const c_void,
                 data.len() as u32,
             );
 
-            #[cfg(rom_md5_mbedtls)]
+            #[cfg(rom_has_md5_mbedtls)]
             let _ = esp_rom_mbedtls_md5_update_ret(
                 &mut self.0 as *mut _,
                 data.as_ptr() as *const c_void,
@@ -150,10 +150,10 @@ impl Context {
     pub fn compute(mut self) -> Digest {
         let mut digest = MaybeUninit::<[u8; 16]>::uninit();
         unsafe {
-            #[cfg(rom_md5_bsd)]
+            #[cfg(rom_has_md5_bsd)]
             esp_rom_md5_final(digest.as_mut_ptr() as *mut _, &mut self.0 as *mut _);
 
-            #[cfg(rom_md5_mbedtls)]
+            #[cfg(rom_has_md5_mbedtls)]
             let _ = esp_rom_mbedtls_md5_finish_ret(
                 &mut self.0 as *mut _,
                 digest.as_mut_ptr() as *mut _,

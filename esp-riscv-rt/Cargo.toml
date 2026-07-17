@@ -12,6 +12,8 @@ license       = "MIT OR Apache-2.0"
 links         = "esp-riscv-rt"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["rtc-ram"] }
 requires_target = ["riscv32imc-unknown-none-elf", "riscv32imac-unknown-none-elf"]
 check-configs = [
@@ -28,7 +30,7 @@ test  = false
 
 [dependencies]
 document-features = "0.2"
-defmt             = { version = "1.0.1", optional = true }
+defmt             = { version = "1.1", optional = true }
 riscv             = "0.15.0"
 # We use the `single-hart` feature since starting up harts != 0 is handled by the HAL, not the runtime.
 riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap", "pre-default-start-trap"]}

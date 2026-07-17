@@ -3,6 +3,7 @@
 
 use std::str::FromStr;
 
+use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
@@ -15,6 +16,7 @@ use crate::{
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
 /// These don't get turned into symbols, but are used to generate code.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GpioPinsAndSignals {
     /// The list of GPIO pins and their properties.
     pub pins: Vec<PinConfig>,
@@ -120,6 +122,7 @@ impl std::fmt::Display for PinLimitation {
 
 /// Properties of a single GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
@@ -186,6 +189,7 @@ impl PinConfig {
 /// listed in [device.gpio.input_signals] or [device.gpio.output_signals].
 /// `None` means the pin does not provide the given alternate function.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct FunctionMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -224,6 +228,7 @@ impl FunctionMap {
 
 /// Available analog functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AnalogMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -258,6 +263,7 @@ impl AnalogMap {
 
 /// Available RTC/LP functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct LowPowerMap {
     #[serde(rename = "0")]
     af0: Option<String>,
@@ -298,6 +304,7 @@ impl LowPowerMap {
 /// signal does not have an Alternate Function and must be routed through the
 /// GPIO matrix.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct IoMuxSignal {
     /// The name of the signal.
     pub name: String,
@@ -363,11 +370,11 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .collect::<Vec<_>>();
 
     let mut lp_functions = vec![];
-    let mut expanded_lp_functions = vec![];
+    let mut expanded_lp_functions = IndexMap::new();
     let mut analog_functions = vec![];
-    let mut expanded_analog_functions = vec![];
+    let mut expanded_analog_functions = IndexMap::new();
     let mut iomux_functions = vec![];
-    let mut expanded_iomux_functions = vec![];
+    let mut expanded_iomux_functions = IndexMap::new();
 
     let pin_afs = gpio
         .pins_and_signals
@@ -419,7 +426,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             }
 
             fn create_matchers_for_signal(
-                branches: &mut Vec<TokenStream>,
+                branches: &mut IndexMap<String, Vec<TokenStream>>,
                 pin_peri: &Ident,
                 signal: &str,
                 af: Option<&TokenStream>,
@@ -469,19 +476,23 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                         None
                     } else {
                         let pattern = format_ident!("{pattern}");
-
-                        Some(quote! {
+                        let tokens = quote! {
                             ( #signal_name, #pattern #(, #numbers)* )
-                        })
+                        };
+                        Some((pattern, tokens))
                     }
                 };
 
-                if let Some(full_signal) = full_signal {
-                    branches.push(if let Some(af) = af {
-                        quote! { #full_signal, #pin_peri, #af }
-                    } else {
-                        quote! { #full_signal, #pin_peri }
-                    });
+                if let Some((pattern, full_signal)) = full_signal {
+                    let pattern_name = pattern.to_string();
+                    branches
+                        .entry(pattern_name)
+                        .or_default()
+                        .push(if let Some(af) = af {
+                            quote! { #full_signal, #pin_peri, #af }
+                        } else {
+                            quote! { #full_signal, #pin_peri }
+                        });
                 }
             }
 
@@ -565,28 +576,28 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         })
     }
 
+    let mut for_each_analog_branches = vec![("all", analog_functions.as_slice())];
+    let mut for_each_lp_branches = vec![("all", lp_functions.as_slice())];
+    let mut for_each_iomux_branches = vec![("all", iomux_functions.as_slice())];
+
+    for (pattern, signals) in expanded_analog_functions.iter() {
+        for_each_analog_branches.push((pattern.as_str(), signals.as_slice()));
+    }
+
+    for (pattern, signals) in expanded_lp_functions.iter() {
+        for_each_lp_branches.push((pattern.as_str(), signals.as_slice()));
+    }
+
+    for (pattern, signals) in expanded_iomux_functions.iter() {
+        for_each_iomux_branches.push((pattern.as_str(), signals.as_slice()));
+    }
+
     let for_each_gpio = generate_for_each_macro("gpio", &[("all", &branches)]);
-    let for_each_analog = generate_for_each_macro(
-        "analog_function",
-        &[
-            ("all", &analog_functions),
-            ("all_expanded", &expanded_analog_functions),
-        ],
-    );
-    let for_each_lp = generate_for_each_macro(
-        "lp_function",
-        &[
-            ("all", &lp_functions),
-            ("all_expanded", &expanded_lp_functions),
-        ],
-    );
-    let for_each_iomux = generate_for_each_macro(
-        "iomux_function",
-        &[
-            ("all", &iomux_functions),
-            ("all_expanded", &expanded_iomux_functions),
-        ],
-    );
+
+    let for_each_analog = generate_for_each_macro("analog_function", &for_each_analog_branches);
+    let for_each_lp = generate_for_each_macro("lp_function", &for_each_lp_branches);
+    let for_each_iomux = generate_for_each_macro("iomux_function", &for_each_iomux_branches);
+
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
@@ -621,7 +632,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-        /// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
         ///
         /// Macro fragments:
         ///
@@ -645,7 +656,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-        /// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
         ///
         /// Macro fragments:
         ///
@@ -673,7 +684,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need identifiers, and maybe the alternate function.
-        /// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs.
         ///
         /// Macro fragments:
         ///

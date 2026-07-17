@@ -21,8 +21,8 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{DmaRxBuf, DmaTxBuf},
-    dma_buffers,
+    dma_rx_buffer,
+    dma_tx_buffer,
     interrupt::software::SoftwareInterruptControl,
     spi::{
         Mode,
@@ -56,9 +56,8 @@ async fn main(_spawner: Spawner) {
         _ => peripherals.DMA_CH0,
     };
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let dma_rx_buf = dma_rx_buffer!(32000).unwrap();
+    let dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 
     let mut spi = Spi::new(
         peripherals.SPI2,

@@ -11,7 +11,11 @@ extern crate alloc;
 use embassy_executor::Spawner;
 use esp_alloc;
 use esp_backtrace as _;
-use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+use esp_hal::{
+    interrupt::software::SoftwareInterruptControl,
+    rtc_cntl::sleep::{LowPower, RtcSleepConfig, TimerWakeupSource},
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -32,19 +36,18 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // Sleep for one second
-    let sleep_config = esp_hal::rtc_cntl::sleep::RtcSleepConfig::default();
+    let sleep_config = RtcSleepConfig::default();
 
     let delay = esp_hal::delay::Delay::new();
     delay.delay_millis(100);
 
-    let timer =
-        esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(core::time::Duration::from_secs(1));
+    let timer = TimerWakeupSource::new(esp_hal::time::Duration::from_secs(1));
 
-    let mut rtc = esp_hal::rtc_cntl::Rtc::new(peripherals.LPWR);
+    let mut lpwr = LowPower::new(peripherals.LPWR);
     esp_println::println!("Start sleep");
     delay.delay_millis(100);
 
-    rtc.sleep(&sleep_config, &[&timer]);
+    lpwr.sleep(&sleep_config, &[&timer]);
     delay.delay_millis(100);
 
     esp_println::println!("Done sleeping");

@@ -14,7 +14,7 @@ use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{
     dma::DmaRxStreamBuf,
-    i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
+    i2s::master::{Channels, DataFormat, I2s, TdmConfig},
     interrupt::software::SoftwareInterruptControl,
     ram,
     rng::Rng,
@@ -150,7 +150,7 @@ async fn main(spawner: Spawner) {
     let dma_channel = peripherals.DMA_CH0;
     let buffer = esp_hal::dma_rx_stream_buffer!(I2S_BUFFER_SIZE, 2048);
 
-    let i2s_cfg = I2sConfig::new_tdm_philips()
+    let i2s_cfg = TdmConfig::new_tdm_philips()
         .with_sample_rate(Rate::from_hz(SAMPLE_RATE))
         .with_data_format(DataFormat::Data32Channel32)
         .with_channels(Channels::STEREO);

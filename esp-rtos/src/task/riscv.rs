@@ -201,18 +201,35 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
 
-        # Save registers
-        addi sp, sp, -16 # allocate 16 bytes for saving regs (RISC-V requires 16-byte alignment)
+        # Reserve enough stack space for the idle context. A running task saves
+        # directly into its CpuContext instead, avoiding duplicate stores.
+        addi sp, sp, -80 # RISC-V requires 16-byte alignment
 
-        # Store the thread pointer on the stack. We'll use it to check what needs to be restored.
         sw tp, 0*4(sp)
-        # Also save ra: jalr below clobbers it, and we must restore it on the idle-stays-idle
-        # path where tp==0 means there is no CpuContext to reload it from.
+        bnez tp, 1f
+
+        # Idle has no CpuContext (tp == 0), so preserve its caller-saved
+        # registers on the interrupted stack.
         sw ra, 1*4(sp)
+        sw t0, 2*4(sp)
+        sw t1, 3*4(sp)
+        sw t2, 4*4(sp)
+        sw t3, 5*4(sp)
+        sw t4, 6*4(sp)
+        sw t5, 7*4(sp)
+        sw t6, 8*4(sp)
+        sw a0, 9*4(sp)
+        sw a1, 10*4(sp)
+        sw a2, 11*4(sp)
+        sw a3, 12*4(sp)
+        sw a4, 13*4(sp)
+        sw a5, 14*4(sp)
+        sw a6, 15*4(sp)
+        sw a7, 16*4(sp)
+        j 2f
 
-        # Skip storing context for the idle context or deleted tasks (no thread pointer)
-        beqz tp, 1f # Skip to calling the interrupt handler
-
+1:
+        # A running task has a CpuContext, so save directly into it.
         sw ra, 0*4(tp)
         sw t0, 1*4(tp)
         sw t1, 2*4(tp)
@@ -230,23 +247,47 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a6, 14*4(tp)
         sw a7, 15*4(tp)
 
-1:
+2:
         # Let's run the interrupt handler, which runs the scheduler. If the scheduler
         # decides we need to switch context, it will change the thread pointer to the new context.
         la t0, {scheduler_interrupt_handler}
         jalr ra, t0, 0
 
-        # Load old thread pointer and return address, and free up stack.
-        # This way we store/reload the unmodified stack pointer.
+        # If idle remains idle, restore its caller-saved registers directly
+        # from the interrupt stack. It has no CpuContext to restore from.
         lw t0, 0*4(sp)
+        bnez t0, 3f
+        bnez tp, 3f
+
         lw ra, 1*4(sp)
-        addi sp, sp, 16
+        lw t1, 3*4(sp)
+        lw t2, 4*4(sp)
+        lw t3, 5*4(sp)
+        lw t4, 6*4(sp)
+        lw t5, 7*4(sp)
+        lw t6, 8*4(sp)
+        lw a0, 9*4(sp)
+        lw a1, 10*4(sp)
+        lw a2, 11*4(sp)
+        lw a3, 12*4(sp)
+        lw a4, 13*4(sp)
+        lw a5, 14*4(sp)
+        lw a6, 15*4(sp)
+        lw a7, 16*4(sp)
+        lw t0, 2*4(sp)
+        addi sp, sp, 80
+        mret
+
+3:
+        # Free the interrupt stack before saving the old task's SP or loading
+        # the selected context.
+        addi sp, sp, 80
 
         # If the thread pointer has not changed, just restore caller-saved registers
-        beq t0, tp, 3f # Skip to restoring caller-saved registers in the new context
+        beq t0, tp, 5f # Skip to restoring caller-saved registers in the new context
 
         # Skip storing context for the idle context or deleted tasks (no thread pointer)
-        beqz t0, 2f # Skip to loading registers for the new context
+        beqz t0, 4f # Skip to loading registers for the new context
 
         # If the thread pointer has changed, switch context
         # First, save registers to the old context
@@ -269,7 +310,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         csrr t1, mepc
         sw t1, 31*4(t0)
 
-2:
+4:
         # Next, load registers from the new context
         lw s0, 16*4(tp)
         lw s1, 17*4(tp)
@@ -290,10 +331,10 @@ unsafe extern "C" fn swint_handler_trampoline() {
         lw t1, 31*4(tp)
         csrw mepc, t1
 
-3:
+5:
         # When tp==0 the idle task is (re-)entering: its caller-saved registers were never
         # written to a CpuContext, so there is nothing to reload.
-        beqz tp, 4f
+        beqz tp, 6f
 
         lw ra, 0*4(tp)
         lw t0, 1*4(tp)
@@ -315,7 +356,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # Restore TP last. For the idle hook, this should write 0, which prevents saving its state.
         lw tp, 29*4(tp)
 
-4:
+6:
         mret
         .cfi_endproc
         ",

@@ -23,8 +23,8 @@
 
 ```rust, no_run
 # {before_snippet}
-# use esp_hal::dma_buffers;
-# use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
+# use esp_hal::dma_rx_buffer;
+# use esp_hal::dma_tx_buffer;
 # use esp_hal::spi::Mode;
 # use esp_hal::spi::slave::Spi;
 let sclk = peripherals.GPIO0;
@@ -32,9 +32,8 @@ let miso = peripherals.GPIO1;
 let mosi = peripherals.GPIO2;
 let cs = peripherals.GPIO3;
 
-let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+let dma_rx_buf = dma_rx_buffer!(32000).unwrap();
+let dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
     .with_sck(sclk)
     .with_mosi(mosi)
@@ -168,6 +167,7 @@ pub mod dma {
     use crate::{
         DriverMode,
         dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
+        rtc_cntl::WakeLock,
         spi::Error,
     };
 
@@ -366,6 +366,7 @@ pub mod dma {
         dma_buf: ManuallyDrop<Buf>,
         has_rx: bool,
         has_tx: bool,
+        _wake_lock: WakeLock,
     }
 
     impl<'d, Dm, Buf> SpiDmaTransfer<'d, Dm, Buf>
@@ -378,6 +379,7 @@ pub mod dma {
                 dma_buf: ManuallyDrop::new(dma_buf),
                 has_rx,
                 has_tx,
+                _wake_lock: WakeLock::new(),
             }
         }
 
@@ -762,10 +764,11 @@ impl Info {
                 w.rsck_i_edge()
                     .bit(matches!(data_mode, Mode::_1 | Mode::_2))
             });
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s2)] {
+            cfg_select! {
+                esp32s2 => {
                     let ctrl1_reg = self.regs().ctrl1();
-                } else {
+                }
+                _ => {
                     let ctrl1_reg = self.regs().slave();
                 }
             }

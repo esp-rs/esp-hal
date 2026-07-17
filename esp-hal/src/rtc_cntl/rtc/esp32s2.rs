@@ -1,6 +1,8 @@
 use strum::FromRepr;
 
-pub(crate) fn init() {}
+use crate::soc::clocks::ClockConfig;
+
+pub(crate) fn init(_config: &ClockConfig) {}
 
 // Terminology:
 //
