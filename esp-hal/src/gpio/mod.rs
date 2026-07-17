@@ -372,6 +372,7 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
+#[cfg(lp_io_driver_supported)]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     fn rtc_number(&self) -> u8;
@@ -397,6 +398,7 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which support internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
+#[cfg(lp_io_driver_supported)]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     #[doc(hidden)]
@@ -2174,6 +2176,7 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
     panic!("Pin {} is not an {}", pin, function)
 }
 
+#[cfg(lp_io_driver_supported)]
 macro_rules! for_each_rtcio_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2196,6 +2199,7 @@ macro_rules! for_each_rtcio_pin {
     };
 }
 
+#[cfg(lp_io_driver_supported)]
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2227,6 +2231,7 @@ macro_rules! for_each_rtcio_output_pin {
     };
 }
 
+#[cfg(lp_io_driver_supported)]
 impl RtcPin for AnyPin<'_> {
     fn rtc_number(&self) -> u8 {
         for_each_rtcio_pin! {
@@ -2256,6 +2261,7 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
+#[cfg(lp_io_driver_supported)]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         for_each_rtcio_output_pin! {
