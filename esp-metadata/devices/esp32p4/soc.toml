@@ -487,7 +487,6 @@ version = "esp32p4"
 [device.gpio]
 support_status = "supported"
 version = 3
-has_bank_1 = true
 has_input_sync = true
 gpio_function = 1
 constant_0_input = 0x3E
