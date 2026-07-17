@@ -17,7 +17,7 @@
 //!     time::Rate,
 //! };
 //!
-//! let sdm = Sdm::new(peripherals.GPIO_SD, SdmConfig::default());
+//! let mut sdm = Sdm::new(peripherals.GPIO_SD, SdmConfig::default());
 //! let config = sdm
 //!     .channel_config()
 //!     .with_frequency(Rate::from_khz(500))?
@@ -30,7 +30,7 @@
 //! # {after_snippet}
 //! ```
 
-use core::fmt;
+use core::{fmt, marker::PhantomData};
 
 use esp_sync::NonReentrantMutex;
 
@@ -77,7 +77,7 @@ for_each_sdm_channel!(
                 clock_source: ClockSource,
                 $(
                     #[doc = concat!("Channel ", stringify!($ch), " creator.")]
-                    pub [<channel $ch>]: ChannelCreator<$ch>,
+                    pub [<channel $ch>]: ChannelCreator,
                 )*
             }
 
@@ -91,7 +91,7 @@ for_each_sdm_channel!(
                         _instance: instance,
                         clock_source: config.clock_source,
                         $(
-                            [<channel $ch>]: ChannelCreator::new(config.clock_source),
+                            [<channel $ch>]: ChannelCreator::new($ch, config.clock_source),
                         )*
                     }
                 }
@@ -285,33 +285,38 @@ impl ChannelConfigBuilder {
 /// Creates a connected sigma-delta channel.
 ///
 /// Channel creators are exposed by [`Sdm`]. Calling [`connect`](Self::connect)
-/// consumes the creator and returns an active [`Channel`], which prevents
-/// accidentally connecting the same channel twice.
+/// mutably borrows the creator for the lifetime of the active [`Channel`],
+/// which prevents accidentally connecting the same channel twice.
 #[derive(Debug)]
-pub struct ChannelCreator<const CHANNEL: usize> {
+pub struct ChannelCreator {
+    channel: usize,
     // This is copied from the Sdm-level configuration so partially moved
     // channel creators still use the shared clock source selected at construction time.
     // It is intentionally not configurable per channel.
     clock_source: ClockSource,
 }
 
-impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
-    const fn new(clock_source: ClockSource) -> Self {
-        Self { clock_source }
+impl ChannelCreator {
+    const fn new(channel: usize, clock_source: ClockSource) -> Self {
+        Self {
+            channel,
+            clock_source,
+        }
     }
 
     /// Configures this channel and connects it to an output pin.
-    pub fn connect<'d>(
-        self,
+    pub fn connect<'a, 'd>(
+        &'a mut self,
         pin: impl PeripheralOutput<'d>,
         config: ChannelConfig,
-    ) -> Result<Channel<CHANNEL>, Error> {
+    ) -> Result<Channel<'a>, Error> {
         let clock_guard = SdmClockGuard::new(self.clock_source)?;
-        write_config_raw(CHANNEL, config);
+        write_config_raw(self.channel, config);
 
         Ok(Channel {
-            clock_source: self.clock_source,
-            _pin_guard: connect_pin(CHANNEL, pin),
+            channel: self.channel,
+            _creator: PhantomData,
+            _pin_guard: connect_pin(self.channel, pin),
             _clock_guard: clock_guard,
         })
     }
@@ -319,27 +324,27 @@ impl<const CHANNEL: usize> ChannelCreator<CHANNEL> {
 
 /// A connected sigma-delta channel.
 ///
-/// Dropping a channel disconnects its output pin and releases the SDM clock
-/// guard. Use [`disconnect`](Self::disconnect) to explicitly release the
-/// channel and recover its [`ChannelCreator`].
+/// Dropping a channel disconnects its output pin, releases the SDM clock guard,
+/// and makes its [`ChannelCreator`] available again.
 #[derive(Debug)]
-pub struct Channel<const CHANNEL: usize> {
-    clock_source: ClockSource,
+pub struct Channel<'a> {
+    channel: usize,
+    _creator: PhantomData<&'a mut ChannelCreator>,
     _pin_guard: PinGuard,
     _clock_guard: SdmClockGuard,
 }
 
-impl<const CHANNEL: usize> Channel<CHANNEL> {
+impl Channel<'_> {
     /// Applies a new channel configuration.
     pub fn apply_config(&mut self, config: &ChannelConfig) {
-        write_config_raw(CHANNEL, *config);
+        write_config_raw(self.channel, *config);
     }
 
     /// Sets raw pulse density.
     ///
     /// The value ranges from `-128` to `127`.
     pub fn set_pulse_density(&mut self, density: i8) {
-        modify_pulse_density_raw(CHANNEL, density);
+        modify_pulse_density_raw(self.channel, density);
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
@@ -352,21 +357,14 @@ impl<const CHANNEL: usize> Channel<CHANNEL> {
     ///
     /// The returned value is in the hardware divider range `1..=256`.
     pub fn prescaler(&self) -> u16 {
-        prescaler_raw(CHANNEL) + 1
+        prescaler_raw(self.channel) + 1
     }
 
     /// Reads the raw pulse density.
     ///
     /// The returned value is in the hardware range `-128..=127`.
     pub fn pulse_density(&self) -> i8 {
-        pulse_density_raw(CHANNEL)
-    }
-
-    /// Disconnects this channel and returns its channel creator.
-    pub fn disconnect(self) -> ChannelCreator<CHANNEL> {
-        let clock_source = self.clock_source;
-        drop(self);
-        ChannelCreator::new(clock_source)
+        pulse_density_raw(self.channel)
     }
 }
 
@@ -464,8 +462,8 @@ fn configure_clock_source(clock_source: ClockSource) {
     //   chip.
     // - P4 uses HP_SYS_CLKRST.peri_clk_ctrl26.iomux_clk_src_sel, a one-bit XTAL/PLL_F80M selector.
     // - ESP32/C3/S2/S3 use APB for this driver path and do not need a source selector write here.
-    cfg_if::cfg_if! {
-        if #[cfg(esp32c5)] {
+    cfg_select! {
+        esp32c5 => {
             crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
                 w.iomux_func_clk_sel()
                     .bits(match clock_source {
@@ -475,7 +473,8 @@ fn configure_clock_source(clock_source: ClockSource) {
                     .iomux_func_clk_en()
                     .set_bit()
             });
-        } else if #[cfg(esp32c6)] {
+        }
+        esp32c6 => {
             crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
                 w.iomux_func_clk_sel()
                     .bits(match clock_source {
@@ -485,7 +484,8 @@ fn configure_clock_source(clock_source: ClockSource) {
                     .iomux_func_clk_en()
                     .set_bit()
             });
-        } else if #[cfg(esp32h2)] {
+        }
+        esp32h2 => {
             crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
                 w.iomux_func_clk_sel()
                     .bits(match clock_source {
@@ -495,7 +495,8 @@ fn configure_clock_source(clock_source: ClockSource) {
                     .iomux_func_clk_en()
                     .set_bit()
             });
-        } else if #[cfg(esp32p4)] {
+        }
+        esp32p4 => {
             crate::peripherals::HP_SYS_CLKRST::regs()
                 .peri_clk_ctrl26()
                 .modify(|_, w| {
@@ -506,7 +507,8 @@ fn configure_clock_source(clock_source: ClockSource) {
                     .iomux_clk_en()
                     .set_bit()
                 });
-        } else {
+        }
+        _ => {
             let _ = clock_source;
         }
     }

@@ -21,12 +21,13 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32h2)] {
+cfg_select! {
+    esp32h2 => {
         const RMT_FREQUENCY: Rate = Rate::from_mhz(32);
         // default clock source for h2 is 32Mhz
         const RMT_DIVIDER: u8 = 32;
-    } else {
+    }
+    _ => {
         const RMT_FREQUENCY: Rate = Rate::from_mhz(80);
         // default clock source for other models is 80Mhz
         const RMT_DIVIDER: u8 = 80;
@@ -47,14 +48,15 @@ const DUTY_MAX: u8 = 245;
 const DUTY_STEP: u8 = 20;
 const DUTY_RATIO_TOLERANCE_PER_MILLE: u32 = 20;
 
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s3))] {
+cfg_select! {
+    any(esp32, esp32s3) => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel4
             };
         }
-    } else {
+    }
+    _ => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel2
@@ -217,7 +219,7 @@ fn expected_ratio_per_mille(duty: u8) -> u32 {
 }
 
 fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
-    let sdm = Sdm::new(ctx.gpio_sd.reborrow(), SdmConfig::default());
+    let mut sdm = Sdm::new(ctx.gpio_sd.reborrow(), SdmConfig::default());
     let config = sdm
         .channel_config()
         .with_frequency(SDM_FREQUENCY)
@@ -237,7 +239,7 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
 
     Delay::new().delay_micros(SAMPLE_TIME_US);
 
-    let _creator = channel.disconnect();
+    drop(channel);
     let mut output = Output::new(ctx.sdm_pin.reborrow(), Level::Low, OutputConfig::default());
     output.set_low();
     // send idle signal so that RMT will stop recording pulses
