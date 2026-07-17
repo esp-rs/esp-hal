@@ -171,7 +171,7 @@ pub struct LintPackagesArgs {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
-        description = "Re-generate metadata and the chip support table in the esp-hal README",
+        description = "Re-generate metadata and tables in the esp-hal README",
         command = "update-metadata"
     )
 )]

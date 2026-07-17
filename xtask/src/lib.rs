@@ -1092,10 +1092,10 @@ pub fn format_yml<P: AsRef<Path>>(check: bool, path: P) -> Result<()> {
     Ok(())
 }
 
-/// Update the metadata and chip support table in the esp-hal README.
+/// Update the generated metadata and tables in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
-    log::info!("Updating esp-metadata and chip support table...");
-    update_chip_support_table(workspace)?;
+    log::info!("Updating esp-metadata and README tables...");
+    update_readme_tables(workspace)?;
     generate_metadata(workspace, save)?;
 
     format_package(
@@ -1161,33 +1161,43 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
     Ok(())
 }
 
-fn update_chip_support_table(workspace: &Path) -> Result<()> {
-    log::debug!("Updating chip support table in README.md...");
+fn update_readme_tables(workspace: &Path) -> Result<()> {
+    const SUPPORTED_DEVICES_START: &str = "<!-- start supported devices table -->";
+    const SUPPORTED_DEVICES_END: &str = "<!-- end supported devices table -->";
+    const CHIP_SUPPORT_START: &str = "<!-- start chip support table -->";
+    const CHIP_SUPPORT_END: &str = "<!-- end chip support table -->";
+
+    log::debug!("Updating generated tables in README.md...");
     let mut output = String::new();
     let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))
         .context("Failed to read {workspace}")?;
 
-    let mut in_support_table = false;
-    let mut generate_support_table = true;
+    let mut end_marker = None;
     for line in readme.lines() {
-        let mut copy_line = true;
-        if line.trim() == "<!-- start chip support table -->" {
-            in_support_table = true;
-        } else if line.trim() == "<!-- end chip support table -->" {
-            in_support_table = false;
-        } else {
-            copy_line = !in_support_table;
-        }
-        if !copy_line {
+        let trimmed = line.trim();
+
+        if let Some(end) = end_marker {
+            if trimmed == end {
+                output.push_str(line);
+                output.push('\n');
+                end_marker = None;
+            }
             continue;
         }
+
         output.push_str(line);
         output.push('\n');
 
-        if in_support_table && generate_support_table {
-            esp_metadata::generate_chip_support_status(&mut output)?;
-
-            generate_support_table = false;
+        match trimmed {
+            SUPPORTED_DEVICES_START => {
+                esp_metadata::generate_supported_devices_table(&mut output)?;
+                end_marker = Some(SUPPORTED_DEVICES_END);
+            }
+            CHIP_SUPPORT_START => {
+                esp_metadata::generate_chip_support_status(&mut output)?;
+                end_marker = Some(CHIP_SUPPORT_END);
+            }
+            _ => {}
         }
     }
 
