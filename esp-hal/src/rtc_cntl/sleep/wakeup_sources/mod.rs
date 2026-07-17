@@ -1,42 +1,74 @@
-#[cfg(any(esp32, esp32s2, esp32s3))]
-mod ext0;
-#[cfg(any(esp32, esp32s2, esp32s3))]
-#[instability::unstable]
-pub use ext0::*;
+cfg_select! {
+    sleep_has_wakeup_source_ext0 => {
+        mod ext0;
+        #[instability::unstable]
+        pub use ext0::*;
+    }
+    _ => {}
+}
 
-#[cfg(not(any(esp32c2, esp32c3)))]
-mod ext1;
-#[cfg(not(any(esp32c2, esp32c3)))]
-#[instability::unstable]
-pub use ext1::*;
+cfg_select! {
+    sleep_has_wakeup_source_ext1 => {
+        mod ext1;
+        #[instability::unstable]
+        pub use ext1::*;
+    }
+    _ => {}
+}
 
-mod gpio;
-#[instability::unstable]
-pub use gpio::*;
+// TODO: merge with RTCIO?
+cfg_select! {
+    sleep_has_wakeup_source_gpio => {
+        mod gpio;
+        #[instability::unstable]
+        pub use gpio::*;
+    }
+    _ => {}
+}
 
-#[cfg(esp32c6)]
-mod lp_core;
-#[cfg(esp32c6)]
-#[instability::unstable]
-pub use lp_core::*;
+// TODO: use a lp_gpio_wakes_from_deep_sleep cfg, or make this universal.
+cfg_select! {
+    all(sleep_has_wakeup_source_gpio, any(esp32c2, esp32c3, esp32s2, esp32s3)) => {
+        mod rtcio;
+        #[instability::unstable]
+        pub use rtcio::*;
+    }
+    _ => {}
+}
 
-#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-mod rtcio;
-#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-#[instability::unstable]
-pub use rtcio::*;
+cfg_select! {
+    sleep_has_wakeup_source_timer => {
+        mod timer;
+        #[instability::unstable]
+        pub use timer::*;
+    }
+    _ => {}
+}
 
-mod timer;
+// TODO: merge with ULP?
+cfg_select! {
+    sleep_has_wakeup_source_lp_core => {
+        mod lp_core;
+        #[instability::unstable]
+        pub use lp_core::*;
+    }
+    _ => {}
+}
 
-#[instability::unstable]
-pub use timer::*;
+cfg_select! {
+    sleep_has_wakeup_source_ulp_riscv => {
+        mod ulp;
+        #[instability::unstable]
+        pub use ulp::*;
+    }
+    _ => {}
+}
 
-#[cfg(any(esp32s2, esp32s3))]
-mod ulp;
-#[cfg(any(esp32s2, esp32s3))]
-#[instability::unstable]
-pub use ulp::*;
-
-mod uart;
-#[instability::unstable]
-pub use uart::*;
+cfg_select! {
+    sleep_has_wakeup_source_uart => {
+        mod uart;
+        #[instability::unstable]
+        pub use uart::*;
+    }
+    _ => {}
+}
