@@ -287,6 +287,40 @@ macro_rules! if_set {
     };
 }
 
+#[cfg(feature = "unstable")]
+include!(concat!(env!("OUT_DIR"), "/version_macro.rs"));
+
+#[doc_replace]
+/// Selects code based on the `esp-hal` version.
+///
+/// Branches are considered from top to bottom. The first branch whose version
+/// is less than or equal to the current `esp-hal` version is
+/// expanded. The fallback branch is expanded if no version branch matches.
+///
+/// Version branches should be listed in descending order.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_hal::at_least_version;
+///
+/// let description = at_least_version! {
+///     (2, 0, 0) => { "esp-hal 2.0.0 or newer" }
+///     (1, 1, 0) => { "esp-hal 1.1.0 or newer" }
+///     _ => { "an older esp-hal version" }
+/// };
+/// # {after_snippet}
+/// ```
+#[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+macro_rules! at_least_version {
+    ($($branch:tt)*) => {
+        $crate::__esp_hal_at_least_version! { $($branch)* }
+    };
+}
+
 /// Macro to ignore tokens.
 ///
 /// This is useful when we need existence of a metavariable (to expand a
@@ -579,6 +613,8 @@ macro_rules! impl_dma_channel_trait {
     };
 }
 pub(crate) use impl_dma_channel_trait;
+#[cfg(feature = "unstable")]
+use procmacros::doc_replace;
 
 /// Macro to allow using unstable HAL features conditionally. Other crates can
 /// use this to "detect" the esp-hal/unstable feature.

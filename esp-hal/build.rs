@@ -1,4 +1,3 @@
-use std::error::Error;
 #[cfg(feature = "rt")]
 use std::{
     collections::HashMap,
@@ -7,6 +6,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use std::{error::Error, fmt::Write as _};
 
 #[cfg(feature = "rt")]
 use esp_config::Value;
@@ -31,6 +31,8 @@ fn main() {
 }
 
 fn try_main() -> Result<(), Box<dyn Error>> {
+    generate_version_macro()?;
+
     // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
     let suppress_panics = std::env::var("RUSTC_WRAPPER")
         .unwrap_or_default()
@@ -135,6 +137,71 @@ fn try_main() -> Result<(), Box<dyn Error>> {
 
 // ----------------------------------------------------------------------------
 // Helper Functions
+fn generate_version_macro() -> Result<(), Box<dyn Error>> {
+    let major = std::env::var("CARGO_PKG_VERSION_MAJOR")?.parse::<u64>()?;
+    let minor = std::env::var("CARGO_PKG_VERSION_MINOR")?.parse::<u64>()?;
+    let patch = std::env::var("CARGO_PKG_VERSION_PATCH")?.parse::<u64>()?;
+    let mut source = String::from(
+        r#"
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __esp_hal_at_least_version {
+"#,
+    );
+
+    // Any minor version of an earlier major version satisfies the requirement.
+    for accepted_major in 0..major {
+        writeln!(
+            source,
+            r#"    (({accepted_major}, $_minor:literal, $_patch:literal) => {{ $($selected:tt)* }} $($rest:tt)*) => {{
+        $($selected)*
+    }};"#
+        )?;
+    }
+
+    // Any patch version of an earlier minor version of the current major satisfies it.
+    for accepted_minor in 0..minor {
+        writeln!(
+            source,
+            r#"    (({major}, {accepted_minor}, $_patch:literal) => {{ $($selected:tt)* }} $($rest:tt)*) => {{
+        $($selected)*
+    }};"#
+        )?;
+    }
+
+    // For the current major and minor version, only this and earlier patches satisfy it.
+    for accepted_patch in 0..=patch {
+        writeln!(
+            source,
+            r#"    (({major}, {minor}, {accepted_patch}) => {{ $($selected:tt)* }} $($rest:tt)*) => {{
+        $($selected)*
+    }};"#
+        )?;
+    }
+
+    source.push_str(
+        r#"    (($major:literal, $minor:literal, $patch:literal) => { $($skipped:tt)* } $($rest:tt)*) => {
+        $crate::__esp_hal_at_least_version! { $($rest)* }
+    };
+    (, $($rest:tt)*) => {
+        $crate::__esp_hal_at_least_version! { $($rest)* }
+    };
+    (_ => { $($fallback:tt)* } $(,)?) => {
+        $($fallback)*
+    };
+}
+"#,
+    );
+
+    let out_dir = std::env::var_os("OUT_DIR").ok_or("OUT_DIR is not set")?;
+    std::fs::write(
+        std::path::PathBuf::from(out_dir).join("version_macro.rs"),
+        source,
+    )?;
+
+    Ok(())
+}
+
 #[cfg(feature = "rt")]
 fn copy_dir_all(
     chip: Chip,
