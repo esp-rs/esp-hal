@@ -1,18 +1,10 @@
-/// ULP wakeup source
+use crate::rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource};
+
+/// RISC-V ULP wakeup source
 ///
 /// Wake up from ULP software interrupt, and/or ULP-RISCV Trap condition.
 /// Both of these triggers are enabled by default.
 /// This source will clear any outstanding software interrupts prior to entering sleep, by default.
-///
-/// S2 supports the following triggers (Refer to ESP32-S2 Technical Reference Manual, Table 9.4-3.
-/// Wakeup Source)
-///  - ULP-FSM software interrupt (unsure if this ALSO supports ULP-RISCV software interrupt)
-///  - ULP-RISCV Trap
-///
-/// S3 supports the following triggers (Refer to ESP32-S3 Technical Reference Manual, Table 10.4-3.
-/// Wakeup Source)
-///  - ULP-FSM software interrupt and ULP-RISCV software interrupt
-///  - ULP-RISCV Trap
 ///
 /// This wakeup source can be used to wake up from both light and deep sleep.
 pub struct UlpWakeupSource {
@@ -31,7 +23,7 @@ impl UlpWakeupSource {
         }
     }
 
-    /// Enable wakeup triggered by software interrupt from ULP-FSM or ULP-RISCV
+    /// Enable wakeup triggered by software interrupt from ULP-RISCV
     pub fn set_wake_on_interrupt(mut self, value: bool) -> Self {
         self.wake_on_interrupt = value;
         self
@@ -65,6 +57,26 @@ impl Default for UlpWakeupSource {
     }
 }
 
-#[cfg_attr(esp32s2, path = "esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "esp32s3.rs")]
-mod implementation;
+impl WakeSource for UlpWakeupSource {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
+        if self.wake_on_interrupt {
+            triggers.insert(WakeupSource::UlpRiscv);
+        }
+        if self.wake_on_trap {
+            triggers.insert(WakeupSource::UlpRiscvTrap);
+        }
+
+        if self.clear_interrupts_on_sleep {
+            self.clear_interrupts();
+        }
+
+        // This one needs to be false to keep the ULP timer and ULP GPIO happy!
+        // Possibly relevant issue: https://github.com/espressif/esp-idf/issues/10595
+        sleep_config.set_rtc_peri_pd_en(false);
+    }
+}
