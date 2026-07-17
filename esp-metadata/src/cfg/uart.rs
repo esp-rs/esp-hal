@@ -21,6 +21,13 @@ pub(crate) struct UartInstanceConfig {
 
     /// IOMUX signal name of the instance's RTS signal.
     pub rts: String,
+
+    #[serde(default = "default_true")]
+    pub wakeup_source: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Generates `for_each_uart!` which can be used to implement the UART
@@ -44,10 +51,12 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
             let cts = format_ident!("{}", instance_config.cts);
             let rts = format_ident!("{}", instance_config.rts);
 
+            let wakeup_source = instance_config.wakeup_source;
+
             // The order and meaning of these tokens must match their use in the
             // `for_each_uart!` call.
             quote! {
-                #id, #instance, #sys, #rx, #tx, #cts, #rts
+                #id, #instance, #sys, #rx, #tx, #cts, #rts, wakeup_source = #wakeup_source
             }
         })
         .collect::<Vec<_>>();

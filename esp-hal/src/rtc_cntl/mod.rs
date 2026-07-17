@@ -159,6 +159,9 @@ macro_rules! wakeup_docstring {
     (WifiBeacon)    => { "Wi-Fi beacon wakeup." };
     (Uart0)         => { "UART0 wakeup." };
     (Uart1)         => { "UART1 wakeup." };
+    (Uart2)         => { "UART2 wakeup." };
+    (Uart3)         => { "UART3 wakeup." };
+    (Uart4)         => { "UART4 wakeup." };
     (Touch)         => { "Touch sensor wakeup." };
     (Ulp)           => { "ULP wakeup." };
     (UlpRiscv)      => { "ULP RISC-V coprocessor wakeup." };
