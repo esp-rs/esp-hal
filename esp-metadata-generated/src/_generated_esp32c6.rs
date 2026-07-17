@@ -290,7 +290,7 @@ macro_rules! property {
         stringify!(16)
     };
     ("lp_io.version") => {
-        "esp32c6"
+        "v4"
     };
     ("lp_uart.ram_size") => {
         32

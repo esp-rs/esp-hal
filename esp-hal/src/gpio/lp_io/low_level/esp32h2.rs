@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcPin, RtcPinWithResistors},
+    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
     peripherals::{GPIO, IO_MUX, LP_AON},
 };
 
@@ -24,10 +24,27 @@ for_each_lp_function! {
                         })
                     });
             }
+
+            fn rtc_set_config(&self, input_enable: bool, _mux: bool, _func: RtcFunction) {
+                IO_MUX::regs().gpio(lp_pin_to_gpio($pin) as usize)
+                    .modify(|_, w| unsafe {
+                        w.slp_sel().bit(false);
+                        w.mcu_sel().bits(1);
+                        w.fun_ie().bit(input_enable)
+                    });
+            }
         }
 
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {}
+        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
+            fn rtcio_pullup(&self, enable: bool) {
+                pullup_enable($pin, enable);
+            }
+
+            fn rtcio_pulldown(&self, enable: bool) {
+                pulldown_enable($pin, enable);
+            }
+        }
     };
 }
 

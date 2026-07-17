@@ -41,14 +41,11 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(unsafe { crate::peripherals::GPIO0::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO1::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO2::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO3::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO4::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO5::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO6::steal() }, wakeup_pins);
-        uninit_pin(unsafe { crate::peripherals::GPIO7::steal() }, wakeup_pins);
+        for_each_lp_function! {
+            (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
+            };
+        }
     }
 }
 

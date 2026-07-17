@@ -61,7 +61,7 @@ peripherals = [
     { name = "LP_APM" },
     { name = "LP_CLKRST" },
     { name = "LPWR", pac = "LP_CLKRST" },
-    # { name = "LP_GPIO" }, # TODO: add PAC manually later
+    { name = "LP_GPIO" },
     # { name = "LP_I2C0" },
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
@@ -120,8 +120,8 @@ timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
 
 [device.lp_io]
-support_status = "not_supported"
-version = "unsupported"
+support_status = "partial"
+version = "v4"
 
 [device.gpio]
 support_status = "supported"
@@ -131,28 +131,28 @@ gpio_function = 1
 constant_0_input = 0x60
 constant_1_input = 0x40
 pins = [
-    { pin =  0,                                                                                     analog = { 0 = "XTAL_32K_P" } },
-    { pin =  1,                                                                                     analog = { 0 = "XTAL_32K_N" } },
-    { pin =  2,  functions = {                  2 = "FSPIQ" } },
-    { pin =  3,  functions = { 0 = "MTMS",      2 = "FSPIHD" },     limitations = ["strapping"] },
-    { pin =  4,  functions = { 0 = "MTDI",      2 = "FSPIWP" },     limitations = ["strapping"] },
-    { pin =  5,  functions = { 0 = "MTCK" } },
-    { pin =  6,  functions = { 0 = "MTDO",      2 = "FSPICLK" } },
-    { pin =  7,  functions = {                  2 = "FSPID" },      limitations = ["strapping"] },
-    { pin =  8,  functions = {                  2 = "FSPICS0" },    limitations = ["strapping"],    analog = { 0 = "ZCD0" } },
-    { pin =  9,                                                     limitations = ["strapping"],    analog = { 0 = "ZCD1" } },
+    { pin =  0,                                                                            analog = { 0 = "XTAL_32K_P"                 }, lp = { 1 = "LP_GPIO0" }},
+    { pin =  1,                                                                            analog = { 0 = "XTAL_32K_N", 1 = "ADC1_CH0" }, lp = { 1 = "LP_GPIO1" }},
+    { pin =  2,  functions = {               2 = "FSPIQ"  },                               analog = {                   1 = "ADC1_CH1" }, lp = { 1 = "LP_GPIO2" }},
+    { pin =  3,  functions = { 0 = "MTMS",   2 = "FSPIHD" },  limitations = ["strapping"], analog = {                   1 = "ADC1_CH2" }, lp = { 1 = "LP_GPIO3" }},
+    { pin =  4,  functions = { 0 = "MTDI",   2 = "FSPIWP" },  limitations = ["strapping"], analog = {                   1 = "ADC1_CH3" }, lp = { 1 = "LP_GPIO4" }},
+    { pin =  5,  functions = { 0 = "MTCK" },                                                                                              lp = { 1 = "LP_GPIO5" }},
+    { pin =  6,  functions = { 0 = "MTDO",   2 = "FSPICLK" },                                                                             lp = { 1 = "LP_GPIO6" }},
+    { pin =  7,  functions = {               2 = "FSPID"   }, limitations = ["strapping"] },
+    { pin =  8,  functions = {               2 = "FSPICS0" }, limitations = ["strapping"], analog = { 0 = "ZCD0" } },
+    { pin =  9,                                               limitations = ["strapping"], analog = { 0 = "ZCD1" } },
     { pin =  10, functions = { 0 = "U0RXD" } },
     { pin =  11, functions = { 0 = "U0TXD" } },
-    { pin =  12,                                                                                    analog = { 0 = "USJ_DM" } },
-    { pin =  13,                                                                                    analog = { 0 = "USJ_DP" } },
-    { pin =  14, functions = { 0 = "FSPICS1" },                     limitations = ["spi_psram"] },
-    { pin =  15, functions = { 0 = "FSPICS0" },                     limitations = ["spi_flash"] },
-    { pin =  16, functions = { 0 = "FSPIQ" },                       limitations = ["spi_flash", "spi_psram"] },
-    { pin =  17, functions = { 0 = "FSPIWP" },                      limitations = ["spi_flash", "spi_psram"] },
-    { pin =  18,                                                    limitations = ["spi_flash", "spi_psram"] },
-    { pin =  19, functions = { 0 = "FSPIHD" },                      limitations = ["spi_flash", "spi_psram"] },
-    { pin =  20, functions = { 0 = "FSPICLK" },                     limitations = ["spi_flash", "spi_psram"] },
-    { pin =  21, functions = { 0 = "FSPID" },                       limitations = ["spi_flash", "spi_psram"] },
+    { pin =  12,                                                                           analog = { 0 = "USJ_DM" } },
+    { pin =  13,                                                                           analog = { 0 = "USJ_DP" } },
+    { pin =  14, functions = { 0 = "FSPICS1" },               limitations = ["spi_psram"] },
+    { pin =  15, functions = { 0 = "FSPICS0" },               limitations = ["spi_flash"] },
+    { pin =  16, functions = { 0 = "FSPIQ" },                 limitations = ["spi_flash", "spi_psram"] },
+    { pin =  17, functions = { 0 = "FSPIWP" },                limitations = ["spi_flash", "spi_psram"] },
+    { pin =  18,                                              limitations = ["spi_flash", "spi_psram"] },
+    { pin =  19, functions = { 0 = "FSPIHD" },                limitations = ["spi_flash", "spi_psram"] },
+    { pin =  20, functions = { 0 = "FSPICLK" },               limitations = ["spi_flash", "spi_psram"] },
+    { pin =  21, functions = { 0 = "FSPID" },                 limitations = ["spi_flash", "spi_psram"] },
     { pin =  22, functions = { 0 = "SDIO_DATA2" } },
     { pin =  23, functions = { 0 = "SDIO_DATA3" } },
     { pin =  24 },
@@ -331,7 +331,6 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 wakeup_sources = {
-    Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,
     WifiBeacon = 3,
