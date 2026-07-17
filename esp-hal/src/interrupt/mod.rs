@@ -210,27 +210,61 @@ impl InterruptStatus {
     fn interrupt_status_word(cpu: Cpu, word: usize) -> u32 {
         match cpu {
             Cpu::ProCpu => {
-                #[cfg(esp32p4)]
-                if word == 4 {
-                    // Discontiguous, cannot be part of the standard status array
-                    return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                cfg_select! {
+                    esp32s31 => {
+                        if word == 5 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status5().read().bits()
+                                & 0x1ff;
+                        }
+                        INTERRUPT_CORE0::regs().core_0_intr_status(word).read().bits()
+                    }
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                        }
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    _ => {
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(word)
+                            .read()
+                            .bits()
+                    }
                 }
-                INTERRUPT_CORE0::regs()
-                    .core_0_intr_status(word)
-                    .read()
-                    .bits()
             }
             #[cfg(multi_core)]
             Cpu::AppCpu => {
-                #[cfg(esp32p4)]
-                if word == 4 {
-                    // Discontiguous, cannot be part of the standard status array
-                    return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                cfg_select! {
+                    esp32s31 => {
+                        if word == 5 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status5().read().bits()
+                                & 0x1ff;
+                        }
+                        INTERRUPT_CORE1::regs().core_1_intr_status(word).read().bits()
+                    }
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                        }
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    _ => {
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(word)
+                            .read()
+                            .bits()
+                    }
                 }
-                INTERRUPT_CORE1::regs()
-                    .core_1_intr_status(word)
-                    .read()
-                    .bits()
             }
         }
     }
@@ -397,21 +431,39 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
 pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
     match core {
         Cpu::ProCpu => {
-            INTERRUPT_CORE0::regs()
-                .core_0_intr_map(interrupt as usize)
-                .write(|w| unsafe { w.bits(cpu_interrupt) });
+            cfg_select! {
+                esp32s31 => {
+                    INTERRUPT_CORE0::regs()
+                        .core_0_intr_map(interrupt as usize)
+                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
+                }
+                _ => {
+                    INTERRUPT_CORE0::regs()
+                        .core_0_intr_map(interrupt as usize)
+                        .write(|w| unsafe { w.bits(cpu_interrupt) });
+                }
+            }
         }
         #[cfg(multi_core)]
         Cpu::AppCpu => {
-            INTERRUPT_CORE1::regs()
-                .core_1_intr_map(interrupt as usize)
-                .write(|w| unsafe { w.bits(cpu_interrupt) });
+            cfg_select! {
+                esp32s31 => {
+                    INTERRUPT_CORE1::regs()
+                        .core_1_intr_map(interrupt as usize)
+                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
+                }
+                _ => {
+                    INTERRUPT_CORE1::regs()
+                        .core_1_intr_map(interrupt as usize)
+                        .write(|w| unsafe { w.bits(cpu_interrupt) });
+                }
+            }
         }
     }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", gpio_driver_supported))]
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
 }
@@ -419,15 +471,41 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 #[cfg(feature = "rt")]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
-        Cpu::ProCpu => INTERRUPT_CORE0::regs()
-            .core_0_intr_map(interrupt as usize)
-            .read()
-            .bits(),
+        Cpu::ProCpu => {
+            cfg_select! {
+                esp32s31 => {
+                    INTERRUPT_CORE0::regs()
+                        .core_0_intr_map(interrupt as usize)
+                        .read()
+                        .map()
+                        .bits() as u32
+                }
+                _ => {
+                    INTERRUPT_CORE0::regs()
+                        .core_0_intr_map(interrupt as usize)
+                        .read()
+                        .bits()
+                }
+            }
+        }
         #[cfg(multi_core)]
-        Cpu::AppCpu => INTERRUPT_CORE1::regs()
-            .core_1_intr_map(interrupt as usize)
-            .read()
-            .bits(),
+        Cpu::AppCpu => {
+            cfg_select! {
+                esp32s31 => {
+                    INTERRUPT_CORE1::regs()
+                        .core_1_intr_map(interrupt as usize)
+                        .read()
+                        .map()
+                        .bits() as u32
+                }
+                _ => {
+                    INTERRUPT_CORE1::regs()
+                        .core_1_intr_map(interrupt as usize)
+                        .read()
+                        .bits()
+                }
+            }
+        }
     };
     CpuInterrupt::from_u32(cpu_intr)
 }

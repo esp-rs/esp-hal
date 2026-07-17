@@ -4073,10 +4073,11 @@ macro_rules! for_each_i2s {
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
-        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
+        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((all(0, UART0, Uart0,
+        U0RXD, U0TXD, U0CTS, U0RTS, wakeup_source = true), (1, UART1, Uart1, U1RXD,
+        U1TXD, U1CTS, U1RTS, wakeup_source = true)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

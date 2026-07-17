@@ -117,6 +117,7 @@ esp32c61 = { version = "0.3", features = ["critical-section"], optional = true, 
 esp32h2 = { version = "0.19", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f68e014" }
 esp32s2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f68e014" }
 esp32s3 = { version = "0.35", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f68e014" }
+esp32s31 = { version = "0.1", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f68e014" }
 esp32p4 = { version = "0.2",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "f68e014" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
@@ -166,6 +167,7 @@ rt = [
     "esp32h2?/rt",
     "esp32s2?/rt",
     "esp32s3?/rt",
+    "esp32s31?/rt",
     "critical-section",
 ]
 
@@ -299,7 +301,16 @@ esp32s3 = [
     "esp-sync/esp32s3",
     "esp-metadata-generated/esp32s3",
 ]
-
+##
+esp32s31 = [
+    "dep:esp32s31",
+    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt/clic-48",
+    "procmacros/rtc-fast",
+    "esp-rom-sys/esp32s31",
+    "esp-sync/esp32s31",
+    "esp-metadata-generated/esp32s31",
+]
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
 log-04 = ["dep:log-04"]

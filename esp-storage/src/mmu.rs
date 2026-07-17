@@ -25,6 +25,8 @@ use esp32p4 as pac;
 use esp32s2 as pac;
 #[cfg(esp32s3)]
 use esp32s3 as pac;
+#[cfg(esp32s31)]
+use esp32s31 as pac;
 #[cfg(not(soc_has_mmu_table))]
 use indexed::*;
 #[cfg(soc_has_mmu_table)]
@@ -117,7 +119,9 @@ pub(crate) fn read_flash_encrypted(offset: u32, bytes: &mut [u8]) -> Result<(), 
 
         crate::maybe_with_critical_section(|| {
             let guard = map_flash_page(page_base)?;
-            invalidate_cache(guard.vaddr() as u32, chunk as u32);
+            // A temporary slot can retain cache lines from its previous mapping. Invalidate
+            // the complete mapping before reading, matching ESP-IDF's MMU mapping sequence.
+            invalidate_cache(guard.vaddr() as u32, guard.page_size);
             let src = unsafe { guard.vaddr().add(in_page) };
             unsafe {
                 ptr::copy_nonoverlapping(src, remaining.as_mut_ptr(), chunk);
@@ -155,13 +159,25 @@ pub(crate) fn invalidate_flash_cache(start: u32, len: u32) {
     }
 }
 
-#[cfg(not(any(esp32, esp32p4)))]
+#[cfg(not(any(esp32, esp32p4, esp32s31)))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);
     }
     unsafe {
         Cache_Invalidate_Addr(vaddr, size);
+    }
+}
+
+#[cfg(esp32s31)]
+fn invalidate_cache(vaddr: u32, size: u32) {
+    const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
+
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE, vaddr, size);
     }
 }
 
@@ -192,7 +208,7 @@ fn invalidate_cache(_vaddr: u32, _size: u32) {
 #[cfg(not(esp32s2))]
 const FLASH_VADDR_BASE: u32 = cfg_select! {
     any(esp32c5, esp32c6, esp32c61, esp32h2) => 0x4200_0000,
-    esp32p4 => 0x4000_0000,
+    any(esp32p4, esp32s31) => 0x4000_0000,
     any(esp32c3, esp32c2, esp32s3) => 0x3C00_0000,
     _ => 0x3F40_0000,
 };
@@ -241,24 +257,27 @@ mod indexed {
     }
 
     pub(super) fn mmu_page_size() -> u32 {
-        match mmu_page_size_code() {
-            0 => 0x10000,
-            1 => 0x8000,
-            2 => 0x4000,
-            _ => 0x2000,
+        let code = mmu_page_size_code();
+        cfg_select! {
+            // The S31 flash MMU's maximum page size is 256 KiB.
+            esp32s31 => 0x40000 >> code,
+            // Other indexed flash MMUs have a 64 KiB maximum page size.
+            _ => 0x10000 >> code,
         }
     }
 
     fn mmu_page_size_code() -> u32 {
         let ctrl = spi0().mmu_power_ctrl().read();
         cfg_select! {
-            any(esp32c5, esp32c61) => ctrl.mmu_page_size().bits() as u32,
+            any(esp32c5, esp32c61, esp32s31) => ctrl.mmu_page_size().bits() as u32,
             _ => ctrl.spi_mmu_page_size().bits() as u32,
         }
     }
 
     fn page_size_shift(page_size: u32) -> u32 {
         match page_size {
+            0x40000 => 18,
+            0x20000 => 17,
             0x10000 => 16,
             0x8000 => 15,
             0x4000 => 14,
@@ -317,11 +336,13 @@ mod indexed {
 
     pub(super) fn set_entry_invalid(entry_id: u32) {
         select_entry(entry_id);
-        spi0().mmu_item_content().reset();
+        // Match `mmu_ll_set_entry_invalid`: the PAC reset value is not zero on every chip.
+        spi0().mmu_item_content().write(|w| unsafe { w.bits(0) });
     }
 
     pub(super) fn entry_count() -> u32 {
         cfg_select! {
+            esp32s31 => 1024,
             any(esp32c5, esp32c61, esp32p4) => 512,
             any(esp32c6, esp32h2) => 256,
             _ => 0,

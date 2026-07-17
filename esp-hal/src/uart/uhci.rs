@@ -304,7 +304,7 @@ where
         let reg = self.uhci_per.register_block();
 
         for_each_uart! {
-            (all $( ($id:literal, $peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
+            (all $( ($id:literal, $peri:ident, $variant:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) ),*) => {
                 reg.conf0().modify(|_, w| {
                     cfg_select! {
                         uhci_combined_uart_selector_field => {

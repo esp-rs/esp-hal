@@ -60,6 +60,8 @@ esp32p4 = ["esp-metadata-generated/esp32p4"]
 esp32s2 = ["esp-metadata-generated/esp32s2"]
 ## Target the ESP32-S3.
 esp32s3 = ["esp-metadata-generated/esp32s3"]
+## Target the ESP32-S31.
+esp32s31 = ["esp-metadata-generated/esp32s31"]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.

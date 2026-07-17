@@ -84,6 +84,9 @@ use crate::{
 };
 
 cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::LP_SYS as LP_AON;
+    }
     soc_has_lp_aon => {
         use crate::peripherals::LP_AON;
     }
@@ -118,6 +121,9 @@ impl CpuClock {
             }
             esp32p4 => {
                 Self::_400MHz
+            }
+            esp32s31 => {
+                Self::_320MHz
             }
             _ => {
                 Self::_240MHz
@@ -205,6 +211,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         crate::rtc_cntl::rtc::init(&cpu_clock_config);
 
         cpu_clock_config.configure(clocks);
+        #[cfg(esp32s31)]
+        crate::rtc_cntl::rtc::configure_wifi_lp_clock(&cpu_clock_config);
 
         // FIXME: MCPWM clock configuration needs to know about the active clock source
         // frequency. In the future, we should turn the MCPWM config structs into
@@ -471,6 +479,8 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         }
         soc_has_clock_node_lp_slow_clk => {
             let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
+                // on S31, clock can not be calibrated to get OSC_SLOW actual frequency
+                #[cfg(not(esp32s31))]
                 LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
                 LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
                 LpSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
@@ -484,6 +494,7 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
     let reg = cfg_select! {
+        esp32s31 => LP_AON::regs().lp_store(1),
         esp32p4 => LP_AON::regs().lp_store1(),
         _ => LP_AON::regs().store1(),
     };
@@ -529,6 +540,7 @@ pub fn xtal_clock() -> Rate {
 /// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
 pub(crate) fn rtc_slow_cal_period() -> u32 {
     let reg = cfg_select! {
+        esp32s31 => LP_AON::regs().lp_store(1),
         esp32p4 => LP_AON::regs().lp_store1(),
         _ => LP_AON::regs().store1(),
     };
@@ -538,6 +550,7 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
 
 /// Read the calibrated RTC fast clock period from memory.
 #[cfg_attr(not(soc_has_pmu), expect(dead_code))]
+#[cfg_attr(esp32s31, expect(dead_code))]
 pub(crate) fn rtc_fast_cal_period() -> u32 {
     RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
