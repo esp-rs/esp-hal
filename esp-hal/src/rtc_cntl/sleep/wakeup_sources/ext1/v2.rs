@@ -22,10 +22,7 @@ impl Ext1WakeupSource<'_, '_> {
 
     pub(in crate::rtc_cntl::sleep) fn wake_io_reset() {
         fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
-            let pin_number = cfg_select! {
-                esp32h2 => pin.rtc_number(),
-                _ => pin.number(),
-            };
+            let pin_number = pin.rtc_number();
 
             if wakeup_pins & (1 << pin_number) != 0 {
                 pin.rtcio_pad_hold(false);
@@ -58,10 +55,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut pin_mask = 0u8;
         let mut level_mask = 0u8;
         for (pin, level) in pins.iter_mut() {
-            let pin_number = cfg_select! {
-                esp32h2 => pin.rtc_number(),
-                _ => pin.number(),
-            };
+            let pin_number = pin.rtc_number();
 
             pin_mask |= 1 << pin_number;
             level_mask |= match level {
