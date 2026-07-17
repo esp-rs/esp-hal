@@ -38,30 +38,16 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
             bits |= 1 << pin.rtc_number();
         }
 
-        unsafe {
-            cfg_select! {
-                esp32s3 => {
-                    LPWR::regs()
-                        .ext_wakeup1()
-                        .modify(|_, w| w.ext_wakeup1_status_clr().set_bit());
-                    LPWR::regs()
-                        .ext_wakeup1()
-                        .modify(|_, w| w.ext_wakeup1_sel().bits(bits));
-                }
-                _ => {
-                    LPWR::regs()
-                        .ext_wakeup1()
-                        .modify(|_, w| w.status_clr().set_bit());
-                    LPWR::regs()
-                        .ext_wakeup1()
-                        .modify(|_, w| w.sel().bits(bits));
-                }
-            }
+        LPWR::regs()
+            .ext_wakeup1()
+            .modify(|_, w| w.status_clr().set_bit());
+        LPWR::regs()
+            .ext_wakeup1()
+            .modify(|_, w| unsafe { w.sel().bits(bits) });
 
-            LPWR::regs()
-                .ext_wakeup_conf()
-                .modify(|_, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
-        }
+        LPWR::regs()
+            .ext_wakeup_conf()
+            .modify(|_, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
     }
 }
 
