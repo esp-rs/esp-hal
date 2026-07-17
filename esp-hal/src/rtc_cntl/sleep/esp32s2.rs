@@ -1,11 +1,4 @@
-use super::{
-    Ext0WakeupSource,
-    Ext1WakeupSource,
-    UlpWakeupSource,
-    WakeSource,
-    WakeTriggers,
-    WakeupLevel,
-};
+use super::{Ext0WakeupSource, UlpWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
@@ -141,57 +134,6 @@ impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
         self.pin
             .borrow_mut()
             .rtc_set_config(true, false, RtcFunction::Rtc);
-    }
-}
-
-impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.insert(WakeupSource::Ext1);
-
-        // TODO: disable clock when not in use
-        SENS::regs()
-            .sar_io_mux_conf()
-            .modify(|_, w| w.iomux_clk_gate_en().set_bit());
-
-        // set pins to RTC function
-        let mut pins = self.pins.borrow_mut();
-        let mut bits = 0u32;
-        for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
-            pin.rtcio_pad_hold(true);
-            bits |= 1 << pin.rtc_number();
-        }
-
-        unsafe {
-            let rtc_cntl = LPWR::regs();
-            // clear previous wakeup status
-            rtc_cntl
-                .ext_wakeup1()
-                .modify(|_, w| w.status_clr().set_bit());
-            // set pin register field
-            rtc_cntl.ext_wakeup1().modify(|_, w| w.sel().bits(bits));
-            // set level register field
-            rtc_cntl
-                .ext_wakeup_conf()
-                .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
-        }
-    }
-}
-
-impl Drop for Ext1WakeupSource<'_, '_> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        let mut pins = self.pins.borrow_mut();
-        for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
-        }
     }
 }
 

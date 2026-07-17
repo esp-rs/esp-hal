@@ -1,7 +1,6 @@
 use core::ops::Not;
 
 use crate::{
-    gpio::RtcFunction,
     peripherals::{LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
@@ -13,93 +12,11 @@ use crate::{
             WakeFromLpCoreWakeupSource,
             WakeSource,
             WakeTriggers,
-            WakeupLevel,
             pmu_common::SleepTimeConfig,
         },
     },
     soc::clocks::{self, ClockTree, LpSlowClkConfig, SocRootClkConfig},
 };
-
-impl Ext1WakeupSource<'_, '_> {
-    /// Returns the currently configured wakeup pins.
-    fn wakeup_pins() -> u8 {
-        LP_AON::regs()
-            .ext_wakeup_cntl()
-            .read()
-            .ext_wakeup_sel()
-            .bits()
-    }
-
-    fn wake_io_reset() {
-        use crate::gpio::RtcPin;
-
-        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
-            if wakeup_pins & (1 << pin.number()) != 0 {
-                pin.rtcio_pad_hold(false);
-                pin.rtc_set_config(false, false, RtcFunction::Rtc);
-            }
-        }
-
-        let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        for_each_lp_function! {
-            (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
-                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
-            };
-        }
-    }
-}
-
-impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        // We don't have to keep the LP domain powered if we hold the wakeup pin states.
-        triggers.insert(WakeupSource::Ext1);
-
-        // set pins to RTC function
-        let mut pins = self.pins.borrow_mut();
-        let mut pin_mask = 0u8;
-        let mut level_mask = 0u8;
-        for (pin, level) in pins.iter_mut() {
-            pin_mask |= 1 << pin.number();
-            level_mask |= match level {
-                WakeupLevel::High => 1 << pin.number(),
-                WakeupLevel::Low => 0,
-            };
-
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
-            pin.rtcio_pad_hold(true);
-        }
-
-        // clear previous wakeup status
-        LP_AON::regs()
-            .ext_wakeup_cntl()
-            .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-
-        // set pin + level register fields
-        LP_AON::regs().ext_wakeup_cntl().modify(|r, w| unsafe {
-            w.ext_wakeup_sel()
-                .bits(r.ext_wakeup_sel().bits() | pin_mask);
-            w.ext_wakeup_lv()
-                .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
-        });
-    }
-}
-
-impl Drop for Ext1WakeupSource<'_, '_> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        let mut pins = self.pins.borrow_mut();
-        for (pin, _level) in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
-        }
-    }
-}
 
 impl WakeSource for WakeFromLpCoreWakeupSource {
     fn apply(
