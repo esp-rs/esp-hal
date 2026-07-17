@@ -4,12 +4,6 @@
         cfg(any(esp32s2, esp32s3)) => "GPIO21",
         cfg(esp32h2) => "GPIO8",
         _ => "GPIO1"
-    },
-    "lp_io_num" => {
-        cfg(esp32) => "15",
-        cfg(any(esp32s2, esp32s3)) => "21",
-        cfg(esp32h2) => "1",
-        _ => "1"
     }
 ))]
 //! Low Power IO (LP_IO)
@@ -33,10 +27,7 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! use esp_hal::gpio::lp_io::LowPowerOutput;
-//! let lp_pin: LowPowerOutput<
-//!     '_,
-//!     __lp_io_num__, // Must match the LP_IO pin number, not the GPIO number
-//! > = LowPowerOutput::new(peripherals.__lp_io__);
+//! let lp_pin = LowPowerOutput::new(peripherals.__lp_io__);
 //! # {after_snippet}
 //! ```
 
@@ -52,6 +43,22 @@ use super::{InputPin, OutputPin, RtcPin};
 #[cfg_attr(lp_io_version = "esp32p4", path = "low_level/esp32p4.rs")]
 mod low_level;
 
+// FIXME: RtcPin is necessary only as long as the sleep API takes &dyn RtcPin(WithResistors).
+// After that has been resolved, we can simplify this hierarchy to only have LowPowerPin.
+
+/// Trait implemented by pins with a known low-power pin number.
+#[doc(hidden)]
+pub trait LowPowerPin<const PIN: u8>: RtcPin {}
+
+for_each_lp_function! {
+    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident) => {
+        impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
+    };
+    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
+        impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
+    };
+}
+
 /// A GPIO output pin configured for low-power operation.
 pub struct LowPowerOutput<'d, const PIN: u8> {
     phantom: PhantomData<&'d mut ()>,
@@ -62,7 +69,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     #[instability::unstable]
     pub fn new<P>(pin: P) -> Self
     where
-        P: OutputPin + RtcPin + 'd,
+        P: LowPowerPin<PIN> + OutputPin + 'd,
     {
         let pin = low_level::init_pin(&pin, false);
         low_level::output_enable(pin, true);
@@ -83,10 +90,9 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     #[instability::unstable]
     pub fn new<P>(pin: P) -> Self
     where
-        P: InputPin + RtcPin + 'd,
+        P: LowPowerPin<PIN> + InputPin + 'd,
     {
         let pin = low_level::init_pin(&pin, true);
-        assert_eq!(pin, PIN);
         low_level::input_enable(pin, true);
         low_level::pullup_enable(pin, false);
         low_level::pulldown_enable(pin, false);
@@ -117,11 +123,10 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     #[instability::unstable]
     pub fn new<P>(pin: P) -> Self
     where
-        P: InputPin + OutputPin + RtcPin + 'd,
+        P: LowPowerPin<PIN> + InputPin + OutputPin + 'd,
     {
         let gpio = pin.number();
         let pin = low_level::init_pin(&pin, true);
-        assert_eq!(pin, PIN);
         low_level::set_open_drain_output(gpio, true);
         low_level::input_enable(pin, true);
         low_level::pullup_enable(pin, true);
