@@ -52,6 +52,57 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
     };
+    ("gpio.version") => {
+        3
+    };
+    ("gpio.version", str) => {
+        stringify!(3)
+    };
+    ("gpio.has_input_sync") => {
+        true
+    };
+    ("gpio.gpio_function") => {
+        1
+    };
+    ("gpio.gpio_function", str) => {
+        stringify!(1)
+    };
+    ("gpio.constant_0_input") => {
+        192
+    };
+    ("gpio.constant_0_input", str) => {
+        stringify!(192)
+    };
+    ("gpio.constant_1_input") => {
+        128
+    };
+    ("gpio.constant_1_input", str) => {
+        stringify!(128)
+    };
+    ("gpio.remap_iomux_pin_registers") => {
+        false
+    };
+    ("gpio.func_in_sel_offset") => {
+        0
+    };
+    ("gpio.func_in_sel_offset", str) => {
+        stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        true
+    };
+    ("gpio.input_signal_max") => {
+        255
+    };
+    ("gpio.input_signal_max", str) => {
+        stringify!(255)
+    };
+    ("gpio.output_signal_max") => {
+        256
+    };
+    ("gpio.output_signal_max", str) => {
+        stringify!(256)
+    };
     ("interrupts.status_registers") => {
         6
     };

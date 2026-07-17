@@ -98,7 +98,7 @@ timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 50, min_rev = 0 }
 
 [device.gpio]
-support_status = "not_supported"
+support_status = "supported"
 # {include gpio.toml}
 
 [device.io_mux]
