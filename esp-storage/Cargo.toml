@@ -11,19 +11,20 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+doc-config = { features = ["esp-hal/unstable", "embedded-storage"] }
 check-configs = [
-    { features = [] },
-    { features = ["embedded-storage"] },
-    { features = ["critical-section"] },
-    { features = ["bytewise-read"] },
-    { features = ["embedded-storage", "critical-section"] },
-    { features = ["embedded-storage", "critical-section", "bytewise-read"] },
+    { features = ["esp-hal/unstable"] },
+    { features = ["esp-hal/unstable", "embedded-storage"] },
+    { features = ["esp-hal/unstable", "critical-section"] },
+    { features = ["esp-hal/unstable", "bytewise-read"] },
+    { features = ["esp-hal/unstable", "embedded-storage", "critical-section"] },
+    { features = ["esp-hal/unstable", "embedded-storage", "critical-section", "bytewise-read"] },
 ]
-clippy-configs = [{ features = ["embedded-storage", "critical-section", "bytewise-read"] }]
+clippy-configs = [{ features = ["esp-hal/unstable", "embedded-storage", "critical-section", "bytewise-read"] }]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6", "embedded-storage"]
+features       = ["esp32c6", "embedded-storage", "esp-hal/unstable"]
 
 [lib]
 bench = false
@@ -31,7 +32,7 @@ bench = false
 [dependencies]
 embedded-storage = { version = "0.3.1", optional = true }
 procmacros       = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true}
+esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true, features = ["requires-unstable"] }
 
 # Optional dependencies
 esp-sync         = { version = "0.2.1", path = "../esp-sync", optional = true }
@@ -74,25 +75,25 @@ defmt = ["dep:defmt"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-hal/esp32c2", "esp-hal/unstable", "esp-rom-sys/esp32c2", "esp-sync/esp32c2", "dep:esp32c2"]
+esp32c2   = ["esp-hal/esp32c2", "esp-rom-sys/esp32c2", "esp-sync/esp32c2", "dep:esp32c2"]
 ##
-esp32c3   = ["esp-hal/esp32c3", "esp-hal/unstable", "esp-rom-sys/esp32c3", "esp-sync/esp32c3", "dep:esp32c3"]
+esp32c3   = ["esp-hal/esp32c3", "esp-rom-sys/esp32c3", "esp-sync/esp32c3", "dep:esp32c3"]
 ##
-esp32c5   = ["esp-hal/esp32c5", "esp-hal/unstable", "esp-rom-sys/esp32c5", "esp-sync/esp32c5", "dep:esp32c5"]
+esp32c5   = ["esp-hal/esp32c5", "esp-rom-sys/esp32c5", "esp-sync/esp32c5", "dep:esp32c5"]
 ##
-esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-sync/esp32c6", "dep:esp32c6"]
+esp32c6   = ["esp-hal/esp32c6", "esp-rom-sys/esp32c6", "esp-sync/esp32c6", "dep:esp32c6"]
 ##
-esp32c61  = ["esp-hal/esp32c61", "esp-hal/unstable", "esp-rom-sys/esp32c61", "esp-sync/esp32c61", "dep:esp32c61"]
+esp32c61  = ["esp-hal/esp32c61", "esp-rom-sys/esp32c61", "esp-sync/esp32c61", "dep:esp32c61"]
 ##
-esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2", "dep:esp32h2"]
+esp32h2   = ["esp-hal/esp32h2", "esp-rom-sys/esp32h2", "esp-sync/esp32h2", "dep:esp32h2"]
 ##
-esp32p4   = ["esp-hal/esp32p4", "esp-hal/unstable", "esp-rom-sys/esp32p4", "esp-sync/esp32p4", "dep:esp32p4"]
+esp32p4   = ["esp-hal/esp32p4", "esp-rom-sys/esp32p4", "esp-sync/esp32p4", "dep:esp32p4"]
 ##
-esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32", "dep:esp32"]
+esp32     = ["esp-hal/esp32", "esp-rom-sys/esp32", "esp-sync/esp32", "dep:esp32"]
 ##
-esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2", "dep:esp32s2"]
+esp32s2   = ["esp-hal/esp32s2", "esp-rom-sys/esp32s2", "esp-sync/esp32s2", "dep:esp32s2"]
 ##
-esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "dep:esp32s3"]
+esp32s3   = ["esp-hal/esp32s3", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "dep:esp32s3"]
 ## Used for testing on a host.
 emulation = []
 

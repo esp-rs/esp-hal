@@ -9,6 +9,11 @@
 //! - read the partition table
 //! - conveniently use a partition to read and write flash contents
 //!
+//! ## `esp-hal/unstable` requirement
+//!
+//! Chip features enable `esp-storage`, which depends on unstable `esp-hal` APIs.
+//! Application crates must enable `esp-hal/unstable` when using this crate on a device.
+//!
 //! ## Examples
 //!
 //! ### Populating the Application Descriptor

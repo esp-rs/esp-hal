@@ -8,6 +8,11 @@
 
 This offers additional support for the ESP-IDF 2nd stage bootloader.
 
+## `esp-hal/unstable` requirement
+
+Chip features pull in `esp-storage`, which depends on unstable `esp-hal` APIs.
+Application crates must enable `esp-hal/unstable` when using this crate on a device.
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.

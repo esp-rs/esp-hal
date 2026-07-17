@@ -4,6 +4,12 @@
 //! For higher-level functionality which works with partitions defined in the partition table, see
 //! `esp-bootloader-esp-idf`.
 //!
+//! ## `esp-hal/unstable` requirement
+//!
+//! This crate uses unstable `esp-hal` APIs and enables `esp-hal/requires-unstable` via its chip
+//! features. Application crates must enable `esp-hal/unstable` when using `esp-storage` on a
+//! device.
+//!
 //! Encrypted flash read/write is available on chips with hardware flash encryption support when
 //! flash encryption is enabled in eFuses. See [`FlashStorage::read_encrypted`] and
 //! [`FlashStorage::write_encrypted`].
