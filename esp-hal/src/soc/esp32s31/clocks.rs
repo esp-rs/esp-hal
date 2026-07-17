@@ -412,10 +412,8 @@ impl I2cInstance {
         new: I2cFunctionClockConfig,
     ) {
         HP_SYS_CLKRST::regs().i2c0_ctrl0().modify(|_, w| unsafe {
-            w.i2c0_clk_src_sel().bit(matches!(
-                new.sclk(),
-                I2cFunctionClockSclk::RcFast
-            ));
+            w.i2c0_clk_src_sel()
+                .bit(matches!(new.sclk(), I2cFunctionClockSclk::RcFast));
             w.i2c0_clk_div_num().bits(new.div_num() as u8);
             w.i2c0_clk_div_numerator().bits(0);
             w.i2c0_clk_div_denominator().bits(0)
@@ -464,27 +462,76 @@ impl TimgInstance {
 }
 
 impl UartInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let regs = HP_SYS_CLKRST::regs();
+        match self {
+            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| w.uart0_clk_en().bit(en)),
+            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| w.uart1_clk_en().bit(en)),
+            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| w.uart2_clk_en().bit(en)),
+            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| w.uart3_clk_en().bit(en)),
+        };
     }
+
     fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<UartFunctionClockConfig>,
-        _new: UartFunctionClockConfig,
+        new: UartFunctionClockConfig,
     ) {
-        // TODO: Configure the UART source and divider when UART support is enabled.
+        let source = match new.sclk() {
+            UartFunctionClockSclk::Xtal => 0,
+            UartFunctionClockSclk::RcFast => 1,
+            UartFunctionClockSclk::PllF80m => 2,
+        };
+        let divider = new.div_num() as u8;
+        let regs = HP_SYS_CLKRST::regs();
+        match self {
+            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| unsafe {
+                w.uart0_clk_src_sel().bits(source);
+                w.uart0_sclk_div_num().bits(divider);
+                w.uart0_sclk_div_numerator().bits(0);
+                w.uart0_sclk_div_denominator().bits(0)
+            }),
+            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| unsafe {
+                w.uart1_clk_src_sel().bits(source);
+                w.uart1_sclk_div_num().bits(divider);
+                w.uart1_sclk_div_numerator().bits(0);
+                w.uart1_sclk_div_denominator().bits(0)
+            }),
+            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| unsafe {
+                w.uart2_clk_src_sel().bits(source);
+                w.uart2_sclk_div_num().bits(divider);
+                w.uart2_sclk_div_numerator().bits(0);
+                w.uart2_sclk_div_denominator().bits(0)
+            }),
+            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| unsafe {
+                w.uart3_clk_src_sel().bits(source);
+                w.uart3_sclk_div_num().bits(divider);
+                w.uart3_sclk_div_numerator().bits(0);
+                w.uart3_sclk_div_denominator().bits(0)
+            }),
+        };
     }
 
     fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
+        // The baud-rate generator is enabled by the UART function clock.
     }
+
     fn configure_baud_rate_generator_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<UartBaudRateGeneratorConfig>,
-        _new: UartBaudRateGeneratorConfig,
+        new: UartBaudRateGeneratorConfig,
     ) {
-        // Nothing to do here
+        let regs = match self {
+            UartInstance::Uart0 => crate::peripherals::UART0::regs(),
+            UartInstance::Uart1 => crate::peripherals::UART1::regs(),
+            UartInstance::Uart2 => crate::peripherals::UART2::regs(),
+            UartInstance::Uart3 => crate::peripherals::UART3::regs(),
+        };
+        regs.clkdiv().write(|w| unsafe {
+            w.clkdiv().bits(new.integral() as u16);
+            w.frag().bits(new.fractional() as u8)
+        });
     }
 }

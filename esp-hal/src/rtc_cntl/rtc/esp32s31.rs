@@ -536,14 +536,12 @@ impl LpSystemInit {
                 .write(|w| w.bits(sleep.power.dig_power.0));
             pmu.lp_sleep_lp_ck_power()
                 .write(|w| w.bits(sleep.power.clk_power.0));
-            pmu.lp_sleep_bias()
-                .write(|w| w.bits(sleep.analog.bias.0));
+            pmu.lp_sleep_bias().write(|w| w.bits(sleep.analog.bias.0));
             pmu.lp_sleep_lp_regulator0()
                 .write(|w| w.bits(sleep.analog.regulator0.0));
             pmu.lp_sleep_lp_regulator1()
                 .write(|w| w.bits(sleep.analog.regulator1.0));
-            pmu.lp_sleep_xtal()
-                .write(|w| w.bits(sleep.power.xtal.0));
+            pmu.lp_sleep_xtal().write(|w| w.bits(sleep.power.xtal.0));
         }
     }
 }
