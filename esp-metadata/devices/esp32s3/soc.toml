@@ -163,7 +163,6 @@ version = "v2"
 [device.gpio]
 version = 2
 support_status = "supported"
-has_bank_1 = true
 has_input_sync = true
 gpio_function = 1
 constant_0_input = 0x3c

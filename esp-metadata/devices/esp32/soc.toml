@@ -156,7 +156,6 @@ version = "esp32"
 [device.gpio]
 version = 1
 support_status = "supported"
-has_bank_1 = true
 gpio_function = 2
 constant_0_input = 0x30
 constant_1_input = 0x38
