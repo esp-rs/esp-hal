@@ -5,29 +5,11 @@ use crate::{
     private::DropGuard,
     rtc_cntl::{
         Rtc,
-        WakeupSource,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{
-            Ext1WakeupSource,
-            WakeFromLpCoreWakeupSource,
-            WakeSource,
-            WakeTriggers,
-            pmu_common::SleepTimeConfig,
-        },
+        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
     },
     soc::clocks::{self, ClockTree, LpSlowClkConfig, SocRootClkConfig},
 };
-
-impl WakeSource for WakeFromLpCoreWakeupSource {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.insert(WakeupSource::LpCore);
-    }
-}
 
 /// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]

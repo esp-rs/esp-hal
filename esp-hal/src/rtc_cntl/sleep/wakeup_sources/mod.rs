@@ -10,10 +10,32 @@ mod ext1;
 #[instability::unstable]
 pub use ext1::*;
 
+mod gpio;
+#[instability::unstable]
+pub use gpio::*;
+
+#[cfg(esp32c6)]
+mod lp_core;
+#[cfg(esp32c6)]
+#[instability::unstable]
+pub use lp_core::*;
+
+#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
+mod rtcio;
+#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
+#[instability::unstable]
+pub use rtcio::*;
+
 mod timer;
 
 #[instability::unstable]
 pub use timer::*;
+
+#[cfg(any(esp32s2, esp32s3))]
+mod ulp;
+#[cfg(any(esp32s2, esp32s3))]
+#[instability::unstable]
+pub use ulp::*;
 
 mod uart;
 #[instability::unstable]
