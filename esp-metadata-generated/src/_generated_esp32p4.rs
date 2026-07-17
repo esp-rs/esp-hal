@@ -437,7 +437,7 @@ macro_rules! property {
         false
     };
     ("timergroup.timg_has_timer1") => {
-        false
+        true
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true

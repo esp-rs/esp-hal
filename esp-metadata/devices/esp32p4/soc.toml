@@ -146,13 +146,13 @@ version = 2
 # trgt(n), comp_load(n) all match esp-hal systimer module expectations.
 [device.systimer]
 
-# GP Timer (TIMG): 2 groups, each with 2 timers + WDT
 [device.timergroup]
 support_status = "partial"
 instances = [
     { name = "timg0" },
     { name = "timg1" },
 ]
+timg_has_timer1 = true
 timg_has_divcnt_rst = true
 
 [device.spi_master]
