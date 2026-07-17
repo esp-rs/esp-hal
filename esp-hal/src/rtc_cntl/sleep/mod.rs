@@ -422,7 +422,7 @@ impl WakeSource for GpioWakeupSource {
 }
 
 macro_rules! uart_wakeup_impl {
-    ($num:literal) => {
+    ($num:literal, $ident:ident) => {
         paste::paste! {
             #[doc = concat!("UART", $num, " wakeup source")]
             ///
@@ -464,25 +464,31 @@ macro_rules! uart_wakeup_impl {
             impl WakeSource for [< Uart $num WakeupSource >] {
                 fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
                     triggers.insert(WakeupSource::[< Uart $num >]);
-                    let uart = crate::peripherals::[< UART $num >]::regs();
+                    let uart = crate::peripherals::$ident::regs();
 
-                    #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
-                    uart.sleep_conf()
-                        .modify(|_, w| unsafe { w.active_threshold().bits(self.threshold) });
-
-                    #[cfg(not(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3)))]
-                    uart.sleep_conf2().modify(|_, w| unsafe {
-                        w.wk_mode_sel().bits(0);
-                        w.active_threshold().bits(self.threshold)
-                    });
+                    cfg_select! {
+                        any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
+                            uart.sleep_conf()
+                                .modify(|_, w| unsafe { w.active_threshold().bits(self.threshold) });
+                        }
+                        _ => {
+                            uart.sleep_conf2().modify(|_, w| unsafe {
+                                w.wk_mode_sel().bits(0);
+                                w.active_threshold().bits(self.threshold)
+                            });
+                        }
+                    }
                 }
             }
         }
     };
 }
 
-uart_wakeup_impl!(0);
-uart_wakeup_impl!(1);
+for_each_uart! {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
+        uart_wakeup_impl!($id, $inst);
+    };
+}
 
 /// The set of wakeup sources configured to end a sleep.
 ///
@@ -606,7 +612,7 @@ impl<'d> LowPower<'d> {
 fn sleep_uart_prepare() {
     use crate::uart::Instance;
     for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
             unsafe {
                 crate::peripherals::$inst::steal().info().suspend_for_sleep();
             }
@@ -618,7 +624,7 @@ fn sleep_uart_prepare() {
 fn sleep_uart_resume() {
     use crate::uart::Instance;
     for_each_uart! {
-        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+        ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
             unsafe {
                 crate::peripherals::$inst::steal().info().resume_from_sleep();
             }
