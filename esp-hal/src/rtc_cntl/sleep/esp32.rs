@@ -1,8 +1,7 @@
-use super::{Ext0WakeupSource, WakeSource, WakeTriggers};
+use super::WakeTriggers;
 use crate::{
-    gpio::{RtcFunction, RtcPin},
-    peripherals::{BB, DPORT, I2S0, LPWR, NRX, RTC_IO},
-    rtc_cntl::{Rtc, WakeupSource, sleep::WakeupLevel},
+    peripherals::{BB, DPORT, I2S0, LPWR, NRX},
+    rtc_cntl::Rtc,
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -68,46 +67,6 @@ pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
 /// Default wait cycles to enable the 8MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
-
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
-    ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
-        triggers.insert(WakeupSource::Ext0);
-
-        // set pin to RTC function
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, true, RtcFunction::Rtc);
-
-        unsafe {
-            // set pin register field
-            RTC_IO::regs()
-                .ext_wakeup0()
-                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
-            // set level register field
-            LPWR::regs()
-                .ext_wakeup_conf()
-                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
-        }
-    }
-}
-
-impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, false, RtcFunction::Rtc);
-    }
-}
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]

@@ -1,4 +1,4 @@
-use super::{Ext0WakeupSource, UlpWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
+use super::{UlpWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{APB_CTRL, EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSTEM},
@@ -96,48 +96,6 @@ impl WakeSource for UlpWakeupSource {
         // This one needs to be false to keep the ULP timer and ULP GPIO happy!
         // Possibly relevant issue: https://github.com/espressif/esp-idf/issues/10595
         sleep_config.set_rtc_peri_pd_en(false);
-    }
-}
-
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
-    ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
-        triggers.insert(WakeupSource::Ext0);
-
-        // set pin to RTC function
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, true, RtcFunction::Rtc);
-
-        unsafe {
-            let rtc_io = RTC_IO::regs();
-            // set pin register field
-            rtc_io
-                .ext_wakeup0()
-                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
-            // set level register field
-            let rtc_cntl = LPWR::regs();
-            rtc_cntl
-                .ext_wakeup_conf()
-                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
-        }
-    }
-}
-
-impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, false, RtcFunction::Rtc);
     }
 }
 

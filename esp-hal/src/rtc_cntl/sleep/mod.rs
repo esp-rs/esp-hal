@@ -14,19 +14,24 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
-#[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
+#[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
 use core::cell::RefCell;
 
 use enumset::EnumSet;
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
-use crate::gpio::RtcPin as RtcIoWakeupPinType;
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
-use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
 use crate::{
     peripherals::LPWR,
     rtc_cntl::{Rtc, WakeupSource},
 };
+
+cfg_select! {
+    any(esp32, esp32s2, esp32s3) => {
+        use crate::gpio::RtcPin as RtcIoWakeupPinType;
+    }
+    any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4) => {
+        use crate::gpio::RtcPinWithResistors as RtcIoWakeupPinType;
+    }
+}
 
 #[cfg(soc_has_pmu)]
 mod pmu_common;
@@ -45,6 +50,7 @@ mod sleep_impl;
 pub use sleep_impl::*;
 
 mod wakeup_sources;
+#[instability::unstable]
 pub use wakeup_sources::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -55,117 +61,6 @@ pub enum WakeupLevel {
     #[default]
     ///  The wake-up event is triggered when the pin is high.
     High,
-}
-
-#[procmacros::doc_replace]
-/// External wake-up source (Ext0).
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::delay::Delay;
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, LowPower, TimerWakeupSource, WakeupLevel}, wakeup_cause, SocResetReason};
-/// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Pull};
-/// # use esp_hal::time::Duration;
-///
-/// let delay = Delay::new();
-/// let mut lpwr = LowPower::new(peripherals.LPWR);
-///
-/// let config = InputConfig::default().with_pull(Pull::None);
-/// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_input = Input::new(pin_4.reborrow(), config);
-///
-/// let reason = reset_reason(Cpu::ProCpu);
-/// let wake_reason = wakeup_cause();
-///
-/// println!("{:?} {:?}", reason, wake_reason);
-///
-/// let timer = TimerWakeupSource::new(Duration::from_secs(30));
-///
-/// core::mem::drop(pin_4_input);
-/// let ext0 = Ext0WakeupSource::new(pin_4, WakeupLevel::High);
-///
-/// delay.delay_millis(100);
-/// lpwr.sleep_deep(&[&timer, &ext0]);
-///
-/// # }
-/// ```
-#[cfg(any(esp32, esp32s2, esp32s3))]
-pub struct Ext0WakeupSource<P: RtcIoWakeupPinType> {
-    /// The pin used as the wake-up source.
-    pin: RefCell<P>,
-    /// The level at which the wake-up event is triggered.
-    level: WakeupLevel,
-}
-
-#[cfg(any(esp32, esp32s2, esp32s3))]
-impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
-    /// Creates a new external wake-up source (Ext0``) with the specified pin
-    /// and wake-up level.
-    pub fn new(pin: P, level: WakeupLevel) -> Self {
-        Self {
-            pin: RefCell::new(pin),
-            level,
-        }
-    }
-}
-
-#[procmacros::doc_replace]
-/// External wake-up source (Ext1).
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::delay::Delay;
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource, WakeupLevel}, wakeup_cause, SocResetReason};
-/// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Pull, RtcPin};
-/// # use esp_hal::time::Duration;
-///
-/// let delay = Delay::new();
-/// let mut lpwr = LowPower::new(peripherals.LPWR);
-///
-/// let config = InputConfig::default().with_pull(Pull::None);
-/// let mut pin_2 = peripherals.GPIO2;
-/// let mut pin_4 = peripherals.GPIO4;
-/// let pin_4_driver = Input::new(pin_4.reborrow(), config);
-///
-/// let reason = reset_reason(Cpu::ProCpu);
-/// let wake_reason = wakeup_cause();
-///
-/// println!("{:?} {:?}", reason, wake_reason);
-///
-/// let timer = TimerWakeupSource::new(Duration::from_secs(30));
-///
-/// // Drop the driver to access `pin_4`
-/// core::mem::drop(pin_4_driver);
-///
-/// let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_4, &mut pin_2];
-///
-/// let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, WakeupLevel::High);
-///
-/// delay.delay_millis(100);
-/// lpwr.sleep_deep(&[&timer, &ext1]);
-///
-/// # }
-/// ```
-#[cfg(any(esp32, esp32s2, esp32s3))]
-pub struct Ext1WakeupSource<'a, 'b> {
-    /// A collection of pins used as wake-up sources.
-    pins: RefCell<&'a mut [&'b mut dyn RtcIoWakeupPinType]>,
-    /// The level at which the wake-up event is triggered across all pins.
-    level: WakeupLevel,
-}
-
-#[cfg(any(esp32, esp32s2, esp32s3))]
-impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
-    /// Creates a new external wake-up source (Ext1) with the specified pins and
-    /// wake-up level.
-    pub fn new(pins: &'a mut [&'b mut dyn RtcIoWakeupPinType], level: WakeupLevel) -> Self {
-        Self {
-            pins: RefCell::new(pins),
-            level,
-        }
-    }
 }
 
 #[procmacros::doc_replace(
@@ -357,75 +252,6 @@ impl WakeSource for GpioWakeupSource {
     ) {
         triggers.insert(WakeupSource::Gpio);
     }
-}
-
-macro_rules! uart_wakeup_impl {
-    ($num:literal, $ident:ident) => {
-        paste::paste! {
-            #[doc = concat!("UART", $num, " wakeup source")]
-            ///
-            /// The chip can be woken up by reverting RXD for multiple cycles until the
-            /// number of rising edges is equal to or greater than the given value.
-            ///
-            /// Note that the character which triggers wakeup (and any characters before
-            /// it) will not be received by the UART after wakeup. This means that the
-            /// external device typically needs to send an extra character to trigger
-            /// wakeup before sending the data.
-            ///
-            /// After waking-up from UART, you should send some extra data through the UART
-            /// port in Active mode, so that the internal wakeup indication signal can be
-            /// cleared. Otherwise, the next UART wake-up would trigger with two less
-            /// rising edges than the configured threshold value.
-            ///
-            /// Wakeup from light sleep takes some time, so not every character sent to the
-            /// UART can be received by the application.
-            ///
-            /// This wakeup source can be used to wake up from light sleep only.
-            pub struct [< Uart $num WakeupSource >] {
-                threshold: u16,
-            }
-
-            impl [< Uart $num WakeupSource >] {
-                #[doc = concat!("Create a new instance of UART", $num, " wakeup source>") ]
-                ///
-                /// # Panics
-                ///
-                /// Panics if `threshold` is out of bounds.
-                pub fn new(threshold: u16) -> Self {
-                    if threshold > 1023 {
-                        panic!("Invalid threshold");
-                    }
-                    Self { threshold }
-                }
-            }
-
-            impl WakeSource for [< Uart $num WakeupSource >] {
-                fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
-                    triggers.insert(WakeupSource::[< Uart $num >]);
-                    let uart = crate::peripherals::$ident::regs();
-
-                    cfg_select! {
-                        any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
-                            uart.sleep_conf()
-                                .modify(|_, w| unsafe { w.active_threshold().bits(self.threshold) });
-                        }
-                        _ => {
-                            uart.sleep_conf2().modify(|_, w| unsafe {
-                                w.wk_mode_sel().bits(0);
-                                w.active_threshold().bits(self.threshold)
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    };
-}
-
-for_each_uart! {
-    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
-        uart_wakeup_impl!($id, $inst);
-    };
 }
 
 /// The set of wakeup sources configured to end a sleep.

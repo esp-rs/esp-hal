@@ -1,7 +1,20 @@
+#[cfg(any(esp32, esp32s2, esp32s3))]
+mod ext0;
+#[cfg(any(esp32, esp32s2, esp32s3))]
+#[instability::unstable]
+pub use ext0::*;
+
 #[cfg(not(any(esp32c2, esp32c3)))]
 mod ext1;
 #[cfg(not(any(esp32c2, esp32c3)))]
-pub use ext1::Ext1WakeupSource;
+#[instability::unstable]
+pub use ext1::*;
 
 mod timer;
-pub use timer::TimerWakeupSource;
+
+#[instability::unstable]
+pub use timer::*;
+
+mod uart;
+#[instability::unstable]
+pub use uart::*;

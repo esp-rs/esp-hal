@@ -30,6 +30,7 @@ mod implementation;
 /// # {after_snippet}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
+#[instability::unstable]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
@@ -37,6 +38,7 @@ pub struct TimerWakeupSource {
 
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
+    #[instability::unstable]
     pub fn new(duration: Duration) -> Self {
         Self { duration }
     }
