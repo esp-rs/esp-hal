@@ -3495,9 +3495,7 @@ macro_rules! for_each_gpio {
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_analog_function!((XTAL_32K_N, GPIO0));
-        _for_each_inner_analog_function!((XTAL_32K_P, GPIO1));
-        _for_each_inner_analog_function!((USJ_DM, GPIO33));
+        tt) => {} } _for_each_inner_analog_function!((USJ_DM, GPIO33));
         _for_each_inner_analog_function!((USJ_DP, GPIO34));
         _for_each_inner_analog_function!((ADC1_CH0, GPIO42));
         _for_each_inner_analog_function!((ADC1_CH1, GPIO43));
@@ -3531,12 +3529,11 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55));
         _for_each_inner_analog_function!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56));
         _for_each_inner_analog_function!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57));
-        _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO0), (XTAL_32K_P, GPIO1),
-        (USJ_DM, GPIO33), (USJ_DP, GPIO34), (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43),
-        (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45), (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47),
-        (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49), (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51),
-        (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53), (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55),
-        (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
+        _for_each_inner_analog_function!((all(USJ_DM, GPIO33), (USJ_DP, GPIO34),
+        (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43), (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45),
+        (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47), (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49),
+        (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51), (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53),
+        (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55), (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
         _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42),
         ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44),
         ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO46),
@@ -3579,29 +3576,7 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0));
-        _for_each_inner_lp_function!((LP_GPIO1, GPIO1));
-        _for_each_inner_lp_function!((LP_GPIO2, GPIO2));
-        _for_each_inner_lp_function!((LP_GPIO3, GPIO3));
-        _for_each_inner_lp_function!((LP_GPIO4, GPIO4));
-        _for_each_inner_lp_function!((LP_GPIO5, GPIO5));
-        _for_each_inner_lp_function!((LP_GPIO6, GPIO6));
-        _for_each_inner_lp_function!((LP_GPIO7, GPIO7));
-        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0));
-        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1));
-        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
-        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
-        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
-        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
-        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6));
-        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO7));
-        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0), (LP_GPIO1, GPIO1), (LP_GPIO2,
-        GPIO2), (LP_GPIO3, GPIO3), (LP_GPIO4, GPIO4), (LP_GPIO5, GPIO5), (LP_GPIO6,
-        GPIO6), (LP_GPIO7, GPIO7))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
-        LP_GPIOn, 0), GPIO0), ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO2, LP_GPIOn, 2),
-        GPIO2), ((LP_GPIO3, LP_GPIOn, 3), GPIO3), ((LP_GPIO4, LP_GPIOn, 4), GPIO4),
-        ((LP_GPIO5, LP_GPIOn, 5), GPIO5), ((LP_GPIO6, LP_GPIOn, 6), GPIO6), ((LP_GPIO7,
-        LP_GPIOn, 7), GPIO7)));
+        => {} } _for_each_inner_lp_function!((all));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
