@@ -52,7 +52,7 @@ enum Cli {
     ///
     /// Reads the body from stdin by default. Pass `--pr` to fetch from GitHub.
     CheckPrChangelog(CheckPrChangelogArgs),
-    /// Re-generate metadata and the chip support table in the esp-hal README.
+    /// Re-generate metadata and tables in the esp-hal README.
     UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),

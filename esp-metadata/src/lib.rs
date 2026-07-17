@@ -324,6 +324,7 @@ struct Device {
     arch: Arch,
     target: String,
     cores: usize,
+    datasheet: String,
     trm: String,
 
     // Peripheral driver configuration:
@@ -373,6 +374,7 @@ impl Config {
                 arch: Arch::RiscV,
                 target: String::new(),
                 cores: 1,
+                datasheet: String::new(),
                 trm: String::new(),
                 peri_config: PeriConfig::default(),
             },
@@ -1457,4 +1459,53 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     }
 
     Ok(())
+}
+
+pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Result {
+    writeln!(
+        output,
+        "| Chip | Datasheet | Technical Reference Manual | Target |"
+    )?;
+    writeln!(
+        output,
+        "| :---: | :-------: | :------------------------: | :----: |"
+    )?;
+
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        writeln!(
+            output,
+            "| {pretty} | [{pretty}][{chip}-datasheet] | [{pretty}][{chip}-trm] | `{target}` |",
+            pretty = chip.pretty_name(),
+            target = config.device.target,
+        )?;
+    }
+
+    writeln!(output)?;
+
+    for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        writeln!(output, "[{chip}-datasheet]: {}", config.device.datasheet,)?;
+        writeln!(output, "[{chip}-trm]: {}", config.device.trm,)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn supported_devices_table_uses_metadata() {
+        let mut table = String::new();
+        generate_supported_devices_table(&mut table).unwrap();
+
+        for chip in Chip::iter() {
+            let config = Config::for_chip(&chip);
+            assert!(table.contains(&config.device.datasheet));
+            assert!(table.contains(&config.device.trm));
+            assert!(table.contains(&config.device.target));
+        }
+    }
 }

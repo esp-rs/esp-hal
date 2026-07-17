@@ -10,6 +10,7 @@ name   = "esp32c61"
 arch   = "riscv"
 target = "riscv32imac-unknown-none-elf"
 cores  = 1
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
 
 [device.rom]

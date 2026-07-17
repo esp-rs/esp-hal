@@ -10,6 +10,7 @@ name   = "esp32s2"
 arch   = "xtensa"
 target = "xtensa-esp32s2-none-elf"
 cores  = 1
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 [device.rom]
