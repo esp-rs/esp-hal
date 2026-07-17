@@ -1,9 +1,9 @@
 use crate::rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource};
 
-macro_rules! uart_wakeup_impl {
-    ($num:literal, $ident:ident) => {
+for_each_uart! {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
         paste::paste! {
-            #[doc = concat!("UART", $num, " wakeup source")]
+            #[doc = concat!("UART", $id, " wakeup source")]
             ///
             /// The chip can be woken up by reverting RXD for multiple cycles until the
             /// number of rising edges is equal to or greater than the given value.
@@ -23,12 +23,12 @@ macro_rules! uart_wakeup_impl {
             ///
             /// This wakeup source can be used to wake up from light sleep only.
             #[instability::unstable]
-            pub struct [< Uart $num WakeupSource >] {
+            pub struct [< Uart $id WakeupSource >] {
                 threshold: u16,
             }
 
-            impl [< Uart $num WakeupSource >] {
-                #[doc = concat!("Create a new instance of UART", $num, " wakeup source>") ]
+            impl [< Uart $id WakeupSource >] {
+                #[doc = concat!("Create a new instance of UART", $id, " wakeup source>") ]
                 ///
                 /// # Panics
                 ///
@@ -43,10 +43,10 @@ macro_rules! uart_wakeup_impl {
             }
 
             #[instability::unstable]
-            impl WakeSource for [< Uart $num WakeupSource >] {
+            impl WakeSource for [< Uart $id WakeupSource >] {
                 fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
-                    triggers.insert(WakeupSource::[< Uart $num >]);
-                    let uart = crate::peripherals::$ident::regs();
+                    triggers.insert(WakeupSource::[< Uart $id >]);
+                    let uart = crate::peripherals::$inst::regs();
 
                     cfg_select! {
                         any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
@@ -63,11 +63,5 @@ macro_rules! uart_wakeup_impl {
                 }
             }
         }
-    };
-}
-
-for_each_uart! {
-    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
-        uart_wakeup_impl!($id, $inst);
     };
 }
