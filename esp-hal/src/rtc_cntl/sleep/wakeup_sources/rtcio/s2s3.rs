@@ -7,16 +7,17 @@ use crate::{
 
 impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPin, level: WakeupLevel) {
-        let rtcio = RTC_IO::regs();
-
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
-        rtcio.pin(pin.number() as usize).modify(|_, w| unsafe {
-            w.wakeup_enable().set_bit().int_type().bits(match level {
-                WakeupLevel::Low => 4,
-                WakeupLevel::High => 5,
-            })
-        });
+        RTC_IO::regs()
+            .pin(pin.number() as usize)
+            .modify(|_, w| unsafe {
+                w.wakeup_enable().set_bit();
+                w.int_type().bits(match level {
+                    WakeupLevel::Low => 4,
+                    WakeupLevel::High => 5,
+                })
+            });
     }
 }
 
@@ -41,8 +42,16 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
         let sens = crate::peripherals::SENS::regs();
 
         // TODO: disable clock when not in use
-        sens.sar_peri_clk_gate_conf()
-            .modify(|_, w| w.iomux_clk_en().set_bit());
+        cfg_select! {
+            esp32s2 => {
+                sens.sar_io_mux_conf()
+                    .modify(|_, w| w.iomux_clk_gate_en().set_bit());
+            }
+            esp32s3 => {
+                sens.sar_peri_clk_gate_conf()
+                    .modify(|_, w| w.iomux_clk_en().set_bit());
+            }
+        }
 
         for (pin, level) in pins.iter_mut() {
             self.apply_pin(*pin, *level);

@@ -73,18 +73,12 @@ fn isolate_digital_gpio() {
 }
 
 fn prepare_gpio_wakeup() {
-    cfg_select! {
-        esp32c2 => {
-            LPWR::regs()
-                .cntl_gpio_wakeup()
-                .modify(|_, w| w.gpio_pin_clk_gate().set_bit());
-        }
-        esp32c3 => {
-            LPWR::regs()
-                .gpio_wakeup()
-                .modify(|_, w| w.gpio_pin_clk_gate().set_bit());
-        }
-    }
+    let reg = cfg_select! {
+        esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
+        esp32c3 => LPWR::regs().gpio_wakeup(),
+    };
+
+    reg.modify(|_, w| w.gpio_pin_clk_gate().set_bit());
 
     LPWR::regs()
         .ext_wakeup_conf()
@@ -92,24 +86,13 @@ fn prepare_gpio_wakeup() {
 }
 
 fn clear_gpio_wakeup_status() {
-    cfg_select! {
-        esp32c2 => {
-            LPWR::regs()
-                .cntl_gpio_wakeup()
-                .modify(|_, w| w.gpio_wakeup_status_clr().set_bit());
-            LPWR::regs()
-                .cntl_gpio_wakeup()
-                .modify(|_, w| w.gpio_wakeup_status_clr().clear_bit());
-        }
-        esp32c3 => {
-            LPWR::regs()
-                .gpio_wakeup()
-                .modify(|_, w| w.gpio_wakeup_status_clr().set_bit());
-            LPWR::regs()
-                .gpio_wakeup()
-                .modify(|_, w| w.gpio_wakeup_status_clr().clear_bit());
-        }
-    }
+    let reg = cfg_select! {
+        esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
+        esp32c3 => LPWR::regs().gpio_wakeup(),
+    };
+
+    reg.modify(|_, w| w.gpio_wakeup_status_clr().set_bit());
+    reg.modify(|_, w| w.gpio_wakeup_status_clr().clear_bit());
 }
 
 impl WakeSource for RtcioWakeupSource<'_, '_> {
