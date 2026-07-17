@@ -518,7 +518,7 @@ impl Driver {
                 w.usr_dummy().clear_bit();
                 w.cs_setup().clear_bit();
             }
-            w.cs_hold().bit(last)
+            w.cs_hold().bit(!last)
         });
         version::set_cs_keep_active(self, !last);
     }
