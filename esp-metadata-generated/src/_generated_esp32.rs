@@ -454,9 +454,6 @@ macro_rules! property {
     ("uart.has_sclk_enable") => {
         false
     };
-    ("uhci.combined_uart_selector_field") => {
-        false
-    };
     ("wifi.has_wifi6") => {
         false
     };

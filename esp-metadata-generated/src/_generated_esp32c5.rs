@@ -271,32 +271,11 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
-    ("ledc.version") => {
-        3
-    };
-    ("ledc.version", str) => {
-        stringify!(3)
-    };
-    ("ledc.channel_count") => {
-        6
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(6)
-    };
     ("lp_i2c_master.fifo_size") => {
         16
     };
     ("lp_i2c_master.fifo_size", str) => {
         stringify!(16)
-    };
-    ("lp_io.version") => {
-        "unsupported"
-    };
-    ("lp_uart.ram_size") => {
-        32
-    };
-    ("lp_uart.ram_size", str) => {
-        stringify!(32)
     };
     ("parl_io.version") => {
         2

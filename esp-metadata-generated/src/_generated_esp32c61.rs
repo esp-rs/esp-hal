@@ -265,21 +265,6 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
-    ("ledc.version") => {
-        3
-    };
-    ("ledc.version", str) => {
-        stringify!(3)
-    };
-    ("ledc.channel_count") => {
-        6
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(6)
-    };
-    ("lp_io.version") => {
-        "unsupported"
-    };
     ("phy.combo_module") => {
         true
     };

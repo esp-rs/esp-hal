@@ -83,6 +83,15 @@ pub(crate) struct SupportStatus {
     pub issue: Option<u32>,
 }
 
+impl SupportStatus {
+    pub fn is_supported(&self) -> bool {
+        matches!(
+            self.status,
+            SupportStatusLevel::Partial | SupportStatusLevel::Supported
+        )
+    }
+}
+
 impl FromStr for SupportStatus {
     type Err = ();
 
