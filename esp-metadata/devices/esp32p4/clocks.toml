@@ -19,6 +19,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
 
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+    ] },
+
     # MPLL divider taps
     { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
     { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10" },

@@ -1364,6 +1364,20 @@ macro_rules! for_each_wakeup_source {
 ///     todo!()
 /// }
 ///
+/// // IOMUX_FUNCTION_CLOCK
+///
+/// fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_iomux_function_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<IomuxFunctionClockConfig>,
+///     _new_config: IomuxFunctionClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // LEDC_SCLK
 ///
 /// fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1994,6 +2008,18 @@ macro_rules! define_clock_tree_types {
                 self.divisor as u32
             }
         }
+        /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum IomuxFunctionClockConfig {
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+        }
         /// The list of clock signals that the `LEDC_SCLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2256,6 +2282,7 @@ macro_rules! define_clock_tree_types {
             apb_clk: Option<ApbClkConfig>,
             mspi_fast_hs_clk: Option<MspiFastHsClkConfig>,
             mspi_fast_ls_clk: Option<MspiFastLsClkConfig>,
+            iomux_function_clock: Option<IomuxFunctionClockConfig>,
             ledc_sclk: Option<LedcSclkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
@@ -2279,6 +2306,7 @@ macro_rules! define_clock_tree_types {
             pll_f48m_refcount: u32,
             pll_f80m_refcount: u32,
             pll_f240m_refcount: u32,
+            iomux_function_clock_refcount: u32,
             ledc_sclk_refcount: u32,
             lp_fast_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
@@ -2349,6 +2377,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the MSPI_FAST_LS_CLK clock tree node
             pub fn mspi_fast_ls_clk(&self) -> Option<MspiFastLsClkConfig> {
                 self.mspi_fast_ls_clk
+            }
+            /// Returns the current configuration of the IOMUX_FUNCTION_CLOCK clock tree node
+            pub fn iomux_function_clock(&self) -> Option<IomuxFunctionClockConfig> {
+                self.iomux_function_clock
             }
             /// Returns the current configuration of the LEDC_SCLK clock tree node
             pub fn ledc_sclk(&self) -> Option<LedcSclkConfig> {
@@ -2438,6 +2470,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk: None,
                 mspi_fast_hs_clk: None,
                 mspi_fast_ls_clk: None,
+                iomux_function_clock: None,
                 ledc_sclk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
@@ -2461,6 +2494,7 @@ macro_rules! define_clock_tree_types {
                 pll_f48m_refcount: 0,
                 pll_f80m_refcount: 0,
                 pll_f240m_refcount: 0,
+                iomux_function_clock_refcount: 0,
                 ledc_sclk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
@@ -2478,6 +2512,8 @@ macro_rules! define_clock_tree_types {
         static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static SOC_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static IOMUX_FUNCTION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static LEDC_SCLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -3180,6 +3216,80 @@ macro_rules! define_clock_tree_types {
         }
         pub fn pll_f240m_source_frequency() -> u32 {
             pll_clk_frequency()
+        }
+        pub fn configure_iomux_function_clock(
+            clocks: &mut ClockTree,
+            new_selector: IomuxFunctionClockConfig,
+        ) {
+            let old_selector = clocks.iomux_function_clock.replace(new_selector);
+            refresh_iomux_function_clock_downstream(clocks);
+            if clocks.iomux_function_clock_refcount > 0 {
+                match new_selector {
+                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                        IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    }
+                }
+            } else {
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn iomux_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<IomuxFunctionClockConfig> {
+            clocks.iomux_function_clock
+        }
+        pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting IOMUX_FUNCTION_CLOCK");
+            if increment_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Enabling IOMUX_FUNCTION_CLOCK");
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                enable_iomux_function_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing IOMUX_FUNCTION_CLOCK");
+            if decrement_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Disabling IOMUX_FUNCTION_CLOCK");
+                enable_iomux_function_clock_impl(clocks, false);
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn iomux_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: IomuxFunctionClockConfig,
+        ) -> u32 {
+            match config {
+                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                IomuxFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+            }
+        }
+        pub fn iomux_function_clock_frequency() -> u32 {
+            IOMUX_FUNCTION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn iomux_function_clock_source_frequency(source: IomuxFunctionClockConfig) -> u32 {
+            match source {
+                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                IomuxFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+            }
         }
         pub fn configure_ledc_sclk(clocks: &mut ClockTree, new_selector: LedcSclkConfig) {
             let old_selector = clocks.ledc_sclk.replace(new_selector);
@@ -4253,6 +4363,8 @@ macro_rules! define_clock_tree_types {
             pub mspi_fast_hs_clk: Option<MspiFastHsClkConfig>,
             /// `MSPI_FAST_LS_CLK` configuration.
             pub mspi_fast_ls_clk: Option<MspiFastLsClkConfig>,
+            /// `IOMUX_FUNCTION_CLOCK` configuration.
+            pub iomux_function_clock: Option<IomuxFunctionClockConfig>,
             /// `LEDC_SCLK` configuration.
             pub ledc_sclk: Option<LedcSclkConfig>,
             /// `LP_FAST_CLK` configuration.
@@ -4269,6 +4381,9 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.soc_root_clk {
                     configure_soc_root_clk(clocks, config);
+                }
+                if let Some(config) = self.iomux_function_clock {
+                    configure_iomux_function_clock(clocks, config);
                 }
                 if let Some(config) = self.ledc_sclk {
                     configure_ledc_sclk(clocks, config);
@@ -4323,6 +4438,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
             refresh_soc_root_clk_downstream(clocks);
+            refresh_iomux_function_clock_downstream(clocks);
             refresh_ledc_sclk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             for child_instance in [I2cInstance::I2c0] {
@@ -4357,6 +4473,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
             refresh_hp_root_clk_downstream(clocks);
+        }
+        fn refresh_iomux_function_clock_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.iomux_function_clock {
+                IOMUX_FUNCTION_CLOCK_FREQ_CACHE.store(
+                    iomux_function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
         }
         fn refresh_ledc_sclk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.ledc_sclk {

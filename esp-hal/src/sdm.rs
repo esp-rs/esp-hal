@@ -22,7 +22,7 @@
 //!     .channel_config()
 //!     .with_frequency(Rate::from_khz(500))?
 //!     .with_duty(128);
-//! let mut channel = sdm.channel0.connect(peripherals.GPIO2, config)?;
+//! let mut channel = sdm.channel0.connect(peripherals.GPIO2, config);
 //!
 //! channel.set_duty(192); // duty ranges from 0 to 255
 //! channel.set_pulse_density(0); // pulse density ranges from -128 to 127
@@ -32,8 +32,8 @@
 
 use core::{fmt, marker::PhantomData};
 
-use esp_sync::NonReentrantMutex;
-
+#[cfg(soc_has_clock_node_iomux_function_clock)]
+use crate::soc::clocks::{self, ClockTree, IomuxFunctionClockConfig};
 use crate::{
     gpio::{
         OutputConfig,
@@ -45,22 +45,6 @@ use crate::{
     system::{GenericPeripheralGuard, Peripheral},
     time::Rate,
 };
-
-static CLOCK_STATE: NonReentrantMutex<SdmClockState> = NonReentrantMutex::new(SdmClockState::new());
-
-struct SdmClockState {
-    users: usize,
-    source: Option<ClockSource>,
-}
-
-impl SdmClockState {
-    const fn new() -> Self {
-        Self {
-            users: 0,
-            source: None,
-        }
-    }
-}
 
 for_each_sdm_channel!(
     (channels $(($ch:literal, $signal:ident)),*) => {
@@ -74,7 +58,6 @@ for_each_sdm_channel!(
             #[non_exhaustive]
             pub struct Sdm<'d> {
                 _instance: GPIO_SD<'d>,
-                clock_source: ClockSource,
                 $(
                     #[doc = concat!("Channel ", stringify!($ch), " creator.")]
                     pub [<channel $ch>]: ChannelCreator,
@@ -87,19 +70,27 @@ for_each_sdm_channel!(
                 /// The SDM clock source is shared by all SDM channels through the IO_MUX
                 /// clock, so it is selected here instead of being configurable per channel.
                 pub fn new(instance: GPIO_SD<'d>, config: SdmConfig) -> Self {
+                    #[cfg(soc_has_clock_node_iomux_function_clock)]
+                    ClockTree::with(|clocks| {
+                        clocks::configure_iomux_function_clock(
+                            clocks,
+                            config.clock_source.into(),
+                        );
+                    });
+                    #[cfg(not(soc_has_clock_node_iomux_function_clock))]
+                    let _ = config;
+
                     Self {
                         _instance: instance,
-                        clock_source: config.clock_source,
                         $(
-                            [<channel $ch>]: ChannelCreator::new($ch, config.clock_source),
+                            [<channel $ch>]: ChannelCreator::new($ch),
                         )*
                     }
                 }
 
-                /// Creates a channel configuration builder using this peripheral's
-                /// clock source.
+                /// Creates a channel configuration builder.
                 pub const fn channel_config(&self) -> ChannelConfigBuilder {
-                    ChannelConfigBuilder::new(self.clock_source)
+                    ChannelConfigBuilder::new()
                 }
             }
         }
@@ -158,17 +149,25 @@ pub enum ClockSource {
     PllF48m,
 }
 
-impl ClockSource {
-    fn frequency(self) -> Rate {
-        match self {
-            #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
-            Self::Apb => Rate::from_hz(crate::soc::clocks::apb_clk_frequency()),
-            #[cfg(any(esp32c5, esp32c6, esp32h2, esp32p4))]
-            Self::Xtal => crate::clock::xtal_clock(),
-            #[cfg(any(esp32c5, esp32c6, esp32p4))]
-            Self::PllF80m => Rate::from_mhz(80),
-            #[cfg(esp32h2)]
-            Self::PllF48m => Rate::from_mhz(48),
+#[cfg(any(esp32c5, esp32c6, esp32p4))]
+// C5/C6 hardware also routes RC_FAST (called FOSC in some register descriptions) through the
+// IO MUX. ESP-IDF does not expose it as an SDM clock source, so neither do we. It should be
+// usable in principle, but has not been included in the supported SDM API.
+impl From<ClockSource> for IomuxFunctionClockConfig {
+    fn from(source: ClockSource) -> Self {
+        match source {
+            ClockSource::Xtal => Self::XtalClk,
+            ClockSource::PllF80m => Self::PllF80m,
+        }
+    }
+}
+
+#[cfg(esp32h2)]
+impl From<ClockSource> for IomuxFunctionClockConfig {
+    fn from(source: ClockSource) -> Self {
+        match source {
+            ClockSource::Xtal => Self::XtalClk,
+            ClockSource::PllF48m => Self::PllF48m,
         }
     }
 }
@@ -180,8 +179,6 @@ impl ClockSource {
 pub enum Error {
     /// The requested frequency cannot be represented by the hardware prescaler.
     UnreachableTargetFrequency,
-    /// Another SDM channel is already using a different clock source.
-    ClockSourceConflict,
     /// The prescaler is outside the supported range.
     PrescalerOutOfRange,
 }
@@ -190,7 +187,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnreachableTargetFrequency => f.write_str("unreachable target frequency"),
-            Self::ClockSourceConflict => f.write_str("SDM clock source conflict"),
             Self::PrescalerOutOfRange => f.write_str("prescaler out of range"),
         }
     }
@@ -238,22 +234,16 @@ impl ChannelConfig {
 }
 
 /// Builds a sigma-delta channel configuration.
-///
-/// This builder carries the peripheral-wide clock source so frequencies can be
-/// converted to raw prescaler values without storing clock selection in the
-/// channel configuration itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct ChannelConfigBuilder {
-    clock_source: ClockSource,
     config: ChannelConfig,
 }
 
 impl ChannelConfigBuilder {
-    const fn new(clock_source: ClockSource) -> Self {
+    const fn new() -> Self {
         Self {
-            clock_source,
             config: ChannelConfig {
                 raw_prescaler: 0,
                 pulse_density: 0,
@@ -263,8 +253,7 @@ impl ChannelConfigBuilder {
 
     /// Sets the requested output frequency.
     pub fn with_frequency(mut self, frequency: Rate) -> Result<ChannelConfig, Error> {
-        self.config.raw_prescaler =
-            raw_prescaler(prescaler_from_frequency(frequency, self.clock_source)?);
+        self.config.raw_prescaler = raw_prescaler(prescaler_from_frequency(frequency)?);
         Ok(self.config)
     }
 
@@ -290,18 +279,11 @@ impl ChannelConfigBuilder {
 #[derive(Debug)]
 pub struct ChannelCreator {
     channel: usize,
-    // This is copied from the Sdm-level configuration so partially moved
-    // channel creators still use the shared clock source selected at construction time.
-    // It is intentionally not configurable per channel.
-    clock_source: ClockSource,
 }
 
 impl ChannelCreator {
-    const fn new(channel: usize, clock_source: ClockSource) -> Self {
-        Self {
-            channel,
-            clock_source,
-        }
+    const fn new(channel: usize) -> Self {
+        Self { channel }
     }
 
     /// Configures this channel and connects it to an output pin.
@@ -309,16 +291,16 @@ impl ChannelCreator {
         &'a mut self,
         pin: impl PeripheralOutput<'d>,
         config: ChannelConfig,
-    ) -> Result<Channel<'a>, Error> {
-        let clock_guard = SdmClockGuard::new(self.clock_source)?;
+    ) -> Channel<'a> {
+        let clock_guard = SdmClockGuard::new();
         write_config_raw(self.channel, config);
 
-        Ok(Channel {
+        Channel {
             channel: self.channel,
             _creator: PhantomData,
             _pin_guard: connect_pin(self.channel, pin),
             _clock_guard: clock_guard,
-        })
+        }
     }
 }
 
@@ -378,53 +360,42 @@ fn connect_pin<'d>(channel: usize, pin: impl PeripheralOutput<'d>) -> PinGuard {
 #[derive(Debug)]
 struct SdmClockGuard {
     _peripheral: GenericPeripheralGuard<{ Peripheral::GpioSd as u8 }>,
-    clock_source: ClockSource,
+    _iomux: IomuxClockGuard,
 }
 
 impl SdmClockGuard {
-    fn new(clock_source: ClockSource) -> Result<Self, Error> {
-        CLOCK_STATE.with(|state| {
-            if state.users == usize::MAX {
-                panic!("SDM clock reference counter overflowed");
-            }
-
-            if state.users == 0 {
-                configure_clock_source(clock_source);
-                state.source = Some(clock_source);
-            } else if state.source != Some(clock_source) {
-                return Err(Error::ClockSourceConflict);
-            }
-
-            state.users += 1;
-            Ok(())
-        })?;
-
-        Ok(Self {
+    fn new() -> Self {
+        let iomux = IomuxClockGuard::new();
+        Self {
             _peripheral: GenericPeripheralGuard::new(),
-            clock_source,
-        })
+            _iomux: iomux,
+        }
     }
 }
 
-impl Drop for SdmClockGuard {
+#[derive(Debug)]
+struct IomuxClockGuard;
+
+impl IomuxClockGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_clock_node_iomux_function_clock)]
+        ClockTree::with(clocks::request_iomux_function_clock);
+        Self
+    }
+}
+
+impl Drop for IomuxClockGuard {
     fn drop(&mut self) {
-        CLOCK_STATE.with(|state| match state.users {
-            0 => panic!("SDM clock reference counter underflowed"),
-            1 => {
-                debug_assert_eq!(state.source, Some(self.clock_source));
-                state.users = 0;
-                state.source = None;
-            }
-            _ => {
-                debug_assert_eq!(state.source, Some(self.clock_source));
-                state.users -= 1;
-            }
-        });
+        #[cfg(soc_has_clock_node_iomux_function_clock)]
+        ClockTree::with(clocks::release_iomux_function_clock);
     }
 }
 
-fn prescaler_from_frequency(frequency: Rate, clock_source: ClockSource) -> Result<u16, Error> {
-    let source_frequency = clock_source.frequency().as_hz();
+fn prescaler_from_frequency(frequency: Rate) -> Result<u16, Error> {
+    #[cfg(soc_has_clock_node_iomux_function_clock)]
+    let source_frequency = clocks::iomux_function_clock_frequency();
+    #[cfg(not(soc_has_clock_node_iomux_function_clock))]
+    let source_frequency = crate::soc::clocks::apb_clk_frequency();
     let requested_frequency = frequency.as_hz();
 
     if requested_frequency == 0 || requested_frequency > source_frequency {
@@ -454,64 +425,6 @@ fn raw_prescaler(prescaler: u16) -> u8 {
 
 const fn duty_to_density(duty: u8) -> i8 {
     duty.wrapping_sub(128) as i8
-}
-
-fn configure_clock_source(clock_source: ClockSource) {
-    // Newer chips expose this selector in different clock-control blocks:
-    // - C5/C6/H2 use PCR.iomux_clk_conf.iomux_func_clk_sel, but the selector encodings differ by
-    //   chip.
-    // - P4 uses HP_SYS_CLKRST.peri_clk_ctrl26.iomux_clk_src_sel, a one-bit XTAL/PLL_F80M selector.
-    // - ESP32/C3/S2/S3 use APB for this driver path and do not need a source selector write here.
-    cfg_select! {
-        esp32c5 => {
-            crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
-                w.iomux_func_clk_sel()
-                    .bits(match clock_source {
-                        ClockSource::Xtal => 0,
-                        ClockSource::PllF80m => 2,
-                    })
-                    .iomux_func_clk_en()
-                    .set_bit()
-            });
-        }
-        esp32c6 => {
-            crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
-                w.iomux_func_clk_sel()
-                    .bits(match clock_source {
-                        ClockSource::PllF80m => 1,
-                        ClockSource::Xtal => 3,
-                    })
-                    .iomux_func_clk_en()
-                    .set_bit()
-            });
-        }
-        esp32h2 => {
-            crate::peripherals::PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
-                w.iomux_func_clk_sel()
-                    .bits(match clock_source {
-                        ClockSource::Xtal => 0,
-                        ClockSource::PllF48m => 2,
-                    })
-                    .iomux_func_clk_en()
-                    .set_bit()
-            });
-        }
-        esp32p4 => {
-            crate::peripherals::HP_SYS_CLKRST::regs()
-                .peri_clk_ctrl26()
-                .modify(|_, w| {
-                    match clock_source {
-                        ClockSource::Xtal => w.iomux_clk_src_sel().clear_bit(),
-                        ClockSource::PllF80m => w.iomux_clk_src_sel().set_bit(),
-                    }
-                    .iomux_clk_en()
-                    .set_bit()
-                });
-        }
-        _ => {
-            let _ = clock_source;
-        }
-    }
 }
 
 fn write_config_raw(channel: usize, config: ChannelConfig) {

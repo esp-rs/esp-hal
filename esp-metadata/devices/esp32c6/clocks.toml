@@ -45,6 +45,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F80M",  type = "derived", from = "PLL_CLK", output = "80_000_000"  },
     { name = "PLL_F160M", type = "derived", from = "PLL_CLK", output = "160_000_000" },
     { name = "PLL_F240M", type = "derived", from = "PLL_CLK", output = "240_000_000" },
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+    ] },
     { name = "LEDC_SCLK", type = "mux", variants = [
         { name = "PLL_F80M",    outputs = "PLL_F80M" },
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },

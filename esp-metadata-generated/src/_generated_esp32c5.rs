@@ -1374,6 +1374,20 @@ macro_rules! for_each_wakeup_source {
 ///     todo!()
 /// }
 ///
+/// // IOMUX_FUNCTION_CLOCK
+///
+/// fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_iomux_function_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<IomuxFunctionClockConfig>,
+///     _new_config: IomuxFunctionClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG_CALIBRATION_CLOCK
 ///
 /// fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1705,6 +1719,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_CLK`.
             PllF480m,
         }
+        /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum IomuxFunctionClockConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+        }
         /// The list of clock signals that the `TIMG_CALIBRATION_CLOCK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1923,6 +1949,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
             crypto_clk: Option<CryptoClkConfig>,
+            iomux_function_clock: Option<IomuxFunctionClockConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             parl_io_rx_clock: [Option<ParlIoRxClockConfig>; 1],
@@ -1952,6 +1979,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             crypto_clk_refcount: u32,
+            iomux_function_clock_refcount: u32,
             timg_calibration_clock_refcount: u32,
             i2c_function_clock_refcount: [u32; 1],
             parl_io_rx_clock_refcount: [u32; 1],
@@ -1999,6 +2027,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the CRYPTO_CLK clock tree node
             pub fn crypto_clk(&self) -> Option<CryptoClkConfig> {
                 self.crypto_clk
+            }
+            /// Returns the current configuration of the IOMUX_FUNCTION_CLOCK clock tree node
+            pub fn iomux_function_clock(&self) -> Option<IomuxFunctionClockConfig> {
+                self.iomux_function_clock
             }
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
@@ -2067,6 +2099,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk: None,
                 lp_slow_clk: None,
                 crypto_clk: None,
+                iomux_function_clock: None,
                 timg_calibration_clock: None,
                 i2c_function_clock: [None; 1],
                 parl_io_rx_clock: [None; 1],
@@ -2096,6 +2129,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 crypto_clk_refcount: 0,
+                iomux_function_clock_refcount: 0,
                 timg_calibration_clock_refcount: 0,
                 i2c_function_clock_refcount: [0; 1],
                 parl_io_rx_clock_refcount: [0; 1],
@@ -2122,6 +2156,8 @@ macro_rules! define_clock_tree_types {
         static LP_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CRYPTO_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static IOMUX_FUNCTION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2837,6 +2873,80 @@ macro_rules! define_clock_tree_types {
                 CryptoClkConfig::Xtal => xtal_clk_frequency(),
                 CryptoClkConfig::Fosc => rc_fast_clk_frequency(),
                 CryptoClkConfig::PllF480m => pll_clk_frequency(),
+            }
+        }
+        pub fn configure_iomux_function_clock(
+            clocks: &mut ClockTree,
+            new_selector: IomuxFunctionClockConfig,
+        ) {
+            let old_selector = clocks.iomux_function_clock.replace(new_selector);
+            refresh_iomux_function_clock_downstream(clocks);
+            if clocks.iomux_function_clock_refcount > 0 {
+                match new_selector {
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                        IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                    }
+                }
+            } else {
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn iomux_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<IomuxFunctionClockConfig> {
+            clocks.iomux_function_clock
+        }
+        pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting IOMUX_FUNCTION_CLOCK");
+            if increment_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Enabling IOMUX_FUNCTION_CLOCK");
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                enable_iomux_function_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing IOMUX_FUNCTION_CLOCK");
+            if decrement_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Disabling IOMUX_FUNCTION_CLOCK");
+                enable_iomux_function_clock_impl(clocks, false);
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn iomux_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: IomuxFunctionClockConfig,
+        ) -> u32 {
+            match config {
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+            }
+        }
+        pub fn iomux_function_clock_frequency() -> u32 {
+            IOMUX_FUNCTION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn iomux_function_clock_source_frequency(source: IomuxFunctionClockConfig) -> u32 {
+            match source {
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(),
+                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
             }
         }
         pub fn configure_timg_calibration_clock(
@@ -3616,6 +3726,8 @@ macro_rules! define_clock_tree_types {
             pub lp_slow_clk: Option<LpSlowClkConfig>,
             /// `CRYPTO_CLK` configuration.
             pub crypto_clk: Option<CryptoClkConfig>,
+            /// `IOMUX_FUNCTION_CLOCK` configuration.
+            pub iomux_function_clock: Option<IomuxFunctionClockConfig>,
             /// `TIMG_CALIBRATION_CLOCK` configuration.
             pub timg_calibration_clock: Option<TimgCalibrationClockConfig>,
         }
@@ -3645,6 +3757,9 @@ macro_rules! define_clock_tree_types {
                 if let Some(config) = self.crypto_clk {
                     configure_crypto_clk(clocks, config);
                 }
+                if let Some(config) = self.iomux_function_clock {
+                    configure_iomux_function_clock(clocks, config);
+                }
                 if let Some(config) = self.timg_calibration_clock {
                     configure_timg_calibration_clock(clocks, config);
                 }
@@ -3670,6 +3785,7 @@ macro_rules! define_clock_tree_types {
             refresh_hp_root_clk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             refresh_crypto_clk_downstream(clocks);
+            refresh_iomux_function_clock_downstream(clocks);
             for child_instance in [I2cInstance::I2c0] {
                 refresh_i2c_function_clock_downstream(clocks, child_instance);
             }
@@ -3746,6 +3862,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.crypto_clk {
                 CRYPTO_CLK_FREQ_CACHE.store(
                     crypto_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_iomux_function_clock_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.iomux_function_clock {
+                IOMUX_FUNCTION_CLOCK_FREQ_CACHE.store(
+                    iomux_function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }

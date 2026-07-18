@@ -225,10 +225,7 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
         .with_frequency(SDM_FREQUENCY)
         .unwrap()
         .with_duty(duty);
-    let channel = sdm
-        .channel0
-        .connect(ctx.sdm_pin.reborrow(), config)
-        .unwrap();
+    let channel = sdm.channel0.connect(ctx.sdm_pin.reborrow(), config);
 
     Delay::new().delay_micros(SDM_WARM_UP_US);
 
