@@ -1,12 +1,12 @@
 use core::cell::RefCell;
 
 use crate::{
-    gpio::RtcFunction,
+    gpio::{Level, RtcFunction},
     peripherals::{LPWR, RTC_IO},
     rtc_cntl::{
         Rtc,
         WakeupSource,
-        sleep::{RtcIoWakeupPinType, RtcSleepConfig, WakeSource, WakeTriggers, WakeupLevel},
+        sleep::{RtcIoWakeupPinType, RtcSleepConfig, WakeSource, WakeTriggers},
     },
 };
 
@@ -16,9 +16,9 @@ use crate::{
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, LowPower, TimerWakeupSource, WakeupLevel}, wakeup_cause, SocResetReason};
+/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Pull};
+/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull};
 /// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
@@ -36,7 +36,7 @@ use crate::{
 /// let timer = TimerWakeupSource::new(Duration::from_secs(30));
 ///
 /// core::mem::drop(pin_4_input);
-/// let ext0 = Ext0WakeupSource::new(pin_4, WakeupLevel::High);
+/// let ext0 = Ext0WakeupSource::new(pin_4, Level::High);
 ///
 /// delay.delay_millis(100);
 /// lpwr.sleep_deep(&[&timer, &ext0]);
@@ -47,13 +47,13 @@ pub struct Ext0WakeupSource<P: RtcIoWakeupPinType> {
     /// The pin used as the wake-up source.
     pin: RefCell<P>,
     /// The level at which the wake-up event is triggered.
-    level: WakeupLevel,
+    level: Level,
 }
 
 impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
     /// Creates a new external wake-up source (Ext0``) with the specified pin
     /// and wake-up level.
-    pub fn new(pin: P, level: WakeupLevel) -> Self {
+    pub fn new(pin: P, level: Level) -> Self {
         Self {
             pin: RefCell::new(pin),
             level,
@@ -91,7 +91,7 @@ impl<P: RtcIoWakeupPinType> WakeSource for Ext0WakeupSource<P> {
             // set level register field
             LPWR::regs()
                 .ext_wakeup_conf()
-                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
+                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == Level::High));
         }
     }
 }

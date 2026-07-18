@@ -50,16 +50,6 @@ mod wakeup_sources;
 #[instability::unstable]
 pub use wakeup_sources::*;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-/// Level at which a wake-up event is triggered
-pub enum WakeupLevel {
-    /// The wake-up event is triggered when the pin is low.
-    Low,
-    #[default]
-    ///  The wake-up event is triggered when the pin is high.
-    High,
-}
-
 /// The set of wakeup sources configured to end a sleep.
 ///
 /// This is a thin wrapper around a set of [`WakeupSource`]s. Wakeup source implementations enable

@@ -1,12 +1,12 @@
-use super::{RtcioWakeupSource, WakeupLevel};
+use super::RtcioWakeupSource;
 use crate::{
-    gpio::{RtcFunction, RtcPin},
+    gpio::{Level, RtcFunction, RtcPin},
     peripherals::RTC_IO,
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
 
 impl RtcioWakeupSource<'_, '_> {
-    fn apply_pin(&self, pin: &mut dyn RtcPin, level: WakeupLevel) {
+    fn apply_pin(&self, pin: &mut dyn RtcPin, level: Level) {
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
         RTC_IO::regs()
@@ -14,8 +14,8 @@ impl RtcioWakeupSource<'_, '_> {
             .modify(|_, w| unsafe {
                 w.wakeup_enable().set_bit();
                 w.int_type().bits(match level {
-                    WakeupLevel::Low => 4,
-                    WakeupLevel::High => 5,
+                    Level::Low => 4,
+                    Level::High => 5,
                 })
             });
     }

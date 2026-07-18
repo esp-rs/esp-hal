@@ -1,6 +1,6 @@
-use super::{RtcioWakeupSource, WakeupLevel};
+use super::RtcioWakeupSource;
 use crate::{
-    gpio::{RtcFunction, RtcPinWithResistors},
+    gpio::{Level, RtcFunction, RtcPinWithResistors},
     peripherals::{GPIO, IO_MUX, LPWR},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
@@ -11,15 +11,15 @@ const SIG_GPIO_OUT_IDX: u32 = 128;
 const GPIO_NUM_MAX: usize = 22;
 
 impl RtcioWakeupSource<'_, '_> {
-    fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: WakeupLevel) {
+    fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: Level) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {
-            WakeupLevel::High => {
+            Level::High => {
                 pin.rtcio_pullup(false);
                 pin.rtcio_pulldown(true);
                 GPIO_INTR_HIGH_LEVEL
             }
-            WakeupLevel::Low => {
+            Level::Low => {
                 pin.rtcio_pullup(true);
                 pin.rtcio_pulldown(false);
                 GPIO_INTR_LOW_LEVEL

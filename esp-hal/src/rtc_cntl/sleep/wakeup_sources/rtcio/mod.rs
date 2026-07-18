@@ -1,6 +1,6 @@
 use core::cell::RefCell;
 
-use crate::rtc_cntl::sleep::{RtcIoWakeupPinType, WakeupLevel};
+use crate::{gpio::Level, rtc_cntl::sleep::RtcIoWakeupPinType};
 
 #[procmacros::doc_replace(
     "pin0" => {
@@ -25,9 +25,9 @@ use crate::rtc_cntl::sleep::{RtcIoWakeupPinType, WakeupLevel};
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::delay::Delay;
-/// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
+/// # use esp_hal::gpio::{self, Input, InputConfig, Level, Pull};
 /// # use esp_hal::rtc_cntl::{reset_reason,
-/// #   sleep::{LowPower, RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
+/// #   sleep::{LowPower, RtcioWakeupSource, TimerWakeupSource},
 /// #   wakeup_cause, SocResetReason
 /// # };
 /// # use esp_hal::system::Cpu;
@@ -42,9 +42,9 @@ use crate::rtc_cntl::sleep::{RtcIoWakeupPinType, WakeupLevel};
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
-/// let wakeup_pins: &mut [(&mut dyn __rtc_pin_trait__, WakeupLevel)] = &mut [
-///     (&mut peripherals.__pin0__, WakeupLevel::Low),
-///     (&mut peripherals.__pin1__, WakeupLevel::High),
+/// let wakeup_pins: &mut [(&mut dyn __rtc_pin_trait__, Level)] = &mut [
+///     (&mut peripherals.__pin0__, Level::Low),
+///     (&mut peripherals.__pin1__, Level::High),
 /// ];
 ///
 /// let rtcio = RtcioWakeupSource::new(wakeup_pins);
@@ -54,12 +54,12 @@ use crate::rtc_cntl::sleep::{RtcIoWakeupPinType, WakeupLevel};
 /// # {after_snippet}
 /// ```
 pub struct RtcioWakeupSource<'a, 'b> {
-    pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]>,
+    pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, Level)]>,
 }
 
 impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     /// Creates a new external GPIO wake-up source.
-    pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, WakeupLevel)]) -> Self {
+    pub fn new(pins: &'a mut [(&'b mut dyn RtcIoWakeupPinType, Level)]) -> Self {
         Self {
             pins: RefCell::new(pins),
         }

@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin},
+    gpio::{Level, RtcFunction, RtcPin},
     peripherals::PMU,
     rtc_cntl::{
         Rtc,
@@ -7,7 +7,7 @@ use crate::{
         WakeSource,
         WakeTriggers,
         WakeupSource,
-        sleep::{Ext1WakeupSource, WakeupLevel},
+        sleep::Ext1WakeupSource,
     },
 };
 
@@ -49,8 +49,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         for (pin, level) in pins.iter_mut() {
             pin_mask |= 1 << pin.number();
             level_mask |= match level {
-                WakeupLevel::High => 1 << pin.number(),
-                WakeupLevel::Low => 0,
+                Level::High => 1 << pin.number(),
+                Level::Low => 0,
             };
 
             pin.rtc_set_config(true, true, RtcFunction::Rtc);

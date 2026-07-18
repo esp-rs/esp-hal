@@ -1,5 +1,5 @@
 use crate::{
-    gpio::RtcFunction,
+    gpio::{Level, RtcFunction},
     peripherals::LPWR,
     rtc_cntl::{
         Rtc,
@@ -7,7 +7,7 @@ use crate::{
         WakeSource,
         WakeTriggers,
         WakeupSource,
-        sleep::{Ext1WakeupSource, WakeupLevel},
+        sleep::Ext1WakeupSource,
     },
 };
 
@@ -47,7 +47,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
 
         LPWR::regs()
             .ext_wakeup_conf()
-            .modify(|_, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
+            .modify(|_, w| w.ext_wakeup1_lv().bit(self.level == Level::High));
     }
 }
 
