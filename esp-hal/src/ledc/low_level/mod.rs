@@ -16,6 +16,11 @@ pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeed
 }
 
 #[inline(always)]
+pub(super) fn get_duty_res(ledc: &RegisterBlock, number: TimerNumber, is_hs: bool) -> u8 {
+    version::get_duty_res(ledc, number, is_hs)
+}
+
+#[inline(always)]
 pub(super) fn ls_freq_hw(clock_source: ClockSource) -> Rate {
     version::ls_freq_hw(clock_source)
 }

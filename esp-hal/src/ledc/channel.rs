@@ -12,13 +12,16 @@
 //! For more information, please refer to the
 #![doc = crate::trm_markdown_link!("ledpwm")]
 
-use core::{fmt::Display, marker::PhantomData};
+use core::{fmt::Display, marker::PhantomData, sync::atomic::Ordering};
 
 use super::low_level;
 use crate::{
     DriverMode,
     gpio::{PinGuard, interconnect::PeripheralOutput},
-    ledc::{Speed, timer::Timer},
+    ledc::{
+        Speed,
+        timer::{self, TIMER_FREQS, Timer},
+    },
     peripherals::LEDC,
     system::{Peripheral, PeripheralGuard},
 };
@@ -141,16 +144,16 @@ impl<'d, const CHANNEL: u8, Dm: DriverMode, S: Speed> ChannelCreator<'d, CHANNEL
 
     /// Configures the channel.
     #[instability::unstable]
-    pub fn configure<'t>(
+    pub fn configure(
         self,
-        timer: &'t Timer<'d, S>,
+        timer: &Timer<'d, S>,
         config: Config,
-    ) -> Result<Channel<'d, 't, Dm, S>, ConfigError> {
+    ) -> Result<Channel<'d, Dm, S>, ConfigError> {
         let mut channel = Channel {
             number: Number::from_u8(CHANNEL),
-            timer,
+            timer: timer.number(),
             pin: PinGuard::new_unconnected(),
-            guard: self.guard,
+            _guard: self.guard,
             _phantom: PhantomData,
         }
         .with_timer(timer);
@@ -189,15 +192,15 @@ impl<'d, const CHANNEL: u8, Dm: DriverMode, S: Speed> ChannelCreator<'d, CHANNEL
 #[instability::unstable]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Channel<'d, 't, Dm: DriverMode, S: Speed> {
+pub struct Channel<'d, Dm: DriverMode, S: Speed> {
     number: Number,
-    timer: &'t Timer<'d, S>,
+    timer: timer::Number,
     pin: PinGuard,
-    guard: Option<PeripheralGuard>,
-    _phantom: PhantomData<Dm>,
+    _guard: Option<PeripheralGuard>,
+    _phantom: PhantomData<(&'d (), Dm, S)>,
 }
 
-impl<'d, 't, Dm: DriverMode, S: Speed> Channel<'d, 't, Dm, S> {
+impl<'d, Dm: DriverMode, S: Speed> Channel<'d, Dm, S> {
     #[procmacros::doc_replace]
     /// Attaches a new timer to the channel and returns the updated channel.
     ///
@@ -218,17 +221,12 @@ impl<'d, 't, Dm: DriverMode, S: Speed> Channel<'d, 't, Dm, S> {
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub fn with_timer<'tn>(self, new_timer: &'tn Timer<'d, S>) -> Channel<'d, 'tn, Dm, S> {
+    pub fn with_timer(mut self, new_timer: &Timer<'d, S>) -> Self {
         let ledc = LEDC::regs();
         low_level::set_channel(ledc, self.number, new_timer.number() as u8, S::IS_HS);
 
-        Channel {
-            number: self.number,
-            timer: new_timer,
-            pin: self.pin,
-            guard: self.guard,
-            _phantom: PhantomData,
-        }
+        self.timer = new_timer.number();
+        self
     }
 
     /// Attaches a new PeripheralOutput to the channel.
@@ -252,7 +250,9 @@ impl<'d, 't, Dm: DriverMode, S: Speed> Channel<'d, 't, Dm, S> {
     /// Returns the maximum duty cycle.
     #[instability::unstable]
     pub fn max_duty_cycle(&self) -> u32 {
-        1u32 << self.timer.config().duty() as u8
+        let ledc = LEDC::regs();
+        let duty_res = low_level::get_duty_res(ledc, self.timer, S::IS_HS);
+        1u32 << duty_res
     }
 
     /// Sets the duty cycle of the channel.
@@ -311,7 +311,9 @@ impl<'d, 't, Dm: DriverMode, S: Speed> Channel<'d, 't, Dm, S> {
         let start_duty_value = start_duty.min(max_duty);
         let end_duty_value = end_duty.min(max_duty);
 
-        let pwm_cycles = duration_ms as u32 * self.timer.config().frequency().as_hz() / 1000;
+        let timer_index = if S::IS_HS { 4 } else { 0 } + self.timer as usize;
+        let frequency = TIMER_FREQS[timer_index].load(Ordering::Acquire);
+        let pwm_cycles = duration_ms as u32 * frequency / 1000;
         let abs_duty_diff = end_duty_value.abs_diff(start_duty_value);
         let duty_steps: u32 = u16::try_from(abs_duty_diff).unwrap_or(65535).into();
         let duty_steps = duty_steps.min(pwm_cycles).max(1);
@@ -355,11 +357,11 @@ mod ehal1 {
     use super::Channel;
     use crate::{DriverMode, ledc::Speed};
 
-    impl<Dm: DriverMode, S: Speed> ErrorType for Channel<'_, '_, Dm, S> {
+    impl<Dm: DriverMode, S: Speed> ErrorType for Channel<'_, Dm, S> {
         type Error = core::convert::Infallible;
     }
 
-    impl<Dm: DriverMode, S: Speed> SetDutyCycle for Channel<'_, '_, Dm, S> {
+    impl<Dm: DriverMode, S: Speed> SetDutyCycle for Channel<'_, Dm, S> {
         fn max_duty_cycle(&self) -> u16 {
             let max_hw = Self::max_duty_cycle(self); // inherent method
             if max_hw > u16::MAX as u32 {

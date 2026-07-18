@@ -14,7 +14,9 @@
 //! For more information, please refer to the
 #![doc = crate::trm_markdown_link!("ledpwm")]
 
-use core::{fmt::Display, marker::PhantomData};
+use core::{fmt::Display, marker::PhantomData, sync::atomic::Ordering};
+
+use portable_atomic::AtomicU32;
 
 use crate::{
     ledc::{Speed, low_level},
@@ -325,6 +327,11 @@ fn apply_config_hs(number: Number, config: &Config) -> Result<bool, ConfigError>
     Ok(false)
 }
 
+const TIMER_COUNT: usize = if cfg!(ledc_version = "1") { 8 } else { 4 };
+// First 4 timers are LS, then 4 HS (if supported)
+pub(super) static TIMER_FREQS: [AtomicU32; TIMER_COUNT] =
+    [const { AtomicU32::new(0) }; TIMER_COUNT];
+
 /// Timer struct
 #[instability::unstable]
 #[derive(Debug)]
@@ -351,6 +358,9 @@ impl<'d, S: Speed> Timer<'d, S> {
         } else {
             apply_config_ls(self.number, config)
         }?;
+
+        let timer_index = if S::IS_HS { 4 } else { 0 } + self.number as usize;
+        TIMER_FREQS[timer_index].store(config.frequency.as_hz(), Ordering::Release);
 
         self.config = *config;
         #[cfg(soc_has_clock_node_ref_tick)]

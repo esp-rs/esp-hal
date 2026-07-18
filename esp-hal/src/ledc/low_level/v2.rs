@@ -20,6 +20,10 @@ pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeed
     ledc.timer(0).conf().modify(|_, w| w.para_up().set_bit());
 }
 
+pub(super) fn get_duty_res(ledc: &RegisterBlock, number: TimerNumber, _is_hs: bool) -> u8 {
+    ledc.timer(number as usize).conf().read().duty_res().bits()
+}
+
 pub(super) fn ls_freq_hw(_clock_source: ClockSource) -> Rate {
     Rate::from_hz(clocks::apb_clk_frequency())
 }
