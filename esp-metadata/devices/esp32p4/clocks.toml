@@ -146,43 +146,43 @@ peripheral_clocks = { templates = [
     { name = "apb_clk_template",        value = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.{{apb_field}}().bit(enable));" },
     { name = "sys_apb_clk_template",    value = "{{sys_clk_template}} {{apb_clk_template}}" },
     # Reusable reset building blocks. Reset bit name is supplied via {{rst_field}}.
-    { name = "rst_en_template",         value = "{{control}}::regs().hp_rst_en{{rst_group}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "rst_en_template",         value = "{{control}}::regs().hp_rst_en{{rst_group}}().modify(|_, w| w.rst_en_{{rst_field}}().bit(reset));" },
     { name = "control",                 value = "crate::peripherals::HP_SYS_CLKRST" },
 ], peripheral_clocks = [
     # Ref: TRM v0.5 Ch 12 (Reset and Clock), Ch 22 (System Registers).
     # UARTs -- sys_clk + apb_clk; reset asserts both core+apb together.
-    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart0_sys_clk_en", apb_field = "uart0_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart0_core().bit(reset).rst_en_uart0_apb().bit(reset));" }, keep_enabled = true },
-    { name = "Uart1", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart1_sys_clk_en", apb_field = "uart1_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart1_core().bit(reset).rst_en_uart1_apb().bit(reset));" } },
-    { name = "Uart2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart2_sys_clk_en", apb_field = "uart2_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart2_core().bit(reset).rst_en_uart2_apb().bit(reset));" } },
-    { name = "Uart3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart3_sys_clk_en", apb_field = "uart3_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart3_core().bit(reset).rst_en_uart3_apb().bit(reset));" } },
-    { name = "Uart4", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart4_sys_clk_en", apb_field = "uart4_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart4_core().bit(reset).rst_en_uart4_apb().bit(reset));" } },
+    { name = "Uart0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart0_sys_clk_en", apb_field = "uart0_apb_clk_en", rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart0_core().bit(reset).rst_en_uart0_apb().bit(reset));" }, keep_enabled = true },
+    { name = "Uart1", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart1_sys_clk_en", apb_field = "uart1_apb_clk_en", rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart1_core().bit(reset).rst_en_uart1_apb().bit(reset));" } },
+    { name = "Uart2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart2_sys_clk_en", apb_field = "uart2_apb_clk_en", rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart2_core().bit(reset).rst_en_uart2_apb().bit(reset));" } },
+    { name = "Uart3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart3_sys_clk_en", apb_field = "uart3_apb_clk_en", rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart3_core().bit(reset).rst_en_uart3_apb().bit(reset));" } },
+    { name = "Uart4", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uart4_sys_clk_en", apb_field = "uart4_apb_clk_en", rst_template = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.rst_en_uart4_core().bit(reset).rst_en_uart4_apb().bit(reset));" } },
     # SPI -- sys_clk + apb_clk; reset in HP_RST_EN2.
-    { name = "Spi2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi2_sys_clk_en", apb_field = "gpspi2_apb_clk_en", rst_group = "2", rst_field = "rst_en_spi2" } },
-    { name = "Spi3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi3_sys_clk_en", apb_field = "gpspi3_apb_clk_en", rst_group = "2", rst_field = "rst_en_spi3" } },
+    { name = "Spi2", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi2_sys_clk_en", apb_field = "gpspi2_apb_clk_en", rst_group = "2", rst_field = "spi2" } },
+    { name = "Spi3", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "gpspi3_sys_clk_en", apb_field = "gpspi3_apb_clk_en", rst_group = "2", rst_field = "spi3" } },
     # I2C master -- apb_clk only; reset in HP_RST_EN1.
-    { name = "I2c0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2c0_apb_clk_en", rst_group = "1", rst_field = "rst_en_i2c0" } },
-    { name = "I2c1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2c1_apb_clk_en", rst_group = "1", rst_field = "rst_en_i2c1" } },
+    { name = "I2c0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2c0_apb_clk_en", rst_group = "1", rst_field = "i2c0" } },
+    { name = "I2c1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2c1_apb_clk_en", rst_group = "1", rst_field = "i2c1" } },
     # I2S -- apb_clk; reset in HP_RST_EN2.
-    { name = "I2s0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s0_apb_clk_en", rst_group = "2", rst_field = "rst_en_i2s0_apb" } },
-    { name = "I2s1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s1_apb_clk_en", rst_group = "2", rst_field = "rst_en_i2s1_apb" } },
-    { name = "I2s2", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s2_apb_clk_en", rst_group = "2", rst_field = "rst_en_i2s2_apb" } },
+    { name = "I2s0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s0_apb_clk_en", rst_group = "2", rst_field = "i2s0_apb" } },
+    { name = "I2s1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s1_apb_clk_en", rst_group = "2", rst_field = "i2s1_apb" } },
+    { name = "I2s2", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "i2s2_apb_clk_en", rst_group = "2", rst_field = "i2s2_apb" } },
     # Timers -- Systimer also needs PERI_CLK_CTRL21.systimer_clk_en gate.
-    { name = "Systimer", template_params = { clk_en_template = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.systimer_apb_clk_en().bit(enable)); {{control}}::regs().peri_clk_ctrl21().modify(|_, w| w.systimer_clk_en().bit(enable));", rst_group = "1", rst_field = "rst_en_stimer" }, keep_enabled = true },
-    { name = "Timg0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", rst_group = "1", rst_field = "rst_en_timergrp0" }, keep_enabled = true },
-    { name = "Timg1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp1_apb_clk_en", rst_group = "1", rst_field = "rst_en_timergrp1" } },
+    { name = "Systimer", template_params = { clk_en_template = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.systimer_apb_clk_en().bit(enable)); {{control}}::regs().peri_clk_ctrl21().modify(|_, w| w.systimer_clk_en().bit(enable));", rst_group = "1", rst_field = "stimer" }, keep_enabled = true },
+    { name = "Timg0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp0_apb_clk_en", rst_group = "1", rst_field = "timergrp0" }, keep_enabled = true },
+    { name = "Timg1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "timergrp1_apb_clk_en", rst_group = "1", rst_field = "timergrp1" } },
     # IO MUX -- gated via PERI_CLK_CTRL26; KEEP_ENABLED because GPIO depends on it.
-    { name = "Iomux", template_params = { clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", rst_group = "1", rst_field = "rst_en_iomux" }, keep_enabled = true },
+    { name = "Iomux", template_params = { clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", rst_group = "1", rst_field = "iomux" }, keep_enabled = true },
     # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
-    { name = "Ledc",   template_params = { rst_group = "1", rst_field = "rst_en_ledc" } },
-    { name = "Pcnt",   template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "pcnt_apb_clk_en", rst_group = "1", rst_field = "rst_en_pcnt" } },
-    { name = "Mcpwm0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm0_apb_clk_en", rst_group = "1", rst_field = "rst_en_pwm0" } },
-    { name = "Mcpwm1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm1_apb_clk_en", rst_group = "1", rst_field = "rst_en_pwm1" } },
+    { name = "Ledc",   template_params = { rst_group = "1", rst_field = "ledc" } },
+    { name = "Pcnt",   template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "pcnt_apb_clk_en", rst_group = "1", rst_field = "pcnt" } },
+    { name = "Mcpwm0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm0_apb_clk_en", rst_group = "1", rst_field = "pwm0" } },
+    { name = "Mcpwm1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "mcpwm1_apb_clk_en", rst_group = "1", rst_field = "pwm1" } },
     # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.
-    { name = "Rmt", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "rmt_sys_clk_en", rst_group = "1", rst_field = "rst_en_rmt" } },
+    { name = "Rmt", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "rmt_sys_clk_en", rst_group = "1", rst_field = "rmt" } },
     # TWAI (CAN) -- reset bits named can0/can1/can2 in PAC.
-    { name = "Twai0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai0_apb_clk_en", rst_group = "1", rst_field = "rst_en_can0" } },
-    { name = "Twai1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai1_apb_clk_en", rst_group = "1", rst_field = "rst_en_can1" } },
-    { name = "Twai2", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai2_apb_clk_en", rst_group = "1", rst_field = "rst_en_can2" } },
+    { name = "Twai0", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai0_apb_clk_en", rst_group = "1", rst_field = "can0" } },
+    { name = "Twai1", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai1_apb_clk_en", rst_group = "1", rst_field = "can1" } },
+    { name = "Twai2", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "twai2_apb_clk_en", rst_group = "1", rst_field = "can2" } },
     # USB -- reset is via LP-domain registers, leave rst as no-op here.
     { name = "UsbFs",  template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg11_sys_clk_en", rst_template = "{{no_rst}}" } },
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "usb_otg20_sys_clk_en", rst_template = "{{no_rst}}" } },
@@ -190,25 +190,25 @@ peripheral_clocks = { templates = [
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "emac_sys_clk_en", rst_template = "{{no_rst}}" } },
     { name = "SdioHost", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en", rst_template ="crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },
-    { name = "Uhci",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", rst_group = "1", rst_field = "rst_en_uhci" } },
+    { name = "Uhci",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", rst_group = "1", rst_field = "uhci" } },
     # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
-    { name = "Aes",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_aes" } },
-    { name = "Sha",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_sha" } },
-    { name = "Rsa",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_rsa" } },
-    { name = "Ecc",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_ecc" } },
-    { name = "Ecdsa", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_ecdsa" } },
-    { name = "Hmac",  template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_hmac" } },
-    { name = "Ds",    template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rst_en_ds" } },
+    { name = "Aes",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "aes" } },
+    { name = "Sha",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "sha" } },
+    { name = "Rsa",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "rsa" } },
+    { name = "Ecc",   template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "ecc" } },
+    { name = "Ecdsa", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "ecdsa" } },
+    { name = "Hmac",  template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "hmac" } },
+    { name = "Ds",    template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", rst_group = "2", rst_field = "ds" } },
     # DMA
-    { name = "AhbGdma", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", rst_group = "1", rst_field = "rst_en_ahb_pdma" } },
-    { name = "AxiGdma", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", rst_group = "1", rst_field = "rst_en_axi_pdma" } },
-    { name = "Vdma",    template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en",     rst_group = "0", rst_field = "rst_en_gdma" } },
+    { name = "AhbGdma", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", rst_group = "1", rst_field = "ahb_pdma" } },
+    { name = "AxiGdma", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", rst_group = "1", rst_field = "axi_pdma" } },
+    { name = "Vdma",    template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "gdma_sys_clk_en",     rst_group = "0", rst_field = "gdma" } },
     # ADC.
-    { name = "Adc", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "adc_apb_clk_en", rst_group = "2", rst_field = "rst_en_adc" } },
+    { name = "Adc", template_params = { clk_en_template = "{{apb_clk_template}}", apb_field = "adc_apb_clk_en", rst_group = "2", rst_field = "adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
     { name = "ParlIo", template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_field = "parlio_sys_clk_en", apb_field = "parlio_apb_clk_en", rst_template ="{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
     # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
-    { name = "LcdCam", template_params = { rst_group = "2", rst_field = "rst_en_lcdcam" } },
+    { name = "LcdCam", template_params = { rst_group = "2", rst_field = "lcdcam" } },
     # MIPI-DSI -- sys_clk in SOC_CLK_CTRL1; bridge reset in HP_RST_EN0.
-    { name = "MipiDsi", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "dsi_sys_clk_en", rst_group = "0", rst_field = "rst_en_dsi_brg" } },
+    { name = "MipiDsi", template_params = { clk_en_template = "{{sys_clk_template}}", sys_field = "dsi_sys_clk_en", rst_group = "0", rst_field = "dsi_brg" } },
 ] }
