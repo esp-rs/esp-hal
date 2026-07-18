@@ -37,12 +37,14 @@ peripherals = [
     { name = "ASSIST_DEBUG" },
     { name = "CACHE" },
     { name = "CLIC" },
+    { name = "CNNT_SYS" },
     { name = "EFUSE" },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },
     { name = "HP_APM" },
     { name = "HP_MEM_APM" },
     { name = "HP_SYS" },
+    { name = "HP_ALIVE_SYS" },
     { name = "HP_SYS_CLKRST" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
     { name = "INTERRUPT_CORE0" },
@@ -75,6 +77,7 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART", stable = true },
     { name = "USB_DEVICE" },
+    { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
     { name = "FLASH", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
@@ -147,3 +150,6 @@ wakeup_sources = {
     WifiBeacon = 23,
     Bt = 25,
 }
+
+[device.usb_otg_hs]
+fifo_depth_words = 896

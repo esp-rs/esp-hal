@@ -307,6 +307,7 @@ esp32s31 = [
     "esp-riscv-rt/rtc-ram",
     "esp-riscv-rt/clic-48",
     "procmacros/rtc-fast",
+    "__usb_otg",
     "esp-rom-sys/esp32s31",
     "esp-sync/esp32s31",
     "esp-metadata-generated/esp32s31",
