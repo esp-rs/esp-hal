@@ -144,7 +144,6 @@ peripheral_clocks = { templates = [
     { name = "sys_clk_template",        value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.{{sys_field}}().bit(enable));" },
     { name = "apb_clk_template",        value = "{{control}}::regs().soc_clk_ctrl2().modify(|_, w| w.{{apb_field}}().bit(enable));" },
     { name = "sys_apb_clk_template",    value = "{{sys_clk_template}} {{apb_clk_template}}" },
-    { name = "crypto_clk_template",     value = "{{control}}::regs().soc_clk_ctrl1().modify(|_, w| w.crypto_sys_clk_en().bit(enable));" },
     # Reusable reset building blocks. Reset bit name is supplied via {{rst_field}}.
     { name = "rst_en0_template",        value = "{{control}}::regs().hp_rst_en0().modify(|_, w| w.{{rst_field}}().bit(reset));" },
     { name = "rst_en1_template",        value = "{{control}}::regs().hp_rst_en1().modify(|_, w| w.{{rst_field}}().bit(reset));" },
@@ -194,13 +193,13 @@ peripheral_clocks = { templates = [
     { name = "SdioHost", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "sdmmc_sys_clk_en", default_rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },
     { name = "Uhci",  template_params = { default_clk_en_template = "{{sys_apb_clk_template}}", sys_field = "uhci_sys_clk_en", apb_field = "uhci_apb_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_uhci" } },
     # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
-    { name = "Aes",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_aes" } },
-    { name = "Sha",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_sha" } },
-    { name = "Rsa",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_rsa" } },
-    { name = "Ecc",   template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecc" } },
-    { name = "Ecdsa", template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecdsa" } },
-    { name = "Hmac",  template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_hmac" } },
-    { name = "Ds",    template_params = { default_clk_en_template = "{{crypto_clk_template}}", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ds" } },
+    { name = "Aes",   template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_aes" } },
+    { name = "Sha",   template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_sha" } },
+    { name = "Rsa",   template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_rsa" } },
+    { name = "Ecc",   template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecc" } },
+    { name = "Ecdsa", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ecdsa" } },
+    { name = "Hmac",  template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_hmac" } },
+    { name = "Ds",    template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "crypto_sys_clk_en", default_rst_template = "{{rst_en2_template}}", rst_field = "rst_en_ds" } },
     # DMA
     { name = "AhbGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "ahb_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_ahb_pdma" } },
     { name = "AxiGdma", template_params = { default_clk_en_template = "{{sys_clk_template}}", sys_field = "axi_pdma_sys_clk_en", default_rst_template = "{{rst_en1_template}}", rst_field = "rst_en_axi_pdma" } },
