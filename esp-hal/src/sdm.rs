@@ -111,20 +111,12 @@ for_each_sdm_channel!(
 );
 
 /// Sigma-delta peripheral configuration.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct SdmConfig {
     /// Clock source used by the shared SDM/IO_MUX clock.
-    pub clock_source: ClockSource,
-}
-
-impl SdmConfig {
-    /// Selects the source clock used by all SDM channels.
-    pub const fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
-        self.clock_source = clock_source;
-        self
-    }
+    clock_source: ClockSource,
 }
 
 /// Source clock for the shared SDM/IO_MUX clock.
@@ -199,11 +191,15 @@ impl core::error::Error for Error {}
 /// The hardware stores the prescaler and pulse density in the same register,
 /// so applying a complete channel configuration can update both fields with a
 /// single register write.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct ChannelConfig {
+    /// Raw hardware prescaler value.
+    #[builder_lite(skip)]
     raw_prescaler: u8,
+
+    /// Pulse density in the hardware range `-128..=127`.
     pulse_density: i8,
 }
 
@@ -215,14 +211,6 @@ impl ChannelConfig {
         check_prescaler(prescaler)?;
         self.raw_prescaler = raw_prescaler(prescaler);
         Ok(self)
-    }
-
-    /// Sets the pulse density.
-    ///
-    /// The value ranges is `-128..=127`.
-    pub const fn with_pulse_density(mut self, density: i8) -> Self {
-        self.pulse_density = density;
-        self
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
