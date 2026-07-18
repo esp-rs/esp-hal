@@ -26,7 +26,7 @@
 //!
 //! channel.set_duty(192); // duty ranges from 0 to 255
 //! channel.set_pulse_density(0); // pulse density ranges from -128 to 127
-//! //
+//!
 //! # {after_snippet}
 //! ```
 
@@ -90,6 +90,10 @@ for_each_sdm_channel!(
 
                 /// Creates a channel configuration builder.
                 pub const fn channel_config(&self) -> ChannelConfigBuilder {
+                    // this ensures that channels can be configured only after that SDM
+                    // have been initialized with a selected clock source. Since
+                    // `with_frequency` requires a clock source to calculate the prescaler,
+                    // it is important that the SDM is initialized first.
                     ChannelConfigBuilder::new()
                 }
             }
@@ -231,6 +235,7 @@ pub struct ChannelConfigBuilder {
 
 impl ChannelConfigBuilder {
     const fn new() -> Self {
+        // see `Sdm::channel_config()` for why this is not public
         Self {
             config: ChannelConfig {
                 raw_prescaler: 0,
