@@ -47,6 +47,25 @@ pub(crate) use chip::{
     PLIC_MX_BASE,
     PLIC_UX_BASE,
 };
+// Per-chip opt-in peripheral config-register retention data (register
+// offsets/masks/maps/counts). The sequence builders below are chip-agnostic;
+// only this register-layout data is device-specific.
+use chip::{
+    I2C_CONF_UPGATE,
+    I2C_CTR_OFF,
+    I2C_FSM_RST,
+    I2C_REGS_MAP,
+    I2C_RETENTION_REGS_CNT,
+    I2C_SCL_LOW_PERIOD_OFF,
+    SPI_CMD_OFF,
+    SPI_REGS_MAP,
+    SPI_RETENTION_REGS_CNT,
+    UART_INT_ENA_OFF,
+    UART_REG_UPDATE,
+    UART_REG_UPDATE_OFF,
+    UART_REGS_MAP,
+    UART_RETENTION_REGS_CNT,
+};
 
 // Bit layout of `regdma_link_head_t` (see ESP-IDF `regdma.h`):
 // https://github.com/espressif/esp-idf/blob/v5.4/components/soc/include/soc/regdma.h#L114-L123
@@ -175,15 +194,7 @@ impl RegdmaLink {
 }
 
 // Console UART config-register retention, shared by the always-on console and
-// the opt-in `UartRetentionMemory`. ESP-IDF v5.4 `uart_periph.c`
-// `UART_SLEEP_RETENTION_ENTRIES`, `uart_reg.h`.
-const UART_INT_ENA_OFF: u32 = 0x0C; // UART_INT_ENA_REG
-const UART_REG_UPDATE_OFF: u32 = 0x98; // UART_REG_UPDATE_REG
-const UART_REG_UPDATE: u32 = 1 << 0;
-/// Registers retained (set bits in [`UART_REGS_MAP`]).
-const UART_RETENTION_REGS_CNT: u32 = 21;
-/// `uart_regs_map[4]`: config registers in the INT_ENA..ID window.
-const UART_REGS_MAP: [u32; 4] = [0x007f_ff6d, 0x0000_0010, 0, 0];
+// the opt-in `UartRetentionMemory`. The register data lives in `chip`.
 /// One ADDR_MAP + a restore-only WRITE+WAIT pulsing `UART_REG_UPDATE`.
 const UART_NODE_COUNT: usize = 3;
 
@@ -207,17 +218,9 @@ fn build_uart_seq(base: u32, nodes: &mut [RegdmaLink], storage: u32) {
     nodes[2] = RegdmaLink::wait(base + UART_REG_UPDATE_OFF, 0, UART_REG_UPDATE, true, false);
 }
 
-// I2C config-register retention. ESP-IDF v5.4 `i2c_periph.c`
-// `i2c0_regs_retention`, `i2c_reg.h`. Config registers are shadowed, so restore
+// I2C config-register retention. Config registers are shadowed, so restore
 // pulses the FSM reset then requests a config update and waits for it to latch.
-const I2C_SCL_LOW_PERIOD_OFF: u32 = 0x00; // I2C_SCL_LOW_PERIOD_REG: ADDR_MAP window base
-const I2C_CTR_OFF: u32 = 0x04; // I2C_CTR_REG
-const I2C_FSM_RST: u32 = 1 << 10; // I2C_FSM_RST (value == mask)
-const I2C_CONF_UPGATE: u32 = 1 << 11; // I2C_CONF_UPGATE (value == mask)
-/// Registers retained (set bits in [`I2C_REGS_MAP`]).
-const I2C_RETENTION_REGS_CNT: u32 = 18;
-/// `i2c0_regs_map[4]`: config registers in the `SCL_LOW_PERIOD..SCL_STRETCH_CONF` window.
-const I2C_REGS_MAP: [u32; 4] = [0xc03f_345b, 0x3, 0, 0];
+// The register data lives in `chip`.
 /// One ADDR_MAP + a restore-only WRITE*3/WAIT pulsing `FSM_RST` then `CONF_UPGATE`.
 const I2C_NODE_COUNT: usize = 5;
 
@@ -238,13 +241,7 @@ fn build_i2c_seq(base: u32, nodes: &mut [RegdmaLink], storage: u32) {
     nodes[4] = RegdmaLink::wait(ctr, 0, I2C_CONF_UPGATE, true, false);
 }
 
-// GPSPI2 config-register retention. ESP-IDF v5.4 `spi_periph.c`
-// `spi2_regs_retention`, `spi_reg.h`.
-const SPI_CMD_OFF: u32 = 0x00; // SPI_CMD_REG: ADDR_MAP window base
-/// Registers retained (set bits in [`SPI_REGS_MAP`]).
-const SPI_RETENTION_REGS_CNT: u32 = 12;
-/// `spi_regs_map[4]`: config registers in the `CMD..SLAVE` window.
-const SPI_REGS_MAP: [u32; 4] = [0x0000_31ff, 0x0100_0000, 0, 0];
+// GPSPI2 config-register retention. The register data lives in `chip`.
 /// A single ADDR_MAP over the config registers.
 const SPI_NODE_COUNT: usize = 1;
 
