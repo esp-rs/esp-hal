@@ -539,8 +539,12 @@ pub(super) fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std
         .map(|pkg| (pkg.package.to_string(), pkg))
         .collect();
 
+    // Restrict the harvest to PRs merged into the branch this release is cut
+    // from (`main`, or a backport branch like `esp-hal-1.1.x`). Without this,
+    // backport PRs would leak into the next `main` release and every `main` PR
+    // would leak into a patch release.
     let (changelogs, migrations) = match changelog_preview::collect_changelogs(
-        workspace, &since_ref, 500,
+        workspace, &since_ref, 500, &plan.base,
     ) {
         Ok(r) => r,
         Err(e) => {
