@@ -16,6 +16,10 @@ for_each_lp_function! {
     (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
+            fn rtc_number(&self) -> u8 {
+                $pin
+            }
+
             unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                 LP_GPIO::regs().pin($pin).modify(|_, w| unsafe {
                     w.wakeup_enable().bit(wakeup).int_type().bits(level)
