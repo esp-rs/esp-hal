@@ -121,6 +121,35 @@ pub(super) const OPS: &[SysOp] = &[
 // ESP32-H2 use software to trigger REGDMA to restore instead of PMU, because regdma has power bug.
 pub(super) const SW_TRIGGER_REGDMA: bool = true;
 
+// Opt-in peripheral config-register retention data (offsets/masks/maps/counts),
+// consumed by the chip-agnostic sequence builders in `retention`.
+//
+// UART: ESP-IDF v5.4 `uart_periph.c` `UART_SLEEP_RETENTION_ENTRIES`, `uart_reg.h`.
+pub(super) const UART_INT_ENA_OFF: u32 = 0x0C; // UART_INT_ENA_REG: ADDR_MAP window base
+pub(super) const UART_REG_UPDATE_OFF: u32 = 0x98; // UART_REG_UPDATE_REG
+pub(super) const UART_REG_UPDATE: u32 = 1 << 0;
+/// Registers retained (set bits in [`UART_REGS_MAP`]).
+pub(super) const UART_RETENTION_REGS_CNT: u32 = 21;
+/// `uart_regs_map[4]`: config registers in the INT_ENA..ID window.
+pub(super) const UART_REGS_MAP: [u32; 4] = [0x007f_ff6d, 0x0000_0010, 0, 0];
+
+// I2C: ESP-IDF v5.4 `i2c_periph.c` `i2c0_regs_retention`, `i2c_reg.h`.
+pub(super) const I2C_SCL_LOW_PERIOD_OFF: u32 = 0x00; // I2C_SCL_LOW_PERIOD_REG: ADDR_MAP window base
+pub(super) const I2C_CTR_OFF: u32 = 0x04; // I2C_CTR_REG
+pub(super) const I2C_FSM_RST: u32 = 1 << 10; // I2C_FSM_RST (value == mask)
+pub(super) const I2C_CONF_UPGATE: u32 = 1 << 11; // I2C_CONF_UPGATE (value == mask)
+/// Registers retained (set bits in [`I2C_REGS_MAP`]).
+pub(super) const I2C_RETENTION_REGS_CNT: u32 = 18;
+/// `i2c0_regs_map[4]`: config registers in the `SCL_LOW_PERIOD..SCL_STRETCH_CONF` window.
+pub(super) const I2C_REGS_MAP: [u32; 4] = [0xc03f_345b, 0x3, 0, 0];
+
+// GPSPI2: ESP-IDF v5.4 `spi_periph.c` `spi2_regs_retention`, `spi_reg.h`.
+pub(super) const SPI_CMD_OFF: u32 = 0x00; // SPI_CMD_REG: ADDR_MAP window base
+/// Registers retained (set bits in [`SPI_REGS_MAP`]).
+pub(super) const SPI_RETENTION_REGS_CNT: u32 = 12;
+/// `spi_regs_map[4]`: config registers in the `CMD..SLAVE` window.
+pub(super) const SPI_REGS_MAP: [u32; 4] = [0x0000_31ff, 0x0100_0000, 0, 0];
+
 // CPU-domain device-register bases lost when `pd_cpu` powers down (consumed by
 // `cpu_retention`). Identical to the C6 (same RISC-V core/cache/PLIC/CLINT).
 pub(crate) const INTPRI_BASE: u32 = 0x600C_5000; // interrupt priority (INTPRI)
