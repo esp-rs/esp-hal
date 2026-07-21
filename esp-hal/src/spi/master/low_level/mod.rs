@@ -639,6 +639,142 @@ impl Driver {
         Ok(())
     }
 
+    /// Asynchronous, FIFO-based half-duplex read.
+    ///
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    pub(super) async fn half_duplex_read_async(
+        &self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        if buffer.is_empty() {
+            error!("Half-duplex mode does not support empty buffer");
+            return Err(Error::Unsupported);
+        }
+
+        self.setup_half_duplex(
+            false,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        )?;
+
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        let mut first = true;
+        let mut chunks = buffer.chunks_mut(FIFO_SIZE).peekable();
+        while let Some(chunk) = chunks.next() {
+            let last = chunks.peek().is_none();
+            self.prepare_half_duplex_chunk(first, last);
+            self.configure_datalen(chunk.len(), 0);
+            self.start_operation();
+
+            let cancel_on_drop = DropGuard::new((), |_| {
+                self.abort_transfer();
+                let _ = self.flush();
+            });
+            self.flush_async().await;
+            cancel_on_drop.defuse();
+
+            self.read_from_fifo(chunk)?;
+            first = false;
+        }
+        Ok(())
+    }
+
+    /// Asynchronous, FIFO-based half-duplex write.
+    ///
+    /// Performs the command, address, dummy, and data phases as a single SPI transaction without
+    /// involving the DMA engine. Transfers larger than the FIFO are split into chunks while keeping
+    /// CS asserted.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    pub(super) async fn half_duplex_write_async(
+        &self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => {
+                let mut buffer = buffer;
+                let mut data_mode = data_mode;
+                let mut address = address;
+                let addr_bytes;
+                if buffer.is_empty() && !address.is_none() {
+                    // If the buffer is empty, we need to send a dummy byte
+                    // to trigger the address phase.
+                    let bytes_to_write = address.width().div_ceil(8);
+                    // The address register is read in big-endian order,
+                    // we have to prepare the emulated write in the same way.
+                    addr_bytes = address.value().to_be_bytes();
+                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+                    data_mode = address.mode();
+                    address = Address::None;
+                }
+
+                if dummy > 0 {
+                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                    error!("Dummy bits are not supported without data");
+                    return Err(Error::Unsupported);
+                }
+            }
+            _ => {}
+        }
+
+        self.setup_half_duplex(
+            true,
+            cmd,
+            address,
+            false,
+            dummy,
+            buffer.is_empty(),
+            data_mode,
+        )?;
+
+        let _keep_cs_guard = DropGuard::new((), |_| version::set_cs_keep_active(self, false));
+        if buffer.is_empty() {
+            self.prepare_half_duplex_chunk(true, true);
+            self.start_operation();
+
+            let cancel_on_drop = DropGuard::new((), |_| {
+                self.abort_transfer();
+                let _ = self.flush();
+            });
+            self.flush_async().await;
+            cancel_on_drop.defuse();
+        } else {
+            let mut first = true;
+            let mut chunks = buffer.chunks(FIFO_SIZE).peekable();
+            while let Some(chunk) = chunks.next() {
+                let last = chunks.peek().is_none();
+                self.prepare_half_duplex_chunk(first, last);
+                self.configure_datalen(0, chunk.len());
+                self.fill_fifo(chunk);
+                self.start_operation();
+
+                let cancel_on_drop = DropGuard::new((), |_| {
+                    self.abort_transfer();
+                    let _ = self.flush();
+                });
+                self.flush_async().await;
+                cancel_on_drop.defuse();
+
+                first = false;
+            }
+        }
+        Ok(())
+    }
+
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
