@@ -7,10 +7,10 @@
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
         _ => ""
     },
-    "tdm_slot_philips" => include_str!("tdm_slot_philips.svg"),
-    "tdm_slot_msb" => include_str!("tdm_slot_msb.svg"),
-    "tdm_slot_pcm_short" => include_str!("tdm_slot_pcm_short.svg"),
-    "tdm_slot_pcm_long" => include_str!("tdm_slot_pcm_long.svg"),
+    "tdm_slot_philips" => include_str!("../tdm_slot_philips.svg"),
+    "tdm_slot_msb" => include_str!("../tdm_slot_msb.svg"),
+    "tdm_slot_pcm_short" => include_str!("../tdm_slot_pcm_short.svg"),
+    "tdm_slot_pcm_long" => include_str!("../tdm_slot_pcm_long.svg"),
 ))]
 //! # Inter-IC Sound (I2S)
 //!
