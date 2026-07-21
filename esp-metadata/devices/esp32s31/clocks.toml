@@ -87,7 +87,7 @@ peripheral_clocks = { templates = [
     { name = "rst_template",            value = "{{default_rst_template}}" },
     { name = "default_clk_en_template", value = "let _ = enable;" },
     { name = "default_rst_template",    value = "let _ = reset;" },
-    { name = "sys_apb_clk_template",    value = "{{control}}::regs().{{sys_reg}}().modify(|_, w| w.reg_{{sys_field}}().bit(enable).reg_{{apb_field}}().bit(enable));" },
+    { name = "sys_apb_clk_template",    value = "{{control}}::regs().{{sys_reg}}().modify(|_, w| w.{{sys_field}}_clk_en().bit(enable).{{apb_field}}_clk_en().bit(enable));" },
     { name = "apb_clk_template",        value = "{{control}}::regs().{{apb_reg}}().modify(|_, w| w.reg_{{apb_field}}().bit(enable));" },
     { name = "rst_template_inner",      value = "{{control}}::regs().{{rst_reg}}().modify(|_, w| w.reg_{{rst_field}}().bit(reset));" },
     { name = "control",                 value = "crate::peripherals::HP_SYS_CLKRST" },
@@ -99,6 +99,8 @@ peripheral_clocks = { templates = [
     { name = "Uart3", template_params = { default_clk_en_template = "{{control}}::regs().uart3_ctrl0().modify(|_, w| w.uart3_sys_clk_en().bit(enable).uart3_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart3_ctrl0().modify(|_, w| w.uart3_core_rst_en().bit(reset).uart3_apb_rst_en().bit(reset));" } },
     { name = "Spi2", template_params = { default_clk_en_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_sys_clk_en().bit(enable).gpspi2_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_rst_en().bit(reset));" } },
     { name = "I2c0", template_params = { default_clk_en_template = "{{control}}::regs().i2c0_ctrl0().modify(|_, w| w.i2c0_apb_clk_en().bit(enable).i2c0_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().i2c0_ctrl0().modify(|_, w| w.i2c0_rst_en().bit(reset));" } },
+    # USB
+    { name = "UsbHs",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_reg = "usb_otghs_ctrl0", sys_field = "usb_otghs_sys", apb_field = "usb_otghs_apb" } },
     # Timers
     { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_apb_clk_en().bit(enable).systimer_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_rst_en().bit(reset));" }, keep_enabled = true },
     { name = "Timg0", template_params = { default_clk_en_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_rst_en().bit(reset));" }, keep_enabled = true },
