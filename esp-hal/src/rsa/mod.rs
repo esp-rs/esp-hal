@@ -1166,11 +1166,14 @@ impl RsaContext {
     ///     let mut d = [0_u32; U512::LIMBS * 2 + 1];
     ///     d[d.len() - 1] = 1;
     ///     let d = Uint::from_words(d);
-    ///     d.const_rem(&modulus.resize()).0.resize()
+    ///     d.wrapping_rem_vartime(&modulus.resize()).resize()
     /// }
     ///
     /// const fn compute_mprime(modulus: &U512) -> u32 {
-    ///     let m_inv = modulus.inv_mod2k(32).to_words()[0];
+    ///     let m_inv = modulus
+    ///         .invert_mod2k(32)
+    ///         .expect_copied("modulus must be odd")
+    ///         .to_words()[0];
     ///     (-1 * m_inv as i64 & (u32::MAX as i64)) as u32
     /// }
     ///

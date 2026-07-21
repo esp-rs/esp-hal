@@ -69,7 +69,7 @@ use esp_hal::{
     time::Instant,
 };
 use esp_println::{print, println};
-use hmac::{Hmac as HmacSw, Mac, SimpleHmac};
+use hmac::{Hmac as HmacSw, KeyInit, Mac, SimpleHmac};
 use nb::block;
 use sha2::Sha256;
 
