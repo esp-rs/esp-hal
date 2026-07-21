@@ -411,8 +411,6 @@ driver_configs![
             /// Digital GPIO register-layout generation derived from the chip SVD.
             version: u32,
             #[serde(default)]
-            has_bank_1: bool,
-            #[serde(default)]
             has_input_sync: bool,
             gpio_function: u32,
             constant_0_input: u32,
