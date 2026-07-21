@@ -374,7 +374,6 @@ pub enum RtcFunction {
 #[instability::unstable]
 pub trait RtcPin: Pin {
     /// RTC number of the pin
-    #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
@@ -2229,7 +2228,6 @@ macro_rules! for_each_rtcio_output_pin {
 }
 
 impl RtcPin for AnyPin<'_> {
-    #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8 {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_number(&target) };
