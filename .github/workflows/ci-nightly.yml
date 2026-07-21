@@ -35,16 +35,17 @@ jobs:
             "esp32c61",
             "esp32h2",
             "esp32p4",
+            "esp32s31",
           ]
     steps:
       - uses: actions/checkout@v6
 
       # Install the Rust nightly toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-nightly
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           components: rust-src, clippy, rustfmt
+          alias: "true"
 
       - name: Build and Check
         shell: bash

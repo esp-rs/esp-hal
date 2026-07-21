@@ -1102,18 +1102,18 @@ macro_rules! for_each_sha_algorithm {
 macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((Ext0, 0));
-        _for_each_inner_wakeup_source!((Ext1, 1)); _for_each_inner_wakeup_source!((Gpio,
-        2)); _for_each_inner_wakeup_source!((WifiBeacon, 3));
+        tt) => {} } _for_each_inner_wakeup_source!((Ext1, 1));
+        _for_each_inner_wakeup_source!((Gpio, 2));
+        _for_each_inner_wakeup_source!((WifiBeacon, 3));
         _for_each_inner_wakeup_source!((Timer, 4)); _for_each_inner_wakeup_source!((Wifi,
         5)); _for_each_inner_wakeup_source!((Uart0, 6));
         _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
         8)); _for_each_inner_wakeup_source!((Bt, 10));
         _for_each_inner_wakeup_source!((LpCore, 11));
         _for_each_inner_wakeup_source!((Usb, 14));
-        _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (WifiBeacon,
-        3), (Timer, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore,
-        11), (Usb, 14)));
+        _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3), (Timer,
+        4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11), (Usb,
+        14)));
     };
 }
 #[macro_export]

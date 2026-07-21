@@ -74,6 +74,16 @@ pub struct ChangelogPreviewArgs {
     /// Maximum number of PRs to fetch (newest first).
     #[arg(long, default_value_t = 500)]
     pub limit: u32,
+
+    /// Only include PRs merged into this base branch (GitHub `base:` qualifier).
+    ///
+    /// Backport PRs are merged into a release branch (e.g. `esp-hal-1.1.x`),
+    /// while regular development lands on `main`. Without this filter the harvest
+    /// would pull entries from every branch, so backport changelogs would leak
+    /// into the next `main` release and all `main` PRs would leak into a patch
+    /// release. Pass `--base esp-hal-1.1.x` when previewing a backport release.
+    #[arg(long, default_value = "main")]
+    pub base: String,
 }
 
 /// Migration guide entries: `(area, pr_number, guide_text)`.
@@ -85,19 +95,25 @@ pub(crate) type MigrationEntries = BTreeMap<String, Vec<(Option<String>, u64, St
 /// - Merged changelog entries keyed by crate name.
 /// - Migration guide entries keyed by crate name.
 ///
+/// `base` restricts the harvest to PRs merged into that branch (see
+/// [`ChangelogPreviewArgs::base`]); pass the branch the release is cut from
+/// (`main` for regular releases, the backport branch for patch releases) so
+/// changelogs cannot leak across release lines.
+///
 /// Requires the `gh` CLI to be installed and authenticated.
 pub(crate) fn collect_changelogs(
     workspace: &Path,
     since_ref: &str,
     limit: u32,
+    base: &str,
 ) -> Result<(BTreeMap<String, Changelog>, MigrationEntries)> {
-    log::info!("Collecting PRs merged since `{since_ref}`…");
+    log::info!("Collecting PRs merged into `{base}` since `{since_ref}`…");
 
     let baseline = ref_to_baseline(workspace, since_ref)?;
     // Fetch with >= (inclusive date) to cast a wide enough net, then trim
     // precisely client-side so PRs merged later on the same day as the
     // baseline ref are not excluded.
-    let prs = list_merged_prs(&baseline.date, limit)?;
+    let prs = list_merged_prs(&baseline.date, limit, base)?;
     let prs: Vec<GhPr> = prs
         .into_iter()
         .filter(|pr| {
@@ -185,7 +201,7 @@ pub fn changelog_preview(workspace: &Path, args: ChangelogPreviewArgs) -> Result
         None => latest_tag(workspace)?,
     };
 
-    let (changelogs, migrations) = collect_changelogs(workspace, &since, args.limit)?;
+    let (changelogs, migrations) = collect_changelogs(workspace, &since, args.limit, &args.base)?;
 
     if changelogs.is_empty() && migrations.is_empty() {
         println!("(No changelog entries found.)");
@@ -276,8 +292,11 @@ fn latest_tag(workspace: &Path) -> Result<String> {
 /// `since_date` is a `YYYY-MM-DD` string used with `merged:>=` (inclusive) as
 /// a coarse server-side filter. The caller is responsible for precise
 /// client-side filtering using the exact `mergedAt` timestamp.
-fn list_merged_prs(since_date: &str, limit: u32) -> Result<Vec<GhPr>> {
-    let search = format!("repo:{UPSTREAM_REPO} is:pr is:merged merged:>={since_date}");
+///
+/// `base` is applied as a `base:<branch>` qualifier so only PRs merged into
+/// that branch are returned, keeping backport and `main` changelogs separate.
+fn list_merged_prs(since_date: &str, limit: u32, base: &str) -> Result<Vec<GhPr>> {
+    let search = merged_pr_query(since_date, base);
 
     let output = Command::new("gh")
         .args([
@@ -305,4 +324,31 @@ fn list_merged_prs(since_date: &str, limit: u32) -> Result<Vec<GhPr>> {
     }
 
     serde_json::from_slice(&output.stdout).context("Failed to parse `gh pr list` output")
+}
+
+/// Build the GitHub search query used to list merged PRs for the harvest.
+///
+/// The `base:<branch>` qualifier scopes the results to a single release line so
+/// backport PRs (merged into e.g. `esp-hal-1.1.x`) and regular PRs (merged into
+/// `main`) never appear in each other's changelog.
+fn merged_pr_query(since_date: &str, base: &str) -> String {
+    format!("repo:{UPSTREAM_REPO} is:pr is:merged merged:>={since_date} base:{base}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn query_scopes_to_base_branch() {
+        // A `main` release must not see backport branches, and vice versa.
+        let main = merged_pr_query("2026-04-24", "main");
+        assert!(main.contains("base:main"));
+        assert!(main.contains("merged:>=2026-04-24"));
+        assert!(!main.contains("base:esp-hal-1.1.x"));
+
+        let backport = merged_pr_query("2026-05-07", "esp-hal-1.1.x");
+        assert!(backport.contains("base:esp-hal-1.1.x"));
+        assert!(!backport.contains("base:main"));
+    }
 }
