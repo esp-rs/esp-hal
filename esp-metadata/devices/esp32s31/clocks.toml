@@ -99,6 +99,7 @@ peripheral_clocks = { templates = [
     { name = "Uart3", template_params = { default_clk_en_template = "{{control}}::regs().uart3_ctrl0().modify(|_, w| w.uart3_sys_clk_en().bit(enable).uart3_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart3_ctrl0().modify(|_, w| w.uart3_core_rst_en().bit(reset).uart3_apb_rst_en().bit(reset));" } },
     { name = "Spi2", template_params = { default_clk_en_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_sys_clk_en().bit(enable).gpspi2_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_rst_en().bit(reset));" } },
     { name = "I2c0", template_params = { default_clk_en_template = "{{control}}::regs().i2c0_ctrl0().modify(|_, w| w.i2c0_apb_clk_en().bit(enable).i2c0_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().i2c0_ctrl0().modify(|_, w| w.i2c0_rst_en().bit(reset));" } },
+    { name = "I2c1", template_params = { default_clk_en_template = "{{control}}::regs().i2c1_ctrl0().modify(|_, w| w.i2c1_apb_clk_en().bit(enable).i2c1_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().i2c1_ctrl0().modify(|_, w| w.i2c1_rst_en().bit(reset));" } },
     # USB
     { name = "UsbHs",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_reg = "usb_otghs_ctrl0", sys_field = "usb_otghs_sys", apb_field = "usb_otghs_apb" } },
     # Timers

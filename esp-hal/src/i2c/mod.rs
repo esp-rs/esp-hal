@@ -30,9 +30,10 @@ crate::unstable_module! {
 #[cfg_attr(i2c_master_version = "1", path = "clocks/v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "clocks/v2.rs")]
 #[cfg_attr(
-    all(i2c_master_version = "3", not(any(esp32p4, soc_has_pcr))),
+    all(i2c_master_version = "3", not(any(esp32p4, esp32s31, soc_has_pcr))),
     path = "clocks/v3.rs"
 )]
 #[cfg_attr(esp32p4, path = "clocks/esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "clocks/esp32s31.rs")]
 #[cfg_attr(soc_has_pcr, path = "clocks/v3_pcr.rs")]
 mod clocks;
