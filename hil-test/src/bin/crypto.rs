@@ -1,8 +1,11 @@
 //! Crypto hardware tests
 
+// Only build on chips that expose at least one crypto driver; otherwise every
+// module below is `cfg`-ed out and the binary has no test harness (and thus no
+// panic handler), which fails to link.
 // ESP32 has no AES-DMA, no point in setting up PSRAM
-//% CHIP_FILTER(psram):    dma_can_access_psram
-//% CHIP_FILTER(no_psram): !dma_can_access_psram
+//% CHIP_FILTER(psram):    dma_can_access_psram && (aes_driver_supported || ecc_driver_supported || rsa_driver_supported || sha_driver_supported || rng_driver_supported)
+//% CHIP_FILTER(no_psram): !dma_can_access_psram && (aes_driver_supported || ecc_driver_supported || rsa_driver_supported || sha_driver_supported || rng_driver_supported)
 
 //% FEATURES: unstable esp-alloc/nightly
 

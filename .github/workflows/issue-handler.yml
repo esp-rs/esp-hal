@@ -21,7 +21,7 @@ jobs:
               [/low power/i, "Area: low power"],
               [/\bbug\b/i, "bug"],
 
-              [/\besp32(?![-_ ]?(?:c2|c3|c5|c6|c61|h2|p4|s2|s3)\b)\b/i, "chip:esp32"],
+              [/\besp32(?![-_ ]?(?:c2|c3|c5|c6|c61|h2|p4|s2|s3|s31)\b)\b/i, "chip:esp32"],
               [/\besp32[-_ ]?c2\b/i, "chip:esp32c2"],
               [/\besp32[-_ ]?c3\b/i, "chip:esp32c3"],
               [/\besp32[-_ ]?c5\b/i, "chip:esp32c5"],
@@ -31,6 +31,7 @@ jobs:
               [/\besp32[-_ ]?p4\b/i, "chip:esp32p4"],
               [/\besp32[-_ ]?s2\b/i, "chip:esp32s2"],
               [/\besp32[-_ ]?s3\b/i, "chip:esp32s3"],
+              [/\besp32[-_ ]?s31\b/i, "chip:esp32s31"],
 
               [/\bci\b/i, "ci"],
               [/documentation/i, "documentation"],
