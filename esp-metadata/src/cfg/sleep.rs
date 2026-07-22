@@ -1,3 +1,4 @@
+use convert_case::{Boundary, Case, Casing};
 use indexmap::IndexMap;
 use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,30 @@ pub(crate) struct WakeupSources {
 /// `esp-hal`. The `all` branch yields one `(variant, bit)` pair per source this
 /// chip supports; the variant documentation is supplied by `esp-hal`.
 impl super::GenericProperty for WakeupSources {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let mut sources = vec![];
+
+        let mut uart_seen = false;
+        for name in self.sources.keys() {
+            if name.starts_with("Uart") {
+                if !uart_seen {
+                    uart_seen = true;
+                    sources.push("sleep_has_wakeup_source_uart".to_string());
+                }
+                continue;
+            }
+
+            sources.push(format!(
+                "sleep_has_wakeup_source_{}",
+                name.from_case(Case::Pascal)
+                    .without_boundaries(&Boundary::digits())
+                    .to_case(Case::Snake)
+            ));
+        }
+
+        Some(sources)
+    }
+
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let sources = self
             .sources

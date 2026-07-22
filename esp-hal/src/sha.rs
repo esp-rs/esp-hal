@@ -84,8 +84,6 @@
 //! # {after_snippet}
 //! ```
 
-#![allow(deprecated, reason = "generic_array 0.14 has been deprecated")]
-
 use core::{
     borrow::BorrowMut,
     convert::Infallible,
@@ -553,7 +551,7 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     const DIGEST_LENGTH: usize;
 
     #[doc(hidden)]
-    type DigestOutputSize: digest::generic_array::ArrayLength<u8> + 'static;
+    type DigestOutputSize: digest::array::ArraySize + 'static;
 }
 
 /// Note: digest has a blanket trait implementation for [digest::Digest] for any
@@ -1277,19 +1275,19 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
         match hasher {
             SoftwareHasher::Sha1(sha) => {
                 let output = sha.finalize_reset();
-                result.copy_from_slice(output.as_slice())
+                result.copy_from_slice(output.as_ref())
             }
             SoftwareHasher::Sha256(sha) => {
                 let output = sha.finalize_reset();
-                result.copy_from_slice(output.as_slice())
+                result.copy_from_slice(output.as_ref())
             }
             SoftwareHasher::Sha384(sha) => {
                 let output = sha.finalize_reset();
-                result.copy_from_slice(output.as_slice())
+                result.copy_from_slice(output.as_ref())
             }
             SoftwareHasher::Sha512(sha) => {
                 let output = sha.finalize_reset();
-                result.copy_from_slice(output.as_slice())
+                result.copy_from_slice(output.as_ref())
             }
         }
     }
@@ -1427,7 +1425,7 @@ macro_rules! impl_worker_context {
             }
         }
 
-        impl digest::core_api::BlockSizeUser for $name {
+        impl digest::block_api::BlockSizeUser for $name {
             type BlockSize = paste::paste!(digest::consts::[< U $block_size >]);
 
             fn block_size() -> usize {

@@ -202,11 +202,11 @@ jobs:
           toolchain: stable
           components: rust-src
       # Install the Rust nightly toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-nightly
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           components: rust-src
+          alias: "true"
 
       - name: Build Xtensa docs
         if: matrix.group == 'xtensa'
@@ -350,10 +350,10 @@ jobs:
       - uses: actions/checkout@v6
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
       # release channel, MIRI is only available in nightly
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-nightly
         with:
-          toolchain: nightly
           components: rustfmt,miri
+          alias: "true"
 
       # Run xtask tests
       - name: Run xtask tests
@@ -490,11 +490,11 @@ jobs:
           default: true
           version: 1.97.0.0
 
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-nightly
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
           components: rust-src
+          alias: "true"
 
       - name: Build hil-test tests
         run: |

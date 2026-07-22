@@ -85,9 +85,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(2)
     };
-    ("gpio.has_bank_1") => {
-        true
-    };
     ("gpio.has_input_sync") => {
         true
     };
@@ -117,6 +114,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        true
     };
     ("gpio.input_signal_max") => {
         242
@@ -937,13 +937,13 @@ macro_rules! for_each_wakeup_source {
         2)); _for_each_inner_wakeup_source!((Timer, 3));
         _for_each_inner_wakeup_source!((Wifi, 5)); _for_each_inner_wakeup_source!((Uart0,
         6)); _for_each_inner_wakeup_source!((Uart1, 7));
-        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Ulp,
-        9)); _for_each_inner_wakeup_source!((UlpRiscv, 11));
+        _for_each_inner_wakeup_source!((Touch, 8));
+        _for_each_inner_wakeup_source!((UlpRiscv, 11));
         _for_each_inner_wakeup_source!((UlpRiscvTrap, 13));
         _for_each_inner_wakeup_source!((Usb, 15));
         _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (Timer, 3),
-        (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (Ulp, 9), (UlpRiscv, 11),
-        (UlpRiscvTrap, 13), (Usb, 15)));
+        (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (UlpRiscv, 11), (UlpRiscvTrap,
+        13), (Usb, 15)));
     };
 }
 #[macro_export]

@@ -6,6 +6,10 @@ use crate::{
 for_each_lp_function! {
     (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident) => {
         impl RtcPin for crate::peripherals::$gpio<'_> {
+            fn rtc_number(&self) -> u8 {
+                $lp_pin
+            }
+
             unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                 LP_GPIO::regs().pin($lp_pin).modify(|_, w| unsafe {
                     w.int_type().bits(level);

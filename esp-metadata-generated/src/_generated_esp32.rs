@@ -79,9 +79,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(1)
     };
-    ("gpio.has_bank_1") => {
-        true
-    };
     ("gpio.has_input_sync") => {
         false
     };
@@ -111,6 +108,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        true
     };
     ("gpio.input_signal_max") => {
         206
