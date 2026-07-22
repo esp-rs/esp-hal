@@ -20,6 +20,7 @@ has_md5_mbedtls = true
 
 [device.soc]
 cpu_has_csr_pc = true
+cpu_mcause_mask = 0x1f
 has_swd_watchdog = true
 
 memory_map = { ranges = [

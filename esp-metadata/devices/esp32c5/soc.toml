@@ -22,6 +22,7 @@ has_md5_bsd = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
+cpu_mcause_mask = 0x1f
 
 has_swd_watchdog = true
 

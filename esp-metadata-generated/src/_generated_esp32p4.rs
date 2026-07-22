@@ -346,6 +346,12 @@ macro_rules! property {
     ("soc.has_swd_watchdog") => {
         true
     };
+    ("soc.cpu_mcause_mask") => {
+        63
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(63)
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };

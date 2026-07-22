@@ -376,6 +376,12 @@ macro_rules! property {
     ("soc.has_swd_watchdog") => {
         false
     };
+    ("soc.cpu_mcause_mask") => {
+        0
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(0)
+    };
     ("clock_tree.syscon_pre_div.divisor") => {
         (0, 1023)
     };

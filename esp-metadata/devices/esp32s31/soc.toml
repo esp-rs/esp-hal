@@ -23,6 +23,8 @@ multi_core_enabled = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
+cpu_mcause_mask = 0x3f
+
 has_swd_watchdog = true
 
 # SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
