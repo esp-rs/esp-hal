@@ -37,6 +37,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 cpu_has_branch_predictor = true
 multi_core_enabled = true
 cpu_has_csr_pc = false
+cpu_mcause_mask = 0x3f
 internal_memory_cached = true
 
 has_swd_watchdog = true

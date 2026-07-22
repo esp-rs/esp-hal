@@ -47,11 +47,8 @@ pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
     let mepc = riscv::register::mepc::read();
-    let code = riscv::register::mcause::read().code();
+    let code = riscv::register::mcause::read().bits() & property!("soc.cpu_mcause_mask");
     let mtval = riscv::register::mtval::read();
-
-    #[cfg(any(esp32p4, esp32s31))]
-    let code = code & 0x3F;
 
     unsafe extern "C" {
         static mut __stack_chk_guard: u32;
