@@ -50,7 +50,7 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
     let code = riscv::register::mcause::read().code();
     let mtval = riscv::register::mtval::read();
 
-    #[cfg(esp32p4)]
+    #[cfg(any(esp32p4, esp32s31))]
     let code = code & 0x3F;
 
     unsafe extern "C" {
