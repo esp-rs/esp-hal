@@ -79,9 +79,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(1)
     };
-    ("gpio.has_bank_1") => {
-        true
-    };
     ("gpio.has_input_sync") => {
         false
     };
@@ -111,6 +108,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        true
     };
     ("gpio.input_signal_max") => {
         206
@@ -376,6 +376,12 @@ macro_rules! property {
     ("soc.has_swd_watchdog") => {
         false
     };
+    ("soc.cpu_mcause_mask") => {
+        0
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(0)
+    };
     ("clock_tree.syscon_pre_div.divisor") => {
         (0, 1023)
     };
@@ -452,9 +458,6 @@ macro_rules! property {
         false
     };
     ("uart.has_sclk_enable") => {
-        false
-    };
-    ("uhci.combined_uart_selector_field") => {
         false
     };
     ("wifi.has_wifi6") => {
@@ -4059,12 +4062,14 @@ macro_rules! for_each_i2s {
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
-        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS,
-        U2RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
+        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((2, UART2, Uart2,
+        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = false));
+        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true), (1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS,
+        wakeup_source = true), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS,
+        wakeup_source = false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

@@ -1,107 +1,15 @@
 use core::ops::Not;
 
 use crate::{
-    gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::{LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
         Rtc,
-        WakeupSource,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
-        sleep::{
-            Ext1WakeupSource,
-            WakeSource,
-            WakeTriggers,
-            WakeupLevel,
-            pmu_common::SleepTimeConfig,
-        },
+        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
     },
     soc::clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig, LpSlowClkConfig},
 };
-
-impl Ext1WakeupSource<'_, '_> {
-    /// Returns the currently configured wakeup pins.
-    fn wakeup_pins() -> u8 {
-        LP_AON::regs()
-            .ext_wakeup_cntl()
-            .read()
-            .ext_wakeup_sel()
-            .bits()
-    }
-
-    /// Resets the pins that had been configured as wakeup trigger to their default state.
-    fn wake_io_reset() {
-        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
-            if wakeup_pins & (1 << pin.rtc_number()) != 0 {
-                pin.rtcio_pad_hold(false);
-                pin.degrade().init_gpio();
-            }
-        }
-
-        let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        for_each_lp_function! {
-            (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
-                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
-            };
-        }
-    }
-}
-
-impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.insert(WakeupSource::Ext1);
-
-        // ext1_wakeup_prepare
-        let mut pins = self.pins.borrow_mut();
-        let mut pin_mask = 0u8;
-        let mut level_mask = 0u8;
-        for (pin, level) in pins.iter_mut() {
-            pin_mask |= 1 << pin.rtc_number();
-            level_mask |= match level {
-                WakeupLevel::High => 1 << pin.rtc_number(),
-                WakeupLevel::Low => 0,
-            };
-
-            pin.rtcio_pad_hold(true);
-            Input::new(
-                unsafe { AnyPin::steal(pin.number()) },
-                InputConfig::default().with_pull(match level {
-                    WakeupLevel::High => Pull::Down,
-                    WakeupLevel::Low => Pull::Up,
-                }),
-            );
-        }
-
-        // clear previous wakeup status
-        LP_AON::regs()
-            .ext_wakeup_cntl()
-            .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-
-        // set pin + level register fields
-        LP_AON::regs().ext_wakeup_cntl().modify(|r, w| unsafe {
-            w.ext_wakeup_sel()
-                .bits(r.ext_wakeup_sel().bits() | pin_mask);
-            w.ext_wakeup_lv()
-                .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
-        });
-    }
-}
-
-impl Drop for Ext1WakeupSource<'_, '_> {
-    fn drop(&mut self) {
-        // reset GPIOs to default state
-        let mut pins = self.pins.borrow_mut();
-        for (pin, _level) in pins.iter_mut() {
-            pin.rtcio_pad_hold(false);
-            unsafe { AnyPin::steal(pin.number()) }.init_gpio();
-        }
-    }
-}
 
 /// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]

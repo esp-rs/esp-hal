@@ -100,9 +100,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(2)
     };
-    ("gpio.has_bank_1") => {
-        true
-    };
     ("gpio.has_input_sync") => {
         true
     };
@@ -132,6 +129,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        true
     };
     ("gpio.input_signal_max") => {
         255
@@ -402,6 +402,12 @@ macro_rules! property {
     };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.cpu_mcause_mask") => {
+        0
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(0)
     };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)
@@ -1164,13 +1170,12 @@ macro_rules! for_each_wakeup_source {
         _for_each_inner_wakeup_source!((Sdio, 4)); _for_each_inner_wakeup_source!((Wifi,
         5)); _for_each_inner_wakeup_source!((Uart0, 6));
         _for_each_inner_wakeup_source!((Uart1, 7));
-        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Ulp,
-        9)); _for_each_inner_wakeup_source!((Bt, 10));
-        _for_each_inner_wakeup_source!((UlpRiscv, 11));
+        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Bt,
+        10)); _for_each_inner_wakeup_source!((UlpRiscv, 11));
         _for_each_inner_wakeup_source!((UlpRiscvTrap, 13));
         _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (Timer, 3),
-        (Sdio, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (Ulp, 9), (Bt, 10),
-        (UlpRiscv, 11), (UlpRiscvTrap, 13)));
+        (Sdio, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (Bt, 10), (UlpRiscv,
+        11), (UlpRiscvTrap, 13)));
     };
 }
 #[macro_export]
@@ -4429,12 +4434,14 @@ macro_rules! for_each_i2s {
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
-        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS,
-        U2RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
+        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((2, UART2, Uart2,
+        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = false));
+        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true), (1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS,
+        wakeup_source = true), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS,
+        wakeup_source = false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

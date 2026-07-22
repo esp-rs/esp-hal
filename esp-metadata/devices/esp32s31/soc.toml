@@ -1,0 +1,157 @@
+# ESP32-S31 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32s31"
+arch   = "riscv"
+target = "riscv32imafc-unknown-none-elf"
+cores  = 2
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf"
+trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
+
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
+
+[device.soc]
+multi_core_enabled = true
+cpu_has_branch_predictor = true
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
+cpu_mcause_mask = 0x3f
+
+has_swd_watchdog = true
+
+# SRAM_START = 0x2F000000, SRAM_SEG_END = 0x2F07AFC0 (from esp-idf ld.hp_mem_defs)
+# dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
+# SOC_ROM_STACK_START = 0x2F07CFB0 (from soc.h)
+memory_map = { ranges = [
+    { name = "dram", start = 0x2F00_0000, end = 0x2F07_AFC0 },
+    { name = "dram2_uninit", start = 0x2F07_AFC0, end = 0x2F07_CFB0 },
+] }
+
+peripherals = [
+    { name = "ASSIST_DEBUG" },
+    { name = "CACHE" },
+    { name = "CLIC" },
+    { name = "CNNT_SYS" },
+    { name = "EFUSE" },
+    { name = "GPIO" },
+    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "HP_APM" },
+    { name = "HP_MEM_APM" },
+    { name = "HP_SYS" },
+    { name = "HP_ALIVE_SYS" },
+    { name = "HP_SYS_CLKRST" },
+    { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTERRUPT_CORE1" },
+    { name = "IO_MUX" },
+    { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
+    { name = "LP_APM" },
+    { name = "LP_PERI", pac = "LP_PERICLKRST" },
+    { name = "LP_SYS" },
+    { name = "LP_TEE" },
+    { name = "LP_WDT" },
+    { name = "LPWR", pac = "PMU" },
+    { name = "MEM_MONITOR", pac = "MEM_MONITOR0" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    { name = "PAU" },
+    { name = "PMU" },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
+    { name = "RNG", pac = "TRNG" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
+    { name = "SYSTEM", pac = "HP_SYS" },
+    { name = "SYSTIMER" },
+    { name = "TEE" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
+    { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
+    { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
+    { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
+    { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART", stable = true },
+    { name = "USB_DEVICE" },
+    { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
+
+    { name = "FLASH", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "CPU_CTRL", virtual = true },
+]
+
+[device.soc.clocks]
+# {include clocks.toml}
+
+[device.interrupts]
+support_status = "partial"
+# 169 interrupt sources => ceil(169/32) = 6 status words
+status_registers = 6
+software_interrupt_count = 4
+controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
+rc_fast_calibration = { divider = 50, min_rev = 0 }
+
+[device.gpio]
+support_status = "supported"
+# {include gpio.toml}
+
+[device.io_mux]
+
+[device.uart]
+support_status = "not_supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+    { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
+    { name = "uart3", sys_instance = "Uart3", tx = "U3TXD", rx = "U3RXD", cts = "U3CTS", rts = "U3RTS" },
+]
+ram_size = 128
+version = 2
+peripheral_controls_mem_clk = true
+has_sclk_enable = true
+
+[device.systimer]
+
+[device.lp_timer]
+
+[device.assist_debug]
+support_status = "not_supported"
+has_sp_monitor = false
+has_region_monitor = true
+
+[device.rng]
+support_status = "not_supported"
+trng_supported = false  # TODO
+apb_cycle_wait_num = 16 # TODO
+is_lp_sys = false
+
+[device.sleep]
+support_status = "not_supported"
+light_sleep = true
+deep_sleep = true
+wakeup_sources = {
+    LpCore = 0,
+    Gpio = 2,
+    Usb = 3,
+    Uart1 = 7,
+    Uart0 = 8,
+    Ext1 = 12,
+    Timer = 13,
+    Wifi = 22,
+    WifiBeacon = 23,
+    Bt = 25,
+}
+
+[device.usb_otg_hs]
+fifo_depth_words = 896

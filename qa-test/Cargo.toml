@@ -34,7 +34,7 @@ esp-storage = { path = "../esp-storage", optional = true }
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
 static_cell = "2.1.1"
-sdio = "0.4"
+sdio = "0.5"
 block-device-adapters = "0.2.0"
 embedded-fatfs = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
@@ -136,6 +136,15 @@ esp32s3 = [
     "esp-println/esp32s3",
     "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
+]
+esp32s31 = [
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-println/esp32s31",
+    # "esp-radio?/esp32s31",
+    "esp-storage?/esp32s31",
 ]
 
 rtos-trace = ["esp-rtos/rtos-trace", "dep:rtos-trace"]

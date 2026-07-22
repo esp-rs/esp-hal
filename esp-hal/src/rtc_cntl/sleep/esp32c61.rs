@@ -6,7 +6,7 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{WakeTriggers, pmu_common::SleepTimeConfig},
+        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
     },
     soc::clocks::{self, ClockTree, HpRootClkConfig, LpSlowClkConfig},
 };
@@ -723,10 +723,7 @@ impl RtcSleepConfig {
     }
 
     fn wake_io_reset() {
-        // loosely based on esp_deep_sleep_wakeup_io_reset
-        //
-        // ESP32-C5 does not yet expose the RTC IO pin abstraction in esp-hal, so
-        // there are no EXT1 wakeup pins to reset here.
+        Ext1WakeupSource::wake_io_reset();
     }
 
     /// Finalize power-down flags, apply configuration based on the flags.

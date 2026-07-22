@@ -115,9 +115,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(2)
     };
-    ("gpio.has_bank_1") => {
-        false
-    };
     ("gpio.has_input_sync") => {
         true
     };
@@ -147,6 +144,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        false
     };
     ("gpio.input_signal_max") => {
         124
@@ -290,7 +290,7 @@ macro_rules! property {
         stringify!(16)
     };
     ("lp_io.version") => {
-        "esp32c6"
+        "v4"
     };
     ("lp_uart.ram_size") => {
         32
@@ -411,6 +411,12 @@ macro_rules! property {
     };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.cpu_mcause_mask") => {
+        31
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(31)
     };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
@@ -1102,18 +1108,18 @@ macro_rules! for_each_sha_algorithm {
 macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((Ext0, 0));
-        _for_each_inner_wakeup_source!((Ext1, 1)); _for_each_inner_wakeup_source!((Gpio,
-        2)); _for_each_inner_wakeup_source!((WifiBeacon, 3));
+        tt) => {} } _for_each_inner_wakeup_source!((Ext1, 1));
+        _for_each_inner_wakeup_source!((Gpio, 2));
+        _for_each_inner_wakeup_source!((WifiBeacon, 3));
         _for_each_inner_wakeup_source!((Timer, 4)); _for_each_inner_wakeup_source!((Wifi,
         5)); _for_each_inner_wakeup_source!((Uart0, 6));
         _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
         8)); _for_each_inner_wakeup_source!((Bt, 10));
         _for_each_inner_wakeup_source!((LpCore, 11));
         _for_each_inner_wakeup_source!((Usb, 14));
-        _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (WifiBeacon,
-        3), (Timer, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore,
-        11), (Usb, 14)));
+        _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3), (Timer,
+        4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11), (Usb,
+        14)));
     };
 }
 #[macro_export]
@@ -5096,10 +5102,11 @@ macro_rules! for_each_i2s {
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
-        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
+        wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
+        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((all(0, UART0, Uart0,
+        U0RXD, U0TXD, U0CTS, U0RTS, wakeup_source = true), (1, UART1, Uart1, U1RXD,
+        U1TXD, U1CTS, U1RTS, wakeup_source = true)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

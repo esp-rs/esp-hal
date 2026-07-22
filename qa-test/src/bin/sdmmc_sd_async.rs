@@ -3,7 +3,9 @@
 //! Initializes an SD card through the `sdio` crate's `MmcBus` integration, mounts
 //! the first FAT partition (or a superfloppy volume), then performs a
 //! non-destructive create/update/read/delete cycle on a test-owned file that is
-//! assumed not to exist. No raw blocks are overwritten.
+//! assumed not to exist. The cycle includes a multi-block payload so both the
+//! single-block (CMD24/CMD17) and multi-block (CMD25/CMD18, with auto-stop)
+//! transfer paths are written and read back. No raw blocks are overwritten.
 //!
 //! Pins:
 //!
@@ -53,6 +55,18 @@ const INPUT_DELAY_PHASE: DelayPhase = DelayPhase::_0;
 const TEST_FILE: &str = "ESPQA.TXT";
 const MSG_CREATE: &[u8] = b"esp-hal sdmmc async create\n";
 const MSG_UPDATE: &[u8] = b"esp-hal sdmmc async update (longer payload)\n";
+
+/// Length of the multi-block payload. Spans several 512-byte blocks so the
+/// write and read take the multi-block path (CMD25 / CMD18), which appends an
+/// auto-stop (CMD12) the single-block path does not.
+const MULTIBLOCK_LEN: usize = 2048;
+
+/// Deterministic, position-dependent byte for the multi-block payload. The
+/// prime modulus keeps the pattern from lining up with 512-byte block
+/// boundaries, so a dropped or mis-ordered block is caught on read-back.
+const fn pattern_byte(i: usize) -> u8 {
+    (i % 251) as u8
+}
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
@@ -144,46 +158,92 @@ async fn fat_crud<IO: ReadWriteSeek>(io: IO) {
     }
 }
 
-/// Creates, reads, updates and deletes [`TEST_FILE`]; returns whether the
-/// round-tripped contents matched.
+/// Creates, reads, updates and deletes [`TEST_FILE`]; returns whether every
+/// round-tripped payload (single- and multi-block) matched.
 async fn fat_crud_inner<IO: ReadWriteSeek>(
     io: IO,
 ) -> Result<bool, embedded_fatfs::Error<IO::Error>> {
     let fs = FileSystem::new(io, FsOptions::new()).await?;
     let ok = {
         let root = fs.root_dir();
-        let mut buf = [0u8; 64];
 
-        // Create + write.
+        println!("Single-block create");
         let mut f = root.create_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_CREATE).await?;
         f.flush().await?;
         drop(f);
+        let created_ok = verify(root.open_file(TEST_FILE).await?, MSG_CREATE.len(), |i| {
+            MSG_CREATE[i]
+        })
+        .await?;
+        println!("Single-block create: OK");
 
-        // Read back the created content.
-        let mut f = root.open_file(TEST_FILE).await?;
-        f.read_exact(&mut buf[..MSG_CREATE.len()]).await?;
-        let created_ok = &buf[..MSG_CREATE.len()] == MSG_CREATE;
-        drop(f);
-
-        // Update: truncate and rewrite with a different payload.
+        println!("Single-block update");
         let mut f = root.open_file(TEST_FILE).await?;
         f.truncate().await?;
         f.write_all(MSG_UPDATE).await?;
         f.flush().await?;
         drop(f);
+        let updated_ok = verify(root.open_file(TEST_FILE).await?, MSG_UPDATE.len(), |i| {
+            MSG_UPDATE[i]
+        })
+        .await?;
+        println!("Single-block update: OK");
 
-        // Read back the updated content.
+        println!("Multi-block update");
+        let mut payload = [0u8; MULTIBLOCK_LEN];
+        for (i, b) in payload.iter_mut().enumerate() {
+            *b = pattern_byte(i);
+        }
         let mut f = root.open_file(TEST_FILE).await?;
-        f.read_exact(&mut buf[..MSG_UPDATE.len()]).await?;
-        let updated_ok = &buf[..MSG_UPDATE.len()] == MSG_UPDATE;
+        f.truncate().await?;
+        f.write_all(&payload).await?;
+        f.flush().await?;
         drop(f);
+        let multiblock_ok = verify(
+            root.open_file(TEST_FILE).await?,
+            MULTIBLOCK_LEN,
+            pattern_byte,
+        )
+        .await?;
+        println!("Multi-block update: OK");
 
-        // Delete, leaving the card as we found it.
+        println!("Delete file");
         root.remove(TEST_FILE).await?;
-        created_ok && updated_ok
+        created_ok && updated_ok && multiblock_ok
     };
     fs.unmount().await?;
     Ok(ok)
+}
+
+/// Reads exactly `len` bytes from `r` in chunks and checks each against
+/// `expected(offset)`. Returns `Ok(false)` on any mismatch or a short read
+/// (premature EOF), so it doubles as the multi-block read-back check.
+async fn verify<R: Read>(
+    mut r: R,
+    len: usize,
+    expected: impl Fn(usize) -> u8,
+) -> Result<bool, R::Error> {
+    let mut buf = [0u8; 64];
+    let mut off = 0;
+    while off < len {
+        let want = (len - off).min(buf.len());
+        let mut got = 0;
+        while got < want {
+            match r.read(&mut buf[got..want]).await? {
+                0 => return Ok(false),
+                n => got += n,
+            }
+        }
+        if buf[..want]
+            .iter()
+            .enumerate()
+            .any(|(i, &b)| b != expected(off + i))
+        {
+            return Ok(false);
+        }
+        off += want;
+    }
+    Ok(true)
 }

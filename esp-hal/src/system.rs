@@ -1,5 +1,7 @@
 //! # System Control
 
+#![cfg_attr(esp32s31, allow(dead_code))]
+
 use esp_sync::NonReentrantMutex;
 
 cfg_select! {
@@ -339,7 +341,7 @@ use crate::rtc_cntl::SocResetReason;
 #[inline]
 pub fn software_reset() -> ! {
     let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
-    #[cfg(esp32p4)]
+    #[cfg(any(esp32p4, esp32s31))]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
 }
@@ -421,6 +423,7 @@ pub fn reset_reason() -> Option<SocResetReason> {
 ///
 /// Returns the [`WakeupReason`][crate::rtc_cntl::WakeupReason] describing the source(s) that ended
 /// the most recent sleep. The result is empty if the chip was not woken from sleep.
+#[cfg(sleep_driver_supported)]
 #[instability::unstable]
 #[inline]
 pub fn wakeup_cause() -> crate::rtc_cntl::WakeupReason {

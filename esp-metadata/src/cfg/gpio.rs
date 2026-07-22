@@ -331,8 +331,10 @@ impl super::GpioProperties {
             .filter_map(|s| s.id)
             .max()
             .unwrap_or(0) as u32;
+        let has_bank_1 = self.pins_and_signals.pins.len() > 32;
 
         [
+            ("gpio.has_bank_1", false, Value::Boolean(has_bank_1)),
             ("gpio.input_signal_max", false, Value::Number(input_max)),
             ("gpio.output_signal_max", false, Value::Number(output_max)),
         ]

@@ -58,12 +58,6 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         false
     };
-    ("assist_debug.has_sp_monitor") => {
-        false
-    };
-    ("assist_debug.has_region_monitor") => {
-        false
-    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -103,9 +97,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(3)
     };
-    ("gpio.has_bank_1") => {
-        true
-    };
     ("gpio.has_input_sync") => {
         true
     };
@@ -135,6 +126,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(1)
+    };
+    ("gpio.has_bank_1") => {
+        true
     };
     ("gpio.input_signal_max") => {
         203
@@ -259,32 +253,8 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
-    ("ledc.version") => {
-        2
-    };
-    ("ledc.version", str) => {
-        stringify!(2)
-    };
-    ("ledc.channel_count") => {
-        8
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(8)
-    };
-    ("lp_i2c_master.fifo_size") => {
-        32
-    };
-    ("lp_i2c_master.fifo_size", str) => {
-        stringify!(32)
-    };
     ("lp_io.version") => {
         "esp32p4"
-    };
-    ("lp_uart.ram_size") => {
-        32
-    };
-    ("lp_uart.ram_size", str) => {
-        stringify!(32)
     };
     ("psram.octal_spi") => {
         false
@@ -376,6 +346,12 @@ macro_rules! property {
     ("soc.has_swd_watchdog") => {
         true
     };
+    ("soc.cpu_mcause_mask") => {
+        63
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(63)
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };
@@ -437,7 +413,7 @@ macro_rules! property {
         false
     };
     ("timergroup.timg_has_timer1") => {
-        false
+        true
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
@@ -461,9 +437,6 @@ macro_rules! property {
         false
     };
     ("uart.has_sclk_enable") => {
-        false
-    };
-    ("uhci.combined_uart_selector_field") => {
         false
     };
     ("usb_otg.fifo_depth_words") => {
@@ -1193,13 +1166,17 @@ macro_rules! for_each_wakeup_source {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_wakeup_source!((Sdio, 0));
         _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Usb,
-        3)); _for_each_inner_wakeup_source!((Uart1, 7));
+        3)); _for_each_inner_wakeup_source!((Uart4, 4));
+        _for_each_inner_wakeup_source!((Uart3, 5));
+        _for_each_inner_wakeup_source!((Uart2, 6));
+        _for_each_inner_wakeup_source!((Uart1, 7));
         _for_each_inner_wakeup_source!((Uart0, 8));
         _for_each_inner_wakeup_source!((Touch, 11));
         _for_each_inner_wakeup_source!((Ext1, 12));
         _for_each_inner_wakeup_source!((Timer, 13));
-        _for_each_inner_wakeup_source!((all(Sdio, 0), (Gpio, 2), (Usb, 3), (Uart1, 7),
-        (Uart0, 8), (Touch, 11), (Ext1, 12), (Timer, 13)));
+        _for_each_inner_wakeup_source!((all(Sdio, 0), (Gpio, 2), (Usb, 3), (Uart4, 4),
+        (Uart3, 5), (Uart2, 6), (Uart1, 7), (Uart0, 8), (Touch, 11), (Ext1, 12), (Timer,
+        13)));
     };
 }
 #[macro_export]
@@ -4831,16 +4808,19 @@ macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
         } _for_each_inner_uart!((0, UART0, Uart0, UART0_RXD, UART0_TXD, UART0_CTS,
-        UART0_RTS)); _for_each_inner_uart!((1, UART1, Uart1, UART1_RXD, UART1_TXD,
-        UART1_CTS, UART1_RTS)); _for_each_inner_uart!((2, UART2, Uart2, UART2_RXD,
-        UART2_TXD, UART2_CTS, UART2_RTS)); _for_each_inner_uart!((3, UART3, Uart3,
-        UART3_RXD, UART3_TXD, UART3_CTS, UART3_RTS)); _for_each_inner_uart!((4, UART4,
-        Uart4, UART4_RXD, UART4_TXD, UART4_CTS, UART4_RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, UART0_RXD, UART0_TXD, UART0_CTS,
-        UART0_RTS), (1, UART1, Uart1, UART1_RXD, UART1_TXD, UART1_CTS, UART1_RTS), (2,
-        UART2, Uart2, UART2_RXD, UART2_TXD, UART2_CTS, UART2_RTS), (3, UART3, Uart3,
-        UART3_RXD, UART3_TXD, UART3_CTS, UART3_RTS), (4, UART4, Uart4, UART4_RXD,
-        UART4_TXD, UART4_CTS, UART4_RTS)));
+        UART0_RTS, wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1,
+        UART1_RXD, UART1_TXD, UART1_CTS, UART1_RTS, wakeup_source = true));
+        _for_each_inner_uart!((2, UART2, Uart2, UART2_RXD, UART2_TXD, UART2_CTS,
+        UART2_RTS, wakeup_source = true)); _for_each_inner_uart!((3, UART3, Uart3,
+        UART3_RXD, UART3_TXD, UART3_CTS, UART3_RTS, wakeup_source = true));
+        _for_each_inner_uart!((4, UART4, Uart4, UART4_RXD, UART4_TXD, UART4_CTS,
+        UART4_RTS, wakeup_source = true)); _for_each_inner_uart!((all(0, UART0, Uart0,
+        UART0_RXD, UART0_TXD, UART0_CTS, UART0_RTS, wakeup_source = true), (1, UART1,
+        Uart1, UART1_RXD, UART1_TXD, UART1_CTS, UART1_RTS, wakeup_source = true), (2,
+        UART2, Uart2, UART2_RXD, UART2_TXD, UART2_CTS, UART2_RTS, wakeup_source = true),
+        (3, UART3, Uart3, UART3_RXD, UART3_TXD, UART3_CTS, UART3_RTS, wakeup_source =
+        true), (4, UART4, Uart4, UART4_RXD, UART4_TXD, UART4_CTS, UART4_RTS,
+        wakeup_source = true)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.

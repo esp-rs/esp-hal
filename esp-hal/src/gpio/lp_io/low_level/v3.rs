@@ -8,6 +8,10 @@ for_each_lp_function! {
         paste::paste! {
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             impl RtcPin for crate::peripherals::$gpio<'_> {
+                fn rtc_number(&self) -> u8 {
+                    $pin
+                }
+
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let gpio_wakeup = cfg_select! {
                         esp32c2 => LPWR::regs().cntl_gpio_wakeup(),

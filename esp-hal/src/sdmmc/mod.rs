@@ -53,7 +53,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::{
         DmaBufError,
-        aligned::{DmaAlignedMut, InternalMemory},
+        aligned::{DmaAlignedMut, DmaAlignedRef, InternalMemory},
     },
     gpio::{
         InputSignal,
@@ -635,9 +635,10 @@ impl EngineSession {
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
-        self.issue_data_command(slot, index, arg, write, block_count)?;
+        let auto_stop = needs_auto_stop(index, block_count);
+        self.issue_data_command(slot, index, arg, write, auto_stop)?;
 
-        let result = run_data_phase(&mut t, ring, write, needs_auto_stop(index, block_count));
+        let result = run_data_phase(&mut t, ring, write, auto_stop);
 
         disable_idmac();
         r.rintsts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
@@ -680,7 +681,7 @@ impl EngineSession {
         index: u8,
         arg: u32,
         write: bool,
-        block_count: u32,
+        auto_stop: bool,
     ) -> Result<(), Error> {
         let r = SDHOST::regs();
         r.cmdarg().write(|w| unsafe { w.bits(arg) });
@@ -690,7 +691,7 @@ impl EngineSession {
             w.check_response_crc().set_bit();
             w.data_expected().set_bit();
             w.read_write().bit(write);
-            w.send_auto_stop().bit(needs_auto_stop(index, block_count));
+            w.send_auto_stop().bit(auto_stop);
             w.wait_prvdata_complete().set_bit();
             w.use_hole().set_bit();
             w.card_number().bits(slot.index());
@@ -735,7 +736,7 @@ impl EngineSession {
         write: bool,
         mut t: Transfer,
         block_size: u16,
-        block_count: u32,
+        auto_stop: bool,
     ) -> Result<[u32; 4], Error> {
         let guard = DropGuard::new((), |()| abort_transfer());
         let r = SDHOST::regs();
@@ -752,12 +753,12 @@ impl EngineSession {
         enable_idmac(ring.as_ptr() as u32);
         r.pldmnd().write(|w| unsafe { w.bits(1) });
 
-        arm_transfer(true, needs_auto_stop(index, block_count), Some(t));
+        arm_transfer(true, auto_stop, Some(t));
         r.idinten().write(|w| unsafe { w.bits(IDINTEN_ALL) });
         r.intmask()
             .write(|w| unsafe { w.bits(idle_intmask() | INTMASK_DATA) });
 
-        self.issue_data_command(slot, index, arg, write, block_count)?;
+        self.issue_data_command(slot, index, arg, write, auto_stop)?;
         wait_result().await?;
         if write {
             wait_busy_async().await?;
@@ -775,7 +776,7 @@ impl EngineSession {
         arg: u32,
         buf: &mut [u8],
         block_size: u16,
-        block_count: u32,
+        auto_stop: bool,
     ) -> Result<[u32; 4], MmcError> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         if let Some(split) = bounce::Bounce::split(buf) {
@@ -785,7 +786,7 @@ impl EngineSession {
                 .map_err(MmcError::from)?;
 
             let resp = self
-                .transfer_async(slot, index, arg, false, transfer, block_size, block_count)
+                .transfer_async(slot, index, arg, false, transfer, block_size, auto_stop)
                 .await?;
 
             self.bounce.read_finish(buf, split);
@@ -803,7 +804,7 @@ impl EngineSession {
                 false,
                 Transfer::single(ptr, total),
                 block_size,
-                block_count,
+                auto_stop,
             )
             .await?;
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
@@ -818,7 +819,7 @@ impl EngineSession {
         arg: u32,
         buf: &[u8],
         block_size: u16,
-        block_count: u32,
+        auto_stop: bool,
     ) -> Result<[u32; 4], MmcError> {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         if let Some(split) = bounce::Bounce::split(buf) {
@@ -828,20 +829,29 @@ impl EngineSession {
                 .map_err(MmcError::from)?;
 
             return Ok(self
-                .transfer_async(slot, index, arg, true, transfer, block_size, block_count)
+                .transfer_async(slot, index, arg, true, transfer, block_size, auto_stop)
                 .await?);
         }
 
-        let ptr = dma_ptr_from_raw(buf.as_ptr())?;
+        let dma = DmaAlignedRef::new(buf)?;
+
+        // Flush the caller's buffer before the IDMAC reads it, else stale
+        // memory is written to the card. Reached only when `Bounce::split`
+        // returned `None`, so `buf` is region-aligned in address and length.
+        #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+        dma.writeback();
+
+        let total = dma.len();
+        let ptr = dma_ptr_ref(dma)?;
         Ok(self
             .transfer_async(
                 slot,
                 index,
                 arg,
                 true,
-                Transfer::single(ptr, buf.len()),
+                Transfer::single(ptr, total),
                 block_size,
-                block_count,
+                auto_stop,
             )
             .await?)
     }
@@ -1835,28 +1845,36 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         self.cmd_async(&mut session, cmd).await
     }
 
-    async fn read_blocks<'a, C>(&mut self, mut cmd: C) -> Result<C::Resp<'a>, MmcError>
+    async fn read_blocks<'a, C>(
+        &mut self,
+        mut cmd: C,
+        auto_stop: bool,
+    ) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::BlockReadCommand + 'a,
     {
         let mut session = lock_engine(slot_id(S)).await?;
         let slot = slot_id(S);
-        let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
+        let (bs, arg) = (cmd.block_size().len() as u16, cmd.arg());
         let words = session
-            .read_async(slot, C::INDEX, arg, cmd.buf(), bs, bc)
+            .read_async(slot, C::INDEX, arg, cmd.buf(), bs, auto_stop)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
 
-    async fn write_blocks<'a, C>(&mut self, cmd: C) -> Result<C::Resp<'a>, MmcError>
+    async fn write_blocks<'a, C>(
+        &mut self,
+        cmd: C,
+        auto_stop: bool,
+    ) -> Result<C::Resp<'a>, MmcError>
     where
         C: sdio::BlockWriteCommand + 'a,
     {
         let mut session = lock_engine(slot_id(S)).await?;
         let slot = slot_id(S);
-        let (bs, bc, arg) = (cmd.block_size().len() as u16, cmd.block_count(), cmd.arg());
+        let (bs, arg) = (cmd.block_size().len() as u16, cmd.arg());
         let words = session
-            .write_async(slot, C::INDEX, arg, cmd.buf(), bs, bc)
+            .write_async(slot, C::INDEX, arg, cmd.buf(), bs, auto_stop)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1869,7 +1887,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let slot = slot_id(S);
         let (n, arg) = (cmd.byte_count(), cmd.arg());
         let words = session
-            .read_async(slot, C::INDEX, arg, cmd.buf(), n as u16, 1)
+            .read_async(slot, C::INDEX, arg, cmd.buf(), n as u16, false)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1882,7 +1900,7 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
         let slot = slot_id(S);
         let (n, arg) = (cmd.byte_count(), cmd.arg());
         let words = session
-            .write_async(slot, C::INDEX, arg, cmd.buf(), n as u16, 1)
+            .write_async(slot, C::INDEX, arg, cmd.buf(), n as u16, false)
             .await?;
         Ok(<C::Resp<'a> as sdio::Response>::from_words(&words))
     }
@@ -1916,6 +1934,10 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
 
     fn supports_mmc(&self) -> bool {
         // Native parallel SD/MMC host (not SPI mode).
+        true
+    }
+
+    fn supports_auto_stop(&self) -> bool {
         true
     }
 
@@ -2128,6 +2150,13 @@ fn wait_busy_cleared() -> Result<(), Error> {
 ///
 /// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
 fn dma_ptr(buf: DmaAlignedMut<'_, [u8]>) -> Result<u32, Error> {
+    dma_ptr_from_raw(buf.as_ptr())
+}
+
+/// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
+///
+/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
+fn dma_ptr_ref(buf: DmaAlignedRef<'_, [u8]>) -> Result<u32, Error> {
     dma_ptr_from_raw(buf.as_ptr())
 }
 

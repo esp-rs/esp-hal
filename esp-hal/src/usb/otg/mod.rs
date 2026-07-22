@@ -8,21 +8,43 @@
         cfg(esp32p4) => "GPIO27",
     },
 ))]
-//! USB On-The-Go (Synopsys DWC) — full-speed (`USB_FS`) and high-speed (`USB_HS`).
+//! USB On-The-Go
 //!
 //! `embassy-usb` / `embassy-usb-host` integration: [`embassy_usb_device`], [`embassy_usb_host`].
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::usb::otg::{Usb, embassy_usb_device};
-//!
-//! let usb = Usb::new_fs(
-//!     peripherals.USB_FS,
-//!     peripherals.__dp_pin__,
-//!     peripherals.__dm_pin__,
-//! );
-//! # {after_snippet}
-//! ```
+#![cfg_attr(
+    usb_otg_driver_supported,
+    doc = r#"
+
+## Example: Full-Speed USB
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::usb::otg::{Usb, embassy_usb_device};
+
+let usb = Usb::new_fs(
+    peripherals.USB_FS,
+    peripherals.__dp_pin__,
+    peripherals.__dm_pin__,
+);
+# {after_snippet}
+```
+"#
+)]
+#![cfg_attr(
+    usb_otg_hs_driver_supported,
+    doc = r#"
+
+## Example: High-Speed USB
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::usb::otg::{Usb, embassy_usb_device};
+
+let usb = Usb::new_hs(peripherals.USB_HS);
+# {after_snippet}
+```
+"#
+)]
 
 use embassy_usb_synopsys_otg::{
     PhyType,
@@ -34,16 +56,23 @@ use embassy_usb_synopsys_otg::{
 };
 use procmacros::handler;
 
-#[cfg(usb_otg_driver_supported)]
-use crate::peripherals::USB_FS;
 #[cfg(usb_otg_hs_driver_supported)]
 use crate::peripherals::USB_HS;
+#[cfg(usb_otg_driver_supported)]
 use crate::{
     gpio::{InputSignal, Level},
+    peripherals::{self, USB_FS},
+};
+use crate::{
     interrupt::{InterruptHandler, Priority},
-    peripherals,
     system::{Peripheral, PeripheralGuard},
 };
+
+#[cfg_attr(esp32s2, path = "ll/esp32s2.rs")]
+#[cfg_attr(esp32s3, path = "ll/esp32s3.rs")]
+#[cfg_attr(esp32p4, path = "ll/esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "ll/esp32s31.rs")]
+mod ll;
 
 pub(crate) enum AnyUsb<'d> {
     #[cfg(usb_otg_driver_supported)]
@@ -70,7 +99,7 @@ impl AnyUsb<'_> {
 }
 
 #[cfg(usb_otg_driver_supported)]
-pub mod fs_pins;
+mod fs_pins;
 #[cfg(usb_otg_driver_supported)]
 pub use fs_pins::{UsbFsDm, UsbFsDp};
 
@@ -131,24 +160,7 @@ impl<'d> USB_FS<'d> {
         }
 
         fn common_init() {
-            #[cfg(esp32p4)]
-            {
-                use crate::RegisterToggle;
-
-                peripherals::LP_AON_CLKRST::regs()
-                    .lp_aonclkrst_hp_usb_clkrst_ctrl0()
-                    .modify(|_, w| w.lp_aonclkrst_usb_otg11_48m_clk_en().set_bit());
-
-                peripherals::LP_AON_CLKRST::regs()
-                    .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-                    .toggle(|w, en| w.lp_aonclkrst_rst_en_usb_otg11().bit(en));
-            }
-
-            #[cfg(esp32s3)]
-            peripherals::LPWR::regs().usb_conf().modify(|_, w| {
-                w.sw_hw_usb_phy_sel().set_bit();
-                w.sw_usb_phy_sel().set_bit()
-            });
+            ll::fs_common_init();
 
             peripherals::USB_WRAP::regs().otg_conf().modify(|_, w| {
                 w.usb_pad_enable().set_bit();
@@ -244,59 +256,6 @@ impl<'d> USB_HS<'d> {
             unsafe { on_host_interrupt(Otg::from_ptr(USB_HS::PTR.cast_mut().cast::<()>()), &state) }
         }
 
-        #[cfg(esp32p4)]
-        fn p4_hs_init() {
-            use crate::RegisterToggle;
-
-            peripherals::LP_AON_CLKRST::regs()
-                .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-                .modify(|_, w| w.lp_aonclkrst_usb_otg20_phyref_clk_en().set_bit());
-
-            peripherals::LP_AON_CLKRST::regs()
-                .lp_aonclkrst_hp_usb_clkrst_ctrl1()
-                .toggle(|w, en| {
-                    w.lp_aonclkrst_rst_en_usb_otg20().bit(en);
-                    w.lp_aonclkrst_rst_en_usb_otg20_phy().bit(en);
-                    w
-                });
-
-            peripherals::HP_SYS::regs()
-                .usbotg20_ctrl()
-                .modify(|_, w| w.otg_suspendm().set_bit());
-
-            const USB_UTMI: usize = 0x5009C000;
-            let fc_06 = (USB_UTMI as *mut u32).wrapping_add(6);
-            let bits = unsafe { fc_06.read_volatile() };
-            unsafe { fc_06.write_volatile(bits | (1 << 3) | (1 << 0)) };
-        }
-
-        #[cfg(esp32p4)]
-        fn connect_hs_pulldowns(connect: bool) {
-            peripherals::LP_SYS::regs()
-                .hp_usb_otghs_phy_ctrl()
-                .modify(|_, w| {
-                    w.hp_utmiotg_dppulldown().bit(connect);
-                    w.hp_utmiotg_dmpulldown().bit(connect);
-                    w
-                });
-        }
-
-        fn hs_enable_device_mode() {
-            #[cfg(esp32p4)]
-            {
-                p4_hs_init();
-                connect_hs_pulldowns(false);
-            }
-        }
-
-        fn hs_enable_host_mode() {
-            #[cfg(esp32p4)]
-            {
-                p4_hs_init();
-                connect_hs_pulldowns(true);
-            }
-        }
-
         static INFO: UsbOtgInfo = UsbOtgInfo {
             register_ptr: USB_HS::PTR.cast(),
             peripheral: Peripheral::UsbHs,
@@ -305,8 +264,8 @@ impl<'d> USB_HS<'d> {
             rx_fifo_extra_words: 31,
             device_interrupt: otg_hs_device_interrupt,
             host_interrupt: otg_hs_host_interrupt,
-            enable_device_mode: hs_enable_device_mode,
-            enable_host_mode: hs_enable_host_mode,
+            enable_device_mode: ll::hs_enable_device_mode,
+            enable_host_mode: ll::hs_enable_host_mode,
             platform_bus_disable_on_drop: || {},
         };
 

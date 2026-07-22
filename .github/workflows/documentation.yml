@@ -180,13 +180,14 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     steps:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          targets: riscv32imac-unknown-none-elf
       - uses: actions/checkout@v6
         with:
           repository: esp-rs/esp-hal
+      - uses: ./.github/actions/setup-nightly
+        with:
+          targets: riscv32imac-unknown-none-elf
+          components: ""
+          alias: "true"
 
       - name: Install cargo-docs-rs
         run: cargo install cargo-docs-rs --locked

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial support for ESP32-P4 (#5523, #5535)
+- Add ESP32-S31 support (#5922)
 
 ### Changed
 

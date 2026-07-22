@@ -14,7 +14,7 @@
 //!
 //! Use the UART port for this example - USB Serial/JTAG will break when the device enters sleep.
 
-//% CHIP_FILTER: sleep_light_sleep
+//% CHIP_FILTER: sleep_driver_supported && sleep_light_sleep
 
 #![no_std]
 #![no_main]
