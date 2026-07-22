@@ -97,6 +97,7 @@ fn main() -> ! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
         feature = "esp32c5" => peripherals.GPIO28,
         feature = "esp32p4" => peripherals.GPIO35,
+        feature = "esp32s31" => peripherals.GPIO61,
         _ => peripherals.GPIO9,
     };
 
