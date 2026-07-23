@@ -220,6 +220,9 @@ options:
   - name: enable-pmp
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"
     default:
+      # TODO - investigate why it's not working correctly
+      - value: false
+        if: "esp32s31"
       - value: true
     active: "riscv && !esp32c2 && !esp32c3"
 

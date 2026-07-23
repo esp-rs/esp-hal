@@ -1,14 +1,14 @@
-//! D+ / D- pin configuration for full-speed USB OTG (analog pad drive strength).
+//! D+ / D- pin configuration for full-speed USB OTG.
 
 use crate::{gpio::Pin, peripherals::IO_MUX};
 
-/// USB D+ (data plus) pin for full-speed OTG.
+/// USB D+ pin for full-speed OTG.
 pub trait UsbFsDp: crate::private::Sealed {
     #[doc(hidden)]
     fn configure(&self);
 }
 
-/// USB D- (data minus) pin for full-speed OTG.
+/// USB D- pin for full-speed OTG.
 pub trait UsbFsDm: crate::private::Sealed {
     #[doc(hidden)]
     fn configure(&self);

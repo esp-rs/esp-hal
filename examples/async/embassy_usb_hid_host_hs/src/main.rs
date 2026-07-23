@@ -5,7 +5,7 @@
 //! Connect a mouse or keyboard to the USB port, and it will log raw HID input reports to the
 //! console.
 //!
-//! The example uses the HS USB port of the ESP32-P4.
+//! The example uses the HS USB port of the ESP32-P4 and ESP32-S31.
 //! This port uses dedicated pins, not GPIOs.
 
 //% CHIP_FILTER: usb_otg_hs_driver_supported

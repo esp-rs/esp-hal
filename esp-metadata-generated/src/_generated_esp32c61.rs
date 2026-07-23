@@ -109,9 +109,6 @@ macro_rules! property {
     ("gpio.version", str) => {
         stringify!(2)
     };
-    ("gpio.has_bank_1") => {
-        false
-    };
     ("gpio.has_input_sync") => {
         true
     };
@@ -141,6 +138,9 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.has_bank_1") => {
+        false
     };
     ("gpio.input_signal_max") => {
         100
@@ -330,6 +330,12 @@ macro_rules! property {
     };
     ("soc.has_swd_watchdog") => {
         true
+    };
+    ("soc.cpu_mcause_mask") => {
+        31
+    };
+    ("soc.cpu_mcause_mask", str) => {
+        stringify!(31)
     };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)

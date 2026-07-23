@@ -413,8 +413,6 @@ driver_configs![
             /// Digital GPIO register-layout generation derived from the chip SVD.
             version: u32,
             #[serde(default)]
-            has_bank_1: bool,
-            #[serde(default)]
             has_input_sync: bool,
             gpio_function: u32,
             constant_0_input: u32,
@@ -741,6 +739,8 @@ driver_configs![
             internal_memory_cached: bool,
             #[serde(default)]
             has_swd_watchdog: bool,
+            #[serde(default)]
+            cpu_mcause_mask: u32,
             #[serde(flatten)]
             config: SocConfig,
         }

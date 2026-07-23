@@ -53,6 +53,9 @@ pub struct AccessPointConfig {
     #[builder_lite(reference)]
     pub(crate) password: String,
     /// The maximum number of connections allowed on the access point.
+    /// When set, this number can be clipped to a true upper limit because
+    /// ESPNow and access point connections share a common pool of hardware
+    /// encryption keys.
     #[builder_lite(unstable)]
     pub(crate) max_connections: u16,
     /// Dtim period of the access point (Range: 1 ~ 10).
