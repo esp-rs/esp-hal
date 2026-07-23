@@ -26,9 +26,11 @@ use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, DriveMode, Flex, Input, Pin},
     ledc::{
+        LSGlobalClkSource,
+        Ledc,
+        LowSpeed,
         channel::{self, ChannelIFace},
         timer::{self, TimerIFace},
-        LSGlobalClkSource, Ledc, LowSpeed,
     },
     peripherals::LEDC,
     time::{Instant, Rate},
@@ -88,7 +90,12 @@ fn average_period_us(input: &Input<'_>, edges: usize) -> u32 {
 
 /// Configure a LowSpeed timer+channel at `frequency` (50% duty) on `test_pin` and
 /// assert the measured output period matches, within `PERIOD_TOLERANCE_PERCENT`.
-fn assert_output_frequency(ledc: LEDC<'static>, test_pin: AnyPin<'static>, delay: Delay, frequency: Rate) {
+fn assert_output_frequency(
+    ledc: LEDC<'static>,
+    test_pin: AnyPin<'static>,
+    delay: Delay,
+    frequency: Rate,
+) {
     let pin = Flex::new(test_pin);
     // SAFETY: the output half is driven only by LEDC and the input half is only sampled.
     let (input, output) = unsafe { pin.split_into_drivers() };
