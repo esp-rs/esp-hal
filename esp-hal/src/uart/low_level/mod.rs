@@ -533,7 +533,14 @@ impl Info {
         Ok(())
     }
 
-    #[cfg(uart_has_sclk_enable)]
+    #[cfg(all(uart_has_sclk_enable, esp32s31))]
+    pub(super) fn set_at_cmd_clock_enabled(&self, enabled: bool) {
+        self.regs()
+            .clk_conf()
+            .modify(|_, w| w.rx_sclk_en().bit(enabled));
+    }
+
+    #[cfg(all(uart_has_sclk_enable, not(esp32s31)))]
     pub(super) fn set_at_cmd_clock_enabled(&self, enabled: bool) {
         self.regs()
             .clk_conf()
