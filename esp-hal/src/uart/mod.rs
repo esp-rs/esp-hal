@@ -50,6 +50,7 @@ crate::unstable_driver! {
 #[cfg_attr(uart_version = "1", path = "clocks/v1.rs")]
 #[cfg_attr(soc_has_pcr, path = "clocks/v2_pcr.rs")]
 #[cfg_attr(esp32p4, path = "clocks/v2_esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "clocks/v2_esp32s31.rs")]
 mod clocks;
 
 mod compat;

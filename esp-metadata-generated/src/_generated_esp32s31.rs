@@ -187,6 +187,27 @@ macro_rules! property {
     ("timergroup.rc_fast_calibration_tick_enable") => {
         false
     };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("uart.version") => {
+        2
+    };
+    ("uart.version", str) => {
+        stringify!(2)
+    };
+    ("uart.peripheral_controls_mem_clk") => {
+        true
+    };
+    ("uart.has_sclk_divider") => {
+        false
+    };
+    ("uart.has_sclk_enable") => {
+        true
+    };
     ("usb_otg_hs.fifo_depth_words") => {
         896
     };
@@ -495,10 +516,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // APB_CLK
 ///
-/// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_apb_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<ApbClkConfig>,
@@ -639,6 +656,21 @@ macro_rules! for_each_sw_interrupt {
 ///         _clocks: &mut ClockTree,
 ///         _old_config: Option<UartBaudRateGeneratorConfig>,
 ///         _new_config: UartBaudRateGeneratorConfig,
+///     ) {
+///         todo!()
+///     }
+///
+///     // UART_MEM_CLOCK
+///
+///     fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_mem_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<UartMemClockConfig>,
+///         _new_config: UartMemClockConfig,
 ///     ) {
 ///         todo!()
 ///     }
@@ -975,6 +1007,18 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
+        /// Configures the `UART0_MEM_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = APB_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct UartMemClockConfig {}
+        impl UartMemClockConfig {
+            /// Creates a new configuration for the MEM_CLOCK clock node.
+            pub const fn new() -> Self {
+                Self {}
+            }
+        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             bbpll_clk: Option<BbpllClkConfig>,
@@ -992,6 +1036,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 4],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 4],
+            uart_mem_clock: [Option<UartMemClockConfig>; 4],
             bbpll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
             xtal32k_clk_refcount: u32,
@@ -1001,7 +1046,6 @@ macro_rules! define_clock_tree_types {
             pll_f120m_refcount: u32,
             pll_f160m_refcount: u32,
             xtal_d2_clk_refcount: u32,
-            apb_clk_refcount: u32,
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
@@ -1011,6 +1055,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 4],
             uart_baud_rate_generator_refcount: [u32; 4],
+            uart_mem_clock_refcount: [u32; 4],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -1085,6 +1130,10 @@ macro_rules! define_clock_tree_types {
             pub fn uart0_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart0 as usize]
             }
+            /// Returns the current configuration of the UART0_MEM_CLOCK clock tree node
+            pub fn uart0_mem_clock(&self) -> Option<UartMemClockConfig> {
+                self.uart_mem_clock[UartInstance::Uart0 as usize]
+            }
             /// Returns the current configuration of the UART1_FUNCTION_CLOCK clock tree node
             pub fn uart1_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart1 as usize]
@@ -1092,6 +1141,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the UART1_BAUD_RATE_GENERATOR clock tree node
             pub fn uart1_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart1 as usize]
+            }
+            /// Returns the current configuration of the UART1_MEM_CLOCK clock tree node
+            pub fn uart1_mem_clock(&self) -> Option<UartMemClockConfig> {
+                self.uart_mem_clock[UartInstance::Uart1 as usize]
             }
             /// Returns the current configuration of the UART2_FUNCTION_CLOCK clock tree node
             pub fn uart2_function_clock(&self) -> Option<UartFunctionClockConfig> {
@@ -1101,6 +1154,10 @@ macro_rules! define_clock_tree_types {
             pub fn uart2_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart2 as usize]
             }
+            /// Returns the current configuration of the UART2_MEM_CLOCK clock tree node
+            pub fn uart2_mem_clock(&self) -> Option<UartMemClockConfig> {
+                self.uart_mem_clock[UartInstance::Uart2 as usize]
+            }
             /// Returns the current configuration of the UART3_FUNCTION_CLOCK clock tree node
             pub fn uart3_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart3 as usize]
@@ -1108,6 +1165,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the UART3_BAUD_RATE_GENERATOR clock tree node
             pub fn uart3_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart3 as usize]
+            }
+            /// Returns the current configuration of the UART3_MEM_CLOCK clock tree node
+            pub fn uart3_mem_clock(&self) -> Option<UartMemClockConfig> {
+                self.uart_mem_clock[UartInstance::Uart3 as usize]
             }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
@@ -1127,6 +1188,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 4],
                 uart_baud_rate_generator: [None; 4],
+                uart_mem_clock: [None; 4],
                 bbpll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 xtal32k_clk_refcount: 0,
@@ -1136,7 +1198,6 @@ macro_rules! define_clock_tree_types {
                 pll_f120m_refcount: 0,
                 pll_f160m_refcount: 0,
                 xtal_d2_clk_refcount: 0,
-                apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
@@ -1146,6 +1207,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 4],
                 uart_baud_rate_generator_refcount: [0; 4],
+                uart_mem_clock_refcount: [0; 4],
             });
         static BBPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -1560,22 +1622,8 @@ macro_rules! define_clock_tree_types {
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk
         }
-        pub fn request_apb_clk(clocks: &mut ClockTree) {
-            trace!("Requesting APB_CLK");
-            if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                request_ahb_clk(clocks);
-                enable_apb_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_apb_clk(clocks: &mut ClockTree) {
-            trace!("Releasing APB_CLK");
-            if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
-                enable_apb_clk_impl(clocks, false);
-                release_ahb_clk(clocks);
-            }
-        }
+        fn request_apb_clk(_clocks: &mut ClockTree) {}
+        fn release_apb_clk(_clocks: &mut ClockTree) {}
         #[allow(unused_variables)]
         pub fn apb_clk_config_frequency(clocks: &mut ClockTree, config: ApbClkConfig) -> u32 {
             (ahb_clk_frequency() / (config.divisor() + 1))
@@ -2231,6 +2279,43 @@ macro_rules! define_clock_tree_types {
                 UART_BAUD_RATE_GENERATOR_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
+            pub fn configure_mem_clock(self, clocks: &mut ClockTree, config: UartMemClockConfig) {
+                let old_config = clocks.uart_mem_clock[self as usize].replace(config);
+                refresh_uart_mem_clock_downstream(clocks, self);
+                self.configure_mem_clock_impl(clocks, old_config, config);
+            }
+            pub fn mem_clock_config(self, clocks: &mut ClockTree) -> Option<UartMemClockConfig> {
+                clocks.uart_mem_clock[self as usize]
+            }
+            pub fn request_mem_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::MEM_CLOCK", self);
+                if increment_reference_count(&mut clocks.uart_mem_clock_refcount[self as usize]) {
+                    trace!("Enabling {:?}::MEM_CLOCK", self);
+                    request_apb_clk(clocks);
+                    self.enable_mem_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_mem_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::MEM_CLOCK", self);
+                if decrement_reference_count(&mut clocks.uart_mem_clock_refcount[self as usize]) {
+                    trace!("Disabling {:?}::MEM_CLOCK", self);
+                    self.enable_mem_clock_impl(clocks, false);
+                    release_apb_clk(clocks);
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn mem_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: UartMemClockConfig,
+            ) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn mem_clock_frequency(self) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn mem_clock_source_frequency() -> u32 {
+                apb_clk_frequency()
+            }
         }
         /// Clock tree configuration.
         ///
@@ -2370,6 +2455,14 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            for child_instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+                UartInstance::Uart3,
+            ] {
+                refresh_uart_mem_clock_downstream(clocks, child_instance);
+            }
         }
         fn refresh_lp_fast_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.lp_fast_clk {
@@ -2447,6 +2540,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
     };
 }
 /// Implement the `Peripheral` enum and enable/disable/reset functions.

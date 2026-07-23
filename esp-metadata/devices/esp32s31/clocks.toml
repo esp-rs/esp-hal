@@ -29,7 +29,8 @@ system_clocks = { clock_tree = [
 
     { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
     { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },
-    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)" },
+    # APB is a core system bus and must not be released with a peripheral clock.
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true },
 
     # LP clocks
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -54,6 +55,7 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+        { name = "MEM_CLOCK", type = "generic", output = "APB_CLK" },
     ] },
     { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
