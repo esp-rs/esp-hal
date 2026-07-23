@@ -992,13 +992,13 @@ macro_rules! define_clock_tree_types {
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SpiFunctionClockConfig {
+            /// Selects `BBPLL_CLK`.
+            Bbpll,
             #[default]
             /// Selects `XTAL_CLK`.
             Xtal,
             /// Selects `RC_FAST_CLK`.
             RcFast,
-            /// Selects `BBPLL_CLK`.
-            Bbpll,
         }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2008,16 +2008,16 @@ macro_rules! define_clock_tree_types {
                 refresh_spi_function_clock_downstream(clocks, self);
                 if clocks.spi_function_clock_refcount[self as usize] > 0 {
                     match new_selector {
+                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
                     }
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                     if let Some(old_selector) = old_selector {
                         match old_selector {
+                            SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
                             SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                             SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                            SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
                         }
                     }
                 } else {
@@ -2036,9 +2036,9 @@ macro_rules! define_clock_tree_types {
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
                     }
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -2050,9 +2050,9 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
+                        SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
                     }
                 }
             }
@@ -2062,9 +2062,9 @@ macro_rules! define_clock_tree_types {
                 config: SpiFunctionClockConfig,
             ) -> u32 {
                 match config {
+                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
-                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
                 }
             }
             pub fn function_clock_frequency(self) -> u32 {
@@ -2073,9 +2073,9 @@ macro_rules! define_clock_tree_types {
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
                 match source {
+                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
-                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
                 }
             }
         }

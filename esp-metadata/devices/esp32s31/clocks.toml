@@ -69,8 +69,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "BBPLL",   outputs = "BBPLL_CLK", default = true },
-            { name = "XTAL",    outputs = "XTAL_CLK" },
+            { name = "BBPLL",   outputs = "BBPLL_CLK" },
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ] },
     ] },
