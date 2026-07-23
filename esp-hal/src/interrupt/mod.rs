@@ -431,33 +431,15 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
 pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
     match core {
         Cpu::ProCpu => {
-            cfg_select! {
-                esp32s31 => {
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_map(interrupt as usize)
-                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
-                }
-                _ => {
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_map(interrupt as usize)
-                        .write(|w| unsafe { w.bits(cpu_interrupt) });
-                }
-            }
+            INTERRUPT_CORE0::regs()
+                .core_0_intr_map(interrupt as usize)
+                .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
         }
         #[cfg(multi_core)]
         Cpu::AppCpu => {
-            cfg_select! {
-                esp32s31 => {
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_map(interrupt as usize)
-                        .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
-                }
-                _ => {
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_map(interrupt as usize)
-                        .write(|w| unsafe { w.bits(cpu_interrupt) });
-                }
-            }
+            INTERRUPT_CORE1::regs()
+                .core_1_intr_map(interrupt as usize)
+                .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
         }
     }
 }
@@ -471,41 +453,17 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 #[cfg(feature = "rt")]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
-        Cpu::ProCpu => {
-            cfg_select! {
-                esp32s31 => {
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_map(interrupt as usize)
-                        .read()
-                        .map()
-                        .bits() as u32
-                }
-                _ => {
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_map(interrupt as usize)
-                        .read()
-                        .bits()
-                }
-            }
-        }
+        Cpu::ProCpu => INTERRUPT_CORE0::regs()
+            .core_0_intr_map(interrupt as usize)
+            .read()
+            .map()
+            .bits() as u32,
         #[cfg(multi_core)]
-        Cpu::AppCpu => {
-            cfg_select! {
-                esp32s31 => {
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_map(interrupt as usize)
-                        .read()
-                        .map()
-                        .bits() as u32
-                }
-                _ => {
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_map(interrupt as usize)
-                        .read()
-                        .bits()
-                }
-            }
-        }
+        Cpu::AppCpu => INTERRUPT_CORE1::regs()
+            .core_1_intr_map(interrupt as usize)
+            .read()
+            .map()
+            .bits() as u32,
     };
     CpuInterrupt::from_u32(cpu_intr)
 }
