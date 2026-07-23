@@ -3168,6 +3168,19 @@ ignored."
         Err(WifiError::Failed)
     }
 
+    // The total hardware encryption key slots available that are shared between
+    // ESP-NOW encrypted peers and the AP connections.
+    // See https://github.com/espressif/esp-idf/blob/master/components/esp_wifi/Kconfig#L589
+    #[cfg(esp32c2)]
+    const TOTAL_HW_ENCRYPT_KEYS: u8 = 4;
+    #[cfg(not(esp32c2))]
+    const TOTAL_HW_ENCRYPT_KEYS: u8 = 17;
+
+    // The upper limit of connections available for the AP. The user set limit in apply_ap_config
+    // is clipped to this value
+    const AP_MAX_CONNECTIONS: u8 =
+        Self::TOTAL_HW_ENCRYPT_KEYS.saturating_sub(CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM as u8);
+
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
         let mut cfg = wifi_config_t {
             ap: wifi_ap_config_t {
@@ -3177,7 +3190,9 @@ ignored."
                 channel: config.channel,
                 authmode: config.auth_method.to_raw(),
                 ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
-                max_connection: config.max_connections as u8,
+                // Clip max_connection in the same way as done internally in esp_wifi_set_config.
+                // Doing this here so that we can do easy comparisons below
+                max_connection: (config.max_connections as u8).min(Self::AP_MAX_CONNECTIONS),
                 beacon_interval: 100,
                 pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
                 ftm_responder: false,
@@ -3206,6 +3221,16 @@ ignored."
             cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.ap.ssid_len = config.ssid.len() as u8;
             cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
+
+            // Compare the new ap config with the current. Only update if something is changing.
+            // This avoids unnecessary connection issues.
+            let mut current: wifi_config_t = core::mem::zeroed();
+            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_AP, &mut current)
+                == include::ESP_OK as i32
+                && current.ap == cfg.ap
+            {
+                return Ok(());
+            }
 
             esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
         }
@@ -3250,6 +3275,16 @@ ignored."
             cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.sta.password[0..(config.password.len())]
                 .copy_from_slice(config.password.as_bytes());
+
+            // Compare the new sta config with the current. Only update if something is changing.
+            // This avoids unnecessary connection issues.
+            let mut current: wifi_config_t = core::mem::zeroed();
+            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_STA, &mut current)
+                == include::ESP_OK as i32
+                && current.sta == cfg.sta
+            {
+                return Ok(());
+            }
 
             esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))
         }

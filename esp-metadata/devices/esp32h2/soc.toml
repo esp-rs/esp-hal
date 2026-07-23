@@ -21,6 +21,7 @@ has_md5_bsd = true
 [device.soc]
 cpu_has_csr_pc = true
 cpu_csr_prv_mode = 0xC10
+cpu_mcause_mask = 0x1f
 
 has_swd_watchdog = true
 

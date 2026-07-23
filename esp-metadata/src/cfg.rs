@@ -729,6 +729,8 @@ driver_configs![
             internal_memory_cached: bool,
             #[serde(default)]
             has_swd_watchdog: bool,
+            #[serde(default)]
+            cpu_mcause_mask: u32,
             #[serde(flatten)]
             config: SocConfig,
         }
