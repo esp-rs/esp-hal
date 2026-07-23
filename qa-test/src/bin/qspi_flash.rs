@@ -69,6 +69,7 @@ fn main() -> ! {
 
     let dma_channel = cfg_select! {
         any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
+        feature = "esp32s31" => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 

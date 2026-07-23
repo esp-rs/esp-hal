@@ -421,20 +421,6 @@ impl I2cInstance {
     }
 }
 
-impl SpiInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
-    }
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<SpiFunctionClockConfig>,
-        _new: SpiFunctionClockConfig,
-    ) {
-        // TODO: Configure the GPSPI source and divider when SPI support is enabled.
-    }
-}
-
 impl TimgInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // TODO: Control the selected timer's function-clock gate.

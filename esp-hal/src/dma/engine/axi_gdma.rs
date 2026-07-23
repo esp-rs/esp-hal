@@ -547,13 +547,27 @@ fn init_axi_dma_racey() {
 
     regs.misc_conf().modify(|_, w| w.clk_en().set_bit());
 
-    // AXI-DMA can access L2MEM, L2ROM, MSPI Flash, MSPI PSRAM.
-    regs.intr_mem_start_addr()
-        .write(|w| unsafe { w.access_intr_mem_start_addr().bits(0x4FC0_0000) });
-    regs.intr_mem_end_addr()
-        .write(|w| unsafe { w.access_intr_mem_end_addr().bits(0x4FFC_0000) });
-    regs.extr_mem_start_addr()
-        .write(|w| unsafe { w.access_extr_mem_start_addr().bits(0x4000_0000) });
-    regs.extr_mem_end_addr()
-        .write(|w| unsafe { w.access_extr_mem_end_addr().bits(0x4C00_0000) });
+    // AXI-DMA can access internal RAM, ROM, MSPI Flash and MSPI PSRAM.
+    cfg_select! {
+        esp32s31 => {
+            regs.intr_mem_start_addr()
+                .write(|w| unsafe { w.access_intr_mem_start_addr().bits(0x2F00_0000) });
+            regs.intr_mem_end_addr()
+                .write(|w| unsafe { w.access_intr_mem_end_addr().bits(0x2F07_FFFF) });
+            regs.extr_mem_start_addr()
+                .write(|w| unsafe { w.access_extr_mem_start_addr().bits(0x4000_0000) });
+            regs.extr_mem_end_addr()
+                .write(|w| unsafe { w.access_extr_mem_end_addr().bits(0x53FF_FFFF) });
+        },
+        _ => {
+            regs.intr_mem_start_addr()
+                .write(|w| unsafe { w.access_intr_mem_start_addr().bits(0x4FC0_0000) });
+            regs.intr_mem_end_addr()
+                .write(|w| unsafe { w.access_intr_mem_end_addr().bits(0x4FFC_0000) });
+            regs.extr_mem_start_addr()
+                .write(|w| unsafe { w.access_extr_mem_start_addr().bits(0x4000_0000) });
+            regs.extr_mem_end_addr()
+                .write(|w| unsafe { w.access_extr_mem_end_addr().bits(0x4C00_0000) });
+        }
+    }
 }
