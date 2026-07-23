@@ -53,6 +53,7 @@ async fn main(_spawner: Spawner) {
     let dma_channel = cfg_select! {
         any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
         feature = "esp32p4" => peripherals.DMA_AXI_CH0,
+        feature = "esp32s31" => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 
@@ -74,9 +75,13 @@ async fn main(_spawner: Spawner) {
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 
-    let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
+    let mut send_buffer = [0u8; 1024];
+    for i in 0..send_buffer.len() {
+        send_buffer[i] = (i % 255) as u8;
+    }
+
     loop {
-        let mut buffer = [0; 8];
+        let mut buffer = [0; 1024];
         esp_println::println!("Sending bytes");
         embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, &send_buffer)
             .await

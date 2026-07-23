@@ -33,6 +33,7 @@ fn main() -> ! {
         any(feature = "esp32c3", feature = "esp32s3") => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
         feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_COPY),
         feature = "esp32p4" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
+        feature = "esp32s31" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
         _ => Mem2Mem::new(peripherals.DMA_CH0),
     };
 
