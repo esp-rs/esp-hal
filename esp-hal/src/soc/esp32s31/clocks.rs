@@ -8,6 +8,8 @@
     reason = "Clock-tree types come from generated macro code"
 )]
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
@@ -103,11 +105,25 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(self, clocks: &mut ClockTree) {
+        // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
+        // update signal. Write the complete configuration before latching it;
+        // applying each change separately can temporarily overclock the buses.
+        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
         self.apply(clocks);
+        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+
+        update_bus_clocks();
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
+static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
+
 fn update_bus_clocks() {
+    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        return;
+    }
+
     HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| w.soc_clk_div_update().set_bit());
@@ -299,13 +315,16 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
             w.cpu_clk_div_numerator().bits(0);
             w.cpu_clk_div_denominator().bits(0)
         });
-    update_bus_clocks();
-    // MEM_CLK is a separate CPU branch and is limited to 160 MHz.
+    // MEM_CLK is a separate CPU branch and is limited to 160 MHz. Both
+    // dividers must be latched together when raising the CPU frequency.
     HP_SYS_CLKRST::regs()
         .mem_freq_ctrl0()
         .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
     update_bus_clocks();
-    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+
+    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+    }
 }
 
 fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {

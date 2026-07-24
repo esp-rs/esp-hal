@@ -30,11 +30,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let config = cfg_select! {
-            esp32s31 => esp_hal::Config::default(),
-            _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-        };
-        let peripherals = esp_hal::init(config);
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
         let rts = hil_test::unconnected_pin!(peripherals);
