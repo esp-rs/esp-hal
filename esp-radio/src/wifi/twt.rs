@@ -27,10 +27,12 @@
 
 use core::fmt;
 
+use docsplay::Display;
 use enumset::EnumSetType;
 use esp_hal::time::Duration;
 use procmacros::BuilderLite;
 
+use super::WifiError;
 #[cfg(wifi_has_wifi6)]
 use crate::sys::include::wifi_twt_config_t;
 use crate::sys::include::{
@@ -598,3 +600,50 @@ impl fmt::Display for TwtWaitError {
 }
 
 impl core::error::Error for TwtWaitError {}
+
+/// Information about a successfully negotiated iTWT agreement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub struct ITwtSetupInfo {
+    /// The negotiated iTWT setup configuration (may differ from requested).
+    pub config: ITwtSetupConfig,
+    /// TWT service period start time.
+    pub target_wake_time: u64,
+}
+
+/// Information about a failed iTWT setup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub struct ITwtSetupFailedInfo {
+    /// The configuration returned in the failure event.
+    pub config: ITwtSetupConfig,
+    /// Setup status code (non-1 value indicates failure).
+    pub status: i32,
+    /// Failure reason code.
+    pub reason: u8,
+}
+
+/// Errors that can occur during an iTWT setup.
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum ITwtSetupError {
+    /// The AP responded with a non-success status.
+    Failed(ITwtSetupFailedInfo),
+
+    /// A Wi-Fi error occurred.
+    WifiError(WifiError),
+}
+
+impl From<WifiError> for ITwtSetupError {
+    fn from(error: WifiError) -> Self {
+        ITwtSetupError::WifiError(error)
+    }
+}
+
+impl core::error::Error for ITwtSetupError {}

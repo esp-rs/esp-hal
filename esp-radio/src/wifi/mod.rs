@@ -1078,31 +1078,6 @@ impl TryFrom<&[u8]> for Password {
     }
 }
 
-/// Information about a successfully negotiated iTWT agreement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-#[instability::unstable]
-pub struct ITwtSetupInfo {
-    /// The negotiated iTWT setup configuration (may differ from requested).
-    pub config: twt::ITwtSetupConfig,
-    /// TWT service period start time.
-    pub target_wake_time: u64,
-}
-
-/// Information about a failed iTWT setup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-#[instability::unstable]
-pub struct ITwtSetupFailedInfo {
-    /// The configuration returned in the failure event.
-    pub config: twt::ITwtSetupConfig,
-    /// Setup status code (non-1 value indicates failure).
-    pub status: i32,
-    /// Failure reason code.
-    pub reason: u8,
-}
 static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 /// A receive packet queue.
@@ -1208,9 +1183,6 @@ pub enum WifiError {
 
     /// TWT setup was rejected by the AP.
     TwtSetupRejected,
-
-    /// iTWT setup failed (the AP responded with a non-success status).
-    TwtSetupFailed(ITwtSetupFailedInfo),
 }
 
 impl WifiError {
@@ -4205,7 +4177,7 @@ impl WifiController<'_> {
     /// Negotiate an individual TWT (Target Wake Time) agreement with the AP.
     ///
     /// The AP may accept, modify, or reject the requested parameters. On
-    /// success, returns [`ITwtSetupInfo`] with the negotiated configuration.
+    /// success, returns [`twt::ITwtSetupInfo`] with the negotiated configuration.
     /// Up to 8 simultaneous agreements are supported.
     ///
     /// Concurrent calls are safe — each is assigned a unique `twt_id` for
@@ -4235,7 +4207,7 @@ impl WifiController<'_> {
     pub async fn itwt_setup(
         &self,
         mut config: twt::ITwtSetupConfig,
-    ) -> Result<ITwtSetupInfo, WifiError> {
+    ) -> Result<twt::ITwtSetupInfo, twt::ITwtSetupError> {
         use portable_atomic::AtomicU16;
         /// Monotonic counter for assigning unique `twt_id` values to iTWT setup
         /// requests.
@@ -4266,12 +4238,12 @@ impl WifiController<'_> {
                     continue;
                 }
                 if status == 1 {
-                    break Ok(ITwtSetupInfo {
+                    break Ok(twt::ITwtSetupInfo {
                         config: negotiated_config,
                         target_wake_time,
                     });
                 } else {
-                    break Err(WifiError::TwtSetupFailed(ITwtSetupFailedInfo {
+                    break Err(twt::ITwtSetupError::Failed(twt::ITwtSetupFailedInfo {
                         config: negotiated_config,
                         status,
                         reason,
