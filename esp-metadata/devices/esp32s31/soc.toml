@@ -69,6 +69,8 @@ peripherals = [
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
+    { name = "SPI3", interrupts = { peri = "SPI3" }, clock_group = "SPI", stable = true },
+    { name = "AXI_GDMA", pac = "AXI_DMA" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -155,3 +157,53 @@ wakeup_sources = {
 
 [device.usb_otg_hs]
 fifo_depth_words = 896
+
+[device.spi_master]
+version = 3
+fifo_size = 64
+support_status = "supported"
+has_octal = true
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CK",
+        sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HOLD"],
+        cs = ["SPI3_CS", "SPI3_CS1", "SPI3_CS2"]
+    },
+]
+
+[device.spi_slave]
+support_status = "not_supported"
+
+[device.dma]
+support_status = "partial"
+gdma_version = 2
+separate_in_out_interrupts = true
+# TODO: add AHB_GDMA and LP_GDMA engines
+engines = [
+    {
+        name = "AXI_GDMA",
+        max_priority = 15,
+        internal_ram_burst_sizes = [8, 16, 32, 64],
+        drivers = ["spi_master"],
+        peripheral_instances = [
+            { name = "SPI2", dma_id = 1 },
+            { name = "SPI3", dma_id = 2 },
+        ],
+        channels = [
+            { name = "DMA_AXI_CH0", mem2mem = true, mem2mem_id = 6, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
+            { name = "DMA_AXI_CH1", mem2mem = true, mem2mem_id = 7, interrupt_in = "AXI_PDMA_IN_CH1", interrupt_out = "AXI_PDMA_OUT_CH1" },
+            { name = "DMA_AXI_CH2", mem2mem = true, mem2mem_id = 8, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
+        ]
+    },
+]

@@ -139,8 +139,8 @@ impl defmt::Format for DmaDescriptorFlags {
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(esp32p4, repr(C, align(8)))] // TODO: only needed for GDMA_AXI
-#[cfg_attr(not(esp32p4), repr(C, align(4)))]
+#[cfg_attr(soc_has_axi_gdma, repr(C, align(8)))]
+#[cfg_attr(not(soc_has_axi_gdma), repr(C, align(4)))]
 pub struct DmaDescriptor {
     /// Descriptor flags.
     pub flags: DmaDescriptorFlags,
@@ -673,29 +673,47 @@ impl From<DmaBufError> for DmaError {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
     /// The lowest priority level (Priority 0).
-    Priority0 = 0,
+    Priority0  = 0,
     /// Priority level 1.
-    Priority1 = 1,
+    Priority1  = 1,
     /// Priority level 2.
-    Priority2 = 2,
+    Priority2  = 2,
     /// Priority level 3.
-    Priority3 = 3,
+    Priority3  = 3,
     /// Priority level 4.
-    Priority4 = 4,
+    Priority4  = 4,
     /// Priority level 5.
-    Priority5 = 5,
+    Priority5  = 5,
     /// Priority level 6.
-    #[cfg(dma_max_priority = "9")]
-    Priority6 = 6,
+    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
+    Priority6  = 6,
     /// Priority level 7.
-    #[cfg(dma_max_priority = "9")]
-    Priority7 = 7,
+    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
+    Priority7  = 7,
     /// Priority level 8.
-    #[cfg(dma_max_priority = "9")]
-    Priority8 = 8,
+    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
+    Priority8  = 8,
     /// Priority level 9.
-    #[cfg(dma_max_priority = "9")]
-    Priority9 = 9,
+    #[cfg(any(dma_max_priority = "9", dma_max_priority = "15"))]
+    Priority9  = 9,
+    /// Priority level 10.
+    #[cfg(dma_max_priority = "15")]
+    Priority10 = 10,
+    /// Priority level 11.
+    #[cfg(dma_max_priority = "15")]
+    Priority11 = 11,
+    /// Priority level 12.
+    #[cfg(dma_max_priority = "15")]
+    Priority12 = 12,
+    /// Priority level 13.
+    #[cfg(dma_max_priority = "15")]
+    Priority13 = 13,
+    /// Priority level 14.
+    #[cfg(dma_max_priority = "15")]
+    Priority14 = 14,
+    /// Priority level 15.
+    #[cfg(dma_max_priority = "15")]
+    Priority15 = 15,
 }
 
 /// The owner bit of a DMA descriptor.
