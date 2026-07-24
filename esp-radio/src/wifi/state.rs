@@ -112,6 +112,13 @@ pub(crate) fn set_station_state(state: WifiStationState) {
     STATION_STATE.store(state, Ordering::Relaxed)
 }
 
+/// Returns `true` if Wi-Fi is currently initialized (not in the
+/// `Uninitialized` state for either interface).
+pub(crate) fn is_wifi_initialized() -> bool {
+    station_state() != WifiStationState::Uninitialized
+        || access_point_state() != WifiAccessPointState::Uninitialized
+}
+
 pub(crate) fn locked<R>(f: impl FnOnce() -> R) -> R {
     static LOCK: NonReentrantMutex<Option<SemaphoreHandle>> = NonReentrantMutex::new(None);
 

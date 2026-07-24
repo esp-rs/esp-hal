@@ -881,8 +881,12 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
-    trace!("wifi_clock_disable");
-    crate::radio_clocks::clocks_ll::enable_wifi(false);
+    if super::state::is_wifi_initialized() {
+        trace!("wifi_clock_disable - no-op (wifi active, modem sleep)");
+    } else {
+        trace!("wifi_clock_disable - gating clocks (wifi deinit)");
+        crate::radio_clocks::clocks_ll::enable_wifi(false);
+    }
 }
 
 /// **************************************************************************
