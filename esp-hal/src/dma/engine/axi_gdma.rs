@@ -548,6 +548,7 @@ fn init_axi_dma_racey() {
     regs.misc_conf().modify(|_, w| w.clk_en().set_bit());
 
     // AXI-DMA can access internal RAM, ROM, MSPI Flash and MSPI PSRAM.
+    // TODO: move memory window limits to device metadata
     cfg_select! {
         esp32s31 => {
             regs.intr_mem_start_addr()
