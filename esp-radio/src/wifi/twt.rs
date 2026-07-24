@@ -13,7 +13,10 @@
 //! scheduled window.
 //!
 //! For best latency, send packets in response to
-//! [`WifiController::wait_for_next_twt_wakeup`](crate::wifi::WifiController::wait_for_next_twt_wakeup)
+#![cfg_attr(
+    wifi_has_wifi6,
+    doc = "[`WifiController::wait_for_next_twt_wakeup`](crate::wifi::WifiController::wait_for_next_twt_wakeup)"
+)]
 //! events. An independent timer can desync from TWT wakeups, causing
 //! packets to miss their window.
 //!
@@ -233,7 +236,10 @@ pub struct ITwtSetupConfig {
     /// Internal correlation ID used to match setup responses to requests.
     ///
     /// Automatically assigned by
-    /// [`WifiController::itwt_setup`](crate::wifi::WifiController::itwt_setup).
+    #[cfg_attr(
+        wifi_has_wifi6,
+        doc = "[`WifiController::itwt_setup`](crate::wifi::WifiController::itwt_setup)."
+    )]
     #[builder_lite(skip_setter)]
     pub twt_id: u16,
     /// The wake interval exponent (set via
