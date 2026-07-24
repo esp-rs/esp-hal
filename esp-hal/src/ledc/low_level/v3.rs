@@ -22,6 +22,14 @@ pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobal
 }
 
 pub(super) fn ls_freq_hw(_clock_source: LSClockSource) -> Rate {
+    // On the ESP32-H2, `set_global_slow_clock` selects `ledc_sclk_sel = 0`, which is
+    // XTAL_CLK (see `ledc_ll_set_slow_clk_sel` in ESP-IDF's
+    // `components/hal/esp32h2/include/hal/ledc_ll.h`), so the divisor must be computed
+    // from the XTAL frequency. Using `apb_clk_frequency()` (96 MHz on the default
+    // preset) produced output at 1/3 of the requested frequency.
+    #[cfg(esp32h2)]
+    return Rate::from_hz(clocks::xtal_clk_frequency());
+    #[cfg(not(esp32h2))]
     Rate::from_hz(clocks::apb_clk_frequency())
 }
 
