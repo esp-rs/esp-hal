@@ -1,20 +1,42 @@
 use super::super::{
-    LSGlobalClkSource,
+    LowSpeedGlobalClockSource,
     channel::Number as ChannelNumber,
-    timer::{HSClockSource, LSClockSource, Number as TimerNumber},
+    timer::Number as TimerNumber,
 };
-use crate::{gpio::OutputSignal, pac::ledc::RegisterBlock, soc::clocks, time::Rate};
+use crate::{
+    gpio::OutputSignal,
+    ledc::timer::ClockSource,
+    pac::ledc::RegisterBlock,
+    soc::clocks,
+    time::Rate,
+};
 
-pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobalClkSource) {
+pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeedGlobalClockSource) {
     match clock_source {
-        LSGlobalClkSource::APBClk => {
+        LowSpeedGlobalClockSource::APBClock => {
             ledc.conf().write(|w| w.apb_clk_sel().set_bit());
         }
     }
     ledc.lstimer(0).conf().modify(|_, w| w.para_up().set_bit());
 }
 
-pub(super) fn ls_freq_hw(_clock_source: LSClockSource) -> Rate {
+pub(super) fn get_duty_res(ledc: &RegisterBlock, number: TimerNumber, is_hs: bool) -> u8 {
+    if is_hs {
+        ledc.hstimer(number as usize)
+            .conf()
+            .read()
+            .duty_res()
+            .bits()
+    } else {
+        ledc.lstimer(number as usize)
+            .conf()
+            .read()
+            .duty_res()
+            .bits()
+    }
+}
+
+pub(super) fn ls_freq_hw(_clock_source: ClockSource) -> Rate {
     Rate::from_hz(clocks::apb_clk_frequency())
 }
 
@@ -41,7 +63,7 @@ pub(super) fn ls_update_hw(ledc: &RegisterBlock, number: TimerNumber) {
         .modify(|_, w| w.para_up().set_bit());
 }
 
-pub(super) fn hs_freq_hw(_clock_source: HSClockSource) -> Rate {
+pub(super) fn hs_freq_hw(_clock_source: ClockSource) -> Rate {
     Rate::from_hz(clocks::apb_clk_frequency())
 }
 
@@ -50,9 +72,9 @@ pub(super) fn hs_configure_hw(
     number: TimerNumber,
     divisor: u32,
     duty: u8,
-    clock_source: HSClockSource,
+    clock_source: ClockSource,
 ) {
-    let sel_hstimer = clock_source == HSClockSource::APBClk;
+    let sel_hstimer = clock_source == ClockSource::APBClock;
     ledc.hstimer(number as usize).conf().modify(|_, w| unsafe {
         w.tick_sel().bit(sel_hstimer);
         w.rst().clear_bit();

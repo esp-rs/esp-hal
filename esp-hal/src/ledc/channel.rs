@@ -1,58 +1,83 @@
 //! # LEDC channel
 //!
 //! ## Overview
-//! The LEDC Channel module  provides a high-level interface to
+//! The LEDC Channel module provides a high-level interface to
 //! configure and control individual PWM channels of the LEDC peripheral.
 //!
 //! ## Configuration
 //! The module allows precise and flexible control over LED lighting and other
-//! `Pulse-Width Modulation (PWM)` applications by offering configurable duty
+//! Pulse-Width Modulation (PWM) applications by offering configurable duty
 //! cycles and frequencies.
+//!
+//! For more information, please refer to the
+#![doc = crate::trm_markdown_link!("ledpwm")]
 
-use super::{
-    low_level,
-    timer::{TimerIFace, TimerSpeed},
-};
+use core::{fmt::Display, marker::PhantomData, sync::atomic::Ordering};
+
+use super::low_level;
 use crate::{
-    gpio::{
-        DriveMode,
-        OutputConfig,
-        interconnect::{self, PeripheralOutput},
+    DriverMode,
+    gpio::{PinGuard, interconnect::PeripheralOutput},
+    ledc::{
+        Speed,
+        timer::{self, TIMER_FREQS, Timer},
     },
-    pac::ledc::RegisterBlock,
     peripherals::LEDC,
+    system::{Peripheral, PeripheralGuard},
 };
 
-/// Fade parameter sub-errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Duty fade errors
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FadeError {
-    /// Start duty % out of range
-    StartDuty,
-    /// End duty % out of range
-    EndDuty,
-    /// Duty % change from start to end is out of range
+    /// Duty change from start to end is out of range
     DutyRange,
     /// Duration too long for timer frequency and duty resolution
     Duration,
 }
 
-/// Channel errors
-#[derive(Debug, Clone, Copy, PartialEq)]
+impl Display for FadeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::DutyRange => write!(f, "Duty change from start to end is out of range"),
+            Self::Duration => write!(
+                f,
+                "Duration too long for timer frequency and duty resolution"
+            ),
+        }
+    }
+}
+
+impl core::error::Error for FadeError {}
+
+/// Channel configuration errors
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// Invalid duty % value
-    Duty,
-    /// Timer not configured
-    Timer,
-    /// Channel not configured
-    Channel,
-    /// Fade parameters invalid
-    Fade(FadeError),
+#[non_exhaustive]
+pub enum ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match *self {}
+    }
+}
+
+impl core::error::Error for ConfigError {}
+
+/// Channel configuration
+#[instability::unstable]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// The duty value
+    duty: u32,
 }
 
 /// Channel number
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[instability::unstable]
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Number {
     /// Channel 0
@@ -75,345 +100,287 @@ pub enum Number {
     Channel7 = 7,
 }
 
-/// Channel configuration
-pub mod config {
-    use crate::{
-        gpio::DriveMode,
-        ledc::timer::{TimerIFace, TimerSpeed},
-    };
-
-    /// Channel configuration
-    #[derive(Copy, Clone)]
-    pub struct Config<'a, S: TimerSpeed> {
-        /// A reference to the timer associated with this channel.
-        pub timer: &'a dyn TimerIFace<S>,
-        /// The duty cycle percentage (0-100).
-        pub duty_pct: u8,
-        /// The pin configuration (PushPull or OpenDrain).
-        pub drive_mode: DriveMode,
+impl Number {
+    const fn from_u8(n: u8) -> Number {
+        // until rust adds const enum generics
+        match n {
+            0 => Number::Channel0,
+            1 => Number::Channel1,
+            2 => Number::Channel2,
+            3 => Number::Channel3,
+            4 => Number::Channel4,
+            5 => Number::Channel5,
+            #[cfg(ledc_channel_count = "8")]
+            6 => Number::Channel6,
+            #[cfg(ledc_channel_count = "8")]
+            7 => Number::Channel7,
+            _ => core::unreachable!(), // defmt::unreachable!() fails const eval
+        }
     }
 }
 
-/// Channel interface
-pub trait ChannelIFace<'a, S: TimerSpeed + 'a>
-where
-    Channel<'a, S>: ChannelHW,
-{
-    /// Configure channel
-    fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
-
-    /// Set channel duty HW
-    fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
-
-    /// Start a duty-cycle fade
-    fn start_duty_fade(
-        &self,
-        start_duty_pct: u8,
-        end_duty_pct: u8,
-        duration_ms: u16,
-    ) -> Result<(), Error>;
-
-    /// Check whether a duty-cycle fade is running
-    fn is_duty_fade_running(&self) -> bool;
+/// Channel creator
+#[instability::unstable]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ChannelCreator<'d, const CHANNEL: u8, Dm: DriverMode, S: Speed> {
+    guard: Option<PeripheralGuard>,
+    _phantom: PhantomData<(&'d (), Dm, S)>,
 }
 
-/// Channel HW interface
-pub trait ChannelHW {
-    /// Configure Channel HW except for the duty which is set via
-    /// [`Self::set_duty_hw`].
-    fn configure_hw(&mut self) -> Result<(), Error>;
-    /// Configure the hardware for the channel with a specific pin
-    /// configuration.
-    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error>;
+impl<'d, const CHANNEL: u8, Dm: DriverMode, S: Speed> ChannelCreator<'d, CHANNEL, Dm, S> {
+    /// Reborrow this channel creator for a shorter lifetime `'a`.
+    ///
+    /// Use this method if you would like to keep working with this channel after you drop the
+    /// configured one.
+    #[instability::unstable]
+    #[inline]
+    pub fn reborrow(&mut self) -> ChannelCreator<'_, CHANNEL, Dm, S> {
+        Self {
+            guard: None,
+            _phantom: PhantomData,
+        }
+    }
 
-    /// Set channel duty HW
-    fn set_duty_hw(&self, duty: u32);
+    /// Configures the channel.
+    #[instability::unstable]
+    pub fn configure(
+        self,
+        timer: &Timer<'d, S>,
+        config: Config,
+    ) -> Result<Channel<'d, Dm, S>, ConfigError> {
+        let mut channel = Channel {
+            number: Number::from_u8(CHANNEL),
+            timer: timer.number(),
+            pin: PinGuard::new_unconnected(),
+            _guard: self.guard,
+            _phantom: PhantomData,
+        }
+        .with_timer(timer);
+        channel.apply_config(&config)?;
 
-    /// Start a duty-cycle fade HW
-    fn start_duty_fade_hw(
-        &self,
-        start_duty: u32,
-        duty_inc: bool,
-        duty_steps: u16,
-        cycles_per_step: u16,
-        duty_per_cycle: u16,
-    );
+        Ok(channel)
+    }
 
-    /// Check whether a duty-cycle fade is running HW
-    fn is_duty_fade_running_hw(&self) -> bool;
+    /// Unsafely steal a channel creator instance.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a channel is in use at one time.
+    #[instability::unstable]
+    #[inline]
+    pub unsafe fn steal() -> Self {
+        Self {
+            guard: Some(PeripheralGuard::new(Peripheral::Ledc)),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Unsafely clone a channel creator instance.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a channel is in use at one time.
+    #[instability::unstable]
+    #[inline]
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        unsafe { Self::steal() }
+    }
 }
 
 /// Channel struct
-pub struct Channel<'a, S: TimerSpeed> {
-    ledc: &'a RegisterBlock,
-    timer: Option<&'a dyn TimerIFace<S>>,
+#[instability::unstable]
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Channel<'d, Dm: DriverMode, S: Speed> {
     number: Number,
-    output_pin: interconnect::OutputSignal<'a>,
+    timer: timer::Number,
+    pin: PinGuard,
+    _guard: Option<PeripheralGuard>,
+    _phantom: PhantomData<(&'d (), Dm, S)>,
 }
 
-impl<'a, S: TimerSpeed> Channel<'a, S> {
-    /// Return a new channel
-    pub fn new(number: Number, output_pin: impl PeripheralOutput<'a>) -> Self {
+impl<'d, Dm: DriverMode, S: Speed> Channel<'d, Dm, S> {
+    #[procmacros::doc_replace]
+    /// Attaches a new timer to the channel and returns the updated channel.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// # use esp_hal::ledc::{self, Ledc};
+    /// # use esp_hal::time::Rate;
+    /// # let mut ledc = Ledc::new(peripherals.LEDC, Default::default())?;
+    /// # let timer0 = ledc.timer0.configure(ledc::timer::Config::default().with_frequency(Rate::from_khz(24)))?;
+    /// # let timer1 = ledc.timer1.configure(ledc::timer::Config::default().with_frequency(Rate::from_khz(12)))?;
+    /// let channel0 = ledc.channel0.configure(&timer0, ledc::channel::Config::default())?;
+    /// // timer0 is borrowed
+    ///
+    /// let channel0 = channel0.with_timer(&timer1);
+    /// // timer0 is no longer borrowed, but timer1 is
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn with_timer(mut self, new_timer: &Timer<'d, S>) -> Self {
         let ledc = LEDC::regs();
-        Channel {
-            ledc,
-            timer: None,
-            number,
-            output_pin: output_pin.into(),
-        }
+        low_level::set_channel(ledc, self.number, new_timer.number() as u8, S::IS_HS);
+
+        self.timer = new_timer.number();
+        self
     }
-}
 
-impl<'a, S: TimerSpeed> ChannelIFace<'a, S> for Channel<'a, S>
-where
-    Channel<'a, S>: ChannelHW,
-{
-    /// Configure channel
-    fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
-        self.timer = Some(config.timer);
+    /// Attaches a new PeripheralOutput to the channel.
+    #[instability::unstable]
+    pub fn with_pin(mut self, pin: impl PeripheralOutput<'d>) -> Self {
+        let output_signal = low_level::output_signal(self.number, S::IS_HS);
+        let pin_out = pin.into();
+        pin_out.apply_output_config(&Default::default());
+        pin_out.set_output_enable(true);
+        self.pin = pin_out.connect_with_guard(output_signal);
+        self
+    }
 
-        self.set_duty(config.duty_pct)?;
-        self.configure_hw_with_drive_mode(config.drive_mode)?;
-
+    /// Changes the configuration.
+    #[instability::unstable]
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.set_duty_cycle(config.duty);
         Ok(())
     }
 
-    /// Set duty % of channel
-    fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
-        let duty_exp;
-        if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.duty() {
-                duty_exp = timer_duty as u32;
-            } else {
-                return Err(Error::Timer);
-            }
-        } else {
-            return Err(Error::Channel);
-        }
-
-        let duty_range = 2u32.pow(duty_exp);
-        let duty_value = (duty_range * duty_pct as u32) / 100;
-
-        if duty_pct > 100u8 {
-            // duty_pct greater than 100%
-            return Err(Error::Duty);
-        }
-
-        self.set_duty_hw(duty_value);
-
-        Ok(())
+    /// Returns the maximum duty cycle.
+    #[instability::unstable]
+    pub fn max_duty_cycle(&self) -> u32 {
+        let ledc = LEDC::regs();
+        let duty_res = low_level::get_duty_res(ledc, self.timer, S::IS_HS);
+        1u32 << duty_res
     }
 
-    /// Start a duty fade from one % to another.
+    /// Sets the duty cycle of the channel.
+    ///
+    /// The duty cycle value will be clamped to the maximum duty cycle configured for the [`Timer`]
+    #[instability::unstable]
+    pub fn set_duty_cycle(&self, duty: u32) {
+        let max_duty = self.max_duty_cycle();
+        let duty_value = duty.min(max_duty);
+
+        let ledc = LEDC::regs();
+        low_level::set_duty_hw(ledc, self.number, S::IS_HS, duty_value);
+        low_level::start_duty_without_fading(ledc, self.number, S::IS_HS);
+        low_level::update_channel(ledc, self.number, S::IS_HS);
+    }
+
+    #[procmacros::doc_replace]
+    /// Starts a duty fade from one duty value to another.
     ///
     /// There's a constraint on the combination of timer frequency, timer PWM
     /// duty resolution (the bit count), the fade "range" (abs(start-end)), and
     /// the duration:
     ///
-    /// frequency * duration / ((1<<bit_count) * abs(start-end)) < 1024
+    /// `frequency * duration / ((1<<bit_count) * abs(start-end)) < 1024`
     ///
     /// Small percentage changes, long durations, coarse PWM resolutions (that
     /// is, low bit counts), and high timer frequencies will all be more likely
-    /// to fail this requirement.  If it does fail, this function will return
+    /// to fail this requirement. If it does fail, this function will return
     /// an error Result.
-    fn start_duty_fade(
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// # use esp_hal::ledc::Ledc;
+    /// # let mut ledc = Ledc::new(peripherals.LEDC, Default::default())?;
+    /// # let timer0 = ledc.timer0.configure(Default::default())?;
+    /// # let mut channel0 = ledc.channel0.configure(&timer0, Default::default())?;
+    /// let max_duty = channel0.max_duty_cycle();
+    ///
+    /// // Fade from 0 to 100% over 1000 milliseconds
+    /// channel0.start_duty_fade(0, max_duty, 1000)?;
+    ///
+    /// // Wait for the fade to complete
+    /// while channel0.is_duty_fade_running() {}
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn start_duty_fade(
         &self,
-        start_duty_pct: u8,
-        end_duty_pct: u8,
+        start_duty: u32,
+        end_duty: u32,
         duration_ms: u16,
-    ) -> Result<(), Error> {
-        let duty_exp;
-        let frequency;
-        if start_duty_pct > 100u8 {
-            return Err(Error::Fade(FadeError::StartDuty));
-        }
-        if end_duty_pct > 100u8 {
-            return Err(Error::Fade(FadeError::EndDuty));
-        }
-        if let Some(timer) = self.timer {
-            if let Some(timer_duty) = timer.duty() {
-                if timer.frequency() > 0 {
-                    duty_exp = timer_duty as u32;
-                    frequency = timer.frequency();
-                } else {
-                    return Err(Error::Timer);
-                }
-            } else {
-                return Err(Error::Timer);
-            }
-        } else {
-            return Err(Error::Channel);
-        }
+    ) -> Result<(), FadeError> {
+        let max_duty = self.max_duty_cycle();
+        let start_duty_value = start_duty.min(max_duty);
+        let end_duty_value = end_duty.min(max_duty);
 
-        let duty_range = (1u32 << duty_exp) - 1;
-        let start_duty_value = (duty_range * start_duty_pct as u32) / 100;
-        let end_duty_value = (duty_range * end_duty_pct as u32) / 100;
-
-        // NB: since we do the multiplication first here, there's no loss of
-        // precision from using milliseconds instead of (e.g.) nanoseconds.
-        let pwm_cycles = (duration_ms as u32) * frequency / 1000;
-
+        let timer_index = if S::IS_HS { 4 } else { 0 } + self.timer as usize;
+        let frequency = TIMER_FREQS[timer_index].load(Ordering::Acquire);
+        let pwm_cycles = duration_ms as u32 * frequency / 1000;
         let abs_duty_diff = end_duty_value.abs_diff(start_duty_value);
         let duty_steps: u32 = u16::try_from(abs_duty_diff).unwrap_or(65535).into();
-        // This conversion may fail if duration_ms is too big, and if either
-        // duty_steps gets truncated, or the fade is over a short range of duty
-        // percentages, so it's too small.  Returning an Err in either case is
-        // fine: shortening the duration_ms will sort things out.
-        let cycles_per_step: u16 = (pwm_cycles / duty_steps)
-            .try_into()
-            .map_err(|_| Error::Fade(FadeError::Duration))
-            .and_then(|res| {
-                if res > 1023 {
-                    Err(Error::Fade(FadeError::Duration))
-                } else {
-                    Ok(res)
-                }
-            })?;
-        // This can't fail unless abs_duty_diff is bigger than 65536*65535-1,
-        // and so duty_steps gets truncated.  But that requires duty_exp to be
-        // at least 32, and the hardware only supports up to 20.  Still, handle
-        // it in case something changes in the future.
-        let duty_per_cycle: u16 = (abs_duty_diff / duty_steps)
-            .try_into()
-            .map_err(|_| Error::Fade(FadeError::DutyRange))?;
+        let duty_steps = duty_steps.min(pwm_cycles).max(1);
 
-        self.start_duty_fade_hw(
+        let cycles_per_step =
+            u16::try_from(pwm_cycles / duty_steps).map_err(|_| FadeError::Duration)?;
+        if cycles_per_step > 1023 {
+            return Err(FadeError::Duration);
+        }
+
+        let duty_per_cycle =
+            u16::try_from(abs_duty_diff / duty_steps).map_err(|_| FadeError::DutyRange)?;
+
+        let ledc = LEDC::regs();
+        low_level::start_duty_fade_hw(
+            ledc,
+            self.number,
+            S::IS_HS,
             start_duty_value,
             end_duty_value > start_duty_value,
-            duty_steps.try_into().unwrap(),
+            duty_steps as u16,
             cycles_per_step,
             duty_per_cycle,
         );
+        low_level::update_channel(ledc, self.number, S::IS_HS);
 
         Ok(())
     }
 
-    fn is_duty_fade_running(&self) -> bool {
-        self.is_duty_fade_running_hw()
+    /// Returns true if a duty-cycle fade is running.
+    #[instability::unstable]
+    pub fn is_duty_fade_running(&self) -> bool {
+        let ledc = LEDC::regs();
+        low_level::is_duty_fade_running_hw(ledc, self.number, S::IS_HS)
     }
 }
 
 mod ehal1 {
-    use embedded_hal::pwm::{self, ErrorKind, ErrorType, SetDutyCycle};
+    use embedded_hal::pwm::{ErrorType, SetDutyCycle};
 
-    use super::{Channel, ChannelHW, Error};
-    use crate::ledc::timer::TimerSpeed;
+    use super::Channel;
+    use crate::{DriverMode, ledc::Speed};
 
-    impl pwm::Error for Error {
-        fn kind(&self) -> pwm::ErrorKind {
-            ErrorKind::Other
-        }
+    impl<Dm: DriverMode, S: Speed> ErrorType for Channel<'_, Dm, S> {
+        type Error = core::convert::Infallible;
     }
 
-    impl<S: TimerSpeed> ErrorType for Channel<'_, S> {
-        type Error = Error;
-    }
-
-    impl<'a, S: TimerSpeed> SetDutyCycle for Channel<'a, S>
-    where
-        Channel<'a, S>: ChannelHW,
-    {
+    impl<Dm: DriverMode, S: Speed> SetDutyCycle for Channel<'_, Dm, S> {
         fn max_duty_cycle(&self) -> u16 {
-            let duty_exp;
-
-            if let Some(timer_duty) = self.timer.and_then(|timer| timer.duty()) {
-                duty_exp = timer_duty as u32;
+            let max_hw = Self::max_duty_cycle(self); // inherent method
+            if max_hw > u16::MAX as u32 {
+                u16::MAX
             } else {
-                return 0;
+                max_hw as u16
             }
-
-            let duty_range = 2u32.pow(duty_exp);
-
-            duty_range as u16
         }
 
-        fn set_duty_cycle(&mut self, mut duty: u16) -> Result<(), Self::Error> {
-            let max = self.max_duty_cycle();
-            duty = if duty > max { max } else { duty };
-            self.set_duty_hw(duty.into());
+        fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+            let max_duty = Self::max_duty_cycle(self); // inherent method
+            let duty_to_set = if max_duty > u16::MAX as u32 {
+                // Scale the u16 duty fraction to the hardware's internal u32 resolution
+                ((duty as u64 * max_duty as u64) / u16::MAX as u64) as u32
+            } else {
+                duty as u32
+            };
+            Self::set_duty_cycle(self, duty_to_set); // inherent method
             Ok(())
         }
-    }
-}
-
-impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
-    fn set_channel(&mut self, timer_number: u8) {
-        low_level::set_channel(self.ledc, self.number, timer_number, S::IS_HS);
-        low_level::start_duty_without_fading(self.ledc, self.number, S::IS_HS);
-    }
-
-    fn start_duty_without_fading(&self) {
-        low_level::start_duty_without_fading(self.ledc, self.number, S::IS_HS);
-    }
-
-    fn update_channel(&self) {
-        low_level::update_channel(self.ledc, self.number, S::IS_HS);
-    }
-}
-
-impl<S> ChannelHW for Channel<'_, S>
-where
-    S: crate::ledc::timer::TimerSpeed,
-{
-    /// Configure Channel HW
-    fn configure_hw(&mut self) -> Result<(), Error> {
-        self.configure_hw_with_drive_mode(DriveMode::PushPull)
-    }
-
-    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error> {
-        if let Some(timer) = self.timer {
-            if !timer.is_configured() {
-                return Err(Error::Timer);
-            }
-
-            self.output_pin
-                .apply_output_config(&OutputConfig::default().with_drive_mode(cfg));
-            self.output_pin.set_output_enable(true);
-
-            let timer_number = timer.number() as u8;
-
-            self.set_channel(timer_number);
-            self.update_channel();
-
-            let signal = low_level::output_signal(self.number, S::IS_HS);
-            signal.connect_to(&self.output_pin);
-        } else {
-            return Err(Error::Timer);
-        }
-
-        Ok(())
-    }
-
-    /// Set duty in channel HW
-    fn set_duty_hw(&self, duty: u32) {
-        low_level::set_duty_hw(self.ledc, self.number, S::IS_HS, duty);
-        self.start_duty_without_fading();
-        self.update_channel();
-    }
-
-    /// Start a duty-cycle fade HW
-    fn start_duty_fade_hw(
-        &self,
-        start_duty: u32,
-        duty_inc: bool,
-        duty_steps: u16,
-        cycles_per_step: u16,
-        duty_per_cycle: u16,
-    ) {
-        low_level::start_duty_fade_hw(
-            self.ledc,
-            self.number,
-            S::IS_HS,
-            start_duty,
-            duty_inc,
-            duty_steps,
-            cycles_per_step,
-            duty_per_cycle,
-        );
-        self.update_channel();
-    }
-
-    fn is_duty_fade_running_hw(&self) -> bool {
-        low_level::is_duty_fade_running_hw(self.ledc, self.number, S::IS_HS)
     }
 }
