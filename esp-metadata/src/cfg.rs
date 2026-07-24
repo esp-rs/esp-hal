@@ -710,6 +710,10 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
+            // esp-hal implements CPU/TOP power-down retention (software CPU retention +
+            // regDMA TOP retention) for light sleep on this chip.
+            #[serde(default)]
+            pd_retention: bool,
         }
     },
     SocProperties {

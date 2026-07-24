@@ -47,6 +47,18 @@ mod version;
 pub(super) struct SpiWrapper<'d> {
     pub(super) spi: AnySpi<'d>,
     _guard: PeripheralGuard,
+    // Active keeps `TOP` powered; `with_retention_memory` swaps to retained.
+    #[cfg(sleep_pd_retention)]
+    pub(super) power: crate::rtc_cntl::retention::PowerManagement<
+        'd,
+        crate::rtc_cntl::retention::SpiRetentionMemory,
+    >,
+    // While retention is armed, hold the function clock on so the config
+    // registers stay accessible to regDMA at TOP power-down/restore. The driver
+    // otherwise only enables it transiently around config writes, leaving it
+    // gated at sleep entry, which makes regDMA back up/restore zeros.
+    #[cfg(sleep_pd_retention)]
+    pub(super) _retention_clock: Option<SpiClockGuard>,
 }
 
 impl<'d> SpiWrapper<'d> {
@@ -55,6 +67,10 @@ impl<'d> SpiWrapper<'d> {
         let this = Self {
             spi: spi.degrade(),
             _guard: PeripheralGuard::new(p),
+            #[cfg(sleep_pd_retention)]
+            power: crate::rtc_cntl::retention::PowerManagement::new(),
+            #[cfg(sleep_pd_retention)]
+            _retention_clock: None,
         };
 
         // Initialize state
@@ -101,6 +117,8 @@ impl Drop for SpiWrapper<'_> {
     }
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(super) struct SpiClockGuard {
     clock: SpiInstance,
 }
