@@ -2419,7 +2419,7 @@ pub mod lp_uart {
                 })
             });
             self.uart.register_block().clk_conf().modify(|_, w| {
-                w.rx_sclk_en().set_bit();
+                w.sclk_en().set_bit();
                 w.tx_sclk_en().set_bit()
             });
 
