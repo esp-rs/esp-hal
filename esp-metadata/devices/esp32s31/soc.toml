@@ -49,6 +49,7 @@ peripherals = [
     { name = "HP_ALIVE_SYS" },
     { name = "HP_SYS_CLKRST" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
+    { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C", stable = true },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
@@ -120,6 +121,27 @@ ram_size = 128
 version = 2
 peripheral_controls_mem_clk = true
 has_sclk_enable = true
+
+[device.i2c_master]
+support_status = "supported"
+version = 3
+instances = [
+    { name = "i2c0", sys_instance = "I2c0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2c1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
+]
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_reliable_fsm_reset = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
+has_pd_en = true
 
 [device.systimer]
 

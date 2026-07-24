@@ -97,6 +97,12 @@ Our self-hosted runners have the following setup:
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
+- ESP32-S31 (`esp32s31-jtag`):
+  - Devkit: `ESP32-S31-DevKitC-1` connected via UART (`UART` port).
+    - `GPIO6` and `GPIO7` are I2C pins.
+    - `GPIO2` and `GPIO3` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
   - Devkit: `ESP32-DevKitC-V4` connected via UART (`UART` port).
     - `GPIO32` and `GPIO33` are I2C pins.
@@ -104,6 +110,7 @@ Our self-hosted runners have the following setup:
   - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
   - RPi: Raspbian 12 configured with the following [setup]
 
+[connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware.html#configure-hardware

@@ -103,6 +103,63 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("i2c_master.version") => {
+        3
+    };
+    ("i2c_master.version", str) => {
+        stringify!(3)
+    };
+    ("i2c_master.has_fsm_timeouts") => {
+        true
+    };
+    ("i2c_master.has_hw_bus_clear") => {
+        true
+    };
+    ("i2c_master.has_bus_timeout_enable") => {
+        true
+    };
+    ("i2c_master.separate_filter_config_registers") => {
+        false
+    };
+    ("i2c_master.can_estimate_nack_reason") => {
+        true
+    };
+    ("i2c_master.has_conf_update") => {
+        true
+    };
+    ("i2c_master.has_reliable_fsm_reset") => {
+        true
+    };
+    ("i2c_master.has_arbitration_en") => {
+        true
+    };
+    ("i2c_master.has_tx_fifo_watermark") => {
+        true
+    };
+    ("i2c_master.bus_timeout_is_exponential") => {
+        true
+    };
+    ("i2c_master.has_pd_en") => {
+        true
+    };
+    ("i2c_master.max_bus_timeout") => {
+        31
+    };
+    ("i2c_master.max_bus_timeout", str) => {
+        stringify!(31)
+    };
+    ("i2c_master.ll_intr_mask") => {
+        262143
+    };
+    ("i2c_master.ll_intr_mask", str) => {
+        stringify!(262143)
+    };
+    ("i2c_master.fifo_size") => {
+        32
+    };
+    ("i2c_master.fifo_size", str) => {
+        stringify!(32)
+    };
     ("interrupts.status_registers") => {
         6
     };
@@ -650,6 +707,7 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cInstance {
             I2c0 = 0,
+            I2c1 = 1,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -986,7 +1044,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
-            i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
+            i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
             spi_function_clock: [Option<SpiFunctionClockConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
@@ -1005,7 +1063,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
-            i2c_function_clock_refcount: [u32; 1],
+            i2c_function_clock_refcount: [u32; 2],
             spi_function_clock_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
@@ -1056,6 +1114,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
+            }
+            /// Returns the current configuration of the I2C1_FUNCTION_CLOCK clock tree node
+            pub fn i2c1_function_clock(&self) -> Option<I2cFunctionClockConfig> {
+                self.i2c_function_clock[I2cInstance::I2c1 as usize]
             }
             /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
             pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
@@ -1121,7 +1183,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk: None,
                 lp_slow_clk: None,
                 timg_calibration_clock: None,
-                i2c_function_clock: [None; 1],
+                i2c_function_clock: [None; 2],
                 spi_function_clock: [None; 1],
                 timg_function_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
@@ -1140,7 +1202,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
-                i2c_function_clock_refcount: [0; 1],
+                i2c_function_clock_refcount: [0; 2],
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
@@ -1165,8 +1227,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static SPI_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static TIMG_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
@@ -2463,6 +2525,8 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// I2C0 peripheral clock signal
             I2c0,
+            /// I2C1 peripheral clock signal
+            I2c1,
             /// SPI2 peripheral clock signal
             Spi2,
             /// SYSTIMER peripheral clock signal
@@ -2487,6 +2551,7 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::I2c0,
+                Self::I2c1,
                 Self::Spi2,
                 Self::Systimer,
                 Self::Timg0,
@@ -2504,6 +2569,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .i2c0_ctrl0()
                         .modify(|_, w| w.i2c0_apb_clk_en().bit(enable).i2c0_clk_en().bit(enable));
+                }
+                Peripheral::I2c1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2c1_ctrl0()
+                        .modify(|_, w| w.i2c1_apb_clk_en().bit(enable).i2c1_clk_en().bit(enable));
                 }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -2594,6 +2664,11 @@ macro_rules! implement_peripheral_clocks {
                         .i2c0_ctrl0()
                         .modify(|_, w| w.i2c0_rst_en().bit(reset));
                 }
+                Peripheral::I2c1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2c1_ctrl0()
+                        .modify(|_, w| w.i2c1_rst_en().bit(reset));
+                }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .gpspi2_ctrl0()
@@ -2682,6 +2757,33 @@ macro_rules! memory_range {
     };
     (size as str, "DRAM2_UNINIT") => {
         "8176"
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the I2C master driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $scl:ident, $sda:ident)`
+///
+/// Macro fragments:
+/// - `$id`: the index of the I2C instance
+/// - `$instance`: the name of the I2C instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$scl`, `$sda`: peripheral signal names.
+///
+/// Example data: `(0, I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_i2c_master {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2c_master { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_i2c_master!((0, I2C0, I2c0, I2CEXT0_SCL, I2CEXT0_SDA));
+        _for_each_inner_i2c_master!((1, I2C1, I2c1, I2CEXT1_SCL, I2CEXT1_SDA));
+        _for_each_inner_i2c_master!((all(0, I2C0, I2c0, I2CEXT0_SCL, I2CEXT0_SDA), (1,
+        I2C1, I2c1, I2CEXT1_SCL, I2CEXT1_SDA)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
@@ -2952,7 +3054,9 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "I2C1 peripheral singleton"]
+        I2C1 <= I2C1(I2C1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -3056,7 +3160,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((HP_ALIVE_SYS(unstable)));
         _for_each_inner_peripheral!((HP_SYS_CLKRST(unstable)));
-        _for_each_inner_peripheral!((I2C0));
+        _for_each_inner_peripheral!((I2C0)); _for_each_inner_peripheral!((I2C1));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
         _for_each_inner_peripheral!((IO_MUX(unstable)));
@@ -3273,6 +3377,8 @@ macro_rules! for_each_peripheral {
         "HP_SYS_CLKRST peripheral singleton"] HP_SYS_CLKRST <= HP_SYS_CLKRST()
         (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C0
         : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "I2C1 peripheral singleton"] I2C1 <= I2C1(I2C1 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <=
         INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -3329,7 +3435,7 @@ macro_rules! for_each_peripheral {
         (GPIO61), (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)),
         (CNNT_SYS(unstable)), (EFUSE(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
         (HP_APM(unstable)), (HP_MEM_APM(unstable)), (HP_SYS(unstable)),
-        (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0),
+        (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1),
         (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
         (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)), (LP_PERI(unstable)),
         (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
