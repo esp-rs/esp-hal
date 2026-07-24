@@ -393,6 +393,8 @@ unstable_driver! {
     pub mod sdmmc;
     #[cfg(sha_driver_supported)]
     pub mod sha;
+    #[cfg(sdm_driver_supported)]
+    pub mod sdm;
     #[cfg(touch_driver_supported)]
     pub mod touch;
     #[cfg(soc_has_trace0)]

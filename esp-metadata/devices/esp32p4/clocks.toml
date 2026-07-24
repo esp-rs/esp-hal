@@ -19,6 +19,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
 
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+    ] },
+
     # MPLL divider taps
     { name = "PLL_F25M",  type = "generic", output = "MPLL_CLK / 20" },
     { name = "PLL_F50M",  type = "generic", output = "MPLL_CLK / 10" },
@@ -180,7 +185,9 @@ peripheral_clocks = { templates = [
     { name = "Iomux", template_params = { clk_en_template = "{{control}}::regs().peri_clk_ctrl26().modify(|_, w| w.iomux_clk_en().bit(enable));", rst_group = "1" }, keep_enabled = true },
     # PWM/Counter/RMT -- LCD/CAM clock gate lives in SOC_CLK_CTRL3 (not modelled in current PAC), keep stub.
     { name = "Ledc",   template_params = { rst_group = "1", rst_field = "ledc" } },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Pcnt",   template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1" } },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Mcpwm0", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "pwm0" } },
     { name = "Mcpwm1", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "1", rst_field = "pwm1" } },
     # NOTE: `rmt_sys_clk_en` despite the name lives on SOC_CLK_CTRL2, not CTRL1.

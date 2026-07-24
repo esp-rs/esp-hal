@@ -42,6 +42,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::new(0)),
         ahb_clk: Some(AhbClkConfig::new(0)),
         apb_clk: Some(ApbClkConfig::new(0)),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF48m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -306,6 +307,27 @@ fn configure_apb_clk_impl(
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
+}
+
+// IOMUX_FUNCTION_CLOCK
+
+fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .iomux_clk_conf()
+        .modify(|_, w| w.iomux_func_clk_en().bit(en));
+}
+
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::XtalClk => 0,
+            IomuxFunctionClockConfig::PllF48m => 2,
+        })
+    });
 }
 
 // XTAL_D2_CLK

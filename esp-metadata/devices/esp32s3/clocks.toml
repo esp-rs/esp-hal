@@ -157,6 +157,7 @@ peripheral_clocks = { templates = [
     { name = "Ledc" },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },

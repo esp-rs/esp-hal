@@ -373,6 +373,15 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(384)
     };
+    ("sdm.channel_count") => {
+        4
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(4)
+    };
+    ("sdm.default_clock_source") => {
+        "pll_f48m"
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -1094,6 +1103,18 @@ macro_rules! for_each_sha_algorithm {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
@@ -1145,6 +1166,20 @@ macro_rules! for_each_wakeup_source {
 /// // RC_FAST_CLK
 ///
 /// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// // IOMUX_FUNCTION_CLOCK
+///
+/// fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_iomux_function_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<IomuxFunctionClockConfig>,
+///     _new_config: IomuxFunctionClockConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -1480,6 +1515,16 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum IomuxFunctionClockConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            #[default]
+            /// Selects `PLL_F48M_CLK`.
+            PllF48m,
+        }
         /// The list of clock signals that the `HP_ROOT_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1810,6 +1855,7 @@ macro_rules! define_clock_tree_types {
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
+            iomux_function_clock: Option<IomuxFunctionClockConfig>,
             hp_root_clk: Option<HpRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
             ahb_clk: Option<AhbClkConfig>,
@@ -1830,6 +1876,7 @@ macro_rules! define_clock_tree_types {
             pll_f96m_clk_refcount: u32,
             pll_f48m_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
+            iomux_function_clock_refcount: u32,
             xtal32k_clk_refcount: u32,
             hp_root_clk_refcount: u32,
             apb_clk_refcount: u32,
@@ -1854,6 +1901,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the XTAL_CLK clock tree node
             pub fn xtal_clk(&self) -> Option<XtalClkConfig> {
                 self.xtal_clk
+            }
+            /// Returns the current configuration of the IOMUX_FUNCTION_CLOCK clock tree node
+            pub fn iomux_function_clock(&self) -> Option<IomuxFunctionClockConfig> {
+                self.iomux_function_clock
             }
             /// Returns the current configuration of the HP_ROOT_CLK clock tree node
             pub fn hp_root_clk(&self) -> Option<HpRootClkConfig> {
@@ -1947,6 +1998,7 @@ macro_rules! define_clock_tree_types {
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
                 xtal_clk: None,
+                iomux_function_clock: None,
                 hp_root_clk: None,
                 cpu_clk: None,
                 ahb_clk: None,
@@ -1967,6 +2019,7 @@ macro_rules! define_clock_tree_types {
                 pll_f96m_clk_refcount: 0,
                 pll_f48m_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
+                iomux_function_clock_refcount: 0,
                 xtal32k_clk_refcount: 0,
                 hp_root_clk_refcount: 0,
                 apb_clk_refcount: 0,
@@ -1984,6 +2037,8 @@ macro_rules! define_clock_tree_types {
                 uart_baud_rate_generator_refcount: [0; 2],
             });
         static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static IOMUX_FUNCTION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static HP_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2114,6 +2169,74 @@ macro_rules! define_clock_tree_types {
         }
         pub fn rc_fast_clk_frequency() -> u32 {
             8000000
+        }
+        pub fn configure_iomux_function_clock(
+            clocks: &mut ClockTree,
+            new_selector: IomuxFunctionClockConfig,
+        ) {
+            let old_selector = clocks.iomux_function_clock.replace(new_selector);
+            refresh_iomux_function_clock_downstream(clocks);
+            if clocks.iomux_function_clock_refcount > 0 {
+                match new_selector {
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                        IomuxFunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                    }
+                }
+            } else {
+                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn iomux_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<IomuxFunctionClockConfig> {
+            clocks.iomux_function_clock
+        }
+        pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting IOMUX_FUNCTION_CLOCK");
+            if increment_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Enabling IOMUX_FUNCTION_CLOCK");
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
+                enable_iomux_function_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing IOMUX_FUNCTION_CLOCK");
+            if decrement_reference_count(&mut clocks.iomux_function_clock_refcount) {
+                trace!("Disabling IOMUX_FUNCTION_CLOCK");
+                enable_iomux_function_clock_impl(clocks, false);
+                match unwrap!(clocks.iomux_function_clock) {
+                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn iomux_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: IomuxFunctionClockConfig,
+        ) -> u32 {
+            match config {
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockConfig::PllF48m => pll_f48m_clk_frequency(),
+            }
+        }
+        pub fn iomux_function_clock_frequency() -> u32 {
+            IOMUX_FUNCTION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn iomux_function_clock_source_frequency(source: IomuxFunctionClockConfig) -> u32 {
+            match source {
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockConfig::PllF48m => pll_f48m_clk_frequency(),
+            }
         }
         pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL32K_CLK");
@@ -3315,6 +3438,8 @@ macro_rules! define_clock_tree_types {
         pub struct ClockConfig {
             /// `XTAL_CLK` configuration.
             pub xtal_clk: Option<XtalClkConfig>,
+            /// `IOMUX_FUNCTION_CLOCK` configuration.
+            pub iomux_function_clock: Option<IomuxFunctionClockConfig>,
             /// `HP_ROOT_CLK` configuration.
             pub hp_root_clk: Option<HpRootClkConfig>,
             /// `CPU_CLK` configuration.
@@ -3334,6 +3459,9 @@ macro_rules! define_clock_tree_types {
             fn apply(&self, clocks: &mut ClockTree) {
                 if let Some(config) = self.xtal_clk {
                     configure_xtal_clk(clocks, config);
+                }
+                if let Some(config) = self.iomux_function_clock {
+                    configure_iomux_function_clock(clocks, config);
                 }
                 if let Some(config) = self.hp_root_clk {
                     configure_hp_root_clk(clocks, config);
@@ -3375,6 +3503,7 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_iomux_function_clock_downstream(clocks);
             refresh_hp_root_clk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             for child_instance in [I2cInstance::I2c0, I2cInstance::I2c1] {
@@ -3399,6 +3528,14 @@ macro_rules! define_clock_tree_types {
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_iomux_function_clock_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.iomux_function_clock {
+                IOMUX_FUNCTION_CLOCK_FREQ_CACHE.store(
+                    iomux_function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
             }
         }
         fn refresh_hp_root_clk_downstream(clocks: &mut ClockTree) {
@@ -3576,6 +3713,8 @@ macro_rules! implement_peripheral_clocks {
             Ecdsa,
             /// ETM peripheral clock signal
             Etm,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// HMAC peripheral clock signal
             Hmac,
             /// I2C_EXT0 peripheral clock signal
@@ -3633,6 +3772,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecc,
                 Self::Ecdsa,
                 Self::Etm,
+                Self::GpioSd,
                 Self::Hmac,
                 Self::I2cExt0,
                 Self::I2cExt1,
@@ -3693,6 +3833,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .etm_conf()
                         .modify(|_, w| w.etm_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    crate::peripherals::GPIO_SD::regs()
+                        .clock_gate()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                    crate::peripherals::GPIO_SD::regs()
+                        .sigmadelta_misc()
+                        .modify(|_, w| w.function_clk_en().bit(enable));
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()
@@ -3849,6 +3997,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .etm_conf()
                         .modify(|_, w| w.etm_rst_en().bit(reset));
+                }
+                Peripheral::GpioSd => {
+                    let _ = reset;
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()

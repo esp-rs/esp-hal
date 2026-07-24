@@ -252,7 +252,10 @@ support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
+clock_sources = ["xtal", "pll_f80m"]
+default_clock_source = "pll_f80m"
 
 [device.spi_master]
 version = 3

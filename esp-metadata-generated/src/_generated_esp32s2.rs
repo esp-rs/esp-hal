@@ -349,6 +349,15 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sdm.channel_count") => {
+        8
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(8)
+    };
+    ("sdm.default_clock_source") => {
+        "apb"
+    };
     ("sleep.light_sleep") => {
         true
     };
@@ -931,6 +940,22 @@ macro_rules! for_each_sha_algorithm {
         "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4),
         (Sha512_224, "SHA-512/224"(sizes : 128, 28, 16) (insecure_against :), 5),
         (Sha512_256, "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((4, GPIO_SD4)); _for_each_inner_sdm_channel!((5,
+        GPIO_SD5)); _for_each_inner_sdm_channel!((6, GPIO_SD6));
+        _for_each_inner_sdm_channel!((7, GPIO_SD7));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3), (4, GPIO_SD4), (5, GPIO_SD5), (6, GPIO_SD6), (7,
+        GPIO_SD7)));
     };
 }
 #[macro_export]
@@ -3627,6 +3652,8 @@ macro_rules! implement_peripheral_clocks {
             DedicatedGpio,
             /// DS peripheral clock signal
             Ds,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// HMAC peripheral clock signal
             Hmac,
             /// I2C_EXT0 peripheral clock signal
@@ -3691,6 +3718,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::CryptoDma,
                 Self::DedicatedGpio,
                 Self::Ds,
+                Self::GpioSd,
                 Self::Hmac,
                 Self::I2cExt0,
                 Self::I2cExt1,
@@ -3750,6 +3778,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en1()
                         .modify(|_, w| w.crypto_ds_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    crate::peripherals::GPIO_SD::regs()
+                        .clock_gate()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                    crate::peripherals::GPIO_SD::regs()
+                        .sigmadelta_misc()
+                        .modify(|_, w| w.function_clk_en().bit(enable));
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()
@@ -3921,6 +3957,9 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en1()
                         .modify(|_, w| w.crypto_ds_rst().bit(reset));
+                }
+                Peripheral::GpioSd => {
+                    let _ = reset;
                 }
                 Peripheral::Hmac => {
                     crate::peripherals::SYSTEM::regs()

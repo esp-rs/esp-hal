@@ -227,7 +227,10 @@ support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 8
+clock_sources = ["apb"]
+default_clock_source = "apb"
 
 [device.spi_master]
 version = 2

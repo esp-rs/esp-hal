@@ -338,7 +338,10 @@ support_status = { status = "not_supported", issue = 5164 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
+clock_sources = ["xtal", "pll_f80m"]
+default_clock_source = "pll_f80m"
 
 [device.lp_uart]
 support_status = { status = "not_supported", issue = 5155 }

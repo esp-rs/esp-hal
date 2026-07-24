@@ -5,6 +5,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F64M_CLK", type = "generic",                    output = "PLL_F96M_CLK * 2 / 3" },
     { name = "PLL_F48M_CLK", type = "generic",                    output = "PLL_F96M_CLK / 2" },
     { name = "RC_FAST_CLK",  type = "source",                     output = "8_000_000" },
+
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        { name = "PLL_F48M", outputs = "PLL_F48M_CLK", default = true },
+    ] },
     
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",                        output = "32768" },
@@ -130,6 +135,7 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },
     { name = "Ledc" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Systimer", keep_enabled = true },

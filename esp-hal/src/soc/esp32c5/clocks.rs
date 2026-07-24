@@ -52,6 +52,7 @@ impl CpuClock {
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -63,6 +64,7 @@ impl CpuClock {
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
@@ -74,6 +76,7 @@ impl CpuClock {
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,
     };
 }
@@ -460,6 +463,28 @@ fn configure_crypto_clk_impl(
             CryptoClkConfig::Xtal => 0,
             CryptoClkConfig::Fosc => 1,
             CryptoClkConfig::PllF480m => 2,
+        })
+    });
+}
+
+// IOMUX_FUNCTION_CLOCK
+
+fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .iomux_clk_conf()
+        .modify(|_, w| w.iomux_func_clk_en().bit(en));
+}
+
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::XtalClk => 0,
+            IomuxFunctionClockConfig::RcFastClk => 1,
+            IomuxFunctionClockConfig::PllF80m => 2,
         })
     });
 }
