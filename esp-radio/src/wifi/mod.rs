@@ -75,21 +75,21 @@
 //! authentication failures on some hardware. If connections are unreliable, lower the maximum with
 //! `WifiController::set_max_tx_power` (requires the `unstable` feature). Its unit is 0.25 dBm and
 //! the range is [8, 84], so for example 64 is 16 dBm.
-//!
-//! ## Power saving
-//!
-//! The following options are available to reduce Wi-Fi power consumption:
-//!
-//! **Power Save Mode (PSM)** -- Using [`WifiController::set_power_saving`] to activate a
-//! [`PowerSaveMode`] allows the modem to turn off between beacon intervals. This is also known as
-//! modem sleep. Applications that send packets frequently may not see any benefit from this
-//! however.
 #![cfg_attr(
-    wifi_has_wifi6,
-    doc = r#"
-**Target Wake Time (TWT)** -- On Wi-Fi 6 (802.11ax) networks using [`WifiController::itwt_setup`] to negotiate
-an individual TWT can significantly lower power consumption, even at high transmit rates.
-"#
+    feature = "unstable",
+    doc = "## Power saving
+
+The following options are available to reduce Wi-Fi power consumption:
+
+**Power Save Mode (PSM)** -- Using [`WifiController::set_power_saving`] to activate a
+[`PowerSaveMode`] allows the modem to turn off between beacon intervals. This is also known as
+modem sleep. Applications that send packets frequently may not see any benefit from this
+however."
+)]
+#![cfg_attr(
+    all(feature = "unstable", wifi_has_wifi6),
+    doc = "**Target Wake Time (TWT)** -- On Wi-Fi 6 (802.11ax) networks using [`WifiController::itwt_setup`] to negotiate
+an individual TWT can significantly lower power consumption, even at high transmit rates."
 )]
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
