@@ -640,6 +640,9 @@ jobs:
           - soc: esp32c6
             runner: esp32c6-radio
             host: aarch64
+          - soc: esp32s3
+            runner: esp32s3-radio
+            host: aarch64
     steps:
       - uses: actions/download-artifact@v4
         with:
