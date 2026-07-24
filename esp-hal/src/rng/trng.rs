@@ -6,6 +6,8 @@ static TRNG_ENABLED: AtomicUsize = AtomicUsize::new(0);
 static TRNG_USERS: AtomicUsize = AtomicUsize::new(0);
 
 use super::Rng;
+#[cfg(not(esp32))]
+use crate::analog::adc::SarAdcGuard;
 use crate::peripherals::{ADC1, RNG};
 
 /// Ensures random numbers are cryptographically secure.
@@ -13,16 +15,26 @@ use crate::peripherals::{ADC1, RNG};
 pub struct TrngSource<'d> {
     _rng: RNG<'d>,
     _adc: ADC1<'d>,
+    #[cfg(not(esp32))]
+    _apb_saradc_guard: SarAdcGuard,
 }
 
 impl<'d> TrngSource<'d> {
     /// Enables the SAR ADC entropy source.
     // TODO: this is not final. A single ADC channel should be sufficient.
     #[instability::unstable]
-    pub fn new(_rng: RNG<'d>, _adc: ADC1<'d>) -> Self {
+    pub fn new(rng: RNG<'d>, adc: ADC1<'d>) -> Self {
+        #[cfg(not(esp32))]
+        let apb_saradc_guard = SarAdcGuard::new();
+
         crate::soc::trng::ensure_randomness();
         unsafe { Self::increase_entropy_source_counter() }
-        Self { _rng, _adc }
+        Self {
+            _rng: rng,
+            _adc: adc,
+            #[cfg(not(esp32))]
+            _apb_saradc_guard: apb_saradc_guard,
+        }
     }
 
     /// Increases the internal entropy source counter.
