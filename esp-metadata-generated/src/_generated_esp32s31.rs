@@ -2631,43 +2631,23 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart0_ctrl0()
-                        .modify(|_, w| {
-                            w.uart0_sys_clk_en()
-                                .bit(enable)
-                                .uart0_apb_clk_en()
-                                .bit(enable)
-                        });
+                        .uart_ctrl0(0)
+                        .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
                 }
                 Peripheral::Uart1 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart1_ctrl0()
-                        .modify(|_, w| {
-                            w.uart1_sys_clk_en()
-                                .bit(enable)
-                                .uart1_apb_clk_en()
-                                .bit(enable)
-                        });
+                        .uart_ctrl0(1)
+                        .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
                 }
                 Peripheral::Uart2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart2_ctrl0()
-                        .modify(|_, w| {
-                            w.uart2_sys_clk_en()
-                                .bit(enable)
-                                .uart2_apb_clk_en()
-                                .bit(enable)
-                        });
+                        .uart_ctrl0(2)
+                        .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
                 }
                 Peripheral::Uart3 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart3_ctrl0()
-                        .modify(|_, w| {
-                            w.uart3_sys_clk_en()
-                                .bit(enable)
-                                .uart3_apb_clk_en()
-                                .bit(enable)
-                        });
+                        .uart_ctrl0(3)
+                        .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
                 }
                 Peripheral::UsbHs => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -2710,43 +2690,23 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart0_ctrl0()
-                        .modify(|_, w| {
-                            w.uart0_core_rst_en()
-                                .bit(reset)
-                                .uart0_apb_rst_en()
-                                .bit(reset)
-                        });
+                        .uart_ctrl0(0)
+                        .modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));
                 }
                 Peripheral::Uart1 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart1_ctrl0()
-                        .modify(|_, w| {
-                            w.uart1_core_rst_en()
-                                .bit(reset)
-                                .uart1_apb_rst_en()
-                                .bit(reset)
-                        });
+                        .uart_ctrl0(1)
+                        .modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));
                 }
                 Peripheral::Uart2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart2_ctrl0()
-                        .modify(|_, w| {
-                            w.uart2_core_rst_en()
-                                .bit(reset)
-                                .uart2_apb_rst_en()
-                                .bit(reset)
-                        });
+                        .uart_ctrl0(2)
+                        .modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));
                 }
                 Peripheral::Uart3 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .uart3_ctrl0()
-                        .modify(|_, w| {
-                            w.uart3_core_rst_en()
-                                .bit(reset)
-                                .uart3_apb_rst_en()
-                                .bit(reset)
-                        });
+                        .uart_ctrl0(3)
+                        .modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));
                 }
                 Peripheral::UsbHs => {
                     let _ = reset;

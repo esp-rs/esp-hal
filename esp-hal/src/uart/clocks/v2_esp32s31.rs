@@ -12,13 +12,9 @@ use crate::{
 
 impl UartInstance {
     pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let regs = HP_SYS_CLKRST::regs();
-        match self {
-            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| w.uart0_clk_en().bit(en)),
-            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| w.uart1_clk_en().bit(en)),
-            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| w.uart2_clk_en().bit(en)),
-            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| w.uart3_clk_en().bit(en)),
-        };
+        HP_SYS_CLKRST::regs()
+            .uart_ctrl0(self as usize)
+            .modify(|_, w| w.clk_en().bit(en));
     }
 
     pub(crate) fn configure_function_clock_impl(
@@ -33,33 +29,14 @@ impl UartInstance {
             UartFunctionClockSclk::PllF80m => 2,
         };
         let divider = new_config.div_num() as u8;
-        let regs = HP_SYS_CLKRST::regs();
-        match self {
-            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| unsafe {
-                w.uart0_clk_src_sel().bits(source);
-                w.uart0_sclk_div_num().bits(divider);
-                w.uart0_sclk_div_numerator().bits(0);
-                w.uart0_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| unsafe {
-                w.uart1_clk_src_sel().bits(source);
-                w.uart1_sclk_div_num().bits(divider);
-                w.uart1_sclk_div_numerator().bits(0);
-                w.uart1_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| unsafe {
-                w.uart2_clk_src_sel().bits(source);
-                w.uart2_sclk_div_num().bits(divider);
-                w.uart2_sclk_div_numerator().bits(0);
-                w.uart2_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| unsafe {
-                w.uart3_clk_src_sel().bits(source);
-                w.uart3_sclk_div_num().bits(divider);
-                w.uart3_sclk_div_numerator().bits(0);
-                w.uart3_sclk_div_denominator().bits(0)
-            }),
-        };
+        HP_SYS_CLKRST::regs()
+            .uart_ctrl0(self as usize)
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(source);
+                w.sclk_div_num().bits(divider);
+                w.sclk_div_numerator().bits(0);
+                w.sclk_div_denominator().bits(0)
+            });
     }
 
     pub(crate) fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
@@ -70,40 +47,25 @@ impl UartInstance {
         if en {
             // UART1-3 memories are powered down after reset. Hand control back to
             // the PMU and request the memory to remain powered while active.
+            macro_rules! power_up_memory {
+                ($register:expr) => {
+                    $register.modify(|_, w| unsafe {
+                        w.mem_lp_mode()
+                            .bits(2)
+                            .mem_lp_en()
+                            .clear_bit()
+                            .mem_force_ctrl()
+                            .clear_bit()
+                    })
+                };
+            }
+
             let regs = HP_SYS::regs();
             match self {
-                UartInstance::Uart0 => regs.uart0_mem_lp_ctrl().modify(|_, w| unsafe {
-                    w.uart0_mem_lp_mode()
-                        .bits(2)
-                        .uart0_mem_lp_en()
-                        .clear_bit()
-                        .uart0_mem_force_ctrl()
-                        .clear_bit()
-                }),
-                UartInstance::Uart1 => regs.uart1_mem_lp_ctrl().modify(|_, w| unsafe {
-                    w.uart1_mem_lp_mode()
-                        .bits(2)
-                        .uart1_mem_lp_en()
-                        .clear_bit()
-                        .uart1_mem_force_ctrl()
-                        .clear_bit()
-                }),
-                UartInstance::Uart2 => regs.uart2_mem_lp_ctrl().modify(|_, w| unsafe {
-                    w.uart2_mem_lp_mode()
-                        .bits(2)
-                        .uart2_mem_lp_en()
-                        .clear_bit()
-                        .uart2_mem_force_ctrl()
-                        .clear_bit()
-                }),
-                UartInstance::Uart3 => regs.uart3_mem_lp_ctrl().modify(|_, w| unsafe {
-                    w.uart3_mem_lp_mode()
-                        .bits(2)
-                        .uart3_mem_lp_en()
-                        .clear_bit()
-                        .uart3_mem_force_ctrl()
-                        .clear_bit()
-                }),
+                UartInstance::Uart0 => power_up_memory!(regs.uart0_mem_lp_ctrl()),
+                UartInstance::Uart1 => power_up_memory!(regs.uart1_mem_lp_ctrl()),
+                UartInstance::Uart2 => power_up_memory!(regs.uart2_mem_lp_ctrl()),
+                UartInstance::Uart3 => power_up_memory!(regs.uart3_mem_lp_ctrl()),
             };
         }
 
