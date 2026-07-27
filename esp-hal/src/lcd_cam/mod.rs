@@ -254,16 +254,19 @@ fn calculate_closest_divider(
     desired_frequency: u32,
 ) -> Option<ClockDivider> {
     let div_num = source_frequency / desired_frequency;
-    if div_num < 2 {
+    // For current chips, LCD and CAM have the same divider range.
+    let (min_divider, max_divider) = property!("clock_tree.lcd_cam.lcd_clock.div_num");
+    let (_, max_denom) = property!("clock_tree.lcd_cam.lcd_clock.div_a");
+    if div_num < min_divider {
         // Source clock isn't fast enough to reach the desired frequency.
         // Return max output.
         return Some(ClockDivider {
-            div_num: 2,
+            div_num: min_divider,
             div_b: 0,
             div_a: 1,
         });
     }
-    if div_num > 256 {
+    if div_num > max_divider {
         // Source is too fast to divide to the desired frequency. Return None.
         return None;
     }
@@ -285,7 +288,7 @@ fn calculate_closest_divider(
         }
     } else {
         let target = div_fraction;
-        let closest = farey_sequence(63).find(|curr| {
+        let closest = farey_sequence(max_denom).find(|curr| {
             // https://en.wikipedia.org/wiki/Fraction#Adding_unlike_quantities
 
             let new_curr_num = curr.numerator * target.denominator;
