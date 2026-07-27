@@ -97,7 +97,7 @@ macro_rules! common_test_pins {
             any(esp32s2, esp32s3, esp32c5) => ($peripherals.GPIO9, $peripherals.GPIO10),
             esp32 => ($peripherals.GPIO2, $peripherals.GPIO4),
             esp32p4 => ($peripherals.GPIO5, $peripherals.GPIO6),
-            // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
+            // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3, esp32s31
             _ => ($peripherals.GPIO2, $peripherals.GPIO3),
         }
     }};
@@ -113,7 +113,7 @@ macro_rules! unconnected_pin {
             esp32c2 => $peripherals.GPIO8,
             esp32c5 => $peripherals.GPIO28,
             esp32p4 => $peripherals.GPIO35,
-            // esp32c3, esp32c6, esp32c61, esp32h2
+            // esp32c3, esp32c6, esp32c61, esp32h2, esp32s31
             _ => $peripherals.GPIO9,
         }
     }};
