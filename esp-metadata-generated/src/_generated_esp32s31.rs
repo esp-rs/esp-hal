@@ -2785,8 +2785,8 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::I2c0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .i2c0_ctrl0()
-                        .modify(|_, w| w.i2c0_apb_clk_en().bit(enable).i2c0_clk_en().bit(enable));
+                        .i2c_ctrl0(0)
+                        .modify(|_, w| w.apb_clk_en().bit(enable).clk_en().bit(enable));
                 }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -2869,8 +2869,8 @@ macro_rules! implement_peripheral_clocks {
                 }
                 Peripheral::I2c0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
-                        .i2c0_ctrl0()
-                        .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                        .i2c_ctrl0(0)
+                        .modify(|_, w| w.rst_en().bit(reset));
                 }
                 Peripheral::Spi2 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()

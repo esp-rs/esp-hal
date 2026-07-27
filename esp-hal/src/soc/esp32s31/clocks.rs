@@ -411,13 +411,15 @@ impl I2cInstance {
         _old: Option<I2cFunctionClockConfig>,
         new: I2cFunctionClockConfig,
     ) {
-        HP_SYS_CLKRST::regs().i2c0_ctrl0().modify(|_, w| unsafe {
-            w.i2c0_clk_src_sel()
-                .bit(matches!(new.sclk(), I2cFunctionClockSclk::RcFast));
-            w.i2c0_clk_div_num().bits(new.div_num() as u8);
-            w.i2c0_clk_div_numerator().bits(0);
-            w.i2c0_clk_div_denominator().bits(0)
-        });
+        HP_SYS_CLKRST::regs()
+            .i2c_ctrl0(self as usize)
+            .modify(|_, w| unsafe {
+                w.clk_src_sel()
+                    .bit(matches!(new.sclk(), I2cFunctionClockSclk::RcFast));
+                w.clk_div_num().bits(new.div_num() as u8);
+                w.clk_div_numerator().bits(0);
+                w.clk_div_denominator().bits(0)
+            });
     }
 }
 

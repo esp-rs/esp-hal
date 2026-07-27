@@ -47,26 +47,23 @@ impl UartInstance {
         if en {
             // UART1-3 memories are powered down after reset. Hand control back to
             // the PMU and request the memory to remain powered while active.
-            macro_rules! power_up_memory {
-                ($register:expr) => {
-                    $register.modify(|_, w| unsafe {
-                        w.mem_lp_mode()
-                            .bits(2)
-                            .mem_lp_en()
-                            .clear_bit()
-                            .mem_force_ctrl()
-                            .clear_bit()
-                    })
-                };
-            }
-
             let regs = HP_SYS::regs();
-            match self {
-                UartInstance::Uart0 => power_up_memory!(regs.uart0_mem_lp_ctrl()),
-                UartInstance::Uart1 => power_up_memory!(regs.uart1_mem_lp_ctrl()),
-                UartInstance::Uart2 => power_up_memory!(regs.uart2_mem_lp_ctrl()),
-                UartInstance::Uart3 => power_up_memory!(regs.uart3_mem_lp_ctrl()),
+            let register = match self {
+                UartInstance::Uart0 => None,
+                UartInstance::Uart1 => Some(regs.uart1_mem_lp_ctrl()),
+                UartInstance::Uart2 => Some(regs.uart2_mem_lp_ctrl()),
+                UartInstance::Uart3 => Some(regs.uart3_mem_lp_ctrl()),
             };
+            if let Some(register) = register {
+                register.modify(|_, w| unsafe {
+                    w.mem_lp_mode()
+                        .bits(2)
+                        .mem_lp_en()
+                        .clear_bit()
+                        .mem_force_ctrl()
+                        .clear_bit()
+                });
+            }
         }
 
         let regs = match self {
