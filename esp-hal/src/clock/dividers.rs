@@ -6,8 +6,8 @@
 // Which parts of this module are used depends on the set of drivers supported by the target chip.
 #![allow(dead_code)]
 
-/// The largest denominator [`FractionalDivider::new`] can be asked for, so that scaling a
-/// numerator by a denominator stays within a `u64`. Hardware fields are far narrower than this.
+/// The largest denominator [`FractionalDivider::new`] can be asked for, so that comparing the
+/// error of two candidates stays within a `u64`. Hardware fields are far narrower than this.
 const MAX_DENOMINATOR: u32 = 1 << 16;
 
 #[derive(Clone, Copy)]
@@ -16,22 +16,54 @@ pub(crate) struct Fraction {
     pub denominator: u32,
 }
 
-/// Returns the fraction closest to `target` for every denominator from 1 to `max_denominator`.
+/// Returns the fraction closest to `target` for each denominator from 1 to `max_denominator`,
+/// stopping early if one of them represents `target` exactly.
 ///
 /// A denominator only admits one closest numerator, so the closest fraction overall is whichever
 /// of these is closest.
 ///
 /// `target` must be between 0 and 1.
 fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Fraction> {
-    (1..=max_denominator).map(move |denominator| {
-        // The closest numerator is `target * denominator`, rounded to the nearest integer.
-        let scaled = target.numerator as u64 * denominator as u64;
-        let numerator = (scaled + target.denominator as u64 / 2) / target.denominator as u64;
+    let Fraction {
+        numerator: n,
+        denominator: d,
+    } = target;
 
-        Fraction {
-            numerator: numerator as u32,
-            denominator,
+    // `acc` tracks `denominator * n % d` and `whole` tracks `denominator * n / d`, so that no
+    // division is needed per candidate. Stepping `acc` by `n` without overflowing means
+    // subtracting the complement whenever it would wrap past `d` instead of adding to it.
+    let complement = d - n;
+    let mut acc = 0_u32;
+    let mut whole = 0_u32;
+
+    let mut denominator = 0;
+    let mut exact = false;
+
+    core::iter::from_fn(move || {
+        if exact || denominator == max_denominator {
+            return None;
         }
+        denominator += 1;
+
+        if acc >= complement {
+            acc -= complement;
+            whole += 1;
+        } else {
+            acc += n;
+        }
+
+        // A zero remainder means this denominator represents the target exactly, so no larger
+        // one can do better.
+        exact = acc == 0;
+
+        // Round to nearest: `acc` is how far the target is above `whole`, `d - acc` how far it
+        // is below the next integer.
+        let numerator = if acc <= d - acc { whole } else { whole + 1 };
+
+        Some(Fraction {
+            numerator,
+            denominator,
+        })
     })
 }
 
