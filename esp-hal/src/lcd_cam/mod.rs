@@ -231,7 +231,7 @@ pub(crate) fn calculate_clkm(
     desired_frequency: u32,
     source_frequencies: &[u32],
 ) -> Result<(usize, ClockDivider), ClockError> {
-    let mut result_freq = 0;
+    let mut result_error = 0;
     let mut result = None;
 
     for (i, &source_frequency) in source_frequencies.iter().enumerate() {
@@ -239,10 +239,14 @@ pub(crate) fn calculate_clkm(
             continue;
         };
 
-        let freq = divider.output_frequency(source_frequency);
-        if result.is_none() || freq > result_freq {
+        // A divider may land either side of the desired frequency, so pick the source that gets
+        // closest to it.
+        let error = divider
+            .output_frequency(source_frequency)
+            .abs_diff(desired_frequency);
+        if result.is_none() || error < result_error {
             result = Some((i, divider));
-            result_freq = freq;
+            result_error = error;
         }
     }
 
