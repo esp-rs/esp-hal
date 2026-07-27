@@ -31,6 +31,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use serde::Deserialize;
@@ -39,12 +40,14 @@ use crate::{
     cfg::{
         ClockTreeNodeInstance,
         clock_tree::{
+            Bounds,
             ClockTreeNodeType,
             Expression,
             RejectExpression,
             SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
+            expr_compiler::Operand,
             human_readable_frequency,
         },
         soc::ProcessedClockData,
@@ -82,6 +85,15 @@ impl ClockTreeNodeType for Source {
         &self.name
     }
 
+    fn output_bounds(&self, instance: &ClockTreeNodeInstance, tree: &ProcessedClockData) -> Bounds {
+        let mut variables = IndexMap::new();
+        if let Some(values) = self.values.as_ref() {
+            variables.insert("VALUE", values.bounds());
+        }
+
+        self.output.0.bounds_in_tree(&variables, instance, tree)
+    }
+
     fn always_on(&self) -> bool {
         self.always_on
     }
@@ -115,7 +127,14 @@ impl ClockTreeNodeType for Source {
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            variables.insert("VALUE", quote! { config.value() });
+            let value_bounds = self
+                .values
+                .as_ref()
+                .map_or(Bounds::UNKNOWN, |values| values.bounds());
+            variables.insert(
+                "VALUE",
+                Operand::new(quote! { config.value() }, value_bounds),
+            );
 
             reject.to_rust(variables, instance, tree)
         });
@@ -313,6 +332,10 @@ pub struct DerivedClockSource {
 impl ClockTreeNodeType for DerivedClockSource {
     fn name(&self) -> &str {
         self.source_options.name()
+    }
+
+    fn output_bounds(&self, instance: &ClockTreeNodeInstance, tree: &ProcessedClockData) -> Bounds {
+        self.source_options.output_bounds(instance, tree)
     }
 
     fn wake_locking(&self) -> bool {

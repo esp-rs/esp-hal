@@ -196,17 +196,14 @@ impl Instance {
     }
 }
 pub(crate) struct ClockDivider {
-    // Integral LCD clock divider value. (8 bits)
-    // Value 0 is treated as 256
-    // Value 1 is treated as 2
-    // Value N is treated as N
-    pub div_num: usize,
+    /// Integral clock divider value, 2 to 256.
+    pub div_num: u32,
 
-    // Fractional clock divider numerator value. (6 bits)
-    pub div_b: usize,
+    /// Fractional clock divider numerator value, 0 to 63.
+    pub div_b: u32,
 
-    // Fractional clock divider denominator value. (6 bits)
-    pub div_a: usize,
+    /// Fractional clock divider denominator value, 1 to 63.
+    pub div_a: u32,
 }
 
 /// Clock configuration errors.
@@ -218,8 +215,8 @@ pub enum ClockError {
 }
 
 pub(crate) fn calculate_clkm(
-    desired_frequency: usize,
-    source_frequencies: &[usize],
+    desired_frequency: u32,
+    source_frequencies: &[u32],
 ) -> Result<(usize, ClockDivider), ClockError> {
     let mut result_freq = 0;
     let mut result = None;
@@ -238,51 +235,38 @@ pub(crate) fn calculate_clkm(
     result.ok_or(ClockError::FrequencyTooLow)
 }
 
-fn calculate_output_frequency(source_frequency: usize, divider: &ClockDivider) -> usize {
-    let n = match divider.div_num {
-        0 => 256,
-        1 => 2,
-        _ => divider.div_num.min(256),
-    };
+fn calculate_output_frequency(source_frequency: u32, divider: &ClockDivider) -> u32 {
+    // OUTPUT = SOURCE / (N + B/A)
+    // OUTPUT = SOURCE / ((NA + B)/A)
+    // OUTPUT = (SOURCE * A) / (NA + B)
 
-    if divider.div_b != 0 && divider.div_a != 0 {
-        // OUTPUT = SOURCE / (N + B/A)
-        // OUTPUT = SOURCE / ((NA + B)/A)
-        // OUTPUT = (SOURCE * A) / (NA + B)
+    // u64 is required to fit the numbers from this arithmetic.
+    let source = source_frequency as u64;
+    let n = divider.div_num as u64;
+    let a = divider.div_a as u64;
+    let b = divider.div_b as u64;
 
-        // u64 is required to fit the numbers from this arithmetic.
-
-        let source = source_frequency as u64;
-        let n = n as u64;
-        let a = divider.div_b as u64;
-        let b = divider.div_a as u64;
-
-        ((source * a) / (n * a + b)) as _
-    } else {
-        source_frequency / n
-    }
+    ((source * a) / (n * a + b)) as u32
 }
 
 fn calculate_closest_divider(
-    source_frequency: usize,
-    desired_frequency: usize,
+    source_frequency: u32,
+    desired_frequency: u32,
 ) -> Option<ClockDivider> {
     let div_num = source_frequency / desired_frequency;
     if div_num < 2 {
         // Source clock isn't fast enough to reach the desired frequency.
         // Return max output.
         return Some(ClockDivider {
-            div_num: 1,
+            div_num: 2,
             div_b: 0,
-            div_a: 0,
+            div_a: 1,
         });
     }
     if div_num > 256 {
         // Source is too fast to divide to the desired frequency. Return None.
         return None;
     }
-
-    let div_num = if div_num == 256 { 0 } else { div_num };
 
     let div_fraction = {
         let div_remainder = source_frequency % desired_frequency;
@@ -297,7 +281,7 @@ fn calculate_closest_divider(
         ClockDivider {
             div_num,
             div_b: 0,
-            div_a: 0,
+            div_a: 1,
         }
     } else {
         let target = div_fraction;
@@ -321,17 +305,17 @@ fn calculate_closest_divider(
 }
 
 // https://en.wikipedia.org/wiki/Euclidean_algorithm
-const fn hcf(a: usize, b: usize) -> usize {
+const fn hcf(a: u32, b: u32) -> u32 {
     if b != 0 { hcf(b, a % b) } else { a }
 }
 
 struct Fraction {
-    pub numerator: usize,
-    pub denominator: usize,
+    pub numerator: u32,
+    pub denominator: u32,
 }
 
 // https://en.wikipedia.org/wiki/Farey_sequence#Next_term
-fn farey_sequence(denominator: usize) -> impl Iterator<Item = Fraction> {
+fn farey_sequence(denominator: u32) -> impl Iterator<Item = Fraction> {
     let mut a = 0;
     let mut b = 1;
     let mut c = 1;

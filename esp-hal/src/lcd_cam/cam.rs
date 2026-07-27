@@ -67,7 +67,7 @@ use crate::{
     lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
-    soc::clocks::{ClockTree, LcdCamInstance},
+    soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -183,12 +183,14 @@ impl<'d> Camera<'d> {
     /// [`ConfigError::Clock`] will be returned if the frequency passed in
     /// `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let sources = property!("clock_tree.lcd_cam.cam_clock");
+        let sources = property!("clock_tree.lcd_cam.cam_clock.sclk");
         let (i, divider) = calculate_clkm(
-            config.frequency.as_hz() as _,
-            &sources.map(|source| LcdCamInstance::cam_clock_source_frequency(source) as usize),
+            config.frequency.as_hz(),
+            &sources.map(LcdCamInstance::cam_clock_source_frequency),
         )
         .map_err(ConfigError::Clock)?;
+        let clock_config =
+            LcdCamCamClockConfig::new(sources[i], divider.div_num, divider.div_a, divider.div_b);
 
         if let Some(value) = config.line_interrupt
             && value > 0b0111_1111
@@ -199,9 +201,6 @@ impl<'d> Camera<'d> {
         self.regs().cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
-                w.cam_clkm_div_num().bits(divider.div_num as _);
-                w.cam_clkm_div_b().bits(divider.div_b as _);
-                w.cam_clkm_div_a().bits(divider.div_a as _);
                 if let Some(threshold) = config.vsync_filter_threshold {
                     w.cam_vsync_filter_thres().bits(threshold as _);
                 }
@@ -216,7 +215,7 @@ impl<'d> Camera<'d> {
             }
         });
         ClockTree::with(|clocks| {
-            LcdCamInstance::LcdCam.configure_cam_clock(clocks, sources[i]);
+            LcdCamInstance::LcdCam.configure_cam_clock(clocks, clock_config);
             if !self.cam.clock_requested {
                 LcdCamInstance::LcdCam.request_cam_clock(clocks);
                 self.cam.clock_requested = true;

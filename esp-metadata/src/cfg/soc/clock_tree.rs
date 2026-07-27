@@ -52,7 +52,7 @@ use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
     clock_tree::{
-        expr_compiler::ExprCompiler,
+        expr_compiler::{ExprCompiler, Operand},
         generic::Generic,
         mux::Multiplexer,
         source::{DerivedClockSource, Source},
@@ -343,9 +343,98 @@ impl ManagementProperties {
     }
 }
 
+/// The range of values an expression or a clock node's output can take.
+///
+/// Bounds are used to decide where 32-bit arithmetic is enough, and where the generated code has
+/// to compute in 64 bits to avoid overflowing. They are conservative: a wider range than the real
+/// one only costs a few casts in the generated code, a narrower one would generate code that
+/// overflows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Bounds {
+    pub min: u64,
+    pub max: u64,
+}
+
+impl Bounds {
+    /// The bounds of a value we know nothing about, other than that it is a `u32`.
+    pub const UNKNOWN: Self = Self {
+        min: 0,
+        max: u32::MAX as u64,
+    };
+
+    pub fn exact(value: u64) -> Self {
+        Self {
+            min: value,
+            max: value,
+        }
+    }
+
+    pub fn new(min: u64, max: u64) -> Self {
+        Self { min, max }
+    }
+
+    /// Widens `self` to also contain `other`.
+    pub fn union(self, other: Self) -> Self {
+        Self {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+        }
+    }
+
+    pub fn fits_in_u32(self) -> bool {
+        self.max <= u32::MAX as u64
+    }
+
+    /// Clamps the bounds to the `u32` range in which frequencies are stored.
+    pub fn as_frequency(self) -> Self {
+        Self {
+            min: self.min.min(u32::MAX as u64),
+            max: self.max.min(u32::MAX as u64),
+        }
+    }
+
+    /// Returns the bounds of `self <op> other`, where `op` is one of the supported arithmetic
+    /// operators. Returns `None` for operators that don't produce a number.
+    pub fn apply_operator(self, operator: &str, other: Self) -> Option<Self> {
+        // Saturate instead of overflowing: a saturated bound is still an upper bound, and it means
+        // the generated code is widened, which is what we want for an expression this extreme.
+        let bounds = match operator {
+            "+" => Self::new(
+                self.min.saturating_add(other.min),
+                self.max.saturating_add(other.max),
+            ),
+            "-" => Self::new(
+                self.min.saturating_sub(other.max),
+                self.max.saturating_sub(other.min),
+            ),
+            "*" => Self::new(
+                self.min.saturating_mul(other.min),
+                self.max.saturating_mul(other.max),
+            ),
+            // A zero divisor panics at runtime, so assume the divisor is at least 1.
+            "/" => Self::new(self.min / other.max.max(1), self.max / other.min.max(1)),
+            "%" => Self::new(0, self.max.min(other.max.saturating_sub(1))),
+            _ => return None,
+        };
+
+        Some(bounds)
+    }
+}
+
 /// Common interface for clock node types.
 pub(crate) trait ClockTreeNodeType: Any {
     fn name(&self) -> &str;
+
+    /// Returns the range of frequencies this node can output.
+    ///
+    /// The default implementation gives up and returns [`Bounds::UNKNOWN`].
+    fn output_bounds(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Bounds {
+        Bounds::UNKNOWN
+    }
 
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
@@ -655,6 +744,23 @@ fn human_readable_frequency(mut output: u64) -> (u64, &'static str) {
 pub struct ValuesExpression(Vec<ValueFragment>);
 
 impl ValuesExpression {
+    /// Returns the range of values the parameter can take.
+    fn bounds(&self) -> Bounds {
+        let mut bounds = None;
+        for fragment in self.0.iter() {
+            let fragment = match fragment {
+                ValueFragment::FixedFrequency(value) => Bounds::exact(*value as u64),
+                ValueFragment::Range(min, max) => Bounds::new(*min as u64, *max as u64),
+            };
+            bounds = Some(match bounds {
+                Some(bounds) => Bounds::union(bounds, fragment),
+                None => fragment,
+            });
+        }
+
+        bounds.unwrap_or(Bounds::UNKNOWN)
+    }
+
     fn as_enum_values(&self) -> Option<Vec<u32>> {
         let frequencies = self
             .0
@@ -754,7 +860,7 @@ pub struct RejectExpression(Expression);
 impl RejectExpression {
     fn to_rust<'a>(
         &'a self,
-        mut variables: HashMap<&'a str, TokenStream>,
+        mut variables: HashMap<&'a str, Operand>,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
@@ -765,7 +871,10 @@ impl RejectExpression {
                 // Referring to a node by name resolves to its output frequency.
                 let node = instance.resolve_node(tree, var);
                 let freq_fn = node.frequency_function_name();
-                variables.insert(var, quote! { #freq_fn() });
+                variables.insert(
+                    var,
+                    Operand::new(quote! { #freq_fn() }, node.output_bounds(tree)),
+                );
 
                 // Only run the assert if the referenced nodes have been configured
                 let config_field = node.properties.indexed_config_accessor();
@@ -835,11 +944,88 @@ impl Expression {
 
     fn to_rust(
         &self,
-        variables: HashMap<&str, TokenStream>,
+        variables: HashMap<&str, Operand>,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         ExprCompiler::new(&variables).compile_expression(self, instance, tree)
+    }
+
+    /// Solves the expression at codegen time, with every variable bound to a fixed value.
+    ///
+    /// Returns `None` if the expression can't be solved, e.g. because it divides by zero or calls
+    /// a function.
+    fn solve(&self, values: &IndexMap<&str, u64>) -> Option<u64> {
+        let mut ctx = somni_expr::Context::new();
+        for (name, value) in values.iter() {
+            ctx.add_variable(name, *value);
+        }
+
+        ctx.evaluate_parsed::<u64>(
+            &self.source,
+            &ast::Expression::Expression {
+                expression: self.expr.clone(),
+            },
+        )
+        .ok()
+    }
+
+    /// Returns the range of values the expression can evaluate to.
+    ///
+    /// The expression is solved at every combination of its variables' extremes. This is more
+    /// accurate than propagating bounds through the operators one by one, because a variable that
+    /// appears multiple times (like `a` in `SOURCE * a / (N * a + b)`) takes the same value in
+    /// every place it appears.
+    fn bounds(&self, variables: &IndexMap<&str, Bounds>) -> Bounds {
+        // Solving 2^n times is only reasonable for the handful of variables a clock node has.
+        if variables.len() > 8 {
+            return Bounds::UNKNOWN;
+        }
+
+        let mut bounds: Option<Bounds> = None;
+        for corner in 0..1u32 << variables.len() {
+            let values = variables
+                .iter()
+                .enumerate()
+                .map(|(index, (name, variable))| {
+                    let value = if corner & (1 << index) == 0 {
+                        variable.min
+                    } else {
+                        variable.max
+                    };
+                    (*name, value)
+                })
+                .collect::<IndexMap<_, _>>();
+
+            if let Some(value) = self.solve(&values) {
+                let value = Bounds::exact(value);
+                bounds = Some(match bounds {
+                    Some(bounds) => bounds.union(value),
+                    None => value,
+                });
+            }
+        }
+
+        bounds.unwrap_or(Bounds::UNKNOWN)
+    }
+
+    /// Returns the bounds of the expression, looking up the bounds of any variable that isn't
+    /// listed in `known` as a clock node's output.
+    fn bounds_in_tree<'s>(
+        &'s self,
+        known: &IndexMap<&'s str, Bounds>,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Bounds {
+        let mut variables = known.clone();
+
+        self.visit_variables(|variable| {
+            if !variables.contains_key(variable) {
+                variables.insert(variable, instance.upstream_bounds(tree, variable));
+            }
+        });
+
+        self.bounds(&variables)
     }
 }
 
@@ -861,5 +1047,61 @@ impl<'de> Deserialize<'de> for Expression {
                 MarkInSource(&s, err.location, "Expression error", &err.error)
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expression(source: &str) -> Expression {
+        let ast::Expression::Expression { expression } =
+            somni_parser::parser::parse_expression::<DefaultTypeSet>(source).unwrap()
+        else {
+            unreachable!()
+        };
+
+        Expression {
+            source: source.to_string(),
+            expr: expression,
+        }
+    }
+
+    #[test]
+    fn operator_bounds_are_conservative() {
+        let a = Bounds::new(2, 10);
+        let b = Bounds::new(3, 4);
+
+        assert_eq!(a.apply_operator("+", b), Some(Bounds::new(5, 14)));
+        assert_eq!(a.apply_operator("-", b), Some(Bounds::new(0, 7)));
+        assert_eq!(a.apply_operator("*", b), Some(Bounds::new(6, 40)));
+        assert_eq!(a.apply_operator("/", b), Some(Bounds::new(0, 3)));
+        assert_eq!(a.apply_operator("%", b), Some(Bounds::new(0, 3)));
+
+        // Comparisons don't produce a number.
+        assert_eq!(a.apply_operator("<", b), None);
+    }
+
+    #[test]
+    fn division_by_a_possibly_zero_value_assumes_a_divisor_of_one() {
+        let bounds = Bounds::new(0, 100).apply_operator("/", Bounds::new(0, 4));
+        assert_eq!(bounds, Some(Bounds::new(0, 100)));
+    }
+
+    #[test]
+    fn expression_bounds_account_for_repeated_variables() {
+        let expr = expression("(sclk * div_a) / (div_num * div_a + div_b)");
+
+        let variables = IndexMap::from_iter([
+            ("sclk", Bounds::new(40_000_000, 240_000_000)),
+            ("div_num", Bounds::new(2, 256)),
+            ("div_a", Bounds::new(1, 63)),
+            ("div_b", Bounds::new(0, 63)),
+        ]);
+
+        // The largest output is reached at div_num = 2, div_b = 0, for any div_a. Solving the
+        // expression keeps div_a consistent between the two places it appears, so the result
+        // isn't inflated to sclk * 63.
+        assert_eq!(expr.bounds(&variables), Bounds::new(125_391, 120_000_000));
     }
 }

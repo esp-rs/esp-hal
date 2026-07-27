@@ -14,7 +14,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    clock::ll::{ClockTree, LcdCamInstance},
+    clock::ll::{ClockTree, LcdCamInstance, LcdCamLcdClockConfig},
     lcd_cam::{ClockError, calculate_clkm},
     peripherals::LCD_CAM,
     system,
@@ -63,18 +63,17 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
     }
 
     fn configure_clocks(&mut self, config: &ClockConfig) -> Result<(), ClockError> {
-        let sources = property!("clock_tree.lcd_cam.lcd_clock");
+        let sources = property!("clock_tree.lcd_cam.lcd_clock.sclk");
         let (i, divider) = calculate_clkm(
-            config.frequency.as_hz() as _,
-            &sources.map(|source| LcdCamInstance::lcd_clock_source_frequency(source) as usize),
+            config.frequency.as_hz(),
+            &sources.map(LcdCamInstance::lcd_clock_source_frequency),
         )?;
+        let clock_config =
+            LcdCamLcdClockConfig::new(sources[i], divider.div_num, divider.div_a, divider.div_b);
 
         self.regs().lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
-            w.lcd_clkm_div_num().bits(divider.div_num as _);
-            w.lcd_clkm_div_b().bits(divider.div_b as _);
-            w.lcd_clkm_div_a().bits(divider.div_a as _); // LCD_PCLK = LCD_CLK / 2
             w.lcd_clk_equ_sysclk().clear_bit();
             w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
             w.lcd_ck_idle_edge()
@@ -83,7 +82,7 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
                 .bit(config.clock_mode.phase == Phase::ShiftHigh)
         });
         ClockTree::with(|clocks| {
-            LcdCamInstance::LcdCam.configure_lcd_clock(clocks, sources[i]);
+            LcdCamInstance::LcdCam.configure_lcd_clock(clocks, clock_config);
             if !self.inner.clock_requested {
                 LcdCamInstance::LcdCam.request_lcd_clock(clocks);
                 self.inner.clock_requested = true;

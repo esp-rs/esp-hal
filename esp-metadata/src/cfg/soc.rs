@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     PeripheralDef,
     cfg::clock_tree::{
+        Bounds,
         ClockNodeFunctions,
         ClockTreeItem,
         ClockTreeNodeType,
@@ -664,12 +665,32 @@ impl ClockTreeNodeInstance {
         tree: &'tree ProcessedClockData,
         clock: &str,
     ) -> &'tree ClockTreeNodeInstance {
+        self.try_resolve_node(tree, clock)
+            .unwrap_or_else(|| panic!("Clock node {clock} not found"))
+    }
+
+    fn try_resolve_node<'tree>(
+        &self,
+        tree: &'tree ProcessedClockData,
+        clock: &str,
+    ) -> Option<&'tree ClockTreeNodeInstance> {
         let local_node = format!("{}_{}", self.group_instance, clock);
-        if let Some(node) = tree.try_get_node(&local_node) {
-            node
-        } else {
-            tree.node(clock)
-        }
+        tree.try_get_node(&local_node)
+            .or_else(|| tree.try_get_node(clock))
+    }
+
+    /// Returns the range of frequencies this node can output.
+    pub(super) fn output_bounds(&self, tree: &ProcessedClockData) -> Bounds {
+        self.node.output_bounds(self, tree).as_frequency()
+    }
+
+    /// Returns the range of values `clock` can take, where `clock` names an upstream clock node.
+    ///
+    /// Unknown names resolve to [`Bounds::UNKNOWN`]; the caller may be looking at an expression
+    /// variable that isn't a clock node at all.
+    pub(super) fn upstream_bounds(&self, tree: &ProcessedClockData, clock: &str) -> Bounds {
+        self.try_resolve_node(tree, clock)
+            .map_or(Bounds::UNKNOWN, |node| node.output_bounds(tree))
     }
 
     fn validate_configures_expr(&self, expr: &ConfiguresExpression) -> Result<()> {
@@ -678,12 +699,6 @@ impl ClockTreeNodeInstance {
 }
 
 impl ProcessedClockData {
-    /// Returns a node by its name (e.g. `XTAL_CLK`).
-    fn node(&self, name: &str) -> &ClockTreeNodeInstance {
-        self.try_get_node(name)
-            .unwrap_or_else(|| panic!("Clock node {name} not found"))
-    }
-
     /// Returns a node by its name (e.g. `XTAL_CLK`), or None if not found.
     fn try_get_node(&self, name: &str) -> Option<&ClockTreeNodeInstance> {
         self.clock_tree.get(name)

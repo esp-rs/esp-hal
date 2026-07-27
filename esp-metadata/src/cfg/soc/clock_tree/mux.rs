@@ -10,6 +10,7 @@ use somni_parser::ast;
 use crate::cfg::{
     ClockTreeNodeInstance,
     clock_tree::{
+        Bounds,
         ClockTreeNodeType,
         ConfiguresExpression,
         SourceFrequencySignature,
@@ -38,6 +39,10 @@ pub struct Multiplexer {
 impl ClockTreeNodeType for Multiplexer {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn output_bounds(&self, instance: &ClockTreeNodeInstance, tree: &ProcessedClockData) -> Bounds {
+        variant_bounds(&self.variants, instance, tree)
     }
 
     fn always_on(&self) -> bool {
@@ -489,6 +494,24 @@ impl Multiplexer {
             }
         }
     }
+}
+
+/// Returns the range of frequencies a mux over `variants` can output.
+pub(super) fn variant_bounds(
+    variants: &[MultiplexerVariant],
+    instance: &ClockTreeNodeInstance,
+    tree: &ProcessedClockData,
+) -> Bounds {
+    let mut bounds = None;
+    for variant in variants {
+        let variant = instance.upstream_bounds(tree, &variant.outputs);
+        bounds = Some(match bounds {
+            Some(bounds) => Bounds::union(bounds, variant),
+            None => variant,
+        });
+    }
+
+    bounds.unwrap_or(Bounds::UNKNOWN)
 }
 
 #[derive(Debug, Clone, Deserialize)]
