@@ -94,7 +94,13 @@ impl<'ctx> ExprCompiler<'ctx> {
             "/" => quote! { / },
             "%" => quote! { % },
             "&&" => quote! { && },
+            "||" => quote! { || },
             "==" => quote! { == },
+            "!=" => quote! { != },
+            "<" => quote! { < },
+            ">" => quote! { > },
+            "<=" => quote! { <= },
+            ">=" => quote! { >= },
             other => todo!("Unsupported binary operator: {other}"),
         };
 
