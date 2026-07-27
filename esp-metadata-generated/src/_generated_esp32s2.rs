@@ -4085,10 +4085,10 @@ macro_rules! memory_range {
         "7864320"
     };
     ("DROM") => {
-        0x3F000000..0x3FF80000
+        0x3F000000..0x3F400000
     };
     (size as str, "DROM") => {
-        "16252928"
+        "4194304"
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

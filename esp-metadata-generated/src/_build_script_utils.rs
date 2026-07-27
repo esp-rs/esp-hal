@@ -6044,7 +6044,7 @@ impl Chip {
                         (
                             "drom",
                             MemoryRegion {
-                                address_range: 0x3F000000..0x3FF80000,
+                                address_range: 0x3F000000..0x3F400000,
                             },
                         ),
                     ],
