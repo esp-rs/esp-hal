@@ -1,8 +1,8 @@
 //! Crypto hardware tests
 
-// ESP32 has no AES-DMA, no point in setting up PSRAM
-//% CHIP_FILTER(psram):    (aes_driver_supported || ecc_driver_supported || rsa_driver_supported) && dma_can_access_psram
-//% CHIP_FILTER(no_psram): (aes_driver_supported || ecc_driver_supported || rsa_driver_supported) && !dma_can_access_psram
+// ESP32 has no AES-DMA, no point in setting up PSRAM. ESP32-S31 has no crypto drivers.
+//% CHIP_FILTER(psram):    !esp32s31 && dma_can_access_psram
+//% CHIP_FILTER(no_psram): !esp32s31 && !dma_can_access_psram
 
 //% FEATURES: unstable esp-alloc/nightly
 

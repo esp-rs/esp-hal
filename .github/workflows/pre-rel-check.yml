@@ -67,6 +67,7 @@ jobs:
           cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
           cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
           cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
+          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32s31
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
@@ -85,6 +86,7 @@ jobs:
           cargo xcheck ci esp32 --toolchain esp --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32s2 --toolchain esp --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32s3 --toolchain esp --steps=lp-examples,examples,qa-test,tests
+          cargo xcheck ci esp32s31 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c3 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c5 --toolchain stable --steps=lp-examples,examples,qa-test,tests
