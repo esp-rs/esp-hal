@@ -50,6 +50,7 @@ impl<'ctx> ExprCompiler<'ctx> {
             ast::RightHandExpression::FunctionCall { name, arguments } => {
                 self.compile_function_call(source, name, arguments, instance, tree)
             }
+            _ => unimplemented!("Unsupported expression: {:#?}", expression),
         }
     }
 

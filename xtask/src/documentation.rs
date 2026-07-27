@@ -7,8 +7,9 @@ use std::{
 use anyhow::{Context as _, Result, ensure};
 use clap::ValueEnum;
 use esp_metadata::Config;
-use minijinja::Value;
 use serde::{Deserialize, Serialize};
+use somni_expr::somni_struct;
+use somni_template::{Env, Iter, SomniStruct, Syntax, Template, TemplateTypes};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -17,6 +18,9 @@ use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher},
     windows_safe_path,
 };
+
+/// A single row of template metadata (a struct value handed to the templates).
+type Meta = SomniStruct<TemplateTypes>;
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -224,11 +228,12 @@ fn latest_redirect_html(
 ) -> Result<String> {
     let base = latest_redirect_base(package, version);
     let resources_path = workspace.join("resources");
-    render_template(
-        &resources_path,
-        "latest_redirect.html.jinja",
-        minijinja::context! { base => base },
-    )
+
+    render_template(&resources_path, "latest_redirect.html.somni", {
+        let mut env = Env::new();
+        env.value("base", base.as_str());
+        env
+    })
 }
 
 fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<PathBuf> {
@@ -505,11 +510,14 @@ fn patch_documentation_index_for_package(
 
         let base_url = base_url.clone().unwrap_or_default();
         let resources_path = workspace.join("resources");
-        let html = render_template(
-            &resources_path,
-            "select.html.jinja",
-            minijinja::context! { base_url => base_url, package => package, version => version },
-        )?;
+
+        let html = render_template(&resources_path, "select.html.somni", {
+            let mut env = Env::new();
+            env.value("base_url", base_url)
+                .value("package", package.to_string())
+                .value("version", version.to_string());
+            env
+        })?;
 
         let node = elem.as_node();
         node.append(kuchikiki::parse_html().one(html));
@@ -643,11 +651,12 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             let meta = generate_documentation_meta_for_package(*package, &chips, current_version)?;
 
             // Render the template to HTML and write it out to the desired path:
-            let html = render_template(
-                &resources_path,
-                "package_index.html.jinja",
-                minijinja::context! { metadata => meta },
-            )?;
+            let html = render_template(&resources_path, "package_index.html.somni", {
+                let mut env = Env::new();
+                env.value("package", package.to_string().replace('-', "_"))
+                    .value("metadata", Iter(meta));
+                env
+            })?;
             let path = version_path.join("index.html");
             fs::write(&path, html).context("Failed to write index.html")?;
             log::info!("Created {}", path.display());
@@ -669,21 +678,17 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     let meta = generate_documentation_meta_for_index(workspace)?;
 
     // Render the template to HTML and write it out to the desired path:
-    let html = render_template(
-        &resources_path,
-        "index.html.jinja",
-        minijinja::context! { metadata => meta },
-    )?;
+    let html = render_template(&resources_path, "index.html.somni", {
+        let mut env = Env::new();
+        env.value("metadata", Iter(meta));
+        env
+    })?;
     let path = docs_path.join("index.html");
     fs::write(&path, html).context("Failed to write index.html")?;
     log::info!("Created {}", path.display());
 
-    // Render the 404 template:
-    let html = render_template(
-        &resources_path,
-        "404.html.jinja",
-        minijinja::context! { metadata => meta },
-    )?;
+    // Render the 404 template (it has no placeholders to fill in):
+    let html = render_template(&resources_path, "404.html.somni", Env::new())?;
     let path = docs_path.join("404.html");
     fs::write(&path, html).context("Failed to write 404.html")?;
     log::info!("Created {}", path.display());
@@ -695,8 +700,13 @@ fn generate_documentation_meta_for_package(
     package: Package,
     chips: &[Chip],
     doc_tree_version: semver::Version,
-) -> Result<Vec<Value>> {
+) -> Result<Vec<Meta>> {
     let mut metadata = Vec::new();
+    let types = &mut TemplateTypes::default();
+
+    let name = package.to_string();
+    let crate_name = name.replace('-', "_");
+    let version = doc_tree_version.to_string();
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
@@ -707,13 +717,17 @@ fn generate_documentation_meta_for_package(
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
-        metadata.push(minijinja::context! {
-            name => package,
-            version => doc_tree_version,
-            chip => chip.to_string(),
-            chip_pretty => chip.pretty_name(),
-            package => package.to_string().replace('-', "_"),
-        });
+        let chip_name = chip.to_string();
+        metadata.push(somni_struct!(
+            types,
+            Meta {
+                name: name.as_str(),
+                version: version.as_str(),
+                chip: chip_name.as_str(),
+                chip_pretty: chip.pretty_name(),
+                package: crate_name.as_str(),
+            }
+        ));
     }
 
     log::debug!("Generated metadata for package '{package}': {metadata:#?}");
@@ -721,9 +735,10 @@ fn generate_documentation_meta_for_package(
     Ok(metadata)
 }
 
-fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>> {
+fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Meta>> {
     let mut metadata = Vec::new();
     let docs_path = workspace.join("docs");
+    let types = &mut TemplateTypes::default();
 
     for package in Package::iter() {
         // Not all packages have documentation built:
@@ -742,11 +757,16 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
             format!("{package}/{version}/{crate_name}/index.html")
         };
 
-        metadata.push(minijinja::context! {
-            name => package,
-            version => version,
-            url => url,
-        });
+        let name = package.to_string();
+        let version = version.to_string();
+        metadata.push(somni_struct!(
+            types,
+            Meta {
+                name: name.as_str(),
+                version: version.as_str(),
+                url: url.as_str(),
+            }
+        ));
     }
 
     log::debug!("Generated metadata for documentation index: {metadata:#?}");
@@ -784,29 +804,39 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
     Ok(manifest)
 }
 
-fn render_template<C>(resources: &Path, template: &str, ctx: C) -> Result<String>
-where
-    C: serde::Serialize,
-{
+fn render_template(resources: &Path, template: &str, env: Env) -> Result<String> {
     let source = fs::read_to_string(resources.join(template))
         .context(format!("Failed to read {template}"))?;
 
-    let mut env = minijinja::Environment::empty();
-    env.add_template(template, &source)?;
+    let tmpl = Template::compile(&source, &Syntax::brackets())
+        .map_err(|err| anyhow::anyhow!("{}", err.display_with(&source)))
+        .with_context(|| format!("Failed to compile {template}"))?;
 
-    let tmpl = env.get_template(template)?;
-    let html = tmpl.render(ctx)?;
-
-    Ok(html)
+    tmpl.render(env)
+        .map_err(|err| anyhow::anyhow!("{}", err.display_with(&source)))
+        .with_context(|| format!("Failed to render {template}"))
 }
 
 #[cfg(test)]
 mod tests {
     use std::{fs, path::Path};
 
+    use somni_expr::somni_struct;
+    use somni_template::{Env, Iter, TemplateTypes};
     use tempfile::TempDir;
 
-    use super::{Manifest, latest_redirect_base, latest_redirect_html, latest_stable_docs_version};
+    use super::{
+        Manifest,
+        generate_documentation_meta_for_package,
+        latest_redirect_base,
+        latest_redirect_html,
+        latest_stable_docs_version,
+        render_template,
+    };
+
+    fn workspace() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+    }
 
     fn mkdir(root: &Path, name: &str) {
         fs::create_dir_all(root.join(name)).unwrap();
@@ -868,10 +898,10 @@ mod tests {
         );
     }
 
-    /// Small integration check for jinja template.
+    /// Small integration check for the redirect template.
     #[test]
     fn latest_redirect_html_matches_latest_redirect_base() {
-        let ws = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let ws = workspace();
         let ver = semver::Version::parse("1.0.0").unwrap();
         let pkg = crate::Package::EspHal;
 
@@ -880,6 +910,110 @@ mod tests {
 
         assert!(html.contains(&format!("var base = \"{base}\"")));
         assert!(html.contains(&format!("content=\"0; url={base}\"")));
+    }
+
+    /// The version select box is embedded in a page full of braces, so make sure the
+    /// surrounding JavaScript survives templating untouched.
+    #[test]
+    fn version_select_renders() {
+        let html = render_template(&workspace().join("resources"), "select.html.somni", {
+            let mut env = Env::new();
+            env.value("base_url", "https://docs.espressif.com/projects/rust")
+                .value("package", "esp-hal")
+                .value("version", "1.0.0");
+            env
+        })
+        .unwrap();
+
+        assert!(
+            html.contains(r#"<option value="1.0.0" selected="selected">1.0.0</option>"#),
+            "{html}"
+        );
+        assert!(
+            html.contains(
+                r#"const manifestUrl = "https://docs.espressif.com/projects/rust/esp-hal/manifest.json";"#
+            ),
+            "{html}"
+        );
+        assert!(html.contains(".then(({ versions }) => {"), "{html}");
+    }
+
+    #[test]
+    fn package_index_renders_a_row_per_chip() {
+        let ws = workspace();
+        let meta = generate_documentation_meta_for_package(
+            crate::Package::EspHal,
+            &[crate::Chip::Esp32c6, crate::Chip::Esp32s3],
+            semver::Version::parse("1.0.0").unwrap(),
+        )
+        .unwrap();
+
+        let html = render_template(&ws.join("resources"), "package_index.html.somni", {
+            let mut env = Env::new();
+            env.value("package", "esp_hal")
+                .value("metadata", Iter(meta));
+            env
+        })
+        .unwrap();
+
+        assert!(
+            html.contains("<title>esp_hal Documentation</title>"),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"<a href="esp32c6/esp_hal/index.html">"#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"<a href="esp32s3/esp_hal/index.html">"#),
+            "{html}"
+        );
+        assert!(
+            html.contains("<span class=\"crate-version\">1.0.0</span>"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn index_renders_a_row_per_package() {
+        // `generate_documentation_meta_for_index` resolves manifests relative to the current
+        // directory, which is the crate root under `cargo test`, so build the rows by hand.
+        let types = &mut TemplateTypes::default();
+        let meta = vec![
+            somni_struct!(
+                types,
+                Meta {
+                    name: "esp-hal",
+                    version: "1.0.0",
+                    url: "esp-hal/1.0.0/index.html",
+                }
+            ),
+            somni_struct!(
+                types,
+                Meta {
+                    name: "esp-alloc",
+                    version: "0.9.0",
+                    url: "esp-alloc/0.9.0/esp_alloc/index.html",
+                }
+            ),
+        ];
+
+        let html = render_template(&workspace().join("resources"), "index.html.somni", {
+            let mut env = Env::new();
+            env.value("metadata", Iter(meta));
+            env
+        })
+        .unwrap();
+
+        assert!(
+            html.contains(r#"<a href="esp-hal/1.0.0/index.html">esp-hal</a>"#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"<a href="esp-alloc/0.9.0/esp_alloc/index.html">esp-alloc</a>"#),
+            "{html}"
+        );
+        assert!(html.contains("<code>esp-hal</code>"), "{html}");
     }
 
     #[test]

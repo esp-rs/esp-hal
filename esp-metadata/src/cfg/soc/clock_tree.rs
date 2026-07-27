@@ -805,6 +805,7 @@ impl Expression {
                     // bit of a convention over specification, though.
                     visit_variables(&arguments[0], f);
                 }
+                _ => unimplemented!("Unsupported expression: {:#?}", expr),
             }
         }
 
