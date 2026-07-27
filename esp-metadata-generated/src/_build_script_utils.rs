@@ -3310,13 +3310,13 @@ impl Chip {
                         (
                             "irom",
                             MemoryRegion {
-                                address_range: 0x42000000..0x42800000,
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                         (
                             "drom",
                             MemoryRegion {
-                                address_range: 0x42800000..0x43000000,
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                     ],
@@ -4636,13 +4636,13 @@ impl Chip {
                         (
                             "irom",
                             MemoryRegion {
-                                address_range: 0x42000000..0x42800000,
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                         (
                             "drom",
                             MemoryRegion {
-                                address_range: 0x42800000..0x43000000,
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                     ],
@@ -6038,13 +6038,13 @@ impl Chip {
                         (
                             "irom",
                             MemoryRegion {
-                                address_range: 0x40080000..0x40400000,
+                                address_range: 0x40080000..0x40800000,
                             },
                         ),
                         (
                             "drom",
                             MemoryRegion {
-                                address_range: 0x3F000000..0x3F400000,
+                                address_range: 0x3F000000..0x3FF80000,
                             },
                         ),
                     ],
@@ -7280,13 +7280,13 @@ impl Chip {
                         (
                             "irom",
                             MemoryRegion {
-                                address_range: 0x40000000..0x44000000,
+                                address_range: 0x40000000..0x50000000,
                             },
                         ),
                         (
                             "drom",
                             MemoryRegion {
-                                address_range: 0x40000000..0x44000000,
+                                address_range: 0x40000000..0x50000000,
                             },
                         ),
                     ],

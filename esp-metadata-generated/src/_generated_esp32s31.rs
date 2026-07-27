@@ -2684,16 +2684,16 @@ macro_rules! memory_range {
         "8176"
     };
     ("IROM") => {
-        0x40000000..0x44000000
+        0x40000000..0x50000000
     };
     (size as str, "IROM") => {
-        "67108864"
+        "268435456"
     };
     ("DROM") => {
-        0x40000000..0x44000000
+        0x40000000..0x50000000
     };
     (size as str, "DROM") => {
-        "67108864"
+        "268435456"
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
