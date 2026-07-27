@@ -16,6 +16,32 @@ pub(crate) struct Fraction {
     pub denominator: u32,
 }
 
+/// A candidate fraction, paired with how far it sits from the target.
+///
+/// The distance is `|target - fraction|` scaled by `target.denominator * fraction.denominator`,
+/// which is why comparing two candidates has to undo the differing denominators.
+#[derive(Clone, Copy)]
+struct Candidate {
+    fraction: Fraction,
+    error: u32,
+}
+
+impl Candidate {
+    /// Returns whichever of `self` and `other` is closer to the target, preferring `self` on a
+    /// tie.
+    fn closer_of(self, other: Candidate) -> Candidate {
+        // This is cheaper than it looks, both architectures implement
+        // widening multiplication cheaply.
+        if self.error as u64 * other.fraction.denominator as u64
+            <= other.error as u64 * self.fraction.denominator as u64
+        {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 /// Returns the fraction closest to `target` for each denominator from 1 to `max_denominator`,
 /// stopping early if one of them represents `target` exactly.
 ///
@@ -23,7 +49,7 @@ pub(crate) struct Fraction {
 /// of these is closest.
 ///
 /// `target` must be between 0 and 1.
-fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Fraction> {
+fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Candidate> {
     let Fraction {
         numerator: n,
         denominator: d,
@@ -57,30 +83,22 @@ fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Fr
         exact = acc == 0;
 
         // Round to nearest: `acc` is how far the target is above `whole`, `d - acc` how far it
-        // is below the next integer.
-        let numerator = if acc <= d - acc { whole } else { whole + 1 };
+        // is below the next integer. Either way that distance is the candidate's error.
+        let below = d - acc;
+        let (numerator, error) = if acc <= below {
+            (whole, acc)
+        } else {
+            (whole + 1, below)
+        };
 
-        Some(Fraction {
-            numerator,
-            denominator,
+        Some(Candidate {
+            fraction: Fraction {
+                numerator,
+                denominator,
+            },
+            error,
         })
     })
-}
-
-/// Returns whichever of `a` and `b` is closer to `target`, preferring `a` on a tie.
-fn closer_to(target: Fraction, a: Fraction, b: Fraction) -> Fraction {
-    // |t_num/t_den - num/den| = |t_num * den - num * t_den| / (t_den * den). The common `t_den`
-    // factor cancels, so the errors compare as `err_a * b_den` against `err_b * a_den`.
-    let error = |f: Fraction| {
-        (target.numerator as u64 * f.denominator as u64)
-            .abs_diff(f.numerator as u64 * target.denominator as u64)
-    };
-
-    if error(a) * b.denominator as u64 <= error(b) * a.denominator as u64 {
-        a
-    } else {
-        b
-    }
 }
 
 /// A clock divider of the form `N + B/A`.
@@ -120,13 +138,18 @@ impl FractionalDivider {
             return Self::integral(integer);
         }
 
-        let zero = Fraction {
-            numerator: 0,
-            denominator: 1,
+        // Dropping the remainder entirely is always an option, and is the yardstick the
+        // candidates are measured against.
+        let dropped = Candidate {
+            fraction: Fraction {
+                numerator: 0,
+                denominator: 1,
+            },
+            error: remainder.numerator,
         };
-        let closest = candidates(remainder, max_denominator).fold(zero, |best, candidate| {
-            closer_to(remainder, best, candidate)
-        });
+        let closest = candidates(remainder, max_denominator)
+            .fold(dropped, Candidate::closer_of)
+            .fraction;
 
         if closest.numerator == closest.denominator {
             // The remainder rounds up to a whole step.
