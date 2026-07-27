@@ -33,6 +33,21 @@ use crate::{
     number,
 };
 
+/// Returns the name of the enum type generated for an enumerated node parameter.
+///
+/// `group` is the template group the node belongs to, or an empty string for standalone nodes.
+fn param_type_name(group: &str, node: &str, param_name: &str) -> Ident {
+    let enum_name_prefix = if group.is_empty() {
+        node.to_string()
+    } else {
+        format!("{group}_{node}")
+    }
+    .from_case(Case::Constant)
+    .to_case(Case::Pascal);
+    let enum_param_name = param_name.from_case(Case::Snake).to_case(Case::Pascal);
+    format_ident!("{enum_name_prefix}{enum_param_name}")
+}
+
 /// Configurable parameter kinds.
 #[derive(Debug, Clone)]
 enum NodeParameter {
@@ -749,20 +764,42 @@ impl ClockTreeNodeType for Generic {
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
-    fn property_macro_branches(&self, path: &str) -> TokenStream {
+    fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
         let mut branches = quote! {};
         for (param_name, param) in self.params.iter() {
-            if let NodeParameter::Value(values) = param
-                && let Some((from, to)) = values.as_range()
-            {
-                let path = format!("{path}.{param_name}");
-                let from = number(from);
-                let to = number(to);
-                branches.extend(quote! {
-                    (#path) => {
-                        (#from, #to)
-                    };
-                })
+            let path = format!("{path}.{param_name}");
+
+            match param {
+                NodeParameter::Value(values) => {
+                    if let Some((from, to)) = values.as_range() {
+                        let from = number(from);
+                        let to = number(to);
+                        branches.extend(quote! {
+                            (#path) => {
+                                (#from, #to)
+                            };
+                        })
+                    } else if let Some(options) = values.as_enum_values() {
+                        let options = options.into_iter().map(number);
+                        branches.extend(quote! {
+                            (#path) => {
+                                [#(#options),*]
+                            };
+                        })
+                    }
+                }
+                NodeParameter::Source(variants) => {
+                    let ty = param_type_name(group, &self.name, param_name);
+                    let options = variants.iter().map(|variant| {
+                        let variant = variant.config_enum_variant_name();
+                        quote! { crate::soc::clocks::#ty::#variant }
+                    });
+                    branches.extend(quote! {
+                        (#path) => {
+                            [#(#options),*]
+                        };
+                    })
+                }
             }
         }
         branches
@@ -897,15 +934,7 @@ impl Generic {
         }
 
         // Enum parameter
-        let enum_name_prefix = if instance.group_template.is_empty() {
-            self.name.clone()
-        } else {
-            format!("{}_{}", instance.group_template, self.name)
-        }
-        .from_case(Case::Constant)
-        .to_case(Case::Pascal);
-        let enum_param_name = param_name.from_case(Case::Snake).to_case(Case::Pascal);
-        format_ident!("{enum_name_prefix}{enum_param_name}")
+        param_type_name(&instance.group_template, &self.name, param_name)
     }
 
     fn parameter_config_type_impl(

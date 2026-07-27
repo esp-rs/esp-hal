@@ -352,6 +352,11 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("clock_tree.cpu_root_clk") => {
+        [crate ::soc::clocks::CpuRootClkConfig::Xtal, crate
+        ::soc::clocks::CpuRootClkConfig::Cpll, crate
+        ::soc::clocks::CpuRootClkConfig::RcFast]
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };
@@ -364,6 +369,28 @@ macro_rules! property {
     ("clock_tree.apb_clk.divisor") => {
         (0, 255)
     };
+    ("clock_tree.lp_fast_clk") => {
+        [crate ::soc::clocks::LpFastClkConfig::RcFast, crate
+        ::soc::clocks::LpFastClkConfig::XtalD2]
+    };
+    ("clock_tree.lp_slow_clk") => {
+        [crate ::soc::clocks::LpSlowClkConfig::RcSlow, crate
+        ::soc::clocks::LpSlowClkConfig::Xtal32k, crate
+        ::soc::clocks::LpSlowClkConfig::OscSlow]
+    };
+    ("clock_tree.timg_calibration_clock") => {
+        [crate ::soc::clocks::TimgCalibrationClockConfig::MpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::SpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::CpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
+    };
+    ("clock_tree.uart.function_clock.sclk") => {
+        [crate ::soc::clocks::UartFunctionClockSclk::Xtal, crate
+        ::soc::clocks::UartFunctionClockSclk::PllF80m, crate
+        ::soc::clocks::UartFunctionClockSclk::RcFast]
+    };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
     };
@@ -373,14 +400,49 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("clock_tree.timg.function_clock") => {
+        [crate ::soc::clocks::TimgFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::TimgFunctionClockConfig::RcFastClk, crate
+        ::soc::clocks::TimgFunctionClockConfig::PllF80m]
+    };
+    ("clock_tree.timg.wdt_clock") => {
+        [crate ::soc::clocks::TimgWdtClockConfig::XtalClk, crate
+        ::soc::clocks::TimgWdtClockConfig::PllF80m, crate
+        ::soc::clocks::TimgWdtClockConfig::RcFastClk]
+    };
+    ("clock_tree.i2c.function_clock.sclk") => {
+        [crate ::soc::clocks::I2cFunctionClockSclk::Xtal, crate
+        ::soc::clocks::I2cFunctionClockSclk::RcFast]
+    };
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
+    };
+    ("clock_tree.spi.function_clock") => {
+        [crate ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
+        ::soc::clocks::SpiFunctionClockConfig::RcFast, crate
+        ::soc::clocks::SpiFunctionClockConfig::Spll]
+    };
+    ("clock_tree.mipi_dsi.dpi_clk.sclk") => {
+        [crate ::soc::clocks::MipiDsiDpiClkSclk::Xtal, crate
+        ::soc::clocks::MipiDsiDpiClkSclk::PllF240m, crate
+        ::soc::clocks::MipiDsiDpiClkSclk::PllF160m]
     };
     ("clock_tree.mipi_dsi.dpi_clk.div_num") => {
         (0, 255)
     };
+    ("clock_tree.mipi_dsi.phy_pll_refclk.sclk") => {
+        [crate ::soc::clocks::MipiDsiPhyPllRefclkSclk::Xtal, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Cpll, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Spll, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Mpll]
+    };
     ("clock_tree.mipi_dsi.phy_pll_refclk.div_num") => {
         (0, 255)
+    };
+    ("clock_tree.mipi_dsi.phy_cfg_clk") => {
+        [crate ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF20m, crate
+        ::soc::clocks::MipiDsiPhyCfgClkConfig::RcFast, crate
+        ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF25m]
     };
     ("spi_master.version") => {
         3

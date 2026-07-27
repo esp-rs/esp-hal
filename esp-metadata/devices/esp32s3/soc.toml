@@ -48,7 +48,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
-    { name = "LCD_CAM" },
+    { name = "LCD_CAM", clock_group = "LCD_CAM" },
     { name = "LEDC" },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
