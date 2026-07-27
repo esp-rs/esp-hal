@@ -76,13 +76,17 @@ impl<'d> LcdCam<'d, Blocking> {
 
         Self {
             lcd: Lcd {
-                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                inner: lcd::Inner {
+                    lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                    _guard: lcd_guard,
+                    clock_requested: false,
+                },
                 _mode: PhantomData,
-                _guard: lcd_guard,
             },
             cam: Cam {
                 lcd_cam,
                 _guard: cam_guard,
+                clock_requested: false,
             },
         }
     }
@@ -91,11 +95,7 @@ impl<'d> LcdCam<'d, Blocking> {
     pub fn into_async(mut self) -> LcdCam<'d, Async> {
         self.set_interrupt_handler(interrupt_handler);
         LcdCam {
-            lcd: Lcd {
-                lcd_cam: self.lcd.lcd_cam,
-                _mode: PhantomData,
-                _guard: self.lcd._guard,
-            },
+            lcd: self.lcd.into_async(),
             cam: self.cam,
         }
     }
@@ -128,11 +128,7 @@ impl<'d> LcdCam<'d, Async> {
     pub fn into_blocking(self) -> LcdCam<'d, Blocking> {
         crate::interrupt::disable(Cpu::current(), Interrupt::LCD_CAM);
         LcdCam {
-            lcd: Lcd {
-                lcd_cam: self.lcd.lcd_cam,
-                _mode: PhantomData,
-                _guard: self.lcd._guard,
-            },
+            lcd: self.lcd.into_blocking(),
             cam: self.cam,
         }
     }

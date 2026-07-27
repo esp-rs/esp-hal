@@ -14,6 +14,7 @@ use crate::cfg::{
         ConfiguresExpression,
         SourceFrequencySignature,
         ValidationContext,
+        config_type_name,
     },
     soc::ProcessedClockData,
 };
@@ -277,6 +278,24 @@ impl ClockTreeNodeType for Multiplexer {
     ) -> TokenStream {
         let config_field = instance.properties.indexed_config_accessor();
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
+    }
+
+    fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
+        if !self.is_configurable() {
+            return quote! {};
+        }
+
+        let ty = config_type_name(group, &self.name);
+        let options = self.variants.iter().map(|variant| {
+            let variant = variant.config_enum_variant_name();
+            quote! { crate::soc::clocks::#ty::#variant }
+        });
+
+        quote! {
+            (#path) => {
+                [#(#options),*]
+            };
+        }
     }
 }
 

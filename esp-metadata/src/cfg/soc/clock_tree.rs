@@ -65,6 +65,23 @@ mod generic;
 mod mux;
 mod source;
 
+/// Returns the name of the config type generated for a node.
+///
+/// `group` is the template group the node belongs to, or an empty string for standalone nodes.
+pub(crate) fn config_type_name(group: &str, node: &str) -> Ident {
+    use convert_case::{Case, Casing};
+
+    let type_name = if group.is_empty() {
+        node.to_string()
+    } else {
+        format!("{group}_{node}")
+    }
+    .from_case(Case::Constant)
+    .to_case(Case::Pascal);
+
+    format_ident!("{type_name}Config")
+}
+
 #[derive(Clone)]
 pub(crate) struct Function {
     pub _name: String,
@@ -443,7 +460,11 @@ pub(crate) trait ClockTreeNodeType: Any {
         tree: &ProcessedClockData,
     ) -> TokenStream;
 
-    fn property_macro_branches(&self, _path: &str) -> TokenStream {
+    /// Generates `property!` branches for the node's configurable parameters.
+    ///
+    /// `group` is the name of the template group the node belongs to, or an empty string for
+    /// standalone nodes. It is needed to reconstruct the names of the generated config types.
+    fn property_macro_branches(&self, _path: &str, _group: &str) -> TokenStream {
         quote! {}
     }
 }
@@ -484,12 +505,12 @@ impl ClockTreeItem {
         }
     }
 
-    pub(crate) fn property_macro_branches(&self, path: &str) -> TokenStream {
+    pub(crate) fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
         match self {
-            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path),
-            ClockTreeItem::Source(src) => src.property_macro_branches(path),
-            ClockTreeItem::Generic(div) => div.property_macro_branches(path),
-            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path),
+            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path, group),
+            ClockTreeItem::Source(src) => src.property_macro_branches(path, group),
+            ClockTreeItem::Generic(div) => div.property_macro_branches(path, group),
+            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path, group),
         }
     }
 }

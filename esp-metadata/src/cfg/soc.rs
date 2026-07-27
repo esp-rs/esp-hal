@@ -277,14 +277,7 @@ impl ClockTreeNodeInstance {
     /// Returns the name of the clock configuration type. The corresponding field in the
     /// `ClockConfig` struct will have this type.
     fn config_type_name(&self) -> Ident {
-        let type_name = if self.group_template.is_empty() {
-            self.node.name().to_string()
-        } else {
-            format!("{}_{}", self.group_template, self.node.name())
-        }
-        .from_case(Case::Constant)
-        .to_case(Case::Pascal);
-        quote::format_ident!("{type_name}Config")
+        clock_tree::config_type_name(&self.group_template, self.node.name())
     }
 
     fn apply_configuration(
@@ -1195,7 +1188,7 @@ impl SystemClocks {
                 "{path}.{}",
                 node.name().from_case(Case::Constant).to_case(Case::Snake)
             );
-            node.property_macro_branches(&path)
+            node.property_macro_branches(&path, "")
         }));
         branches.extend(self.template_groups.iter().flat_map(|group| {
             group.clocks.iter().map(|node| {
@@ -1204,7 +1197,7 @@ impl SystemClocks {
                     group.group.from_case(Case::Constant).to_case(Case::Snake),
                     node.name().from_case(Case::Constant).to_case(Case::Snake)
                 );
-                node.property_macro_branches(&path)
+                node.property_macro_branches(&path, &group.group)
             })
         }));
         branches
