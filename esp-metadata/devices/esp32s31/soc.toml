@@ -75,6 +75,7 @@ peripherals = [
     { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
     { name = "SPI3", interrupts = { peri = "SPI3" }, clock_group = "SPI", stable = true },
     { name = "AXI_GDMA", pac = "AXI_DMA" },
+    { name = "SHA" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -275,7 +276,7 @@ size_increment = 32
 memory_size_bytes = 512
 
 [device.sha]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 5973 }
 algo = {
     sha1 = 0,
     sha224 = 1,

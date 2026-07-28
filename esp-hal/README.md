@@ -108,7 +108,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | SDMMC/SDIO host           | ⚒️   |          |          |          |          |           |          | ⚒️      |          | ⚒️      |           |
 | SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |           |
-| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [⚒️][5973] [^1] |
 | SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       |
@@ -159,6 +159,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 [5972]: https://github.com/esp-rs/esp-hal/issues/5972
+[5973]: https://github.com/esp-rs/esp-hal/issues/5973
 [5977]: https://github.com/esp-rs/esp-hal/issues/5977
 [5979]: https://github.com/esp-rs/esp-hal/issues/5979
 [5980]: https://github.com/esp-rs/esp-hal/issues/5980
