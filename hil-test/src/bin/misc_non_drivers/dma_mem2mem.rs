@@ -3,8 +3,7 @@ mod tests {
     use esp_hal::{
         Blocking,
         dma::{DmaError, Mem2Mem},
-        dma_buffers,
-        dma_descriptors,
+        dma_buffers, dma_descriptors,
     };
     const DATA_SIZE: usize = 1024 * 10;
 
@@ -19,7 +18,7 @@ mod tests {
         let mem2mem = cfg_select! {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
             any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
-            esp32p4 => Mem2Mem::new(peripherals.DMA_CH1),
+            any(esp32p4, esp32s31) => Mem2Mem::new(peripherals.DMA_CH1),
             _ => Mem2Mem::new(peripherals.DMA_CH0),
         };
 
