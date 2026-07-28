@@ -60,12 +60,9 @@ impl UartInstance {
             UartInstance::Uart3 => regs.uart3_mem_lp_ctrl(),
         };
         memory.modify(|_, w| unsafe {
-            w.mem_lp_mode()
-                .bits(2)
-                .mem_lp_en()
-                .bit(!en)
-                .mem_force_ctrl()
-                .set_bit()
+            w.mem_lp_mode().bits(2);
+            w.mem_lp_en().bit(!en);
+            w.mem_force_ctrl().set_bit()
         });
     }
 
