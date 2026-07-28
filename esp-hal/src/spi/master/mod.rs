@@ -523,55 +523,102 @@ impl Config {
         if self.frequency > ((source_freq / 4) * 3) {
             // Using source frequency directly will give us the best result here.
             // Set the SPI_CLK_EQU_SYSCLK bit.
-            Ok(1 << 31)
-        } else {
-            // For best duty cycle resolution, we want n to be as close to 32 as
-            // possible, but we also need a pre/n combo that gets us as close as
-            // possible to the intended frequency. To do this, we bruteforce n and
-            // calculate the best pre to go along with that. If there's a choice
-            // between pre/n combos that give the same result, use the one with the
-            // higher n.
+            return Ok(1 << 31);
+        }
 
-            let mut best_n: u32 = 2;
-            let mut best_pre: u32 = 0;
-            let mut best_err: u32 = u32::MAX;
+        let (n, pre) =
+            Self::divider_pair(source_freq.as_hz() as u64, self.frequency.as_hz() as u64);
 
-            let target_freq_hz = self.frequency.as_hz();
-            let source_freq_hz = source_freq.as_hz();
+        // In master mode, L == N
+        let l = n;
 
-            // Start at n = 2. We need to be able to set h/l so we have at least
-            // one high and one low pulse.
+        // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
+        let h = (n / 2).max(1);
 
-            for n in 2..=64 {
-                let pre = (source_freq_hz / n).div_ceil(target_freq_hz).clamp(1, 16);
+        Ok((l - 1) // SPI_CLKCNT_L
+            | ((h - 1) << 6) // SPI_CLKCNT_H
+            | ((n - 1) << 12) // SPI_CLKCNT_N
+            | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
+    }
 
-                let errval = (source_freq_hz / (pre * n)).abs_diff(target_freq_hz);
-                if errval <= best_err {
-                    best_err = errval;
-                    best_n = n;
-                    best_pre = pre;
+    /// Finds the `(n, pre)` pair whose resulting bus frequency is closest to
+    /// `target_freq_hz`, where `n` is `SPI_CLKCNT_N + 1` and `pre` is
+    /// `SPI_CLKDIV_PRE + 1`.
+    ///
+    /// The peripheral divides the source clock by `pre * n`. `n` also determines
+    /// the duty cycle resolution, so out of equally accurate pairs we want the
+    /// one with the largest `n`.
+    ///
+    /// Out-of-range frequencies (see [`Config::validate`]) yield an arbitrary
+    /// in-range pair rather than an error.
+    fn divider_pair(source_freq_hz: u64, target_freq_hz: u64) -> (u32, u32) {
+        // A zero target is rejected by `validate`, but must not divide by zero
+        // here. Answer with the slowest pair available.
+        if target_freq_hz == 0 {
+            return (64, 16);
+        }
 
-                    if errval == 0 {
-                        break;
-                    }
-                }
+        // For a divider `d` the frequency error is `|source / d - target|`. We
+        // avoid the division by keeping the error as the numerator of
+        // `|source - target * d| / d`, and comparing two candidates by
+        // cross-multiplying each numerator with the other's `d`.
+        let error_numerator = |divider: u64| source_freq_hz.abs_diff(target_freq_hz * divider);
+
+        let ideal_divider = source_freq_hz / target_freq_hz;
+
+        // `source / (pre * n)` falls as `n` grows, so the best `n` for a given
+        // `pre` is one of the two integers around the ideal, fractional one. Of
+        // the two, the larger is preferred on a tie, for its finer duty cycle
+        // resolution. `n` starts at 2 so that h/l can describe at least one high
+        // and one low pulse.
+        let best_n_for = |pre: u64| {
+            let ideal = ideal_divider / pre;
+            let (hi, lo) = ((ideal + 1).clamp(2, 64), ideal.clamp(2, 64));
+
+            let (error_hi, error_lo) = (error_numerator(pre * hi), error_numerator(pre * lo));
+
+            // `pre` cancels out of the cross-multiplied comparison.
+            if error_lo * hi < error_hi * lo {
+                (lo, pre * lo, error_lo)
+            } else {
+                (hi, pre * hi, error_hi)
+            }
+        };
+
+        // A `pre` of 1 offers every divider up to 64, so if the ideal divider is
+        // in that range, the best `n` for it is also the best divider overall,
+        // with the largest `n` that can produce it. No need to look further.
+        if ideal_divider < 64 {
+            return (best_n_for(1).0 as u32, 1);
+        }
+
+        // `n` maxes out at 64, so a smaller `pre` cannot bring the source clock
+        // down to the target. As `n` shrinks when `pre` grows, walking `pre`
+        // upwards visits the candidates in order of decreasing duty cycle
+        // resolution, which lets us keep the first of several equally accurate
+        // pairs.
+        //
+        // The seed is a divider of 1, which any candidate in range beats, since
+        // `target` is at most three quarters of `source` here.
+        let mut best = (2, 1);
+        let mut best_divider = 1;
+        let mut best_error = source_freq_hz;
+
+        for pre in (ideal_divider / 64).max(1)..=16 {
+            let (n, divider, error) = best_n_for(pre);
+
+            if error * best_divider < best_error * divider {
+                best = (n as u32, pre as u32);
+                best_divider = divider;
+                best_error = error;
             }
 
-            // n = SPI_CLKCNT_N + 1
-            let n = best_n;
-            // pre = SPI_CLKDIV_PRE + 1
-            let pre = best_pre;
-            // In master mode, L == N
-            let l = n;
-
-            // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
-            let h = (n / 2).max(1);
-
-            Ok((l - 1) // SPI_CLKCNT_L
-                | ((h - 1) << 6) // SPI_CLKCNT_H
-                | ((n - 1) << 12) // SPI_CLKCNT_N
-                | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
+            if best_error == 0 {
+                break;
+            }
         }
+
+        best
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
