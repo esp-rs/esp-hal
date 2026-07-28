@@ -16,13 +16,21 @@
 //! - IO3  => GPIO13
 //! - CS   => GPIO14
 //!
+//! The following wiring is assumed for ESP32-P4:
+//! - SCLK => GPIO3
+//! - MISO => GPIO2
+//! - MOSI => GPIO4
+//! - IO2  => GPIO5
+//! - IO3  => GPIO6
+//! - CS   => GPIO8
+//!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
 //! Connect a flash chip (GD25Q64C was used) and make sure QE in the status
 //! register is set.
 
-//% CHIP_FILTER: spi_master_supports_dma && !esp32p4
+//% CHIP_FILTER: spi_master_supports_dma
 //% TAG: flashchip
 
 #![no_std]
@@ -57,6 +65,14 @@ fn main() -> ! {
             peripherals.GPIO13,
             peripherals.GPIO14,
         ),
+        feature = "esp32p4" => (
+            peripherals.GPIO3,
+            peripherals.GPIO2,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+            peripherals.GPIO6,
+            peripherals.GPIO8,
+        ),
         _ => (
             peripherals.GPIO0,
             peripherals.GPIO1,
@@ -69,7 +85,7 @@ fn main() -> ! {
 
     let dma_channel = cfg_select! {
         any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
-        feature = "esp32s31" => peripherals.DMA_AXI_CH0,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 
