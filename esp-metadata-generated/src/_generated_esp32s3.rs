@@ -480,15 +480,33 @@ macro_rules! property {
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
     };
-    ("clock_tree.lcd_cam.lcd_clock") => {
-        [crate ::soc::clocks::LcdCamLcdClockConfig::XtalClk, crate
-        ::soc::clocks::LcdCamLcdClockConfig::PllD2, crate
-        ::soc::clocks::LcdCamLcdClockConfig::Pll160m]
+    ("clock_tree.lcd_cam.lcd_clock.sclk") => {
+        [crate ::soc::clocks::LcdCamLcdClockSclk::XtalClk, crate
+        ::soc::clocks::LcdCamLcdClockSclk::PllD2, crate
+        ::soc::clocks::LcdCamLcdClockSclk::Pll160m]
     };
-    ("clock_tree.lcd_cam.cam_clock") => {
-        [crate ::soc::clocks::LcdCamCamClockConfig::XtalClk, crate
-        ::soc::clocks::LcdCamCamClockConfig::PllD2, crate
-        ::soc::clocks::LcdCamCamClockConfig::Pll160m]
+    ("clock_tree.lcd_cam.lcd_clock.div_num") => {
+        (2, 256)
+    };
+    ("clock_tree.lcd_cam.lcd_clock.div_a") => {
+        (1, 63)
+    };
+    ("clock_tree.lcd_cam.lcd_clock.div_b") => {
+        (0, 63)
+    };
+    ("clock_tree.lcd_cam.cam_clock.sclk") => {
+        [crate ::soc::clocks::LcdCamCamClockSclk::XtalClk, crate
+        ::soc::clocks::LcdCamCamClockSclk::PllD2, crate
+        ::soc::clocks::LcdCamCamClockSclk::Pll160m]
+    };
+    ("clock_tree.lcd_cam.cam_clock.div_num") => {
+        (2, 256)
+    };
+    ("clock_tree.lcd_cam.cam_clock.div_a") => {
+        (1, 63)
+    };
+    ("clock_tree.lcd_cam.cam_clock.div_b") => {
+        (0, 63)
     };
     ("clock_tree.spi.function_clock") => {
         [crate ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
@@ -1909,10 +1927,9 @@ macro_rules! define_clock_tree_types {
                 self.div_num as u32
             }
         }
-        /// The list of clock signals that the `LCD_CAM_LCD_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum LcdCamLcdClockConfig {
+        pub enum LcdCamLcdClockSclk {
             #[default]
             /// Selects `XTAL_CLK`.
             XtalClk,
@@ -1921,10 +1938,71 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_160M`.
             Pll160m,
         }
-        /// The list of clock signals that the `LCD_CAM_CAM_CLOCK` multiplexer can output.
+        /// Configures the `LCD_CAM_LCD_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = (sclk * div_a) / (div_num * div_a + div_b)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct LcdCamLcdClockConfig {
+            sclk: LcdCamLcdClockSclk,
+            div_num: u32,
+            div_a: u32,
+            div_b: u32,
+        }
+        impl LcdCamLcdClockConfig {
+            /// Creates a new configuration for the LCD_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (2 ..= 256).
+            ///
+            /// Panics if the div_a value is outside the
+            /// valid range (1 ..= 63).
+            ///
+            /// Panics if the div_b value is outside the
+            /// valid range (0 ..= 63).
+            pub const fn new(
+                sclk: LcdCamLcdClockSclk,
+                div_num: u32,
+                div_a: u32,
+                div_b: u32,
+            ) -> Self {
+                ::core::assert!(
+                    div_num >= 2 && div_num <= 256,
+                    "`LCD_CAM_LCD_CLOCK` div_num must be between 2 and 256 (inclusive)."
+                );
+                ::core::assert!(
+                    div_a >= 1 && div_a <= 63,
+                    "`LCD_CAM_LCD_CLOCK` div_a must be between 1 and 63 (inclusive)."
+                );
+                ::core::assert!(
+                    div_b <= 63,
+                    "`LCD_CAM_LCD_CLOCK` div_b must be between 0 and 63 (inclusive)."
+                );
+                Self {
+                    sclk,
+                    div_num,
+                    div_a,
+                    div_b,
+                }
+            }
+            pub(crate) fn sclk(self) -> LcdCamLcdClockSclk {
+                self.sclk
+            }
+            pub(crate) fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
+            pub(crate) fn div_a(self) -> u32 {
+                self.div_a as u32
+            }
+            pub(crate) fn div_b(self) -> u32 {
+                self.div_b as u32
+            }
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum LcdCamCamClockConfig {
+        pub enum LcdCamCamClockSclk {
             #[default]
             /// Selects `XTAL_CLK`.
             XtalClk,
@@ -1932,6 +2010,68 @@ macro_rules! define_clock_tree_types {
             PllD2,
             /// Selects `PLL_160M`.
             Pll160m,
+        }
+        /// Configures the `LCD_CAM_CAM_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = (sclk * div_a) / (div_num * div_a + div_b)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct LcdCamCamClockConfig {
+            sclk: LcdCamCamClockSclk,
+            div_num: u32,
+            div_a: u32,
+            div_b: u32,
+        }
+        impl LcdCamCamClockConfig {
+            /// Creates a new configuration for the CAM_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (2 ..= 256).
+            ///
+            /// Panics if the div_a value is outside the
+            /// valid range (1 ..= 63).
+            ///
+            /// Panics if the div_b value is outside the
+            /// valid range (0 ..= 63).
+            pub const fn new(
+                sclk: LcdCamCamClockSclk,
+                div_num: u32,
+                div_a: u32,
+                div_b: u32,
+            ) -> Self {
+                ::core::assert!(
+                    div_num >= 2 && div_num <= 256,
+                    "`LCD_CAM_CAM_CLOCK` div_num must be between 2 and 256 (inclusive)."
+                );
+                ::core::assert!(
+                    div_a >= 1 && div_a <= 63,
+                    "`LCD_CAM_CAM_CLOCK` div_a must be between 1 and 63 (inclusive)."
+                );
+                ::core::assert!(
+                    div_b <= 63,
+                    "`LCD_CAM_CAM_CLOCK` div_b must be between 0 and 63 (inclusive)."
+                );
+                Self {
+                    sclk,
+                    div_num,
+                    div_a,
+                    div_b,
+                }
+            }
+            pub(crate) fn sclk(self) -> LcdCamCamClockSclk {
+                self.sclk
+            }
+            pub(crate) fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
+            pub(crate) fn div_a(self) -> u32 {
+                self.div_a as u32
+            }
+            pub(crate) fn div_b(self) -> u32 {
+                self.div_b as u32
+            }
         }
         /// The list of clock signals that the `MCPWM0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -3263,29 +3403,25 @@ macro_rules! define_clock_tree_types {
             }
         }
         impl LcdCamInstance {
-            pub fn configure_lcd_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: LcdCamLcdClockConfig,
-            ) {
-                let old_selector = clocks.lcd_cam_lcd_clock[self as usize].replace(new_selector);
+            pub fn configure_lcd_clock(self, clocks: &mut ClockTree, config: LcdCamLcdClockConfig) {
+                let old_config = clocks.lcd_cam_lcd_clock[self as usize].replace(config);
                 refresh_lcd_cam_lcd_clock_downstream(clocks, self);
                 if clocks.lcd_cam_lcd_clock_refcount[self as usize] > 0 {
-                    match new_selector {
-                        LcdCamLcdClockConfig::XtalClk => request_xtal_clk(clocks),
-                        LcdCamLcdClockConfig::PllD2 => request_pll_d2(clocks),
-                        LcdCamLcdClockConfig::Pll160m => request_pll_160m(clocks),
+                    match config.sclk {
+                        LcdCamLcdClockSclk::XtalClk => request_xtal_clk(clocks),
+                        LcdCamLcdClockSclk::PllD2 => request_pll_d2(clocks),
+                        LcdCamLcdClockSclk::Pll160m => request_pll_160m(clocks),
                     }
-                    self.configure_lcd_clock_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        match old_selector {
-                            LcdCamLcdClockConfig::XtalClk => release_xtal_clk(clocks),
-                            LcdCamLcdClockConfig::PllD2 => release_pll_d2(clocks),
-                            LcdCamLcdClockConfig::Pll160m => release_pll_160m(clocks),
+                    self.configure_lcd_clock_impl(clocks, old_config, config);
+                    if let Some(old_config) = old_config {
+                        match old_config.sclk {
+                            LcdCamLcdClockSclk::XtalClk => release_xtal_clk(clocks),
+                            LcdCamLcdClockSclk::PllD2 => release_pll_d2(clocks),
+                            LcdCamLcdClockSclk::Pll160m => release_pll_160m(clocks),
                         }
                     }
                 } else {
-                    self.configure_lcd_clock_impl(clocks, old_selector, new_selector);
+                    self.configure_lcd_clock_impl(clocks, old_config, config);
                 }
             }
             pub fn lcd_clock_config(self, clocks: &mut ClockTree) -> Option<LcdCamLcdClockConfig> {
@@ -3297,10 +3433,10 @@ macro_rules! define_clock_tree_types {
                 {
                     trace!("Enabling {:?}::LCD_CLOCK", self);
                     crate::rtc_cntl::WakeLock::acquire();
-                    match unwrap!(clocks.lcd_cam_lcd_clock[self as usize]) {
-                        LcdCamLcdClockConfig::XtalClk => request_xtal_clk(clocks),
-                        LcdCamLcdClockConfig::PllD2 => request_pll_d2(clocks),
-                        LcdCamLcdClockConfig::Pll160m => request_pll_160m(clocks),
+                    match unwrap!(clocks.lcd_cam_lcd_clock[self as usize]).sclk {
+                        LcdCamLcdClockSclk::XtalClk => request_xtal_clk(clocks),
+                        LcdCamLcdClockSclk::PllD2 => request_pll_d2(clocks),
+                        LcdCamLcdClockSclk::Pll160m => request_pll_160m(clocks),
                     }
                     self.enable_lcd_clock_impl(clocks, true);
                 }
@@ -3312,10 +3448,10 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::LCD_CLOCK", self);
                     crate::rtc_cntl::WakeLock::release();
                     self.enable_lcd_clock_impl(clocks, false);
-                    match unwrap!(clocks.lcd_cam_lcd_clock[self as usize]) {
-                        LcdCamLcdClockConfig::XtalClk => release_xtal_clk(clocks),
-                        LcdCamLcdClockConfig::PllD2 => release_pll_d2(clocks),
-                        LcdCamLcdClockConfig::Pll160m => release_pll_160m(clocks),
+                    match unwrap!(clocks.lcd_cam_lcd_clock[self as usize]).sclk {
+                        LcdCamLcdClockSclk::XtalClk => release_xtal_clk(clocks),
+                        LcdCamLcdClockSclk::PllD2 => release_pll_d2(clocks),
+                        LcdCamLcdClockSclk::Pll160m => release_pll_160m(clocks),
                     }
                 }
             }
@@ -3324,46 +3460,45 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: LcdCamLcdClockConfig,
             ) -> u32 {
-                match config {
-                    LcdCamLcdClockConfig::XtalClk => xtal_clk_frequency(),
-                    LcdCamLcdClockConfig::PllD2 => pll_d2_frequency(),
-                    LcdCamLcdClockConfig::Pll160m => pll_160m_frequency(),
-                }
+                (((match config.sclk {
+                    LcdCamLcdClockSclk::XtalClk => xtal_clk_frequency(),
+                    LcdCamLcdClockSclk::PllD2 => pll_d2_frequency(),
+                    LcdCamLcdClockSclk::Pll160m => pll_160m_frequency(),
+                } as u64)
+                    * (config.div_a() as u64))
+                    / (((config.div_num() * config.div_a()) + config.div_b()) as u64))
+                    as u32
             }
             pub fn lcd_clock_frequency(self) -> u32 {
                 LCD_CAM_LCD_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn lcd_clock_source_frequency(source: LcdCamLcdClockConfig) -> u32 {
-                match source {
-                    LcdCamLcdClockConfig::XtalClk => xtal_clk_frequency(),
-                    LcdCamLcdClockConfig::PllD2 => pll_d2_frequency(),
-                    LcdCamLcdClockConfig::Pll160m => pll_160m_frequency(),
+            pub fn lcd_clock_source_frequency(sclk: LcdCamLcdClockSclk) -> u32 {
+                match sclk {
+                    LcdCamLcdClockSclk::XtalClk => xtal_clk_frequency(),
+                    LcdCamLcdClockSclk::PllD2 => pll_d2_frequency(),
+                    LcdCamLcdClockSclk::Pll160m => pll_160m_frequency(),
                 }
             }
-            pub fn configure_cam_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: LcdCamCamClockConfig,
-            ) {
-                let old_selector = clocks.lcd_cam_cam_clock[self as usize].replace(new_selector);
+            pub fn configure_cam_clock(self, clocks: &mut ClockTree, config: LcdCamCamClockConfig) {
+                let old_config = clocks.lcd_cam_cam_clock[self as usize].replace(config);
                 refresh_lcd_cam_cam_clock_downstream(clocks, self);
                 if clocks.lcd_cam_cam_clock_refcount[self as usize] > 0 {
-                    match new_selector {
-                        LcdCamCamClockConfig::XtalClk => request_xtal_clk(clocks),
-                        LcdCamCamClockConfig::PllD2 => request_pll_d2(clocks),
-                        LcdCamCamClockConfig::Pll160m => request_pll_160m(clocks),
+                    match config.sclk {
+                        LcdCamCamClockSclk::XtalClk => request_xtal_clk(clocks),
+                        LcdCamCamClockSclk::PllD2 => request_pll_d2(clocks),
+                        LcdCamCamClockSclk::Pll160m => request_pll_160m(clocks),
                     }
-                    self.configure_cam_clock_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        match old_selector {
-                            LcdCamCamClockConfig::XtalClk => release_xtal_clk(clocks),
-                            LcdCamCamClockConfig::PllD2 => release_pll_d2(clocks),
-                            LcdCamCamClockConfig::Pll160m => release_pll_160m(clocks),
+                    self.configure_cam_clock_impl(clocks, old_config, config);
+                    if let Some(old_config) = old_config {
+                        match old_config.sclk {
+                            LcdCamCamClockSclk::XtalClk => release_xtal_clk(clocks),
+                            LcdCamCamClockSclk::PllD2 => release_pll_d2(clocks),
+                            LcdCamCamClockSclk::Pll160m => release_pll_160m(clocks),
                         }
                     }
                 } else {
-                    self.configure_cam_clock_impl(clocks, old_selector, new_selector);
+                    self.configure_cam_clock_impl(clocks, old_config, config);
                 }
             }
             pub fn cam_clock_config(self, clocks: &mut ClockTree) -> Option<LcdCamCamClockConfig> {
@@ -3375,10 +3510,10 @@ macro_rules! define_clock_tree_types {
                 {
                     trace!("Enabling {:?}::CAM_CLOCK", self);
                     crate::rtc_cntl::WakeLock::acquire();
-                    match unwrap!(clocks.lcd_cam_cam_clock[self as usize]) {
-                        LcdCamCamClockConfig::XtalClk => request_xtal_clk(clocks),
-                        LcdCamCamClockConfig::PllD2 => request_pll_d2(clocks),
-                        LcdCamCamClockConfig::Pll160m => request_pll_160m(clocks),
+                    match unwrap!(clocks.lcd_cam_cam_clock[self as usize]).sclk {
+                        LcdCamCamClockSclk::XtalClk => request_xtal_clk(clocks),
+                        LcdCamCamClockSclk::PllD2 => request_pll_d2(clocks),
+                        LcdCamCamClockSclk::Pll160m => request_pll_160m(clocks),
                     }
                     self.enable_cam_clock_impl(clocks, true);
                 }
@@ -3390,10 +3525,10 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::CAM_CLOCK", self);
                     crate::rtc_cntl::WakeLock::release();
                     self.enable_cam_clock_impl(clocks, false);
-                    match unwrap!(clocks.lcd_cam_cam_clock[self as usize]) {
-                        LcdCamCamClockConfig::XtalClk => release_xtal_clk(clocks),
-                        LcdCamCamClockConfig::PllD2 => release_pll_d2(clocks),
-                        LcdCamCamClockConfig::Pll160m => release_pll_160m(clocks),
+                    match unwrap!(clocks.lcd_cam_cam_clock[self as usize]).sclk {
+                        LcdCamCamClockSclk::XtalClk => release_xtal_clk(clocks),
+                        LcdCamCamClockSclk::PllD2 => release_pll_d2(clocks),
+                        LcdCamCamClockSclk::Pll160m => release_pll_160m(clocks),
                     }
                 }
             }
@@ -3402,21 +3537,24 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: LcdCamCamClockConfig,
             ) -> u32 {
-                match config {
-                    LcdCamCamClockConfig::XtalClk => xtal_clk_frequency(),
-                    LcdCamCamClockConfig::PllD2 => pll_d2_frequency(),
-                    LcdCamCamClockConfig::Pll160m => pll_160m_frequency(),
-                }
+                (((match config.sclk {
+                    LcdCamCamClockSclk::XtalClk => xtal_clk_frequency(),
+                    LcdCamCamClockSclk::PllD2 => pll_d2_frequency(),
+                    LcdCamCamClockSclk::Pll160m => pll_160m_frequency(),
+                } as u64)
+                    * (config.div_a() as u64))
+                    / (((config.div_num() * config.div_a()) + config.div_b()) as u64))
+                    as u32
             }
             pub fn cam_clock_frequency(self) -> u32 {
                 LCD_CAM_CAM_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn cam_clock_source_frequency(source: LcdCamCamClockConfig) -> u32 {
-                match source {
-                    LcdCamCamClockConfig::XtalClk => xtal_clk_frequency(),
-                    LcdCamCamClockConfig::PllD2 => pll_d2_frequency(),
-                    LcdCamCamClockConfig::Pll160m => pll_160m_frequency(),
+            pub fn cam_clock_source_frequency(sclk: LcdCamCamClockSclk) -> u32 {
+                match sclk {
+                    LcdCamCamClockSclk::XtalClk => xtal_clk_frequency(),
+                    LcdCamCamClockSclk::PllD2 => pll_d2_frequency(),
+                    LcdCamCamClockSclk::Pll160m => pll_160m_frequency(),
                 }
             }
         }
