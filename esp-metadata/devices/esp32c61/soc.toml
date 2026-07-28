@@ -215,7 +215,7 @@ wakeup_sources = {
 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5981 }
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true

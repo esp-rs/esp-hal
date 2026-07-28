@@ -307,7 +307,7 @@ support_status = { status = "not_supported", issue = 1905 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
