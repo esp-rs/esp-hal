@@ -490,6 +490,9 @@ impl Default for Config {
 
 impl Config {
     /// Set the frequency of the SPI bus clock.
+    ///
+    /// The closest available frequency that does not exceed `frequency` is used,
+    /// so the bus never runs faster than requested.
     pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
@@ -520,8 +523,8 @@ impl Config {
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if self.frequency > ((source_freq / 4) * 3) {
-            // Using source frequency directly will give us the best result here.
+        if self.frequency >= source_freq {
+            // Bypass the divider, which is exactly the source frequency.
             // Set the SPI_CLK_EQU_SYSCLK bit.
             return Ok(1 << 31);
         }
@@ -540,95 +543,64 @@ impl Config {
             | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
     }
 
-    /// Finds the `(n, pre)` pair whose resulting bus frequency is closest to
-    /// `target_freq_hz`, where `n` is `SPI_CLKCNT_N + 1` and `pre` is
+    /// Finds the `(n, pre)` pair producing the highest bus frequency that does
+    /// not exceed `target_freq_hz`, where `n` is `SPI_CLKCNT_N + 1` and `pre` is
     /// `SPI_CLKDIV_PRE + 1`.
     ///
-    /// The peripheral divides the source clock by `pre * n`. `n` also determines
-    /// the duty cycle resolution, so out of equally accurate pairs we want the
-    /// one with the largest `n`.
+    /// The peripheral divides the source clock by `pre * n`, so this is the
+    /// smallest divider that does not overshoot. `n` also determines the duty
+    /// cycle resolution, so out of pairs forming that divider we want the one
+    /// with the largest `n`.
     ///
-    /// Out-of-range frequencies (see [`Config::validate`]) yield an arbitrary
-    /// in-range pair rather than an error.
+    /// Out-of-range frequencies (see [`Config::validate`]) yield the slowest pair
+    /// available rather than an error.
     fn divider_pair(source_freq_hz: u32, target_freq_hz: u32) -> (u32, u32) {
         // A zero target is rejected by `validate`, but must not divide by zero
-        // here. Answer with the slowest pair available.
+        // here.
         if target_freq_hz == 0 {
             return (64, 16);
         }
 
-        // For a divider `d` the frequency error is `|source / d - target|`, which
-        // we keep as the numerator of `|source - target * d| / d` so that no
-        // division is needed to compare candidates. No candidate divider is more
-        // than one step past the ideal one, which keeps `target * d` below
-        // `2 * source`.
-        let error_numerator = |divider: u32| source_freq_hz.abs_diff(target_freq_hz * divider);
+        // Any smaller divider would run the bus faster than requested. `n` starts
+        // at 2 so that h/l can describe at least one high and one low pulse.
+        let min_divider = source_freq_hz.div_ceil(target_freq_hz).max(2);
 
-        // Comparing two candidates cross-multiplies each error numerator with the
-        // other's divider. These products are the only values here that do not
-        // fit in 32 bits, and widening multiplication is cheap.
-        let closer = |this: (u32, u32), that: (u32, u32)| {
-            let (error, divider) = this;
-            let (other_error, other_divider) = that;
-
-            u64::from(error) * u64::from(other_divider)
-                < u64::from(other_error) * u64::from(divider)
-        };
-
-        let ideal_divider = source_freq_hz / target_freq_hz;
-
-        // `source / (pre * n)` falls as `n` grows, so the best `n` for a given
-        // `pre` is one of the two integers around the ideal, fractional one. Of
-        // the two, the larger is preferred on a tie, for its finer duty cycle
-        // resolution. `n` starts at 2 so that h/l can describe at least one high
-        // and one low pulse.
-        let best_n_for = |pre: u32| {
-            let ideal = ideal_divider / pre;
-            let (n_hi, n_lo) = ((ideal + 1).clamp(2, 64), ideal.clamp(2, 64));
-            let (divider_hi, divider_lo) = (pre * n_hi, pre * n_lo);
-            let (error_hi, error_lo) = (error_numerator(divider_hi), error_numerator(divider_lo));
-
-            if closer((error_lo, divider_lo), (error_hi, divider_hi)) {
-                (n_lo, divider_lo, error_lo)
-            } else {
-                (n_hi, divider_hi, error_hi)
-            }
-        };
-
-        // A `pre` of 1 offers every divider up to 64, so if the ideal divider is
-        // in that range, the best `n` for it is also the best divider overall,
-        // with the largest `n` that can produce it. No need to look further.
-        if ideal_divider < 64 {
-            return (best_n_for(1).0, 1);
+        // A `pre` of 1 offers every divider up to 64, so if the smallest usable
+        // divider is in that range we can form it directly, with the largest `n`
+        // that produces it.
+        if min_divider <= 64 {
+            return (min_divider, 1);
         }
 
         // `n` maxes out at 64, so a smaller `pre` cannot bring the source clock
         // down to the target. As `n` shrinks when `pre` grows, walking `pre`
         // upwards visits the candidates in order of decreasing duty cycle
-        // resolution, which lets us keep the first of several equally accurate
-        // pairs.
+        // resolution, which lets us keep the first of several that share a
+        // divider.
         //
-        // The seed is a divider of 1, which any candidate in range beats, since
-        // `target` is at most three quarters of `source` here.
-        let mut best = (2, 1);
-        let mut best_divider = 1;
-        let mut best_error = source_freq_hz;
+        // The seed is the slowest pair, which also answers requests below the
+        // supported range.
+        let mut best = (64, 16);
+        let mut best_divider = 64 * 16;
 
         // A `for` loop over a range would leave a divide-by-zero check on `pre`
         // in the generated code, as the lower bound is not visible through the
         // range iterator on all targets.
-        let mut pre = (ideal_divider / 64).max(1);
+        let mut pre = min_divider.div_ceil(64);
         while pre <= 16 {
-            let (n, divider, error) = best_n_for(pre);
+            // The smallest `n` that keeps `pre * n` from overshooting. The lower
+            // bound on `pre` keeps this at or below 64.
+            let n = min_divider.div_ceil(pre);
+            let divider = pre * n;
 
-            if closer((error, divider), (best_error, best_divider)) {
+            if divider < best_divider {
                 best = (n, pre);
                 best_divider = divider;
-                best_error = error;
-            }
 
-            if best_error == 0 {
-                break;
+                // Nothing can beat hitting the smallest usable divider exactly.
+                if divider == min_divider {
+                    break;
+                }
             }
 
             pre += 1;
