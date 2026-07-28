@@ -353,7 +353,7 @@ support_status = "not_supported"  # LCD path of LCD_CAM block
 # left out until those are mapped from P4 TRM. README row stays blank.
 
 [device.rng]
-support_status = "partial"  # TRNG
+support_status = { status = "partial", issue = 5982 }
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16  # placeholder
 is_lp_sys = true

@@ -103,7 +103,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PSRAM                     | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      | ⚒️      |           |
 | RGB display               | ⚒️   |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |           |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      |          | ⚒️      | ⚒️      |           |
-| RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| RNG                       | [⚒️][5979] [^1] | [⚒️][5979] [^1] | [⚒️][5979] [^1] | [⚒️][5980] [^1] | [⚒️][5979] [^1] | [⚒️][5981] [^1] | [⚒️][5979] [^1] | [⚒️][5982] [^1] | [⚒️][5979] [^1] | [⚒️][5979] [^1] | ❌        |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | SDMMC/SDIO host           | ⚒️   |          |          |          |          |           |          | ⚒️      |          | ⚒️      |           |
@@ -158,6 +158,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
+[5979]: https://github.com/esp-rs/esp-hal/issues/5979
+[5980]: https://github.com/esp-rs/esp-hal/issues/5980
+[5981]: https://github.com/esp-rs/esp-hal/issues/5981
+[5982]: https://github.com/esp-rs/esp-hal/issues/5982
 <!-- end chip support table -->
 
 ## `unstable` feature
