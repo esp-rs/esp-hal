@@ -16,6 +16,14 @@
 //! - IO3         =>  GPIO13
 //! - CS          =>  GPIO14
 //!
+//! The following wiring is assumed for ESP32-P4:
+//! - SCLK => GPIO3
+//! - MISO => GPIO2
+//! - MOSI => GPIO4
+//! - IO2  => GPIO5
+//! - IO3  => GPIO6
+//! - CS   => GPIO8
+//!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
@@ -55,6 +63,14 @@ fn main() -> ! {
             peripherals.GPIO5,
             peripherals.GPIO13,
             peripherals.GPIO14,
+        ),
+        feature = "esp32p4" => (
+            peripherals.GPIO3,
+            peripherals.GPIO2,
+            peripherals.GPIO4,
+            peripherals.GPIO5,
+            peripherals.GPIO6,
+            peripherals.GPIO8,
         ),
         _ => (
             peripherals.GPIO0,
