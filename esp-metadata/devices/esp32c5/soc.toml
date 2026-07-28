@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true

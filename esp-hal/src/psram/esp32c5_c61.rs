@@ -139,8 +139,8 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
 
 #[procmacros::ram]
 pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
-    const MMU_PAGE_SIZE: u32 = 0x10000;
-    const FLASH_MMU_TABLE_SIZE: u32 = 512;
+    const MMU_PAGE_SIZE: u32 = property!("mmu.page_size");
+    const FLASH_MMU_TABLE_SIZE: u32 = property!("mmu.entry_num");
 
     fn select_mmu_entry(entry_id: u32) {
         SPI0::regs()

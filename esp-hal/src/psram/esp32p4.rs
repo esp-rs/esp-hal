@@ -11,8 +11,7 @@ use crate::{
     soc::pac,
 };
 
-/// MMU page size (64 KB)
-const MMU_PAGE_SIZE: usize = 0x10000;
+const MMU_PAGE_SIZE: usize = property!("mmu.page_size");
 
 /// PSRAM_MSPI0 base, AXI cache controller.
 const MSPI0_BASE: u32 = 0x5008_E000;
