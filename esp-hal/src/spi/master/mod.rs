@@ -526,8 +526,7 @@ impl Config {
             return Ok(1 << 31);
         }
 
-        let (n, pre) =
-            Self::divider_pair(source_freq.as_hz() as u64, self.frequency.as_hz() as u64);
+        let (n, pre) = Self::divider_pair(source_freq.as_hz(), self.frequency.as_hz());
 
         // In master mode, L == N
         let l = n;
@@ -551,18 +550,30 @@ impl Config {
     ///
     /// Out-of-range frequencies (see [`Config::validate`]) yield an arbitrary
     /// in-range pair rather than an error.
-    fn divider_pair(source_freq_hz: u64, target_freq_hz: u64) -> (u32, u32) {
+    fn divider_pair(source_freq_hz: u32, target_freq_hz: u32) -> (u32, u32) {
         // A zero target is rejected by `validate`, but must not divide by zero
         // here. Answer with the slowest pair available.
         if target_freq_hz == 0 {
             return (64, 16);
         }
 
-        // For a divider `d` the frequency error is `|source / d - target|`. We
-        // avoid the division by keeping the error as the numerator of
-        // `|source - target * d| / d`, and comparing two candidates by
-        // cross-multiplying each numerator with the other's `d`.
-        let error_numerator = |divider: u64| source_freq_hz.abs_diff(target_freq_hz * divider);
+        // For a divider `d` the frequency error is `|source / d - target|`, which
+        // we keep as the numerator of `|source - target * d| / d` so that no
+        // division is needed to compare candidates. No candidate divider is more
+        // than one step past the ideal one, which keeps `target * d` below
+        // `2 * source`.
+        let error_numerator = |divider: u32| source_freq_hz.abs_diff(target_freq_hz * divider);
+
+        // Comparing two candidates cross-multiplies each error numerator with the
+        // other's divider. These products are the only values here that do not
+        // fit in 32 bits, and widening multiplication is cheap.
+        let closer = |this: (u32, u32), that: (u32, u32)| {
+            let (error, divider) = this;
+            let (other_error, other_divider) = that;
+
+            u64::from(error) * u64::from(other_divider)
+                < u64::from(other_error) * u64::from(divider)
+        };
 
         let ideal_divider = source_freq_hz / target_freq_hz;
 
@@ -571,17 +582,16 @@ impl Config {
         // the two, the larger is preferred on a tie, for its finer duty cycle
         // resolution. `n` starts at 2 so that h/l can describe at least one high
         // and one low pulse.
-        let best_n_for = |pre: u64| {
+        let best_n_for = |pre: u32| {
             let ideal = ideal_divider / pre;
-            let (hi, lo) = ((ideal + 1).clamp(2, 64), ideal.clamp(2, 64));
+            let (n_hi, n_lo) = ((ideal + 1).clamp(2, 64), ideal.clamp(2, 64));
+            let (divider_hi, divider_lo) = (pre * n_hi, pre * n_lo);
+            let (error_hi, error_lo) = (error_numerator(divider_hi), error_numerator(divider_lo));
 
-            let (error_hi, error_lo) = (error_numerator(pre * hi), error_numerator(pre * lo));
-
-            // `pre` cancels out of the cross-multiplied comparison.
-            if error_lo * hi < error_hi * lo {
-                (lo, pre * lo, error_lo)
+            if closer((error_lo, divider_lo), (error_hi, divider_hi)) {
+                (n_lo, divider_lo, error_lo)
             } else {
-                (hi, pre * hi, error_hi)
+                (n_hi, divider_hi, error_hi)
             }
         };
 
@@ -589,7 +599,7 @@ impl Config {
         // in that range, the best `n` for it is also the best divider overall,
         // with the largest `n` that can produce it. No need to look further.
         if ideal_divider < 64 {
-            return (best_n_for(1).0 as u32, 1);
+            return (best_n_for(1).0, 1);
         }
 
         // `n` maxes out at 64, so a smaller `pre` cannot bring the source clock
@@ -604,11 +614,15 @@ impl Config {
         let mut best_divider = 1;
         let mut best_error = source_freq_hz;
 
-        for pre in (ideal_divider / 64).max(1)..=16 {
+        // A `for` loop over a range would leave a divide-by-zero check on `pre`
+        // in the generated code, as the lower bound is not visible through the
+        // range iterator on all targets.
+        let mut pre = (ideal_divider / 64).max(1);
+        while pre <= 16 {
             let (n, divider, error) = best_n_for(pre);
 
-            if error * best_divider < best_error * divider {
-                best = (n as u32, pre as u32);
+            if closer((error, divider), (best_error, best_divider)) {
+                best = (n, pre);
                 best_divider = divider;
                 best_error = error;
             }
@@ -616,6 +630,8 @@ impl Config {
             if best_error == 0 {
                 break;
             }
+
+            pre += 1;
         }
 
         best
