@@ -510,7 +510,7 @@ mod interrupt_spi_dma {
             any(feature = "esp32", feature = "esp32s2") => {
                 (peripherals.DMA_SPI2, peripherals.DMA_SPI3)
             }
-            feature = "esp32p4" => {
+            any(feature = "esp32p4", feature = "esp32s31") => {
                 (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
             }
             _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
