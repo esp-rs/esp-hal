@@ -67,6 +67,21 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(2)
     };
+    ("ecc.zero_extend_writes") => {
+        false
+    };
+    ("ecc.separate_jacobian_point_memory") => {
+        true
+    };
+    ("ecc.has_memory_clock_gate") => {
+        true
+    };
+    ("ecc.supports_enhanced_security") => {
+        true
+    };
+    ("ecc.mem_block_size") => {
+        48
+    };
     ("gpio.version") => {
         3
     };
@@ -455,6 +470,42 @@ macro_rules! with_spi_master_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
         : tt) => {} } _with_inner_spi_master_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
+        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((5, AffinePointAddition));
+        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_ecc_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((8, ModularAddition));
+        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
+        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
+        _for_each_inner_ecc_working_mode!((11, ModularDivision));
+        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (5, AffinePointAddition), (6,
+        JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_curve {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
+        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((2, P384,
+        384)); _for_each_inner_ecc_curve!((all(0, P192, 192), (1, P256, 256), (2, P384,
+        384)));
     };
 }
 #[macro_export]
@@ -2809,6 +2860,8 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// AXI_GDMA peripheral clock signal
             AxiGdma,
+            /// ECC peripheral clock signal
+            Ecc,
             /// I2C0 peripheral clock signal
             I2c0,
             /// I2C1 peripheral clock signal
@@ -2839,6 +2892,7 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::AxiGdma,
+                Self::Ecc,
                 Self::I2c0,
                 Self::I2c1,
                 Self::Spi2,
@@ -2859,6 +2913,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .axi_pdma_ctrl0()
                         .modify(|_, w| w.axi_pdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .crypto_ctrl0()
+                        .modify(|_, w| w.crypto_ecc_clk_en().bit(enable));
                 }
                 Peripheral::I2c0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -2948,6 +3007,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .axi_pdma_ctrl0()
                         .modify(|_, w| w.axi_pdma_rst_en().bit(reset));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .crypto_ctrl0()
+                        .modify(|_, w| w.crypto_ecc_rst_en().bit(reset));
                 }
                 Peripheral::I2c0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3401,13 +3465,14 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "CLIC peripheral singleton"]
         CLIC <= CLIC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "CNNT_SYS peripheral singleton"] CNNT_SYS <= CNNT_SYS() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
-        GPIO_SD <= GPIO_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECC peripheral singleton"] ECC
+        <= ECC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
+        GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_EXT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_MEM_APM peripheral singleton"] HP_MEM_APM <= HP_MEM_APM() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
         HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3522,6 +3587,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((CACHE(unstable)));
         _for_each_inner_peripheral!((CLIC(unstable)));
         _for_each_inner_peripheral!((CNNT_SYS(unstable)));
+        _for_each_inner_peripheral!((ECC(unstable)));
         _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
@@ -3750,6 +3816,7 @@ macro_rules! for_each_peripheral {
         (@ peri_type #[doc = "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)),
         (@ peri_type #[doc = "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@
         peri_type #[doc = "CNNT_SYS peripheral singleton"] CNNT_SYS <= CNNT_SYS()
+        (unstable)), (@ peri_type #[doc = "ECC peripheral singleton"] ECC <= ECC()
         (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE()
         (unstable)), (@ peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO()
         (unstable)), (@ peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <=
@@ -3823,20 +3890,21 @@ macro_rules! for_each_peripheral {
         (GPIO54), (GPIO55), (GPIO56), (GPIO57), (GPIO58), (GPIO59), (GPIO60), (GPIO61),
         (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)), (DMA_AXI_CH2(unstable)),
         (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)),
-        (CNNT_SYS(unstable)), (EFUSE(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
-        (HP_APM(unstable)), (HP_MEM_APM(unstable)), (HP_SYS(unstable)),
-        (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1),
-        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
-        (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)), (LP_PERI(unstable)),
-        (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
-        (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
-        (PAU(unstable)), (PMU(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)),
-        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)),
-        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)),
-        (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3), (USB_DEVICE(unstable)),
-        (USB_HS(unstable)), (FLASH(unstable)), (SW_INTERRUPT(unstable)),
-        (CPU_CTRL(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1,
-        AxiGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel)));
+        (CNNT_SYS(unstable)), (ECC(unstable)), (EFUSE(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_MEM_APM(unstable)),
+        (HP_SYS(unstable)), (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0),
+        (I2C1), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (IO_MUX(unstable)), (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)),
+        (LP_PERI(unstable)), (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)),
+        (LPWR(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
+        (MODEM_SYSCON(unstable)), (PAU(unstable)), (PMU(unstable)),
+        (RTC_TIMER(unstable)), (RNG(unstable)), (SPI0(unstable)), (SPI1(unstable)),
+        (SPI2), (SPI3), (AXI_GDMA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)),
+        (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (UART2),
+        (UART3), (USB_DEVICE(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
+        Spi3, 2, AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

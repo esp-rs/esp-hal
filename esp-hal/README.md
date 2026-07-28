@@ -79,7 +79,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | ❌       | [❌][884] [^1] | [❌][884] [^1] | ❌        |
 | ECDSA                     |       |          |          | [❌][5444] [^1] |          | [❌][5444] [^1] | [❌][5444] [^1] | ❌       |          |          | ❌        |
-| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          | ❌        |
+| ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          | [⚒️][5972] [^1] |
 | Ethernet                  | ⚒️   |          |          |          |          |           |          | ⚒️      |          |          |           |
 | ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      | [❌][5419] [^1] | ⚒️      | ❌       |          |          |           |
 | GPIO                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       |
@@ -158,6 +158,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
+[5972]: https://github.com/esp-rs/esp-hal/issues/5972
 [5977]: https://github.com/esp-rs/esp-hal/issues/5977
 [5979]: https://github.com/esp-rs/esp-hal/issues/5979
 [5980]: https://github.com/esp-rs/esp-hal/issues/5980

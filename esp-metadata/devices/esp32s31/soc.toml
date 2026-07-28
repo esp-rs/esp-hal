@@ -42,6 +42,7 @@ peripherals = [
     { name = "CACHE" },
     { name = "CLIC" },
     { name = "CNNT_SYS" },
+    { name = "ECC" },
     { name = "EFUSE" },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },
@@ -233,7 +234,7 @@ engines = [
 ]
 
 [device.ecc]
-support_status = "not_supported"
+support_status = { status = "partial", issue = 5972 }
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
