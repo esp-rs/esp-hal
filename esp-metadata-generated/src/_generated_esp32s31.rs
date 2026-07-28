@@ -223,6 +223,24 @@ macro_rules! property {
     ("rom.has_md5_mbedtls") => {
         false
     };
+    ("rsa.version") => {
+        3
+    };
+    ("rsa.version", str) => {
+        stringify!(3)
+    };
+    ("rsa.size_increment") => {
+        32
+    };
+    ("rsa.size_increment", str) => {
+        stringify!(32)
+    };
+    ("rsa.memory_size_bytes") => {
+        512
+    };
+    ("rsa.memory_size_bytes", str) => {
+        stringify!(512)
+    };
     ("soc.cpu_has_branch_predictor") => {
         true
     };
@@ -676,6 +694,232 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_exponentiation {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_exponentiation { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_exponentiation!((32));
+        _for_each_inner_rsa_exponentiation!((64));
+        _for_each_inner_rsa_exponentiation!((96));
+        _for_each_inner_rsa_exponentiation!((128));
+        _for_each_inner_rsa_exponentiation!((160));
+        _for_each_inner_rsa_exponentiation!((192));
+        _for_each_inner_rsa_exponentiation!((224));
+        _for_each_inner_rsa_exponentiation!((256));
+        _for_each_inner_rsa_exponentiation!((288));
+        _for_each_inner_rsa_exponentiation!((320));
+        _for_each_inner_rsa_exponentiation!((352));
+        _for_each_inner_rsa_exponentiation!((384));
+        _for_each_inner_rsa_exponentiation!((416));
+        _for_each_inner_rsa_exponentiation!((448));
+        _for_each_inner_rsa_exponentiation!((480));
+        _for_each_inner_rsa_exponentiation!((512));
+        _for_each_inner_rsa_exponentiation!((544));
+        _for_each_inner_rsa_exponentiation!((576));
+        _for_each_inner_rsa_exponentiation!((608));
+        _for_each_inner_rsa_exponentiation!((640));
+        _for_each_inner_rsa_exponentiation!((672));
+        _for_each_inner_rsa_exponentiation!((704));
+        _for_each_inner_rsa_exponentiation!((736));
+        _for_each_inner_rsa_exponentiation!((768));
+        _for_each_inner_rsa_exponentiation!((800));
+        _for_each_inner_rsa_exponentiation!((832));
+        _for_each_inner_rsa_exponentiation!((864));
+        _for_each_inner_rsa_exponentiation!((896));
+        _for_each_inner_rsa_exponentiation!((928));
+        _for_each_inner_rsa_exponentiation!((960));
+        _for_each_inner_rsa_exponentiation!((992));
+        _for_each_inner_rsa_exponentiation!((1024));
+        _for_each_inner_rsa_exponentiation!((1056));
+        _for_each_inner_rsa_exponentiation!((1088));
+        _for_each_inner_rsa_exponentiation!((1120));
+        _for_each_inner_rsa_exponentiation!((1152));
+        _for_each_inner_rsa_exponentiation!((1184));
+        _for_each_inner_rsa_exponentiation!((1216));
+        _for_each_inner_rsa_exponentiation!((1248));
+        _for_each_inner_rsa_exponentiation!((1280));
+        _for_each_inner_rsa_exponentiation!((1312));
+        _for_each_inner_rsa_exponentiation!((1344));
+        _for_each_inner_rsa_exponentiation!((1376));
+        _for_each_inner_rsa_exponentiation!((1408));
+        _for_each_inner_rsa_exponentiation!((1440));
+        _for_each_inner_rsa_exponentiation!((1472));
+        _for_each_inner_rsa_exponentiation!((1504));
+        _for_each_inner_rsa_exponentiation!((1536));
+        _for_each_inner_rsa_exponentiation!((1568));
+        _for_each_inner_rsa_exponentiation!((1600));
+        _for_each_inner_rsa_exponentiation!((1632));
+        _for_each_inner_rsa_exponentiation!((1664));
+        _for_each_inner_rsa_exponentiation!((1696));
+        _for_each_inner_rsa_exponentiation!((1728));
+        _for_each_inner_rsa_exponentiation!((1760));
+        _for_each_inner_rsa_exponentiation!((1792));
+        _for_each_inner_rsa_exponentiation!((1824));
+        _for_each_inner_rsa_exponentiation!((1856));
+        _for_each_inner_rsa_exponentiation!((1888));
+        _for_each_inner_rsa_exponentiation!((1920));
+        _for_each_inner_rsa_exponentiation!((1952));
+        _for_each_inner_rsa_exponentiation!((1984));
+        _for_each_inner_rsa_exponentiation!((2016));
+        _for_each_inner_rsa_exponentiation!((2048));
+        _for_each_inner_rsa_exponentiation!((2080));
+        _for_each_inner_rsa_exponentiation!((2112));
+        _for_each_inner_rsa_exponentiation!((2144));
+        _for_each_inner_rsa_exponentiation!((2176));
+        _for_each_inner_rsa_exponentiation!((2208));
+        _for_each_inner_rsa_exponentiation!((2240));
+        _for_each_inner_rsa_exponentiation!((2272));
+        _for_each_inner_rsa_exponentiation!((2304));
+        _for_each_inner_rsa_exponentiation!((2336));
+        _for_each_inner_rsa_exponentiation!((2368));
+        _for_each_inner_rsa_exponentiation!((2400));
+        _for_each_inner_rsa_exponentiation!((2432));
+        _for_each_inner_rsa_exponentiation!((2464));
+        _for_each_inner_rsa_exponentiation!((2496));
+        _for_each_inner_rsa_exponentiation!((2528));
+        _for_each_inner_rsa_exponentiation!((2560));
+        _for_each_inner_rsa_exponentiation!((2592));
+        _for_each_inner_rsa_exponentiation!((2624));
+        _for_each_inner_rsa_exponentiation!((2656));
+        _for_each_inner_rsa_exponentiation!((2688));
+        _for_each_inner_rsa_exponentiation!((2720));
+        _for_each_inner_rsa_exponentiation!((2752));
+        _for_each_inner_rsa_exponentiation!((2784));
+        _for_each_inner_rsa_exponentiation!((2816));
+        _for_each_inner_rsa_exponentiation!((2848));
+        _for_each_inner_rsa_exponentiation!((2880));
+        _for_each_inner_rsa_exponentiation!((2912));
+        _for_each_inner_rsa_exponentiation!((2944));
+        _for_each_inner_rsa_exponentiation!((2976));
+        _for_each_inner_rsa_exponentiation!((3008));
+        _for_each_inner_rsa_exponentiation!((3040));
+        _for_each_inner_rsa_exponentiation!((3072));
+        _for_each_inner_rsa_exponentiation!((3104));
+        _for_each_inner_rsa_exponentiation!((3136));
+        _for_each_inner_rsa_exponentiation!((3168));
+        _for_each_inner_rsa_exponentiation!((3200));
+        _for_each_inner_rsa_exponentiation!((3232));
+        _for_each_inner_rsa_exponentiation!((3264));
+        _for_each_inner_rsa_exponentiation!((3296));
+        _for_each_inner_rsa_exponentiation!((3328));
+        _for_each_inner_rsa_exponentiation!((3360));
+        _for_each_inner_rsa_exponentiation!((3392));
+        _for_each_inner_rsa_exponentiation!((3424));
+        _for_each_inner_rsa_exponentiation!((3456));
+        _for_each_inner_rsa_exponentiation!((3488));
+        _for_each_inner_rsa_exponentiation!((3520));
+        _for_each_inner_rsa_exponentiation!((3552));
+        _for_each_inner_rsa_exponentiation!((3584));
+        _for_each_inner_rsa_exponentiation!((3616));
+        _for_each_inner_rsa_exponentiation!((3648));
+        _for_each_inner_rsa_exponentiation!((3680));
+        _for_each_inner_rsa_exponentiation!((3712));
+        _for_each_inner_rsa_exponentiation!((3744));
+        _for_each_inner_rsa_exponentiation!((3776));
+        _for_each_inner_rsa_exponentiation!((3808));
+        _for_each_inner_rsa_exponentiation!((3840));
+        _for_each_inner_rsa_exponentiation!((3872));
+        _for_each_inner_rsa_exponentiation!((3904));
+        _for_each_inner_rsa_exponentiation!((3936));
+        _for_each_inner_rsa_exponentiation!((3968));
+        _for_each_inner_rsa_exponentiation!((4000));
+        _for_each_inner_rsa_exponentiation!((4032));
+        _for_each_inner_rsa_exponentiation!((4064));
+        _for_each_inner_rsa_exponentiation!((4096));
+        _for_each_inner_rsa_exponentiation!((all(32), (64), (96), (128), (160), (192),
+        (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
+        (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
+        (928), (960), (992), (1024), (1056), (1088), (1120), (1152), (1184), (1216),
+        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536),
+        (1568), (1600), (1632), (1664), (1696), (1728), (1760), (1792), (1824), (1856),
+        (1888), (1920), (1952), (1984), (2016), (2048), (2080), (2112), (2144), (2176),
+        (2208), (2240), (2272), (2304), (2336), (2368), (2400), (2432), (2464), (2496),
+        (2528), (2560), (2592), (2624), (2656), (2688), (2720), (2752), (2784), (2816),
+        (2848), (2880), (2912), (2944), (2976), (3008), (3040), (3072), (3104), (3136),
+        (3168), (3200), (3232), (3264), (3296), (3328), (3360), (3392), (3424), (3456),
+        (3488), (3520), (3552), (3584), (3616), (3648), (3680), (3712), (3744), (3776),
+        (3808), (3840), (3872), (3904), (3936), (3968), (4000), (4032), (4064), (4096)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_multiplication {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_multiplication { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_multiplication!((32));
+        _for_each_inner_rsa_multiplication!((64));
+        _for_each_inner_rsa_multiplication!((96));
+        _for_each_inner_rsa_multiplication!((128));
+        _for_each_inner_rsa_multiplication!((160));
+        _for_each_inner_rsa_multiplication!((192));
+        _for_each_inner_rsa_multiplication!((224));
+        _for_each_inner_rsa_multiplication!((256));
+        _for_each_inner_rsa_multiplication!((288));
+        _for_each_inner_rsa_multiplication!((320));
+        _for_each_inner_rsa_multiplication!((352));
+        _for_each_inner_rsa_multiplication!((384));
+        _for_each_inner_rsa_multiplication!((416));
+        _for_each_inner_rsa_multiplication!((448));
+        _for_each_inner_rsa_multiplication!((480));
+        _for_each_inner_rsa_multiplication!((512));
+        _for_each_inner_rsa_multiplication!((544));
+        _for_each_inner_rsa_multiplication!((576));
+        _for_each_inner_rsa_multiplication!((608));
+        _for_each_inner_rsa_multiplication!((640));
+        _for_each_inner_rsa_multiplication!((672));
+        _for_each_inner_rsa_multiplication!((704));
+        _for_each_inner_rsa_multiplication!((736));
+        _for_each_inner_rsa_multiplication!((768));
+        _for_each_inner_rsa_multiplication!((800));
+        _for_each_inner_rsa_multiplication!((832));
+        _for_each_inner_rsa_multiplication!((864));
+        _for_each_inner_rsa_multiplication!((896));
+        _for_each_inner_rsa_multiplication!((928));
+        _for_each_inner_rsa_multiplication!((960));
+        _for_each_inner_rsa_multiplication!((992));
+        _for_each_inner_rsa_multiplication!((1024));
+        _for_each_inner_rsa_multiplication!((1056));
+        _for_each_inner_rsa_multiplication!((1088));
+        _for_each_inner_rsa_multiplication!((1120));
+        _for_each_inner_rsa_multiplication!((1152));
+        _for_each_inner_rsa_multiplication!((1184));
+        _for_each_inner_rsa_multiplication!((1216));
+        _for_each_inner_rsa_multiplication!((1248));
+        _for_each_inner_rsa_multiplication!((1280));
+        _for_each_inner_rsa_multiplication!((1312));
+        _for_each_inner_rsa_multiplication!((1344));
+        _for_each_inner_rsa_multiplication!((1376));
+        _for_each_inner_rsa_multiplication!((1408));
+        _for_each_inner_rsa_multiplication!((1440));
+        _for_each_inner_rsa_multiplication!((1472));
+        _for_each_inner_rsa_multiplication!((1504));
+        _for_each_inner_rsa_multiplication!((1536));
+        _for_each_inner_rsa_multiplication!((1568));
+        _for_each_inner_rsa_multiplication!((1600));
+        _for_each_inner_rsa_multiplication!((1632));
+        _for_each_inner_rsa_multiplication!((1664));
+        _for_each_inner_rsa_multiplication!((1696));
+        _for_each_inner_rsa_multiplication!((1728));
+        _for_each_inner_rsa_multiplication!((1760));
+        _for_each_inner_rsa_multiplication!((1792));
+        _for_each_inner_rsa_multiplication!((1824));
+        _for_each_inner_rsa_multiplication!((1856));
+        _for_each_inner_rsa_multiplication!((1888));
+        _for_each_inner_rsa_multiplication!((1920));
+        _for_each_inner_rsa_multiplication!((1952));
+        _for_each_inner_rsa_multiplication!((1984));
+        _for_each_inner_rsa_multiplication!((2016));
+        _for_each_inner_rsa_multiplication!((2048));
+        _for_each_inner_rsa_multiplication!((all(32), (64), (96), (128), (160), (192),
+        (224), (256), (288), (320), (352), (384), (416), (448), (480), (512), (544),
+        (576), (608), (640), (672), (704), (736), (768), (800), (832), (864), (896),
+        (928), (960), (992), (1024), (1056), (1088), (1120), (1152), (1184), (1216),
+        (1248), (1280), (1312), (1344), (1376), (1408), (1440), (1472), (1504), (1536),
+        (1568), (1600), (1632), (1664), (1696), (1728), (1760), (1792), (1824), (1856),
+        (1888), (1920), (1952), (1984), (2016), (2048)));
     };
 }
 #[macro_export]
@@ -2893,6 +3137,8 @@ macro_rules! implement_peripheral_clocks {
             I2c0,
             /// I2C1 peripheral clock signal
             I2c1,
+            /// RSA peripheral clock signal
+            Rsa,
             /// SHA peripheral clock signal
             Sha,
             /// SPI2 peripheral clock signal
@@ -2924,6 +3170,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecc,
                 Self::I2c0,
                 Self::I2c1,
+                Self::Rsa,
                 Self::Sha,
                 Self::Spi2,
                 Self::Spi3,
@@ -2958,6 +3205,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .i2c_ctrl0(1)
                         .modify(|_, w| w.apb_clk_en().bit(enable).clk_en().bit(enable));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .crypto_ctrl0()
+                        .modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3057,6 +3309,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .i2c_ctrl0(1)
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .crypto_ctrl0()
+                        .modify(|_, w| w.crypto_rsa_rst_en().bit(reset));
                 }
                 Peripheral::Sha => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -3554,35 +3811,37 @@ macro_rules! for_each_peripheral {
         "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RNG peripheral singleton"] RNG
         <= TRNG() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI1 peripheral singleton"]
-        SPI1 <= SPI1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI3 peripheral singleton"]
-        SPI3 <= SPI3(SPI3 : { bind_peri_interrupt, enable_peri_interrupt,
+        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI0 peripheral singleton"]
+        SPI0 <= SPI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI2 peripheral singleton"]
+        SPI2 <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
-        <= SHA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SYSTEM peripheral singleton"] SYSTEM <= HP_SYS() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTIMER peripheral singleton"]
-        SYSTIMER <= SYSTIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
-        TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
-        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        "SPI3 peripheral singleton"] SPI3 <= SPI3(SPI3 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART2 peripheral singleton"]
-        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART3 peripheral singleton"] UART3 <= UART3(UART3 : { bind_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AXI_GDMA peripheral singleton"]
+        AXI_GDMA <= AXI_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "SHA peripheral singleton"] SHA <= SHA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
+        SYSTEM <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TEE peripheral singleton"] TEE
+        <= TEE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
+        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
+        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART3 peripheral singleton"]
+        UART3 <= UART3(UART3 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "USB_HS peripheral singleton"]
         USB_HS <= USB_OTG_HS(USB_OTG_HS : { bind_peri_interrupt, enable_peri_interrupt,
@@ -3656,6 +3915,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PMU(unstable)));
         _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((RNG(unstable)));
+        _for_each_inner_peripheral!((RSA(unstable)));
         _for_each_inner_peripheral!((SPI0(unstable)));
         _for_each_inner_peripheral!((SPI1(unstable)));
         _for_each_inner_peripheral!((SPI2)); _for_each_inner_peripheral!((SPI3));
@@ -3895,7 +4155,9 @@ macro_rules! for_each_peripheral {
         PMU() (unstable)), (@ peri_type #[doc = "RTC_TIMER peripheral singleton"]
         RTC_TIMER <= LP_TIMER() (unstable)), (@ peri_type #[doc =
         "RNG peripheral singleton"] RNG <= TRNG() (unstable)), (@ peri_type #[doc =
-        "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)), (@ peri_type #[doc =
+        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "SPI0 peripheral singleton"] SPI0 <= SPI0() (unstable)), (@ peri_type #[doc =
         "SPI1 peripheral singleton"] SPI1 <= SPI1() (unstable)), (@ peri_type #[doc =
         "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
@@ -3941,13 +4203,14 @@ macro_rules! for_each_peripheral {
         (LP_APM(unstable)), (LP_PERI(unstable)), (LP_SYS(unstable)), (LP_TEE(unstable)),
         (LP_WDT(unstable)), (LPWR(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (PAU(unstable)),
-        (PMU(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)), (SPI0(unstable)),
-        (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)), (SHA(unstable)),
-        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)),
-        (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3), (USB_DEVICE(unstable)),
-        (USB_HS(unstable)), (FLASH(unstable)), (SW_INTERRUPT(unstable)),
-        (CPU_CTRL(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1,
-        AxiGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel)));
+        (PMU(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)), (RSA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)),
+        (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
+        (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3),
+        (USB_DEVICE(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
+        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
+        Spi3, 2, AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

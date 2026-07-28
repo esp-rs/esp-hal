@@ -110,6 +110,7 @@ peripheral_clocks = { templates = [
     # Crypto - there is a crypto_clk_en bit as well, luckily it starts as 1
     { name = "Ecc", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_ecc_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_ecc_rst_en().bit(reset));" } }, # TODO
     { name = "Sha", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_sha_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_sha_rst_en().bit(reset));" } }, # TODO
+    { name = "Rsa", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_rsa_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_rsa_rst_en().bit(reset));" } }, # TODO
     # Timers
     { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_apb_clk_en().bit(enable).systimer_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_rst_en().bit(reset));" }, keep_enabled = true },
     { name = "Timg0", template_params = { default_clk_en_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_rst_en().bit(reset));" }, keep_enabled = true },

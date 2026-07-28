@@ -70,6 +70,7 @@ peripherals = [
     { name = "PMU" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
@@ -270,8 +271,8 @@ key_length = { options = [
 ] }
 
 [device.rsa]
-support_status = "not_supported"
-version = 3 # TODO verify
+support_status = "partial"
+version = 3 # v3-shaped, but contains RSA_CLK_FORCE_ON_REG
 size_increment = 32
 memory_size_bytes = 512
 
