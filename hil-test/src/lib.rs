@@ -113,7 +113,8 @@ macro_rules! unconnected_pin {
             esp32c2 => $peripherals.GPIO8,
             esp32c5 => $peripherals.GPIO28,
             esp32p4 => $peripherals.GPIO35,
-            // esp32c3, esp32c6, esp32c61, esp32h2, esp32s31
+            esp32s31 => $peripherals.GPIO61,
+            // esp32c3, esp32c6, esp32c61, esp32h2
             _ => $peripherals.GPIO9,
         }
     }};
