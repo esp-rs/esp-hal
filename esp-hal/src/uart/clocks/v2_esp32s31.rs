@@ -52,28 +52,21 @@ impl UartInstance {
         };
         uart.conf0().modify(|_, w| w.mem_clk_en().bit(en));
 
-        // UART0 has a different reset state from UART1-3, so its PAC register
-        // has a different type even though the fields have the same layout.
-        macro_rules! set_memory_power {
-            ($register:expr) => {
-                $register.modify(|_, w| unsafe {
-                    w.mem_lp_mode()
-                        .bits(2)
-                        .mem_lp_en()
-                        .bit(!en)
-                        .mem_force_ctrl()
-                        .set_bit()
-                })
-            };
-        }
-
         let regs = HP_SYS::regs();
-        match self {
-            UartInstance::Uart0 => set_memory_power!(regs.uart0_mem_lp_ctrl()),
-            UartInstance::Uart1 => set_memory_power!(regs.uart1_mem_lp_ctrl()),
-            UartInstance::Uart2 => set_memory_power!(regs.uart2_mem_lp_ctrl()),
-            UartInstance::Uart3 => set_memory_power!(regs.uart3_mem_lp_ctrl()),
+        let memory = match self {
+            UartInstance::Uart0 => regs.uart0_mem_lp_ctrl(),
+            UartInstance::Uart1 => regs.uart1_mem_lp_ctrl(),
+            UartInstance::Uart2 => regs.uart2_mem_lp_ctrl(),
+            UartInstance::Uart3 => regs.uart3_mem_lp_ctrl(),
         };
+        memory.modify(|_, w| unsafe {
+            w.mem_lp_mode()
+                .bits(2)
+                .mem_lp_en()
+                .bit(!en)
+                .mem_force_ctrl()
+                .set_bit()
+        });
     }
 
     pub(crate) fn configure_mem_clock_impl(
